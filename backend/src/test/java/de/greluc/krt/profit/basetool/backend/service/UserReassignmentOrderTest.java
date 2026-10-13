@@ -97,7 +97,9 @@ class UserReassignmentOrderTest {
           "170:OperationUserReassignment||operation_payout_status.paid_out_by_user_id",
           "180:IdentityUserReassignment||app_user.approved_by_id,user_approval_event.user_id,"
               + "user_approval_event.decided_by_id,deletion_request.user_id,"
-              + "deletion_request.decided_by_id,user_roles.user_id,terms_acceptance.user_id");
+              + "deletion_request.decided_by_id,user_roles.user_id,terms_acceptance.user_id",
+          "190:SupplyUserReassignment|supply_donation.donor_user_id,supply_donation.received_by,"
+              + "supply_need.created_by|");
 
   @Autowired private UserAccountMergeService mergeService;
 
@@ -123,7 +125,7 @@ class UserReassignmentOrderTest {
   void noColumnIsDeclaredTwice() {
     List<String> all = new ArrayList<>(mergeService.followedColumns());
     all.addAll(mergeService.staysWithTheAct());
-    assertThat(all).doesNotHaveDuplicates().hasSize(58);
+    assertThat(all).doesNotHaveDuplicates().hasSize(61);
   }
 
   private static List<String> describe(List<UserReassignmentParticipant> participants) {

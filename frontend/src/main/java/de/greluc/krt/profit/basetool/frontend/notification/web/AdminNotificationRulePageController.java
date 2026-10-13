@@ -137,7 +137,11 @@ public class AdminNotificationRulePageController {
           "EXCHANGE_CLIENT_UPDATE_REQUIRED",
           "EXCHANGE_CLIENT_CAPABILITY_REMOVED",
           "EXCHANGE_SWITCHED_OFF",
-          "EXCHANGE_SWITCHED_ON");
+          "EXCHANGE_SWITCHED_ON",
+          "SUPPLY_DONATION_PLEDGED",
+          "SUPPLY_DONATION_RECEIVED",
+          "SUPPLY_DONATION_DECLINED",
+          "SUPPLY_DONATION_WITHDRAWN");
 
   /**
    * {@code NotificationType} codes, labelled via {@code admin.notificationRules.notificationType}.
@@ -202,7 +206,10 @@ public class AdminNotificationRulePageController {
           "EXCHANGE_CLIENT_ACTIVATED",
           "EXCHANGE_CLIENT_UPDATE_REQUIRED",
           "EXCHANGE_CLIENT_CAPABILITY_REMOVED",
-          "EXCHANGE_SWITCHED_OFF");
+          "EXCHANGE_SWITCHED_OFF",
+          "SUPPLY_DONATION_PLEDGED",
+          "SUPPLY_DONATION_RECEIVED",
+          "SUPPLY_DONATION_DECLINED");
 
   /**
    * {@code SelectorKind} codes, labelled via {@code admin.notificationRules.selector.kind}. All but

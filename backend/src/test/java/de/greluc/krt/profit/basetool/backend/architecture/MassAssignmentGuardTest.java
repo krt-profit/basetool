@@ -69,6 +69,9 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronDto;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderCreateRequest;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStoreItemDto;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.supply.internal.CreateNeedRequest;
+import de.greluc.krt.profit.basetool.backend.supply.internal.PledgeRequest;
+import de.greluc.krt.profit.basetool.backend.supply.internal.RecordDonationRequest;
 import de.greluc.krt.profit.basetool.guardfixture.massassignment.FixtureMassAssignmentController;
 import de.greluc.krt.profit.basetool.guardfixture.massassignment.FixtureNestedRequest;
 import de.greluc.krt.profit.basetool.guardfixture.massassignment.FixtureOrderDto;
@@ -203,6 +206,24 @@ class MassAssignmentGuardTest {
           Map.entry(
               ReassignResponsibleOrgUnitRequest.class,
               Map.of("responsibleOrgUnitId", JOB_ORDER_UNITS)),
+          Map.entry(
+              CreateNeedRequest.class,
+              Map.of(
+                  "orgUnitId",
+                  "the raising unit, authorised by SupplyNeedService.create through"
+                      + " canManageUnit")),
+          Map.entry(
+              PledgeRequest.class,
+              Map.of(
+                  "receivingOrgUnitId",
+                  "the receiving unit, which SupplyDonationService.pledge checks accepts"
+                      + " donations")),
+          Map.entry(
+              RecordDonationRequest.class,
+              Map.of(
+                  "receivingOrgUnitId",
+                  "the receiving unit, authorised by SupplyDonationService.record through"
+                      + " canManageUnit")),
           Map.entry(AddExternalParticipantRequest.class, Map.of("orgUnitIds", AFFILIATION)),
           Map.entry(UpdateParticipantRequest.class, Map.of("orgUnitIds", AFFILIATION)),
           Map.entry(BulkOrgUnitChangeRequest.class, Map.of("targetOwningOrgUnitId", MOVE_TARGET)),

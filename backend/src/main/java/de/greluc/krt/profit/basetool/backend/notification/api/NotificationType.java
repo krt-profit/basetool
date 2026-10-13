@@ -378,7 +378,26 @@ public enum NotificationType {
    * The exchange was switched off (REQ-XCH-041); connected applications cannot read or write until
    * it is on again.
    */
-  EXCHANGE_SWITCHED_OFF;
+  EXCHANGE_SWITCHED_OFF,
+
+  /**
+   * A member pledged a material donation (REQ-SUP-016). The default rule notifies the lead and the
+   * Logisticians of the receiving unit, excluding the actor; superseded when the pledge is
+   * received, declined or withdrawn.
+   */
+  SUPPLY_DONATION_PLEDGED,
+
+  /**
+   * A receiving unit confirmed a donation, in full or in part (REQ-SUP-016). The default rule
+   * notifies the donor; rendered with the unit, the material and the received amount.
+   */
+  SUPPLY_DONATION_RECEIVED,
+
+  /**
+   * A receiving unit declined a pledge (REQ-SUP-016). The default rule notifies the donor; rendered
+   * with the unit, the material and the reason code.
+   */
+  SUPPLY_DONATION_DECLINED;
 
   /**
    * Whether a member may mute this type (REQ-NOTIF-027). The account-deletion types serve a legal
@@ -448,7 +467,10 @@ public enum NotificationType {
           EXCHANGE_CLIENT_ACTIVATED,
           EXCHANGE_CLIENT_UPDATE_REQUIRED,
           EXCHANGE_CLIENT_CAPABILITY_REMOVED,
-          EXCHANGE_SWITCHED_OFF ->
+          EXCHANGE_SWITCHED_OFF,
+          SUPPLY_DONATION_PLEDGED,
+          SUPPLY_DONATION_RECEIVED,
+          SUPPLY_DONATION_DECLINED ->
           true;
     };
   }

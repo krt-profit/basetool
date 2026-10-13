@@ -81,7 +81,8 @@ class ModularityTest {
           "privacy",
           "promotion",
           "refinery",
-          "scope");
+          "scope",
+          "supply");
 
   private static final int DECLARED_MODULE_FLOOR = 26;
 

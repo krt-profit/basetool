@@ -993,6 +993,34 @@ owner-only exactly like the interessenten of an offer (REQ-MARKET-015…020).
 role). Every Materialbörse mutation — offers and requests — is audited under `AuditDomain.MARKET` (see
 [`docs/specs/audit.md`](docs/specs/audit.md)).
 
+### 3.13 Bedarf & Spenden (supply, REQ-SUP-\*)
+
+The supply surface (`/supply/...`, group „Beschaffung") is off until an admin sets `supply.enabled`
+on `/admin/supply`; while it is off every endpoint except the state read and the admin endpoints
+answers `404`. Every controller is class-gated on `hasRole('KRT_MEMBER')`; the admin controller on
+`hasRole('ADMIN')`. Within that gate the unit-scoped writes are role-scoped in `SupplyAccessPolicy`
+(`canManageUnit`: the lead or a Logistician of the unit, or an admin), not tenant-scoped — a need is
+visible to every member. The purchase fields of a need (maximum unit price, purchased amount, UEX
+reference price) are returned only to the raising unit's managers, the governing leadership and a
+trade delegate.
+
+| Action                                                                      | Member | Log. / Lead of the unit | Governing leadership | Admin |
+|:----------------------------------------------------------------------------|:-------|:------------------------|:---------------------|:------|
+| See the `OPEN` needs                                                        | ✅      | ✅                       | ✅                    | ✅     |
+| See every state of a unit's needs                                           | —      | ✅ (own unit)            | ✅                    | ✅     |
+| See a need's purchase fields                                                | —      | ✅ (own unit)            | ✅                    | ✅     |
+| Raise / edit / pause / resume / withdraw a need                             | —      | ✅ (unit may raise)      | —                    | ✅ (unit may raise) |
+| Pledge a donation (optionally from an own Lager row), withdraw an own pledge | ✅      | ✅                       | ✅                    | ✅ ²   |
+| Receive / decline a pledge, record a received donation                      | —      | ✅ (receiving unit)      | —                    | ✅     |
+| See a unit's donations                                                      | —      | ✅ (own unit)            | ✅                    | ✅     |
+| See an anonymous donor's name                                               | donor  | —                       | ✅                    | ✅     |
+| Monthly statistics                                                          | own totals | ✅ (own unit)        | ✅ (all, per donor)   | ✅     |
+| Switch the surface on, mark units as raising / receiving                    | —      | —                       | —                    | ✅     |
+
+² An admin may withdraw any unreceived pledge. „Governing leadership" is the Bereichsleiter of the
+governing Bereich (`supply.governing_area_id`), the Organisationsleitung and an admin. Every supply
+mutation is audited under `AuditDomain.SUPPLY`.
+
 ---
 
 ## 4. Multi-OrgUnit visibility (scoping)

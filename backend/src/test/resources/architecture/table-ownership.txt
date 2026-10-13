@@ -114,6 +114,9 @@ ship hangar
 ship_type catalogue
 space_station catalogue
 star_system catalogue
+supply_donation supply
+supply_need supply
+supply_unit_setting supply
 system_setting admin
 terminal catalogue
 terms_acceptance identity

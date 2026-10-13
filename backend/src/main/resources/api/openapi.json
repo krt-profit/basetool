@@ -56,6 +56,8 @@
     "name" : "promotion"
   }, {
     "name" : "refinery"
+  }, {
+    "name" : "supply"
   } ],
   "paths" : {
     "/api/v1/announcements/current" : {
@@ -744,7 +746,7 @@
           "required" : true,
           "schema" : {
             "type" : "string",
-            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION", "ROLE", "PROMOTION", "MARKET", "HANGAR", "BLUEPRINT", "CONNECTED_APPS" ]
+            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION", "ROLE", "PROMOTION", "MARKET", "HANGAR", "BLUEPRINT", "CONNECTED_APPS", "SUPPLY" ]
           }
         }, {
           "in" : "query",
@@ -864,7 +866,7 @@
           "required" : true,
           "schema" : {
             "type" : "string",
-            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION", "ROLE", "PROMOTION", "MARKET", "HANGAR", "BLUEPRINT", "CONNECTED_APPS" ]
+            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION", "ROLE", "PROMOTION", "MARKET", "HANGAR", "BLUEPRINT", "CONNECTED_APPS", "SUPPLY" ]
           }
         }, {
           "in" : "query",
@@ -896,7 +898,7 @@
           "required" : false,
           "schema" : {
             "type" : "string",
-            "enum" : [ "INVENTORY_ITEM_CREATED", "INVENTORY_ITEM_UPDATED", "INVENTORY_ITEM_MERGED", "INVENTORY_ITEM_NOTE_UPDATED", "INVENTORY_ALLOCATION_ADDED", "INVENTORY_ALLOCATION_CHANGED", "INVENTORY_ALLOCATION_REMOVED", "INVENTORY_ITEM_CONSUMED", "INVENTORY_ITEM_TRANSFERRED", "INVENTORY_ITEM_SOLD", "INVENTORY_ITEM_DEPERSONALIZED", "INVENTORY_ITEM_PERSONALIZED", "INVENTORY_ITEM_DELIVERY_TOGGLED", "INVENTORY_BULK_CHECKED_OUT", "INVENTORY_BULK_REBOOKED", "INVENTORY_WIPED", "INVENTORY_RECEIVED_FROM_REFINERY", "INVENTORY_RECEIVED_FROM_PRODUCTION", "INVENTORY_HANDED_OVER", "INVENTORY_CONSUMED_BY_PRODUCTION", "INVENTORY_ORG_RESTAMPED", "INVENTORY_ORG_UNIT_CHANGED", "INVENTORY_BULK_ORG_UNIT_CHANGED", "INVENTORY_STOLEN_MARKED", "INVENTORY_STOLEN_UNMARKED", "INVENTORY_BULK_STOLEN_CHANGED", "INVENTORY_OWNER_REASSIGNED", "INVENTORY_PURGED_ON_USER_DELETION", "INVENTORY_AUDIT_EXPORTED", "INVENTORY_AUDIT_PURGED", "JOB_ORDER_CREATED", "JOB_ORDER_ITEM_CREATED", "JOB_ORDER_UPDATED", "JOB_ORDER_ITEM_UPDATED", "JOB_ORDER_STATUS_CHANGED", "JOB_ORDER_PRIORITY_CHANGED", "JOB_ORDER_BLUEPRINT_COUNTING_CHANGED", "JOB_ORDER_DELETED", "JOB_ORDER_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_ASSIGNEE_NOTE_SET", "JOB_ORDER_ASSIGNEE_NOTE_CLEARED", "JOB_ORDER_MATERIAL_UNLINKED", "JOB_ORDER_INVENTORY_UNLINKED", "JOB_ORDER_HANDOVER_CREATED", "JOB_ORDER_ITEM_HANDOVER_CREATED", "JOB_ORDER_PRODUCTION_BOOKED", "JOB_ORDER_CLAIM_UPSERTED", "JOB_ORDER_CLAIM_WITHDRAWN", "QUALITY_TIER_CREATED", "QUALITY_TIER_UPDATED", "QUALITY_TIER_DEACTIVATED", "QUALITY_TIER_DELETED", "JOB_ORDER_AUDIT_EXPORTED", "JOB_ORDER_AUDIT_PURGED", "REFINERY_ORDER_CREATED", "REFINERY_ORDER_UPDATED", "REFINERY_ORDER_CANCELED", "REFINERY_ORDER_STORED", "REFINERY_METHOD_CREATED", "REFINERY_METHOD_UPDATED", "REFINERY_METHOD_DELETED", "REFINERY_METHODS_SYNCED", "REFINERY_YIELDS_SYNCED", "REFINERY_ORDERS_REASSIGNED", "REFINERY_AUDIT_EXPORTED", "REFINERY_AUDIT_PURGED", "PERSONAL_INVENTORY_CREATED", "PERSONAL_INVENTORY_UPDATED", "PERSONAL_INVENTORY_DELETED", "PERSONAL_DATA_PURGED_ON_USER_DELETION", "PERSONAL_INVENTORY_AUDIT_EXPORTED", "PERSONAL_INVENTORY_AUDIT_PURGED", "MISSION_CREATED", "MISSION_UPDATED", "MISSION_DELETED", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_UPDATED", "MISSION_PARTICIPANT_CHECKED_IN", "MISSION_PARTICIPANT_CHECKED_OUT", "MISSION_UNIT_ADDED", "MISSION_UNIT_UPDATED", "MISSION_UNIT_REMOVED", "MISSION_CREW_ADDED", "MISSION_CREW_UPDATED", "MISSION_CREW_REMOVED", "MISSION_FREQUENCY_CHANGED", "MISSION_FREQUENCY_REMOVED", "MISSION_OWNER_CHANGED", "MISSION_OWNING_ORG_UNIT_CHANGED", "MISSION_PARTY_LEAD_CHANGED", "MISSION_MANAGER_ADDED", "MISSION_MANAGER_REMOVED", "MISSION_FINANCE_ENTRY_CREATED", "MISSION_FINANCE_ENTRY_UPDATED", "MISSION_FINANCE_ENTRY_DELETED", "MISSION_STEP_ADDED", "MISSION_STEP_UPDATED", "MISSION_STEP_REMOVED", "MISSION_STEP_REORDERED", "MISSION_STEP_DONE_CHANGED", "MISSION_OBJECTIVE_ADDED", "MISSION_OBJECTIVE_UPDATED", "MISSION_OBJECTIVE_REMOVED", "MISSION_OBJECTIVE_REORDERED", "MISSION_AUDIT_EXPORTED", "MISSION_AUDIT_PURGED", "OPERATION_CREATED", "OPERATION_UPDATED", "OPERATION_DELETED", "OPERATION_PAYOUT_TOGGLED", "OPERATION_AUDIT_EXPORTED", "OPERATION_AUDIT_PURGED", "MEMBERSHIP_GRANTED", "MEMBERSHIP_REVOKED", "ROLE_GRANTED", "ROLE_CHANGED", "ROLE_REVOKED", "CAPABILITY_FLAGS_CHANGED", "ROLE_PERMISSIONS_CHANGED", "KOMMANDO_GROUP_CREATED", "KOMMANDO_GROUP_UPDATED", "KOMMANDO_GROUP_DELETED", "USER_DELETED", "USER_MERGED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_WITHDRAWN", "ACCOUNT_DELETION_REQUEST_DECLINED", "ACCOUNT_DELETION_REQUEST_EXECUTED", "ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED", "HANDLE_SNAPSHOTS_ANONYMISED", "PERSON_SEARCH_PERFORMED", "PERSONAL_DATA_EXPORTED", "ROLE_AUDIT_EXPORTED", "ROLE_AUDIT_PURGED", "PROMOTION_TOPIC_CREATED", "PROMOTION_TOPIC_UPDATED", "PROMOTION_TOPIC_DELETED", "PROMOTION_CATEGORY_CREATED", "PROMOTION_CATEGORY_UPDATED", "PROMOTION_CATEGORY_DELETED", "PROMOTION_LEVEL_CONTENT_CREATED", "PROMOTION_LEVEL_CONTENT_UPDATED", "PROMOTION_LEVEL_CONTENT_DELETED", "PROMOTION_RANK_REQUIREMENT_CREATED", "PROMOTION_RANK_REQUIREMENT_UPDATED", "PROMOTION_RANK_REQUIREMENT_DELETED", "PROMOTION_EVALUATION_CREATED", "PROMOTION_EVALUATION_UPDATED", "PROMOTION_EVALUATION_DELETED", "PROMOTION_AUDIT_EXPORTED", "PROMOTION_AUDIT_PURGED", "MARKET_OFFER_RELEASED", "MARKET_OFFER_DEACTIVATED", "MARKET_OFFER_REDUCED", "MARKET_OFFER_REMOVED", "MARKET_REMARK_UPDATED", "MARKET_INTEREST_REGISTERED", "MARKET_INTEREST_WITHDRAWN", "MARKET_REQUEST_CREATED", "MARKET_REQUEST_UPDATED", "MARKET_REQUEST_DEACTIVATED", "MARKET_REQUEST_INTEREST_SIGNALLED", "MARKET_REQUEST_INTEREST_WITHDRAWN", "MARKET_AUDIT_EXPORTED", "MARKET_AUDIT_PURGED", "HANGAR_SHIP_CREATED", "HANGAR_SHIP_UPDATED", "HANGAR_SHIP_DELETED", "HANGAR_EMPTIED", "HANGAR_IMPORTED", "HANGAR_FITTED_RESET", "HANGAR_HOME_LOCATION_SET", "HANGAR_AUDIT_EXPORTED", "HANGAR_AUDIT_PURGED", "BLUEPRINT_ADDED", "BLUEPRINT_BATCH_ADDED", "BLUEPRINT_UPDATED", "BLUEPRINT_REMOVED", "BLUEPRINT_ALL_REMOVED", "BLUEPRINT_IMPORTED", "BLUEPRINT_SHARING_CHANGED", "BLUEPRINT_PURGED_ALL_USERS", "BLUEPRINT_DEFAULT_ADDED", "BLUEPRINT_DEFAULT_REMOVED", "BLUEPRINT_DEFAULTS_GRANTED", "BLUEPRINT_AUDIT_EXPORTED", "BLUEPRINT_AUDIT_PURGED", "EXCHANGE_CLIENT_CREATED", "EXCHANGE_CLIENT_UPDATED", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_SWITCH_CHANGED", "EXCHANGE_CLIENT_DISCONNECTED", "EXCHANGE_INSTALLATION_DISCONNECTED", "EXCHANGE_MEMBER_DEPARTED", "EXCHANGE_CHANGES_UNDONE", "EXCHANGE_MASS_CHANGE_CONFIRMED", "EXCHANGE_BULK_UNDO_STARTED", "EXCHANGE_BULK_UNDO_FINISHED", "EXCHANGE_CONNECTIONS_PURGED", "CONNECTED_APPS_AUDIT_EXPORTED", "CONNECTED_APPS_AUDIT_PURGED" ]
+            "enum" : [ "INVENTORY_ITEM_CREATED", "INVENTORY_ITEM_UPDATED", "INVENTORY_ITEM_MERGED", "INVENTORY_ITEM_NOTE_UPDATED", "INVENTORY_ALLOCATION_ADDED", "INVENTORY_ALLOCATION_CHANGED", "INVENTORY_ALLOCATION_REMOVED", "INVENTORY_ITEM_CONSUMED", "INVENTORY_ITEM_TRANSFERRED", "INVENTORY_ITEM_SOLD", "INVENTORY_ITEM_DEPERSONALIZED", "INVENTORY_ITEM_PERSONALIZED", "INVENTORY_ITEM_DELIVERY_TOGGLED", "INVENTORY_BULK_CHECKED_OUT", "INVENTORY_BULK_REBOOKED", "INVENTORY_WIPED", "INVENTORY_RECEIVED_FROM_REFINERY", "INVENTORY_RECEIVED_FROM_PRODUCTION", "INVENTORY_HANDED_OVER", "INVENTORY_CONSUMED_BY_PRODUCTION", "INVENTORY_ORG_RESTAMPED", "INVENTORY_ORG_UNIT_CHANGED", "INVENTORY_BULK_ORG_UNIT_CHANGED", "INVENTORY_STOLEN_MARKED", "INVENTORY_STOLEN_UNMARKED", "INVENTORY_BULK_STOLEN_CHANGED", "INVENTORY_OWNER_REASSIGNED", "INVENTORY_PURGED_ON_USER_DELETION", "INVENTORY_AUDIT_EXPORTED", "INVENTORY_AUDIT_PURGED", "JOB_ORDER_CREATED", "JOB_ORDER_ITEM_CREATED", "JOB_ORDER_UPDATED", "JOB_ORDER_ITEM_UPDATED", "JOB_ORDER_STATUS_CHANGED", "JOB_ORDER_PRIORITY_CHANGED", "JOB_ORDER_BLUEPRINT_COUNTING_CHANGED", "JOB_ORDER_DELETED", "JOB_ORDER_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_ASSIGNEE_NOTE_SET", "JOB_ORDER_ASSIGNEE_NOTE_CLEARED", "JOB_ORDER_MATERIAL_UNLINKED", "JOB_ORDER_INVENTORY_UNLINKED", "JOB_ORDER_HANDOVER_CREATED", "JOB_ORDER_ITEM_HANDOVER_CREATED", "JOB_ORDER_PRODUCTION_BOOKED", "JOB_ORDER_CLAIM_UPSERTED", "JOB_ORDER_CLAIM_WITHDRAWN", "QUALITY_TIER_CREATED", "QUALITY_TIER_UPDATED", "QUALITY_TIER_DEACTIVATED", "QUALITY_TIER_DELETED", "JOB_ORDER_AUDIT_EXPORTED", "JOB_ORDER_AUDIT_PURGED", "REFINERY_ORDER_CREATED", "REFINERY_ORDER_UPDATED", "REFINERY_ORDER_CANCELED", "REFINERY_ORDER_STORED", "REFINERY_METHOD_CREATED", "REFINERY_METHOD_UPDATED", "REFINERY_METHOD_DELETED", "REFINERY_METHODS_SYNCED", "REFINERY_YIELDS_SYNCED", "REFINERY_ORDERS_REASSIGNED", "REFINERY_AUDIT_EXPORTED", "REFINERY_AUDIT_PURGED", "PERSONAL_INVENTORY_CREATED", "PERSONAL_INVENTORY_UPDATED", "PERSONAL_INVENTORY_DELETED", "PERSONAL_DATA_PURGED_ON_USER_DELETION", "PERSONAL_INVENTORY_AUDIT_EXPORTED", "PERSONAL_INVENTORY_AUDIT_PURGED", "MISSION_CREATED", "MISSION_UPDATED", "MISSION_DELETED", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_UPDATED", "MISSION_PARTICIPANT_CHECKED_IN", "MISSION_PARTICIPANT_CHECKED_OUT", "MISSION_UNIT_ADDED", "MISSION_UNIT_UPDATED", "MISSION_UNIT_REMOVED", "MISSION_CREW_ADDED", "MISSION_CREW_UPDATED", "MISSION_CREW_REMOVED", "MISSION_FREQUENCY_CHANGED", "MISSION_FREQUENCY_REMOVED", "MISSION_OWNER_CHANGED", "MISSION_OWNING_ORG_UNIT_CHANGED", "MISSION_PARTY_LEAD_CHANGED", "MISSION_MANAGER_ADDED", "MISSION_MANAGER_REMOVED", "MISSION_FINANCE_ENTRY_CREATED", "MISSION_FINANCE_ENTRY_UPDATED", "MISSION_FINANCE_ENTRY_DELETED", "MISSION_STEP_ADDED", "MISSION_STEP_UPDATED", "MISSION_STEP_REMOVED", "MISSION_STEP_REORDERED", "MISSION_STEP_DONE_CHANGED", "MISSION_OBJECTIVE_ADDED", "MISSION_OBJECTIVE_UPDATED", "MISSION_OBJECTIVE_REMOVED", "MISSION_OBJECTIVE_REORDERED", "MISSION_AUDIT_EXPORTED", "MISSION_AUDIT_PURGED", "OPERATION_CREATED", "OPERATION_UPDATED", "OPERATION_DELETED", "OPERATION_PAYOUT_TOGGLED", "OPERATION_AUDIT_EXPORTED", "OPERATION_AUDIT_PURGED", "MEMBERSHIP_GRANTED", "MEMBERSHIP_REVOKED", "ROLE_GRANTED", "ROLE_CHANGED", "ROLE_REVOKED", "CAPABILITY_FLAGS_CHANGED", "ROLE_PERMISSIONS_CHANGED", "KOMMANDO_GROUP_CREATED", "KOMMANDO_GROUP_UPDATED", "KOMMANDO_GROUP_DELETED", "USER_DELETED", "USER_MERGED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_WITHDRAWN", "ACCOUNT_DELETION_REQUEST_DECLINED", "ACCOUNT_DELETION_REQUEST_EXECUTED", "ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED", "HANDLE_SNAPSHOTS_ANONYMISED", "PERSON_SEARCH_PERFORMED", "PERSONAL_DATA_EXPORTED", "ROLE_AUDIT_EXPORTED", "ROLE_AUDIT_PURGED", "PROMOTION_TOPIC_CREATED", "PROMOTION_TOPIC_UPDATED", "PROMOTION_TOPIC_DELETED", "PROMOTION_CATEGORY_CREATED", "PROMOTION_CATEGORY_UPDATED", "PROMOTION_CATEGORY_DELETED", "PROMOTION_LEVEL_CONTENT_CREATED", "PROMOTION_LEVEL_CONTENT_UPDATED", "PROMOTION_LEVEL_CONTENT_DELETED", "PROMOTION_RANK_REQUIREMENT_CREATED", "PROMOTION_RANK_REQUIREMENT_UPDATED", "PROMOTION_RANK_REQUIREMENT_DELETED", "PROMOTION_EVALUATION_CREATED", "PROMOTION_EVALUATION_UPDATED", "PROMOTION_EVALUATION_DELETED", "PROMOTION_AUDIT_EXPORTED", "PROMOTION_AUDIT_PURGED", "MARKET_OFFER_RELEASED", "MARKET_OFFER_DEACTIVATED", "MARKET_OFFER_REDUCED", "MARKET_OFFER_REMOVED", "MARKET_REMARK_UPDATED", "MARKET_INTEREST_REGISTERED", "MARKET_INTEREST_WITHDRAWN", "MARKET_REQUEST_CREATED", "MARKET_REQUEST_UPDATED", "MARKET_REQUEST_DEACTIVATED", "MARKET_REQUEST_INTEREST_SIGNALLED", "MARKET_REQUEST_INTEREST_WITHDRAWN", "MARKET_AUDIT_EXPORTED", "MARKET_AUDIT_PURGED", "HANGAR_SHIP_CREATED", "HANGAR_SHIP_UPDATED", "HANGAR_SHIP_DELETED", "HANGAR_EMPTIED", "HANGAR_IMPORTED", "HANGAR_FITTED_RESET", "HANGAR_HOME_LOCATION_SET", "HANGAR_AUDIT_EXPORTED", "HANGAR_AUDIT_PURGED", "BLUEPRINT_ADDED", "BLUEPRINT_BATCH_ADDED", "BLUEPRINT_UPDATED", "BLUEPRINT_REMOVED", "BLUEPRINT_ALL_REMOVED", "BLUEPRINT_IMPORTED", "BLUEPRINT_SHARING_CHANGED", "BLUEPRINT_PURGED_ALL_USERS", "BLUEPRINT_DEFAULT_ADDED", "BLUEPRINT_DEFAULT_REMOVED", "BLUEPRINT_DEFAULTS_GRANTED", "BLUEPRINT_AUDIT_EXPORTED", "BLUEPRINT_AUDIT_PURGED", "EXCHANGE_CLIENT_CREATED", "EXCHANGE_CLIENT_UPDATED", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_SWITCH_CHANGED", "EXCHANGE_CLIENT_DISCONNECTED", "EXCHANGE_INSTALLATION_DISCONNECTED", "EXCHANGE_MEMBER_DEPARTED", "EXCHANGE_CHANGES_UNDONE", "EXCHANGE_MASS_CHANGE_CONFIRMED", "EXCHANGE_BULK_UNDO_STARTED", "EXCHANGE_BULK_UNDO_FINISHED", "EXCHANGE_CONNECTIONS_PURGED", "CONNECTED_APPS_AUDIT_EXPORTED", "CONNECTED_APPS_AUDIT_PURGED", "NEED_RAISED", "NEED_UPDATED", "NEED_PAUSED", "NEED_RESUMED", "NEED_WITHDRAWN", "NEED_FULFILLED", "DONATION_PLEDGED", "DONATION_RECEIVED", "DONATION_DECLINED", "DONATION_WITHDRAWN", "DONATION_RECORDED", "SUPPLY_UNIT_SETTING_CHANGED", "SUPPLY_SETTINGS_CHANGED", "SUPPLY_AUDIT_EXPORTED", "SUPPLY_AUDIT_PURGED" ]
           }
         }, {
           "in" : "query",
@@ -1048,7 +1050,7 @@
           "required" : true,
           "schema" : {
             "type" : "string",
-            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION", "ROLE", "PROMOTION", "MARKET", "HANGAR", "BLUEPRINT", "CONNECTED_APPS" ]
+            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION", "ROLE", "PROMOTION", "MARKET", "HANGAR", "BLUEPRINT", "CONNECTED_APPS", "SUPPLY" ]
           }
         }, {
           "in" : "query",
@@ -1193,7 +1195,7 @@
           "required" : true,
           "schema" : {
             "type" : "string",
-            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION", "ROLE", "PROMOTION", "MARKET", "HANGAR", "BLUEPRINT", "CONNECTED_APPS" ]
+            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION", "ROLE", "PROMOTION", "MARKET", "HANGAR", "BLUEPRINT", "CONNECTED_APPS", "SUPPLY" ]
           }
         }, {
           "in" : "query",
@@ -9920,7 +9922,7 @@
     },
     "/api/v1/blueprints/admin/defaults" : {
       "get" : {
-        "operationId" : "list_8",
+        "operationId" : "list_9",
         "responses" : {
           "200" : {
             "content" : {
@@ -12502,7 +12504,7 @@
     },
     "/api/v1/connected-apps" : {
       "get" : {
-        "operationId" : "list_11",
+        "operationId" : "list_12",
         "responses" : {
           "200" : {
             "content" : {
@@ -13984,7 +13986,7 @@
       },
       "put" : {
         "description" : "Switching off reaches the gateway's mirror before the commit or not at all.",
-        "operationId" : "updateSettings",
+        "operationId" : "updateSettings_1",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -24447,7 +24449,7 @@
         "x-domain" : "catalogue"
       },
       "post" : {
-        "operationId" : "create_7",
+        "operationId" : "create_8",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -24793,7 +24795,7 @@
         "x-domain" : "catalogue"
       },
       "put" : {
-        "operationId" : "update_8",
+        "operationId" : "update_9",
         "parameters" : [ {
           "in" : "path",
           "name" : "id",
@@ -36795,7 +36797,7 @@
     },
     "/api/v1/notifications" : {
       "get" : {
-        "operationId" : "list_10",
+        "operationId" : "list_11",
         "parameters" : [ {
           "in" : "query",
           "name" : "page",
@@ -36935,7 +36937,7 @@
     },
     "/api/v1/notifications/admin/rules" : {
       "get" : {
-        "operationId" : "list_7",
+        "operationId" : "list_8",
         "responses" : {
           "200" : {
             "content" : {
@@ -37052,7 +37054,7 @@
         "x-domain" : "notification"
       },
       "post" : {
-        "operationId" : "create_6",
+        "operationId" : "create_7",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -37278,7 +37280,7 @@
         "x-domain" : "notification"
       },
       "get" : {
-        "operationId" : "get_5",
+        "operationId" : "get_6",
         "parameters" : [ {
           "in" : "path",
           "name" : "id",
@@ -37401,7 +37403,7 @@
         "x-domain" : "notification"
       },
       "put" : {
-        "operationId" : "update_7",
+        "operationId" : "update_8",
         "parameters" : [ {
           "in" : "path",
           "name" : "id",
@@ -37654,7 +37656,7 @@
           "required" : true,
           "schema" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "BANK_BOOKING_REQUEST_UPDATED", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER", "MISSION_CHECKIN_OPEN", "MISSION_PARTICIPANT_ADDED_BY_OTHER", "MISSION_PARTICIPANT_REMOVED_BY_OTHER", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_PAID_OUT", "OPERATION_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "BANK_BOOKING_REQUEST_APPROVED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_RECEIVED", "BANK_HOLDER_TRANSFER_RECEIVED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED", "HANGAR_SHIP_REMOVED_FROM_UNIT", "HANGAR_FITTED_RESET", "HANGAR_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF" ]
+            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "BANK_BOOKING_REQUEST_UPDATED", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER", "MISSION_CHECKIN_OPEN", "MISSION_PARTICIPANT_ADDED_BY_OTHER", "MISSION_PARTICIPANT_REMOVED_BY_OTHER", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_PAID_OUT", "OPERATION_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "BANK_BOOKING_REQUEST_APPROVED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_RECEIVED", "BANK_HOLDER_TRANSFER_RECEIVED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED", "HANGAR_SHIP_REMOVED_FROM_UNIT", "HANGAR_FITTED_RESET", "HANGAR_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF", "SUPPLY_DONATION_PLEDGED", "SUPPLY_DONATION_RECEIVED", "SUPPLY_DONATION_DECLINED" ]
           }
         } ],
         "requestBody" : {
@@ -40893,7 +40895,7 @@
     },
     "/api/v1/orders/settings" : {
       "get" : {
-        "operationId" : "settings_1",
+        "operationId" : "settings_2",
         "responses" : {
           "200" : {
             "content" : {
@@ -48884,7 +48886,7 @@
         "x-domain" : "blueprint"
       },
       "get" : {
-        "operationId" : "list_6",
+        "operationId" : "list_7",
         "parameters" : [ {
           "in" : "query",
           "name" : "page",
@@ -51028,7 +51030,7 @@
         "x-domain" : "blueprint"
       },
       "put" : {
-        "operationId" : "update_6",
+        "operationId" : "update_7",
         "parameters" : [ {
           "in" : "path",
           "name" : "id",
@@ -51280,7 +51282,7 @@
     },
     "/api/v1/personal-inventory" : {
       "get" : {
-        "operationId" : "list_5",
+        "operationId" : "list_6",
         "parameters" : [ {
           "in" : "query",
           "name" : "page",
@@ -51425,7 +51427,7 @@
         "x-domain" : "personalinventory"
       },
       "post" : {
-        "operationId" : "create_5",
+        "operationId" : "create_6",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -52166,7 +52168,7 @@
         "x-domain" : "personalinventory"
       },
       "get" : {
-        "operationId" : "get_4",
+        "operationId" : "get_5",
         "parameters" : [ {
           "in" : "path",
           "name" : "id",
@@ -52289,7 +52291,7 @@
         "x-domain" : "personalinventory"
       },
       "put" : {
-        "operationId" : "update_5",
+        "operationId" : "update_6",
         "parameters" : [ {
           "in" : "path",
           "name" : "id",
@@ -52924,7 +52926,7 @@
     },
     "/api/v1/promotion/categories" : {
       "get" : {
-        "operationId" : "list_4",
+        "operationId" : "list_5",
         "parameters" : [ {
           "in" : "query",
           "name" : "page",
@@ -53062,7 +53064,7 @@
         "x-domain" : "promotion"
       },
       "post" : {
-        "operationId" : "create_4",
+        "operationId" : "create_5",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -53564,7 +53566,7 @@
         "x-domain" : "promotion"
       },
       "get" : {
-        "operationId" : "get_3",
+        "operationId" : "get_4",
         "parameters" : [ {
           "in" : "path",
           "name" : "id",
@@ -53687,7 +53689,7 @@
         "x-domain" : "promotion"
       },
       "put" : {
-        "operationId" : "update_4",
+        "operationId" : "update_5",
         "parameters" : [ {
           "in" : "path",
           "name" : "id",
@@ -54980,7 +54982,7 @@
     },
     "/api/v1/promotion/level-contents" : {
       "get" : {
-        "operationId" : "list_3",
+        "operationId" : "list_4",
         "parameters" : [ {
           "in" : "query",
           "name" : "page",
@@ -55118,7 +55120,7 @@
         "x-domain" : "promotion"
       },
       "post" : {
-        "operationId" : "create_3",
+        "operationId" : "create_4",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -55472,7 +55474,7 @@
         "x-domain" : "promotion"
       },
       "get" : {
-        "operationId" : "get_2",
+        "operationId" : "get_3",
         "parameters" : [ {
           "in" : "path",
           "name" : "id",
@@ -55595,7 +55597,7 @@
         "x-domain" : "promotion"
       },
       "put" : {
-        "operationId" : "update_3",
+        "operationId" : "update_4",
         "parameters" : [ {
           "in" : "path",
           "name" : "id",
@@ -55722,7 +55724,7 @@
     },
     "/api/v1/promotion/rank-requirements" : {
       "get" : {
-        "operationId" : "list_2",
+        "operationId" : "list_3",
         "parameters" : [ {
           "in" : "query",
           "name" : "page",
@@ -55860,7 +55862,7 @@
         "x-domain" : "promotion"
       },
       "post" : {
-        "operationId" : "create_2",
+        "operationId" : "create_3",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -56222,7 +56224,7 @@
         "x-domain" : "promotion"
       },
       "get" : {
-        "operationId" : "get_1",
+        "operationId" : "get_2",
         "parameters" : [ {
           "in" : "path",
           "name" : "id",
@@ -56345,7 +56347,7 @@
         "x-domain" : "promotion"
       },
       "put" : {
-        "operationId" : "update_2",
+        "operationId" : "update_3",
         "parameters" : [ {
           "in" : "path",
           "name" : "id",
@@ -56472,7 +56474,7 @@
     },
     "/api/v1/promotion/topics" : {
       "get" : {
-        "operationId" : "list_1",
+        "operationId" : "list_2",
         "parameters" : [ {
           "in" : "query",
           "name" : "page",
@@ -56610,7 +56612,7 @@
         "x-domain" : "promotion"
       },
       "post" : {
-        "operationId" : "create_1",
+        "operationId" : "create_2",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -56955,7 +56957,7 @@
         "x-domain" : "promotion"
       },
       "get" : {
-        "operationId" : "get",
+        "operationId" : "get_1",
         "parameters" : [ {
           "in" : "path",
           "name" : "id",
@@ -57078,7 +57080,7 @@
         "x-domain" : "promotion"
       },
       "put" : {
-        "operationId" : "update_1",
+        "operationId" : "update_2",
         "parameters" : [ {
           "in" : "path",
           "name" : "id",
@@ -58015,7 +58017,7 @@
     },
     "/api/v1/refinery-orders/settings" : {
       "get" : {
-        "operationId" : "settings",
+        "operationId" : "settings_1",
         "responses" : {
           "200" : {
             "content" : {
@@ -63836,7 +63838,7 @@
     },
     "/api/v1/squadrons/{squadronId}/kommando-groups" : {
       "get" : {
-        "operationId" : "list",
+        "operationId" : "list_1",
         "parameters" : [ {
           "in" : "path",
           "name" : "squadronId",
@@ -63968,7 +63970,7 @@
         "x-domain" : "orgunit"
       },
       "post" : {
-        "operationId" : "create",
+        "operationId" : "create_1",
         "parameters" : [ {
           "in" : "path",
           "name" : "squadronId",
@@ -64205,7 +64207,7 @@
         "x-domain" : "orgunit"
       },
       "put" : {
-        "operationId" : "update",
+        "operationId" : "update_1",
         "parameters" : [ {
           "in" : "path",
           "name" : "squadronId",
@@ -65205,6 +65207,2869 @@
         "tags" : [ "catalogue" ],
         "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
+      }
+    },
+    "/api/v1/supply/admin/settings" : {
+      "get" : {
+        "operationId" : "settings",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SupplySettingsDto"
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Read the supply runtime settings",
+        "tags" : [ "supply" ],
+        "x-contract-tier" : "T2",
+        "x-domain" : "supply"
+      },
+      "put" : {
+        "operationId" : "updateSettings",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateSupplySettingsRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SupplySettingsDto"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Store the supply runtime settings",
+        "tags" : [ "supply" ],
+        "x-contract-tier" : "T2",
+        "x-domain" : "supply"
+      }
+    },
+    "/api/v1/supply/admin/units" : {
+      "get" : {
+        "operationId" : "units_1",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/SupplyUnitDto"
+                  }
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "List every org unit with its supply setting",
+        "tags" : [ "supply" ],
+        "x-contract-tier" : "T2",
+        "x-domain" : "supply"
+      }
+    },
+    "/api/v1/supply/admin/units/{orgUnitId}" : {
+      "put" : {
+        "operationId" : "updateUnit",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "orgUnitId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateSupplyUnitRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SupplyUnitDto"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Set what an org unit does in the supply module",
+        "tags" : [ "supply" ],
+        "x-contract-tier" : "T2",
+        "x-domain" : "supply"
+      }
+    },
+    "/api/v1/supply/donations" : {
+      "get" : {
+        "operationId" : "listForUnit",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "orgUnitId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "status",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "PLEDGED", "RECEIVED", "PARTIALLY_RECEIVED", "DECLINED", "WITHDRAWN" ]
+            },
+            "uniqueItems" : true
+          }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseDonationDto"
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "List the donations of a receiving unit (paged)",
+        "tags" : [ "supply" ],
+        "x-contract-tier" : "T2",
+        "x-domain" : "supply"
+      },
+      "post" : {
+        "operationId" : "pledge",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PledgeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DonationDto"
+                }
+              }
+            },
+            "description" : "Created"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Pledge a material donation",
+        "tags" : [ "supply" ],
+        "x-contract-tier" : "T2",
+        "x-domain" : "supply"
+      }
+    },
+    "/api/v1/supply/donations/recorded" : {
+      "post" : {
+        "operationId" : "record",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RecordDonationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DonationDto"
+                }
+              }
+            },
+            "description" : "Created"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Record a donation the unit already received",
+        "tags" : [ "supply" ],
+        "x-contract-tier" : "T2",
+        "x-domain" : "supply"
+      }
+    },
+    "/api/v1/supply/donations/{id}/decline" : {
+      "post" : {
+        "operationId" : "decline_1",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DeclineDonationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DonationDto"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Decline a pledged donation",
+        "tags" : [ "supply" ],
+        "x-contract-tier" : "T2",
+        "x-domain" : "supply"
+      }
+    },
+    "/api/v1/supply/donations/{id}/receive" : {
+      "post" : {
+        "operationId" : "receive",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ReceiveDonationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DonationDto"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Confirm the receipt of a pledged donation",
+        "tags" : [ "supply" ],
+        "x-contract-tier" : "T2",
+        "x-domain" : "supply"
+      }
+    },
+    "/api/v1/supply/donations/{id}/withdraw" : {
+      "post" : {
+        "operationId" : "withdraw_2",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DonationDto"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Withdraw a pledged donation",
+        "tags" : [ "supply" ],
+        "x-contract-tier" : "T2",
+        "x-domain" : "supply"
+      }
+    },
+    "/api/v1/supply/me/donations" : {
+      "get" : {
+        "operationId" : "listMine",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "status",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "PLEDGED", "RECEIVED", "PARTIALLY_RECEIVED", "DECLINED", "WITHDRAWN" ]
+            },
+            "uniqueItems" : true
+          }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseDonationDto"
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "List the caller's own donations (paged)",
+        "tags" : [ "supply" ],
+        "x-contract-tier" : "T2",
+        "x-domain" : "supply"
+      }
+    },
+    "/api/v1/supply/me/donations/stats" : {
+      "get" : {
+        "operationId" : "myStats",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MyDonationStatsDto"
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Read the caller's own donation totals",
+        "tags" : [ "supply" ],
+        "x-contract-tier" : "T2",
+        "x-domain" : "supply"
+      }
+    },
+    "/api/v1/supply/needs" : {
+      "get" : {
+        "operationId" : "list",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "orgUnitId",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "status",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "OPEN", "PAUSED", "FULFILLED", "WITHDRAWN" ]
+            },
+            "uniqueItems" : true
+          }
+        }, {
+          "in" : "query",
+          "name" : "purchasable",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean"
+          }
+        }, {
+          "in" : "query",
+          "name" : "materialId",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseNeedDto"
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "List the needs the caller may see (paged)",
+        "tags" : [ "supply" ],
+        "x-contract-tier" : "T2",
+        "x-domain" : "supply"
+      },
+      "post" : {
+        "operationId" : "create",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateNeedRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/NeedDto"
+                }
+              }
+            },
+            "description" : "Created"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Raise a need",
+        "tags" : [ "supply" ],
+        "x-contract-tier" : "T2",
+        "x-domain" : "supply"
+      }
+    },
+    "/api/v1/supply/needs/open" : {
+      "get" : {
+        "operationId" : "open",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "orgUnitId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/NeedDto"
+                  }
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "List the open needs of one raising unit",
+        "tags" : [ "supply" ],
+        "x-contract-tier" : "T2",
+        "x-domain" : "supply"
+      }
+    },
+    "/api/v1/supply/needs/{id}" : {
+      "get" : {
+        "operationId" : "get",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/NeedDto"
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Read one need",
+        "tags" : [ "supply" ],
+        "x-contract-tier" : "T2",
+        "x-domain" : "supply"
+      },
+      "put" : {
+        "operationId" : "update",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateNeedRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/NeedDto"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Edit an open or paused need",
+        "tags" : [ "supply" ],
+        "x-contract-tier" : "T2",
+        "x-domain" : "supply"
+      }
+    },
+    "/api/v1/supply/needs/{id}/pause" : {
+      "post" : {
+        "operationId" : "pause",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/NeedDto"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Pause an open need",
+        "tags" : [ "supply" ],
+        "x-contract-tier" : "T2",
+        "x-domain" : "supply"
+      }
+    },
+    "/api/v1/supply/needs/{id}/resume" : {
+      "post" : {
+        "operationId" : "resume",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/NeedDto"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Resume a paused need",
+        "tags" : [ "supply" ],
+        "x-contract-tier" : "T2",
+        "x-domain" : "supply"
+      }
+    },
+    "/api/v1/supply/needs/{id}/withdraw" : {
+      "post" : {
+        "operationId" : "withdraw_1",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/NeedDto"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Withdraw a need",
+        "tags" : [ "supply" ],
+        "x-contract-tier" : "T2",
+        "x-domain" : "supply"
+      }
+    },
+    "/api/v1/supply/state" : {
+      "get" : {
+        "operationId" : "state",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SupplyStateDto"
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Read whether the supply surface is switched on",
+        "tags" : [ "supply" ],
+        "x-contract-tier" : "T2",
+        "x-domain" : "supply"
+      }
+    },
+    "/api/v1/supply/stats" : {
+      "get" : {
+        "operationId" : "stats",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "months",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 6
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SupplyStatsDto"
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Read the donation statistics per receiving unit and month",
+        "tags" : [ "supply" ],
+        "x-contract-tier" : "T2",
+        "x-domain" : "supply"
+      }
+    },
+    "/api/v1/supply/units" : {
+      "get" : {
+        "operationId" : "units",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/SupplyUnitDto"
+                  }
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "List the units that raise needs or accept donations",
+        "tags" : [ "supply" ],
+        "x-contract-tier" : "T2",
+        "x-domain" : "supply"
       }
     },
     "/api/v1/terminals" : {
@@ -67421,7 +70286,7 @@
     },
     "/api/v1/users/admin/registrations" : {
       "get" : {
-        "operationId" : "list_9",
+        "operationId" : "list_10",
         "parameters" : [ {
           "in" : "query",
           "name" : "status",
@@ -71059,11 +73924,11 @@
           },
           "domain" : {
             "type" : "string",
-            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION", "ROLE", "PROMOTION", "MARKET", "HANGAR", "BLUEPRINT", "CONNECTED_APPS" ]
+            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION", "ROLE", "PROMOTION", "MARKET", "HANGAR", "BLUEPRINT", "CONNECTED_APPS", "SUPPLY" ]
           },
           "eventType" : {
             "type" : "string",
-            "enum" : [ "INVENTORY_ITEM_CREATED", "INVENTORY_ITEM_UPDATED", "INVENTORY_ITEM_MERGED", "INVENTORY_ITEM_NOTE_UPDATED", "INVENTORY_ALLOCATION_ADDED", "INVENTORY_ALLOCATION_CHANGED", "INVENTORY_ALLOCATION_REMOVED", "INVENTORY_ITEM_CONSUMED", "INVENTORY_ITEM_TRANSFERRED", "INVENTORY_ITEM_SOLD", "INVENTORY_ITEM_DEPERSONALIZED", "INVENTORY_ITEM_PERSONALIZED", "INVENTORY_ITEM_DELIVERY_TOGGLED", "INVENTORY_BULK_CHECKED_OUT", "INVENTORY_BULK_REBOOKED", "INVENTORY_WIPED", "INVENTORY_RECEIVED_FROM_REFINERY", "INVENTORY_RECEIVED_FROM_PRODUCTION", "INVENTORY_HANDED_OVER", "INVENTORY_CONSUMED_BY_PRODUCTION", "INVENTORY_ORG_RESTAMPED", "INVENTORY_ORG_UNIT_CHANGED", "INVENTORY_BULK_ORG_UNIT_CHANGED", "INVENTORY_STOLEN_MARKED", "INVENTORY_STOLEN_UNMARKED", "INVENTORY_BULK_STOLEN_CHANGED", "INVENTORY_OWNER_REASSIGNED", "INVENTORY_PURGED_ON_USER_DELETION", "INVENTORY_AUDIT_EXPORTED", "INVENTORY_AUDIT_PURGED", "JOB_ORDER_CREATED", "JOB_ORDER_ITEM_CREATED", "JOB_ORDER_UPDATED", "JOB_ORDER_ITEM_UPDATED", "JOB_ORDER_STATUS_CHANGED", "JOB_ORDER_PRIORITY_CHANGED", "JOB_ORDER_BLUEPRINT_COUNTING_CHANGED", "JOB_ORDER_DELETED", "JOB_ORDER_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_ASSIGNEE_NOTE_SET", "JOB_ORDER_ASSIGNEE_NOTE_CLEARED", "JOB_ORDER_MATERIAL_UNLINKED", "JOB_ORDER_INVENTORY_UNLINKED", "JOB_ORDER_HANDOVER_CREATED", "JOB_ORDER_ITEM_HANDOVER_CREATED", "JOB_ORDER_PRODUCTION_BOOKED", "JOB_ORDER_CLAIM_UPSERTED", "JOB_ORDER_CLAIM_WITHDRAWN", "QUALITY_TIER_CREATED", "QUALITY_TIER_UPDATED", "QUALITY_TIER_DEACTIVATED", "QUALITY_TIER_DELETED", "JOB_ORDER_AUDIT_EXPORTED", "JOB_ORDER_AUDIT_PURGED", "REFINERY_ORDER_CREATED", "REFINERY_ORDER_UPDATED", "REFINERY_ORDER_CANCELED", "REFINERY_ORDER_STORED", "REFINERY_METHOD_CREATED", "REFINERY_METHOD_UPDATED", "REFINERY_METHOD_DELETED", "REFINERY_METHODS_SYNCED", "REFINERY_YIELDS_SYNCED", "REFINERY_ORDERS_REASSIGNED", "REFINERY_AUDIT_EXPORTED", "REFINERY_AUDIT_PURGED", "PERSONAL_INVENTORY_CREATED", "PERSONAL_INVENTORY_UPDATED", "PERSONAL_INVENTORY_DELETED", "PERSONAL_DATA_PURGED_ON_USER_DELETION", "PERSONAL_INVENTORY_AUDIT_EXPORTED", "PERSONAL_INVENTORY_AUDIT_PURGED", "MISSION_CREATED", "MISSION_UPDATED", "MISSION_DELETED", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_UPDATED", "MISSION_PARTICIPANT_CHECKED_IN", "MISSION_PARTICIPANT_CHECKED_OUT", "MISSION_UNIT_ADDED", "MISSION_UNIT_UPDATED", "MISSION_UNIT_REMOVED", "MISSION_CREW_ADDED", "MISSION_CREW_UPDATED", "MISSION_CREW_REMOVED", "MISSION_FREQUENCY_CHANGED", "MISSION_FREQUENCY_REMOVED", "MISSION_OWNER_CHANGED", "MISSION_OWNING_ORG_UNIT_CHANGED", "MISSION_PARTY_LEAD_CHANGED", "MISSION_MANAGER_ADDED", "MISSION_MANAGER_REMOVED", "MISSION_FINANCE_ENTRY_CREATED", "MISSION_FINANCE_ENTRY_UPDATED", "MISSION_FINANCE_ENTRY_DELETED", "MISSION_STEP_ADDED", "MISSION_STEP_UPDATED", "MISSION_STEP_REMOVED", "MISSION_STEP_REORDERED", "MISSION_STEP_DONE_CHANGED", "MISSION_OBJECTIVE_ADDED", "MISSION_OBJECTIVE_UPDATED", "MISSION_OBJECTIVE_REMOVED", "MISSION_OBJECTIVE_REORDERED", "MISSION_AUDIT_EXPORTED", "MISSION_AUDIT_PURGED", "OPERATION_CREATED", "OPERATION_UPDATED", "OPERATION_DELETED", "OPERATION_PAYOUT_TOGGLED", "OPERATION_AUDIT_EXPORTED", "OPERATION_AUDIT_PURGED", "MEMBERSHIP_GRANTED", "MEMBERSHIP_REVOKED", "ROLE_GRANTED", "ROLE_CHANGED", "ROLE_REVOKED", "CAPABILITY_FLAGS_CHANGED", "ROLE_PERMISSIONS_CHANGED", "KOMMANDO_GROUP_CREATED", "KOMMANDO_GROUP_UPDATED", "KOMMANDO_GROUP_DELETED", "USER_DELETED", "USER_MERGED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_WITHDRAWN", "ACCOUNT_DELETION_REQUEST_DECLINED", "ACCOUNT_DELETION_REQUEST_EXECUTED", "ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED", "HANDLE_SNAPSHOTS_ANONYMISED", "PERSON_SEARCH_PERFORMED", "PERSONAL_DATA_EXPORTED", "ROLE_AUDIT_EXPORTED", "ROLE_AUDIT_PURGED", "PROMOTION_TOPIC_CREATED", "PROMOTION_TOPIC_UPDATED", "PROMOTION_TOPIC_DELETED", "PROMOTION_CATEGORY_CREATED", "PROMOTION_CATEGORY_UPDATED", "PROMOTION_CATEGORY_DELETED", "PROMOTION_LEVEL_CONTENT_CREATED", "PROMOTION_LEVEL_CONTENT_UPDATED", "PROMOTION_LEVEL_CONTENT_DELETED", "PROMOTION_RANK_REQUIREMENT_CREATED", "PROMOTION_RANK_REQUIREMENT_UPDATED", "PROMOTION_RANK_REQUIREMENT_DELETED", "PROMOTION_EVALUATION_CREATED", "PROMOTION_EVALUATION_UPDATED", "PROMOTION_EVALUATION_DELETED", "PROMOTION_AUDIT_EXPORTED", "PROMOTION_AUDIT_PURGED", "MARKET_OFFER_RELEASED", "MARKET_OFFER_DEACTIVATED", "MARKET_OFFER_REDUCED", "MARKET_OFFER_REMOVED", "MARKET_REMARK_UPDATED", "MARKET_INTEREST_REGISTERED", "MARKET_INTEREST_WITHDRAWN", "MARKET_REQUEST_CREATED", "MARKET_REQUEST_UPDATED", "MARKET_REQUEST_DEACTIVATED", "MARKET_REQUEST_INTEREST_SIGNALLED", "MARKET_REQUEST_INTEREST_WITHDRAWN", "MARKET_AUDIT_EXPORTED", "MARKET_AUDIT_PURGED", "HANGAR_SHIP_CREATED", "HANGAR_SHIP_UPDATED", "HANGAR_SHIP_DELETED", "HANGAR_EMPTIED", "HANGAR_IMPORTED", "HANGAR_FITTED_RESET", "HANGAR_HOME_LOCATION_SET", "HANGAR_AUDIT_EXPORTED", "HANGAR_AUDIT_PURGED", "BLUEPRINT_ADDED", "BLUEPRINT_BATCH_ADDED", "BLUEPRINT_UPDATED", "BLUEPRINT_REMOVED", "BLUEPRINT_ALL_REMOVED", "BLUEPRINT_IMPORTED", "BLUEPRINT_SHARING_CHANGED", "BLUEPRINT_PURGED_ALL_USERS", "BLUEPRINT_DEFAULT_ADDED", "BLUEPRINT_DEFAULT_REMOVED", "BLUEPRINT_DEFAULTS_GRANTED", "BLUEPRINT_AUDIT_EXPORTED", "BLUEPRINT_AUDIT_PURGED", "EXCHANGE_CLIENT_CREATED", "EXCHANGE_CLIENT_UPDATED", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_SWITCH_CHANGED", "EXCHANGE_CLIENT_DISCONNECTED", "EXCHANGE_INSTALLATION_DISCONNECTED", "EXCHANGE_MEMBER_DEPARTED", "EXCHANGE_CHANGES_UNDONE", "EXCHANGE_MASS_CHANGE_CONFIRMED", "EXCHANGE_BULK_UNDO_STARTED", "EXCHANGE_BULK_UNDO_FINISHED", "EXCHANGE_CONNECTIONS_PURGED", "CONNECTED_APPS_AUDIT_EXPORTED", "CONNECTED_APPS_AUDIT_PURGED" ]
+            "enum" : [ "INVENTORY_ITEM_CREATED", "INVENTORY_ITEM_UPDATED", "INVENTORY_ITEM_MERGED", "INVENTORY_ITEM_NOTE_UPDATED", "INVENTORY_ALLOCATION_ADDED", "INVENTORY_ALLOCATION_CHANGED", "INVENTORY_ALLOCATION_REMOVED", "INVENTORY_ITEM_CONSUMED", "INVENTORY_ITEM_TRANSFERRED", "INVENTORY_ITEM_SOLD", "INVENTORY_ITEM_DEPERSONALIZED", "INVENTORY_ITEM_PERSONALIZED", "INVENTORY_ITEM_DELIVERY_TOGGLED", "INVENTORY_BULK_CHECKED_OUT", "INVENTORY_BULK_REBOOKED", "INVENTORY_WIPED", "INVENTORY_RECEIVED_FROM_REFINERY", "INVENTORY_RECEIVED_FROM_PRODUCTION", "INVENTORY_HANDED_OVER", "INVENTORY_CONSUMED_BY_PRODUCTION", "INVENTORY_ORG_RESTAMPED", "INVENTORY_ORG_UNIT_CHANGED", "INVENTORY_BULK_ORG_UNIT_CHANGED", "INVENTORY_STOLEN_MARKED", "INVENTORY_STOLEN_UNMARKED", "INVENTORY_BULK_STOLEN_CHANGED", "INVENTORY_OWNER_REASSIGNED", "INVENTORY_PURGED_ON_USER_DELETION", "INVENTORY_AUDIT_EXPORTED", "INVENTORY_AUDIT_PURGED", "JOB_ORDER_CREATED", "JOB_ORDER_ITEM_CREATED", "JOB_ORDER_UPDATED", "JOB_ORDER_ITEM_UPDATED", "JOB_ORDER_STATUS_CHANGED", "JOB_ORDER_PRIORITY_CHANGED", "JOB_ORDER_BLUEPRINT_COUNTING_CHANGED", "JOB_ORDER_DELETED", "JOB_ORDER_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_ASSIGNEE_NOTE_SET", "JOB_ORDER_ASSIGNEE_NOTE_CLEARED", "JOB_ORDER_MATERIAL_UNLINKED", "JOB_ORDER_INVENTORY_UNLINKED", "JOB_ORDER_HANDOVER_CREATED", "JOB_ORDER_ITEM_HANDOVER_CREATED", "JOB_ORDER_PRODUCTION_BOOKED", "JOB_ORDER_CLAIM_UPSERTED", "JOB_ORDER_CLAIM_WITHDRAWN", "QUALITY_TIER_CREATED", "QUALITY_TIER_UPDATED", "QUALITY_TIER_DEACTIVATED", "QUALITY_TIER_DELETED", "JOB_ORDER_AUDIT_EXPORTED", "JOB_ORDER_AUDIT_PURGED", "REFINERY_ORDER_CREATED", "REFINERY_ORDER_UPDATED", "REFINERY_ORDER_CANCELED", "REFINERY_ORDER_STORED", "REFINERY_METHOD_CREATED", "REFINERY_METHOD_UPDATED", "REFINERY_METHOD_DELETED", "REFINERY_METHODS_SYNCED", "REFINERY_YIELDS_SYNCED", "REFINERY_ORDERS_REASSIGNED", "REFINERY_AUDIT_EXPORTED", "REFINERY_AUDIT_PURGED", "PERSONAL_INVENTORY_CREATED", "PERSONAL_INVENTORY_UPDATED", "PERSONAL_INVENTORY_DELETED", "PERSONAL_DATA_PURGED_ON_USER_DELETION", "PERSONAL_INVENTORY_AUDIT_EXPORTED", "PERSONAL_INVENTORY_AUDIT_PURGED", "MISSION_CREATED", "MISSION_UPDATED", "MISSION_DELETED", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_UPDATED", "MISSION_PARTICIPANT_CHECKED_IN", "MISSION_PARTICIPANT_CHECKED_OUT", "MISSION_UNIT_ADDED", "MISSION_UNIT_UPDATED", "MISSION_UNIT_REMOVED", "MISSION_CREW_ADDED", "MISSION_CREW_UPDATED", "MISSION_CREW_REMOVED", "MISSION_FREQUENCY_CHANGED", "MISSION_FREQUENCY_REMOVED", "MISSION_OWNER_CHANGED", "MISSION_OWNING_ORG_UNIT_CHANGED", "MISSION_PARTY_LEAD_CHANGED", "MISSION_MANAGER_ADDED", "MISSION_MANAGER_REMOVED", "MISSION_FINANCE_ENTRY_CREATED", "MISSION_FINANCE_ENTRY_UPDATED", "MISSION_FINANCE_ENTRY_DELETED", "MISSION_STEP_ADDED", "MISSION_STEP_UPDATED", "MISSION_STEP_REMOVED", "MISSION_STEP_REORDERED", "MISSION_STEP_DONE_CHANGED", "MISSION_OBJECTIVE_ADDED", "MISSION_OBJECTIVE_UPDATED", "MISSION_OBJECTIVE_REMOVED", "MISSION_OBJECTIVE_REORDERED", "MISSION_AUDIT_EXPORTED", "MISSION_AUDIT_PURGED", "OPERATION_CREATED", "OPERATION_UPDATED", "OPERATION_DELETED", "OPERATION_PAYOUT_TOGGLED", "OPERATION_AUDIT_EXPORTED", "OPERATION_AUDIT_PURGED", "MEMBERSHIP_GRANTED", "MEMBERSHIP_REVOKED", "ROLE_GRANTED", "ROLE_CHANGED", "ROLE_REVOKED", "CAPABILITY_FLAGS_CHANGED", "ROLE_PERMISSIONS_CHANGED", "KOMMANDO_GROUP_CREATED", "KOMMANDO_GROUP_UPDATED", "KOMMANDO_GROUP_DELETED", "USER_DELETED", "USER_MERGED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_WITHDRAWN", "ACCOUNT_DELETION_REQUEST_DECLINED", "ACCOUNT_DELETION_REQUEST_EXECUTED", "ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED", "HANDLE_SNAPSHOTS_ANONYMISED", "PERSON_SEARCH_PERFORMED", "PERSONAL_DATA_EXPORTED", "ROLE_AUDIT_EXPORTED", "ROLE_AUDIT_PURGED", "PROMOTION_TOPIC_CREATED", "PROMOTION_TOPIC_UPDATED", "PROMOTION_TOPIC_DELETED", "PROMOTION_CATEGORY_CREATED", "PROMOTION_CATEGORY_UPDATED", "PROMOTION_CATEGORY_DELETED", "PROMOTION_LEVEL_CONTENT_CREATED", "PROMOTION_LEVEL_CONTENT_UPDATED", "PROMOTION_LEVEL_CONTENT_DELETED", "PROMOTION_RANK_REQUIREMENT_CREATED", "PROMOTION_RANK_REQUIREMENT_UPDATED", "PROMOTION_RANK_REQUIREMENT_DELETED", "PROMOTION_EVALUATION_CREATED", "PROMOTION_EVALUATION_UPDATED", "PROMOTION_EVALUATION_DELETED", "PROMOTION_AUDIT_EXPORTED", "PROMOTION_AUDIT_PURGED", "MARKET_OFFER_RELEASED", "MARKET_OFFER_DEACTIVATED", "MARKET_OFFER_REDUCED", "MARKET_OFFER_REMOVED", "MARKET_REMARK_UPDATED", "MARKET_INTEREST_REGISTERED", "MARKET_INTEREST_WITHDRAWN", "MARKET_REQUEST_CREATED", "MARKET_REQUEST_UPDATED", "MARKET_REQUEST_DEACTIVATED", "MARKET_REQUEST_INTEREST_SIGNALLED", "MARKET_REQUEST_INTEREST_WITHDRAWN", "MARKET_AUDIT_EXPORTED", "MARKET_AUDIT_PURGED", "HANGAR_SHIP_CREATED", "HANGAR_SHIP_UPDATED", "HANGAR_SHIP_DELETED", "HANGAR_EMPTIED", "HANGAR_IMPORTED", "HANGAR_FITTED_RESET", "HANGAR_HOME_LOCATION_SET", "HANGAR_AUDIT_EXPORTED", "HANGAR_AUDIT_PURGED", "BLUEPRINT_ADDED", "BLUEPRINT_BATCH_ADDED", "BLUEPRINT_UPDATED", "BLUEPRINT_REMOVED", "BLUEPRINT_ALL_REMOVED", "BLUEPRINT_IMPORTED", "BLUEPRINT_SHARING_CHANGED", "BLUEPRINT_PURGED_ALL_USERS", "BLUEPRINT_DEFAULT_ADDED", "BLUEPRINT_DEFAULT_REMOVED", "BLUEPRINT_DEFAULTS_GRANTED", "BLUEPRINT_AUDIT_EXPORTED", "BLUEPRINT_AUDIT_PURGED", "EXCHANGE_CLIENT_CREATED", "EXCHANGE_CLIENT_UPDATED", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_SWITCH_CHANGED", "EXCHANGE_CLIENT_DISCONNECTED", "EXCHANGE_INSTALLATION_DISCONNECTED", "EXCHANGE_MEMBER_DEPARTED", "EXCHANGE_CHANGES_UNDONE", "EXCHANGE_MASS_CHANGE_CONFIRMED", "EXCHANGE_BULK_UNDO_STARTED", "EXCHANGE_BULK_UNDO_FINISHED", "EXCHANGE_CONNECTIONS_PURGED", "CONNECTED_APPS_AUDIT_EXPORTED", "CONNECTED_APPS_AUDIT_PURGED", "NEED_RAISED", "NEED_UPDATED", "NEED_PAUSED", "NEED_RESUMED", "NEED_WITHDRAWN", "NEED_FULFILLED", "DONATION_PLEDGED", "DONATION_RECEIVED", "DONATION_DECLINED", "DONATION_WITHDRAWN", "DONATION_RECORDED", "SUPPLY_UNIT_SETTING_CHANGED", "SUPPLY_SETTINGS_CHANGED", "SUPPLY_AUDIT_EXPORTED", "SUPPLY_AUDIT_PURGED" ]
           },
           "id" : {
             "type" : "string",
@@ -73457,6 +76322,53 @@
         },
         "required" : [ "name" ]
       },
+      "CreateNeedRequest" : {
+        "type" : "object",
+        "properties" : {
+          "amount" : {
+            "type" : "number",
+            "format" : "double",
+            "exclusiveMinimum" : 0
+          },
+          "gameItemId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "jobOrderId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "materialId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "maxUnitPrice" : {
+            "type" : "integer",
+            "format" : "int64",
+            "exclusiveMinimum" : 0
+          },
+          "orgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "priority" : {
+            "type" : "string",
+            "enum" : [ "LOW", "NORMAL", "HIGH" ]
+          },
+          "purchasable" : {
+            "type" : "boolean"
+          },
+          "purchaseReason" : {
+            "type" : "string",
+            "enum" : [ "HIGH_FARM_EFFORT", "RARE_SOURCE", "TIME_CRITICAL", "OTHER" ]
+          },
+          "qualityTierId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        },
+        "required" : [ "amount", "orgUnitId" ]
+      },
       "DataExport" : {
         "type" : "object",
         "properties" : {
@@ -73504,6 +76416,20 @@
             "format" : "int64"
           }
         }
+      },
+      "DeclineDonationRequest" : {
+        "type" : "object",
+        "properties" : {
+          "reason" : {
+            "type" : "string",
+            "enum" : [ "WRONG_ITEM", "NOT_NEEDED", "QUALITY_TOO_LOW", "DONOR_ABSENT", "OTHER" ]
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "reason", "version" ]
       },
       "DefaultBlueprintCreateRequest" : {
         "type" : "object",
@@ -73601,6 +76527,116 @@
           "requiredQuantity" : {
             "type" : "number",
             "format" : "double"
+          }
+        }
+      },
+      "DonationDto" : {
+        "type" : "object",
+        "properties" : {
+          "anonymous" : {
+            "type" : "boolean"
+          },
+          "canReceive" : {
+            "type" : "boolean"
+          },
+          "canWithdraw" : {
+            "type" : "boolean"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "declineReason" : {
+            "type" : "string",
+            "enum" : [ "WRONG_ITEM", "NOT_NEEDED", "QUALITY_TOO_LOW", "DONOR_ABSENT", "OTHER" ]
+          },
+          "donorIsMe" : {
+            "type" : "boolean"
+          },
+          "donorName" : {
+            "type" : "string"
+          },
+          "fromStock" : {
+            "type" : "boolean"
+          },
+          "gameItem" : {
+            "$ref" : "#/components/schemas/SupplyRefDto"
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "material" : {
+            "$ref" : "#/components/schemas/SupplyRefDto"
+          },
+          "needId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "pledgedAmount" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "quality" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "quantityType" : {
+            "type" : "string"
+          },
+          "receivedAmount" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "receivedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "receivingOrgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "receivingOrgUnitName" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "PLEDGED", "RECEIVED", "PARTIALLY_RECEIVED", "DECLINED", "WITHDRAWN" ]
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "DonorTotal" : {
+        "type" : "object",
+        "properties" : {
+          "amount" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "donations" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "donorName" : {
+            "type" : "string"
+          },
+          "entry" : {
+            "type" : "string"
+          }
+        }
+      },
+      "EntryAmount" : {
+        "type" : "object",
+        "properties" : {
+          "amount" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "entry" : {
+            "type" : "string"
           }
         }
       },
@@ -77219,6 +80255,21 @@
           }
         }
       },
+      "MyDonationStatsDto" : {
+        "type" : "object",
+        "properties" : {
+          "donations" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "entries" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/EntryAmount"
+            }
+          }
+        }
+      },
       "MyPayoutPreferenceRequest" : {
         "type" : "object",
         "properties" : {
@@ -77266,6 +80317,91 @@
         "properties" : {
           "rsiHandle" : {
             "type" : "string"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "NeedDto" : {
+        "type" : "object",
+        "properties" : {
+          "amount" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "canManage" : {
+            "type" : "boolean"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "fulfilledAmount" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "gameItem" : {
+            "$ref" : "#/components/schemas/SupplyRefDto"
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "jobOrderId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "material" : {
+            "$ref" : "#/components/schemas/SupplyRefDto"
+          },
+          "maxUnitPrice" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "openAmount" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "orgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "orgUnitName" : {
+            "type" : "string"
+          },
+          "orgUnitShorthand" : {
+            "type" : "string"
+          },
+          "priority" : {
+            "type" : "string",
+            "enum" : [ "LOW", "NORMAL", "HIGH" ]
+          },
+          "purchasable" : {
+            "type" : "boolean"
+          },
+          "purchaseReason" : {
+            "type" : "string",
+            "enum" : [ "HIGH_FARM_EFFORT", "RARE_SOURCE", "TIME_CRITICAL", "OTHER" ]
+          },
+          "purchasedAmount" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "qualityTier" : {
+            "$ref" : "#/components/schemas/SupplyTierRefDto"
+          },
+          "quantityType" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "OPEN", "PAUSED", "FULFILLED", "WITHDRAWN" ]
+          },
+          "uexReferencePrice" : {
+            "type" : "number",
+            "format" : "double"
           },
           "version" : {
             "type" : "integer",
@@ -77373,7 +80509,7 @@
           },
           "type" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "BANK_BOOKING_REQUEST_UPDATED", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER", "MISSION_CHECKIN_OPEN", "MISSION_PARTICIPANT_ADDED_BY_OTHER", "MISSION_PARTICIPANT_REMOVED_BY_OTHER", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_PAID_OUT", "OPERATION_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "BANK_BOOKING_REQUEST_APPROVED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_RECEIVED", "BANK_HOLDER_TRANSFER_RECEIVED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED", "HANGAR_SHIP_REMOVED_FROM_UNIT", "HANGAR_FITTED_RESET", "HANGAR_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF" ]
+            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "BANK_BOOKING_REQUEST_UPDATED", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER", "MISSION_CHECKIN_OPEN", "MISSION_PARTICIPANT_ADDED_BY_OTHER", "MISSION_PARTICIPANT_REMOVED_BY_OTHER", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_PAID_OUT", "OPERATION_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "BANK_BOOKING_REQUEST_APPROVED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_RECEIVED", "BANK_HOLDER_TRANSFER_RECEIVED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED", "HANGAR_SHIP_REMOVED_FROM_UNIT", "HANGAR_FITTED_RESET", "HANGAR_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF", "SUPPLY_DONATION_PLEDGED", "SUPPLY_DONATION_RECEIVED", "SUPPLY_DONATION_DECLINED" ]
           }
         }
       },
@@ -77402,7 +80538,7 @@
           },
           "eventType" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_CANCELLED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "ACCOUNT_DELETION_REQUEST_RESOLVED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "DISCORD_REGISTRATION_DECIDED", "JOB_ORDER_CLOSED", "BANK_BOOKING_REQUEST_UPDATED_BY_REQUESTER", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER_DUE", "MISSION_STARTED", "MISSION_CHECKED_IN", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_END_RECORDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_MARKED", "OPERATION_PAYOUT_UNMARKED", "OPERATION_COMPLETED", "OPERATION_COMPLETED_UNOWNED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "REFINERY_ORDER_READY_CLEARED", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "BANK_BOOKING_REQUEST_APPROVED", "BANK_BOOKING_REQUEST_APPROVAL_REVOKED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_BOOKED", "BANK_HOLDER_TRANSFER_BOOKED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "BANK_HOLDER_NOTICE_CLEARED", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_LEADERSHIP_ROLE_MISMATCH_CLEARED", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED_TO_UNIT", "HANGAR_SHIP_UNASSIGNED_FROM_UNIT", "HANGAR_SHIP_DELETED_FROM_MISSION", "HANGAR_FITTED_RESET_FOR_OWNER", "HANGAR_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF", "EXCHANGE_SWITCHED_ON" ]
+            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_CANCELLED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "ACCOUNT_DELETION_REQUEST_RESOLVED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "DISCORD_REGISTRATION_DECIDED", "JOB_ORDER_CLOSED", "BANK_BOOKING_REQUEST_UPDATED_BY_REQUESTER", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER_DUE", "MISSION_STARTED", "MISSION_CHECKED_IN", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_END_RECORDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_MARKED", "OPERATION_PAYOUT_UNMARKED", "OPERATION_COMPLETED", "OPERATION_COMPLETED_UNOWNED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "REFINERY_ORDER_READY_CLEARED", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "BANK_BOOKING_REQUEST_APPROVED", "BANK_BOOKING_REQUEST_APPROVAL_REVOKED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_BOOKED", "BANK_HOLDER_TRANSFER_BOOKED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "BANK_HOLDER_NOTICE_CLEARED", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_LEADERSHIP_ROLE_MISMATCH_CLEARED", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED_TO_UNIT", "HANGAR_SHIP_UNASSIGNED_FROM_UNIT", "HANGAR_SHIP_DELETED_FROM_MISSION", "HANGAR_FITTED_RESET_FOR_OWNER", "HANGAR_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF", "EXCHANGE_SWITCHED_ON", "SUPPLY_DONATION_PLEDGED", "SUPPLY_DONATION_RECEIVED", "SUPPLY_DONATION_DECLINED", "SUPPLY_DONATION_WITHDRAWN" ]
           },
           "excludeActor" : {
             "type" : "boolean"
@@ -77413,7 +80549,7 @@
           },
           "notificationType" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "BANK_BOOKING_REQUEST_UPDATED", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER", "MISSION_CHECKIN_OPEN", "MISSION_PARTICIPANT_ADDED_BY_OTHER", "MISSION_PARTICIPANT_REMOVED_BY_OTHER", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_PAID_OUT", "OPERATION_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "BANK_BOOKING_REQUEST_APPROVED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_RECEIVED", "BANK_HOLDER_TRANSFER_RECEIVED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED", "HANGAR_SHIP_REMOVED_FROM_UNIT", "HANGAR_FITTED_RESET", "HANGAR_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF" ]
+            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "BANK_BOOKING_REQUEST_UPDATED", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER", "MISSION_CHECKIN_OPEN", "MISSION_PARTICIPANT_ADDED_BY_OTHER", "MISSION_PARTICIPANT_REMOVED_BY_OTHER", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_PAID_OUT", "OPERATION_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "BANK_BOOKING_REQUEST_APPROVED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_RECEIVED", "BANK_HOLDER_TRANSFER_RECEIVED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED", "HANGAR_SHIP_REMOVED_FROM_UNIT", "HANGAR_FITTED_RESET", "HANGAR_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF", "SUPPLY_DONATION_PLEDGED", "SUPPLY_DONATION_RECEIVED", "SUPPLY_DONATION_DECLINED" ]
           },
           "selectors" : {
             "type" : "array",
@@ -77497,14 +80633,14 @@
           },
           "eventType" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_CANCELLED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "ACCOUNT_DELETION_REQUEST_RESOLVED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "DISCORD_REGISTRATION_DECIDED", "JOB_ORDER_CLOSED", "BANK_BOOKING_REQUEST_UPDATED_BY_REQUESTER", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER_DUE", "MISSION_STARTED", "MISSION_CHECKED_IN", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_END_RECORDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_MARKED", "OPERATION_PAYOUT_UNMARKED", "OPERATION_COMPLETED", "OPERATION_COMPLETED_UNOWNED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "REFINERY_ORDER_READY_CLEARED", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "BANK_BOOKING_REQUEST_APPROVED", "BANK_BOOKING_REQUEST_APPROVAL_REVOKED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_BOOKED", "BANK_HOLDER_TRANSFER_BOOKED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "BANK_HOLDER_NOTICE_CLEARED", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_LEADERSHIP_ROLE_MISMATCH_CLEARED", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED_TO_UNIT", "HANGAR_SHIP_UNASSIGNED_FROM_UNIT", "HANGAR_SHIP_DELETED_FROM_MISSION", "HANGAR_FITTED_RESET_FOR_OWNER", "HANGAR_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF", "EXCHANGE_SWITCHED_ON" ]
+            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_CANCELLED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "ACCOUNT_DELETION_REQUEST_RESOLVED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "DISCORD_REGISTRATION_DECIDED", "JOB_ORDER_CLOSED", "BANK_BOOKING_REQUEST_UPDATED_BY_REQUESTER", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER_DUE", "MISSION_STARTED", "MISSION_CHECKED_IN", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_END_RECORDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_MARKED", "OPERATION_PAYOUT_UNMARKED", "OPERATION_COMPLETED", "OPERATION_COMPLETED_UNOWNED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "REFINERY_ORDER_READY_CLEARED", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "BANK_BOOKING_REQUEST_APPROVED", "BANK_BOOKING_REQUEST_APPROVAL_REVOKED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_BOOKED", "BANK_HOLDER_TRANSFER_BOOKED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "BANK_HOLDER_NOTICE_CLEARED", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_LEADERSHIP_ROLE_MISMATCH_CLEARED", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED_TO_UNIT", "HANGAR_SHIP_UNASSIGNED_FROM_UNIT", "HANGAR_SHIP_DELETED_FROM_MISSION", "HANGAR_FITTED_RESET_FOR_OWNER", "HANGAR_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF", "EXCHANGE_SWITCHED_ON", "SUPPLY_DONATION_PLEDGED", "SUPPLY_DONATION_RECEIVED", "SUPPLY_DONATION_DECLINED", "SUPPLY_DONATION_WITHDRAWN" ]
           },
           "excludeActor" : {
             "type" : "boolean"
           },
           "notificationType" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "BANK_BOOKING_REQUEST_UPDATED", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER", "MISSION_CHECKIN_OPEN", "MISSION_PARTICIPANT_ADDED_BY_OTHER", "MISSION_PARTICIPANT_REMOVED_BY_OTHER", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_PAID_OUT", "OPERATION_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "BANK_BOOKING_REQUEST_APPROVED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_RECEIVED", "BANK_HOLDER_TRANSFER_RECEIVED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED", "HANGAR_SHIP_REMOVED_FROM_UNIT", "HANGAR_FITTED_RESET", "HANGAR_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF" ]
+            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "BANK_BOOKING_REQUEST_UPDATED", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER", "MISSION_CHECKIN_OPEN", "MISSION_PARTICIPANT_ADDED_BY_OTHER", "MISSION_PARTICIPANT_REMOVED_BY_OTHER", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_PAID_OUT", "OPERATION_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "BANK_BOOKING_REQUEST_APPROVED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_RECEIVED", "BANK_HOLDER_TRANSFER_RECEIVED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED", "HANGAR_SHIP_REMOVED_FROM_UNIT", "HANGAR_FITTED_RESET", "HANGAR_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF", "SUPPLY_DONATION_PLEDGED", "SUPPLY_DONATION_RECEIVED", "SUPPLY_DONATION_DECLINED" ]
           },
           "selectors" : {
             "type" : "array",
@@ -78784,6 +81920,39 @@
           }
         }
       },
+      "PageResponseDonationDto" : {
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/DonationDto"
+            }
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "sort" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "totalElements" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalPages" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
       "PageResponseFrequencyTypeDto" : {
         "type" : "object",
         "properties" : {
@@ -79319,6 +82488,39 @@
             "type" : "array",
             "items" : {
               "$ref" : "#/components/schemas/MissionListDto"
+            }
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "sort" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "totalElements" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalPages" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "PageResponseNeedDto" : {
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/NeedDto"
             }
           },
           "page" : {
@@ -80618,6 +83820,44 @@
         },
         "required" : [ "locationType", "locationUexId", "name", "quantity", "version" ]
       },
+      "PledgeRequest" : {
+        "type" : "object",
+        "properties" : {
+          "amount" : {
+            "type" : "number",
+            "format" : "double",
+            "exclusiveMinimum" : 0
+          },
+          "anonymous" : {
+            "type" : "boolean"
+          },
+          "gameItemId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "materialId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "needId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "quality" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "receivingOrgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "sourceInventoryItemId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        },
+        "required" : [ "amount" ]
+      },
       "PoiDto" : {
         "type" : "object",
         "properties" : {
@@ -80649,7 +83889,7 @@
           "code" : {
             "type" : "string",
             "description" : "The stable reason, one of the values in x-problem-codes (the ProblemCode registry, REQ-API-019). The exchange operations under /api/v1/exchange answer the codes of the frozen exchange contract instead (ExchangeProblemException). The list grows; a client treats an unknown code by its status.",
-            "x-problem-codes" : [ "ACCESS_DENIED", "ACTING_MEMBER_REFUSED", "APP_UPDATE_REQUIRED", "BAD_REQUEST", "BANK_ACCOUNT_CLOSED", "BANK_ACCOUNT_HAS_PENDING_REQUESTS", "BANK_ACCOUNT_NOT_EMPTY", "BANK_ALREADY_REVERSED", "BANK_CARTEL_APPROVAL_REQUIRED", "BANK_FEE_EXCEEDS_AMOUNT", "BANK_GRANTEE_MISSING_ROLE", "BANK_HOLDER_INACTIVE", "BANK_HOLDER_OVERDRAFT", "BANK_JUSTIFICATION_REQUIRED", "BANK_NOT_REVERSIBLE", "BANK_OVERDRAFT", "BANK_OWNER_APPROVAL_REQUIRED", "BANK_REQUEST_ALREADY_APPROVED", "BANK_REQUEST_NOT_PENDING", "BANK_SELF_TRANSFER", "BANK_SPLIT_NO_TARGETS", "BANK_SPLIT_TOO_SMALL", "BUSINESS_CONFLICT", "CONSTRAINT_VIOLATION", "DATA_INTEGRITY_VIOLATION", "DUPLICATE_ENTITY", "ENTITY_IN_USE", "EXTERNAL_SERVICE_ERROR", "ILLEGAL_ARGUMENT", "INTERNAL_ERROR", "METHOD_NOT_ALLOWED", "MISSION_PARTICIPANT_REQUIRED", "NOT_ACCEPTABLE", "NOT_FOUND", "NO_ROLE", "OPTIMISTIC_LOCK", "OVER_ALLOCATION", "OWNER_ORG_UNIT_REQUIRED", "PENDING_APPROVAL", "PESSIMISTIC_LOCK", "PRODUCTION_ALLOCATION", "RATE_LIMIT_EXCEEDED", "REPORT_GENERATION_FAILED", "REQUEST_BODY_TOO_LARGE", "SERVICE_UNAVAILABLE", "TERMS_NOT_ACCEPTED", "TYPE_MISMATCH", "UNAUTHENTICATED", "UNSUPPORTED_MEDIA_TYPE", "VALIDATION_FAILED" ]
+            "x-problem-codes" : [ "ACCESS_DENIED", "ACTING_MEMBER_REFUSED", "APP_UPDATE_REQUIRED", "BAD_REQUEST", "BANK_ACCOUNT_CLOSED", "BANK_ACCOUNT_HAS_PENDING_REQUESTS", "BANK_ACCOUNT_NOT_EMPTY", "BANK_ALREADY_REVERSED", "BANK_CARTEL_APPROVAL_REQUIRED", "BANK_FEE_EXCEEDS_AMOUNT", "BANK_FOUR_EYES_REQUIRED", "BANK_GRANTEE_MISSING_ROLE", "BANK_HOLDER_INACTIVE", "BANK_HOLDER_OVERDRAFT", "BANK_JUSTIFICATION_REQUIRED", "BANK_NOT_REVERSIBLE", "BANK_OVERDRAFT", "BANK_OWNER_APPROVAL_REQUIRED", "BANK_REQUEST_ALREADY_APPROVED", "BANK_REQUEST_NOT_PENDING", "BANK_SELF_TRANSFER", "BANK_SPLIT_NO_TARGETS", "BANK_SPLIT_TOO_SMALL", "BUSINESS_CONFLICT", "CONSTRAINT_VIOLATION", "DATA_INTEGRITY_VIOLATION", "DUPLICATE_ENTITY", "ENTITY_IN_USE", "EXTERNAL_SERVICE_ERROR", "ILLEGAL_ARGUMENT", "INTERNAL_ERROR", "METHOD_NOT_ALLOWED", "MISSION_PARTICIPANT_REQUIRED", "NOT_ACCEPTABLE", "NOT_FOUND", "NO_ROLE", "OPTIMISTIC_LOCK", "OVER_ALLOCATION", "OWNER_ORG_UNIT_REQUIRED", "PENDING_APPROVAL", "PESSIMISTIC_LOCK", "PRODUCTION_ALLOCATION", "RATE_LIMIT_EXCEEDED", "REPORT_GENERATION_FAILED", "REQUEST_BODY_TOO_LARGE", "SERVICE_UNAVAILABLE", "SUPPLY_DISABLED", "SUPPLY_DONATION_DOES_NOT_FIT_NEED", "SUPPLY_DONATION_NOT_PLEDGED", "SUPPLY_NEED_NOT_OPEN", "SUPPLY_NEED_UNIT_MISMATCH", "SUPPLY_ROW_NOT_OWNED", "SUPPLY_UNIT_CANNOT_RAISE", "SUPPLY_UNIT_CANNOT_RECEIVE", "TERMS_NOT_ACCEPTED", "TYPE_MISMATCH", "UNAUTHENTICATED", "UNSUPPORTED_MEDIA_TYPE", "VALIDATION_FAILED" ]
           },
           "correlationId" : {
             "type" : "string",
@@ -81169,6 +84409,67 @@
           }
         },
         "required" : [ "responsibleOrgUnitId" ]
+      },
+      "ReceiveDonationRequest" : {
+        "type" : "object",
+        "properties" : {
+          "locationId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "receivedAmount" : {
+            "type" : "number",
+            "format" : "double",
+            "exclusiveMinimum" : 0
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "locationId", "receivedAmount", "version" ]
+      },
+      "RecordDonationRequest" : {
+        "type" : "object",
+        "properties" : {
+          "amount" : {
+            "type" : "number",
+            "format" : "double",
+            "exclusiveMinimum" : 0
+          },
+          "anonymous" : {
+            "type" : "boolean"
+          },
+          "donorUserId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "gameItemId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "locationId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "materialId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "needId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "quality" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "receivingOrgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        },
+        "required" : [ "amount", "locationId", "receivingOrgUnitId" ]
       },
       "RefineryExtractDto" : {
         "type" : "object",
@@ -82446,6 +85747,118 @@
           }
         }
       },
+      "SupplyRefDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        }
+      },
+      "SupplySettingsDto" : {
+        "type" : "object",
+        "properties" : {
+          "enabled" : {
+            "type" : "boolean"
+          },
+          "governingAreaId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "governingAreaName" : {
+            "type" : "string"
+          }
+        }
+      },
+      "SupplyStateDto" : {
+        "type" : "object",
+        "properties" : {
+          "enabled" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "SupplyStatsDto" : {
+        "type" : "object",
+        "properties" : {
+          "donors" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/DonorTotal"
+            }
+          },
+          "months" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "units" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/UnitMonth"
+            }
+          }
+        }
+      },
+      "SupplyTierRefDto" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "labelDe" : {
+            "type" : "string"
+          },
+          "labelEn" : {
+            "type" : "string"
+          },
+          "minQuality" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "SupplyUnitDto" : {
+        "type" : "object",
+        "properties" : {
+          "acceptsDonations" : {
+            "type" : "boolean"
+          },
+          "canManage" : {
+            "type" : "boolean"
+          },
+          "kind" : {
+            "type" : "string",
+            "enum" : [ "SQUADRON", "SPECIAL_COMMAND", "BEREICH", "ORGANISATIONSLEITUNG" ]
+          },
+          "mayRaiseNeeds" : {
+            "type" : "boolean"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "orgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "shorthand" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
       "SyncReportDto" : {
         "type" : "object",
         "properties" : {
@@ -82695,6 +86108,35 @@
           }
         }
       },
+      "UnitMonth" : {
+        "type" : "object",
+        "properties" : {
+          "amounts" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/EntryAmount"
+            }
+          },
+          "distinctDonors" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "donations" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "month" : {
+            "type" : "string"
+          },
+          "orgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "orgUnitName" : {
+            "type" : "string"
+          }
+        }
+      },
       "UpdateBankBookingRequest" : {
         "type" : "object",
         "properties" : {
@@ -82932,6 +86374,41 @@
         },
         "required" : [ "stepsVersion", "title" ]
       },
+      "UpdateNeedRequest" : {
+        "type" : "object",
+        "properties" : {
+          "amount" : {
+            "type" : "number",
+            "format" : "double",
+            "exclusiveMinimum" : 0
+          },
+          "jobOrderId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "maxUnitPrice" : {
+            "type" : "integer",
+            "format" : "int64",
+            "exclusiveMinimum" : 0
+          },
+          "priority" : {
+            "type" : "string",
+            "enum" : [ "LOW", "NORMAL", "HIGH" ]
+          },
+          "purchasable" : {
+            "type" : "boolean"
+          },
+          "purchaseReason" : {
+            "type" : "string",
+            "enum" : [ "HIGH_FARM_EFFORT", "RARE_SOURCE", "TIME_CRITICAL", "OTHER" ]
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "amount", "version" ]
+      },
       "UpdateParticipantRequest" : {
         "type" : "object",
         "properties" : {
@@ -82988,6 +86465,33 @@
           }
         },
         "required" : [ "preference" ]
+      },
+      "UpdateSupplySettingsRequest" : {
+        "type" : "object",
+        "properties" : {
+          "enabled" : {
+            "type" : "boolean"
+          },
+          "governingAreaId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }
+      },
+      "UpdateSupplyUnitRequest" : {
+        "type" : "object",
+        "properties" : {
+          "acceptsDonations" : {
+            "type" : "boolean"
+          },
+          "mayRaiseNeeds" : {
+            "type" : "boolean"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
       },
       "UpdateUnitRequest" : {
         "type" : "object",
@@ -83189,6 +86693,16 @@
             "format" : "int32"
           }
         }
+      },
+      "VersionRequest" : {
+        "type" : "object",
+        "properties" : {
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "version" ]
       }
     },
     "securitySchemes" : {

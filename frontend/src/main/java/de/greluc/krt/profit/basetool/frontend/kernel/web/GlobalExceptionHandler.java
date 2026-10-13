@@ -645,6 +645,14 @@ public class GlobalExceptionHandler {
     m.put("BANK_ACCOUNT_HAS_PENDING_REQUESTS", "error.bank.accountHasPendingRequests");
     m.put("BANK_OWNER_APPROVAL_REQUIRED", "error.bank.ownerApprovalRequired");
     m.put("BANK_FOUR_EYES_REQUIRED", "error.bank.fourEyesRequired");
+    m.put("SUPPLY_DISABLED", "error.supply.disabled");
+    m.put("SUPPLY_UNIT_CANNOT_RAISE", "error.supply.unitCannotRaise");
+    m.put("SUPPLY_UNIT_CANNOT_RECEIVE", "error.supply.unitCannotReceive");
+    m.put("SUPPLY_NEED_NOT_OPEN", "error.supply.needNotOpen");
+    m.put("SUPPLY_NEED_UNIT_MISMATCH", "error.supply.needUnitMismatch");
+    m.put("SUPPLY_DONATION_NOT_PLEDGED", "error.supply.donationNotPledged");
+    m.put("SUPPLY_DONATION_DOES_NOT_FIT_NEED", "error.supply.donationDoesNotFitNeed");
+    m.put("SUPPLY_ROW_NOT_OWNED", "error.supply.rowNotOwned");
     m.put("BANK_CARTEL_APPROVAL_REQUIRED", "error.bank.cartelApprovalRequired");
     m.put("BANK_SPLIT_NO_TARGETS", "error.bank.splitNoTargets");
     m.put("BANK_SPLIT_TOO_SMALL", "error.bank.splitTooSmall");

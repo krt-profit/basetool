@@ -23,6 +23,7 @@ module joborder 10
 module materialexchange 10
 module operation 11
 module bank 11
+module supply 11
 module exchange 12
 module privacy 13
 module app 14
@@ -174,4 +175,5 @@ package admin admin the admin module's package tree (plan 5.2)
 package operation operation the operation module's package tree (plan 5.2)
 package promotion promotion the promotion module's package tree (plan 5.2)
 package personalinventory personalinventory the personal-inventory module's package tree (plan 5.2)
+package supply supply the supply module's package tree (supply and purchasing plan 5.1 rank 11)
 

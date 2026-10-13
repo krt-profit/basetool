@@ -227,6 +227,11 @@ exempt-column|role.description
 exempt-column|role.name
 exempt-column|role_permissions.permission
 exempt-column|ship.insurance
+exempt-column|supply_donation.decline_reason
+exempt-column|supply_donation.status
+exempt-column|supply_need.priority
+exempt-column|supply_need.purchase_reason
+exempt-column|supply_need.status
 exempt-column|system_setting.setting_key
 exempt-column|system_setting.setting_value
 exempt-column|terms_acceptance.terms_version

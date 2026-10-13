@@ -106,6 +106,7 @@ class TableOwnershipTest {
           "materialexchange",
           "operation",
           "bank",
+          "supply",
           "exchange",
           "privacy",
           "app");

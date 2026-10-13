@@ -467,5 +467,28 @@ public enum NotificationEventType {
    * An admin switched the exchange on again (REQ-XCH-041). Creates no notification; clears the
    * switched-off notices.
    */
-  EXCHANGE_SWITCHED_ON
+  EXCHANGE_SWITCHED_ON,
+
+  /**
+   * A member pledged a material donation (REQ-SUP-016). The default rule notifies the lead and the
+   * Logisticians of the receiving unit.
+   */
+  SUPPLY_DONATION_PLEDGED,
+
+  /**
+   * A receiving unit confirmed a donation (REQ-SUP-016). The default rule notifies the donor; the
+   * event clears the pledge notices.
+   */
+  SUPPLY_DONATION_RECEIVED,
+
+  /**
+   * A receiving unit declined a pledge (REQ-SUP-016). The default rule notifies the donor; the
+   * event clears the pledge notices.
+   */
+  SUPPLY_DONATION_DECLINED,
+
+  /**
+   * A donor withdrew a pledge (REQ-SUP-016). Creates no notification; clears the pledge notices.
+   */
+  SUPPLY_DONATION_WITHDRAWN
 }

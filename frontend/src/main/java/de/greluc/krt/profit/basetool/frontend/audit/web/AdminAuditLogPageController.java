@@ -374,7 +374,25 @@ public class AdminAuditLogPageController {
                   "EXCHANGE_BULK_UNDO_FINISHED",
                   "EXCHANGE_CONNECTIONS_PURGED",
                   "CONNECTED_APPS_AUDIT_EXPORTED",
-                  "CONNECTED_APPS_AUDIT_PURGED")));
+                  "CONNECTED_APPS_AUDIT_PURGED")),
+          Map.entry(
+              "SUPPLY",
+              List.of(
+                  "NEED_RAISED",
+                  "NEED_UPDATED",
+                  "NEED_PAUSED",
+                  "NEED_RESUMED",
+                  "NEED_WITHDRAWN",
+                  "NEED_FULFILLED",
+                  "DONATION_PLEDGED",
+                  "DONATION_RECEIVED",
+                  "DONATION_DECLINED",
+                  "DONATION_WITHDRAWN",
+                  "DONATION_RECORDED",
+                  "SUPPLY_UNIT_SETTING_CHANGED",
+                  "SUPPLY_SETTINGS_CHANGED",
+                  "SUPPLY_AUDIT_EXPORTED",
+                  "SUPPLY_AUDIT_PURGED")));
 
   /** Reads the audit trails and the exchange registry. */
   private final AuditBackendClient auditClient;

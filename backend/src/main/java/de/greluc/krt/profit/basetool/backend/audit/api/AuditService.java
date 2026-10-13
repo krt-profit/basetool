@@ -190,6 +190,7 @@ public class AuditService implements AuditRecorder {
       case HANGAR -> AuditEventType.HANGAR_AUDIT_PURGED;
       case BLUEPRINT -> AuditEventType.BLUEPRINT_AUDIT_PURGED;
       case CONNECTED_APPS -> AuditEventType.CONNECTED_APPS_AUDIT_PURGED;
+      case SUPPLY -> AuditEventType.SUPPLY_AUDIT_PURGED;
     };
   }
 

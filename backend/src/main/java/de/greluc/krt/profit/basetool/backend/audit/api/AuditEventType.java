@@ -744,7 +744,52 @@ public enum AuditEventType {
   CONNECTED_APPS_AUDIT_EXPORTED(AuditDomain.CONNECTED_APPS),
 
   /** Connected-applications audit rows older than an admin-chosen cutoff were purged. */
-  CONNECTED_APPS_AUDIT_PURGED(AuditDomain.CONNECTED_APPS);
+  CONNECTED_APPS_AUDIT_PURGED(AuditDomain.CONNECTED_APPS),
+
+  /** A unit raised a need (REQ-SUP-003). */
+  NEED_RAISED(AuditDomain.SUPPLY),
+
+  /** A need's amount, priority, purchasable flag or job-order link changed (REQ-SUP-003). */
+  NEED_UPDATED(AuditDomain.SUPPLY),
+
+  /** A need was paused (REQ-SUP-005). */
+  NEED_PAUSED(AuditDomain.SUPPLY),
+
+  /** A paused need was opened again (REQ-SUP-005). */
+  NEED_RESUMED(AuditDomain.SUPPLY),
+
+  /** A need was withdrawn (REQ-SUP-005). */
+  NEED_WITHDRAWN(AuditDomain.SUPPLY),
+
+  /** A need reached its amount and was fulfilled (REQ-SUP-005). */
+  NEED_FULFILLED(AuditDomain.SUPPLY),
+
+  /** A member pledged a donation (REQ-SUP-007). */
+  DONATION_PLEDGED(AuditDomain.SUPPLY),
+
+  /** A receiving unit confirmed a donation, in full or in part (REQ-SUP-009). */
+  DONATION_RECEIVED(AuditDomain.SUPPLY),
+
+  /** A receiving unit declined a pledge (REQ-SUP-010). */
+  DONATION_DECLINED(AuditDomain.SUPPLY),
+
+  /** A donor withdrew a pledge (REQ-SUP-010). */
+  DONATION_WITHDRAWN(AuditDomain.SUPPLY),
+
+  /** A receiving unit recorded a donation it already received (REQ-SUP-011). */
+  DONATION_RECORDED(AuditDomain.SUPPLY),
+
+  /** An admin changed what an org unit does in the supply module (REQ-SUP-002). */
+  SUPPLY_UNIT_SETTING_CHANGED(AuditDomain.SUPPLY),
+
+  /** An admin switched the supply surface on or off or changed the governing Bereich. */
+  SUPPLY_SETTINGS_CHANGED(AuditDomain.SUPPLY),
+
+  /** The supply audit log was exported as a PDF or JSON for a period. */
+  SUPPLY_AUDIT_EXPORTED(AuditDomain.SUPPLY),
+
+  /** Supply audit rows older than an admin-chosen cutoff were purged. */
+  SUPPLY_AUDIT_PURGED(AuditDomain.SUPPLY);
 
   /** The functional area this event type belongs to; pins the persisted {@code domain} column. */
   private final @NotNull AuditDomain domain;

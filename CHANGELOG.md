@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Bedarf & Spenden (Beschaffung).** Einheiten, die Bedarf melden dürfen, veröffentlichen, was ihnen fehlt; Mitglieder sagen Materialspenden zu (auch direkt aus der eigenen Lagerzeile, anonym möglich), die empfangende Einheit bestätigt sie ins Einheitenlager. Dazu Statistik pro Monat, drei Benachrichtigungen (Zusage, Erhalt, Ablehnung), Prüfprotokoll-Bereich „Bedarf & Spenden" und Verwaltungsseite `/admin/supply`; per Schalter `supply.enabled` standardmäßig aus (REQ-SUP-001…020, ADR-0252, ADR-0253, Migrationen V284–V286).
+
 ### Changed
 
 - **Bank: Vier-Augen-Prinzip für jeden Buchungsantrag.** Wer einen Antrag gestellt hat, kann ihn weder freigeben noch bestätigen (409 `BANK_FOUR_EYES_REQUIRED`); eine zweite Person entscheidet. Ablehnen bleibt möglich, direkte Buchungen bleiben unverändert, Admins sind ausgenommen (REQ-BANK-062, ADR-0251).

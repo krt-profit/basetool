@@ -1,11 +1,10 @@
-> **Doc type:** Proposal — written 2026-10-07 for the owner's review and brought up to the code of
-> `main` at `0da1df779` (v1.16.1) on 2026-10-13, after the domain modularisation, the notification
-> engine extension (#2414 Part A) and the first `StockCommands` shipped. The open decisions of §2 were
-> answered by the owner on 2026-10-07 (E-01 … E-12, F-1 … F-4) and still stand; only what they are
-> anchored to changed. **Nothing is built and nothing below is binding** until @greluc approves the
-> plan as a whole. On approval the draft requirements of §9 move into `docs/specs/supply.md` and
-> `docs/specs/purchasing.md`, the amendments into their specs, the decisions of §2 into ADRs, and
-> this header becomes *living plan*.
+> **Doc type:** Living plan — written 2026-10-07 for the owner's review and brought up to the code of
+> `main` at `0da1df779` (v1.16.1) on 2026-10-13. The open decisions of §2 were answered by the owner
+> on 2026-10-07 (E-01 … E-12, F-1 … F-4) and still stand. **Status 2026-10-13:** B1 (four-eyes,
+> ADR-0251), S1 (`StockCommands`, ADR-0252) and S2 (`supply`, ADR-0253,
+> [`supply.md`](specs/supply.md)) are built; S3 … S6 are not. The requirements of §9.1 live in
+> [`supply.md`](specs/supply.md) and bind; §9.2 stays a draft until S3. §8.1 records where S2 deviates
+> from this text.
 > **Owner area:** BE · FE · BANK · INV · NOTIF · AUDIT · OBS · MOD
 > **Related ADRs:** ADR-0020, ADR-0028, ADR-0096, ADR-0109, ADR-0123, ADR-0229, ADR-0231 …
 > ADR-0236, ADR-0240 … ADR-0242, ADR-0244, ADR-0245, ADR-0250 · **Related specs:**
@@ -607,6 +606,21 @@ Each step is one pull request (or a short stack), shippable alone, behind the fe
 | S5 | Overdue settlement: `SettlementOverdueNoticeProducer` and N7 | S3 |
 | S6 | Report (CSV, forum text), dashboard, alerts | S4 |
 | Pilot | Admin switches `purchasing.enabled` after the OL resolutions; BL Profit appoints HB, sets cap; 4–6 weeks; evaluated with the S6 report | S4 (S5, S6 recommended) |
+
+### 8.1 Where S2 deviates from this text
+
+- The governing Bereich and the switch `supply.enabled` are system settings (`supply.governing_area_id`),
+  not columns; the sidebar flag reaches the frontend through `SupplyFeatureState` (30 s cache) and a
+  layout advice, not through the capabilities record.
+- A donation and a need carry **no free text**: the `note` fields are dropped, so no person can be named
+  in them (REQ-SUP-014).
+- The trade delegate's view of the purchase fields goes through the `NeedPriceAudience` SPI that
+  `supply` owns and `purchasing` implements (S3); without an implementation nobody is a delegate.
+- A need's covered and purchased amounts are credited by bulk `UPDATE` statements that leave the
+  need's version alone (REQ-SUP-019).
+- Not yet built: the pledge shown on a Lager row (`EarmarkTargets.Donations`), a donor picker for a
+  recorded donation, the pledge button on a Lager row, the Android rendering of the three notices
+  (repository `basetool-android`), and the live-sync topics for the app (they are web-only).
 
 Nothing in the engine is left to wait for: the notification extension (#2414 Part A), the transfer
 notice (#2409) and the holder reconciliation (#2413) are on `main`, so S5 is an ordinary step and N4

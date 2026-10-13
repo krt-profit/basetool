@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<head>
+    <title th:text="#{supply.stats.title} + ' - ' + ${appTitle}">Statistik - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+<th:block th:replace="~{supply/fragments/supply-links :: supplyLinks}"></th:block>
+    </th:block>
+</head>
+<body>
+<th:block th:fragment="pageContent">
+<main>
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.supply', titleText=#{supply.stats.title}, count=null, actions=null)}"></th:block>
+
+    <th:block th:replace="~{supply/fragments/supply-tabs :: tabs(active='stats')}"></th:block>
+
+    <form class="no-track toolbar" method="get" th:action="@{/supply/stats}">
+        <label for="supply-stats-months" th:text="#{supply.stats.months}">Zeitraum (Monate)</label>
+        <select id="supply-stats-months" name="months" data-testid="supply-stats-months">
+            <option th:each="m : ${ {3,6,12,24} }" th:value="${m}" th:selected="${m == months}" th:text="${m}">6</option>
+        </select>
+        <button type="submit" class="btn btn-ghost" th:text="#{supply.stats.apply}">&Uuml;bernehmen</button>
+    </form>
+
+    <section class="card card--flush">
+        <div class="table-responsive" th:if="${stats != null and !#lists.isEmpty(stats.units())}">
+            <table class="data-table data-table--stack supply-table" data-testid="supply-stats-table">
+                <thead>
+                    <tr>
+                        <th th:text="#{supply.stats.month}">Monat</th>
+                        <th th:text="#{supply.donation.unit}">Einheit</th>
+                        <th th:text="#{supply.stats.donations}">Spenden</th>
+                        <th th:text="#{supply.stats.donors}">Verschiedene Spender</th>
+                        <th th:text="#{supply.stats.amounts}">Mengen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="row : ${stats.units()}">
+                        <td th:text="${row.month()}">2026-10</td>
+                        <td th:text="${row.orgUnitName()}">ARGON</td>
+                        <td th:text="${row.donations()}">4</td>
+                        <td th:text="${row.distinctDonors()}">3</td>
+                        <td>
+                            <span th:each="a, st : ${row.amounts()}" th:text="${a.entry()} + ': ' + ${a.amount()} + (${st.last} ? '' : ', ')">Quantanium: 4</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <th:block th:if="${stats == null or #lists.isEmpty(stats.units())}">
+            <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='supply.stats.empty.title', textKey='supply.stats.empty.text')}"></th:block>
+        </th:block>
+    </section>
+
+    <section class="card card--flush" th:if="${stats != null and !#lists.isEmpty(stats.donors())}" data-testid="supply-stats-donors">
+        <h2 class="supply-section-title" th:text="#{supply.stats.donorList}">Spenden je Mitglied</h2>
+        <div class="table-responsive">
+            <table class="data-table data-table--stack supply-table">
+                <thead>
+                    <tr>
+                        <th th:text="#{supply.donation.donor}">Spender</th>
+                        <th th:text="#{supply.donation.entry}">Material / Item</th>
+                        <th th:text="#{supply.stats.donations}">Spenden</th>
+                        <th th:text="#{supply.donation.amount}">Menge</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="d : ${stats.donors()}">
+                        <td th:text="${d.donorName()}">Name</td>
+                        <td th:text="${d.entry()}">Quantanium</td>
+                        <td th:text="${d.donations()}">2</td>
+                        <td th:text="${d.amount()}">8</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>
+</th:block>
+</body>
+</html>

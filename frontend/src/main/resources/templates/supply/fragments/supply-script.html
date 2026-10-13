@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="supplyBootstrap">
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    var supplyI18n = {
+        needSaved:        /*[[#{supply.need.saved}]]*/ 'Bedarf gespeichert.',
+        needChanged:      /*[[#{supply.need.changed}]]*/ 'Bedarf aktualisiert.',
+        needError:        /*[[#{supply.need.error}]]*/ 'Der Bedarf konnte nicht gespeichert werden.',
+        pledgeSaved:      /*[[#{supply.pledge.saved}]]*/ 'Spende angemeldet.',
+        pledgeError:      /*[[#{supply.pledge.error}]]*/ 'Die Spende konnte nicht angemeldet werden.',
+        pledgeForNeed:    /*[[#{supply.pledge.forNeed}]]*/ 'Für den Bedarf: {0}',
+        received:         /*[[#{supply.donation.received}]]*/ 'Spende bestätigt.',
+        declined:         /*[[#{supply.donation.declined}]]*/ 'Spende abgelehnt.',
+        withdrawn:        /*[[#{supply.donation.withdrawn}]]*/ 'Spende zurückgezogen.',
+        recorded:         /*[[#{supply.donation.recorded}]]*/ 'Spende erfasst.',
+        donationError:    /*[[#{supply.donation.error}]]*/ 'Die Aktion konnte nicht ausgeführt werden.',
+        settingsSaved:    /*[[#{supply.admin.saved}]]*/ 'Gespeichert.',
+        settingsError:    /*[[#{supply.admin.error}]]*/ 'Speichern fehlgeschlagen.'
+    };
+    var supplyConflict = {
+        title:                /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt',
+        reloadDetailFallback: /*[[#{frontend.ajax.conflict.detail}]]*/ 'Bitte neu laden.',
+        reloadLabel:          /*[[#{frontend.ajax.conflict.reload}]]*/ 'Aktuelle Werte laden',
+        dismissLabel:         /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schliessen',
+        reloadQuestion:       /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
+    };
+</script>
+</th:block>
+</body>
+</html>

@@ -44,6 +44,7 @@
       "privacy::api",
       "refinery::api",
       "scope::api",
+      "supply::api",
       "kernel"
     })
 package de.greluc.krt.profit.basetool.backend.app;

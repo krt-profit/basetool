@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<head>
+    <title th:text="#{supply.mine.title} + ' - ' + ${appTitle}">Meine Spenden - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+<th:block th:replace="~{supply/fragments/supply-links :: supplyLinks}"></th:block>
+    </th:block>
+</head>
+<body>
+<th:block th:fragment="pageContent">
+<main>
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.supply', titleText=#{supply.mine.title}, count=null, actions=~{::mine-actions})}">
+        <th:block th:ref="mine-actions">
+            <button type="button" class="btn btn--cta" data-trigger="supply-open-pledge" data-testid="supply-free-pledge"
+                    th:if="${!#lists.isEmpty(receivingUnits)}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{supply.pledge.free}">Spende anmelden</span></button>
+        </th:block>
+    </th:block>
+
+    <th:block th:replace="~{supply/fragments/supply-tabs :: tabs(active='mine')}"></th:block>
+
+    <section class="supply-mystats card" th:if="${myStats != null}" data-testid="supply-my-stats">
+        <h2 class="supply-mystats__title" th:text="#{supply.mine.stats}">Meine Spenden insgesamt</h2>
+        <p class="supply-mystats__count" th:text="#{supply.mine.stats.count(${myStats.donations()})}">3 Spenden</p>
+        <ul class="supply-mystats__list" th:if="${!#lists.isEmpty(myStats.entries())}">
+            <li th:each="e : ${myStats.entries()}" th:text="${e.entry()} + ': ' + ${e.amount()}">Quantanium: 12</li>
+        </ul>
+    </section>
+
+    <section class="list-panel">
+        <div id="supply-mine-results" class="card card--flush" th:data-live-sync-topic="${supplyLiveSyncTopic}">
+        <th:block th:fragment="myDonationsResults">
+            <div class="table-responsive" th:if="${!#lists.isEmpty(donations)}">
+                <table class="data-table data-table--stack supply-table">
+                    <thead>
+                        <tr>
+                            <th th:text="#{supply.donation.entry}">Material / Item</th>
+                            <th th:text="#{supply.donation.unit}">Einheit</th>
+                            <th th:text="#{supply.donation.amount}">Menge</th>
+                            <th class="cell-status" th:text="#{supply.need.status}">Status</th>
+                            <th class="cell-actions"><span class="visually-hidden" th:text="#{supply.actions}">Aktionen</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="d : ${donations}" data-testid="supply-donation-row" th:data-donation-id="${d.id()}">
+                            <td>
+                                <span class="cell-title" th:text="${d.material() != null ? d.material().name() : d.gameItem().name()}">Quantanium</span>
+                                <span class="cell-sub">
+                                    <span th:if="${d.quality() != null}" th:text="'Q' + ${d.quality()}">Q500</span>
+                                    <span th:if="${d.anonymous()}" class="chip chip--muted" th:text="#{supply.donation.anonymous}">anonym</span>
+                                    <span th:if="${d.fromStock()}" class="chip chip--muted" th:text="#{supply.donation.fromStock}">aus dem Lager</span>
+                                </span>
+                            </td>
+                            <td th:text="${d.receivingOrgUnitName()}">ARGON</td>
+                            <td th:text="${d.receivedAmount() != null ? d.receivedAmount() + ' / ' + d.pledgedAmount() : d.pledgedAmount()}">3</td>
+                            <td class="cell-status">
+                                <span class="chip" th:classappend="${d.status() == 'PLEDGED'} ? 'chip--primary' : 'chip--muted'"
+                                      th:text="#{'supply.donation.status.' + ${d.status()}}">Angemeldet</span>
+                                <span class="cell-sub" th:if="${d.declineReason() != null}"
+                                      th:text="#{'supply.donation.reason.' + ${d.declineReason()}}">Falscher Gegenstand</span>
+                            </td>
+                            <td class="cell-actions">
+                                <button type="button" class="btn btn-quiet-danger" data-trigger="supply-donation-withdraw"
+                                        data-testid="supply-donation-withdraw"
+                                        th:if="${d.canWithdraw()}" th:data-donation-id="${d.id()}" th:data-version="${d.version()}"
+                                        th:text="#{supply.donation.withdraw}">Zur&uuml;ckziehen</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <th:block th:if="${#lists.isEmpty(donations)}">
+                <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='supply.mine.empty.title', textKey='supply.mine.empty.text')}"></th:block>
+            </th:block>
+            <th:block th:replace="~{kernel/fragments/components :: listFoot(pageResponse=${donationsPage}, baseUrl=${paginationBaseUrl})}"></th:block>
+            <nav th:replace="~{kernel/fragments/pagination :: pageSizePicker(pageResponse=${donationsPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
+        </th:block>
+        </div>
+    </section>
+
+    <th:block th:replace="~{supply/fragments/pledge-modal :: pledgeModal}"></th:block>
+</main>
+</th:block>
+
+<th:block th:fragment="pageTail">
+<th:block th:replace="~{supply/fragments/supply-script :: supplyBootstrap}"></th:block>
+<script type="module" th:src="@{/js/supply/supply-mine.js}" th:attr="nonce=${cspNonce}"></script>
+</th:block>
+</body>
+</html>

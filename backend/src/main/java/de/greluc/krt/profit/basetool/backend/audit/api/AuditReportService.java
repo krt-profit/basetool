@@ -178,6 +178,7 @@ public class AuditReportService {
       case HANGAR -> AuditEventType.HANGAR_AUDIT_EXPORTED;
       case BLUEPRINT -> AuditEventType.BLUEPRINT_AUDIT_EXPORTED;
       case CONNECTED_APPS -> AuditEventType.CONNECTED_APPS_AUDIT_EXPORTED;
+      case SUPPLY -> AuditEventType.SUPPLY_AUDIT_EXPORTED;
     };
   }
 

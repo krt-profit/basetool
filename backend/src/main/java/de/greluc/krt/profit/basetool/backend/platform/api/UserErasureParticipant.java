@@ -74,7 +74,10 @@ public interface UserErasureParticipant {
     EVALUATIONS,
 
     /** Refinery orders reassigned. */
-    REFINERY_ORDERS_REASSIGNED
+    REFINERY_ORDERS_REASSIGNED,
+
+    /** Donations detached from the departed donor. */
+    SUPPLY_DONATIONS_DETACHED
   }
 
   /**

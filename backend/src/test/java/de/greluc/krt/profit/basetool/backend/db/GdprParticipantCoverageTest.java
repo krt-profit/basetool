@@ -196,6 +196,13 @@ class GdprParticipantCoverageTest {
               "deletion_request.decided_by_id",
               "Names the admin who decided another member's erasure request."),
           Map.entry(
+              "supply_donation.received_by",
+              "Names the member who confirmed another member's donation; the row is the donor's."),
+          Map.entry(
+              "supply_need.created_by",
+              "Names the unit lead who raised a need; the need is the raising unit's, not the"
+                  + " member's."),
+          Map.entry(
               "user_approval_event.decided_by_id",
               "Names the admin who decided another member's registration (REQ-SEC-058)."),
           Map.entry(

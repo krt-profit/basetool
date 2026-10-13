@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="pledgeModal">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='supply-pledge-modal', titleKey='supply.pledge.title', titleId='supply-pledge-title', variant='krt-modal--wide', body=~{::supply-pledge-modal-body})}">
+        <th:block th:ref="supply-pledge-modal-body">
+            <form id="supply-pledge-form" class="no-track" novalidate>
+                <div class="krt-modal-body">
+                    <input type="hidden" id="supply-pledge-need-id">
+                    <input type="hidden" id="supply-pledge-source-id">
+                    <p class="supply-pledge-need" id="supply-pledge-need-label" hidden></p>
+                    <div class="form-group" id="supply-pledge-unit-row">
+                        <label for="supply-pledge-unit" th:text="#{supply.pledge.unit}">Annehmende Einheit</label>
+                        <select id="supply-pledge-unit" required>
+                            <option th:each="u : ${receivingUnits}" th:value="${u.orgUnitId()}" th:text="${u.name()}">ARGON</option>
+                        </select>
+                    </div>
+                    <div id="supply-pledge-catalogue">
+                        <div class="form-group">
+                            <label for="supply-pledge-kind" th:text="#{supply.need.kind}">Art</label>
+                            <select id="supply-pledge-kind">
+                                <option value="material" th:text="#{supply.kind.material}">Material</option>
+                                <option value="item" th:text="#{supply.kind.item}">Item</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="supply-pledge-material-row">
+                            <label for="supply-pledge-material" th:text="#{supply.need.material}">Material</label>
+                            <select id="supply-pledge-material">
+                                <option th:each="m : ${materials}" th:value="${m.id()}" th:data-quantity-type="${m.quantityType()}" th:text="${m.name()}">Quantanium</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="supply-pledge-item-row" hidden>
+                            <label for="supply-pledge-item" th:text="#{supply.need.item}">Item</label>
+                            <select id="supply-pledge-item">
+                                <option th:each="i : ${items}" th:value="${i.id()}" th:text="${i.name()}">Item</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="supply-pledge-quality-row">
+                            <label for="supply-pledge-quality" th:text="#{supply.pledge.quality}">Qualit&auml;t (0&ndash;1000)</label>
+                            <input type="number" id="supply-pledge-quality" min="0" max="1000" step="1" inputmode="numeric" value="0">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="supply-pledge-amount" th:text="#{supply.need.amount}">Menge</label>
+                        <input type="number" id="supply-pledge-amount" min="0.001" step="any" inputmode="decimal" required>
+                    </div>
+                    <div class="form-group flex-gap-sm">
+                        <input type="checkbox" id="supply-pledge-anonymous">
+                        <label for="supply-pledge-anonymous" th:text="#{supply.pledge.anonymous}">Anonym spenden</label>
+                    </div>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="supply-pledge-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta" data-testid="supply-pledge-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{supply.pledge.submit}">Spende anmelden</span></button>
+                </div>
+            </form>
+        </th:block>
+    </th:block>
+</th:block>
+</body>
+</html>

@@ -247,7 +247,27 @@ public enum LiveSyncTopicClass {
       null,
       null,
       null,
-      Set.of(Roles.authority(Roles.ADMIN)));
+      Set.of(Roles.authority(Roles.ADMIN))),
+
+  /**
+   * Global supply room for {@code /supply/needs} and {@code /supply/donations/mine} with the
+   * sections {@code needs} and {@code mine}, authorized by the socket's authentication alone.
+   */
+  SUPPLY_NEEDS("supply-needs", false, Set.of("needs", "mine"), false, "supply_needs", null, null),
+
+  /**
+   * A receiving unit's donation room for {@code /supply/donations/incoming}, keyed by the unit's
+   * id, with the {@code donations} section; authorized by the donation list read of that unit,
+   * which only the unit's managers and the governing leadership pass.
+   */
+  SUPPLY_DONATIONS(
+      "supply-donations",
+      true,
+      Set.of("donations"),
+      false,
+      "supply_donations",
+      "/api/v1/supply/donations?orgUnitId={id}&size=1",
+      null);
 
   /** The wire prefix identifying the class. */
   private final @NotNull String prefix;

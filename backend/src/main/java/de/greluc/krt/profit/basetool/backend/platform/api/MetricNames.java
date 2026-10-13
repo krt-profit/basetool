@@ -1097,5 +1097,24 @@ public final class MetricNames {
   /** {@link #TAG_FIELD} value: the release page. */
   public static final String FIELD_RELEASES_URL = "releases_url";
 
+  /**
+   * Counter {@code basetool_supply_needs_total} — needs by lifecycle event, tag {@code event}
+   * (REQ-OBS-011).
+   */
+  public static final String SUPPLY_NEEDS = "basetool.supply.needs";
+
+  /**
+   * Counter {@code basetool_supply_donations_total} — donations by the state they reached, tag
+   * {@code status} (REQ-OBS-011).
+   */
+  public static final String SUPPLY_DONATIONS = "basetool.supply.donations";
+
+  /** Gauge {@code basetool_supply_needs_open} — needs open for donations. */
+  public static final String SUPPLY_NEEDS_OPEN = "basetool.supply.needs.open";
+
+  /** Gauge {@code basetool_supply_donations_pledged_open} — pledges awaiting their receipt. */
+  public static final String SUPPLY_DONATIONS_PLEDGED_OPEN =
+      "basetool.supply.donations.pledged.open";
+
   private MetricNames() {}
 }

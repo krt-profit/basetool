@@ -116,7 +116,19 @@
                             <a th:href="@{/materials/profit-calculation}" class="nav-link" th:text="#{nav.materials.profit_calculation}">Profitberechnung</a>
                         </div>
                     </section>
-                    <section class="nav-group" data-group-key="organisation" data-nav-icon="users"
+                    <section class="nav-group" data-group-key="supply" data-nav-icon="download"
+                             th:if="${supplyEnabled}" th:data-nav-group="#{nav.section.supply}">
+                        <button type="button" class="nav-group-head" aria-expanded="true" aria-controls="nav-group-supply">
+                            <svg class="krt-icon nav-group-icon" aria-hidden="true"><use href="#krt-icon-download"></use></svg>
+                            <span class="nav-group-label" th:text="#{nav.section.supply}">Beschaffung</span>
+                            <span class="nav-group-count"></span>
+                            <svg class="krt-icon nav-group-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
+                        </button>
+                        <div class="nav-group-links" id="nav-group-supply">
+                            <a th:href="@{/supply/needs}" class="nav-link" data-testid="nav-supply-needs" th:text="#{nav.supply.needs}">Bedarf</a>
+                            <a th:href="@{/supply/donations/mine}" class="nav-link" data-testid="nav-supply-mine" th:text="#{nav.supply.mine}">Meine Spenden</a>
+                        </div>
+                    </section>                    <section class="nav-group" data-group-key="organisation" data-nav-icon="users"
                              th:data-nav-group="#{nav.section.organisation}">
                         <button type="button" class="nav-group-head" aria-expanded="true" aria-controls="nav-group-organisation">
                             <svg class="krt-icon nav-group-icon" aria-hidden="true"><use href="#krt-icon-users"></use></svg>
@@ -253,6 +265,7 @@
                             <a th:href="@{/admin/audit-log}" class="nav-link" data-testid="nav-admin-audit-log" th:text="#{nav.admin.auditLog}">Audit-Logs</a>
                             <a th:href="@{/admin/settings}" class="nav-link" th:text="#{nav.admin.settings}">Systemeinstellungen</a>
                             <a th:href="@{/admin/exchange-clients}" class="nav-link" data-testid="nav-admin-exchange-clients" th:text="#{nav.admin.exchangeClients}">Verbundene Anwendungen</a>
+                            <a th:href="@{/admin/supply}" class="nav-link" data-testid="nav-admin-supply" th:text="#{nav.admin.supply}">Bedarf &amp; Spenden</a>
                             <a th:href="@{/admin/notification-rules}" class="nav-link" th:text="#{nav.admin.notificationRules}">Notification rules</a>
                             <a th:href="@{/admin/sync-reports}" class="nav-link" th:text="#{nav.admin.syncReports}">Sync-Berichte</a>
                             <a th:href="@{/admin/discord-registrations}" class="nav-link" data-testid="nav-admin-discord-registrations" th:text="#{nav.admin.discordRegistrations}">Discord-Registrierungen</a>

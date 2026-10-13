@@ -82,6 +82,7 @@ public final class NoStoreApiScopes {
           "/api/v1/settings/**",
           "/api/v1/special-commands/*/members/**",
           "/api/v1/squadrons/*/members/**",
+          "/api/v1/supply/**",
           "/api/v1/terms/**",
           "/api/v1/users/**");
 

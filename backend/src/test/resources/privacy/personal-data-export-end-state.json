@@ -525,5 +525,19 @@
       "updated_at" : "<instant>"
     } ],
     "truncated" : false
+  }, {
+    "key" : "supplyDonations",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "created_at" : "<instant>",
+      "status" : "RECEIVED",
+      "entry" : "Zzz Export Ore",
+      "quality" : 500,
+      "pledged_amount" : 4.0,
+      "received_amount" : 4.0,
+      "receiving_unit" : "IRIDIUM",
+      "anonymous" : false
+    } ],
+    "truncated" : false
   } ]
 }

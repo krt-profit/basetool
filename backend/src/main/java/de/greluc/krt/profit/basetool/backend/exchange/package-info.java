@@ -40,7 +40,8 @@
       "orgunit::api",
       "platform::api",
       "refinery::api",
-      "scope::api"
+      "scope::api",
+      "supply::api"
     })
 package de.greluc.krt.profit.basetool.backend.exchange;
 

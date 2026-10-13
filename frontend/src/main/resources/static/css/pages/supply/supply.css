@@ -1,0 +1,42 @@
+@layer base, components, page, utilities;
+
+@layer page {
+    .supply-tabs {
+        margin-bottom: var(--space-4);
+    }
+    .supply-table .cell-actions {
+        white-space: nowrap;
+    }
+    .supply-table .cell-actions .btn {
+        margin-inline-start: var(--space-2);
+    }
+    .supply-meter {
+        width: 100%;
+        min-width: 6rem;
+        margin-bottom: var(--space-2);
+    }
+    .supply-mystats {
+        margin-bottom: var(--space-4);
+        padding: var(--space-4);
+    }
+    .supply-mystats__title,
+    .supply-section-title {
+        margin: 0 0 var(--space-3);
+        font-size: var(--fs-h3);
+    }
+    .supply-mystats__count {
+        margin: 0 0 var(--space-2);
+        color: var(--color-gray-1);
+    }
+    .supply-mystats__list {
+        margin: 0;
+        padding-inline-start: var(--space-6);
+    }
+    .supply-pledge-need {
+        margin: 0 0 var(--space-3);
+        color: var(--color-gray-1);
+    }
+    .supply-pledge-need[hidden] {
+        display: none;
+    }
+}

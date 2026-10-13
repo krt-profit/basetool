@@ -133,6 +133,7 @@
 /admin/special-commands/{id}/members/{userId}/lead POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSpecialCommandsPageController#toggleMemberLeadAjax gate=class:hasRole('ADMIN') layout=yes
 /admin/special-commands/{id}/update POST -> AdminSpecialCommandsPageController#updateSpecialCommand gate=class:hasRole('ADMIN') layout=yes
 /admin/special-commands/{id}/update POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSpecialCommandsPageController#updateSpecialCommandAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/supply GET -> SupplyPageController#adminSettings gate=method:hasRole('ADMIN') layout=yes
 /admin/sync-reports GET -> AdminSyncReportsPageController#combined gate=class:hasRole('ADMIN') layout=yes
 /admin/sync-reports/delete-old POST -> AdminSyncReportsPageController#deleteOld gate=class:hasRole('ADMIN') layout=yes
 /admin/sync-reports/delete-old POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSyncReportsPageController#deleteOldAjax gate=class:hasRole('ADMIN') layout=yes
@@ -213,6 +214,18 @@
 /api/proxy/special-commands/{id}/profit-eligible PATCH -> SpecialCommandAdminProxyController#setProfitEligible gate=method:hasRole('ADMIN') layout=no
 /api/proxy/squadrons/{id}/profit-eligible PATCH -> SquadronAdminProxyController#setProfitEligible gate=method:hasRole('ADMIN') layout=no
 /api/proxy/squadrons/{id}/promotion-enabled PATCH -> SquadronAdminProxyController#setPromotionEnabled gate=method:hasRole('ADMIN') layout=no
+/api/proxy/supply/admin/settings PUT -> SupplyProxyController#updateSettings gate=method:hasRole('ADMIN') layout=no
+/api/proxy/supply/admin/units/{orgUnitId} PUT -> SupplyProxyController#updateUnit gate=method:hasRole('ADMIN') layout=no
+/api/proxy/supply/donations POST -> SupplyProxyController#pledge gate=class:isAuthenticated() layout=no
+/api/proxy/supply/donations/recorded POST -> SupplyProxyController#record gate=class:isAuthenticated() layout=no
+/api/proxy/supply/donations/{id}/decline POST -> SupplyProxyController#decline gate=class:isAuthenticated() layout=no
+/api/proxy/supply/donations/{id}/receive POST -> SupplyProxyController#receive gate=class:isAuthenticated() layout=no
+/api/proxy/supply/donations/{id}/withdraw POST -> SupplyProxyController#withdraw gate=class:isAuthenticated() layout=no
+/api/proxy/supply/needs POST -> SupplyProxyController#createNeed gate=class:isAuthenticated() layout=no
+/api/proxy/supply/needs/{id} PUT -> SupplyProxyController#updateNeed gate=class:isAuthenticated() layout=no
+/api/proxy/supply/needs/{id}/pause POST -> SupplyProxyController#pauseNeed gate=class:isAuthenticated() layout=no
+/api/proxy/supply/needs/{id}/resume POST -> SupplyProxyController#resumeNeed gate=class:isAuthenticated() layout=no
+/api/proxy/supply/needs/{id}/withdraw POST -> SupplyProxyController#withdrawNeed gate=class:isAuthenticated() layout=no
 /api/v1/orders/{jobOrderId}/handovers/report/preview POST -> JobOrderHandoverReportProxyController#previewHandoverReport gate=method:isAuthenticated() layout=no
 /api/v1/orders/{jobOrderId}/handovers/{handoverId}/report GET -> JobOrderHandoverReportProxyController#downloadHandoverReport gate=method:isAuthenticated() layout=no
 /api/v1/orders/{jobOrderId}/item-handovers/{handoverId}/report GET -> JobOrderHandoverReportProxyController#downloadItemHandoverReport gate=method:isAuthenticated() layout=no
@@ -535,6 +548,10 @@
 /ship-data/reset-fitted POST headers=[X-Requested-With=XMLHttpRequest] -> ShipDataPageController#resetAllFittedAjax gate=method:hasRole('ADMIN') layout=yes
 /ship-data/ship-types/{id}/visibility POST -> ShipDataPageController#toggleShipTypeVisibility gate=method:hasRole('ADMIN') layout=yes
 /ship-data/ship-types/{id}/visibility POST headers=[X-Requested-With=XMLHttpRequest] -> ShipDataPageController#toggleShipTypeVisibilityAjax gate=method:hasRole('ADMIN') layout=yes
+/supply/donations/incoming GET -> SupplyPageController#incomingDonations gate=class:isAuthenticated() layout=yes
+/supply/donations/mine GET -> SupplyPageController#myDonations gate=class:isAuthenticated() layout=yes
+/supply/needs GET -> SupplyPageController#needs gate=class:isAuthenticated() layout=yes
+/supply/stats GET -> SupplyPageController#stats gate=class:isAuthenticated() layout=yes
 /terms GET -> TermsController#showTerms gate=none layout=yes
 /terms/accept GET -> TermsAcceptancePageController#showAcceptancePage gate=class:isAuthenticated() layout=yes
 /terms/accept POST -> TermsAcceptancePageController#recordAcceptance gate=class:isAuthenticated() layout=yes

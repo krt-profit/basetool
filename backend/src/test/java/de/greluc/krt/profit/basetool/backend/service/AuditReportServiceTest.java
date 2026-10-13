@@ -88,7 +88,8 @@ class AuditReportServiceTest {
           Map.entry(AuditDomain.MARKET, AuditEventType.MARKET_AUDIT_EXPORTED),
           Map.entry(AuditDomain.HANGAR, AuditEventType.HANGAR_AUDIT_EXPORTED),
           Map.entry(AuditDomain.BLUEPRINT, AuditEventType.BLUEPRINT_AUDIT_EXPORTED),
-          Map.entry(AuditDomain.CONNECTED_APPS, AuditEventType.CONNECTED_APPS_AUDIT_EXPORTED));
+          Map.entry(AuditDomain.CONNECTED_APPS, AuditEventType.CONNECTED_APPS_AUDIT_EXPORTED),
+          Map.entry(AuditDomain.SUPPLY, AuditEventType.SUPPLY_AUDIT_EXPORTED));
 
   @Test
   void export_rendersEventsAndRecordsExportEvent() throws IOException {
