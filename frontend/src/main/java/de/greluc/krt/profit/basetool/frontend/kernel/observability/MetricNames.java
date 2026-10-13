@@ -177,6 +177,15 @@ public final class MetricNames {
    */
   public static final String CLIENT_ERROR = "basetool.client.error";
 
+  /**
+   * Counter {@code basetool_client_csp_violation_total}, tag {@link #TAG_DIRECTIVE}: the {@link
+   * #CLIENT_ERROR_CSP_VIOLATION} reports by the violated Content-Security-Policy directive.
+   *
+   * <p>The directive is the first word of the beacon's message, kept only when it is a name in the
+   * server-side allow-list and counted as {@link #DIRECTIVE_OTHER} otherwise (REQ-OBS-006).
+   */
+  public static final String CLIENT_CSP_VIOLATION = "basetool.client.csp.violation";
+
   /** Counter {@code basetool_backend_client_errors_total} — tags {@code reason}, {@code method}. */
   public static final String BACKEND_CLIENT_ERRORS = "basetool.backend.client.errors";
 
@@ -244,6 +253,15 @@ public final class MetricNames {
    * five {@code CLIENT_ERROR_*} literals; a non-matching payload yields no series (REQ-OBS-006).
    */
   public static final String TAG_KIND = "kind";
+
+  /**
+   * Tag key: the violated Content-Security-Policy directive on {@link #CLIENT_CSP_VIOLATION},
+   * resolved server-side against an allow-list of directive names (REQ-OBS-006).
+   */
+  public static final String TAG_DIRECTIVE = "directive";
+
+  /** {@link #TAG_DIRECTIVE} value for a report whose directive is not in the allow-list. */
+  public static final String DIRECTIVE_OTHER = "other";
 
   /** Tag key: the HTTP verb of the failed backend call ({@code GET}/{@code POST}/…). */
   public static final String TAG_METHOD = "method";
