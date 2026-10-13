@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-06-17
 - **Deciders:** @greluc
-- **Related:** spec REQ-SEC-012 · ADR-0001 (frontend OAuth2 client) · runbook `docs/INGEST_KEYCLOAK_SETUP.md` (step 4)
+- **Related:** spec REQ-SEC-012 · ADR-0001 (frontend OAuth2 client) · runbook `docs/archive/INGEST_KEYCLOAK_SETUP.md` (step 4)
 
 ## Context
 

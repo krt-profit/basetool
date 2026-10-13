@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
-> **Owner area:** INGEST · **Related ADRs:** [ADR-0018](../adr/0018-desktop-ingest-gateway-device-grant.md), [ADR-0110](../adr/0110-ingest-handoff-consume-off-navigational-get.md), [ADR-0129](../adr/0129-ingest-gateway-is-a-trusted-subsystem-not-a-token-relay.md), [ADR-0204](../adr/0204-backend-and-ingest-call-http-through-restclient-without-webflux.md) · **Related:** epic [#639](https://github.com/krt-profit/basetool/issues/639), runbook [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md), [`refinery-screenshot-import.md`](refinery-screenshot-import.md) (`REQ-REFINERY-018`), [`security-and-access.md`](security-and-access.md), [`api-conventions.md`](api-conventions.md), [ADR-0007](../adr/0007-client-side-vlm-screenshot-extraction.md), [ADR-0008](../adr/0008-refinery-extract-json-contract.md)
+> **Owner area:** INGEST · **Related ADRs:** [ADR-0018](../adr/0018-desktop-ingest-gateway-device-grant.md), [ADR-0110](../adr/0110-ingest-handoff-consume-off-navigational-get.md), [ADR-0129](../adr/0129-ingest-gateway-is-a-trusted-subsystem-not-a-token-relay.md), [ADR-0204](../adr/0204-backend-and-ingest-call-http-through-restclient-without-webflux.md) · **Related:** epic [#639](https://github.com/krt-profit/basetool/issues/639), runbook [`INGEST_KEYCLOAK_SETUP.md`](../archive/INGEST_KEYCLOAK_SETUP.md), [`refinery-screenshot-import.md`](refinery-screenshot-import.md) (`REQ-REFINERY-018`), [`security-and-access.md`](security-and-access.md), [`api-conventions.md`](api-conventions.md), [ADR-0007](../adr/0007-client-side-vlm-screenshot-extraction.md), [ADR-0008](../adr/0008-refinery-extract-json-contract.md)
 
 # Desktop one-click ingest (send-to-basetool)
 
@@ -274,7 +274,7 @@ with `basetool-backend`), `ExchangeDpopGateTest` (an unauthenticated or unbound 
 nothing relayed), `ArchitectureTest` (every REST surface is authorization-annotated) · **Code:**
 `SecurityConfig`, `ExchangeController`, `HandoffStagingService` (per-`sub` Redis key); the public
 `basetool-sc-extractor`
-device-grant client per [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md) · **Issues:** #641, #642
+device-grant client per [`INGEST_KEYCLOAK_SETUP.md`](../archive/INGEST_KEYCLOAK_SETUP.md) · **Issues:** #641, #642
 
 ### REQ-INGEST-003 — Short-lived single-use Redis handoff
 
@@ -579,7 +579,7 @@ precede turning the check on, in that order.
 **Enforced by:** `SecurityConfigTest` (the audience validator), `ArchitectureTest` (every surface is
 authorization-annotated; the gateway adds no new authority) · **Code:** ingest `SecurityConfig`, the
 backend `SecurityConfig` audience knob; Keycloak realm config per
-[`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md); `ROLES_AND_PERMISSIONS.md` unchanged ·
+[`INGEST_KEYCLOAK_SETUP.md`](../archive/INGEST_KEYCLOAK_SETUP.md); `ROLES_AND_PERMISSIONS.md` unchanged ·
 **Issues:** #641
 
 ### REQ-INGEST-009 — Bot / scanner hardening at the edge

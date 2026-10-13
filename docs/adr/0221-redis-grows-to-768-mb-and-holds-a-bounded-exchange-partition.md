@@ -84,7 +84,7 @@ before its `INCR`, so it can no longer lose its expiry (second review, L8).
 
 ## Amendment 2 (2026-09-28) — the resize arrives with the release, and leaves with a rollback
 
-**Status:** accepted · **Spec:** `REQ-OPS-018` · **Runbook:** `docs/EXCHANGE_GO_LIVE_RUNBOOK.md`
+**Status:** accepted · **Spec:** `REQ-OPS-018` · **Runbook:** `docs/archive/EXCHANGE_GO_LIVE_RUNBOOK.md`
 
 Decision 1 placed the resize „before the first exchange release". It cannot be a step of its own:
 `--maxmemory 768mb` and `Memory=1024M` are lines of the generated `redis.container` unit, and units

@@ -9,7 +9,7 @@
   [`docs/specs/deployment-delivery.md`](../specs/deployment-delivery.md) (`REQ-OPS-022`,
   `REQ-OPS-033`) · [`docs/specs/security-and-access.md`](../specs/security-and-access.md)
   (`REQ-SEC-030`, `REQ-SEC-035`) ·
-  [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md) (the procedure)
+  [`INGEST_KEYCLOAK_SETUP.md`](../archive/INGEST_KEYCLOAK_SETUP.md) (the procedure)
 
 ## Context
 

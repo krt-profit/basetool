@@ -5,7 +5,7 @@
 
 ## Context & goal
 
-The [domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md) (decisions D-01 and D-02,
+The [domain modularisation plan](../archive/DOMAIN_MODULARISATION_PLAN.md) (decisions D-01 and D-02,
 §5.1 and §5.7) turns the backend into a modular monolith: one package per domain inside the
 `backend` Gradle project, boundaries enforced by tests. Before any class moves, the target module of
 every class is written down, the coupling that exists today is frozen in a baseline that may only

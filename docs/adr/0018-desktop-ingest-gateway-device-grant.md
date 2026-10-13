@@ -12,7 +12,7 @@
   [ADR-0216](0216-the-exchange-api-is-a-separate-contract-on-the-ingest-gateway.md) (epic #2078).
 - **Date:** 2026-06-16
 - **Deciders:** Lucas Greuloch (@greluc)
-- **Related:** epic [#639](https://github.com/krt-profit/basetool/issues/639) · spec [`desktop-ingest.md`](../specs/desktop-ingest.md) (`REQ-INGEST-*`) · runbook [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md) · [`refinery-screenshot-import.md`](../specs/refinery-screenshot-import.md) `REQ-REFINERY-018` · [ADR-0007](0007-client-side-vlm-screenshot-extraction.md) · [ADR-0008](0008-refinery-extract-json-contract.md) · supersedes the deferred direct-upload phase [#437](https://github.com/krt-profit/basetool/issues/437)
+- **Related:** epic [#639](https://github.com/krt-profit/basetool/issues/639) · spec [`desktop-ingest.md`](../specs/desktop-ingest.md) (`REQ-INGEST-*`) · runbook [`INGEST_KEYCLOAK_SETUP.md`](../archive/INGEST_KEYCLOAK_SETUP.md) · [`refinery-screenshot-import.md`](../specs/refinery-screenshot-import.md) `REQ-REFINERY-018` · [ADR-0007](0007-client-side-vlm-screenshot-extraction.md) · [ADR-0008](0008-refinery-extract-json-contract.md) · supersedes the deferred direct-upload phase [#437](https://github.com/krt-profit/basetool/issues/437)
 
 ## Context
 

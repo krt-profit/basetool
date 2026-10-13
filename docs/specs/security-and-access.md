@@ -158,7 +158,7 @@ pins all three, and a change to it is a reviewed change.
 `AuthorizationMatrixRenderingTest` (proves the matrix can fail: fixture annotations, reordered
 fixture rules, an unknown manager) · **Code:** test-only, `AuthorizationMatrix` ·
 **Related:** REQ-SEC-002, REQ-SEC-003, REQ-SEC-052, plan guard G-02
-([`DOMAIN_MODULARISATION_PLAN.md`](../DOMAIN_MODULARISATION_PLAN.md) §6.1)
+([`DOMAIN_MODULARISATION_PLAN.md`](../archive/DOMAIN_MODULARISATION_PLAN.md) §6.1)
 
 ### REQ-SEC-003 — Architectural invariants (ArchUnit-enforced)
 
@@ -327,7 +327,7 @@ class rename, a moved bean or a changed signature therefore has to fail the buil
 `MissionSecurityService`, `AuthHelperService`, `OrgRoleManagementSecurityService`,
 `BankSecurityService`, `SpecialCommandSecurityService`, `ExchangeGate`, `ConnectedAppsGate` ·
 **Related:** REQ-SEC-002, REQ-OBS-020, plan guard G-04
-([`DOMAIN_MODULARISATION_PLAN.md`](../DOMAIN_MODULARISATION_PLAN.md) §6.1)
+([`DOMAIN_MODULARISATION_PLAN.md`](../archive/DOMAIN_MODULARISATION_PLAN.md) §6.1)
 
 ### REQ-SEC-076 — No class calls its own gated method
 
@@ -1570,7 +1570,7 @@ next free number.)
 The rule that **only client software expressly approved by the operator may access the platform's
 interfaces** is binding on users through the Terms of Use, not merely enforced at the ingest
 gateway. Until 2026-08-03 it existed solely as operator documentation (`README.md`,
-[`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md),
+[`INGEST_KEYCLOAK_SETUP.md`](../archive/INGEST_KEYCLOAK_SETUP.md),
 [`desktop-ingest.md`](desktop-ingest.md)) — text a user never sees and that is no part of the
 agreement. Blocking the author of an unapproved client was therefore only possible under the
 no-reason clause of terms section 8, which reads as arbitrary rather than as a named breach.
@@ -5750,7 +5750,7 @@ stays an explicit loop, not an annotation.
 
 ### REQ-SEC-082 — Admin accounts need a second factor, and the realm's session windows are one reviewed file
 
-Three realm-wide hardening steps of [`KEYCLOAK_HARDENING_RUNBOOK.md`](../KEYCLOAK_HARDENING_RUNBOOK.md)
+Three realm-wide hardening steps of [`KEYCLOAK_HARDENING_RUNBOOK.md`](../archive/KEYCLOAK_HARDENING_RUNBOOK.md)
 (D-26 of the modularisation plan) are code, not console clicks: `scripts/harden-keycloak-realm.py`,
 dry run by default, with a rollback file, never deleting.
 
@@ -5788,13 +5788,13 @@ dry run by default, with a rollback file, never deleting.
   (`harden-keycloak-realm.py --selftest`).
 - [ ] A login that comes in through Discord is gated: **not testable in the repository** (the test
   realm has no real Discord provider, only a disabled stand-in the bind is exercised on); the owner checks it at the production run
-  ([`OWNER_STEPS_2026-10.md`](../OWNER_STEPS_2026-10.md) § 7).
+  ([`OWNER_STEPS_2026-10.md`](../archive/OWNER_STEPS_2026-10.md) § 7).
 
 **Enforced by:** `scripts/harden-keycloak-realm.py --selftest`,
 `scripts/harden-keycloak-realm.integration.py` (needs Docker; run before changing the script) ·
 **Code:** `scripts/harden-keycloak-realm.py`, `scripts/keycloak/session-windows.json`,
 `scripts/keycloak/hardening_probe.py` · **Related:** REQ-SEC-052, REQ-SEC-053, ADR-0159, ADR-0202,
-[`OWNER_STEPS_2026-10.md`](../OWNER_STEPS_2026-10.md)
+[`OWNER_STEPS_2026-10.md`](../archive/OWNER_STEPS_2026-10.md)
 
 ---
 

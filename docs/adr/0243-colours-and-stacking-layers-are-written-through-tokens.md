@@ -7,7 +7,7 @@
 - **Related:** spec [`ui-design-system.md`](../specs/ui-design-system.md) (`REQ-UI-001`, `REQ-UI-023`)
   · [ADR-0212](0212-every-stylesheet-sits-in-a-cascade-layer.md) (cascade layers) ·
   [ADR-0239](0239-the-browser-baseline-is-baseline-2025-and-trusted-types-follow.md) (browser
-  baseline) · [`DOMAIN_MODULARISATION_PLAN.md`](../DOMAIN_MODULARISATION_PLAN.md) §8.2, §9.2 B-03
+  baseline) · [`DOMAIN_MODULARISATION_PLAN.md`](../archive/DOMAIN_MODULARISATION_PLAN.md) §8.2, §9.2 B-03
 
 ## Context
 

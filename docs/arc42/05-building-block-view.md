@@ -72,7 +72,7 @@ Layered, with the direction enforced by ArchUnit rather than by convention:
 | `filter` / `annotation` / `validation` / `util` / `web` / `exception` / `config` | The usual Spring surface |
 
 These layer packages were cut into domain modules (the
-[domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md), §5.1); since 2026-10-12 every domain
+[domain modularisation plan](../archive/DOMAIN_MODULARISATION_PLAN.md), §5.1); since 2026-10-12 every domain
 class lies in a module package and the table above describes the roles the layers had. The business gauges are published per module (`platform.api.BusinessGaugeSource`, one `…BusinessGauges` bean in each owning module's `internal`); `app.internal.BusinessMetricsCollector` only schedules them. The
 **domain map** [`backend/src/test/resources/architecture/domain-map.txt`](../../backend/src/test/resources/architecture/domain-map.txt)
 is the source of truth for its target module and that module's rank: every class is assigned there
@@ -450,7 +450,7 @@ decisions in ADR-0216 … ADR-0221 and ADR-0224 … ADR-0228.
 
 *Corrected 2026-09-29:* the write-services row said every exchange write goes "through the domain's
 own services". The stock book-in does not: it is a second write path into the Lager, which the
-[domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md) (§5.3, §7.5) routes through the
+[domain modularisation plan](../archive/DOMAIN_MODULARISATION_PLAN.md) (§5.3, §7.5) routes through the
 inventory module's command API.
 
 ## 5.6 The monitoring plane

@@ -1,11 +1,11 @@
 > **Doc type:** Appendix of the frozen plan
-> [Domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md) — a snapshot of 2026-09-29
+> [Domain modularisation plan](../archive/DOMAIN_MODULARISATION_PLAN.md) — a snapshot of 2026-09-29
 > against `origin/main` `95e945326`; statuses change as work lands.
 
 # Previous audits re-evaluated
 
 This appendix holds the full tables behind §11 of the
-[domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md). As decided by the owner (D-06), it
+[domain modularisation plan](../archive/DOMAIN_MODULARISATION_PLAN.md). As decided by the owner (D-06), it
 re-evaluates the September 2026 improvement audit and the July 2026 modularity audit in full, and
 the earlier focused audits only for the items they deferred, rejected or left open, plus the fixes a
 domain split could put at risk. Findings about the sibling repositories are listed, not re-verified.
@@ -886,7 +886,7 @@ the September audit (OPS-MON-01, OPS-REL-01).
 | D1981-INGEST007 | REQ-INGEST-007 promises a "remember me" opt-in the extractor lacks | — | UNKNOWN | The spec is unchanged (`docs/specs/desktop-ingest.md:515-522`); to be settled in the extractor repository. |
 | D1981-REQIDS | Duplicated requirement ids | DONE | DROPPED | 18 ids renumbered (`d9a7d53bb3`). |
 | D1981-RESTORE | The restore-drill alert used a 35-day window | DONE | DROPPED | Eight days (`monitoring/prometheus/alerts/ops-automation.yml:56`). |
-| D1981-KCHARDEN | Keycloak hardening steps 2 (SMTP, forgotten password), 11 (OTP for admins) and 12 (session windows) | OPEN | CONFIRMED | Adopted on 2026-10-04 (D-26); each realm write needs the owner's yes. `docs/KEYCLOAK_HARDENING_RUNBOOK.md`; independent of the domain split — step 11 matters most, as admin accounts have no second factor. |
+| D1981-KCHARDEN | Keycloak hardening steps 2 (SMTP, forgotten password), 11 (OTP for admins) and 12 (session windows) | OPEN | CONFIRMED | Adopted on 2026-10-04 (D-26); each realm write needs the owner's yes. `docs/archive/KEYCLOAK_HARDENING_RUNBOOK.md`; independent of the domain split — step 11 matters most, as admin accounts have no second factor. |
 | D1981-OAUTH | The confidential frontend OAuth2 client not yet migrated | DONE | DROPPED | Live in production since 2026-09-25. |
 | D1981-TS | TypeScript migration plan | — | REJECTION-HOLDS | Deliberately unscheduled (ADR-0125); per-domain script folders work with `checkJs`. |
 

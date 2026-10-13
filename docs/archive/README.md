@@ -44,7 +44,9 @@ section number, not because it describes the system today.
 | [`ANDROID_API_EXPOSURE_PLAN.md`](ANDROID_API_EXPOSURE_PLAN.md) | Exposing `/api/v1` to the Android app | Shipped 2026-08-21 |
 | [`MEMBERS_ONLY_PLAN.md`](MEMBERS_ONLY_PLAN.md) | Removing every anonymous and guest access | Shipped 2026-09-06 |
 | [`WIRE_PROTOCOL_EVALUATION.md`](WIRE_PROTOCOL_EVALUATION.md) | Whether to leave REST/JSON (an analysis) | Decided 2026-09-10 → ADR-0161 |
-| [`domain-modularisation-audit-2026-09/`](domain-modularisation-audit-2026-09/README.md) | The raw evidence of the domain modularisation audit (reports, finding data, scripts) | Frozen 2026-10-01; the plan built from it is [`DOMAIN_MODULARISATION_PLAN.md`](../DOMAIN_MODULARISATION_PLAN.md), itself frozen 2026-10-13 |
+| [`domain-modularisation-audit-2026-09/`](domain-modularisation-audit-2026-09/README.md) | The raw evidence of the domain modularisation audit (reports, finding data, scripts) | Frozen 2026-10-01; the plan built from it is [`DOMAIN_MODULARISATION_PLAN.md`](DOMAIN_MODULARISATION_PLAN.md), itself frozen 2026-10-13 |
+| [`DOMAIN_MODULARISATION_PLAN.md`](DOMAIN_MODULARISATION_PLAN.md) | The backend cut into domains (modular monolith) | Frozen 2026-10-13; P5-c and P5-d not implemented |
+| [`DESIGN_SC_EXTRACTOR.md`](DESIGN_SC_EXTRACTOR.md) | The binding design of the SC Extractor GUI (epic #439) | Implemented 2026-06-10; archived 2026-10-13 |
 | [`MGMT_VPN_PLAN.md`](MGMT_VPN_PLAN.md) | Management access over WireGuard | **Not carried out** beyond its inventory; closed 2026-07-08 |
 | [`PODMAN_MIGRATION_PLAN.md`](PODMAN_MIGRATION_PLAN.md) | Rootless Podman under Quadlet on a rebuilt host | Cut over 2026-09-22 |
 | [`PODMAN_HOST_BOOTSTRAP.md`](PODMAN_HOST_BOOTSTRAP.md) | The host bootstrap, step by step | Superseded by the Ansible role (ADR-0188) |
@@ -61,6 +63,12 @@ section number, not because it describes the system today.
 | [`MONITORING_ROLLOUT_RUNBOOK.md`](MONITORING_ROLLOUT_RUNBOOK.md) | The Prometheus/Grafana/Loki/Tempo stack | Closed 2026-08-28 (epics #936, #1041) |
 | [`EDGE_CUTOVER_RUNBOOK.md`](EDGE_CUTOVER_RUNBOOK.md) | Nginx Proxy Manager → native nginx | 2026-09-12 |
 | [`PODMAN_CUTOVER_RUNBOOK.md`](PODMAN_CUTOVER_RUNBOOK.md) | Docker host → rootless Podman host | 2026-09-22 |
+| [`EXCHANGE_GO_LIVE_RUNBOOK.md`](EXCHANGE_GO_LIVE_RUNBOOK.md) | The External Client Exchange go-live, with the coupled Android and SC Extractor release | 2026-09-28 |
+| [`RELEASE_1.11.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.11.0_PRODUCTION_RUNBOOK.md) | The production rollout of v1.11.0 | 2026-09-25 |
+| [`RELEASE_1.14.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.14.0_PRODUCTION_RUNBOOK.md) | The production rollout of v1.14.0 | 2026-10 |
+| [`INGEST_KEYCLOAK_SETUP.md`](INGEST_KEYCLOAK_SETUP.md) | The Keycloak side of the ingest gateway, including onboarding an approved ingest client | Applied 2026-06 → 2026-09; archived 2026-10-13 |
+| [`KEYCLOAK_HARDENING_RUNBOOK.md`](KEYCLOAK_HARDENING_RUNBOOK.md) | The twelve realm hardening steps (WP-K2) | Archived 2026-10-13; per-step state as of that date |
+| [`OWNER_STEPS_2026-10.md`](OWNER_STEPS_2026-10.md) | The owner-only host and realm steps of October 2026 | Archived 2026-10-13 |
 
 The three documents marked *restored* had been deleted from the repository in May 2026. They were
 brought back from git history on 2026-09-22 because some 40 Java sources and Flyway migrations
@@ -73,12 +81,7 @@ These are still in use and stay in [`docs/`](../):
 
 - [`deployment.md`](../deployment.md) — production deployment and operations
 - [`backup.md`](../backup.md) — backup, restore and the restore drill
-- [`KEYCLOAK_HARDENING_RUNBOOK.md`](../KEYCLOAK_HARDENING_RUNBOOK.md) — realm hardening; some steps
-  are still open
-- [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md) — Keycloak side of the ingest gateway,
-  including onboarding a new approved ingest client
 - [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md) — ADR-0001,
   not yet carried out
 - [`TYPESCRIPT_MIGRATION_PLAN.md`](../TYPESCRIPT_MIGRATION_PLAN.md) — a costed option, not scheduled
-- [`DESIGN_SC_EXTRACTOR.md`](../DESIGN_SC_EXTRACTOR.md) — the binding design of the SC Extractor GUI
 - [`privacy/data-breach-runbook.md`](../privacy/data-breach-runbook.md) — the GDPR breach procedure

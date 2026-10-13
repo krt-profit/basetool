@@ -7,7 +7,7 @@
   `REQ-FE-018`, `REQ-FE-023`, `REQ-FE-034`) · [ADR-0069](0069-inline-js-page-module-extraction.md)
   (page modules, inline scripts as data) · [ADR-0125](0125-typed-javascript-via-checkjs-not-typescript.md)
   (type check) · [ADR-0239](0239-the-browser-baseline-is-baseline-2025-and-trusted-types-follow.md)
-  (browser baseline) · [`DOMAIN_MODULARISATION_PLAN.md`](../DOMAIN_MODULARISATION_PLAN.md) §7.8, §8.2
+  (browser baseline) · [`DOMAIN_MODULARISATION_PLAN.md`](../archive/DOMAIN_MODULARISATION_PLAN.md) §7.8, §8.2
 
 ## Context
 

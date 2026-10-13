@@ -1,3 +1,7 @@
+> **Archived 2026-10-13.** Doc type: Historical record — frozen, kept as a record and no longer updated. Commands and states below describe the host and the code as they were.
+>
+> **Current truth:** [`deployment.md`](../deployment.md) and [`security-and-access.md`](../specs/security-and-access.md). Index of the archive: [`README.md`](README.md).
+
 > **Doc type:** Operator runbook, one page — **the owner runs every step; nothing here was or may be
 > executed by an agent.** Written 2026-10-10 (domain modularisation plan, D-26). **Living document:**
 > a step is struck from the table below when it is done, with the date. Last reviewed: 2026-10-13.
@@ -10,7 +14,7 @@ linked; this page is the order, the approvals and the words to type.
 
 > [!important] Approvals
 > A **production write** (host, realm, release) happens only after @greluc has said yes in chat to
-> *that* command — root [`CLAUDE.md` → *Production host access*](../CLAUDE.md). **Repository
+> *that* command — root [`CLAUDE.md` → *Production host access*](../../CLAUDE.md). **Repository
 > settings** (GitHub environments and secrets) are the owner's own action in the web UI or with
 > `gh` under the owner's login. Where the table says *testing*, the owner's own call is enough; the
 > testing host is never an agent's to touch either.
@@ -38,7 +42,7 @@ one file when the owner picks the numbers, and step 9 needs the release to exist
 (GitHub created it empty on the first job that named it), holds no secret, and the repository secret
 `RELEASE_APP_PRIVATE_KEY` is still set. The release jobs therefore read the repository secret. After
 this step they read the environment secret, which only `main` can reach
-([ADR-0201](adr/0201-release-tags-and-release-prs-are-created-by-the-basetool-release-app.md)
+([ADR-0201](../adr/0201-release-tags-and-release-prs-are-created-by-the-basetool-release-app.md)
 amendments 3 and 4).
 
 **Do it in this order; the secret goes in before the old one goes out.**
@@ -185,7 +189,7 @@ Prometheus, `time() - basetool_restore_drill_last_success_timestamp` is a few se
 **If it fails:** `FATAL … refusing to run with an unpinned image` means the unit's image pin is
 unreadable (`db-backend.container` has no `@sha256:`), which is the defect S-09 guards against: stop
 and report it. Any other `FAIL:` line is a restore problem; treat it as the severe incident
-[`backup.md`](backup.md) says it is.
+[`backup.md`](../backup.md) says it is.
 
 **Rollback:** there is nothing to undo. An interrupted drill leaves one container and a work
 directory: `sudo -u iri podman rm -f iri-restore-drill` and `rm -rf /var/iri/backup/restore-drill`.
@@ -432,7 +436,7 @@ structure is now defined by `scripts/harden-keycloak-realm.py` itself, which is 
 
 The CSP's Trusted Types directives ship in report-only mode (ADR-0239). The switch is the only step
 of that decision still open; the full procedure, with the reasoning, is
-[`deployment.md` → *Trusted Types: report, then enforce*](deployment.md#trusted-types-report-then-enforce).
+[`deployment.md` → *Trusted Types: report, then enforce*](../deployment.md#trusted-types-report-then-enforce).
 
 **Precondition** — at least a week of ordinary use since the release with the report-only policy went
 live, and `DialogA11yE2eTest` green on `main`. In Grafana → Explore → Prometheus the query must
@@ -478,7 +482,7 @@ again with the same command, `${UCTL} restart frontend.service`.
 > of that release.
 
 **Not cut yet** — the latest release on 2026-10-10 is v1.13.7. This step is the standard promotion
-([`deployment.md` → *Promoting to production*](deployment.md#promoting-to-production)) with the
+([`deployment.md` → *Promoting to production*](../deployment.md#promoting-to-production)) with the
 checks this release needs. This release has its own runbook, with the exact pre-promotion reads, the
 backup step, the post-promotion verification and the rollback:
 [`RELEASE_1.14.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.14.0_PRODUCTION_RUNBOOK.md). Follow that, not this

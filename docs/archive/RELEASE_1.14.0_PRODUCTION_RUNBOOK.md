@@ -1,9 +1,13 @@
+> **Archived 2026-10-13.** Doc type: Historical record — frozen, kept as a record and no longer updated. Commands and states below describe the host and the code as they were.
+>
+> **Current truth:** [`deployment.md`](../deployment.md). Index of the archive: [`README.md`](README.md).
+
 # Release 1.14.0 — production rollout runbook
 
 > **Doc type:** Operator runbook for **one** release — the move of production (and, through
 > `promote.yml`'s `sync-testing`, the testing host) from **v1.13.7 to v1.14.0**. Written 2026-10-10 from
 > a read-only audit of the 235 commits between `v1.13.7` and `4d60fd5cb`, against the code and the docs
-> on `main`. **Historical once 1.14.0 is live**: freeze it then and let [`deployment.md`](deployment.md)
+> on `main`. **Historical once 1.14.0 is live**: freeze it then and let [`deployment.md`](../deployment.md)
 > stay the living truth. Several production facts below are **claims from the repository's own docs**,
 > not reads; the pre-checks in §2.2 turn them into reads.
 >
@@ -12,7 +16,7 @@
 > no command in this document has been executed.
 
 Shell conventions (`cd /`, `${UCTL}`, `${UPOD}`) are the ones in
-[`deployment.md` → Shell conventions](deployment.md#shell-conventions-used-below).
+[`deployment.md` → Shell conventions](../deployment.md#shell-conventions-used-below).
 
 > [!danger] **This release cannot be rolled back by code alone.**
 > Migrations `V262`–`V264` make `quality_tier_id` `NOT NULL` on three job-order tables and `V264` drops
@@ -145,7 +149,7 @@ tail -40 /var/log/iri-backup.log                           # ends without FATAL;
 ```
 
 Confirm the off-site copy exists and note the Flyway head (`260`) and the time. The restore procedure is
-[`backup.md` → Restoring](backup.md#restoring-disaster-recovery); read it now, not during an incident. A
+[`backup.md` → Restoring](../backup.md#restoring-disaster-recovery); read it now, not during an incident. A
 migration rehearsal on a copy of that snapshot (a throwaway Postgres) is the stronger check and is
 optional.
 
@@ -170,7 +174,7 @@ where the new map expects 404; it turns green after the deploy.
 > [!warning] This step was optional, and skipping it took production down on 2026-10-10
 > The host's `deploy.sh` and `backup.sh` were the pre-fix copies, the edge started after the apps and the
 > promotion failed. The comparison is now a mandatory step of every promotion, with the exact commands:
-> [`deployment.md` → Before a promotion: the host scripts](deployment.md#before-a-promotion-the-host-scripts)
+> [`deployment.md` → Before a promotion: the host scripts](../deployment.md#before-a-promotion-the-host-scripts)
 > (ADR-0247). The text below is the original, kept as it was.
 
 `deploy.sh` and the other scripts reach the host only through the Ansible role, not the config bundle. This
@@ -270,7 +274,7 @@ backoff (600 s, doubling). Recovery: fix the offending rows (your decision, a pr
 retry, or `deploy.sh --force`; or restore the pre-promotion backup.
 
 **So the rollback is: restore from the backup of §2.3.** It returns the database to the instant of the backup and
-loses every write since, from every member. Procedure: [`backup.md` → Restoring](backup.md#restoring-disaster-recovery),
+loses every write since, from every member. Procedure: [`backup.md` → Restoring](../backup.md#restoring-disaster-recovery),
 then promote the version the restored data fits (`1.13.7`). Stop the deploy timer first so no tick brings the new
 release back mid-restore. Compensating SQL for a rollback that keeps the data (drop the three `NOT NULL`s, re-fill the old
 columns from `quality_tier`, recreate the dropped unique index, delete the new rules and notices) is a sketch that was never

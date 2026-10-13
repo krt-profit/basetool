@@ -1,6 +1,10 @@
+> **Archived 2026-10-13.** Doc type: Historical record — frozen, kept as a record and no longer updated. Commands and states below describe the host and the code as they were.
+>
+> **Current truth:** [`desktop-ingest.md`](../specs/desktop-ingest.md), [`refinery-screenshot-import.md`](../specs/refinery-screenshot-import.md) and the `basetool-sc-extractor` repository. Index of the archive: [`README.md`](README.md).
+
 # Design Spec — Basetool SC Extractor (GUI rebuild for epic #439)
 
-> **Doc type:** Binding design spec for epic #439 — **implemented** (desktop tool: [`krt-profit/basetool-sc-extractor`](https://github.com/krt-profit/basetool-sc-extractor) PR #5, merged while the repository was still `basetool-bp-extractor`; frontend review surface: basetool #518; both 2026-06-10). Registered in [`docs/specs/INDEX.md`](specs/INDEX.md). Remains the binding visual reference for the extractor GUI and the shared review language; UI changes must keep matching it or amend it in the same PR. Last reviewed: 2026-09-22, against the extractor at `c5c6e84`.
+> **Doc type:** Binding design spec for epic #439 — **implemented** (desktop tool: [`krt-profit/basetool-sc-extractor`](https://github.com/krt-profit/basetool-sc-extractor) PR #5, merged while the repository was still `basetool-bp-extractor`; frontend review surface: basetool #518; both 2026-06-10). Registered in [`docs/specs/INDEX.md`](../specs/INDEX.md). Remains the binding visual reference for the extractor GUI and the shared review language; UI changes must keep matching it or amend it in the same PR. Last reviewed: 2026-09-22, against the extractor at `c5c6e84`.
 >
 > **Provenance / how to read this.** This is the **binding** UI/UX design for the SC
 > Extractor desktop tool (and the shared visual language of the frontend review
@@ -9,7 +13,7 @@
 > <https://api.anthropic.com/v1/design/h/mM6v29vZctN6kiBsF62_eA>
 > — a gzip bundle; extract it and open `project/Basetool SC Extractor.html` to click
 > through every screen and state. **Offline-capable mirror (vendored in this repo):**
-> [`design/basetool-sc-extractor.offline.zip`](design/basetool-sc-extractor.offline.zip)
+> [`design/basetool-sc-extractor.offline.zip`](../design/basetool-sc-extractor.offline.zip)
 > — a single self-contained HTML file (all CSS / JS / fonts / images embedded; **no
 > network needed**), shipped zipped; extract it and open the HTML in any browser to click
 > through every screen offline. This Markdown file is the written contract that
@@ -27,7 +31,7 @@
 > **Reference prototype:** the interactive HTML prototype inside the Claude Design
 > bundle linked above (`project/Basetool SC Extractor.html`), or — fully offline — the
 > vendored mirror
-> [`design/basetool-sc-extractor.offline.zip`](design/basetool-sc-extractor.offline.zip) (extract + open the HTML) — every screen and state
+> [`design/basetool-sc-extractor.offline.zip`](../design/basetool-sc-extractor.offline.zip) (extract + open the HTML) — every screen and state
 > below is clickable; the DE/EN toggle, density, nav model and confidence display are
 > togglable via the in-app Tweaks panel, but the **frozen defaults** are the ones
 > listed under *Locked decisions*.
@@ -102,7 +106,7 @@ tokens. The desktop app mirrors these in `src/main/kotlin/com/basetool/bpextract
   the title bar, and the multi-size installer icon (`src/main/resources/app.ico`, frames
   16/24/32/48/64/128/256 so Explorer never resamples one large frame). The org mark stays on
   org-branded surfaces only — mirrors REQ-UI-019 in
-  [`specs/ui-design-system.md`](specs/ui-design-system.md).
+  [`specs/ui-design-system.md`](../specs/ui-design-system.md).
 - **Motion.** Restrained: 0.2s colour/background on hover; progress bars and the
   extraction stepper animate; no bounce/parallax.
 - **Scrollbars.** KRT square scrollbars; the extraction console uses `.scroll-accent`
@@ -228,8 +232,8 @@ instead (a green success alert then names the written path), and the send stays 
 with a danger alert naming the reason — while a row lacks its quantity or an order lacks its
 goods or source screenshots. The send is the **one-click send** of epic
 [#639](https://github.com/krt-profit/basetool/issues/639) (transport spec
-[`docs/specs/desktop-ingest.md`](specs/desktop-ingest.md), `REQ-INGEST-*`;
-[ADR-0018](adr/0018-desktop-ingest-gateway-device-grant.md)). Pressing it:
+[`docs/specs/desktop-ingest.md`](../specs/desktop-ingest.md), `REQ-INGEST-*`;
+[ADR-0018](../adr/0018-desktop-ingest-gateway-device-grant.md)). Pressing it:
 
 1. **First send only — consent.** A KRT scrim modal (never a native dialog) names
    the artifact, the destination (your own basetool account), and the exact personal

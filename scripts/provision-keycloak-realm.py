@@ -397,7 +397,7 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
             withheld_scope_reason=_NO_OFFLINE_SESSION,
             service_account_roles={"<realm>": [f"default-roles-{realm}"]},
             env_vars_to_fill=["IRI_INGEST_SERVICE_ACCOUNT_CLIENT_SECRET"],
-            env_doc_hint=(" together with the other four values of docs/INGEST_KEYCLOAK_SETUP.md "
+            env_doc_hint=(" together with the other four values of docs/archive/INGEST_KEYCLOAK_SETUP.md "
                         "step 9b (IRI_INGEST_PUBLIC_BASE_URL, "
                         "IRI_INGEST_SERVICE_ACCOUNT_TOKEN_URI, "
                         "IRI_INGEST_SERVICE_ACCOUNT_CLIENT_ID=basetool-ingest-gateway, and "

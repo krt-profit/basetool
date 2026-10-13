@@ -1,3 +1,7 @@
+> **Archived 2026-10-13.** Doc type: Historical record — frozen, kept as a record and no longer updated. Commands and states below describe the host and the code as they were.
+>
+> **Current truth:** [`deployment.md`](../deployment.md) and [`deployment-delivery.md`](../specs/deployment-delivery.md). Index of the archive: [`README.md`](README.md).
+
 # External Client Exchange — production go-live runbook
 
 > **Doc type:** Operator runbook for **one** rollout — the go-live of the External Client Exchange
@@ -8,7 +12,7 @@
 > 2026-09-27 (issue comment 5858785595). Its author read no host: the values production gave on
 > 2026-09-28 (the coordinator's reads, three of them `podman exec` with the owner's yes) are marked
 > „read 2026-09-28", and every value still open is marked **TO BE READ** with the read-only command
-> that establishes it. [`deployment.md`](deployment.md) stays the living procedure.
+> that establishes it. [`deployment.md`](../deployment.md) stays the living procedure.
 >
 > **Executed and frozen (2026-09-28).** S1–S16 ran on 2026-09-28 with release 1.13.0, 1.13.1
 > removed the legacy routes the same evening, and S17 created VerseKit's Keycloak client and
@@ -41,7 +45,7 @@ interactive root shell. A one-shot read can also be passed in single quotes,
 stripped (vault *Production Access*).
 
 **Shell prelude**, once per session, as root, from `/` — the conventions of
-[`deployment.md` → Shell conventions](deployment.md#shell-conventions-used-below):
+[`deployment.md` → Shell conventions](../deployment.md#shell-conventions-used-below):
 
 ```bash
 cd /
@@ -90,7 +94,7 @@ non-secret variables, never the whole environment:
 ${UPOD} exec <svc> printenv <NAME>
 ```
 
-**Restarts travel along `Requires=`** ([`deployment.md` → Driving the stack](deployment.md#driving-the-stack)):
+**Restarts travel along `Requires=`** ([`deployment.md` → Driving the stack](../deployment.md#driving-the-stack)):
 `ingest` alone restarts nothing else; `backend` also restarts `frontend` and `ingest` (about one
 minute of web outage); `redis` restarts `frontend` and `ingest`; `keycloak` restarts everything.
 A `restart` returns before its dependents are back — follow it with a `start` of them, which waits.
@@ -261,7 +265,7 @@ equal to `main` — read 2026-09-28: they differ, so **S1 is needed**.
   `render-redis-acl.py`, `mint-internal-tls.sh`, `redis-users.acl.tmpl` — whatever differs from
   `main`. **Restarts:** nothing; no credential changes.
 - **Precondition:** a WSL controller with `ansible/`, `scripts/` **and** `monitoring/` mirrored from
-  the same `origin/main` ([`ansible/README.md`](../ansible/README.md)); R2 clean.
+  the same `origin/main` ([`ansible/README.md`](../../ansible/README.md)); R2 clean.
 - **Command** (WSL, in the mirrored `ansible/`):
 
   ```bash
@@ -295,7 +299,7 @@ trigger on 2026-09-26).
   `basetool-ingest` gains `%R~exchange:*`, `+incr`, the sorted-set commands and
   `+eval +evalsha +zrem +zscore`; nothing else. **Restarts:** nothing; nobody is signed out.
 - **Precondition:** S1 done (R3 equal); R4 as expected; R5 refused.
-- **Command** ([`deployment.md` → The Redis ACL](deployment.md#the-redis-acl) — render next to the
+- **Command** ([`deployment.md` → The Redis ACL](../deployment.md#the-redis-acl) — render next to the
   live file and copy over it, because the single-file bind mount follows the **inode**):
 
   ```bash
@@ -379,7 +383,7 @@ until S9; `IRI_INGEST_ALLOWED_CLIENT_IDS=basetool-sc-extractor` and audit-only o
 
 ### S5 — Cut the release
 
-GitHub, no host change. [`deployment.md` → Cutting a release](deployment.md#cutting-a-release):
+GitHub, no host change. [`deployment.md` → Cutting a release](../deployment.md#cutting-a-release):
 *Actions → Release · Prepare* with version **`1.13.0`** (owner decision 2026-09-28) → merge the `chore(release): v1.13.0` PR → `release-publish.yml` tags it with the
 `basetool-release` App token → the tag run of `release-images.yml` re-tags backend, frontend, ingest,
 `config` and `keycloak-spi` as `:1.13.0`. Confirm all five exist before S6 (the promote refuses
@@ -537,7 +541,7 @@ krt-profit/basetool-android --json tagName,isLatest,assets`; install it on the P
 > later wave raises it in its own pull request, and a rollback restores the previous release's floor
 > without a host step. `APP_ANDROID_MINIMUM_VERSION_CODE` / `…_LATEST_VERSION_CODE` below reach no
 > container of such a release; the host keeps only the break-glass `APP_ANDROID_*_OVERRIDE`. The
-> living procedure is [`deployment.md` → *The Android app floor*](deployment.md#the-android-app-floor).
+> living procedure is [`deployment.md` → *The Android app floor*](../deployment.md#the-android-app-floor).
 > The step below is the record of 2026-09-28; the value it set, 17 / 17, is the committed default.
 
 **PRODUCTION WRITE — needs @greluc's explicit per-action yes.** About **one minute of web and app
@@ -603,7 +607,7 @@ asks for is kept as long as S7 is published first).
 
 **PRODUCTION WRITE — needs @greluc's explicit per-action yes** — the dry run writes nothing to the
 realm, but its session does: a `basetool-provisioner` client created by the owner in the Admin
-Console (SSH tunnel, [`deployment.md` → Keycloak Admin Console via SSH tunnel](deployment.md#keycloak-admin-console-via-ssh-tunnel);
+Console (SSH tunnel, [`deployment.md` → Keycloak Admin Console via SSH tunnel](../deployment.md#keycloak-admin-console-via-ssh-tunnel);
 confidential, service-account roles only, `realm-management` → `manage-clients` + `manage-realm`),
 files under `/root/kc-realm/`, and a kcadm session file on the Keycloak tmpfs.
 
@@ -624,7 +628,7 @@ files under `/root/kc-realm/`, and a kcadm session file on the Keycloak tmpfs.
   The realm provisioner imports the mobile one **and** reads `keycloak/external-clients.json` beside
   itself by default — copying only the two scripts ends in `cannot read the third-party client list`
   before anything is read. On the host, the empty list: `printf '[]\n' > /root/kc-realm/keycloak/none.json`.
-- **Open the session** (host; [`keycloak/README.md` → provisioning](keycloak/README.md#runbook--provisioning-the-mobile-client-basetool-android)):
+- **Open the session** (host; [`keycloak/README.md` → provisioning](../keycloak/README.md#runbook--provisioning-the-mobile-client-basetool-android)):
 
   ```bash
   cd /

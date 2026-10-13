@@ -1,12 +1,16 @@
+> **Archived 2026-10-13.** Doc type: Historical record — frozen, kept as a record and no longer updated. Commands and states below describe the host and the code as they were.
+>
+> **Current truth:** [`keycloak/README.md`](../keycloak/README.md), REQ-SEC-052 / REQ-SEC-053 in [`security-and-access.md`](../specs/security-and-access.md) and `scripts/harden-keycloak-realm.py`. Index of the archive: [`README.md`](README.md).
+
 > **Doc type:** Operator runbook — **the owner runs every step; nothing here is automated and
 > nothing here ships with the image.** Written 2026-09-06 as WP-K2 of the (now archived)
-> [`MEMBERS_ONLY_PLAN.md`](archive/MEMBERS_ONLY_PLAN.md); the owner took all twelve items on 2026-09-05
+> [`MEMBERS_ONLY_PLAN.md`](MEMBERS_ONLY_PLAN.md); the owner took all twelve items on 2026-09-05
 > (decision D11), the two originally marked optional included. Rewritten 2026-09-08 from a decision
 > list into an executable procedure, against the Keycloak **26.7** sources the deployment pins.
 > **Living document** — the per-step status below is kept current. Last reviewed: 2026-09-22
 > (status re-checked against the realm reference; commands rewritten for the rootless-Podman
-> production host). **Requirement:** [REQ-SEC-052, REQ-SEC-053](specs/security-and-access.md) ·
-> **ADR:** [0159](adr/0159-the-basetool-has-no-anonymous-or-guest-surface.md)
+> production host). **Requirement:** [REQ-SEC-052, REQ-SEC-053](../specs/security-and-access.md) ·
+> **ADR:** [0159](../adr/0159-the-basetool-has-no-anonymous-or-guest-surface.md)
 
 # Keycloak hardening runbook (WP-K2)
 
@@ -27,7 +31,7 @@ Nine of the twelve are applied; three are open, plus a thirteenth finding (decid
 applied to production by `scripts/provision-keycloak-realm.py` on 2026-09-23 with the owner's yes;
 the testing realm is not provisioned yet) and the clean-up. The
 evidence is the sanitized realm export regenerated from production on **2026-09-09**
-([`docs/keycloak/realm-config.reference.json`](keycloak/realm-config.reference.json), commit
+([`docs/keycloak/realm-config.reference.json`](../keycloak/realm-config.reference.json), commit
 `72b9b1b2b`, which recorded "steps 1 and 3–10 applied, 11 not, 2 and 12 open"), and for step 4 a
 read-only query of `db-keycloak` on 2026-09-16. Production may have moved since: **re-read the live
 value (§ 0.5) before acting on an "open" row.**
@@ -191,7 +195,7 @@ which turns a procedure credential into one that can mint and elevate accounts.
 > of that section. Finish creating the client here; verify it there.
 
 The same identity, its two roles and the reasoning are also in
-[`docs/keycloak/README.md`](keycloak/README.md), where it was written for the mobile-client
+[`docs/keycloak/README.md`](../keycloak/README.md), where it was written for the mobile-client
 provisioning runbook. It is repeated here rather than linked because a runbook that sends you to
 another document for the credential you cannot start without is not a runbook.
 
@@ -209,7 +213,7 @@ kcadm's default session file, `/opt/keycloak/.keycloak/kcadm.config`, cannot be 
 only writable paths are the unit's tmpfs mounts. The session therefore goes to
 `/opt/keycloak/data/tmp/kcadm.config` via kcadm's `--config` option, on **every** call. Define the
 helper once per shell — as root, **from `/`** (`sudo -u` keeps the working directory, and `iri`
-cannot enter `/root`; see [`deployment.md` → *Shell conventions*](deployment.md#shell-conventions-used-below)),
+cannot enter `/root`; see [`deployment.md` → *Shell conventions*](../deployment.md#shell-conventions-used-below)),
 with the § 0.5 captures kept in a root-only directory:
 
 ```bash
@@ -231,12 +235,12 @@ derived from the generated unit on 2026-09-22 and first exercised on the product
 missing. **Since the internal-TLS step-3 release (#2036, v1.12.0 — on production since
 2026-09-25)**, `/run/secrets/keystore.p12` is Keycloak's own leaf keystore and the unit mounts no
 truststore; the `config truststore` line above is **untested** in that shape — see the open question in
-[`keycloak/README.md` → *Runbook — provisioning the mobile client*](keycloak/README.md#runbook--provisioning-the-mobile-client-basetool-android).
+[`keycloak/README.md` → *Runbook — provisioning the mobile client*](../keycloak/README.md#runbook--provisioning-the-mobile-client-basetool-android).
 On a Docker Compose host (the local stack) the root filesystem is writable, and
 `kc …` without `--config` works as before.
 
 > [!note] The `/auth` in `--server` is load-bearing since 2026-09-13
-> Keycloak serves under that relative path ([ADR-0166](adr/0166-identity-moves-onto-the-app-origin.md)),
+> Keycloak serves under that relative path ([ADR-0166](../adr/0166-identity-moves-onto-the-app-origin.md)),
 > so a base URL without it answers 404 — and kcadm surfaces that as an authentication problem rather
 > than as a wrong address, which is a long detour to take.
 >
@@ -450,7 +454,7 @@ send the reset mail at all.
 >
 > Consequence now disclosed rather than pending: the store holds login and admin events with
 > timestamps, accounts and IP addresses for 30 days, which
-> [`docs/privacy/processing-activities.md`](privacy/processing-activities.md) records as part of A7
+> [`docs/privacy/processing-activities.md`](../privacy/processing-activities.md) records as part of A7
 > and the privacy policy states in its security-monitoring section.
 
 Before this was applied there was no login-failure, token-error or client-disable event anywhere:
@@ -541,10 +545,10 @@ intercepted authorization code is redeemable without it.
 > [!note] Superseded on production 2026-09-25 — `basetool-frontend` is confidential
 > ADR-0001 is carried out: since 16:15 UTC that day production's client is confidential (client
 > secret **and** PKCE `S256`, which stays required), so M-6 is closed there
-> ([`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md)). The callout
+> ([`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md)). The callout
 > below describes the state before, and still the testing realm's.
 
-> [!important] This step is the interim state, not the target — [ADR-0001](adr/0001-frontend-confidential-oauth2-client.md) is still pending
+> [!important] This step is the interim state, not the target — [ADR-0001](../adr/0001-frontend-confidential-oauth2-client.md) is still pending
 > The frontend is public **today**, and that is the code's answer, not a plan's:
 > `frontend/src/main/resources/application.yml` registers the client with
 > `client-authentication-method: none`, and the realm has `publicClient: true` with no secret.
@@ -557,7 +561,7 @@ intercepted authorization code is redeemable without it.
 > the downgrade: without the attribute an authorization request that simply omits the challenge is
 > accepted. What neither gives you is the second factor at the token endpoint that ADR-0001 wants,
 > so **audit finding M-6 stays open after this step**, and its runbook is
-> [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md). Do not read
+> [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md). Do not read
 > a green step 6 as M-6 closed.
 
 **Console (26.7):** *Clients* → `basetool-frontend` → *Settings* → **Capability config** →
@@ -1070,7 +1074,7 @@ flow described in the note above (**not** the browser copy of 11a) → *Save*.
    > somebody does that, write step 11's flow down by hand: the sub-flow name, its requirement, the
    > condition's `User role`, the OTP step's requirement, and the binding.
 
-4. **Close the open finding in [`docs/keycloak/README.md`](keycloak/README.md)**, which records
+4. **Close the open finding in [`docs/keycloak/README.md`](../keycloak/README.md)**, which records
    `fullScopeAllowed: true` on the frontend and the extractor. Step 8 closes the extractor half. The
    frontend half is deliberately **not** on this list: it is a public browser client whose scope is
    the member's own roles, and narrowing it is ADR-0001's confidential-client migration, not a

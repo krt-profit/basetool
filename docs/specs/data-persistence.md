@@ -1078,7 +1078,7 @@ are unaffected, because they do not go through the HQL `like` rendering.
 ### REQ-DATA-020 — every table has one owning module, and SQL reaches a foreign table only through a listed crossing
 
 Every base table of the schema (except Flyway's `flyway_schema_history`) has **exactly one owning
-module** of the target architecture ([plan §5.1, §5.6](../DOMAIN_MODULARISATION_PLAN.md)). The
+module** of the target architecture ([plan §5.1, §5.6](../archive/DOMAIN_MODULARISATION_PLAN.md)). The
 owner is the module whose aggregate the table stores; foreign keys between modules stay, they are
 integrity, not coupling. A **trigger** or a **native statement** (a repository's
 `@Query(nativeQuery = true)` or `@NativeQuery`, an entity's `@Formula`) names another module's table

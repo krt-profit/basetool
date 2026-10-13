@@ -3,7 +3,7 @@
 - **Status:** Accepted — implementation pending (plan Phases 0 to 5)
 - **Date:** 2026-09-29
 - **Deciders:** @greluc (owner decision D-01)
-- **Related:** [domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md) §5.1, §5.2, §5.8,
+- **Related:** [domain modularisation plan](../archive/DOMAIN_MODULARISATION_PLAN.md) §5.1, §5.2, §5.8,
   §7 · [ADR-0232](0232-modules-interact-through-commands-observers-and-after-commit-events.md)
   (interaction styles) · [ADR-0233](0233-module-boundaries-are-enforced-by-archunit-and-spring-modulith-in-test-scope.md)
   (enforcement) · [ADR-0047](0047-backend-package-acyclic-dependencies.md) (layer cycles, amended) ·

@@ -29,7 +29,7 @@ authorization chain, the scope predicate, the audited areas, the aggregates and 
 
 ## Module map — every class belongs to one target module
 
-The backend is being cut by domain (ADR-0231, `docs/DOMAIN_MODULARISATION_PLAN.md`). Until the
+The backend is being cut by domain (ADR-0231, `docs/archive/DOMAIN_MODULARISATION_PLAN.md`). Until the
 domain packages exist, `src/test/resources/architecture/domain-map.txt` assigns every main class to
 its target module, first matching rule wins (REQ-MOD-001…006).
 

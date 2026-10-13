@@ -95,7 +95,7 @@ The frontend now sends the secret; Keycloak, still public, ignores it. Log in on
 window — it must work exactly as before. Nobody is signed out.
 
 **2. Switch Keycloak, with the same secret, in one update** (the provisioner session of
-[`INGEST_KEYCLOAK_SETUP.md` → *New or out-of-date realm*](INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner),
+[`INGEST_KEYCLOAK_SETUP.md` → *New or out-of-date realm*](archive/INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner),
 steps 1–3, for `kc`/`KCADM` and the rollback basis):
 
 ```bash
@@ -154,7 +154,7 @@ step, because they refresh with the registration the frontend runs with now.
 
 - ~~Make `--frontend-client confidential` part of every documented provisioner run~~ — **done
   2026-09-25**: the procedure in
-  [`INGEST_KEYCLOAK_SETUP.md` → *New or out-of-date realm*](INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner)
+  [`INGEST_KEYCLOAK_SETUP.md` → *New or out-of-date realm*](archive/INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner)
   passes it with `KEYCLOAK_FRONTEND_CLIENT_SECRET` from `.env`, and says what a host whose frontend
   has no secret yet must do first.
 - **Open:** update the host's `/var/iri/code/realm-export.json` seed (`"publicClient": false`,
@@ -174,5 +174,5 @@ step, because they refresh with the registration the frontend runs with now.
 
 - [ADR-0001](adr/0001-frontend-confidential-oauth2-client.md) — the decision.
 - [ADR-0202](adr/0202-a-realm-is-brought-to-the-production-shape-by-a-provisioner-that-never-deletes.md) — the provisioner, amendment 2.
-- [`KEYCLOAK_HARDENING_RUNBOOK.md`](KEYCLOAK_HARDENING_RUNBOOK.md) — step 6 (PKCE `S256`).
+- [`KEYCLOAK_HARDENING_RUNBOOK.md`](archive/KEYCLOAK_HARDENING_RUNBOOK.md) — step 6 (PKCE `S256`).
 - [`CHANGELOG.md`](../CHANGELOG.md)

@@ -1122,7 +1122,7 @@ and the old backend then walls old apps while new apps find their paths gone. Co
 > This used to read: configuration, not a table, because raising the floor has to work without a
 > migration, an admin screen or a deploy. Until 2026-10-03 the floor was bound at backend start from
 > `APP_ANDROID_MINIMUM_VERSION_CODE` (default `0`) in the host `.env` and raised by runbook step S8
-> of [`EXCHANGE_GO_LIVE_RUNBOOK.md`](../EXCHANGE_GO_LIVE_RUNBOOK.md), after the re-cut release was
+> of [`EXCHANGE_GO_LIVE_RUNBOOK.md`](../archive/EXCHANGE_GO_LIVE_RUNBOOK.md), after the re-cut release was
 > verified healthy and reverted first on a rollback. Now the floor and the newest build are reviewed
 > literals in the backend's `application.yml` (`app.android.version-policy.release.*`), so they
 > deploy and roll back with the release; the host keeps only an emergency override under new names
