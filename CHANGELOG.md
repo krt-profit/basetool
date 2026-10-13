@@ -5,22 +5,33 @@
 ### Added
 
 - **Monitoring: CSP-Verstöße nach Direktive.** Neue Metrik `basetool_client_csp_violation_total{directive}` und Panel 85 im Betriebs-Dashboard; ein `ClientErrorSpike` für `csp_violation` nennt damit die verletzte Direktive, ohne dass der Logger auf Produktion angehoben werden muss.
+
 - **Star-Citizen-Links: Kategorien lassen sich einklappen.** Standardmäßig sind alle offen; deine Auswahl bleibt lokal im Browser gespeichert.
+
 - **Star-Citizen-Links: Lootmaster und VerseIntel.** Lootmaster (Crafting-Blueprints, Wikelo-Trades, Missionen) steht unter „Datenbanken & Crafting", VerseIntel (Wissensgraph zu Entwickleraussagen, Patch Notes und Bug-Reports) unter „Universum & Community".
+
 - **Ablehnungen nennen ihren Grund im Log.** Die WARN-Zeile einer 422 `PRODUCTION_ALLOCATION` trägt jetzt, welche der fünf Prüfungen abgelehnt hat, samt Material-/Lagerzeilen-ID und Mengen (`reason`, `materialId`, `consumed`, …) als abfragbare Felder in Loki – nie den Request-Body. Die Antwort an den Client bleibt unverändert.
 
 ### Fixed
 
 - **Dialoge schließen sich nicht mehr beim Markieren per Ziehen.** Wer in einem Feld Text markiert und die Maustaste außerhalb des Dialogs loslässt, behält den Dialog offen (gilt für alle Dialoge, z. B. das Verkaufen im Lager).
+
 - **Lager: der Verkaufsbetrag ist beim Öffnen leer.** Das Feld wurde mit dem Wert des vorherigen Verkaufs vorbefüllt; es wird bei jedem Öffnen des Ausbuchen-Dialogs geleert.
+
+- **Mobil: Auswahlgruppen füllen wieder die Breite.** Die Variante `krt-segmented--block` (Umschalter über die volle Zeile, z. B. Rundungsmodus in den Systemeinstellungen) war seit dem Design-System-Update 2026-10 durch einen Tippfehler im Selektor wirkungslos; die Systemeinstellungen scrollten dadurch auf dem Handy seitwärts.
+
 - **Mein Lager: die Tabelle scrollt am Desktop nicht mehr seitwärts.** Die Baumtabelle füllt wieder ihren Container; nur auf schmalen Bildschirmen (bis 1024 px) darf sie breiter als der Bildschirm sein.
+
 - **Kachel-Raster: alle Kacheln sind gleich ausgerichtet.** In der Material-Übersicht (und anderen Kachel-Rastern) saßen alle Kacheln außer der ersten um 1 rem tiefer, weil die Regel für aufeinanderfolgende Karten auch im Raster griff.
+
 - **Leitung: die Einheiten-Liste links ist einheitlich eingerückt.** Die Gruppen (Organisationsleitung, Bereiche, Staffeln, Spezialkommandos) saßen je nach Namenslänge unterschiedlich weit rechts; dasselbe Layout-Problem hatte das Inhaltsverzeichnis der Datenschutzerklärung.
+
 - **Monitoring: zwei Fehlalarme.** `ExternalFetchErrors` zählt unvollständige SC-Wiki-Seitendurchläufe nicht mehr mit (neues Label `reason`, Wert `census`; sie haben je Lauf einen festen Sockel und lösten bei Neustart oder Upstream-Umbau aus). `SystemdUnitFailed` ignoriert `dnf-makecache.service`, das bei einem 5xx des Spiegelservers beim nächsten Lauf von selbst heilt.
 
 ### Changed
 
 - **Profil: Auszahlungsart und Blaupausen-Freigabe sind entkoppelt.** Beide Einstellungen liegen in eigenen Tabellen (Migration V283) mit eigener Version; Speichern der einen macht Profil, RSI-Handle und die andere Karte nicht mehr veraltet. Die alten Spalten bleiben bis zu einer späteren Version.
+
 - **Lesbarere Bedienelemente (Design-System 2026-10).** Buttons, Eingabefelder, Auswahlen und Seitenzahlen haben eine Füllung und einen sichtbaren Rand (mindestens 3:1); Umschalter wie „Kommend / Vergangen / Alle“ oder „Globales / Mein Lager“ sind ein gemeinsames Segment-Element, Ein/Aus-Optionen ein Schalter; Listen-Seiten liegen mit Toolbar, Tabelle und Seitenzahlen auf einer Fläche, der Filter-Button zeigt aktive Filter mit eckigem Zähler.
 
 ## [v1.15.0](https://github.com/krt-profit/basetool/releases/tag/v1.15.0) - 2026-10-11
