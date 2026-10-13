@@ -1,17 +1,17 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:336a4fee-041a-4217-9cae-b578a878ea4d",
+  "serialNumber" : "urn:uuid:cda1f7fe-4a0b-4373-a160-526f6c89dc2f",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-10-11T16:19:46Z",
+    "timestamp" : "2026-10-13T10:52:05Z",
     "tools" : {
       "components" : [
         {
           "type" : "application",
           "author" : "CycloneDX",
           "name" : "cyclonedx-gradle-plugin",
-          "version" : "3.4.1"
+          "version" : "3.5.1"
         }
       ]
     },
@@ -26,7 +26,7 @@
       "externalReferences" : [
         {
           "type" : "build-system",
-          "url" : "https://github.com/krt-profit/basetool/actions/runs/38154932131"
+          "url" : "https://github.com/krt-profit/basetool/actions/runs/38385999799"
         },
         {
           "type" : "vcs",
