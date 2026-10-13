@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **Verbundene Anwendungen: Karte nutzt die volle Breite.** Mit nur einer verbundenen Anwendung blieb die rechte Hälfte leer, weil das Raster leere Spalten reservierte; es klappt sie jetzt weg (`connected-apps.css`).
+
 - **Datenschutzerklärung: Inhaltsverzeichnis ohne doppelte Kapitelnummern.** Die Kapitel zeigten „1. 1. Datenschutz auf einen Blick“, weil die Listennummerierung zusätzlich zur Nummer im Titel erschien; sie ist jetzt abgeschaltet (`legal.css`).
 
 ## [v1.16.0](https://github.com/krt-profit/basetool/releases/tag/v1.16.0) - 2026-10-13
