@@ -1,5 +1,3 @@
-// @ts-check
-
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
@@ -17,8 +15,34 @@ let bodyEl = null;
 let summaryEl = null;
 /** @type {HTMLButtonElement | null} */
 let applyBtn = null;
+
+/**
+ * @typedef {ApiDto<'BlueprintImportEntryDto'>} BpImportEntry
+ */
+
+/**
+ * @typedef {object} BpSearchHit
+ * @property {string} productKey the blueprint product
+ * @property {string} [name] the product name
+ */
+
+/**
+ * @typedef {object} BpImportResolution
+ * @property {string | null} externalName the imported name
+ * @property {string} productKey the chosen blueprint product
+ * @property {string | null} acquiredAt the acquisition date, or null
+ * @property {string | null} note the note, or null
+ */
+
+/** @type {WeakMap<Element, number>} */
 const rowDebounce = new WeakMap();
 
+/**
+ * Looks up an element by id.
+ *
+ * @param {string} id the element id
+ * @returns {HTMLElement | null} the element, or null
+ */
 function $(id) {
     return document.getElementById(id);
 }
@@ -112,6 +136,11 @@ function onFileChosen() {
     fileInput.value = '';
 }
 
+/**
+ * Uploads the chosen file for an import preview.
+ *
+ * @param {File} file the chosen export file
+ */
 function uploadPreview(file) {
     const fd = new FormData();
     fd.append('file', file);
@@ -128,6 +157,11 @@ function uploadPreview(file) {
         });
 }
 
+/**
+ * Renders the import preview into the modal.
+ *
+ * @param {ApiDto<'BlueprintImportPreviewDto'>} preview the preview
+ */
 function renderPreview(preview) {
     if (!bodyEl) return;
     if (summaryEl) {
@@ -165,6 +199,13 @@ function renderPreview(preview) {
     /** @type {KrtHtml[]} */
     const html = [];
 
+    /**
+     * Appends one titled group of preview rows.
+     *
+     * @param {string | undefined} title the group title
+     * @param {BpImportEntry[]} groupEntries the group's entries
+     * @param {string} kind `matched`, `suggested`, `unmatched` or `owned`
+     */
     function appendGroup(title, groupEntries, kind) {
         if (!groupEntries || groupEntries.length === 0) return;
         html.push(
@@ -178,6 +219,12 @@ function renderPreview(preview) {
         html.push(krtHtml`</div></section>`);
     }
 
+    /**
+     * Appends one preview row.
+     *
+     * @param {BpImportEntry} entry the entry
+     * @param {string} kind the group the entry belongs to
+     */
     function appendRow(entry, kind) {
         const isOwned = kind === 'owned';
         const suggestions = entry.suggestions || [];
@@ -234,6 +281,11 @@ function renderPreview(preview) {
         html.push(krtHtml`</div>`);
     }
 
+    /**
+     * Appends the product search box and the suggestion chips of an unresolved row.
+     *
+     * @param {BpImportEntry} entry the entry
+     */
     function appendSearchControl(entry) {
         const suggestions = entry.suggestions || [];
         html.push(
@@ -272,6 +324,7 @@ function renderPreview(preview) {
     bindRowSearch();
 }
 
+/** Wires the suggestion chips and the product search of every preview row. */
 function bindRowSearch() {
     if (!bodyEl) return;
     bodyEl.querySelectorAll('.krt-bp-imp-suggestion').forEach((chip) => {
@@ -280,7 +333,9 @@ function bindRowSearch() {
             setRowProduct(row, chip.getAttribute('data-key'), chip.getAttribute('data-name'));
         });
     });
-    bodyEl.querySelectorAll('.krt-bp-imp-search').forEach((input) => {
+    /** @type {NodeListOf<HTMLInputElement>} */ (
+        bodyEl.querySelectorAll('.krt-bp-imp-search')
+    ).forEach((input) => {
         const row = input.closest('.krt-bp-imp-row');
         const results = row
             ? /** @type {HTMLElement | null} */ (row.querySelector('.krt-bp-imp-results'))
@@ -302,6 +357,13 @@ function bindRowSearch() {
     });
 }
 
+/**
+ * Searches blueprint products for a row's search box.
+ *
+ * @param {HTMLInputElement} input the row's search box
+ * @param {HTMLElement | null} results the row's result list
+ * @param {Element | null} row the preview row
+ */
 function rowSearch(input, results, row) {
     if (!results) return;
     const q = input.value || '';
@@ -318,6 +380,13 @@ function rowSearch(input, results, row) {
         });
 }
 
+/**
+ * Renders the product hits below a row's search box.
+ *
+ * @param {HTMLElement | null} results the row's result list
+ * @param {Element | null} row the preview row
+ * @param {BpSearchHit[] | null} items the hits
+ */
 function renderRowResults(results, row, items) {
     if (!results) return;
     if (!items || items.length === 0) {
@@ -351,15 +420,29 @@ function renderRowResults(results, row, items) {
     });
 }
 
+/**
+ * Assigns a product to a preview row and ticks its include box.
+ *
+ * @param {Element | null} row the preview row
+ * @param {string | null} key the product key
+ * @param {string | null} name the product name
+ */
 function setRowProduct(row, key, name) {
     if (!row) return;
     row.setAttribute('data-key', key || '');
-    const input = row.querySelector('.krt-bp-imp-search');
+    const input = /** @type {HTMLInputElement | null} */ (row.querySelector('.krt-bp-imp-search'));
     if (input) input.value = name || '';
-    const include = row.querySelector('.krt-bp-imp-include');
+    const include = /** @type {HTMLInputElement | null} */ (
+        row.querySelector('.krt-bp-imp-include')
+    );
     if (include && key) include.checked = true;
 }
 
+/**
+ * Ticks or unticks every enabled include box; ticking skips rows without a product.
+ *
+ * @param {boolean} value true to tick
+ */
 function selectAll(value) {
     if (!bodyEl) return;
     /** @type {NodeListOf<HTMLInputElement>} */ (
@@ -374,6 +457,7 @@ function selectAll(value) {
 
 function apply() {
     if (!bodyEl) return;
+    /** @type {BpImportResolution[]} */
     const resolutions = [];
     bodyEl.querySelectorAll('.krt-bp-imp-row').forEach((row) => {
         const include = /** @type {HTMLInputElement | null} */ (

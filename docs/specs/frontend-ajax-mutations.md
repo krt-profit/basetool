@@ -1794,31 +1794,24 @@ The decision and its rejected alternatives are ADR-0125.
 
 **The gate.** `:frontend:typecheckJs` runs strictly (`ignoreExitValue = false`) and is wired into
 `check` next to `lintCss` / `lintJs` / `lintHtml` / `prettierCheck`. A type error fails the build
-exactly as an ESLint finding does. `moduleDetection` must stay `legacy`: `package.json` declares
-`type: module`, and under the default `auto` every `.js` file would be classified as an ES module
-with its own scope — which would both misrepresent the runtime and blind the checker to the
-cross-file globals and redeclaration collisions it exists to catch.
+exactly as an ESLint finding does. `moduleDetection` is `force`: every script is checked as an ES
+module with its own scope, as the browser runs it (ADR-0250); the one classic script, the
+`krt-client-error.js` beacon, shares nothing with another file.
 
-**Opt-in per file.** Checking is enabled per file by a leading `// @ts-check`; `checkJs` stays
-`false` globally so a script that has not been brought to green does not have to be. **A file that
-opts in must be error-free** — there is no partial state, and opting a file in is what makes its
-errors a build failure. No script carries `@ts-nocheck`, `@ts-ignore` or `@ts-expect-error`. The
-sequencing lives in [`TYPESCRIPT_MIGRATION_PLAN.md`](../TYPESCRIPT_MIGRATION_PLAN.md).
+**Every script is checked.** `checkJs` is `true` and `strict`, `noImplicitAny` and
+`useUnknownInCatchVariables` are on, so no script opts in and none can opt out: a new script is
+checked from its first commit, and a type error in any of them fails the build. No script carries
+`@ts-nocheck`, `@ts-ignore` or `@ts-expect-error`.
 
-**The ratchet per domain.** `frontend/typecheck-ratchet.json` assigns every script of `static/js`
-to exactly one domain (the frontend's domains of the modularisation plan §5.9, plus `kernel` for the
-shared infrastructure; subfolders of `static/js` are scanned too, `vendor/` excepted) and lists the
-domains that are **migrated**. **Every domain of the manifest must be migrated**, so the manifest
-cannot hold an unchecked domain; a migrated domain holds only scripts that opt in, so a new script
-that skips the pragma fails the build, and the list of migrated domains only grows. `:frontend:testTypecheckRatchet` (in `check`;
+**The ratchet.** `frontend/typecheck-ratchet.json` assigns every script of `static/js` to exactly
+one domain (the frontend's domains of the modularisation plan §5.9, plus `kernel` for the shared
+infrastructure; subfolders of `static/js` are scanned too, `vendor/` excepted), and each script
+lives in its domain's folder. `:frontend:testTypecheckRatchet` (in `check`;
 `scripts/typecheck-ratchet.mjs`, proven on planted trees by `typecheck-ratchet.test.mjs`) fails on
-a script that belongs to no domain, on a domain dropped from the list (`MIGRATED_FLOOR`), on a
-number of checked scripts below `CHECKED_FILES_FLOOR`, on a suppression pragma, and on a
-`tsconfig.json` that excludes scripts or loses `strict`. Migrating a domain edits the manifest and
-raises the floors in the same change. A script that is too large to check is split first into
-parts loaded by consecutive `defer` tags in the original order (ADR-0069 stays; no module, no
-import map). While the scripts share one flat folder, the domain is a name in the manifest; the
-asset move of step F5 turns each name into a folder.
+a script that belongs to no domain or sits outside its domain's folder, on a suppression pragma,
+and on a `tsconfig.json` that excludes scripts or turns `strict`, `checkJs`, `noImplicitAny` or
+`useUnknownInCatchVariables` off. A script that is too large to check is split first into modules
+by responsibility (REQ-FE-035).
 
 **Backend DTO shapes are never restated by hand.** `:frontend:generateApiTypes` derives
 `build/generated/ts/api.d.ts` from `backend/src/main/resources/api/openapi.json` on every build,
@@ -1857,7 +1850,7 @@ beacon first, then enforced.
 **Modern syntax is lint-enforced.** `prefer-template`, `prefer-arrow-callback`,
 `prefer-object-has-own`, `radix` and `logical-assignment-operators` are errors for the browser and
 the Node scripts. `?.` and `??` are not enforced: their semantics differ from `&&` / `||` for falsy
-values, so they are introduced by hand in files that opt into `// @ts-check`.
+values, so they are introduced by hand.
 
 > [!note] Amended 2026-10-02 — the browser baseline (D-16; ADR-0239)
 > The project had no documented baseline; the features already shipped implied Chrome 105,
@@ -1870,17 +1863,26 @@ values, so they are introduced by hand in files that opt into `// @ts-check`.
 > modern-syntax rules above were enabled with their autofix applied. No Trusted Types directive is
 > sent yet.
 
-**JSDoc must be JSDoc.** In a checked file, `{@code …}` / `{@link …}` / `@param name {shape}` —
-Javadoc spellings this repo uses elsewhere — are parsed as type syntax and are hard errors.
-Convert them when opting a file in.
+**JSDoc must be JSDoc.** `{@code …}` / `{@link …}` / `@param name {shape}` — Javadoc spellings
+this repo uses elsewhere — are parsed as type syntax and are hard errors.
+
+**An untyped value is declared, not inferred.** A parameter, a variable and a returned shape carry
+a JSDoc type; `any` stays reserved for untyped JSON, and a caught value is narrowed from `unknown`
+where the code reads it.
+
+> [!note] Amended 2026-10-13 — every script is checked, and the checker is fully strict
+> `checkJs` moved from per-file `// @ts-check` opt-in to the whole tree, `noImplicitAny` and
+> `useUnknownInCatchVariables` were switched on, and the ratchet lost its pragma, "migrated" list
+> and floor rules (all 149 scripts were already green). `moduleDetection` reads `force` since
+> ADR-0250; the text above had still said `legacy`.
 
 > **Verification** — **Gate:** `./gradlew :frontend:typecheckJs` (strict, in `check`),
 > `:frontend:lintJs` and `:frontend:testEslintBans` (the language level and the baseline bans) ·
-> **Config:** `frontend/tsconfig.json` (`allowJs` + `noEmit` + `moduleDetection: legacy`),
+> **Config:** `frontend/tsconfig.json` (`allowJs` + `checkJs` + `noEmit` + `moduleDetection: force`),
 > `frontend/build.gradle.kts` (`generateApiTypes`, `typecheckJs`) · **Code:**
 > `frontend/types/globals.d.ts`, `frontend/types/thymeleaf-bootstrap.d.ts`,
-> `frontend/types/dto.d.ts`, `frontend/scripts/gen-api-types.mjs`, the 44 files (of 100) carrying
-> `// @ts-check` (recounted 2026-10-02) · **ADR:** ADR-0125, ADR-0130, ADR-0239 ·
+> `frontend/types/dto.d.ts`, `frontend/scripts/gen-api-types.mjs`, `frontend/typecheck-ratchet.json`
+> (every script of `static/js` is checked) · **ADR:** ADR-0125, ADR-0130, ADR-0239 ·
 > **Issues:** —
 
 ### REQ-FE-019 — The same live sync reaches the native app, in both directions
@@ -2706,8 +2708,8 @@ REQ-FE-033, REQ-FE-034, ADR-0250
 - The per-area conversions themselves (one issue per area, #573–#582) — this spec is the contract
   they each satisfy, not the work list.
 - Converting the sources to TypeScript, and the inline `<script>` blocks still in the Thymeleaf
-  templates — the checker of REQ-FE-018 reads `.js` files only. See ADR-0125 and
-  [`TYPESCRIPT_MIGRATION_PLAN.md`](../TYPESCRIPT_MIGRATION_PLAN.md).
+  templates — the checker of REQ-FE-018 reads `.js` files only. See ADR-0125 and the archived
+  [`TYPESCRIPT_MIGRATION_PLAN.md`](../archive/TYPESCRIPT_MIGRATION_PLAN.md).
 - Switching the CSRF token repository to cookie-based, and adopting htmx or app-wide Alpine — all
   explicitly rejected in ADR-0012.
 - Live-collaboration features beyond the section-refresh sync of REQ-FE-010/-015

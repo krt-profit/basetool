@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 /* global materialIndex: writable, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_MATERIAL_LABEL, MSG_AMOUNT_LABEL, MSG_MINQUALITY_LABEL, SCU_HINT_TEXT, MSG_SCMDB_SUCCESS, MSG_SCMDB_SOME_UNKNOWN, MSG_SCMDB_NO_MATCH, MSG_SCMDB_NOT_FOUND, ITEM_I18N, EDIT_ITEMS, MSG_MATERIAL_INVALID, MSG_ITEM_INVALID, MSG_CREATE_FAILED, MSG_UPDATE_FAILED */
 
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
@@ -29,6 +27,28 @@ import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtEnhanceComboboxes, krtSearchableSelect } from '/js/kernel/krt-searchable-select.js';
 
+/** @typedef {ApiDto<'MaterialDto'> & {id: string}} OrderMaterial */
+/** @typedef {ApiDto<'BlueprintReferenceDto'> & {id: string}} OrderBlueprint */
+
+/**
+ * Prefill values of an item line, from the edit bootstrap or an adopted sub-assembly.
+ *
+ * @typedef {object} ItemLinePrefill
+ * @property {string} [id] the stored line id
+ * @property {number | string} [manufactured] the amount already produced
+ * @property {string} [parentId] the client line id of the parent line
+ * @property {string} [gameItemId] the ordered item
+ * @property {string} [gameItemName] the ordered item's name
+ * @property {number | string} [amount] the ordered amount
+ * @property {string} [blueprintId] the stored blueprint
+ * @property {Record<string, string>} [qualities] the stored quality code per material id
+ */
+
+/**
+ * Builds the SCU hint bubble shown next to an SCU amount field.
+ *
+ * @returns {HTMLSpanElement} the hint element
+ */
 function buildScuHint() {
     const hint = document.createElement('span');
     hint.className = 'scu-hint';
@@ -49,6 +69,12 @@ function buildScuHint() {
     return hint;
 }
 
+/**
+ * Clones the children of an option template into a select.
+ *
+ * @param {string} templateId the template element id
+ * @param {Element | null} target the select to fill
+ */
 function copyTemplateOptions(templateId, target) {
     const tpl = document.getElementById(templateId);
     if (!tpl || !target) return;
@@ -108,6 +134,11 @@ function quantityTypeOf(sel) {
     return qt;
 }
 
+/**
+ * Syncs a material row's amount step, unit label and SCU hint with the picked material.
+ *
+ * @param {Element | null} row the `.material-row`
+ */
 function refreshMaterialUnit(row) {
     if (!row) {
         return;
@@ -288,8 +319,15 @@ function updateCounter(area) {
     counter.textContent = `${area.value.length} / ${max}`;
 }
 
+/**
+ * Looks up a job-order material by its lower-cased name.
+ *
+ * @param {string} normalizedName the trimmed, lower-cased material name
+ * @returns {Promise<OrderMaterial | null>} the material, or null when none matches or the search fails
+ */
 async function findJobOrderMaterialByName(normalizedName) {
     try {
+        /** @type {OrderMaterial[]} */
         const list =
             (await krtFetch.getJson(
                 `/catalog/material-search?jobOrder=true&q=${encodeURIComponent(normalizedName)}`,
@@ -300,6 +338,7 @@ async function findJobOrderMaterialByName(normalizedName) {
     }
 }
 
+/** Imports the pasted SCMDB lines into the material rows. */
 async function importFromScmdb() {
     const importField = /** @type {HTMLTextAreaElement} */ (
         document.getElementById('scmdb-import-text')
@@ -437,10 +476,16 @@ function addMaterialRow() {
 
 let itemLineIndex = 0;
 
+/**
+ * Searches the orderable items for the item combobox.
+ *
+ * @param {string} query the typed text
+ * @returns {Promise<{value: string | undefined, label: string | undefined}[]>} the options
+ */
 function fetchItemOptions(query) {
     return krtFetch
         .getJson(`/orders/item-search?q=${encodeURIComponent(query || '')}`)
-        .then((list) => {
+        .then((/** @type {ApiDto<'InventoryGameItemReferenceDto'>[] | null} */ list) => {
             return (list || []).map((gi) => {
                 return { value: gi.id, label: gi.name };
             });
@@ -450,6 +495,12 @@ function fetchItemOptions(query) {
         });
 }
 
+/**
+ * Disables or enables every control inside a container.
+ *
+ * @param {string} containerId the container element id
+ * @param {boolean} disabled whether the controls are disabled
+ */
 function setFormDisabled(containerId, disabled) {
     const c = document.getElementById(containerId);
     if (!c) return;
@@ -475,6 +526,12 @@ function toggleOrderMode() {
     }
 }
 
+/**
+ * Appends an item line to the item form.
+ *
+ * @param {ItemLinePrefill} [prefill] the values to preselect
+ * @returns {HTMLDivElement | null} the new line, or null when the form has no line container
+ */
 function addItemLine(prefill) {
     prefill ||= {};
     const idx = itemLineIndex++;
@@ -553,18 +610,37 @@ function addItemLine(prefill) {
     return row;
 }
 
+/**
+ * Empties the derived-material, unresolved and sub-assembly blocks of an item line.
+ *
+ * @param {HTMLElement} row the `.item-line`
+ */
 function clearDerived(row) {
-    row.querySelector('[data-role="derived"]').replaceChildren();
-    const u = row.querySelector('[data-role="unresolved"]');
+    const derived = /** @type {HTMLElement} */ (row.querySelector('[data-role="derived"]'));
+    derived.replaceChildren();
+    const u = /** @type {HTMLElement} */ (row.querySelector('[data-role="unresolved"]'));
     u.hidden = true;
     u.replaceChildren();
-    row.querySelector('[data-role="subassemblies"]').replaceChildren();
+    const subs = /** @type {HTMLElement} */ (row.querySelector('[data-role="subassemblies"]'));
+    subs.replaceChildren();
 }
 
+/**
+ * Loads the blueprints producing an item line's item into its blueprint select and derives the
+ * materials for the pick.
+ *
+ * @param {HTMLElement} row the `.item-line`
+ * @param {string} [preselectBpId] the blueprint to preselect when offered
+ * @param {Record<string, string>} [qualities] the stored quality code per material id
+ */
 function loadBlueprints(row, preselectBpId, qualities) {
-    const gameItemId = row.querySelector('[data-role="item-select"]').value;
-    const wrap = row.querySelector('[data-role="blueprint-wrap"]');
-    const bpSelect = row.querySelector('[data-role="blueprint-select"]');
+    const gameItemId = /** @type {HTMLInputElement} */ (
+        row.querySelector('[data-role="item-select"]')
+    ).value;
+    const wrap = /** @type {HTMLElement} */ (row.querySelector('[data-role="blueprint-wrap"]'));
+    const bpSelect = /** @type {HTMLSelectElement} */ (
+        row.querySelector('[data-role="blueprint-select"]')
+    );
     clearDerived(row);
     if (!gameItemId) {
         wrap.hidden = true;
@@ -574,7 +650,7 @@ function loadBlueprints(row, preselectBpId, qualities) {
     krtFetch
         .getJson(`/orders/item-blueprints/${encodeURIComponent(gameItemId)}`)
         .catch(() => [])
-        .then((list) => {
+        .then((/** @type {OrderBlueprint[] | null} */ list) => {
             list ||= [];
             bpSelect.replaceChildren(
                 ...list.map((b) => {
@@ -599,20 +675,33 @@ function loadBlueprints(row, preselectBpId, qualities) {
         });
 }
 
+/**
+ * Renders the derived materials, unresolved ingredients and sub-assemblies of the line's chosen
+ * blueprint and amount.
+ *
+ * @param {HTMLElement} row the `.item-line`
+ * @param {Record<string, string>} [qualities] the stored quality code per material id
+ */
 function loadDerivation(row, qualities) {
-    const blueprintId = row.querySelector('[data-role="blueprint-select"]').value;
-    const amount = parseInt(row.querySelector('[data-role="amount"]').value, 10) || 1;
+    const blueprintId = /** @type {HTMLSelectElement} */ (
+        row.querySelector('[data-role="blueprint-select"]')
+    ).value;
+    const amount =
+        parseInt(
+            /** @type {HTMLInputElement} */ (row.querySelector('[data-role="amount"]')).value,
+            10,
+        ) || 1;
     if (!blueprintId) {
         clearDerived(row);
         return;
     }
     const idx = row.dataset.lineIndex;
-    const derived = row.querySelector('[data-role="derived"]');
-    const unresolved = row.querySelector('[data-role="unresolved"]');
-    const subs = row.querySelector('[data-role="subassemblies"]');
+    const derived = /** @type {HTMLElement} */ (row.querySelector('[data-role="derived"]'));
+    const unresolved = /** @type {HTMLElement} */ (row.querySelector('[data-role="unresolved"]'));
+    const subs = /** @type {HTMLElement} */ (row.querySelector('[data-role="subassemblies"]'));
     krtFetch
         .getJson(`/orders/item-derivation/${encodeURIComponent(blueprintId)}?amount=${amount}`)
-        .then((d) => {
+        .then((/** @type {ApiDto<'ItemDerivationDto'> | null} */ d) => {
             if (!d) {
                 clearDerived(row);
                 return;
@@ -651,14 +740,14 @@ function loadDerivation(row, qualities) {
                 unresolved.hidden = false;
                 krtHtml.set(
                     unresolved,
-                    krtHtml`<p>${ITEM_I18N.unresolved} ${d.unresolvedIngredients.map(String).join(', ')}</p>`,
+                    krtHtml`<p>${ITEM_I18N.unresolved} ${(d.unresolvedIngredients ?? []).map(String).join(', ')}</p>`,
                 );
             } else {
                 unresolved.hidden = true;
                 unresolved.replaceChildren();
             }
             if ((d.subAssemblies || []).length) {
-                const subLines = d.subAssemblies.map((sa) => {
+                const subLines = (d.subAssemblies ?? []).map((sa) => {
                     const gi = sa.gameItem || {};
                     return krtHtml`<div class="oc-material-line">
                         <span class="flex-2">${gi.name || ''} &times; ${sa.quantity}</span>
@@ -680,7 +769,7 @@ const itemLinesContainer = document.getElementById('item-lines');
 if (itemLinesContainer) {
     itemLinesContainer.addEventListener('change', (e) => {
         const target = /** @type {Element} */ (e.target);
-        const row = target.closest('.item-line');
+        const row = /** @type {HTMLElement | null} */ (target.closest('.item-line'));
         if (!row) return;
         if (target.matches('[data-role="item-select"]')) {
             loadBlueprints(row);
@@ -759,6 +848,14 @@ krtEvents.on('click', 'orders-add-material', addMaterialRow);
 krtEvents.on('click', 'orders-remove-material', removeMaterialRow);
 krtEvents.on('click', 'orders-add-item', () => addItemLine());
 
+/**
+ * Submits an order create or update form and follows the answer's target URL.
+ *
+ * @param {HTMLFormElement} form the form to submit
+ * @param {string} invalidMessage the toast for a 400 answer
+ * @param {string} failedMessage the toast for any other failure
+ * @param {HTMLElement | null} submitter the control that triggered the submit
+ */
 function _submitOrderCreate(form, invalidMessage, failedMessage, submitter) {
     krtFetch.submitForm({
         form,

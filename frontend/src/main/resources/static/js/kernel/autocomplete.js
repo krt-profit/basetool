@@ -1,13 +1,19 @@
-// @ts-check
+/**
+ * A suggestion: a plain string, or an object whose `label` is shown and `value` is filled in.
+ *
+ * @typedef {string | {label?: string, value?: string}} AutocompleteItem
+ */
 
 /**
  * Initialize a custom autocomplete on an input element.
  * @param {HTMLInputElement} inp - The input element
- * @param {Array|Function} dataSource - Either an array of strings, or a function that takes a query and returns a Promise resolving to an array of strings.
- * @param {Object} options - Configuration options
+ * @param {AutocompleteItem[] | ((query: string) => Promise<AutocompleteItem[]>)} dataSource - Either an array of suggestions, or a function that takes a query and returns a Promise resolving to an array of suggestions.
+ * @param {{debounceTime?: number, onSelect?: (item: AutocompleteItem) => void}} [options] - Configuration options
  */
 export function krtAutocomplete(inp, dataSource, options = {}) {
+    /** @type {number} */
     let currentFocus;
+    /** @type {ReturnType<typeof setTimeout> | undefined} */
     let debounceTimer;
 
     const a = document.createElement('DIV');
@@ -64,6 +70,12 @@ export function krtAutocomplete(inp, dataSource, options = {}) {
         }
     });
 
+    /**
+     * Renders up to 15 suggestions with the typed text emphasised.
+     *
+     * @param {AutocompleteItem[] | null | undefined} arr the suggestions
+     * @param {string} val the typed text
+     */
     function renderResults(arr, val) {
         closeAllLists();
         if (!arr || !arr.length) return;
@@ -103,6 +115,11 @@ export function krtAutocomplete(inp, dataSource, options = {}) {
         });
     }
 
+    /**
+     * Highlights the suggestion at `currentFocus`, wrapping around at both ends.
+     *
+     * @param {HTMLCollectionOf<HTMLDivElement> | null} x the rendered suggestions
+     */
     function addActive(x) {
         if (!x) return false;
         removeActive(x);
@@ -111,12 +128,22 @@ export function krtAutocomplete(inp, dataSource, options = {}) {
         x[currentFocus].classList.add('autocomplete-active');
     }
 
+    /**
+     * Removes the active highlight from every suggestion.
+     *
+     * @param {HTMLCollectionOf<HTMLDivElement>} x the rendered suggestions
+     */
     function removeActive(x) {
         for (let i = 0; i < x.length; i++) {
             x[i].classList.remove('autocomplete-active');
         }
     }
 
+    /**
+     * Empties this input's suggestion list unless the element is the list or the input itself.
+     *
+     * @param {EventTarget | null} [elmnt] the clicked element to keep open
+     */
     function closeAllLists(elmnt) {
         const x = document.getElementsByClassName('autocomplete-items');
         for (let i = 0; i < x.length; i++) {

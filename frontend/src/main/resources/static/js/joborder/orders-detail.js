@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 /* global labelPiece, labelScu, scuHintText, labelMenge, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_HANDOVER_MISSION_HERKUNFT, MSG_HANDOVER_MISSION_REST, MSG_HANDOVER_MISSION_MIN, MSG_STOLEN, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR, ORDER_HANDOVER_I18N */
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
@@ -95,6 +93,7 @@ function initOrdersDetail() {
         krtLiveSync.createReceiver({
             topic: `order:${window.orderId}`,
             sections: ORDER_SECTIONS,
+            /** @param {string[]} keys the section keys to re-fetch */
             refresh(keys) {
                 if (joborderHooks.refreshOrderSection) {
                     joborderHooks.refreshOrderSection(keys, { broadcast: false });
@@ -567,7 +566,7 @@ function _refreshHandoverMissionPicker(row) {
         title.style.marginBottom = '0.35rem';
         title.textContent = MSG_HANDOVER_MISSION_HERKUNFT;
         holder.appendChild(title);
-        missions.forEach((m) => {
+        missions.forEach((/** @type {Required<ApiDto<'MissionAllocationDto'>>} */ m) => {
             const line = document.createElement('label');
             line.style.display = 'flex';
             line.style.gap = '0.5rem';

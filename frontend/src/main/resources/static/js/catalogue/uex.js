@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 /* global MSG_SAVED, MSG_ERROR */
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';

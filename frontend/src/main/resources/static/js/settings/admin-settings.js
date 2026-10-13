@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 /* global MSG_ENABLED, MSG_DISABLED, MSG_ERROR, MSG_SAVED, MSG_PROFIT_ENABLED, MSG_PROFIT_DISABLED, MSG_PROFIT_ERROR, MSG_PROFIT_SAVED, SAVE_SUCCESS, SAVE_ERROR, SAVE_CONFLICT */
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
@@ -162,6 +160,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!body) {
                         return;
                     }
+                    /**
+                     * @param {string} name the form control name
+                     * @param {any} value the value from the response body
+                     */
                     function setVer(name, value) {
                         if (el[name] && value != null) {
                             el[name].value = value;

@@ -1,4 +1,3 @@
-// @ts-check
 const pendingQueue =
     (window.krtEvents &&
         window.krtEvents._isBootstrapStub &&

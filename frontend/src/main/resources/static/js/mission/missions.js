@@ -1,5 +1,3 @@
-// @ts-check
-
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
@@ -31,6 +29,11 @@ function initMissions() {
         return params.toString();
     }
 
+    /**
+     * Re-pulls the result list with the current filters.
+     *
+     * @param {boolean} [pushHistory] false to replace the history entry instead of adding one
+     */
     function loadResults(pushHistory) {
         const query = buildQueryString();
         krtFetch.swap({
@@ -77,6 +80,11 @@ function initMissions() {
         return checked ? checked.value : 'UPCOMING';
     }
 
+    /**
+     * Checks the period radio with the given value and unchecks the others.
+     *
+     * @param {string} value the period value
+     */
     function selectPeriod(value) {
         periodInputs().forEach((el) => {
             el.checked = el.value === value;
@@ -92,6 +100,11 @@ function initMissions() {
         }
     }
 
+    /**
+     * Stores the filter preference; a storage failure is ignored.
+     *
+     * @param {unknown} value the JSON-serialisable preference
+     */
     function writeFilterPref(value) {
         try {
             localStorage.setItem(FILTER_PREF_KEY, JSON.stringify(value));
@@ -102,6 +115,12 @@ function initMissions() {
         writeFilterPref({ period: currentPeriod() });
     }
 
+    /**
+     * Reads the period out of a stored preference, including the legacy `showPast` flag.
+     *
+     * @param {{ period?: unknown, showPast?: unknown } | null} saved the stored preference
+     * @returns {string | null} the period, or null when the preference holds none
+     */
     function storedPeriod(saved) {
         if (!saved) return null;
         if (typeof saved.period === 'string' && PERIODS.indexOf(saved.period) >= 0) {

@@ -17,12 +17,16 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { missionHooks } from '/js/mission/mission-hooks.js';
+
+/**
+ * @typedef {object} UserSearchHit
+ * @property {string} id the user
+ * @property {string} [effectiveName] the name shown in the result list
+ */
 
 document.addEventListener('DOMContentLoaded', () => {
     (function wireParticipantAjax() {
@@ -309,6 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultsDiv = document.getElementById('participant-search-results');
 
     if (searchInput && resultsDiv && userIdInput) {
+        /** @type {number | undefined} */
         let debounceTimer;
 
         searchInput.addEventListener('input', function () {
@@ -331,7 +336,7 @@ document.addEventListener('DOMContentLoaded', () => {
             debounceTimer = setTimeout(() => {
                 krtFetch
                     .getJson(`/users/search?query=${encodeURIComponent(val)}`)
-                    .then((users) => {
+                    .then((/** @type {UserSearchHit[] | null} */ users) => {
                         closeAllLists();
                         if (!users || users.length === 0) return;
 
@@ -385,6 +390,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    /** @type {number | undefined} */
     let partyLeadDebounce;
 
     function partyLeadCloseLists() {
@@ -419,7 +425,7 @@ document.addEventListener('DOMContentLoaded', () => {
         partyLeadDebounce = setTimeout(() => {
             krtFetch
                 .getJson(`/users/search?query=${encodeURIComponent(val)}`)
-                .then((users) => {
+                .then((/** @type {UserSearchHit[] | null} */ users) => {
                     partyLeadCloseLists();
                     if (!users || users.length === 0) return;
                     users.slice(0, USER_SEARCH_RENDER_CAP).forEach((user) => {

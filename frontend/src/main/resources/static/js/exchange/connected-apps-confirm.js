@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
@@ -47,11 +45,11 @@ function initConnectedAppsConfirm() {
             done: text('done'),
             discarded: text('discarded'),
             refused: text('refused'),
-            resources: {
+            resources: /** @type {Record<string, string>} */ ({
                 blueprints: text('resourceBlueprints'),
                 stock: text('resourceStock'),
                 ships: text('resourceShips'),
-            },
+            }),
         };
     }
 

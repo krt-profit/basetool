@@ -1,5 +1,3 @@
-// @ts-check
-
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
@@ -34,6 +32,22 @@ let deleteBtn = null;
 let backBtn = null;
 /** @type {HTMLElement | null} */
 let activeRow = null;
+
+/**
+ * @typedef {ApiDto<'PersonalBlueprintRecipeResponse'>} BpRecipe
+ */
+
+/**
+ * @typedef {ApiDto<'BlueprintRequirementGroupDto'>} BpRecipeGroup
+ */
+
+/**
+ * @typedef {ApiDto<'BlueprintRequirementIngredientDto'>} BpRecipeIngredient
+ */
+
+/**
+ * @typedef {ApiDto<'BlueprintRequirementModifierDto'>} BpRecipeModifier
+ */
 
 const recipeCache = new Map();
 
@@ -89,11 +103,25 @@ function clear(node) {
     }
 }
 
+/**
+ * Substitutes the blueprint id into an endpoint template and keeps the result same-origin.
+ *
+ * @param {string | undefined} template the endpoint with an `ID_PLACEHOLDER`
+ * @param {string} id the blueprint id
+ * @returns {string} the same-origin URL
+ */
 function resolveUrl(template, id) {
     const raw = (template || '').replace('ID_PLACEHOLDER', encodeURIComponent(id));
     return safeSameOriginUrl(raw, raw);
 }
 
+/**
+ * Reads a row attribute, mapping a missing or `null` literal value to an empty string.
+ *
+ * @param {Element} row the master row
+ * @param {string} name the attribute name
+ * @returns {string} the value, or an empty string
+ */
 function attr(row, name) {
     const v = row.getAttribute(name);
     return v == null || v === 'null' ? '' : v;
@@ -145,12 +173,23 @@ function rows() {
         : [];
 }
 
+/**
+ * The master-list rows that the filter leaves visible.
+ *
+ * @returns {HTMLElement[]} the visible row elements
+ */
 function visibleRows() {
     return rows().filter((r) => {
         return !r.hidden;
     });
 }
 
+/**
+ * Marks a master row as the selected one and loads its detail.
+ *
+ * @param {HTMLElement | null | undefined} row the row to select
+ * @param {{ focus?: boolean, showDetail?: boolean }} [opts] focus the row; reveal the detail pane
+ */
 function select(row, opts) {
     if (!row) {
         return;
@@ -225,6 +264,11 @@ function sourceChipText(source, clientId, clientName) {
     return client ? `${name} · ${client}` : name;
 }
 
+/**
+ * Fills the detail header from the selected row's data attributes.
+ *
+ * @param {Element} row the selected master row
+ */
 function renderDetailHead(row) {
     if (!detailContent || !detailEmpty || !nameEl || !acquiredEl || !noteEl || !noteSection) {
         return;
@@ -284,6 +328,11 @@ function renderDetailHead(row) {
     }
 }
 
+/**
+ * Shows a blueprint's recipe from the cache or fetches it.
+ *
+ * @param {string} id the blueprint id
+ */
 function loadRecipe(id) {
     if (!recipeEl || !id) {
         return;
@@ -317,6 +366,7 @@ function loadRecipe(id) {
         });
 }
 
+/** Replaces the recipe pane with the load error. */
 function showError() {
     if (!recipeEl) {
         return;
@@ -331,6 +381,11 @@ function showError() {
     );
 }
 
+/**
+ * Renders a recipe into the recipe pane.
+ *
+ * @param {BpRecipe} recipe the recipe
+ */
 function renderRecipe(recipe) {
     if (!recipeEl) {
         return;
@@ -349,7 +404,7 @@ function renderRecipe(recipe) {
         return;
     }
 
-    if (recipe.variantCount > 1) {
+    if ((recipe.variantCount ?? 0) > 1) {
         const hint = `${recipe.variantCount} ${krtI18nText(
             i18n().variants,
             'krtBlueprintsRecipeI18n.variants',
@@ -374,6 +429,13 @@ function renderRecipe(recipe) {
     }
 }
 
+/**
+ * Renders one requirement group with its ingredients and its quality slider.
+ *
+ * @param {BpRecipeGroup} group the requirement group
+ * @param {number} groupIndex the group's position, matching the craftability groups
+ * @returns {HTMLElement} the quality block
+ */
 function renderQualityBlock(group, groupIndex) {
     const block = el('div', 'quality-block');
     const slot = group.name || group.groupKey;
@@ -412,6 +474,7 @@ function renderQualityBlock(group, groupIndex) {
         return block;
     }
 
+    /** @type {{ modifier: BpRecipeModifier, out: HTMLElement }[]} */
     const chips = [];
     mods.forEach((m) => {
         const chip = el('span', 'chip');
@@ -429,15 +492,19 @@ function renderQualityBlock(group, groupIndex) {
     if (banded.length > 0) {
         const qmin = Math.min.apply(
             null,
-            banded.map((m) => {
-                return m.effectiveQualityMin;
-            }),
+            /** @type {number[]} */ (
+                banded.map((m) => {
+                    return m.effectiveQualityMin;
+                })
+            ),
         );
         const qmax = Math.max.apply(
             null,
-            banded.map((m) => {
-                return m.effectiveQualityMax;
-            }),
+            /** @type {number[]} */ (
+                banded.map((m) => {
+                    return m.effectiveQualityMax;
+                })
+            ),
         );
 
         let defaultQ = qmax;
@@ -514,6 +581,12 @@ function renderQualityBlock(group, groupIndex) {
     return block;
 }
 
+/**
+ * Renders one ingredient line with its quantity and minimum quality.
+ *
+ * @param {BpRecipeIngredient} ing the ingredient
+ * @returns {HTMLElement} the line
+ */
 function renderIngredientLine(ing) {
     const line = el('div', 'quality-name');
     const strong = document.createElement('strong');
@@ -545,6 +618,12 @@ function renderIngredientLine(ing) {
     return line;
 }
 
+/**
+ * The localized hint for which direction of a modifier is better.
+ *
+ * @param {string | null | undefined} bw `higher`, `lower` or `neutral`
+ * @returns {string | null} the hint, or null for anything else
+ */
 function betterWhenText(bw) {
     if (bw === 'higher') {
         return krtI18nText(i18n().betterHigher, 'krtBlueprintsRecipeI18n.betterHigher');
@@ -558,14 +637,35 @@ function betterWhenText(bw) {
     return null;
 }
 
+/**
+ * Clamps a value to the unit interval.
+ *
+ * @param {number} t the value
+ * @returns {number} the value between 0 and 1
+ */
 function clamp01(t) {
     return t < 0 ? 0 : t > 1 ? 1 : t;
 }
 
+/**
+ * Linear interpolation.
+ *
+ * @param {number} a the value at 0
+ * @param {number} b the value at 1
+ * @param {number} t the position between 0 and 1
+ * @returns {number} the interpolated value
+ */
 function lerp(a, b, t) {
     return a + (b - a) * t;
 }
 
+/**
+ * Evaluates a quality modifier at a quality, over its segments or its min/max range.
+ *
+ * @param {BpRecipeModifier} m the modifier
+ * @param {number} q the quality
+ * @returns {number | null | undefined} the modifier value, null when the quality is out of range
+ */
 function computeModifierValue(m, q) {
     const segs = m.segments || [];
     if (segs.length > 0) {
@@ -599,6 +699,12 @@ function computeModifierValue(m, q) {
     return null;
 }
 
+/**
+ * Rounds an SCU amount to two decimals.
+ *
+ * @param {number | string | null | undefined} value the amount
+ * @returns {string} the rounded amount, `0` when empty
+ */
 function fmtScu(value) {
     if (value == null) {
         return '0';
@@ -607,12 +713,25 @@ function fmtScu(value) {
     return (Math.round(n * 100) / 100).toString();
 }
 
+/**
+ * The localized unit label of a quantity type.
+ *
+ * @param {string | null | undefined} quantityType `SCU` or `PIECE`
+ * @returns {string} the unit label
+ */
 function unitLabel(quantityType) {
     return quantityType === 'PIECE'
         ? krtI18nText(i18n().unitPiece, 'krtBlueprintsRecipeI18n.unitPiece')
         : i18n().unitScu || 'SCU';
 }
 
+/**
+ * Formats an amount in the unit of its quantity type.
+ *
+ * @param {number | string | null | undefined} value the amount
+ * @param {string | null | undefined} quantityType `SCU` or `PIECE`
+ * @returns {string} the formatted amount
+ */
 function fmtAmount(value, quantityType) {
     if (quantityType === 'PIECE') {
         return value == null ? '0' : String(Math.round(Number(value)));
@@ -825,6 +944,7 @@ function renderKpi(data) {
  * @returns {HTMLElement | null} the section, or null when no material was evaluated
  */
 function renderIngredients(data) {
+    /** @type {ApiDto<'CraftabilityMaterialDto'>[]} */
     const materials = data.materials || [];
     if (materials.length === 0) {
         return null;
@@ -864,7 +984,7 @@ function renderIngredients(data) {
     const body = el('tbody');
     materials.forEach((m) => {
         const avail = refineryOn ? m.availableScuWithRefinery : m.availableScu;
-        const missing = refineryOn ? m.missingScuWithRefinery : m.missingScu;
+        const missing = (refineryOn ? m.missingScuWithRefinery : m.missingScu) ?? 0;
         const eff = refineryOn ? m.effectiveQualityWithRefinery : m.effectiveQuality;
         const qt = m.quantityType;
         const unit = ` ${unitLabel(qt)}`;
@@ -911,6 +1031,11 @@ function renderIngredients(data) {
     return section;
 }
 
+/**
+ * Renders the craftability detail of a blueprint.
+ *
+ * @param {string} id the blueprint id
+ */
 function renderCraftDetail(id) {
     if (!detailCraftEl) {
         return;
@@ -1014,6 +1139,12 @@ function onScopeChange() {
     applyClientFilter();
 }
 
+/**
+ * Whether a blueprint is craftable, possibly with a caveat.
+ *
+ * @param {string} id the blueprint id
+ * @returns {boolean} true for `ok` and `limited`
+ */
 function isRowCraftable(id) {
     const state = craftState(craftabilityById.get(id));
     return state === 'ok' || state === 'limited';
@@ -1038,6 +1169,11 @@ function applyClientFilter() {
     }
 }
 
+/**
+ * Moves the selection with the arrow, Home and End keys.
+ *
+ * @param {KeyboardEvent} e the key event
+ */
 function onListKeydown(e) {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') {
         return;
@@ -1144,7 +1280,7 @@ function init() {
     }
     applyClientFilter();
 
-    /** @type {Element | null | undefined} */
+    /** @type {HTMLElement | null | undefined} */
     let initial = null;
     let fromDeeplink = false;
     try {

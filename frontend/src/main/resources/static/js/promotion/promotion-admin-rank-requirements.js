@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 /* global AR_CATEGORIES_BY_TOPIC, MSG_SAVED, MSG_DELETED, MSG_ERROR, MSG_CONFLICT, MSG_INVALID_STEP, MSG_DELETE_TITLE, MSG_DELETE_MSG, MSG_DELETE_GROUP_TITLE, MSG_DELETE_GROUP_MSG, MSG_GROUP_DELETED, MSG_OK, MSG_CANCEL, MSG_REFRESH_FAILED */
 
 import {
@@ -30,9 +28,19 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 
+/**
+ * Shows a success toast.
+ *
+ * @param {string} msg the toast text
+ */
 function toastSuccess(msg) {
     showFrontendSuccessToast(msg);
 }
+/**
+ * Shows an error toast.
+ *
+ * @param {string} msg the toast text
+ */
 function toastError(msg) {
     showFrontendErrorToast(msg);
 }
@@ -47,9 +55,19 @@ function arControl(id) {
     return /** @type {HTMLInputElement} */ (document.getElementById(id));
 }
 
+/**
+ * Closes a dialog.
+ *
+ * @param {string} id the dialog's element id
+ */
 function closeModal(id) {
     krtModal.close(id);
 }
+/**
+ * Opens a dialog.
+ *
+ * @param {string} id the dialog's element id
+ */
 function openModal(id) {
     krtModal.open(id);
 }
@@ -63,24 +81,36 @@ function arRefresh() {
     });
 }
 
+/**
+ * Sets the "to" rank of a dialog to one below its "from" rank.
+ *
+ * @param {HTMLElement | null} fromInput the "from" rank input
+ */
 function syncToRank(fromInput) {
     if (!fromInput) return;
     const form = fromInput.closest('.krt-modal');
     if (!form) return;
-    const toInput = form.querySelector('.rank-to-input');
+    const toInput = /** @type {HTMLInputElement | null} */ (form.querySelector('.rank-to-input'));
     if (!toInput) return;
-    const fromVal = parseInt(fromInput.value, 10);
+    const fromVal = parseInt(/** @type {HTMLInputElement} */ (fromInput).value, 10);
     toInput.value = Number.isFinite(fromVal) ? String(fromVal - 1) : '';
 }
 
+/**
+ * Refills a dialog's category select with the categories of the chosen topic.
+ *
+ * @param {HTMLElement} topicSelect the topic select
+ */
 function rebuildCategoryDropdown(topicSelect) {
     const form = topicSelect.closest('.krt-modal');
     if (!form) return;
-    const catSelect = form.querySelector('.ar-category-select');
+    const catSelect = /** @type {HTMLSelectElement | null} */ (
+        form.querySelector('.ar-category-select')
+    );
     if (!catSelect) return;
     const previousValue = catSelect.value;
     while (catSelect.options.length > 1) catSelect.remove(1);
-    const topicId = topicSelect.value;
+    const topicId = /** @type {HTMLSelectElement} */ (topicSelect).value;
     if (topicId && AR_CATEGORIES_BY_TOPIC && AR_CATEGORIES_BY_TOPIC[topicId]) {
         AR_CATEGORIES_BY_TOPIC[topicId].forEach((cat) => {
             const opt = document.createElement('option');
@@ -94,10 +124,25 @@ function rebuildCategoryDropdown(topicSelect) {
     }
 }
 
+/**
+ * Whether the rank step lowers the rank by exactly one.
+ *
+ * @param {number} fromVal the "from" rank
+ * @param {number} toVal the "to" rank
+ * @returns {boolean} true for a single step
+ */
 function isValidSingleStep(fromVal, toVal) {
     return Number.isFinite(fromVal) && Number.isFinite(toVal) && fromVal - toVal === 1;
 }
 
+/**
+ * Sends one rank-requirement write.
+ *
+ * @param {string} url the proxy endpoint
+ * @param {string} method the HTTP method
+ * @param {object | null} body the JSON payload, if any
+ * @returns {Promise<any>} the parsed body, `{}` for an empty one, null when the write failed
+ */
 function apiCall(url, method, body) {
     return krtFetch
         .write({
@@ -127,19 +172,29 @@ function apiCall(url, method, body) {
         });
 }
 
+/**
+ * Opens the create dialog, optionally preset from a matrix cell.
+ *
+ * @param {HTMLElement | null} btn the matrix cell button, or null for a blank dialog
+ */
 function openCreateModal(btn) {
     const presetFrom = btn ? parseInt(btn.getAttribute('data-ar-from') || '', 10) : NaN;
     const from = Number.isFinite(presetFrom) ? presetFrom : 20;
     arControl('cr-from').value = String(from);
     arControl('cr-to').value = String(from - 1);
     arControl('cr-topic').value = (btn && btn.getAttribute('data-ar-topic-id')) || '';
-    rebuildCategoryDropdown(document.getElementById('cr-topic'));
+    rebuildCategoryDropdown(/** @type {HTMLElement} */ (document.getElementById('cr-topic')));
     arControl('cr-level').value = 'LEVEL_A';
     arControl('cr-count').value = '1';
     arControl('cr-desc').value = '';
     openModal('modal-create');
 }
 
+/**
+ * Scrolls to and flashes the requirement rows of one matrix cell.
+ *
+ * @param {HTMLElement} btn the matrix cell button
+ */
 function showMatrixCell(btn) {
     const from = btn.getAttribute('data-ar-from');
     const to = btn.getAttribute('data-ar-to');
@@ -170,6 +225,11 @@ function showMatrixCell(btn) {
     });
 }
 
+/**
+ * Opens the edit dialog filled from a requirement row's button.
+ *
+ * @param {HTMLElement} btn the edit button carrying the requirement's data attributes
+ */
 function openEditModal(btn) {
     arControl('er-id').value = btn.getAttribute('data-ar-id') ?? '';
     arControl('er-version').value = btn.getAttribute('data-ar-version') ?? '';
@@ -177,7 +237,7 @@ function openEditModal(btn) {
     arControl('er-to').value = btn.getAttribute('data-ar-to') ?? '';
     const topicId = btn.getAttribute('data-ar-topic-id') || '';
     arControl('er-topic').value = topicId;
-    rebuildCategoryDropdown(document.getElementById('er-topic'));
+    rebuildCategoryDropdown(/** @type {HTMLElement} */ (document.getElementById('er-topic')));
     arControl('er-category').value = btn.getAttribute('data-ar-category-id') || '';
     arControl('er-level').value = btn.getAttribute('data-ar-level') ?? '';
     arControl('er-count').value = btn.getAttribute('data-ar-count') ?? '';
@@ -236,11 +296,22 @@ function submitEdit() {
     });
 }
 
+/**
+ * Deletes one requirement.
+ *
+ * @param {string | null} id the requirement id
+ * @returns {Promise<any>} the parsed body, null when the write failed, false when no id was given
+ */
 function deleteRequirement(id) {
     if (!id) return Promise.resolve(false);
     return apiCall(`/api/proxy/promotion/rank-requirements/${id}`, 'DELETE', null);
 }
 
+/**
+ * Asks for confirmation, then deletes one requirement.
+ *
+ * @param {string | null} id the requirement id
+ */
 function confirmAndDelete(id) {
     const fn = showKrtConfirm;
     if (typeof fn !== 'function') return;
@@ -254,6 +325,12 @@ function confirmAndDelete(id) {
     });
 }
 
+/**
+ * Asks for confirmation, then deletes every requirement of one rank step.
+ *
+ * @param {number} fromRank the "from" rank of the group
+ * @param {number} toRank the "to" rank of the group
+ */
 function confirmAndDeleteGroup(fromRank, toRank) {
     const fn = showKrtConfirm;
     if (typeof fn !== 'function') return;
@@ -321,7 +398,7 @@ function applyFilter() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    rebuildCategoryDropdown(document.getElementById('cr-topic'));
+    rebuildCategoryDropdown(/** @type {HTMLElement} */ (document.getElementById('cr-topic')));
 
     krtEvents.on('click', 'ar-open-create', () => {
         openCreateModal(null);
@@ -349,11 +426,13 @@ document.addEventListener('DOMContentLoaded', () => {
     krtEvents.on('change', 'ar-topic-change', rebuildCategoryDropdown);
     krtEvents.on('input', 'ar-rank-from', syncToRank);
 
-    document.querySelectorAll('.ar-rank-from').forEach((el) => {
-        el.addEventListener('input', () => {
-            syncToRank(el);
-        });
-    });
+    /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('.ar-rank-from')).forEach(
+        (el) => {
+            el.addEventListener('input', () => {
+                syncToRank(el);
+            });
+        },
+    );
 
     const filter = document.getElementById('ar-filter');
     if (filter) filter.addEventListener('input', applyFilter);

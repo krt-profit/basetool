@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 /* global OPS_MSG */
 
 import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
@@ -27,6 +25,11 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { operationHooks } from '/js/operation/operation-hooks.js';
 
+/**
+ * Points the delete form at the operation and opens the delete dialog.
+ *
+ * @param {string | null} id the operation id
+ */
 function openDeleteModal(id) {
     const deleteForm = /** @type {HTMLFormElement | null} */ (
         document.getElementById('delete-operation-form')
@@ -50,6 +53,11 @@ function opsConflictStrings() {
     };
 }
 
+/**
+ * Closes the dialog with the given id, when present.
+ *
+ * @param {string} id the dialog element id
+ */
 function closeOperationModal(id) {
     const modal = document.getElementById(id);
     if (modal) krtModal.close(modal);

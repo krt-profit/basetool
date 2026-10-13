@@ -195,30 +195,5 @@
     "shell": [
       "shell/sc-links.js"
     ]
-  },
-  "migrated": [
-    "audit",
-    "bank",
-    "blueprint",
-    "catalogue",
-    "dashboard",
-    "exchange",
-    "hangar",
-    "identity",
-    "inventory",
-    "joborder",
-    "kernel",
-    "leadership",
-    "materialexchange",
-    "mission",
-    "notification",
-    "operation",
-    "orgchart",
-    "orgunit",
-    "personalinventory",
-    "promotion",
-    "refinery",
-    "settings",
-    "shell"
-  ]
+  }
 }

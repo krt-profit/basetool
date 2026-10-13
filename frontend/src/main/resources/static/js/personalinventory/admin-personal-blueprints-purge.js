@@ -1,5 +1,3 @@
-// @ts-check
-
 import { showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 

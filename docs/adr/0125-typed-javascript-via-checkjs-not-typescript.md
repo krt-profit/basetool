@@ -3,7 +3,7 @@
 - **Status:** Accepted — DTO type generation and the TypeScript 5.x pin superseded by ADR-0130
 - **Date:** 2026-08-02
 - **Deciders:** Repository owner (@greluc)
-- **Related:** spec REQ-FE-018 ([`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md)) · ADR-0069 (inline-JS page-module extraction) · ADR-0012/0013 (the krtFetch foundation) · [`docs/TYPESCRIPT_MIGRATION_PLAN.md`](../TYPESCRIPT_MIGRATION_PLAN.md)
+- **Related:** spec REQ-FE-018 ([`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md)) · ADR-0069 (inline-JS page-module extraction) · ADR-0012/0013 (the krtFetch foundation) · [`docs/archive/TYPESCRIPT_MIGRATION_PLAN.md`](../archive/TYPESCRIPT_MIGRATION_PLAN.md) (archived)
 
 ## Context
 
@@ -106,7 +106,7 @@ and we will not convert the sources to TypeScript.**
   which is churn on otherwise-working code.
 
 - The remaining 60 files are not a TODO left in the tree — they are simply not yet opted in, and
-  the sequencing is [`TYPESCRIPT_MIGRATION_PLAN.md`](../TYPESCRIPT_MIGRATION_PLAN.md), which also
+  the sequencing is [`TYPESCRIPT_MIGRATION_PLAN.md`](../archive/TYPESCRIPT_MIGRATION_PLAN.md), which also
   records under what conditions the "no TypeScript" half of this decision should be revisited.
 
 ## Alternatives considered
@@ -169,3 +169,20 @@ from 85 KB to 28 KB gzipped, about 57 KB. It is not built, for five reasons:
 
 The transfer saving that matters comes from compression at the edge: it sent JavaScript, CSS and
 JSON uncompressed until PR #2021 added the missing `gzip_types`.
+
+## Amendment 2026-10-13 — every script is checked, and the checker is fully strict
+
+The per-file opt-in and the "migrated" bookkeeping are retired because they have no work left to
+track: all 149 scripts passed `checkJs` already. `tsconfig.json` now sets `checkJs`, `noImplicitAny`
+and `useUnknownInCatchVariables` to `true` beside `strict`, so a new script is checked from its
+first commit without a pragma. The 813 implicit-`any` errors that ADR-0130 had priced at 514 were
+annotated with JSDoc in the same change; no runtime behaviour moved.
+`frontend/typecheck-ratchet.json` keeps only the domain manifest, and `typecheck-ratchet.mjs` now
+guards the four options, the domain ownership of every script and the absence of suppressions
+(REQ-FE-018).
+
+The decision of this ADR stands: the sources stay JavaScript and no build step exists. With every
+script checked under the full option set, a conversion to `.ts` would buy shorter annotations and
+cost a build step, so the migration plan was archived as
+[`TYPESCRIPT_MIGRATION_PLAN.md`](../archive/TYPESCRIPT_MIGRATION_PLAN.md) and reopens only through a new
+ADR.

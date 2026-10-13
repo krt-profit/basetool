@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 /**

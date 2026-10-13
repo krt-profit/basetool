@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 /* global MISSION_MSG, MISSION_CONFLICT, MISSION_TITLES */
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';

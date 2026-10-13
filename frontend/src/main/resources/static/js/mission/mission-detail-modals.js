@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 import { showKrtConfirm } from '/js/kernel/toast.js';
 import { krtSyncDatetimeSplitGroup } from '/js/kernel/datetime-splitter.js';
 import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
@@ -40,36 +38,59 @@ function initMissionDetailModals() {
     const stepsJson = /** @type {HTMLInputElement | null} */ (
         document.getElementById('mission-steps-json')
     );
-    const objectiveTemplate = document.getElementById('mission-create-objective-row');
-    const stepTemplate = document.getElementById('mission-create-step-row');
+    const objectiveTemplate = /** @type {HTMLTemplateElement | null} */ (
+        document.getElementById('mission-create-objective-row')
+    );
+    const stepTemplate = /** @type {HTMLTemplateElement | null} */ (
+        document.getElementById('mission-create-step-row')
+    );
 
+    /**
+     * Writes the 1-based position into each row's number badge.
+     *
+     * @param {ParentNode | null} list the list whose `.ae-row` children are numbered
+     */
     function renumber(list) {
         if (!list) {
             return;
         }
-        Array.prototype.forEach.call(list.querySelectorAll('.ae-row'), (row, i) => {
-            const num = row.querySelector('.ae-num');
-            if (num) {
-                num.textContent = String(i + 1);
-            }
-        });
+        Array.prototype.forEach.call(
+            list.querySelectorAll('.ae-row'),
+            (/** @type {Element} */ row, /** @type {number} */ i) => {
+                const num = row.querySelector('.ae-num');
+                if (num) {
+                    num.textContent = String(i + 1);
+                }
+            },
+        );
     }
 
+    /**
+     * Appends a row cloned from the template to the list and numbers the list.
+     *
+     * @param {Element | null} list the list to append to
+     * @param {HTMLTemplateElement | null} template the row template
+     * @param {{ title?: string, kind?: string, meta?: string } | null} values the row's initial
+     *     field values
+     * @returns {HTMLElement | null} the new row; null when the list or template is missing
+     */
     function addRow(list, template, values) {
         if (!list || !template) {
             return null;
         }
-        const row = template.content.firstElementChild.cloneNode(true);
+        const row = /** @type {HTMLElement} */ (
+            /** @type {Element} */ (template.content.firstElementChild).cloneNode(true)
+        );
         if (values) {
-            const title = row.querySelector('.ae-title');
+            const title = /** @type {HTMLInputElement | null} */ (row.querySelector('.ae-title'));
             if (title && values.title != null) {
                 title.value = values.title;
             }
-            const kind = row.querySelector('.ae-kind');
+            const kind = /** @type {HTMLSelectElement | null} */ (row.querySelector('.ae-kind'));
             if (kind && values.kind != null) {
                 kind.value = values.kind;
             }
-            const meta = row.querySelector('.ae-meta');
+            const meta = /** @type {HTMLInputElement | null} */ (row.querySelector('.ae-meta'));
             if (meta && values.meta != null) {
                 meta.value = values.meta;
             }
@@ -79,6 +100,12 @@ function initMissionDetailModals() {
         return row;
     }
 
+    /**
+     * Moves a row one position up or down within its list.
+     *
+     * @param {Element} row the row to move
+     * @param {number} dir negative for up, positive for down
+     */
     function moveRow(row, dir) {
         const list = row.parentNode;
         if (!list) {
@@ -92,16 +119,28 @@ function initMissionDetailModals() {
         renumber(list);
     }
 
+    /**
+     * Focuses the title input of a row.
+     *
+     * @param {Element | null} row the row, or null for no-op
+     */
     function focusTitle(row) {
         if (!row) {
             return;
         }
-        const title = row.querySelector('.ae-title');
+        const title = /** @type {HTMLInputElement | null} */ (row.querySelector('.ae-title'));
         if (title) {
             title.focus();
         }
     }
 
+    /**
+     * Fills the list with the rows serialized in the hidden JSON input.
+     *
+     * @param {Element | null} list the list to fill
+     * @param {HTMLTemplateElement | null} template the row template
+     * @param {HTMLInputElement | null} jsonInput the hidden input holding the JSON array
+     */
     function hydrate(list, template, jsonInput) {
         if (!list || !template || !jsonInput || !jsonInput.value) {
             return;
@@ -119,28 +158,47 @@ function initMissionDetailModals() {
         }
     }
 
+    /**
+     * Reads the titled rows of a list into plain entries.
+     *
+     * @param {ParentNode | null} list the list whose `.ae-row` children are read
+     * @param {'kind' | 'meta'} extraKey the extra field each entry carries
+     * @returns {Array<{ title: string, kind?: string, meta?: string | null }>} the entries in
+     *     list order; rows without a title are skipped
+     */
     function serialize(list, extraKey) {
+        /** @type {Array<{ title: string, kind?: string, meta?: string | null }>} */
         const out = [];
         if (!list) {
             return out;
         }
-        Array.prototype.forEach.call(list.querySelectorAll('.ae-row'), (row) => {
-            const titleInput = row.querySelector('.ae-title');
-            const title = titleInput ? titleInput.value.trim() : '';
-            if (!title) {
-                return;
-            }
-            const entry = { title };
-            if (extraKey === 'kind') {
-                const kind = row.querySelector('.ae-kind');
-                entry.kind = kind ? kind.value : 'PRIMARY';
-            } else if (extraKey === 'meta') {
-                const meta = row.querySelector('.ae-meta');
-                const metaValue = meta ? meta.value.trim() : '';
-                entry.meta = metaValue ? metaValue : null;
-            }
-            out.push(entry);
-        });
+        Array.prototype.forEach.call(
+            list.querySelectorAll('.ae-row'),
+            (/** @type {Element} */ row) => {
+                const titleInput = /** @type {HTMLInputElement | null} */ (
+                    row.querySelector('.ae-title')
+                );
+                const title = titleInput ? titleInput.value.trim() : '';
+                if (!title) {
+                    return;
+                }
+                /** @type {{ title: string, kind?: string, meta?: string | null }} */
+                const entry = { title };
+                if (extraKey === 'kind') {
+                    const kind = /** @type {HTMLSelectElement | null} */ (
+                        row.querySelector('.ae-kind')
+                    );
+                    entry.kind = kind ? kind.value : 'PRIMARY';
+                } else if (extraKey === 'meta') {
+                    const meta = /** @type {HTMLInputElement | null} */ (
+                        row.querySelector('.ae-meta')
+                    );
+                    const metaValue = meta ? meta.value.trim() : '';
+                    entry.meta = metaValue ? metaValue : null;
+                }
+                out.push(entry);
+            },
+        );
         return out;
     }
 
@@ -370,17 +428,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     if (eStartTimeUi) {
                         eStartTimeUi.value = startUtc;
-                        krtSyncDatetimeSplitGroup(
-                            /** @type {ParentNode} */ (
-                                eStartTimeUi.closest('.datetime-split-group')
-                            ),
-                        );
+                        krtSyncDatetimeSplitGroup(eStartTimeUi.closest('.datetime-split-group'));
                     }
                     if (eEndTimeUi) {
                         eEndTimeUi.value = endUtc;
-                        krtSyncDatetimeSplitGroup(
-                            /** @type {ParentNode} */ (eEndTimeUi.closest('.datetime-split-group')),
-                        );
+                        krtSyncDatetimeSplitGroup(eEndTimeUi.closest('.datetime-split-group'));
                     }
 
                     missionHooks.modalOpen(eModal);
@@ -405,6 +457,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     document.getElementById('edit-participant-end-time-hidden')
                 );
 
+                /**
+                 * Passes the value of a split date-time field on as the hidden field's value.
+                 *
+                 * @param {string} localDateStr the field value
+                 * @returns {string} the value, empty when absent
+                 */
                 function toUtcISOString(localDateStr) {
                     return localDateStr || '';
                 }

@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 /* global KRT_ORDERS_REORDER_I18N */
 
 import { showFrontendSuccessToast } from '/js/kernel/toast.js';

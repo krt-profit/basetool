@@ -406,6 +406,35 @@ interface KrtLiveSyncHandlers {
     onChanged?: (sections: string[]) => void;
     /** Runs with the section-keyed map of peers currently editing. */
     onPresence?: (sections: Record<string, KrtPresenceEditor[]>) => void;
+    /** Runs when the relay refused the subscription. */
+    onDenied?: () => void;
+}
+
+/** A section's container: a CSS selector, or an object naming it. */
+type KrtSectionContainer = string | { container?: string | null };
+
+/** The configuration of a receiver built by `krtLiveSync.createReceiver`. */
+interface KrtReceiverConfig {
+    /** Section key to the container selector of that section. */
+    sections?: Record<string, KrtSectionContainer>;
+    /** Re-renders the given sections. */
+    refresh?: (keys: string[]) => void;
+    /** Base delay in milliseconds used to coalesce inbound changes. */
+    coalesceMs?: number;
+    /** The stale-data pill shown while sections are deferred. */
+    pill?: { id?: string; label?: () => string | null | undefined };
+    /** An extra test that keeps a section from refreshing while it returns true. */
+    busyTest?: (sectionKey: string, container: Element | '' | null) => boolean;
+    /** Document events that drive the receiver. */
+    events?: { changed?: string; resync?: string };
+    /** The topic room to subscribe to. */
+    topic?: string;
+}
+
+/** The handle `krtLiveSync.createReceiver` returns. */
+interface KrtReceiver {
+    /** Applies the changed sections, or every section when the list is empty or absent. */
+    apply(incomingSections: string[] | null | undefined): void;
 }
 
 /** One peer shown as editing a section in a presence message. */
@@ -419,7 +448,7 @@ interface KrtPresenceEditor {
 /** The live multi-user sync channel installed by `krt-live-sync.js` (ADR-0092). */
 interface KrtLiveSyncApi {
     /** Builds a receiver that applies inbound peer changes to the local DOM. */
-    createReceiver(config: unknown): unknown;
+    createReceiver(config: KrtReceiverConfig): KrtReceiver;
     /** Subscribes to a topic room and returns the subscription handle. */
     subscribe(topic: string, handlers: KrtLiveSyncHandlers): { unsubscribe(): void };
     /**
@@ -651,7 +680,28 @@ interface DocumentEventMap {
     /** Fired when a mission section changed locally and peers must re-render it. */
     'krt:mission-changed': CustomEvent<{ section?: string }>;
     /** Fired when the mission page must drop its local state and re-fetch. */
-    'krt:mission-resync': CustomEvent<unknown>;
+    'krt:mission-resync': CustomEvent<null>;
+}
+
+/** Fetches combobox options on demand for a query. */
+type KrtComboboxRemoteSource = (query: string) => Promise<any[]>;
+
+/** Overrides for one combobox instance; each text key has a `data-combobox-*` fallback. */
+interface KrtComboboxConfig {
+    /** The input placeholder. */
+    placeholder?: string;
+    /** The text for an empty result. */
+    noResultsText?: string;
+    /** The hint shown when the list is capped. */
+    hintText?: string;
+    /** The custom validity for unmatched text. */
+    invalidText?: string;
+    /** The text shown while loading. */
+    loadingText?: string;
+    /** The result cap, 50 when absent. */
+    maxResults?: string | number;
+    /** The on-demand option source, used instead of filtering the static list. */
+    remoteSource?: KrtComboboxRemoteSource;
 }
 
 /** The controller `krt-searchable-select.js` attaches to an enhanced combobox. */
@@ -748,8 +798,8 @@ interface Window {
     krtModal: KrtModalApi;
     openModal?: (...args: any[]) => void;
 
-    krtSearchableSelect?: (select: HTMLSelectElement, config: Record<string, unknown>) => unknown;
-    krtComboboxRemoteSources?: Record<string, unknown>;
+    krtSearchableSelect?: (select: HTMLSelectElement, config?: KrtComboboxConfig) => void;
+    krtComboboxRemoteSources?: Record<string, KrtComboboxRemoteSource>;
 
     krtComboboxI18n?: KrtComboboxI18n;
     krtProfileI18n?: KrtI18nDict;

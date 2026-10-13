@@ -1,4 +1,3 @@
-// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -108,6 +107,11 @@ const ADMIN_INVENTORY_FILTER_PARAMS = [
     'nonStolenOnly',
 ];
 
+/**
+ * Reads the stored filter preference.
+ *
+ * @returns {any} the stored object, or null when absent or unreadable
+ */
 function readAdminInventoryFilterPref() {
     try {
         const raw = localStorage.getItem(ADMIN_INVENTORY_FILTER_KEY);
@@ -118,12 +122,23 @@ function readAdminInventoryFilterPref() {
     }
 }
 
+/**
+ * Stores the filter preference; a storage failure is ignored.
+ *
+ * @param {unknown} value the JSON-serialisable preference
+ */
 function writeAdminInventoryFilterPref(value) {
     try {
         localStorage.setItem(ADMIN_INVENTORY_FILTER_KEY, JSON.stringify(value));
     } catch (_e) {}
 }
 
+/**
+ * The values of a filter family's ticked boxes.
+ *
+ * @param {string} className the family's checkbox class
+ * @returns {string[] | null} the ticked values, or null when none or all are ticked
+ */
 function adminInventoryFilterSelection(className) {
     const boxes = /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
         document.getElementsByClassName(className)
@@ -136,6 +151,22 @@ function adminInventoryFilterSelection(className) {
     return picked.length === 0 || picked.length === boxes.length ? null : picked;
 }
 
+/**
+ * @typedef {object} AdminFilterSnapshot
+ * @property {string[] | null} [materials] the material filter
+ * @property {string[] | null} [gameItems] the game-item filter
+ * @property {string[] | null} [locations] the location filter
+ * @property {string[] | null} [jobOrders] the job-order filter
+ * @property {string[] | null} [missions] the mission filter
+ * @property {string} [minQuality] the minimum quality
+ * @property {string} stolen the stolen filter value
+ */
+
+/**
+ * The current filter selection of the active view.
+ *
+ * @returns {AdminFilterSnapshot} the selection
+ */
 function snapshotAdminInventoryFilters() {
     if (adminLager.lagerIsItemsView()) {
         return {
@@ -158,12 +189,22 @@ function snapshotAdminInventoryFilters() {
     };
 }
 
+/** Stores the current filter selection under the active view's key. */
 function persistAdminInventoryFilters() {
     const stored = readAdminInventoryFilterPref() || {};
     stored[adminLager.lagerIsItemsView() ? 'items' : 'material'] = snapshotAdminInventoryFilters();
     writeAdminInventoryFilterPref(stored);
 }
 
+/**
+ * Ticks the boxes of a family from a stored selection.
+ *
+ * @param {unknown} saved the stored values
+ * @param {string} checkClass the family's checkbox class
+ * @param {string} allId the family's select-all box id
+ * @param {string} headerId the family's header id
+ * @returns {boolean} true when at least one box was ticked
+ */
 function applyAdminSavedSelection(saved, checkClass, allId, headerId) {
     if (!Array.isArray(saved) || saved.length === 0) return false;
     const boxes = /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
@@ -180,6 +221,11 @@ function applyAdminSavedSelection(saved, checkClass, allId, headerId) {
     return any;
 }
 
+/**
+ * Restores the stored filters unless the address already carries filter parameters.
+ *
+ * @returns {boolean} true when a stored filter was applied
+ */
 function restoreAdminInventoryFilters() {
     let params;
     try {
@@ -228,17 +274,30 @@ function restoreAdminInventoryFilters() {
     return changed;
 }
 
+/**
+ * The number of active filters, for the filter panel's badge.
+ *
+ * @returns {number} the count
+ */
 function countActiveAdminInventoryFilters() {
     const snapshot = snapshotAdminInventoryFilters();
     let active = 0;
-    ['materials', 'gameItems', 'locations', 'jobOrders', 'missions'].forEach((dimension) => {
-        if (Array.isArray(snapshot[dimension]) && snapshot[dimension].length > 0) active++;
+    /** @type {Array<'materials' | 'gameItems' | 'locations' | 'jobOrders' | 'missions'>} */ ([
+        'materials',
+        'gameItems',
+        'locations',
+        'jobOrders',
+        'missions',
+    ]).forEach((dimension) => {
+        const picked = snapshot[dimension];
+        if (Array.isArray(picked) && picked.length > 0) active++;
     });
     if (typeof snapshot.minQuality === 'string' && snapshot.minQuality !== '') active++;
     if (snapshot.stolen === 'non' || snapshot.stolen === 'only') active++;
     return active;
 }
 
+/** Re-pulls the grouped table with the current filters and mirrors them into the address. */
 function filterInventory() {
     persistAdminInventoryFilters();
     krtFilterPanel.refresh('globalFilterPanel');
@@ -310,6 +369,7 @@ const INVENTORY_ALL_SECTIONS = {
     stock: { container: '#tableContainer', fragmentValue: 'stock' },
 };
 
+/** Tells peers viewing the global Lager that the stock changed. */
 function broadcastInventoryAllChanged() {
     if (typeof krtLiveSync.sendChanged === 'function') {
         krtLiveSync.sendChanged('inventory', Object.keys(INVENTORY_ALL_SECTIONS));
@@ -343,6 +403,7 @@ if (document.getElementById('tableContainer')) {
     });
 }
 
+/** Clears every filter and re-pulls the table. */
 function resetInventoryFilter() {
     ['matCheck', 'gameItemCheck', 'locCheck', 'jobOrderCheck', 'missionCheck'].forEach((cls) => {
         const boxes = /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
@@ -660,6 +721,7 @@ function submitUmbuchen(event) {
         });
 }
 
+/** Wires the delete-all dialog of the global Lager. */
 function initInventoryAdmin() {
     const deleteBtn = document.getElementById('delete-all-global-inventory-btn');
     const modal = document.getElementById('delete-all-global-inventory-modal');
@@ -699,7 +761,10 @@ function initInventoryAdmin() {
                 toast: false,
                 errorMessage: deleteBtn.getAttribute('data-error-failed') ?? undefined,
                 onSuccess() {
-                    showInventoryToast('success', deleteBtn.getAttribute('data-success'));
+                    showInventoryToast(
+                        'success',
+                        /** @type {string} */ (deleteBtn.getAttribute('data-success')),
+                    );
                     filterInventory();
                     broadcastInventoryAllChanged();
                     adminLager.broadcastBoardChanged();

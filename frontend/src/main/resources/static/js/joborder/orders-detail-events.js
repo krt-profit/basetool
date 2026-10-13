@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 /* global ORDER_CONFLICT, I18N_ADDED, I18N_REMOVED, I18N_NOTE_SAVED, I18N_NOTE_DELETED, I18N_ADD_ERROR, I18N_REMOVE_ERROR, I18N_NOTE_ERROR, I18N_NOTE_CONFLICT, I18N_NOTE_FORBIDDEN, I18N_NOTE_FOR */
 
 import {
@@ -159,6 +157,7 @@ async function oaSend(method, url, opts) {
     opts ||= {};
 
     const errorMsg = opts.errorMsg || I18N_NOTE_ERROR;
+    /** @type {KrtWriteOpts & KrtSubmitFormOpts} */
     const common = {
         method,
         url,

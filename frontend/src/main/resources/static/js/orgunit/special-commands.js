@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 /* global SC_MSG, SC_CONFLICT */
 
 import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
@@ -43,6 +41,7 @@ function openCreate() {
     krtModal.open(modal);
 }
 
+/** @param {Element} btn the clicked edit button carrying the `data-*` values */
 function openEdit(btn) {
     title.textContent = SC_MSG.editTitle;
     assignFormAction(form, safeSameOriginUrl(btn.getAttribute('data-action'), form.action));
@@ -63,6 +62,7 @@ const deleteForm = /** @type {HTMLFormElement | null} */ (
 );
 const deleteNameEl = document.getElementById('sc-delete-name');
 
+/** @param {Element} btn the clicked delete button carrying the `data-*` values */
 function openDelete(btn) {
     if (!deleteModal || !deleteForm) return;
     assignFormAction(
@@ -153,6 +153,11 @@ function reswapScResults() {
     krtFetch.swap({ url, container: '#sc-results', history: false });
 }
 
+/**
+ * @param {HTMLFormElement} theForm the form to submit
+ * @param {string} successMessage the localized success toast text
+ * @param {(() => void) | null} onSuccess runs after a successful write, before the list swap
+ */
 function scWrite(theForm, successMessage, onSuccess) {
     krtFetch.submitForm({
         form: theForm,

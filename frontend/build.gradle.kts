@@ -656,7 +656,7 @@ val typecheckJs =
   tasks.register<NpxTask>("typecheckJs") {
     group = "verification"
     description =
-      "Type-checks the opted-in browser scripts with tsc --noEmit (strict; fails on findings)."
+      "Type-checks every browser script with tsc --noEmit (strict, checkJs, noImplicitAny; fails on findings)."
     dependsOn(tasks.named("npmInstall"), generateApiTypes)
     command.set("tsc")
     args.set(listOf("-p", "tsconfig.json"))
@@ -677,7 +677,7 @@ val testTypecheckRatchet =
   tasks.register<NodeTask>("testTypecheckRatchet") {
     group = "verification"
     description =
-      "Holds the type-check ratchet: migrated domains are fully checked, and the ratchet fires on planted trees."
+      "Holds the type-check ratchet: every script has a domain, the strict options stay on, and the ratchet fires on planted trees."
     dependsOn(tasks.named("npmSetup"))
     script.set(layout.projectDirectory.file("scripts/typecheck-ratchet.test.mjs").asFile)
     ignoreExitValue.set(false)

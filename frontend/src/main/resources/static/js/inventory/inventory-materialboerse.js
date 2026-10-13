@@ -10,8 +10,6 @@
  * Delegated via window.krtEvents so lazily-loaded leaf rows need no re-binding.
  */
 
-// @ts-check
-
 import { showKrtConfirm } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';

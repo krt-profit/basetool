@@ -1,4 +1,3 @@
-// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -90,6 +89,11 @@ function readJson(res, fallback) {
     return res.json();
 }
 
+/**
+ * Shows the unread count on every bell badge, capped at 99+.
+ *
+ * @param {unknown} count the unread count; anything but a number counts as zero
+ */
 function setBadge(count) {
     const badge = document.getElementById('notification-badge');
     if (!badge) {
@@ -189,6 +193,15 @@ function chevron() {
     return svg;
 }
 
+/**
+ * Builds one icon button of a notification row.
+ *
+ * @param {string} attr the suffix of the `data-` marker attribute
+ * @param {string} label the accessible label and tooltip
+ * @param {string} icon the icon symbol id
+ * @param {string} className the button's classes
+ * @returns {HTMLButtonElement} the button
+ */
 function actionButton(attr, label, icon, className) {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -275,11 +288,23 @@ function toggleDropdown() {
     }
 }
 
+/**
+ * Runs a callback for every rendered row of one notification.
+ *
+ * @param {string} id the notification id
+ * @param {(li: HTMLElement) => void} fn the callback
+ */
 function eachItem(id, fn) {
     const nodes = document.querySelectorAll(`[data-notif-id="${cssEscape(id)}"]`);
     Array.prototype.forEach.call(nodes, fn);
 }
 
+/**
+ * Escapes a value for use inside a quoted attribute selector.
+ *
+ * @param {string} value the raw value
+ * @returns {string} the escaped value
+ */
 function cssEscape(value) {
     if (window.CSS && typeof window.CSS.escape === 'function') {
         return window.CSS.escape(value);
@@ -287,6 +312,11 @@ function cssEscape(value) {
     return String(value).replace(/["\\]/g, '\\$&');
 }
 
+/**
+ * Marks a rendered row as read and drops its mark-read button.
+ *
+ * @param {Element} li the notification row
+ */
 function markReadInPlace(li) {
     li.classList.add('is-read');
     li.setAttribute('data-notif-read', 'true');
@@ -296,12 +326,22 @@ function markReadInPlace(li) {
     }
 }
 
+/**
+ * Removes a rendered row and refreshes the empty state of its list.
+ *
+ * @param {Element} li the notification row
+ */
 function removeItem(li) {
     const list = li.parentElement;
     li.remove();
     refreshEmptyState(list);
 }
 
+/**
+ * Shows the empty hint next to a list exactly when it holds no notification row.
+ *
+ * @param {Element | null} list the list element
+ */
 function refreshEmptyState(list) {
     if (!list) {
         return;
@@ -319,6 +359,12 @@ function refreshEmptyState(list) {
     }
 }
 
+/**
+ * Marks one notification read and patches its rows in place.
+ *
+ * @param {string} id the notification id
+ * @param {Element | null} submitter the button disabled while the write is in flight
+ */
 function doMarkRead(id, submitter) {
     krtFetch
         .write({
@@ -334,6 +380,12 @@ function doMarkRead(id, submitter) {
         .finally(refreshUnreadCount);
 }
 
+/**
+ * Deletes one notification and removes its rows in place.
+ *
+ * @param {string} id the notification id
+ * @param {Element | null} submitter the button disabled while the write is in flight
+ */
 function doDelete(id, submitter) {
     krtFetch
         .write({
@@ -349,6 +401,11 @@ function doDelete(id, submitter) {
         .finally(refreshUnreadCount);
 }
 
+/**
+ * Marks every notification read and patches the rows in place.
+ *
+ * @param {Element | null} submitter the button disabled while the write is in flight
+ */
 function doMarkAll(submitter) {
     krtFetch
         .write({
@@ -365,6 +422,11 @@ function doMarkAll(submitter) {
         .finally(refreshUnreadCount);
 }
 
+/**
+ * Deletes every read notification after a confirmation and removes the rows in place.
+ *
+ * @param {Element | null} submitter the button disabled while the write is in flight
+ */
 function doClearRead(submitter) {
     confirmThen(i18n.confirmClearTitle, i18n.confirmClearBody, () => {
         krtFetch
@@ -383,12 +445,18 @@ function doClearRead(submitter) {
     });
 }
 
+/**
+ * Appends the next page of notifications to the notification page's list.
+ *
+ * @param {HTMLButtonElement} btn the load-more button
+ */
 function loadMorePage(btn) {
     const list = document.getElementById('notification-page-list');
     if (!list || btn.disabled) {
         return;
     }
-    const page = parseInt(btn.getAttribute('data-notif-next-page'), 10) || 1;
+    const page =
+        parseInt(/** @type {string} */ (btn.getAttribute('data-notif-next-page')), 10) || 1;
     btn.disabled = true;
     readNotifications(`/notifications/page-items?page=${page}`)
         .then((res) => {
@@ -398,7 +466,7 @@ function loadMorePage(btn) {
             if (!data || !Array.isArray(data.items)) {
                 return;
             }
-            data.items.forEach((item) => {
+            data.items.forEach((/** @type {any} */ item) => {
                 if (!list.querySelector(`[data-notif-id="${cssEscape(item.id)}"]`)) {
                     list.appendChild(buildItem(item, true));
                 }
@@ -420,6 +488,12 @@ function loadMorePage(btn) {
         });
 }
 
+/**
+ * Rewrites the "shown of total" hint of the notification page.
+ *
+ * @param {Element} list the list element
+ * @param {number | string} total the total number of notifications
+ */
 function updatePageHint(list, total) {
     const hint = document.querySelector('[data-notif-hint]');
     if (!hint) {
@@ -430,6 +504,13 @@ function updatePageHint(list, total) {
     hint.textContent = template.replace('{shown}', String(shown)).replace('{total}', String(total));
 }
 
+/**
+ * Asks for confirmation and runs the action only when it is given.
+ *
+ * @param {string} title the dialog title
+ * @param {string} body the dialog text
+ * @param {() => void} action the action to run on confirmation
+ */
 function confirmThen(title, body, action) {
     showKrtConfirm(title, body, i18n.confirmOk, i18n.confirmCancel).then((ok) => {
         if (ok) {
@@ -438,43 +519,49 @@ function confirmThen(title, body, action) {
     });
 }
 
+/**
+ * Handles every click of the page: row actions, bulk actions, load-more and the dropdown toggle.
+ *
+ * @param {MouseEvent} event the click
+ */
 function onDocumentClick(event) {
-    const markReadBtn = event.target.closest('[data-notif-mark-read]');
+    const target = /** @type {Element} */ (event.target);
+    const markReadBtn = target.closest('[data-notif-mark-read]');
     if (markReadBtn) {
         const readLi = markReadBtn.closest('[data-notif-id]');
         if (readLi) {
-            doMarkRead(readLi.getAttribute('data-notif-id'), markReadBtn);
+            doMarkRead(/** @type {string} */ (readLi.getAttribute('data-notif-id')), markReadBtn);
         }
         return;
     }
-    const deleteBtn = event.target.closest('[data-notif-delete]');
+    const deleteBtn = target.closest('[data-notif-delete]');
     if (deleteBtn) {
         const delLi = deleteBtn.closest('[data-notif-id]');
         if (delLi) {
-            doDelete(delLi.getAttribute('data-notif-id'), deleteBtn);
+            doDelete(/** @type {string} */ (delLi.getAttribute('data-notif-id')), deleteBtn);
         }
         return;
     }
-    const markAllBtn = event.target.closest('[data-notif-mark-all]');
+    const markAllBtn = target.closest('[data-notif-mark-all]');
     if (markAllBtn) {
         doMarkAll(markAllBtn);
         return;
     }
-    const clearReadBtn = event.target.closest('[data-notif-clear-read]');
+    const clearReadBtn = target.closest('[data-notif-clear-read]');
     if (clearReadBtn) {
         doClearRead(clearReadBtn);
         return;
     }
-    const loadMoreBtn = event.target.closest('[data-notif-load-more]');
+    const loadMoreBtn = target.closest('[data-notif-load-more]');
     if (loadMoreBtn) {
-        loadMorePage(loadMoreBtn);
+        loadMorePage(/** @type {HTMLButtonElement} */ (loadMoreBtn));
         return;
     }
-    if (event.target.closest('#notification-toggle')) {
+    if (target.closest('#notification-toggle')) {
         toggleDropdown();
         return;
     }
-    if (bell && !event.target.closest('#notification-bell')) {
+    if (bell && !target.closest('#notification-bell')) {
         closeDropdown();
     }
 }

@@ -1,9 +1,20 @@
-// @ts-check
-
 import { krtTermsGate } from '/js/kernel/krt-fetch.js';
 
 const DEFAULT_COALESCE_MS = 400;
 
+/**
+ * @typedef {object} TopicEntry
+ * @property {string} state `idle`, `pending`, `subscribed` or `denied`
+ * @property {boolean} ackedOnce whether the relay acknowledged the subscription before
+ * @property {number} deniedAttempts consecutive indeterminate denials
+ * @property {number | null} resubscribeTimer the pending re-subscribe timer, if any
+ * @property {KrtLiveSyncHandlers} [handlers] the callbacks registered by `subscribe`
+ */
+
+/**
+ * @param {KrtSectionContainer | null | undefined} sectionValue a section map value
+ * @returns {string | null} the container selector, or null
+ */
 function containerSelector(sectionValue) {
     if (typeof sectionValue === 'string') {
         return sectionValue;
@@ -27,6 +38,7 @@ const syncSocket = (function () {
     const RESUBSCRIBE_MAX_MS = 30000;
     const RESUBSCRIBE_MAX_ATTEMPTS = 5;
     const topics = Object.create(null);
+    /** @type {{topic: string, sections: string[]}[]} */
     const publishBuffer = [];
     /** @type {WebSocket | null} */
     let ws = null;
@@ -44,6 +56,10 @@ const syncSocket = (function () {
         return ws && ws.readyState === WebSocket.OPEN;
     }
 
+    /**
+     * @param {object} obj the message to serialize and send
+     * @returns {boolean} whether the socket accepted it
+     */
     function rawSend(obj) {
         if (!isOpen() || !ws) {
             return false;
@@ -85,11 +101,12 @@ const syncSocket = (function () {
             }
         });
         while (publishBuffer.length) {
-            const p = publishBuffer.shift();
+            const p = /** @type {{topic: string, sections: string[]}} */ (publishBuffer.shift());
             rawSend({ type: 'changed', topic: p.topic, sections: p.sections });
         }
     }
 
+    /** @param {TopicEntry} entry the topic whose re-subscribe timer is cancelled */
     function clearResubscribe(entry) {
         if (entry.resubscribeTimer) {
             window.clearTimeout(entry.resubscribeTimer);
@@ -97,6 +114,10 @@ const syncSocket = (function () {
         }
     }
 
+    /**
+     * @param {string} topic the denied topic
+     * @param {TopicEntry} entry the topic's state
+     */
     function scheduleResubscribe(topic, entry) {
         clearResubscribe(entry);
         const ceiling = Math.min(
@@ -115,6 +136,7 @@ const syncSocket = (function () {
         }, wait);
     }
 
+    /** @param {MessageEvent} ev the relay message */
     function onMessage(ev) {
         let msg;
         try {
@@ -160,6 +182,7 @@ const syncSocket = (function () {
         }
     }
 
+    /** @param {CloseEvent} ev the close event */
     function onClose(ev) {
         ws = null;
         if (ev && ev.code === TERMS_GATE_CLOSE_CODE) {
@@ -198,6 +221,11 @@ const syncSocket = (function () {
     }
 
     return {
+        /**
+         * @param {string} topic the topic room
+         * @param {KrtLiveSyncHandlers} handlers the callbacks to register
+         * @returns {{unsubscribe(): void}} the subscription handle
+         */
         subscribe(topic, handlers) {
             if (!topic) {
                 return { unsubscribe() {} };
@@ -221,6 +249,10 @@ const syncSocket = (function () {
                 },
             };
         },
+        /**
+         * @param {string} topic the topic room
+         * @param {string | string[]} sections the changed section keys
+         */
         sendChanged(topic, sections) {
             if (!topic || stopped) {
                 return;
@@ -231,6 +263,11 @@ const syncSocket = (function () {
                 publishBuffer.push({ topic, sections: secs });
             }
         },
+        /**
+         * @param {string} topic the topic room
+         * @param {string} type the presence message type
+         * @param {string} sectionKey the section the presence refers to
+         */
         sendPresence(topic, type, sectionKey) {
             if (!topic || !type) {
                 return;
@@ -246,26 +283,42 @@ const syncSocket = (function () {
     };
 })();
 
+/**
+ * Builds a receiver that applies inbound peer changes: coalesces them, defers busy sections behind
+ * a pill and calls `cfg.refresh` with the sections ready to re-render.
+ *
+ * @param {KrtReceiverConfig} cfg the receiver configuration
+ * @returns {KrtReceiver} the receiver
+ */
 function createReceiver(cfg) {
+    /** @type {Record<string, KrtSectionContainer>} */
     const sections = (cfg && cfg.sections) || {};
     const refreshFn = cfg && cfg.refresh;
     const coalesceMs = cfg && cfg.coalesceMs ? cfg.coalesceMs : DEFAULT_COALESCE_MS;
+    /** @type {NonNullable<KrtReceiverConfig['pill']>} */
     const pillCfg = (cfg && cfg.pill) || {};
     const pillId = pillCfg.id || 'krt-livesync-pill';
     const pillClassName = 'krt-livesync-pill';
     const extraBusyTest = cfg && cfg.busyTest;
 
+    /** @type {Record<string, string | null>} */
     const sectionContainers = {};
     Object.keys(sections).forEach((sectionKey) => {
         sectionContainers[sectionKey] = containerSelector(sections[sectionKey]);
     });
     const allSections = Object.keys(sectionContainers);
 
+    /** @type {Record<string, boolean>} */
     const pendingNow = {};
+    /** @type {Record<string, boolean>} */
     const deferred = {};
     /** @type {number | null} */
     let timer = null;
 
+    /**
+     * @param {string} sectionKey the section to test
+     * @returns {boolean} whether the section must not be re-rendered now
+     */
     function sectionBusy(sectionKey) {
         if (anyModalOpen()) {
             return true;
@@ -281,6 +334,7 @@ function createReceiver(cfg) {
         return false;
     }
 
+    /** @param {string[]} keys the sections to hand to the configured refresh callback */
     function refresh(keys) {
         if (keys.length && typeof refreshFn === 'function') {
             refreshFn(keys);
@@ -310,6 +364,7 @@ function createReceiver(cfg) {
         pill.className = pillClassName;
         pill.textContent = label;
         pill.addEventListener('click', () => {
+            /** @type {string[]} */
             const ready = [];
             Object.keys(deferred).forEach((k) => {
                 if (sectionBusy(k)) {
@@ -345,6 +400,7 @@ function createReceiver(cfg) {
         keys.forEach((k) => {
             delete pendingNow[k];
         });
+        /** @type {string[]} */
         const ready = [];
         let nowDeferred = false;
         keys.forEach((k) => {
@@ -363,6 +419,7 @@ function createReceiver(cfg) {
         hidePillIfEmpty();
     }
 
+    /** @param {string} sectionKey the section to re-render after the coalescing delay */
     function schedule(sectionKey) {
         pendingNow[sectionKey] = true;
         if (!timer) {
@@ -370,6 +427,7 @@ function createReceiver(cfg) {
         }
     }
 
+    /** @param {string[] | null | undefined} incomingSections the changed sections, all if empty */
     function apply(incomingSections) {
         const keys =
             Array.isArray(incomingSections) && incomingSections.length
@@ -393,10 +451,12 @@ function createReceiver(cfg) {
         }
     }
 
+    /** @type {NonNullable<KrtReceiverConfig['events']>} */
     const events = (cfg && cfg.events) || {};
     if (events.changed) {
         document.addEventListener(events.changed, (ev) => {
-            apply(ev && ev.detail ? ev.detail.sections : null);
+            const detail = /** @type {CustomEvent<{sections?: string[]} | null>} */ (ev).detail;
+            apply(detail ? detail.sections : null);
         });
     }
     if (events.resync) {

@@ -5,10 +5,10 @@
     "(noEmit) — nothing is compiled, no bundle is produced and no script tag",
     "changes. See ADR-0125.",
     "",
-    "checkJs is deliberately FALSE: files opt in individually with a leading",
-    "`// @ts-check` comment, and typecheck-ratchet.json holds the domains in",
-    "which every file must have opted in (the ratchet, REQ-FE-018). Nothing",
-    "under `exclude` may hide a checked script.",
+    "checkJs is TRUE: every script is checked, with no per-file opt-in, and",
+    "strict, noImplicitAny and useUnknownInCatchVariables stay on; the ratchet",
+    "(typecheck-ratchet.json, REQ-FE-018) holds the options and the domain",
+    "manifest. Nothing under `exclude` may hide a checked script.",
     "",
     "moduleDetection is `force`: every script is checked as an ES module with its",
     "own scope, as the browser runs it (ADR-0250); the one classic script, the",
@@ -17,7 +17,7 @@
   ],
   "compilerOptions": {
     "allowJs": true,
-    "checkJs": false,
+    "checkJs": true,
     "noEmit": true,
     "target": "ES2025",
     "lib": [
@@ -34,8 +34,8 @@
       ]
     },
     "strict": true,
-    "noImplicitAny": false,
-    "useUnknownInCatchVariables": false,
+    "noImplicitAny": true,
+    "useUnknownInCatchVariables": true,
     "types": [],
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true

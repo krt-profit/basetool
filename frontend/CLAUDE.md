@@ -219,60 +219,49 @@ whitelist and a page's JS seam map disagree.
 
 ## Type checking (REQ-FE-018, ADR-0125)
 
-The scripts under `static/js` are statically type-checked by `:frontend:typecheckJs`
-(`tsc --noEmit`, strict, wired into `check`). **TypeScript is a checker here, not a language:**
+Every script under `static/js` is statically type-checked by `:frontend:typecheckJs`
+(`tsc --noEmit`, wired into `check`) with `strict`, `checkJs`, `noImplicitAny` and
+`useUnknownInCatchVariables` all on. **TypeScript is a checker here, not a language:**
 the sources stay JavaScript, stay ES modules served as they are (ADR-0250), and nothing is
-compiled, bundled or renamed. Do **not** convert files to `.ts` — the
-full migration is an unscheduled, costed option in
-[`docs/TYPESCRIPT_MIGRATION_PLAN.md`](../docs/TYPESCRIPT_MIGRATION_PLAN.md), not a default.
+compiled, bundled or renamed. Do **not** convert files to `.ts` — the archived
+[`docs/archive/TYPESCRIPT_MIGRATION_PLAN.md`](../docs/archive/TYPESCRIPT_MIGRATION_PLAN.md) records why
+and under which conditions that would be reopened (a new ADR).
 
 **The module runs TypeScript 7, and the DTO declarations are emitted by us** — `openapi-typescript`
-is gone (ADR-0130). Two consequences you will actually trip over:
+is gone (ADR-0130). What that means when you write a script:
 
-- **`let x = null;` no longer self-types.** TS 7 grants such a declaration an *evolving* implicit
-  `any` only when `noImplicitAny` is on, and this config deliberately keeps it **off**. So TS 7
-  infers the literal type `null` and then rejects every later assignment (`TS2322`), every deref
-  (`TS18047`) and every post-narrowing use (`TS2339` on `never`) — 179 errors across 12 files when
-  the upgrade landed. **Annotate the declaration with the precise type**:
-  `/** @type {HTMLInputElement | null} */`, `/** @type {number | null} */`, … `any` is reserved for
-  genuinely untyped JSON (a `Map` lookup, an untyped list item) — **no element handle is `any`**,
-  and re-introducing one would silently re-open the null-safety gap below. Two DOM-signature
-  papercuts follow: `clearTimeout` takes `number | undefined`, so a `number | null` handle needs
+- **Every parameter, variable and returned shape carries a JSDoc type.** `@param {Type} name`,
+  `@returns {Type}`, `/** @type {HTMLInputElement | null} */`. `any` is reserved for genuinely
+  untyped JSON (a `Map` lookup, an untyped list item) — **no element handle is `any`**. An
+  object literal that is extended later gets the full shape as a `@typedef` or an inline
+  `@type {{…}}` with optional members.
+- **`| null` on a handle means the null case is yours to handle.** A function that dereferences a
+  handle must guard it, and the guard has to cover **every** handle it touches, not just the first
+  one. Before adding a guard, check whether the real fix is upstream: a helper with no declared
+  return type poisons everything downstream of it, and a `querySelector` whose result is used as a
+  checkbox or text input wants one cast at the query, not a cast at every use. Two DOM-signature
+  papercuts: `clearTimeout` takes `number | undefined`, so a `number | null` handle needs
   `clearTimeout(t ?? undefined)`; and a generic `getElementById` feeding a specifically-typed
   variable needs a cast at the assignment.
-- **`| null` on a handle means the null case is now yours to handle.** Because `noImplicitAny` is
-  off, these handles used to be `any` and their null dereferences went unchecked — the gap
-  ADR-0125 believed it had closed. They are typed now, so a function that dereferences a handle
-  must guard it, and the guard has to cover **every** handle it touches, not just the first one
-  (`renderDetailHead` guarded one of six). Before adding a guard, check whether the real fix is
-  upstream: a helper with no declared return type poisons everything downstream of it — typing
-  `el()` alone fixed nine errors — and a `querySelector` whose result is used as a checkbox or
-  text input wants one cast at the query, not a cast at every use.
+- **A caught value is `unknown`.** Narrow it where the code reads it
+  (`err instanceof Error ? err.message : String(err)`).
 - **`scripts/gen-api-types.mjs` is ours to extend.** It covers the flat-object subset springdoc
   emits today (`$ref`, `items`, `enum`, `additionalProperties`, `nullable`, primitives) and
   **fails the build** on `allOf` / `oneOf` / `anyOf` / `not` / `discriminator`. The realistic
   trigger is a backend model gaining `@JsonSubTypes`. When that build failure names a construct,
   extend the emitter — never weaken the guard, because a DTO degraded to `unknown` type-checks
   everywhere and silently removes the drift protection the whole mechanism exists for.
-
-`noImplicitAny` stays **off**: turning it on also clears the evolving-`any` class, but costs 514
-implicit-any errors — and TS 5.9.3 reported the identical 514, so that is pre-existing annotation
-debt rather than anything TS 7 introduced.
-
 - **The language level is ES2025** (ADR-0239, REQ-FE-018): the floor is Chrome 122, Firefox 131,
   Safari / iOS 18.4. `Promise.try`, `RegExp.escape` and `Float16Array` are in TypeScript's `ES2025`
   lib but above the floor, so ESLint rejects them.
-- **Opt in per file** with a leading `// @ts-check`. A file that opts in **must** be error-free —
-  there is no partial state. Prefer opting in any file you substantially touch. No script carries
-  `@ts-nocheck`, `@ts-ignore` or `@ts-expect-error`.
-- **The ratchet per domain** (`frontend/typecheck-ratchet.json`, `:frontend:testTypecheckRatchet`):
-  every script of `static/js` (subfolders included, `vendor/` excepted) is listed by its path under
-  exactly one domain, and lives in that domain's folder, so **a new script must be added to its
-  domain's list** or the build fails. **Every domain
-  is migrated** (`"migrated"` equals the domain list): a new script needs `// @ts-check` from its
-  first commit, and a new domain is added to `"domains"`, to `"migrated"` and to `MIGRATED_FLOOR`
-  (raise `CHECKED_FILES_FLOOR` too) in `scripts/typecheck-ratchet.mjs`; the list and the floors never
-  shrink.
+- **No pragma, no opt-in, no suppression.** A script is checked from its first commit and must be
+  error-free. No script carries `@ts-nocheck`, `@ts-ignore` or `@ts-expect-error`.
+- **The ratchet** (`frontend/typecheck-ratchet.json`, `:frontend:testTypecheckRatchet`): every
+  script of `static/js` (subfolders included, `vendor/` excepted) is listed by its path under
+  exactly one domain and lives in that domain's folder, so **a new script must be added to its
+  domain's list** or the build fails. The test also fails when `tsconfig.json` turns `strict`,
+  `checkJs`, `noImplicitAny` or `useUnknownInCatchVariables` off, hides scripts with `exclude`, or
+  when a script suppresses the check. A new domain is added to `"domains"` only.
   A script that is too large to check is split first into modules by responsibility (see *ES modules*
   below), the first keeping the file name.
 - **Declare shared contracts in the same change.** A new kernel API is an `export` of its module and is
@@ -286,9 +275,9 @@ debt rather than anything TS 7 introduced.
   `/** @param {ApiDto<'MaterialDto'>} row */`, `ApiPage<…>`, `ApiProblem`. The types come from
   `openapi.json` via `:frontend:generateApiTypes`; the generated file is build output and must not
   be committed.
-- **In a checked file, JSDoc must be real JSDoc.** The Javadoc spellings used elsewhere in this
+- **JSDoc must be real JSDoc.** The Javadoc spellings used elsewhere in this
   repo — `{@code …}`, `{@link …}`, `@param name {shape}` — are parsed as type syntax and are hard
-  errors. Convert them when you opt a file in.
+  errors.
 
 ## ES modules (REQ-FE-035, ADR-0250)
 

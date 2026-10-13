@@ -11,8 +11,6 @@
  * window.materialboerseI18n. No native dialogs, no full-page reload.
  */
 
-// @ts-check
-
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
@@ -73,7 +71,33 @@ function initMaterialboerseRelease() {
         onDone: null,
         onCancel: null,
     };
+    /**
+     * One releasable stock row of the material picker.
+     *
+     * @typedef {object} MaterialPickerItem
+     * @property {string} inventoryItemId the inventory entry
+     * @property {string} kind `MATERIAL` or `ITEM`
+     * @property {string} materialName the material or item name
+     * @property {number | string} quality the quality tier
+     * @property {number | string} amount the stock
+     * @property {string} quantityType `SCU` or `PIECE`
+     * @property {string} [locationName] the entry's location
+     * @property {boolean} [alreadyReleased] whether the entry already has an offer
+     * @property {boolean} [stolen] whether the entry is stolen stock
+     */
+
+    /**
+     * One blueprint product of the item picker.
+     *
+     * @typedef {object} MaterialProductItem
+     * @property {string} productKey the product
+     * @property {string} name the product name
+     * @property {string} [manufacturerName] the manufacturer
+     */
+
+    /** @type {MaterialPickerItem[]} */
     let pickerItems = [];
+    /** @type {MaterialProductItem[]} */
     let productItems = [];
     /** @type {HTMLElement | null} */
     let lastFocused = null;
@@ -88,6 +112,13 @@ function initMaterialboerseRelease() {
     let itemPickerListOpen = false;
     let pickerKind = 'MATERIAL';
 
+    /**
+     * Fills the `{0}` placeholder of a message template.
+     *
+     * @param {string | null | undefined} template the localized template
+     * @param {string} value the replacement
+     * @returns {string} the filled text
+     */
     function fmt(template, value) {
         return String(template || '').replace('{0}', value);
     }
@@ -113,6 +144,12 @@ function initMaterialboerseRelease() {
         );
     }
 
+    /**
+     * Sets the text of an element inside the modal.
+     *
+     * @param {string} sel the selector
+     * @param {string} text the new text
+     */
     function setText(sel, text) {
         const el = q(sel);
         if (el) {
@@ -120,6 +157,12 @@ function initMaterialboerseRelease() {
         }
     }
 
+    /**
+     * Shows or hides an element inside the modal.
+     *
+     * @param {string} sel the selector
+     * @param {boolean} on true to show
+     */
     function toggle(sel, on) {
         const el = q(sel);
         if (el) {
@@ -130,6 +173,10 @@ function initMaterialboerseRelease() {
     /**
      * Formats an amount in the material's own unit: an integer count + the piece unit for a PIECE
      * material, otherwise the up-to-3-decimal SCU rendering, with localized unit labels.
+     *
+     * @param {string | number | null | undefined} amount the amount
+     * @param {string | null | undefined} quantityType `SCU` or `PIECE`
+     * @returns {string} the rendered amount with its unit
      */
     function formatAmount(amount, quantityType) {
         const n = Number(amount);
@@ -145,6 +192,12 @@ function initMaterialboerseRelease() {
         return `${n.toLocaleString('de-DE', { maximumFractionDigits: 3 })} ${i18n.unitScu || 'SCU'}`;
     }
 
+    /**
+     * Shows the picked material and quality in the fact row.
+     *
+     * @param {string | null | undefined} material the material or item name
+     * @param {string | number | null | undefined} quality the quality tier
+     */
     function setFacts(material, quality) {
         setText('[data-mb-fact-material]', material || '—');
         setText(
@@ -220,7 +273,11 @@ function initMaterialboerseRelease() {
         return amount;
     }
 
-    /** Shows a transient client-side validation error toast. */
+    /**
+     * Shows a transient client-side validation error toast.
+     *
+     * @param {string | null | undefined} message the text; the generic error text when empty
+     */
     function showError(message) {
         showFrontendErrorToast(message || i18n.error || '');
     }
@@ -355,7 +412,12 @@ function initMaterialboerseRelease() {
         }
     }
 
-    /** Close after a successful submit — fires the onDone hook with the response body. */
+    /**
+     * Close after a successful submit — fires the onDone hook with the response body.
+     *
+     * @param {any} body the response body
+     * @returns {void | Promise<unknown>} the hook's result
+     */
     function finish(body) {
         const onDone = state.onDone;
         hide();
@@ -379,6 +441,11 @@ function initMaterialboerseRelease() {
         };
     }
 
+    /**
+     * Loads the releasable stock rows, optionally filtered by a search text.
+     *
+     * @param {string} query the search text; empty for all
+     */
     function loadPicker(query) {
         const seq = ++pickerSeq;
         const url = `/materialboerse/releasable-items?kind=${encodeURIComponent(
@@ -402,7 +469,11 @@ function initMaterialboerseRelease() {
             });
     }
 
-    /** Debounces a server-side picker search so every keystroke does not fire its own request. */
+    /**
+     * Debounces a server-side picker search so every keystroke does not fire its own request.
+     *
+     * @param {string} query the search text
+     */
     function searchPicker(query) {
         if (pickerSearchTimer) {
             clearTimeout(pickerSearchTimer);
@@ -494,7 +565,11 @@ function initMaterialboerseRelease() {
         list.hidden = !pickerListOpen;
     }
 
-    /** Shows or hides the quality fact — item rows (stock-backed item offers) have no quality. */
+    /**
+     * Shows or hides the quality fact — item rows (stock-backed item offers) have no quality.
+     *
+     * @param {boolean} show true to show
+     */
     function toggleQualityFact(show) {
         toggle('[data-mb-fact-quality-wrap]', show);
     }
@@ -520,6 +595,11 @@ function initMaterialboerseRelease() {
         closePickerList();
     }
 
+    /**
+     * Loads the offerable blueprint products, optionally filtered by a search text.
+     *
+     * @param {string} query the search text; empty for all
+     */
     function loadItemPicker(query) {
         const seq = ++itemPickerSeq;
         const url = `/materialboerse/offerable-products${query ? `?q=${encodeURIComponent(query)}` : ''}`;
@@ -541,7 +621,11 @@ function initMaterialboerseRelease() {
             });
     }
 
-    /** Debounces a server-side blueprint-product search so every keystroke does not fire a request. */
+    /**
+     * Debounces a server-side blueprint-product search so every keystroke does not fire a request.
+     *
+     * @param {string} query the search text
+     */
     function searchItemPicker(query) {
         if (itemPickerSearchTimer) {
             clearTimeout(itemPickerSearchTimer);
@@ -667,6 +751,8 @@ function initMaterialboerseRelease() {
     /**
      * Submits an item offer for the picked blueprint product and a whole quantity ≥ 1; on success
      * notifies peers and closes the modal.
+     *
+     * @param {string} remark the remark text
      */
     function submitItem(remark) {
         if (!state.productKey) {
@@ -791,6 +877,11 @@ function initMaterialboerseRelease() {
         }
     });
 
+    /**
+     * Keeps Tab inside the modal.
+     *
+     * @param {KeyboardEvent} e the Tab key event
+     */
     function trapFocus(e) {
         const focusable = modal.querySelectorAll(
             'button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])',

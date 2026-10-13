@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 /* global LOCATION_MSG, LOCATION_CONFLICT */
 
 import { krtAutocomplete } from '/js/kernel/autocomplete.js';

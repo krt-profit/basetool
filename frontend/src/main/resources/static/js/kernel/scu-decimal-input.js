@@ -1,5 +1,3 @@
-// @ts-check
-
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 const SELECTOR = 'input[data-scu-decimal]';

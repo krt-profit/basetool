@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 import { showKrtConfirm } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
@@ -57,6 +55,17 @@ function initConnectedApps() {
         };
     }
 
+    /**
+     * Reads the undo dialog's localized texts from the `ca-undo-i18n` data attributes.
+     *
+     * @returns {{
+     *     done: string,
+     *     skippedTitle: string,
+     *     unnamed: string,
+     *     reasons: Record<string, string>,
+     *     resources: Record<string, string>,
+     * }} the texts, the reason and resource labels keyed by their backend codes
+     */
     function readUndoMessages() {
         const holder = document.getElementById('ca-undo-i18n');
         const data = holder ? holder.dataset : /** @type {DOMStringMap} */ ({});

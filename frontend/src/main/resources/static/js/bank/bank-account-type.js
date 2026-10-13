@@ -1,4 +1,3 @@
-// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -21,6 +20,8 @@
 /**
  * The org-unit kinds each account type may be owned by (REQ-ORG-019); types absent here own no
  * org unit.
+ *
+ * @type {Record<string, string[]>}
  */
 const ACCOUNT_TYPE_OWNER_KINDS = {
     ORG_UNIT: ['SQUADRON', 'SPECIAL_COMMAND'],

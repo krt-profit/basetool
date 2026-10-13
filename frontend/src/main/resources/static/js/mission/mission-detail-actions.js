@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 /* global MSG_ERROR_PAYOUT_UPDATE, MSG_ERROR_MANAGER_ADD, MSG_ERROR_MANAGER_REMOVE, MSG_ERROR_OWNER_CHANGE, MSG_CONFIRM_OWNER_CHANGE, MSG_ERROR_OWNING_ORG_UNIT_CHANGE, MSG_CONFIRM_OWNING_ORG_UNIT_CHANGE, MSG_CONFIRM_MANAGER_REMOVE, MSG_ERROR_USER_REQUIRED, MSG_ERROR_MISSION_ID_MISSING, missionId */
 
 import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
@@ -370,7 +368,9 @@ async function addMissionManager() {
         }
     } catch (err) {
         console.error('Network or unexpected error:', err);
-        showFrontendErrorToast(`${MSG_ERROR_MANAGER_ADD} (Error: ${err.message})`);
+        showFrontendErrorToast(
+            `${MSG_ERROR_MANAGER_ADD} (Error: ${err instanceof Error ? err.message : String(err)})`,
+        );
     }
 }
 

@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 /* global missionId */
 
 import { showKrtConfirm } from '/js/kernel/toast.js';
@@ -164,6 +162,12 @@ document.addEventListener('krt:swapped', (ev) => {
             pill.textContent = statusLabel;
         }
     }
+    /**
+     * Writes a UTC attribute of the head metadata onto a fact element and relocalizes it.
+     *
+     * @param {string} id the fact element's id
+     * @param {string} utcAttr the metadata attribute holding the UTC value
+     */
     function patchFact(id, utcAttr) {
         const el = document.getElementById(id);
         if (!el) {
@@ -201,6 +205,7 @@ document.addEventListener('krt:swapped', (ev) => {
 krtLiveSync.createReceiver({
     sections: MISSION_SECTIONS,
     events: { changed: 'krt:mission-changed', resync: 'krt:mission-resync' },
+    /** @param {string[] | string} keys the changed section keys */
     refresh(keys) {
         if (missionHooks.refresh) {
             missionHooks.refresh(keys, { broadcast: false });
@@ -232,20 +237,36 @@ function refreshSteps() {
     }
     return Promise.resolve();
 }
+/**
+ * Writes to the steps section.
+ *
+ * @param {KrtWriteOpts} opts the write options
+ * @returns {Promise<KrtWriteResult>} the write outcome
+ */
 function writeStep(opts) {
     return missionHooks.write(
         Object.assign({ sectionKey: 'steps', onSuccess: refreshSteps }, opts),
     );
 }
+
+/**
+ * Reads the row ids of the list in document order.
+ *
+ * @returns {(string | null)[]} the row ids
+ */
 function listOrder() {
-    return Array.prototype.map.call(
-        document.querySelectorAll('#mission-step-list .ae-row'),
-        (r) => {
+    return /** @type {(string | null)[]} */ (
+        Array.prototype.map.call(document.querySelectorAll('#mission-step-list .ae-row'), (r) => {
             return r.getAttribute('data-step-id');
-        },
+        })
     );
 }
 
+/**
+ * Flips the done state of a step.
+ *
+ * @param {Element} box the toggle trigger of the step
+ */
 function toggleStep(box) {
     const sid = box.getAttribute('data-step-id');
     if (!sid || stepsVersion() === null) {
@@ -260,6 +281,11 @@ function toggleStep(box) {
         },
     });
 }
+/**
+ * Appends a step with the default title.
+ *
+ * @param {Element} _btn the add trigger
+ */
 function addStep(_btn) {
     if (stepsVersion() === null) {
         return;
@@ -276,14 +302,19 @@ function addStep(_btn) {
         },
     });
 }
+/**
+ * Saves the edited title and meta of a step row.
+ *
+ * @param {Element} row the step row
+ */
 function editStep(row) {
     const sid = row.getAttribute('data-step-id');
-    const titleInput = row.querySelector('.ae-title');
+    const titleInput = /** @type {HTMLInputElement | null} */ (row.querySelector('.ae-title'));
     if (!sid || stepsVersion() === null || !titleInput) {
         return;
     }
     const title = titleInput.value.trim();
-    const metaInput = row.querySelector('.ae-meta');
+    const metaInput = /** @type {HTMLInputElement | null} */ (row.querySelector('.ae-meta'));
     const meta = metaInput ? metaInput.value : null;
     if (!title) {
         return;
@@ -296,6 +327,12 @@ function editStep(row) {
         },
     });
 }
+/**
+ * Deletes a step after confirmation.
+ *
+ * @param {Element} btn the delete trigger inside the step row
+ * @returns {Promise<void>} resolves once the request was sent
+ */
 async function deleteStep(btn) {
     const row = btn.closest('.ae-row');
     if (!row) {
@@ -333,6 +370,11 @@ async function deleteStep(btn) {
         },
     });
 }
+/**
+ * Persists a new step order.
+ *
+ * @param {(string | null)[]} order the step ids in their new order
+ */
 function reorder(order) {
     if (stepsVersion() === null) {
         return;
@@ -345,6 +387,12 @@ function reorder(order) {
         },
     });
 }
+/**
+ * Moves a step one place up or down.
+ *
+ * @param {Element} btn the move trigger inside the step row
+ * @param {number} dir -1 for up, 1 for down
+ */
 function moveStep(btn, dir) {
     const row = btn.closest('.ae-row');
     if (!row) {
@@ -478,20 +526,38 @@ function initMissionDetail() {
         }
         return Promise.resolve();
     }
+    /**
+     * Writes to the objectives section.
+     *
+     * @param {KrtWriteOpts} opts the write options
+     * @returns {Promise<KrtWriteResult>} the write outcome
+     */
     function writeObjective(opts) {
         return missionHooks.write(
             Object.assign({ sectionKey: 'objectives', onSuccess: refreshObjectives }, opts),
         );
     }
+    /**
+     * Reads the row ids of the list in document order.
+     *
+     * @returns {(string | null)[]} the row ids
+     */
     function listOrder() {
-        return Array.prototype.map.call(
-            document.querySelectorAll('#mission-objective-list .ae-row'),
-            (r) => {
-                return r.getAttribute('data-objective-id');
-            },
+        return /** @type {(string | null)[]} */ (
+            Array.prototype.map.call(
+                document.querySelectorAll('#mission-objective-list .ae-row'),
+                (r) => {
+                    return r.getAttribute('data-objective-id');
+                },
+            )
         );
     }
 
+    /**
+     * Appends an objective with the default title.
+     *
+     * @param {Element} _btn the add trigger
+     */
     function addObjective(_btn) {
         if (objectivesVersion() === null) {
             return;
@@ -508,10 +574,15 @@ function initMissionDetail() {
             },
         });
     }
+    /**
+     * Saves the edited title and kind of an objective row.
+     *
+     * @param {Element} row the objective row
+     */
     function editObjective(row) {
         const oid = row.getAttribute('data-objective-id');
-        const titleInput = row.querySelector('.ae-title');
-        const kindSelect = row.querySelector('.ae-kind');
+        const titleInput = /** @type {HTMLInputElement | null} */ (row.querySelector('.ae-title'));
+        const kindSelect = /** @type {HTMLSelectElement | null} */ (row.querySelector('.ae-kind'));
         if (!oid || objectivesVersion() === null || !titleInput || !kindSelect) {
             return;
         }
@@ -528,6 +599,12 @@ function initMissionDetail() {
             },
         });
     }
+    /**
+     * Deletes an objective after confirmation.
+     *
+     * @param {Element} btn the delete trigger inside the objective row
+     * @returns {Promise<void>} resolves once the request was sent
+     */
     async function deleteObjective(btn) {
         const row = btn.closest('.ae-row');
         if (!row) {
@@ -567,6 +644,11 @@ function initMissionDetail() {
             },
         });
     }
+    /**
+     * Persists a new step order.
+     *
+     * @param {(string | null)[]} order the step ids in their new order
+     */
     function reorder(order) {
         if (objectivesVersion() === null) {
             return;
@@ -579,6 +661,12 @@ function initMissionDetail() {
             },
         });
     }
+    /**
+     * Moves an objective one place up or down.
+     *
+     * @param {Element} btn the move trigger inside the objective row
+     * @param {number} dir -1 for up, 1 for down
+     */
     function moveObjective(btn, dir) {
         const row = btn.closest('.ae-row');
         if (!row) {

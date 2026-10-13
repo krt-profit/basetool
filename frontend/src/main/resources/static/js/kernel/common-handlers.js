@@ -1,5 +1,3 @@
-// @ts-check
-
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtHooks } from '/js/kernel/krt-hooks.js';
@@ -11,6 +9,12 @@ function initCommonHandlers() {
         }
     });
 
+    /**
+     * Finds the nearest ancestor that clips its overflow.
+     *
+     * @param {Element} el the element whose ancestors are inspected
+     * @returns {HTMLElement | null} the clipping ancestor, or null when none is below the body
+     */
     function hintClippingAncestor(el) {
         let node = el.parentElement;
         while (node && node !== document.body && node !== document.documentElement) {
@@ -23,8 +27,13 @@ function initCommonHandlers() {
         return null;
     }
 
+    /**
+     * Shifts a hint bubble horizontally so it stays inside the viewport and its clipping ancestor.
+     *
+     * @param {Element} hint the `.scu-hint` element
+     */
     function positionHintBubble(hint) {
-        const bubble = hint.querySelector('.scu-hint__bubble');
+        const bubble = /** @type {HTMLElement | null} */ (hint.querySelector('.scu-hint__bubble'));
         if (!bubble) {
             return;
         }
@@ -50,6 +59,11 @@ function initCommonHandlers() {
         }
     }
 
+    /**
+     * Repositions the bubble of the hint containing `target`, if any.
+     *
+     * @param {Element | null} target the event target
+     */
     function repositionHintFrom(target) {
         const hint = target && target.closest ? target.closest('.scu-hint') : null;
         if (hint) {
@@ -58,10 +72,10 @@ function initCommonHandlers() {
     }
 
     document.addEventListener('mouseover', (event) => {
-        repositionHintFrom(event.target);
+        repositionHintFrom(/** @type {Element | null} */ (event.target));
     });
     document.addEventListener('focusin', (event) => {
-        repositionHintFrom(event.target);
+        repositionHintFrom(/** @type {Element | null} */ (event.target));
     });
 
     const on = krtEvents.on;
@@ -76,8 +90,8 @@ function initCommonHandlers() {
      * Navigates to a same-origin path, rebuilding the URL through the path, search and hash setters
      * of an anchor at the current origin so the scheme can never change.
      *
-     * @param raw  the candidate URL, typically a `data-*` attribute value
-     * @return `true` if navigation was triggered, `false` if the input was rejected
+     * @param {string | null} raw the candidate URL, typically a `data-*` attribute value
+     * @returns {boolean} `true` if navigation was triggered, `false` if the input was rejected
      */
     function navigateSafe(raw) {
         if (typeof raw !== 'string') return false;
@@ -142,6 +156,9 @@ function initCommonHandlers() {
     /**
      * Submits the form named by `data-form-id`; bound to `click` for buttons (whose default action
      * is prevented) and to `change` for form controls.
+     *
+     * @param {HTMLElement} el the control carrying `data-form-id`
+     * @param {Event} event the triggering event
      */
     function submitFormByIdHandler(el, event) {
         const id = el.getAttribute('data-form-id');
@@ -159,6 +176,8 @@ function initCommonHandlers() {
     /**
      * Calls the global `filterTable` with the table named by `data-table-id` and the control's
      * value; bound to `input` and `keyup`.
+     *
+     * @param {HTMLElement} el the filter input carrying `data-table-id`
      */
     function filterTableHandler(el) {
         if (typeof krtHooks.filterTable !== 'function') return;

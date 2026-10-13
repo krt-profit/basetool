@@ -1,5 +1,3 @@
-// @ts-check
-
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { missionHooks } from '/js/mission/mission-hooks.js';
@@ -22,6 +20,15 @@ const SECTION_SELECTOR = '[data-panel-key]';
  * @property {(ev: FocusEvent) => void} _onFocusOut bound focusout listener
  * @property {() => void} _onVisibility bound visibilitychange listener
  * @property {() => void} _tick bound heartbeat tick
+ */
+
+/**
+ * The constructor of a presence channel, which `new MissionPresence(…)` yields.
+ *
+ * @typedef {new (
+ *     missionId: string,
+ *     currentUserId: string | null | undefined,
+ * ) => { start(): void, stop(): void, sendChanged(sections: string[]): void }} MissionPresenceConstructor
  */
 
 /**
@@ -103,12 +110,23 @@ MissionPresence.prototype.stop = function () {
     this.subscription = null;
 };
 
+/**
+ * Announces this viewer's presence in a section to the room.
+ *
+ * @param {string} type `focus`, `blur` or `heartbeat`
+ * @param {string} sectionKey the section's `data-panel-key`
+ */
 MissionPresence.prototype._sendPresence = function (type, sectionKey) {
     if (typeof krtLiveSync.sendPresence === 'function') {
         krtLiveSync.sendPresence(this.topic, type, sectionKey);
     }
 };
 
+/**
+ * Tells the room's peers which sections this viewer changed.
+ *
+ * @param {string[]} sections the changed section keys
+ */
 MissionPresence.prototype.sendChanged = function (sections) {
     if (
         Array.isArray(sections) &&
@@ -137,8 +155,13 @@ MissionPresence.prototype._tick = function () {
     }
 };
 
+/**
+ * Starts presence for the section that received focus.
+ *
+ * @param {FocusEvent} ev the focusin event
+ */
 MissionPresence.prototype._onFocusIn = function (ev) {
-    const section = this._sectionOf(ev.target);
+    const section = this._sectionOf(/** @type {Element | null} */ (ev.target));
     if (!section || section === this.activeSection) {
         return;
     }
@@ -150,11 +173,16 @@ MissionPresence.prototype._onFocusIn = function (ev) {
     this._ensureHeartbeat();
 };
 
+/**
+ * Ends presence when focus leaves the active section.
+ *
+ * @param {FocusEvent} ev the focusout event
+ */
 MissionPresence.prototype._onFocusOut = function (ev) {
     if (!this.activeSection) {
         return;
     }
-    const next = ev.relatedTarget;
+    const next = /** @type {Element | null} */ (ev.relatedTarget);
     if (next && this._sectionOf(next) === this.activeSection) {
         return;
     }
@@ -170,6 +198,12 @@ MissionPresence.prototype._onVisibility = function () {
     }
 };
 
+/**
+ * Resolves the section panel that contains an element.
+ *
+ * @param {Element | null} element the focus target
+ * @returns {string | null} the panel's `data-panel-key`, or null outside any section
+ */
 MissionPresence.prototype._sectionOf = function (element) {
     if (!element || !element.closest) {
         return null;
@@ -189,7 +223,7 @@ MissionPresence.prototype._render = function () {
         const key = panel.getAttribute('data-panel-key');
         const header = panel.querySelector('.col-header') || panel;
         let indicator = header.querySelector('.krt-presence-indicator');
-        const editors = (state[String(key)] || []).filter((e) => {
+        const editors = (state[String(key)] || []).filter((/** @type {KrtPresenceEditor} */ e) => {
             return !self.currentUserId || e.userId !== self.currentUserId;
         });
         if (editors.length === 0) {
@@ -214,7 +248,7 @@ MissionPresence.prototype._render = function () {
             label.textContent = String(editors.length);
         }
         const names = editors
-            .map((e) => {
+            .map((/** @type {KrtPresenceEditor} */ e) => {
                 return e.displayName || '';
             })
             .filter(Boolean);
@@ -237,7 +271,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!window.missionId || window.missionPresenceUserId == null) {
         return;
     }
-    const presence = new MissionPresence(window.missionId, window.missionPresenceUserId);
+    const presence = new /** @type {MissionPresenceConstructor} */ (
+        /** @type {unknown} */ (MissionPresence)
+    )(window.missionId, window.missionPresenceUserId);
     presence.start();
     missionHooks.presence = presence;
 });

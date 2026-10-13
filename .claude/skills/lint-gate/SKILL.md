@@ -25,12 +25,12 @@ the how-to behind that rule.
 | `:frontend:lintProbeJs` | ESLint | the e2e probe script, extracted from its Java text block |
 | `:frontend:lintHtml` | HTMLHint | `templates/**` |
 | `:frontend:prettierCheck` | Prettier | CSS / JS / `types/**/*.d.ts` / `scripts/**/*.mjs` formatting |
-| `:frontend:typecheckJs` | `tsc --noEmit` | files carrying `// @ts-check` (REQ-FE-018, ADR-0125) |
+| `:frontend:typecheckJs` | `tsc --noEmit` | every script, strict with `noImplicitAny` (REQ-FE-018, ADR-0125) |
 | `:frontend:testGenApiTypes` | Node | the self-test of the OpenAPI → `.d.ts` emitter |
 | `:frontend:testKrtFetchReadJs` | Node | the read path `krtFetch.get` / `getJson` (REQ-FE-031) |
 | `:frontend:testEslintBans` | Node + ESLint API | the transport, baseline and Trusted Types sink bans fire on planted sources |
 | `:frontend:testTrustedTypesJs` | Node | the `krtHtml` builder and the two Trusted Types policies (ADR-0239) |
-| `:frontend:testTypecheckRatchet` | Node | every script (subfolders too) is listed in a domain of `typecheck-ratchet.json`; every domain is migrated and holds only `// @ts-check` scripts; the migrated list and the checked-file count never fall (REQ-FE-018) |
+| `:frontend:testTypecheckRatchet` | Node | every script (subfolders too) is listed in a domain of `typecheck-ratchet.json`; each script lives in its domain's folder; no suppression pragma; `tsconfig.json` keeps `strict`, `checkJs`, `noImplicitAny` and `useUnknownInCatchVariables` on (REQ-FE-018) |
 
 Before pushing, run the whole sweep and get it to **zero findings**:
 

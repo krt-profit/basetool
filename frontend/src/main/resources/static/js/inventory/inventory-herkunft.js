@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 

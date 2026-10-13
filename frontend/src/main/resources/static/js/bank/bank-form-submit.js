@@ -1,4 +1,3 @@
-// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -25,6 +24,12 @@ import { showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 
+/**
+ * One field error of a bank validation problem.
+ *
+ * @typedef {{ field: string, message: string }} BankFieldError
+ */
+
 /** Form field names serialized as JSON numbers instead of strings. */
 const NUMBER_FIELDS = [
     'amount',
@@ -43,6 +48,8 @@ const BOOLEAN_FIELDS = ['active'];
  * Maps backend bank conflict codes onto the form field whose inline error slot
  * should show the localized message; unmapped codes land in the form's
  * `_global` slot.
+ *
+ * @type {Record<string, string>}
  */
 const CODE_FIELD = {
     BANK_OVERDRAFT: 'amount',
@@ -60,6 +67,8 @@ const CODE_FIELD = {
  * Maps a form's `data-refresh` token to its swap container and whether the current query string
  * is preserved on the in-place re-render (REQ-FE-005). `accountBody` drops the query so the
  * booking history resets to page 0.
+ *
+ * @type {Record<string, { container: string, preserveQuery: boolean }>}
  */
 const REFRESH_TARGETS = {
     accountBody: { container: '#bank-account-results', preserveQuery: false },
@@ -161,7 +170,7 @@ async function submitBankForm(form) {
                 return true;
             }
             if (payload && Array.isArray(payload.fieldErrors) && payload.fieldErrors.length > 0) {
-                payload.fieldErrors.forEach((fe) => {
+                payload.fieldErrors.forEach((/** @type {BankFieldError} */ fe) => {
                     showError(form, fe.field, fe.message);
                 });
                 return true;
@@ -199,7 +208,7 @@ function handleBankSuccess(form) {
         showFrontendSuccessToast(savedMessage);
     }
     publishBankLiveSync(form);
-    const spec = REFRESH_TARGETS[form.getAttribute('data-refresh')];
+    const spec = REFRESH_TARGETS[/** @type {string} */ (form.getAttribute('data-refresh'))];
     if (!spec) {
         window.location.reload();
         return;
@@ -209,13 +218,15 @@ function handleBankSuccess(form) {
         ? window.location.pathname + window.location.search
         : window.location.pathname;
     const container = document.querySelector(spec.container);
-    const frozen = container
-        ? Array.from(
-              container.querySelectorAll(
-                  'button[data-trigger="open-modal-display"]:not([disabled])',
-              ),
-          )
-        : [];
+    const frozen = /** @type {HTMLButtonElement[]} */ (
+        container
+            ? Array.from(
+                  container.querySelectorAll(
+                      'button[data-trigger="open-modal-display"]:not([disabled])',
+                  ),
+              )
+            : []
+    );
     frozen.forEach((button) => {
         button.disabled = true;
     });

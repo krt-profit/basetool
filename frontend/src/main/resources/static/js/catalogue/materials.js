@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 import { krtAutocomplete } from '/js/kernel/autocomplete.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 

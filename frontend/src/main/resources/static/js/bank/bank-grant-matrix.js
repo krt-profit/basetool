@@ -1,4 +1,3 @@
-// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -23,7 +22,11 @@ import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 
-/** Maps a grant flag name onto the row attribute the next toggle click reads. */
+/**
+ * Maps a grant flag name onto the row attribute the next toggle click reads.
+ *
+ * @type {Record<string, string>}
+ */
 const FLAG_ATTR = {
     canDeposit: 'data-can-deposit',
     canWithdraw: 'data-can-withdraw',
@@ -38,7 +41,8 @@ const FLAG_ATTR = {
  * @param {HTMLTableRowElement} row the grant row carrying the flag + version attributes
  * @param {string} flag the toggled flag name (canDeposit / canWithdraw / canTransfer)
  * @param {boolean} newValue the value the flag was toggled to
- * @param {Object} payload the BankGrantDto response body (carries the fresh version)
+ * @param {{version?: number | null} | null} payload the BankGrantDto response body, carrying the
+ *     fresh version
  */
 function applyGrantFlagResult(button, row, flag, newValue, payload) {
     button.classList.toggle('on', newValue);
@@ -88,6 +92,7 @@ export function initGrantMatrix() {
                 'data-account-id',
             )}`,
             payload() {
+                /** @type {Record<string, boolean | number>} */
                 const p = {
                     canDeposit: row.getAttribute('data-can-deposit') === 'true',
                     canWithdraw: row.getAttribute('data-can-withdraw') === 'true',

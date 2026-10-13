@@ -1,5 +1,3 @@
-// @ts-check
-
 (function () {
     'use strict';
 
@@ -17,12 +15,28 @@
     const BUDGET_CAPACITY = 5;
     const BUDGET_REFILL_MS = 60000;
 
-    /** @type {{ tokens: number, at: number } | null} */
+    /**
+     * @typedef {object} ClientErrorPayload
+     * @property {string} kind the report kind
+     * @property {string | null} message the capped message
+     * @property {string | null} source the script URL or blocked origin
+     * @property {number | null} line the line number
+     * @property {number | null} column the column number
+     */
+
+    /**
+     * @typedef {object} Budget
+     * @property {number} tokens the remaining tokens
+     * @property {number} at the timestamp the refill interval is measured from
+     */
+
+    /** @type {Budget | null} */
     let memoryBudget = null;
 
     let sending = false;
 
     const PENDING_CAPACITY = 5;
+    /** @type {ClientErrorPayload[]} */
     let pending = [];
     let flushArmed = false;
 
@@ -43,6 +57,11 @@
         return memoryBudget;
     }
 
+    /**
+     * Persists the bucket to the in-memory fallback and, when available, sessionStorage.
+     *
+     * @param {Budget} budget the bucket to store
+     */
     function writeBudget(budget) {
         memoryBudget = budget;
         try {
@@ -68,7 +87,12 @@
         return true;
     }
 
-    /** Coerces any value to a length-capped string, or null when there is nothing to report. */
+    /**
+     * Coerces any value to a length-capped string, or null when there is nothing to report.
+     *
+     * @param {unknown} value the value to coerce
+     * @returns {string | null} the capped string, or null
+     */
     function field(value) {
         if (value === null || value === undefined || value === '') {
             return null;
@@ -77,13 +101,21 @@
         return s.length > MAX_FIELD_LENGTH ? s.slice(0, MAX_FIELD_LENGTH) : s;
     }
 
-    /** Coerces a line/column to a finite integer, or null. Never a string — the server types it. */
+    /**
+     * Coerces a line/column to a finite integer, or null. Never a string — the server types it.
+     *
+     * @param {unknown} value the line or column
+     * @returns {number | null} the integer, or null
+     */
     function number(value) {
         return typeof value === 'number' && isFinite(value) ? Math.trunc(value) : null;
     }
 
     /**
      * Strips the query string and fragment from a script URL, then caps its length.
+     *
+     * @param {unknown} value the script URL
+     * @returns {string | null} the stripped, capped URL, or null
      */
     function scriptUrl(value) {
         if (value === null || value === undefined || value === '') {
@@ -105,6 +137,9 @@
     /**
      * Reduces a CSP violation's blockedURI to its origin; a data: or blob: URL becomes its scheme
      * and a non-URL keyword such as 'inline' or 'eval' passes through bare.
+     *
+     * @param {unknown} value the blockedURI
+     * @returns {string | null} the origin, scheme or keyword, or null
      */
     function blockedOrigin(value) {
         if (value === null || value === undefined || value === '') {
@@ -124,6 +159,9 @@
 
     /**
      * Reads a meta tag's content, or null when it is absent or the string 'undefined'.
+     *
+     * @param {string} name the meta tag name
+     * @returns {string | null} the content, or null
      */
     function metaContent(name) {
         const el = document.querySelector(`meta[name="${name}"]`);
@@ -134,6 +172,9 @@
     /**
      * POSTs one payload best-effort, swallowing every failure. Returns false without sending when
      * the CSRF meta tags are not readable, true otherwise.
+     *
+     * @param {ClientErrorPayload} payload the report to send
+     * @returns {boolean} whether the report was handed to fetch
      */
     function deliver(payload) {
         const token = metaContent('_csrf');
@@ -182,7 +223,15 @@
         }
     }
 
-    /** Rate-limits, builds the payload, and either delivers or briefly queues it. */
+    /**
+     * Rate-limits, builds the payload, and either delivers or briefly queues it.
+     *
+     * @param {string} kind the report kind
+     * @param {unknown} message the message to cap
+     * @param {unknown} source the script URL or blocked origin
+     * @param {unknown} line the line number
+     * @param {unknown} column the column number
+     */
     function report(kind, message, source, line, column) {
         if (sending || !takeToken()) {
             return;
@@ -240,6 +289,9 @@
     /**
      * The violated directive; for a Trusted Types sink violation also the sink the browser names in
      * front of the sample's `|`, never the sample's markup.
+     *
+     * @param {SecurityPolicyViolationEvent} event the violation event
+     * @returns {string} the directive, with the sink appended where applicable
      */
     function violationMessage(event) {
         const directive = event.effectiveDirective || event.violatedDirective;

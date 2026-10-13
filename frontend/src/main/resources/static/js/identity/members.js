@@ -1,4 +1,3 @@
-// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -113,8 +112,8 @@ function bindFilter() {
                 }
             },
             {
-                onSelect(/** @type {string} */ item) {
-                    input.value = item;
+                onSelect(/** @type {string | {label?: string, value?: string}} */ item) {
+                    input.value = /** @type {string} */ (item);
                     clearTimeout(membersFilterTimer);
                     applyMembersFilter();
                 },

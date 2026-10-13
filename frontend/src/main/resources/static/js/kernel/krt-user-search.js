@@ -1,4 +1,3 @@
-// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -21,6 +20,13 @@
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtComboboxRemoteSources } from '/js/kernel/krt-combobox-sources.js';
 
+/**
+ * Maps a user search hit to a combobox option.
+ *
+ * @param {{ id: string, effectiveName?: string, displayName?: string, username?: string }} row
+ *     the search hit
+ * @returns {{ value: string, label: string }} the option
+ */
 function toOption(row) {
     return {
         value: row.id,
@@ -28,6 +34,13 @@ function toOption(row) {
     };
 }
 
+/**
+ * Searches users through the given endpoint.
+ *
+ * @param {string} path the search endpoint
+ * @param {string} [query] the search text
+ * @returns {Promise<{ value: string, label: string }[]>} the matching options; empty on failure
+ */
 function fetchUsers(path, query) {
     return krtFetch
         .getJson(`${path}?query=${encodeURIComponent(query || '')}`)

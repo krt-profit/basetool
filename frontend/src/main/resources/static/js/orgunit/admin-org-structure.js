@@ -1,4 +1,3 @@
-// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -64,9 +63,16 @@ function initAdminOrgStructure() {
         topic: 'org-structure',
         sections: ORG_STRUCTURE_SECTIONS,
         coalesceMs: 1500,
+        /**
+         * @param {string[]} keys the sections to re-render
+         */
         refresh(keys) {
             orgStructureSeam.refresh(keys, { broadcast: false });
         },
+        /**
+         * @param {string} sectionKey the section about to be replaced
+         * @returns {boolean} true while the section holds unsaved input
+         */
         busyTest(sectionKey) {
             if (sectionKey !== 'forms') {
                 return false;
@@ -90,11 +96,23 @@ function initAdminOrgStructure() {
         };
     }
 
+    /**
+     * Reads a trimmed input value.
+     *
+     * @param {string} id the input element id
+     * @returns {string} the trimmed value, or an empty string when the input is missing
+     */
     function fieldValue(id) {
         const el = /** @type {HTMLInputElement | null} */ (document.getElementById(id));
         return el ? el.value.trim() : '';
     }
 
+    /**
+     * Maps an empty value to null.
+     *
+     * @param {string | null | undefined} value the value
+     * @returns {string | null} the value, or null when empty
+     */
     function emptyToNull(value) {
         return value === '' || value == null ? null : value;
     }

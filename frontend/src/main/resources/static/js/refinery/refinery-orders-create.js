@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 /* global MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP, MATERIAL_ENTRY_TITLE_LABEL, MATERIAL_REMOVE_LABEL, RATING_LEVELS, SPEED_LEVELS, MSG_RFC_MATERIAL_INVALID, MSG_RFC_CREATE_FAILED, MSG_RFC_MISSION_PARTICIPANT_REQUIRED, MSG_RFC_IMPORT_FAILED, REFINERY_HANDOFF_ID */
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
@@ -552,6 +550,7 @@ document.addEventListener('krt:swapped', (e) => {
     if (c && c.id === 'refineryImportFormContainer') _reinitRefineryForm(true);
 });
 
+/** @param {string} html the same-origin import form fragment */
 function _swapRefineryImportFragment(html) {
     const container = document.getElementById('refineryImportFormContainer');
     if (!container) {
@@ -563,6 +562,7 @@ function _swapRefineryImportFragment(html) {
     resetUnsavedChanges();
 }
 
+/** @param {KrtWriteResult} result the outcome of the import submit */
 function _applyRefineryImportResult(result) {
     if (!result.ok) return;
     if (result.redirected || typeof result.body !== 'string') {
@@ -577,6 +577,7 @@ function _refineryImportFailed() {
     return true;
 }
 
+/** @param {HTMLFormElement} form the import form */
 function _submitRefineryImport(form) {
     krtFetch
         .submitForm({
@@ -589,7 +590,9 @@ function _submitRefineryImport(form) {
         })
         .then(_applyRefineryImportResult);
 }
-const _refineryImportForm = document.getElementById('refineryImportForm');
+const _refineryImportForm = /** @type {HTMLFormElement | null} */ (
+    document.getElementById('refineryImportForm')
+);
 if (_refineryImportForm) {
     _refineryImportForm.addEventListener('submit', (e) => {
         e.preventDefault();
