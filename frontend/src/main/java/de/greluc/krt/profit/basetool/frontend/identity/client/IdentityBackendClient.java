@@ -61,6 +61,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriComponentsBuilder;
 import reactor.netty.http.client.HttpClientRequest;
@@ -230,9 +231,10 @@ public class IdentityBackendClient {
    * Downloads the caller's data export as JSON (REQ-SEC-058).
    *
    * @param responseTimeout the per-request response timeout of the download
-   * @return the JSON bytes, or {@code null} when the backend sent no body
+   * @return the JSON with the backend's {@code Content-Disposition}, or {@code null} when none came
    */
-  public byte @Nullable [] myExportJson(@NotNull Duration responseTimeout) {
+  @Nullable
+  public ResponseEntity<byte[]> myExportJson(@NotNull Duration responseTimeout) {
     return export("/api/v1/users/me/export", new Object[0], responseTimeout);
   }
 
@@ -240,9 +242,10 @@ public class IdentityBackendClient {
    * Downloads the caller's data export as PDF (REQ-SEC-058).
    *
    * @param responseTimeout the per-request response timeout of the download
-   * @return the PDF bytes, or {@code null} when the backend sent no body
+   * @return the PDF with the backend's {@code Content-Disposition}, or {@code null} when none came
    */
-  public byte @Nullable [] myExportPdf(@NotNull Duration responseTimeout) {
+  @Nullable
+  public ResponseEntity<byte[]> myExportPdf(@NotNull Duration responseTimeout) {
     return export("/api/v1/users/me/export/pdf", new Object[0], responseTimeout);
   }
 
@@ -251,9 +254,10 @@ public class IdentityBackendClient {
    *
    * @param userId the member the export is about
    * @param responseTimeout the per-request response timeout of the download
-   * @return the PDF bytes, or {@code null} when the backend sent no body
+   * @return the PDF with the backend's {@code Content-Disposition}, or {@code null} when none came
    */
-  public byte @Nullable [] memberExportPdf(
+  @Nullable
+  public ResponseEntity<byte[]> memberExportPdf(
       @NotNull UUID userId, @NotNull Duration responseTimeout) {
     return export(
         "/api/v1/users/admin/{userId}/export/pdf", new Object[] {userId}, responseTimeout);
@@ -264,9 +268,10 @@ public class IdentityBackendClient {
    *
    * @param userId the member the export is about
    * @param responseTimeout the per-request response timeout of the download
-   * @return the JSON bytes, or {@code null} when the backend sent no body
+   * @return the JSON with the backend's {@code Content-Disposition}, or {@code null} when none came
    */
-  public byte @Nullable [] memberExportJson(
+  @Nullable
+  public ResponseEntity<byte[]> memberExportJson(
       @NotNull UUID userId, @NotNull Duration responseTimeout) {
     return export("/api/v1/users/admin/{userId}/export", new Object[] {userId}, responseTimeout);
   }
@@ -724,9 +729,10 @@ public class IdentityBackendClient {
    * @param uri the export URI template
    * @param uriVariables the values expanded into the template, in order
    * @param responseTimeout the per-request response timeout
-   * @return the document bytes, or {@code null} when the backend sent no body
+   * @return the document with the backend's headers, or {@code null} when the backend sent nothing
    */
-  private byte @Nullable [] export(
+  @Nullable
+  private ResponseEntity<byte[]> export(
       @NotNull String uri, @NotNull Object[] uriVariables, @NotNull Duration responseTimeout) {
     return backendApiClient.execute(
         HttpMethod.GET,
@@ -740,6 +746,6 @@ public class IdentityBackendClient {
                       HttpClientRequest nativeRequest = request.getNativeRequest();
                       nativeRequest.responseTimeout(responseTimeout);
                     }),
-        spec -> spec.bodyToMono(byte[].class));
+        spec -> spec.toEntity(byte[].class));
   }
 }

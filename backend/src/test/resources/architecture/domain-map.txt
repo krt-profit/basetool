@@ -42,6 +42,7 @@ class AccountConsolidationService privacy GDPR orchestration, transitional modul
 class DataExportService privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class DataExportReportService privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class DataExportPdfFormat privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
+class DataExportDocuments privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class PersonSearchService privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class PersonSearchHitDto privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class DataExportController privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)

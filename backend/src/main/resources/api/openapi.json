@@ -68174,13 +68174,13 @@
         "responses" : {
           "200" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/DataExport"
                 }
               }
             },
-            "description" : "OK",
+            "description" : "The export",
             "headers" : {
               "Cache-Control" : {
                 "description" : "Caching policy: private, no-store",
@@ -69087,13 +69087,13 @@
         "responses" : {
           "200" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/DataExport"
                 }
               }
             },
-            "description" : "OK",
+            "description" : "The export",
             "headers" : {
               "Cache-Control" : {
                 "description" : "Caching policy: private, no-store",
