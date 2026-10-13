@@ -1,13 +1,25 @@
-> **Doc type:** Living plan — the direction was decided by the owner on 2026-09-29, every
-> open decision on 2026-10-01, the delivery of the remaining phases on 2026-10-04 (D-23 … D-27).
-> **Status:** Phase −1 done (merged 2026-10-01, PRs #2299–#2312); Phase 0 done (2026-10-03,
-> merged as one chain of pull requests, #2350 … #2353): the decision records (ADR-0231 … ADR-0239
-> and the amendments of §14) and every guard of §6.1 that Phase 0 owns; the app's re-read of the
-> version policy shipped with app v0.5.0 (basetool-android#209, published 2026-10-03). Phase 1:
-> the error model (P1-12) is done (2026-10-04) — the first classes moved into module packages;
-> the module declarations (P1-13) are in place for every module package on `main` (2026-10-04)
-> and grow with each move.
-> Last reviewed: 2026-10-04.
+> **Doc type:** Historical plan — frozen 2026-10-13 by the owner's decision, kept as the record of
+> the domain modularisation and no longer updated. The direction was decided on 2026-09-29, every
+> open decision on 2026-10-01, the delivery of the remaining phases on 2026-10-04 (D-23 … D-27); the
+> rest of the plan was built in one umbrella pull request (#2552, 2026-10-12).
+> **The living truth is elsewhere:** the module structure and its known debt in
+> [`arc42/05-building-block-view.md`](arc42/05-building-block-view.md) and
+> [`arc42/11-risks-and-technical-debt.md`](arc42/11-risks-and-technical-debt.md); the requirements in
+> [`specs/INDEX.md`](specs/INDEX.md) and the specs it lists (`module-boundaries.md`, REQ-MOD-\*);
+> the decisions in [`adr/README.md`](adr/README.md) (ADR-0231 … ADR-0239 and later); and the
+> Basetool Knowledge Base. When this document and those disagree, they are right.
+> **Not done, and why:** P5-c (`backend-exchange`) and P5-d (`backend-bank`) are not implemented, by
+> decision of the owner on 2026-10-12 (§5.8: an extraction that compiles against the whole `backend`
+> gives no compile-time isolation); P3-11, the per-command audit contract, is struck (it was never
+> defined); the REST API cut (§7.9) waits for the owner's release decision and an app release; of the
+> Phase −1 defects (§9), C-03 is the owner's repository setting and the two items of §9.4 are open
+> investigations. Every step that only the owner can take is tracked in
+> [`OWNER_STEPS_2026-10.md`](OWNER_STEPS_2026-10.md).
+> **Status:** every step of the plan that was in scope is done and ticked in the checklist of §7.6
+> (kept as the end state): Phase −1 (2026-10-01), Phase 0 (2026-10-03), the move of every domain class
+> out of the layer packages, the access policies, the member-settings tables, the Lager row as a
+> read-only view, the scope fragments beside their repositories, NullAway on every module, and
+> `build-logic` (P5-a, P5-b). Last reviewed: 2026-10-13.
 > **Owner area:** BE · FE · API · SEC · **Related ADRs:** ADR-0020, ADR-0028, ADR-0032, ADR-0047,
 > ADR-0060, ADR-0065, ADR-0069, ADR-0130, ADR-0135, ADR-0136, ADR-0205, ADR-0206, ADR-0212,
 > ADR-0214, ADR-0216, ADR-0219, ADR-0223, ADR-0229, ADR-0231 … ADR-0239 · **Specs:**
@@ -30,14 +42,16 @@ refuses code that reaches past that API. It is the report of a whole-repository 
   APIs — and two secondary ones: use modern, final language features where they pay off, and
   re-evaluate the findings of the previous audits under today's rules. It names every change with
   its implementation, pros, cons, risks and regressions, and the guard that catches a regression.
-- **What it is not.** A record of finished work: Phase −1 (§7.1) and Phase 0 (§7.2) are merged,
-  and no class has moved yet. Section 2 lists every decision; section 13 maps the
-  former open decisions onto them.
+- **What it is now.** A record of finished work: Phase −1 (§7.1), Phase 0 (§7.2) and the moves
+  of §7.3 to §7.6 are merged, and every domain class lies in its module package. What was not done is
+  named in the header. Section 2 lists every decision; section 13 maps the former open decisions
+  onto them. The sections below keep the tense and the numbers of the day they were written; the
+  checklist of §7.6 is the end state.
 - **Scope.** All modules of `basetool`: `backend`, `frontend`, `ingest`, `keycloak-spi`,
   `keycloak-theme`, `logging-support`, `test-support`, the build and the delivery path. Sibling
   repositories are out of scope, except the Android app's forced-update path, which the API cut
   depends on.
-- **Code state.** `origin/main` at `95e945326` (2026-09-29).
+- **Code state.** The audit was measured on `origin/main` at `95e945326` (2026-09-29); the plan was frozen on the tree of the umbrella pull request #2552 (2026-10-13).
 - **How it was done.** Eleven read-only analyses, each writing evidence (`file:line`, counts with
   the script that produced them) — the backend domain graph from a class-level `jdeps` graph of the
   compiled classes, cross-cutting concerns and refactor safety, the frontend's Java side, its

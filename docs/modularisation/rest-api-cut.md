@@ -1,4 +1,4 @@
-> **Doc type:** Appendix of the living plan [Domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md)
+> **Doc type:** Appendix of the frozen plan [Domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md)
 > — the target cut decided on 2026-09-29 (full cut, hard cut with forced update); a snapshot
 > against `origin/main` `95e945326`.
 

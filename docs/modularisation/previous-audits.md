@@ -1,4 +1,4 @@
-> **Doc type:** Appendix of the living plan
+> **Doc type:** Appendix of the frozen plan
 > [Domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md) — a snapshot of 2026-09-29
 > against `origin/main` `95e945326`; statuses change as work lands.
 
