@@ -60,8 +60,7 @@ missing one turns the next edit into a spurious 409.
 4. Each receiving client re-reads the named sections and swaps them in place.
 
 The Android app takes a second door to the same relay: a backend **SSE** stream, bridged onto the
-same Redis channel in both directions (ADR-0143). Design: ADR-0094; the knowledge base's Live Sync
-note has the bounds and what has broken.
+same Redis channel in both directions (ADR-0143). Design: ADR-0094.
 
 ## 6.5 The desktop extractor sends a refinery order
 

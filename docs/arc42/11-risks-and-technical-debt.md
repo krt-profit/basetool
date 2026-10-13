@@ -27,16 +27,6 @@ lives in the backend source tree (REQ-OPS-038); all of them select the mirrors b
 `@DtoMirror` marker, not by a package (REQ-FE-032). Nothing in `main` imports a generated type yet — replacing the mirrors is a separate epic,
 and until it happens the duplication is real.
 
-## 11.3 The knowledge base cannot be gated by this repository's CI
-
-The vault is a separate git repository, so no build here can fail because a note was not updated. The
-rule is written into `CLAUDE.md`, into every repository's `CLAUDE.md`, and into agent memory — which
-is mitigation by repetition, not enforcement.
-
-**Cost.** A vault that has drifted is worse than no vault, because each stale note still reads as
-authoritative. The only real defence is the habit of correcting a note the moment it is caught
-disagreeing with the code, and saying so in the note, dated.
-
 ## 11.4 Derived nullity annotations have no gate
 
 ADR-0192 applied 1,063 nullity annotations derived mechanically from the code. Nothing checks that

@@ -11,8 +11,7 @@ Production is a single Rocky Linux 10 host with SELinux enforcing, rootless Podm
 There is no cluster, no orchestrator and no standby — a deliberate consequence of the
 one-maintainer constraint (§2). Two other machines exist around it: a **testing host** built by the
 same role and fed by its own `:testing` channel (`REQ-OPS-022`), and the **retired Docker host**,
-shut down on cutover day but not yet decommissioned (§7.7). Addresses live in the knowledge base's
-Hosts note, not here.
+shut down on cutover day but not yet decommissioned (§7.7). Addresses are deliberately not recorded here.
 
 The host is provisioned by the Ansible role in [`ansible/`](../../ansible/README.md) (ADR-0188):
 packages, the two accounts below and the subuid range, directory ownership, SELinux contexts,

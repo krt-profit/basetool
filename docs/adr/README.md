@@ -27,7 +27,7 @@ We use a lightweight [MADR](https://adr.github.io/madr/)-style format — copy
   [`repo-lint.yml`](../../.github/workflows/repo-lint.yml) fails a PR that duplicates a number or
   takes one the base already holds; run it locally with
   `ADR_BASE_REF=origin/main scripts/check-adr-numbering.sh`. It cannot see a branch nobody has
-  pushed, so also check the knowledge base's decision index, which lists numbers held by work in
+  pushed, so also check the open PRs for numbers held by work in
   flight — that is what caught `0169`. What the gate does and does not catch:
   [ADR-0171](0171-an-adr-number-is-claimed-against-the-base-branch.md).
 - **Filename:** `NNNN-kebab-case-title.md`.

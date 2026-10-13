@@ -417,4 +417,4 @@ verification metadata is untouched by this track (no new dependency).
    call-existence tests; E2E seeder and specs.
 7. Tests keyed on the old paths in the backend (controller, security, audit, rate-limit, cache).
 8. Docs: `docs/specs/*` paths, `ROLES_AND_PERMISSIONS.md`, arc42 §5/§8 where a root is named,
-   the knowledge base, the German wiki, CHANGELOG (one line), plan §7.9 row.
+   the German wiki, CHANGELOG (one line), plan §7.9 row.

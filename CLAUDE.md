@@ -7,65 +7,6 @@ Module-scoped guidance lives in [`backend/CLAUDE.md`](backend/CLAUDE.md) and
 
 Profit Basetool — a squadron-management web app (mission planning, hangar, inventory, refinery, user admin) for the "DAS KARTELL" / IRIDIUM organization. Three Spring Boot 4 applications (`backend`, `frontend`, `ingest`) on Java 25, plus the `keycloak-spi` provider JAR, the `keycloak-theme`, the shipped `logging-support` library and the test-only `test-support` library; PostgreSQL 18, Keycloak 26 OAuth2, Redis-backed Spring Sessions. Production runs as rootless Podman + Quadlet units generated from the compose files (arc42 §7); local and test stacks run on Docker Compose. Gradle 9 with Kotlin DSL. Dependency versions live in the **version catalog** at **`gradle/libs.versions.toml`** — edit that, not `build.gradle.kts`. [refreshVersions](https://jmfayard.github.io/refreshVersions/) runs in *catalog* mode and is applied **only on request**: `./gradlew refreshVersions -PrefreshVersions` annotates the catalog in place with `## ⬆ = "…"` comment markers for each available update and changes no version itself (without the flag the task does not exist — the plugin is kept off every other build because it is not configuration-cache compatible). **There is no `versions.properties`** (removed 2026-09-23): it held zero versions, and the refreshVersions run recreates an empty one that is gitignored. Repositories are declared once, in `settings.gradle.kts` (`FAIL_ON_PROJECT_REPOS`); shared module conventions (toolchain, Lombok/JetBrains, Mockito agent, `spotbugsMain`, SBOM settings, …) live in the **`build-logic`** included build as `basetool.*` precompiled script plugins that each module applies by id in its `plugins {}` block (REQ-OPS-046, ADR-0248) — the root build has no `subprojects {}` block, and a precompiled script reads the catalog by alias (`Catalog.kt`, not `libs.…`) and copies a script-level `val` into a local before a task action or a provider lambda captures it. The per-module values those conventions apply — test heap, coverage floors, PIT targets — live in each module's **`build-settings.properties`**, and a missing file or key fails configuration (REQ-OPS-037); a new module declares its own instead of inheriting a default. The configuration cache is on for every build (`org.gradle.configuration-cache=true` in `gradle.properties`; CI also passes `--configuration-cache`), so a build-script change must stay configuration-cache compatible — check with `./gradlew help --configuration-cache` run twice (the second must say *reused*) and `./gradlew build -m --configuration-cache`. **Every artifact Gradle resolves is checked against `gradle/verification-metadata.xml`** (SHA-256, strict; ADR-0208, REQ-OPS-034): a change that alters what the build resolves — a catalog bump, a new dependency or plugin — regenerates it in the same commit with `GRADLE_USER_HOME="$(mktemp -d)" ./gradlew --write-verification-metadata sha256 help build :frontend:compileE2eJava` (details: CONTRIBUTING → *Dependency verification*).
 
-## The knowledge base (HARD RULE — read before every task)
-
-The **Basetool Knowledge Base** is the single source of truth about this project: an Obsidian
-vault and git repository (`basetool-knowledge`, the `Basetool Knowledge` folder inside it), sitting
-beside this repository in the workspace. It covers **all** of the Basetool — backend, frontend,
-ingest, keycloak-spi, keycloak-theme, the Android app, the SC extractor, the P4K reader, and the
-platform they stand on (Keycloak, Redis, PostgreSQL, the edge proxy, monitoring, delivery) — plus
-the roles, permissions, scoping, decisions, incidents and runbooks around them.
-
-**This rule is binding on every AI agent working on the Basetool or any of its parts and
-repositories, without exception.**
-
-> [!important] If you cannot find it, **ask** — at the start of the session
-> The vault's location is workspace-specific and it is **not** a submodule of any repository, so a
-> fresh machine, a git worktree, a CI runner or a differently-laid-out checkout may simply not have
-> it beside this repo. In that case: **do not guess a path, do not proceed as if the rule did not
-> apply, and do not silently skip it. Ask the user where the knowledge base is, at the start of the
-> session, before starting the work.** A missing vault is a question to ask, never a rule to drop.
-
-### Consult it before you work
-
-- **Read the knowledge base before starting any task**, not after. Enter through its root map
-  (`00 Maps/Basetool.md`) and follow the links to the systems, domains and permission notes your
-  task touches. Its `CLAUDE.md` explains how it is written.
-- It answers *what a feature does*, *who may do it*, *what it connects to*, *why it was built that
-  way*, *what broke once*, and *the exact values* — before you re-derive any of that from the code.
-- When the knowledge base and the code disagree, **the code is right** — and the note is then wrong
-  and gets fixed in the same session. Never leave a known contradiction standing.
-
-### Update it with every change
-
-- **Every change to the Basetool or any of its parts updates the knowledge base in the same unit of
-  work.** A feature, a permission, an endpoint, a decision, an env var, a metric, a migration, a
-  network segment, an incident and its fix — each moves with its notes. The knowledge base is not
-  written afterwards and is never "caught up later".
-- The vault is a **separate git repository**, so it cannot be gated by this repository's CI. That is
-  exactly why it is stated here as a hard rule: nothing will fail your build if you skip it, and
-  skipping it is still an incomplete change.
-- Move `updated:` on every note whose content you re-checked, and run its checker
-  (`python "90 Meta/vaultcheck.py"` from the vault root) before committing.
-
-### It must never drift from reality
-
-**The knowledge base represents the truth about this project, and every part of the system orients
-by it.** A vault that has drifted is worse than no vault, because each stale note still reads as
-authoritative.
-
-- **If you notice the knowledge base is out of date, incomplete, or does not cover something —
-  update or extend it. Immediately, as part of the work in hand.** This holds even when the gap is
-  outside the task you were given: an uncovered module, a missing note, a fact nobody wrote down.
-- Do not silently work around a stale note, and do not defend a thin one. Fix it.
-- When a fact turns out to have been wrong, **correct it and say so in the note**, dated — a vault
-  that quietly rewrites its own history teaches its readers not to trust it.
-- **Never put a secret or any personal data into the vault.** It is a git repository that must stay
-  safe to push anywhere: no passwords, tokens, client secrets, keys or `.env` contents, and no
-  member names, e-mail addresses, Discord handles or production Keycloak subject ids. If a fact
-  cannot be written without a credential, write the *shape* of it and point at where the value
-  lives.
-
 ## Requirements, specs & decisions (binding)
 
 Durable requirements are **first-class and binding** — they live as docs-as-code, not in
@@ -379,7 +320,7 @@ repository — main, test and e2e sources alike ([ADR-0214](docs/adr/0214-code-c
   `REQ-…` / `ADR-…` pointer is fine.
 - **The reasoning goes into the commit message and the PR body** — that is where a reviewer and a
   later `git blame` find it. A durable fact a later change needs goes into the spec, the ADR, the
-  runbook or the knowledge base, never into a comment.
+  runbook, never into a comment.
 - **Out of scope:** applied Flyway migrations (their checksum covers the comments), generated files
   (`openapi.json`, SBOMs, `verification-metadata.xml`, the units and templates
   `generate-quadlet.py` writes), vendored `gradlew`, Markdown, and test fixtures whose comments are
