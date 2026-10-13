@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.16.0](https://github.com/krt-profit/basetool/releases/tag/v1.16.0) - 2026-10-13
+
 ### Added
 
 - **Monitoring: CSP-Verstöße nach Direktive.** Neue Metrik `basetool_client_csp_violation_total{directive}` und Panel 85 im Betriebs-Dashboard; ein `ClientErrorSpike` für `csp_violation` nennt damit die verletzte Direktive, ohne dass der Logger auf Produktion angehoben werden muss.
@@ -11,6 +13,14 @@
 - **Star-Citizen-Links: Lootmaster und VerseIntel.** Lootmaster (Crafting-Blueprints, Wikelo-Trades, Missionen) steht unter „Datenbanken & Crafting", VerseIntel (Wissensgraph zu Entwickleraussagen, Patch Notes und Bug-Reports) unter „Universum & Community".
 
 - **Ablehnungen nennen ihren Grund im Log.** Die WARN-Zeile einer 422 `PRODUCTION_ALLOCATION` trägt jetzt, welche der fünf Prüfungen abgelehnt hat, samt Material-/Lagerzeilen-ID und Mengen (`reason`, `materialId`, `consumed`, …) als abfragbare Felder in Loki – nie den Request-Body. Die Antwort an den Client bleibt unverändert.
+
+### Changed
+
+- **Android-App: Update-Pflicht bis Build 19.** Der Server verlangt jetzt mindestens Build 20 (App v0.6.1) und meldet ihn als neueste Version; Builds bis 19 (v0.6.0 und älter) sehen den Update-Bildschirm. Build 19 scheitert beim Speichern von Auszahlungsart und Blaupausen-Freigabe mit einem Konflikt, Build 20 nicht.
+
+- **Profil: Auszahlungsart und Blaupausen-Freigabe sind entkoppelt.** Beide Einstellungen liegen in eigenen Tabellen (Migration V283) mit eigener Version; Speichern der einen macht Profil, RSI-Handle und die andere Karte nicht mehr veraltet. Die alten Spalten bleiben bis zu einer späteren Version.
+
+- **Lesbarere Bedienelemente (Design-System 2026-10).** Buttons, Eingabefelder, Auswahlen und Seitenzahlen haben eine Füllung und einen sichtbaren Rand (mindestens 3:1); Umschalter wie „Kommend / Vergangen / Alle“ oder „Globales / Mein Lager“ sind ein gemeinsames Segment-Element, Ein/Aus-Optionen ein Schalter; Listen-Seiten liegen mit Toolbar, Tabelle und Seitenzahlen auf einer Fläche, der Filter-Button zeigt aktive Filter mit eckigem Zähler.
 
 ### Fixed
 
@@ -29,14 +39,6 @@
 - **Leitung: die Einheiten-Liste links ist einheitlich eingerückt.** Die Gruppen (Organisationsleitung, Bereiche, Staffeln, Spezialkommandos) saßen je nach Namenslänge unterschiedlich weit rechts; dasselbe Layout-Problem hatte das Inhaltsverzeichnis der Datenschutzerklärung.
 
 - **Monitoring: zwei Fehlalarme.** `ExternalFetchErrors` zählt unvollständige SC-Wiki-Seitendurchläufe nicht mehr mit (neues Label `reason`, Wert `census`; sie haben je Lauf einen festen Sockel und lösten bei Neustart oder Upstream-Umbau aus). `SystemdUnitFailed` ignoriert `dnf-makecache.service`, das bei einem 5xx des Spiegelservers beim nächsten Lauf von selbst heilt.
-
-### Changed
-
-- **Android-App: Update-Pflicht bis Build 19.** Der Server verlangt jetzt mindestens Build 20 (App v0.6.1) und meldet ihn als neueste Version; Builds bis 19 (v0.6.0 und älter) sehen den Update-Bildschirm. Build 19 scheitert beim Speichern von Auszahlungsart und Blaupausen-Freigabe mit einem Konflikt, Build 20 nicht.
-
-- **Profil: Auszahlungsart und Blaupausen-Freigabe sind entkoppelt.** Beide Einstellungen liegen in eigenen Tabellen (Migration V283) mit eigener Version; Speichern der einen macht Profil, RSI-Handle und die andere Karte nicht mehr veraltet. Die alten Spalten bleiben bis zu einer späteren Version.
-
-- **Lesbarere Bedienelemente (Design-System 2026-10).** Buttons, Eingabefelder, Auswahlen und Seitenzahlen haben eine Füllung und einen sichtbaren Rand (mindestens 3:1); Umschalter wie „Kommend / Vergangen / Alle“ oder „Globales / Mein Lager“ sind ein gemeinsames Segment-Element, Ein/Aus-Optionen ein Schalter; Listen-Seiten liegen mit Toolbar, Tabelle und Seitenzahlen auf einer Fläche, der Filter-Button zeigt aktive Filter mit eckigem Zähler.
 
 ## [v1.15.0](https://github.com/krt-profit/basetool/releases/tag/v1.15.0) - 2026-10-11
 
