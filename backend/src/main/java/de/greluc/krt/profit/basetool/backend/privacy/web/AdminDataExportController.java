@@ -19,12 +19,16 @@
 
 package de.greluc.krt.profit.basetool.backend.privacy.web;
 
+import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportDocuments;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportReportService;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -33,6 +37,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * The admin variant of the Art. 15 / Art. 20 data export (REQ-SEC-058), for members who cannot
@@ -48,12 +53,13 @@ public class AdminDataExportController {
 
   private final DataExportService dataExportService;
   private final DataExportReportService dataExportReportService;
+  private final ObjectMapper objectMapper;
 
   /**
-   * The member's complete export as JSON.
+   * The member's complete export as indented JSON, named {@code Datenexport <name> <yy-MM-dd>}.
    *
    * @param userId the member the export is about
-   * @return the export
+   * @return the export as an attachment
    */
   @GetMapping
   @PreAuthorize("hasRole('ADMIN')")
@@ -63,10 +69,23 @@ public class AdminDataExportController {
           "For an access request from somebody who cannot sign in - a locked-out member, or a "
               + "disabled account. Identical projections and identical third-party anonymisation "
               + "as the self-service export: an admin export is not a fuller one.")
-  public ResponseEntity<DataExportService.DataExport> exportJson(@PathVariable UUID userId) {
+  @ApiResponses(
+      @ApiResponse(
+          responseCode = "200",
+          description = "The export",
+          content =
+              @Content(
+                  mediaType = MediaType.APPLICATION_JSON_VALUE,
+                  schema = @Schema(implementation = DataExportService.DataExport.class))))
+  public ResponseEntity<byte[]> exportJson(@PathVariable UUID userId) {
     DataExportService.DataExport export = dataExportService.export(userId);
+    byte[] json = DataExportDocuments.json(objectMapper, export);
     dataExportService.recordExport(userId, "json", export.totalRows(), false);
-    return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(export);
+    return ResponseEntity.ok()
+        .header(
+            HttpHeaders.CONTENT_DISPOSITION, DataExportDocuments.contentDisposition(export, "json"))
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(json);
   }
 
   /**
@@ -84,11 +103,7 @@ public class AdminDataExportController {
     dataExportService.recordExport(userId, "pdf", export.totalRows(), false);
     return ResponseEntity.ok()
         .header(
-            HttpHeaders.CONTENT_DISPOSITION,
-            ContentDisposition.attachment()
-                .filename("datenauskunft-" + userId + ".pdf")
-                .build()
-                .toString())
+            HttpHeaders.CONTENT_DISPOSITION, DataExportDocuments.contentDisposition(export, "pdf"))
         .contentType(MediaType.APPLICATION_PDF)
         .body(pdf);
   }

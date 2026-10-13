@@ -61,7 +61,7 @@ public class DataExportProxyController {
   public ResponseEntity<byte[]> json() {
     return fetch(
         () -> identityClient.myExportJson(httpProperties.exportResponseTimeout()),
-        "datenauskunft.json",
+        "json",
         MediaType.APPLICATION_JSON);
   }
 
@@ -75,7 +75,7 @@ public class DataExportProxyController {
   public ResponseEntity<byte[]> pdf() {
     return fetch(
         () -> identityClient.myExportPdf(httpProperties.exportResponseTimeout()),
-        "datenauskunft.pdf",
+        "pdf",
         MediaType.APPLICATION_PDF);
   }
 
@@ -91,7 +91,7 @@ public class DataExportProxyController {
   public ResponseEntity<byte[]> adminPdf(@PathVariable UUID userId) {
     return fetch(
         () -> identityClient.memberExportPdf(userId, httpProperties.exportResponseTimeout()),
-        "datenauskunft-" + userId + ".pdf",
+        "pdf",
         MediaType.APPLICATION_PDF);
   }
 
@@ -106,25 +106,36 @@ public class DataExportProxyController {
   public ResponseEntity<byte[]> adminJson(@PathVariable UUID userId) {
     return fetch(
         () -> identityClient.memberExportJson(userId, httpProperties.exportResponseTimeout()),
-        "datenauskunft-" + userId + ".json",
+        "json",
         MediaType.APPLICATION_JSON);
   }
 
   /**
    * Fetches one export document, which the client reads with an extended response timeout and no
-   * retries, and re-wraps it with attachment headers. The filename never carries a handle.
+   * retries, and re-wraps it as an attachment. The backend names the file {@code Datenexport
+   * <account name> <yy-MM-dd>}; its {@code Content-Disposition} is relayed as sent.
    *
    * @param download the client call reading the document
-   * @param filename the download filename
+   * @param extension the file extension used when the backend sent no filename
    * @param mediaType the response content type
    * @return the proxied attachment response
    */
   private ResponseEntity<byte[]> fetch(
-      @NotNull Supplier<byte[]> download, @NotNull String filename, @NotNull MediaType mediaType) {
-    byte[] body = withBackendStatus(download);
+      @NotNull Supplier<ResponseEntity<byte[]>> download,
+      @NotNull String extension,
+      @NotNull MediaType mediaType) {
+    ResponseEntity<byte[]> backend = withBackendStatus(download);
+    if (backend == null) {
+      return ResponseEntity.noContent().build();
+    }
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(mediaType);
-    headers.setContentDispositionFormData("attachment", filename);
-    return ResponseEntity.ok().headers(headers).body(body);
+    String disposition = backend.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION);
+    if (disposition != null) {
+      headers.set(HttpHeaders.CONTENT_DISPOSITION, disposition);
+    } else {
+      headers.setContentDispositionFormData("attachment", "Datenexport." + extension);
+    }
+    return ResponseEntity.ok().headers(headers).body(backend.getBody());
   }
 }

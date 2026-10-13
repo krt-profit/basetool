@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Datenauskunft: sprechende Dateinamen und lesbares JSON.** PDF und JSON heißen jetzt „Datenexport <Kontoname> <JJ-MM-TT>“ (auch beim Export durch einen Admin), und die JSON-Datei ist eingerückt statt einzeilig (REQ-SEC-058).
+
 ### Fixed
 
 - **Datenschutzerklärung: Inhaltsverzeichnis ohne doppelte Kapitelnummern.** Die Kapitel zeigten „1. 1. Datenschutz auf einen Blick“, weil die Listennummerierung zusätzlich zur Nummer im Titel erschien; sie ist jetzt abgeschaltet (`legal.css`).

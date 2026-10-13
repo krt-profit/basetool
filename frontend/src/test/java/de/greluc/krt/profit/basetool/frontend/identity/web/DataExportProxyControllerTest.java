@@ -50,12 +50,14 @@ import org.springframework.web.server.ResponseStatusException;
  * Unit tests for {@link DataExportProxyController} (REQ-SEC-058, ADR-0185) against a {@link
  * MockWebServer} backend.
  *
- * <p>Asserts that the member's own endpoints relay no user id, that no download filename carries a
- * handle (the admin variant carries the subject id), and that backend statuses are relayed.
+ * <p>Asserts that the member's own endpoints relay no user id, that the backend's {@code
+ * Content-Disposition} is relayed as sent, and that backend statuses are relayed.
  */
 class DataExportProxyControllerTest {
 
   private static final UUID SUBJECT = UUID.fromString("11111111-2222-3333-4444-555555555555");
+  private static final String BACKEND_DISPOSITION =
+      "attachment; filename*=UTF-8''Datenexport%20Alice%2026-10-13.json";
   private static final byte[] DOCUMENT = "{\"subject\":{}}".getBytes(StandardCharsets.UTF_8);
 
   private MockWebServer server;
@@ -112,40 +114,49 @@ class DataExportProxyControllerTest {
   }
 
   @Test
-  void theOwnDownloadFilenameCarriesNoIdentifierAtAll() throws Exception {
+  void theBackendsFilenameIsRelayedAsSent() throws Exception {
     server.enqueue(okResponse("application/json"));
 
     String disposition = disposition(controller.json());
 
-    assertTrue(
-        disposition.contains("filename=\"datenauskunft.json\""),
-        "unexpected disposition: " + disposition);
+    assertEquals(BACKEND_DISPOSITION, disposition);
     assertFalse(
-        disposition.contains(SUBJECT.toString()), "the member's own filename needs no identifier");
+        disposition.contains(SUBJECT.toString()), "the filename carries the account name only");
   }
 
   @Test
-  void adminPdf_relaysTheSubjectIdAndNamesTheFileAfterIt() throws Exception {
+  void aBackendWithoutFilenameFallsBackToAPlainDatenexportName() throws Exception {
+    server.enqueue(
+        new MockResponse()
+            .setResponseCode(200)
+            .setHeader("Content-Type", "application/pdf")
+            .setBody("x"));
+
+    String disposition = disposition(controller.pdf());
+
+    assertTrue(
+        disposition.contains("filename=\"Datenexport.pdf\""),
+        "unexpected disposition: " + disposition);
+  }
+
+  @Test
+  void adminPdf_relaysTheSubjectIdAndTheBackendsFilename() throws Exception {
     server.enqueue(okResponse("application/pdf"));
 
     String disposition = disposition(controller.adminPdf(SUBJECT));
 
     assertEquals("/api/v1/users/admin/" + SUBJECT + "/export/pdf", takePath());
-    assertTrue(
-        disposition.contains("filename=\"datenauskunft-" + SUBJECT + ".pdf\""),
-        "unexpected disposition: " + disposition);
+    assertEquals(BACKEND_DISPOSITION, disposition);
   }
 
   @Test
-  void adminJson_relaysTheSubjectIdAndNamesTheFileAfterIt() throws Exception {
+  void adminJson_relaysTheSubjectIdAndTheBackendsFilename() throws Exception {
     server.enqueue(okResponse("application/json"));
 
     String disposition = disposition(controller.adminJson(SUBJECT));
 
     assertEquals("/api/v1/users/admin/" + SUBJECT + "/export", takePath());
-    assertTrue(
-        disposition.contains("filename=\"datenauskunft-" + SUBJECT + ".json\""),
-        "unexpected disposition: " + disposition);
+    assertEquals(BACKEND_DISPOSITION, disposition);
   }
 
   @Test
@@ -186,6 +197,7 @@ class DataExportProxyControllerTest {
     return new MockResponse()
         .setResponseCode(200)
         .setHeader("Content-Type", contentType)
+        .setHeader("Content-Disposition", BACKEND_DISPOSITION)
         .setBody(new String(DOCUMENT, StandardCharsets.UTF_8));
   }
 

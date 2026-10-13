@@ -105,7 +105,14 @@ class DataSubjectRightsAuditIntegrationTest {
     mockMvc
         .perform(get("/api/v1/users/me/export").with(member(actor)).accept(FRONTEND_ACCEPT))
         .andExpect(status().isOk())
-        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON));
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+        .andExpect(
+            result -> {
+              assertThat(result.getResponse().getHeader("Content-Disposition"))
+                  .startsWith("attachment")
+                  .contains("Datenexport");
+              assertThat(result.getResponse().getContentAsString()).contains("\n  \"subjectId\"");
+            });
 
     assertThat(auditRows(AuditEventType.PERSONAL_DATA_EXPORTED))
         .as("one export row, recorded by the subject themselves")

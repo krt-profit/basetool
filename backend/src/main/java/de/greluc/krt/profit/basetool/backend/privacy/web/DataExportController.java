@@ -20,14 +20,16 @@
 package de.greluc.krt.profit.basetool.backend.privacy.web;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
+import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportDocuments;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportReportService;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -37,6 +39,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * The caller's own Art. 15 / Art. 20 data export as JSON (full, portable) or PDF (readable summary
@@ -53,12 +56,13 @@ public class DataExportController {
   private final DataExportService dataExportService;
   private final DataExportReportService dataExportReportService;
   private final UserService userService;
+  private final ObjectMapper objectMapper;
 
   /**
-   * The caller's complete export as JSON.
+   * The caller's complete export as indented JSON, named {@code Datenexport <name> <yy-MM-dd>}.
    *
    * @param jwt the caller's validated token
-   * @return the export
+   * @return the export as an attachment
    */
   @GetMapping
   @PreAuthorize("isAuthenticated()")
@@ -70,11 +74,24 @@ public class DataExportController {
               + "(provided by the member, on consent or contract). Third-party data is excluded by "
               + "the projections rather than scrubbed afterwards; free text the member wrote has "
               + "other members' handles replaced.")
-  public ResponseEntity<DataExportService.DataExport> exportJson(@AuthenticationPrincipal Jwt jwt) {
+  @ApiResponses(
+      @ApiResponse(
+          responseCode = "200",
+          description = "The export",
+          content =
+              @Content(
+                  mediaType = MediaType.APPLICATION_JSON_VALUE,
+                  schema = @Schema(implementation = DataExportService.DataExport.class))))
+  public ResponseEntity<byte[]> exportJson(@AuthenticationPrincipal Jwt jwt) {
     UUID userId = userService.getUserIdFromJwt(jwt);
     DataExportService.DataExport export = dataExportService.export(userId);
+    byte[] json = DataExportDocuments.json(objectMapper, export);
     dataExportService.recordExport(userId, "json", export.totalRows(), true);
-    return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(export);
+    return ResponseEntity.ok()
+        .header(
+            HttpHeaders.CONTENT_DISPOSITION, DataExportDocuments.contentDisposition(export, "json"))
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(json);
   }
 
   /**
@@ -100,11 +117,7 @@ public class DataExportController {
     dataExportService.recordExport(userId, "pdf", export.totalRows(), true);
     return ResponseEntity.ok()
         .header(
-            HttpHeaders.CONTENT_DISPOSITION,
-            ContentDisposition.attachment()
-                .filename("datenauskunft-" + userId + ".pdf")
-                .build()
-                .toString())
+            HttpHeaders.CONTENT_DISPOSITION, DataExportDocuments.contentDisposition(export, "pdf"))
         .contentType(MediaType.APPLICATION_PDF)
         .body(pdf);
   }

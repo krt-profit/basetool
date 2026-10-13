@@ -147,10 +147,10 @@ class IdentityBackendClientTest {
     backend.answerBytes("application/pdf", document);
     backend.answerBytes("application/json", document);
 
-    assertThat(client.myExportJson(TIMEOUT)).isEqualTo(document);
-    assertThat(client.myExportPdf(TIMEOUT)).isEqualTo(document);
-    assertThat(client.memberExportPdf(USER, TIMEOUT)).isEqualTo(document);
-    assertThat(client.memberExportJson(USER, TIMEOUT)).isEqualTo(document);
+    assertThat(client.myExportJson(TIMEOUT).getBody()).isEqualTo(document);
+    assertThat(client.myExportPdf(TIMEOUT).getBody()).isEqualTo(document);
+    assertThat(client.memberExportPdf(USER, TIMEOUT).getBody()).isEqualTo(document);
+    assertThat(client.memberExportJson(USER, TIMEOUT).getBody()).isEqualTo(document);
 
     backend.expect("GET", "/api/v1/users/me/export");
     backend.expect("GET", "/api/v1/users/me/export/pdf");
