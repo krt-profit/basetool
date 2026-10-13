@@ -45,6 +45,15 @@ public class PersonalBlueprintExportSections implements PersonalDataExportSectio
                 SELECT product_name, acquired_at, note, created_at
                 FROM personal_blueprint WHERE owner_user_id = :userId ORDER BY created_at
                 """)
-            .scrubbing("note"));
+            .scrubbing("note"),
+        new Section(
+            470,
+            "blueprintSharing",
+            ART_15_20,
+            "Chosen by the member on the profile page.",
+            """
+            SELECT share_globally, created_at, updated_at
+            FROM member_blueprint_sharing WHERE user_id = :userId
+            """));
   }
 }

@@ -20,9 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.promotion.web;
 
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.platform.api.CurrentUserId;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionEligibilityResponse;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionEligibilityService;
-import de.greluc.krt.profit.basetool.backend.web.CurrentUserId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

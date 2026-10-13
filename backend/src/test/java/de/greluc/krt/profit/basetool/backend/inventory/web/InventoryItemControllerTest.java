@@ -28,7 +28,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.BulkCheckoutRequest;
@@ -55,10 +56,9 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryMergeCa
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryOrgUnitChangeService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStolenMarkService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.UpdateDeliveredRequest;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

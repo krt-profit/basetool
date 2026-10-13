@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.privacy.internal;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonMentionSource;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonMentionSource.Target;
+import de.greluc.krt.profit.basetool.backend.privacy.api.PersonMentionRegistry;
 import java.lang.reflect.Constructor;
 import java.util.Comparator;
 import java.util.List;

@@ -48,6 +48,7 @@ import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -135,10 +136,14 @@ public class ProfileController {
     }
 
     PayoutPreference defaultPayoutPreference = PayoutPreference.PAYOUT;
+    long payoutVersion = 0L;
     try {
       MyPayoutPreferenceResponse pref = identityClient.myPayoutPreference();
       if (pref != null && pref.defaultPayoutPreference() != null) {
         defaultPayoutPreference = PayoutPreference.valueOf(pref.defaultPayoutPreference());
+      }
+      if (pref != null && pref.version() != null) {
+        payoutVersion = pref.version();
       }
     } catch (Exception e) {
       log.debug(
@@ -148,10 +153,14 @@ public class ProfileController {
     NotificationPreferenceProxyController.populate(model, notificationClient);
 
     boolean shareBlueprintsGlobally = false;
+    long sharingVersion = 0L;
     try {
       MyBlueprintSharingResponse sharing = identityClient.myBlueprintSharing();
       if (sharing != null) {
         shareBlueprintsGlobally = sharing.shareBlueprintsGlobally();
+        if (sharing.version() != null) {
+          sharingVersion = sharing.version();
+        }
       }
     } catch (Exception e) {
       log.debug(
@@ -198,17 +207,15 @@ public class ProfileController {
     }
 
     if (!model.containsAttribute("profilePayoutPreferenceForm")) {
-      Long version = (Long) model.getAttribute("version");
       model.addAttribute(
           "profilePayoutPreferenceForm",
-          new ProfilePayoutPreferenceForm(defaultPayoutPreference, version != null ? version : 0L));
+          new ProfilePayoutPreferenceForm(defaultPayoutPreference, payoutVersion));
     }
 
     if (!model.containsAttribute("profileBlueprintSharingForm")) {
-      Long version = (Long) model.getAttribute("version");
       model.addAttribute(
           "profileBlueprintSharingForm",
-          new ProfileBlueprintSharingForm(shareBlueprintsGlobally, version != null ? version : 0L));
+          new ProfileBlueprintSharingForm(shareBlueprintsGlobally, sharingVersion));
     }
 
     if (!model.containsAttribute("profileRsiHandleForm")) {
@@ -369,7 +376,7 @@ public class ProfileController {
   /**
    * AJAX variant of {@link #updatePayoutPreference} that answers with JSON (REQ-FE-001).
    *
-   * <p>Returns the user row's new {@code version}. A backend conflict maps to an {@code
+   * <p>Returns the payout setting's own new {@code version}. A backend conflict maps to an {@code
    * OPTIMISTIC_LOCK} 409, validation errors to 400.
    *
    * @param form validated JSON payload
@@ -394,9 +401,12 @@ public class ProfileController {
         form.defaultPayoutPreference() == null
             ? PayoutPreference.PAYOUT.name()
             : form.defaultPayoutPreference().name();
+    MyPayoutPreferenceResponse saved;
     try {
-      identityClient.updateMyPayoutPreference(
-          new MyPayoutPreferenceRequest(preference, form.version() == null ? 0L : form.version()));
+      saved =
+          identityClient.updateMyPayoutPreference(
+              new MyPayoutPreferenceRequest(
+                  preference, form.version() == null ? 0L : form.version()));
     } catch (BackendServiceException e) {
       log.debug("AJAX payout-preference update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
@@ -411,7 +421,7 @@ public class ProfileController {
           .body(Map.of("detail", msg("error.profile.update.failed")));
     }
     Map<String, Object> body = new LinkedHashMap<>();
-    body.put("version", refreshedUserVersion(form.version()));
+    body.put("version", ownVersion(saved == null ? null : saved.version(), form.version()));
     body.put("defaultPayoutPreference", preference);
     return ResponseEntity.ok(body);
   }
@@ -463,7 +473,7 @@ public class ProfileController {
   /**
    * AJAX variant of {@link #updateBlueprintSharing} that answers with JSON (REQ-FE-001).
    *
-   * <p>Returns the user row's new {@code version}. A backend conflict maps to an {@code
+   * <p>Returns the sharing setting's own new {@code version}. A backend conflict maps to an {@code
    * OPTIMISTIC_LOCK} 409, validation errors to 400.
    *
    * @param form validated JSON payload
@@ -484,10 +494,12 @@ public class ProfileController {
     if (bindingResult.hasErrors()) {
       return ResponseEntity.badRequest().body(Map.of("detail", firstFieldError(bindingResult)));
     }
+    MyBlueprintSharingResponse saved;
     try {
-      identityClient.updateMyBlueprintSharing(
-          new MyBlueprintSharingRequest(
-              form.shareBlueprintsGlobally(), form.version() == null ? 0L : form.version()));
+      saved =
+          identityClient.updateMyBlueprintSharing(
+              new MyBlueprintSharingRequest(
+                  form.shareBlueprintsGlobally(), form.version() == null ? 0L : form.version()));
     } catch (BackendServiceException e) {
       log.debug("AJAX blueprint-sharing update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
@@ -502,7 +514,7 @@ public class ProfileController {
           .body(Map.of("detail", msg("error.profile.update.failed")));
     }
     Map<String, Object> body = new LinkedHashMap<>();
-    body.put("version", refreshedUserVersion(form.version()));
+    body.put("version", ownVersion(saved == null ? null : saved.version(), form.version()));
     body.put("shareBlueprintsGlobally", form.shareBlueprintsGlobally());
     return ResponseEntity.ok(body);
   }
@@ -553,7 +565,21 @@ public class ProfileController {
   }
 
   /**
-   * Reads the user row's current {@code version} from {@code /api/v1/users/me} after a write.
+   * Picks the version of a setting with its own lock after a write.
+   *
+   * @param saved the version the backend answered, or {@code null} when it sent no body
+   * @param priorVersion the submitted version; may be {@code null}
+   * @return the answered version, or {@code priorVersion + 1} when the backend sent none
+   */
+  private static Long ownVersion(@Nullable Long saved, @Nullable Long priorVersion) {
+    if (saved != null) {
+      return saved;
+    }
+    return (priorVersion == null ? 0L : priorVersion) + 1;
+  }
+
+  /**
+   * Reads the caller's user-row version after a write, for the sections that share it.
    *
    * @param priorVersion the submitted version; may be {@code null}
    * @return the current version, or {@code priorVersion + 1} when the lookup fails

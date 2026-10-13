@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
-import de.greluc.krt.profit.basetool.backend.validation.QualityValue;
+import de.greluc.krt.profit.basetool.backend.kernel.QualityValue;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;

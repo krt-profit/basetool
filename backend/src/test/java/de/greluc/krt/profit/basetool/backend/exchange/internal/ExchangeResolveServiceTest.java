@@ -25,6 +25,8 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintExternalAliasRepository;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintExternalAliasSource;
@@ -48,9 +50,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResol
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse.Result;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse.Status;
 import de.greluc.krt.profit.basetool.backend.kernel.FuzzyNameMatcher;
-import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
-import de.greluc.krt.profit.basetool.backend.service.AuditService;
+import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;

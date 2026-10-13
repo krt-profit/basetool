@@ -13,9 +13,15 @@
 
 // @ts-check
 
-(function () {
-    'use strict';
+import { showFrontendErrorToast } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtHtml } from '/js/kernel/krt-html.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { krtHooks } from '/js/kernel/krt-hooks.js';
 
+function initMaterialboerseRelease() {
     /**
      * The seed values `open` takes from its caller; absent fields are blank.
      *
@@ -49,7 +55,7 @@
 
     const i18n = { ...window.materialboerseModalI18n, ...window.materialboerseI18n };
     const modal = /** @type {HTMLElement} */ (document.getElementById('mb-modal'));
-    if (!modal || !window.krtFetch) {
+    if (!modal) {
         return;
     }
 
@@ -131,7 +137,7 @@
             return String(amount);
         }
         if (quantityType === 'PIECE') {
-            return `${n.toLocaleString('de-DE', { maximumFractionDigits: 0 })} ${window.krtI18nText(
+            return `${n.toLocaleString('de-DE', { maximumFractionDigits: 0 })} ${krtI18nText(
                 i18n.unitPiece,
                 'materialboerseModalI18n.unitPiece',
             )}`;
@@ -164,7 +170,7 @@
         state.available = isNaN(maxNum) ? null : maxNum;
         if (unit) {
             unit.textContent = isPiece
-                ? window.krtI18nText(i18n.unitPiece, 'materialboerseModalI18n.unitPiece')
+                ? krtI18nText(i18n.unitPiece, 'materialboerseModalI18n.unitPiece')
                 : i18n.unitScu || 'SCU';
         }
         if (input) {
@@ -183,7 +189,7 @@
             hint.textContent =
                 state.available != null
                     ? fmt(
-                          window.krtI18nText(i18n.amountMax, 'materialboerseModalI18n.amountMax'),
+                          krtI18nText(i18n.amountMax, 'materialboerseModalI18n.amountMax'),
                           formatAmount(state.available, state.quantityType),
                       )
                     : '';
@@ -216,9 +222,7 @@
 
     /** Shows a transient client-side validation error toast. */
     function showError(message) {
-        if (typeof window.showFrontendErrorToast === 'function') {
-            window.showFrontendErrorToast(message || i18n.error || '');
-        }
+        showFrontendErrorToast(message || i18n.error || '');
     }
 
     function updateCharCount() {
@@ -227,7 +231,7 @@
         const counter = q('[data-mb-charcount]');
         if (ta && counter) {
             counter.textContent = fmt(
-                window.krtI18nText(i18n.charCounter, 'materialboerseModalI18n.charCounter'),
+                krtI18nText(i18n.charCounter, 'materialboerseModalI18n.charCounter'),
                 ta.value.length.toLocaleString('de-DE'),
             );
         }
@@ -323,7 +327,7 @@
         }
 
         lastFocused = /** @type {HTMLElement | null} */ (document.activeElement);
-        window.krtModal.open(modal);
+        krtModal.open(modal);
         const first = isNew
             ? q('[data-mb-picker-input]')
             : isItem
@@ -335,7 +339,7 @@
     }
 
     function hide() {
-        window.krtModal.close(modal);
+        krtModal.close(modal);
         if (lastFocused && typeof lastFocused.focus === 'function') {
             lastFocused.focus();
         }
@@ -380,7 +384,7 @@
         const url = `/materialboerse/releasable-items?kind=${encodeURIComponent(
             pickerKind,
         )}${query ? `&q=${encodeURIComponent(query)}` : ''}`;
-        window.krtFetch
+        krtFetch
             .getJson(url)
             .then((items) => {
                 if (seq !== pickerSeq) {
@@ -519,7 +523,7 @@
     function loadItemPicker(query) {
         const seq = ++itemPickerSeq;
         const url = `/materialboerse/offerable-products${query ? `?q=${encodeURIComponent(query)}` : ''}`;
-        window.krtFetch
+        krtFetch
             .getJson(url)
             .then((items) => {
                 if (seq !== itemPickerSeq) {
@@ -612,7 +616,7 @@
             if (offeredAmount === null) {
                 return;
             }
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'PUT',
                 url: `/materialboerse/offers/${state.offerId}/remark/ajax`,
                 payload: {
@@ -642,7 +646,7 @@
         if (offeredAmount === null) {
             return;
         }
-        window.krtFetch.write({
+        krtFetch.write({
             method: 'POST',
             url: '/materialboerse/offers/ajax',
             payload: {
@@ -679,7 +683,7 @@
             return;
         }
         toggle('[data-mb-qty-error]', false);
-        window.krtFetch.write({
+        krtFetch.write({
             method: 'POST',
             url: '/materialboerse/item-offers/ajax',
             payload: { productKey: state.productKey, quantity, remark },
@@ -694,9 +698,7 @@
     }
 
     function notifyPeers() {
-        if (window.krtLiveSync) {
-            window.krtLiveSync.sendChanged(MATERIALBOARD_TOPIC, ['board']);
-        }
+        krtLiveSync.sendChanged(MATERIALBOARD_TOPIC, ['board']);
     }
 
     document.addEventListener('click', (e) => {
@@ -810,5 +812,8 @@
         }
     }
 
-    window.krtMaterialRelease = { open, close: cancel };
-})();
+    krtHooks.materialRelease = { open, close: cancel };
+    window.krtMaterialRelease = krtHooks.materialRelease;
+}
+
+initMaterialboerseRelease();

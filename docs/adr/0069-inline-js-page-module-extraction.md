@@ -138,3 +138,16 @@ The dialogue dictionaries of `fragments/materialboerse-modal.html` and
 labels are written out instead of aliased. Listener registration moved from parse time into the
 deferred module of the same page, which runs before `DOMContentLoaded`, so every listener still
 fires; the order among them changes only where they are independent.
+
+## Amendment 2026-10-12 — the page modules are ES modules
+
+[ADR-0250](0250-scripts-are-es-modules-behind-a-per-page-import-map.md) turned every script but
+`krt-client-error.js` into an ES module behind a per-page import map. Inline scripts are still data
+bootstraps (a classic inline `const` is readable from a module through the global lexical
+environment), the cross-file bare names
+that the shared global scope allowed (`krtAutocomplete`, the inventory note dialog, the order detail
+parts) are imports now, and so is the kernel API (`krtFetch`, `krtModal`, the toasts, …): a
+module has no hidden shared scope. 48 immediately invoked wrappers were removed from modules where
+that was provably neutral, and the 49 that guard with an early `return` or pair names in one file are
+named functions with one call; the seams between the parts of a page are hook registries. No script
+but the classic beacon is wrapped.

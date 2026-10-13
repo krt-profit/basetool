@@ -21,9 +21,9 @@ package de.greluc.krt.profit.basetool.backend.db;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
-import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
-import de.greluc.krt.profit.basetool.backend.service.UserAccountMergeService;
+import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.privacy.api.UserAccountMergeService;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;

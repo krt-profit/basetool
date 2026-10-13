@@ -19,13 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.exception.ReportGenerationException;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderHandover;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
-import de.greluc.krt.profit.basetool.backend.service.pdf.KrtPdfSupport;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.ReportGenerationException;
+import de.greluc.krt.profit.basetool.backend.platform.api.KrtPdfSupport;
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.time.ZoneId;
@@ -34,6 +33,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -101,7 +101,7 @@ public class JobOrderHandoverReportService {
                         item.getMaterial() != null ? item.getMaterial().getName() : "-",
                         item.getLocationName() != null ? item.getLocationName() : "-",
                         item.getAmount(),
-                        item.getQuality(),
+                        Objects.requireNonNull(item.getQuality()),
                         item.getMaterial() != null && item.getMaterial().getQuantityType() != null
                             ? item.getMaterial().getQuantityType().name()
                             : null))
@@ -163,7 +163,7 @@ public class JobOrderHandoverReportService {
       KrtPdfSupport.addMetaRow(
           metaTable,
           "EMPFÄNGER (HANDLE)",
-          HandleAnonymisation.humanise(recipientHandle, label("general.anonymisedHandle")));
+          HandleAnonymisation.humaniseRequired(recipientHandle, label("general.anonymisedHandle")));
       krt.document().add(metaTable);
 
       KrtPdfSupport.addSectionHeader(krt, "ÜBERGEBENE MATERIALIEN");

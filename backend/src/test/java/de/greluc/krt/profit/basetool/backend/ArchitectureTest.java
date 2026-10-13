@@ -52,6 +52,7 @@ import com.tngtech.archunit.library.dependencies.SliceAssignment;
 import com.tngtech.archunit.library.dependencies.SliceIdentifier;
 import de.greluc.krt.profit.basetool.backend.admin.web.AppVersionPolicyController;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.audit.internal.AuditRetentionProperties;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAuditService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankHolderPostingRepository;
@@ -69,17 +70,22 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankViewUserDt
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankVisibilityService;
 import de.greluc.krt.profit.basetool.backend.bank.web.OrgUnitBankController;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.PersonalBlueprintOverviewService;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeArchetype;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationReferenceDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ManufacturerDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StalePriceSweep;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexValues;
-import de.greluc.krt.profit.basetool.backend.controller.BasetoolErrorController;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ActingMemberAuthorities;
 import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ActingMemberFilter;
@@ -92,87 +98,103 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeConnectio
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeGate;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeMirrorProperties;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClients;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarService;
+import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
+import de.greluc.krt.profit.basetool.backend.identity.api.RejectedRegistrationRetentionProperties;
 import de.greluc.krt.profit.basetool.backend.identity.api.TermsConsentCheck;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDtoRedaction;
-import de.greluc.krt.profit.basetool.backend.identity.internal.RejectedRegistrationRetentionProperties;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.identity.web.DiscordAccountExistenceController;
 import de.greluc.krt.profit.basetool.backend.identity.web.TermsDocumentController;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderAllocationDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.MaterialCollectionEntryDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MissionAllocationDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAggregationService;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckoutService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderInventoryOwnerRedactor;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemStockEntryDto;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimService;
 import de.greluc.krt.profit.basetool.backend.kernel.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
+import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.Permissions;
 import de.greluc.krt.profit.basetool.backend.kernel.ProblemResponseFactory;
 import de.greluc.krt.profit.basetool.backend.kernel.Quality;
 import de.greluc.krt.profit.basetool.backend.kernel.RequestMemo;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
+import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncAuthorization;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.backend.livesync.internal.LiveSyncFanoutProperties;
-import de.greluc.krt.profit.basetool.backend.mapper.MissionViewerAccess;
-import de.greluc.krt.profit.basetool.backend.mapper.OrgUnitMembershipMapper;
-import de.greluc.krt.profit.basetool.backend.mapper.StockViewerAccess;
-import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeQueryParams;
+import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionCrewDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionFrequencyDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionObjectiveDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionObjectiveKind;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionOperationDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionOperationSummary;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionStepDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionUnitDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionViewerAccess;
 import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionPeerRedactor;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSectionVersions;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.model.Squadron;
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationParamsCodec;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
 import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationFanoutProperties;
-import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationParamsCodec;
 import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationRetentionProperties;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgRoleManagementSecurityService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitLabels;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipMapper;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitReferenceDto;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
-import de.greluc.krt.profit.basetool.backend.orgunit.internal.OrgUnitLabels;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
+import de.greluc.krt.profit.basetool.backend.platform.api.ApiClientMetricsProperties;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthenticatedSubject;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthoritiesCacheProperties;
+import de.greluc.krt.profit.basetool.backend.platform.api.BasetoolErrorController;
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientAttribution;
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.platform.api.PartialRoleScopeProperties;
 import de.greluc.krt.profit.basetool.backend.platform.api.RateLimitProperties;
 import de.greluc.krt.profit.basetool.backend.platform.api.RefusedSubjectWindow;
+import de.greluc.krt.profit.basetool.backend.platform.api.RequestBodyLimitProperties;
 import de.greluc.krt.profit.basetool.backend.platform.api.ResilientRedisMessageListenerContainer;
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
-import de.greluc.krt.profit.basetool.backend.platform.internal.ApiClientMetricsProperties;
-import de.greluc.krt.profit.basetool.backend.platform.internal.RequestBodyLimitProperties;
+import de.greluc.krt.profit.basetool.backend.privacy.api.HandleSpellings;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleErasureCoverage;
-import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleSpellings;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderService;
-import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
-import de.greluc.krt.profit.basetool.backend.service.AuditService;
-import de.greluc.krt.profit.basetool.backend.service.OrgRoleManagementSecurityService;
-import de.greluc.krt.profit.basetool.backend.validation.DtoConstraints;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -199,6 +221,7 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.hibernate.annotations.OptimisticLock;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.Mapper;
 import org.mapstruct.MapperConfig;
@@ -299,27 +322,26 @@ class ArchitectureTest {
 
   /** The controller layer: web controllers, their nested classes and the legacy package. */
   static final DescribedPredicate<JavaClass> CONTROLLER_CODE =
-      layer("controller code", WEB_CONTROLLERS, BasetoolErrorController.class);
+      layer("controller code", WEB_CONTROLLERS, "controller");
 
   /** The service layer: services, their nested classes and the legacy package. */
   static final DescribedPredicate<JavaClass> SERVICE_CODE =
-      layer("service code", SERVICES, AuditService.class);
+      layer("service code", SERVICES, "service");
 
   /** The mapper layer: MapStruct mappers, their nested classes and the legacy package. */
-  static final DescribedPredicate<JavaClass> MAPPER_CODE =
-      layer("mapper code", MAPPERS, UserMapper.class);
+  static final DescribedPredicate<JavaClass> MAPPER_CODE = layer("mapper code", MAPPERS, "mapper");
 
   /** The repository layer: Spring Data repositories, their nested classes and the package. */
   static final DescribedPredicate<JavaClass> REPOSITORY_CODE =
-      layer("repository code", SPRING_DATA_REPOSITORIES, UserRepository.class);
+      layer("repository code", SPRING_DATA_REPOSITORIES, "repository");
 
   /** The model: JPA-managed types, their nested classes and the legacy model package tree. */
   static final DescribedPredicate<JavaClass> MODEL_CODE =
-      layer("model code", PERSISTENT_TYPES, User.class);
+      layer("model code", PERSISTENT_TYPES, "model");
 
-  /** The validation leaf: constraints, validators and the legacy validation package. */
+  /** The validation leaf: constraints and validators, wherever they lie. */
   static final DescribedPredicate<JavaClass> VALIDATION_CODE =
-      layer("validation code", VALIDATION_TYPES, DtoConstraints.class);
+      layer("validation code", VALIDATION_TYPES, null);
 
   /**
    * The dependency-leaf helpers: the kernel's and platform's primitives and the small per-module
@@ -349,6 +371,7 @@ class ArchitectureTest {
           IngestGatewayProperties.class,
           InventoryAllocations.class,
           InventoryAuditLabels.class,
+          InventoryGameItemReferenceDto.class,
           InventoryItemDto.class,
           InventoryProperties.class,
           JobOrderAllocationDto.class,
@@ -359,6 +382,7 @@ class ArchitectureTest {
           LiveSyncAuthorization.class,
           LocationReferenceDto.class,
           MaterialCategoryDto.class,
+          MaterialCollectionEntryDto.class,
           MaterialDto.class,
           MaterialReferenceDto.class,
           QuantityType.class,
@@ -391,12 +415,37 @@ class ArchitectureTest {
           ScuAmounts.class,
           StaffelMembershipResolver.class,
           StalePriceSweep.class,
+          SquadronReferenceDto.class,
           StockViewerAccess.class,
           StringNormalization.class,
           SubjectAuthentication.class,
           TermsConsentCheck.class,
+          ShipDto.class,
+          LocationDto.class,
+          ShipTypeDto.class,
+          ManufacturerDto.class,
+          MissionDto.class,
+          MissionParticipantDto.class,
+          MissionUnitDto.class,
+          MissionCrewDto.class,
+          MissionFrequencyDto.class,
+          MissionOperationDto.class,
+          MissionStepDto.class,
+          MissionObjectiveDto.class,
+          JobTypeDto.class,
+          FrequencyTypeDto.class,
+          OrgUnitReferenceDto.class,
+          MissionObjectiveKind.class,
+          MissionOperationSummary.class,
+          PayoutPreference.class,
+          JobTypeArchetype.class,
+          OrgUnitKind.class,
+          JobOrderItemStockEntryDto.class,
+          JobOrderItemStockGroupDto.class,
           UexValues.class,
-          UserDtoRedaction.class);
+          UserDto.class,
+          UserDtoRedaction.class,
+          UserReferenceDto.class);
 
   /** The dependency-leaf helpers, their nested classes and arrays of either. */
   static final DescribedPredicate<JavaClass> LEAF_HELPERS =
@@ -682,7 +731,7 @@ class ArchitectureTest {
 
   @Test
   void serviceLayerShouldNotReachIntoSecurityContext() {
-    assertClassFloor("serviceLayerShouldNotReachIntoSecurityContext", serviceSelection(), 507);
+    assertClassFloor("serviceLayerShouldNotReachIntoSecurityContext", serviceSelection(), 481);
     serviceLayerShouldNotReachIntoSecurityContextRule(serviceSelection()).check(CLASSES);
   }
 
@@ -759,7 +808,7 @@ class ArchitectureTest {
 
   @Test
   void mapperLayerShouldNotReachIntoSecurityContext() {
-    assertClassFloor("mapperLayerShouldNotReachIntoSecurityContext", MAPPER_CODE, 106);
+    assertClassFloor("mapperLayerShouldNotReachIntoSecurityContext", MAPPER_CODE, 103);
     mapperLayerShouldNotReachIntoSecurityContextRule().check(CLASSES);
   }
 
@@ -961,7 +1010,7 @@ class ArchitectureTest {
   void controllerLayerShouldNotDependOnRepositoryLayer() {
     assertClassFloor("controllerLayerShouldNotDependOnRepositoryLayer", CONTROLLER_CODE, 99);
     assertClassFloor(
-        "controllerLayerShouldNotDependOnRepositoryLayer (targets)", REPOSITORY_CODE, 113);
+        "controllerLayerShouldNotDependOnRepositoryLayer (targets)", REPOSITORY_CODE, 107);
     controllerLayerShouldNotDependOnRepositoryLayerRule().check(CLASSES);
   }
 
@@ -1253,7 +1302,7 @@ class ArchitectureTest {
 
   @Test
   void mapperLayerShouldNotDependOnServiceLayer() {
-    assertClassFloor("mapperLayerShouldNotDependOnServiceLayer", MAPPER_CODE, 106);
+    assertClassFloor("mapperLayerShouldNotDependOnServiceLayer", MAPPER_CODE, 103);
     mustNotDependOnServicesRule(MAPPER_CODE)
         .because(
             "the service layer depends on mappers, so a mapper -> service edge re-creates the "
@@ -1290,7 +1339,7 @@ class ArchitectureTest {
 
   @Test
   void validationLayerMustStayADependencyLeaf() {
-    assertClassFloor("validationLayerMustStayADependencyLeaf", VALIDATION_CODE, 7);
+    assertClassFloor("validationLayerMustStayADependencyLeaf", VALIDATION_CODE, 5);
     validationLayerMustStayADependencyLeafRule(VALIDATION_CODE).check(CLASSES);
   }
 
@@ -1330,7 +1379,7 @@ class ArchitectureTest {
     assertClassFloor(
         "mutatingServiceMethodsInReadOnlyClassesNeedExplicitTransactional",
         SERVICE_CODE.or(EXCHANGE_NON_WEB).or(BANK_NON_WEB),
-        498);
+        484);
     mutatingServiceMethodsInReadOnlyClassesRule().check(CLASSES);
   }
 
@@ -1679,7 +1728,7 @@ class ArchitectureTest {
   void noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities() {
     DescribedPredicate<JavaClass> selection = nonInterfaces(MODEL_CODE);
     assertClassFloor(
-        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 224);
+        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 120);
     noSquadronIdJoinColumnRule(selection, SQUADRON_ID_COLUMN_GRANDFATHERED).check(CLASSES);
   }
 
@@ -2033,17 +2082,17 @@ class ArchitectureTest {
   }
 
   /**
-   * A layer: classes of a role, the classes nested in them, and the package tree of a legacy anchor
-   * class, so today's package is still covered and a role class stays covered wherever it moves.
+   * A layer: classes of a role, the classes nested in them, and the package tree of a legacy
+   * package, so today's package is still covered and a role class stays covered wherever it moves.
    *
    * @param name the layer's name
    * @param role the role predicate
-   * @param legacyAnchor a class of the layer's legacy package
+   * @param legacyPackage the layer's legacy package below the root package, or {@code null}
    * @return the layer predicate
    */
   static DescribedPredicate<JavaClass> layer(
-      String name, DescribedPredicate<JavaClass> role, Class<?> legacyAnchor) {
-    String anchorPackage = legacyAnchor.getPackageName();
+      String name, DescribedPredicate<JavaClass> role, @Nullable String legacyPackage) {
+    String anchorPackage = legacyPackage == null ? null : ROOT_PACKAGE + "." + legacyPackage;
     return DescribedPredicate.describe(
         "are "
             + name
@@ -2051,12 +2100,12 @@ class ArchitectureTest {
             + role.getDescription()
             + ", the classes nested in them, or the"
             + " package tree of "
-            + legacyAnchor.getSimpleName()
+            + (legacyPackage == null ? "no legacy package" : "the legacy package " + legacyPackage)
             + ")",
         c ->
             role.test(c)
                 || role.test(outermost(c))
-                || isInPackageTree(c.getPackageName(), anchorPackage));
+                || (anchorPackage != null && isInPackageTree(c.getPackageName(), anchorPackage)));
   }
 
   /**

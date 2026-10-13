@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.JobOrderHandoverItem;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverItem;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;

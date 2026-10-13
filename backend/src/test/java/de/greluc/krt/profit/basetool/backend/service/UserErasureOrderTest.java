@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant.Phase;
+import de.greluc.krt.profit.basetool.backend.privacy.api.UserDeletionService;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;

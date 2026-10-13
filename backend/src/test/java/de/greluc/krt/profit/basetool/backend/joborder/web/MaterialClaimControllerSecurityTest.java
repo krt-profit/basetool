@@ -70,8 +70,9 @@ class MaterialClaimControllerSecurityTest {
   }
 
   /**
-   * A valid {@link de.greluc.krt.profit.basetool.backend.model.dto.CreateClaimDto} body so bean
-   * validation passes and the request reaches the {@code @PreAuthorize} gate rather than a 400.
+   * A valid {@link de.greluc.krt.profit.basetool.backend.joborder.internal.CreateClaimDto} body so
+   * bean validation passes and the request reaches the {@code @PreAuthorize} gate rather than a
+   * 400.
    */
   private static String validClaimBody() {
     return "{\"materialId\":\""

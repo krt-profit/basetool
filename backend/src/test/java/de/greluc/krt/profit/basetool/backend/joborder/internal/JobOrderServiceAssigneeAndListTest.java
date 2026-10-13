@@ -31,34 +31,34 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierDto;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
+import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderMaterialStockRow;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockRows;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockReads;
-import de.greluc.krt.profit.basetool.backend.mapper.JobOrderMapper;
-import de.greluc.krt.profit.basetool.backend.model.JobOrder;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderAssignee;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto;
-import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderMaterialStockRow;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAssignee;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemService;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMapper;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterialDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
-import de.greluc.krt.profit.basetool.backend.service.AuditService;
-import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
-import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService;
-import de.greluc.krt.profit.basetool.backend.service.OrderLinkedStockRows;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.util.HashSet;
 import java.util.List;
@@ -95,7 +95,7 @@ class JobOrderServiceAssigneeAndListTest {
   @Mock private OwnerScopeService ownerScopeService;
   @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
   @Mock private JobOrderMapper jobOrderMapper;
-  @Mock private de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper squadronMapper;
+  @Mock private de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper squadronMapper;
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private JobOrderItemService jobOrderItemService;
   @Mock private MaterialClaimService materialClaimService;
@@ -139,7 +139,7 @@ class JobOrderServiceAssigneeAndListTest {
             jobOrderStockProjectionService,
             null,
             null,
-            ownerScopeService,
+            null,
             actingUserService());
     queryService =
         new JobOrderQueryService(
@@ -611,7 +611,7 @@ class JobOrderServiceAssigneeAndListTest {
       when(jobOrderRepository.findAllActiveWithMaterials()).thenReturn(List.of(o));
       when(jobOrderMapper.toDto(mat))
           .thenReturn(
-              new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto(
+              new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterialDto(
                   mat.getId(),
                   null,
                   650,

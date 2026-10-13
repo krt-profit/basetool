@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.SquadronReferenceDto;
+import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
 import java.util.List;
 import org.jetbrains.annotations.Nullable;
 

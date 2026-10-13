@@ -21,12 +21,11 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.inventory.api.ExchangeStockLotRow;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryScope;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow;
-import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderMaterialStockRow;
-import de.greluc.krt.profit.basetool.backend.scope.api.ScopeSpecifications;
+import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderMaterialStockRow;
 import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;
@@ -167,7 +166,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   @Query(
       "SELECT i FROM InventoryItem i WHERE EXISTS (SELECT 1 FROM InventoryMissionAllocation ma"
           + " WHERE ma.inventoryItem = i AND ma.missionId = :missionId) AND "
-          + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE)
+          + InventoryScope.TRIPLE)
   List<InventoryItem> findByMissionIdScoped(
       @Param("missionId") UUID missionId,
       @Param("isAdminAllScope") boolean isAdminAllScope,
@@ -210,7 +209,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   @EntityGraph(attributePaths = {"material", "location", "user", "owningOrgUnit"})
   @Query(
       "SELECT i FROM InventoryItem i WHERE i.material = :material AND i.personal = false AND "
-          + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE)
+          + InventoryScope.TRIPLE)
   Page<InventoryItem> findByMaterialAndPersonalFalseScoped(
       @Param("material") Material material,
       @Param("isAdminAllScope") boolean isAdminAllScope,
@@ -233,7 +232,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       attributePaths = {"gameItem", "gameItem.manufacturer", "location", "user", "owningOrgUnit"})
   @Query(
       "SELECT i FROM InventoryItem i WHERE i.gameItem = :gameItem AND i.personal = false AND "
-          + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE)
+          + InventoryScope.TRIPLE)
   Page<InventoryItem> findByGameItemAndPersonalFalseScoped(
       @Param("gameItem") GameItem gameItem,
       @Param("isAdminAllScope") boolean isAdminAllScope,
@@ -253,7 +252,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   @EntityGraph(attributePaths = {"material", "location", "user", "owningOrgUnit"})
   @Query(
       "SELECT i FROM InventoryItem i WHERE i.personal = false AND i.material IS NOT NULL AND "
-          + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE
+          + InventoryScope.TRIPLE
           + " AND (:hasMaterials = false OR i.material.id IN :materialIds) AND (:minQuality IS"
           + " NULL OR i.quality >= :minQuality) AND (:hasJobOrders = false OR EXISTS (SELECT 1"
           + " FROM InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrderId"
@@ -326,7 +325,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       attributePaths = {"gameItem", "gameItem.manufacturer", "location", "user", "owningOrgUnit"})
   @Query(
       "SELECT i FROM InventoryItem i WHERE i.personal = false AND i.gameItem IS NOT NULL AND "
-          + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE
+          + InventoryScope.TRIPLE
           + " AND (:hasGameItems = false OR i.gameItem.id IN :gameItemIds) AND (:hasJobOrders ="
           + " false OR EXISTS (SELECT 1 FROM InventoryJobOrderAllocation ja WHERE"
           + " ja.inventoryItem = i AND ja.jobOrderId IN :jobOrderIds)) AND (:hasLocations = false"
@@ -360,7 +359,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       LEFT JOIN i.owningOrgUnit oou
       WHERE i.personal = false AND i.material IS NOT NULL AND
       """
-          + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE
+          + InventoryScope.TRIPLE
           + " AND (:hasMaterials = false OR i.material.id IN :materialIds) AND (:minQuality IS"
           + " NULL OR i.quality >= :minQuality) AND (:hasJobOrders = false OR EXISTS (SELECT 1"
           + " FROM InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrderId"
@@ -458,7 +457,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       LEFT JOIN i.owningOrgUnit oou
       WHERE i.personal = false AND i.gameItem IS NOT NULL AND
       """
-          + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE
+          + InventoryScope.TRIPLE
           + " AND (:hasGameItems = false OR i.gameItem.id IN :gameItemIds) AND (:hasJobOrders ="
           + " false OR EXISTS (SELECT 1 FROM InventoryJobOrderAllocation ja WHERE"
           + " ja.inventoryItem = i AND ja.jobOrderId IN :jobOrderIds))"
@@ -643,7 +642,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       i.quality IS NULL) OR i.quality = :quality) AND ((:owningOrgUnitId IS NULL AND
       i.owningOrgUnit IS NULL) OR i.owningOrgUnit.id = :owningOrgUnitId) AND
       """
-          + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE
+          + InventoryScope.TRIPLE
           + " ORDER BY i.createdAt ASC")
   Page<InventoryItem> findGlobalStackEntries(
       @Param("materialId") UUID materialId,
@@ -706,7 +705,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       i.user.id = :userId AND i.location.id = :locationId AND ((:owningOrgUnitId IS NULL AND
       i.owningOrgUnit IS NULL) OR i.owningOrgUnit.id = :owningOrgUnitId) AND
       """
-          + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE
+          + InventoryScope.TRIPLE
           + " ORDER BY i.createdAt ASC")
   Page<InventoryItem> findGlobalItemStackEntries(
       @Param("gameItemId") UUID gameItemId,
@@ -762,7 +761,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       SUM(i.amount) as amount
       FROM InventoryItem i WHERE i.personal = false AND i.material IS NOT NULL AND
       """
-          + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE
+          + InventoryScope.TRIPLE
           + " GROUP BY i.material")
   Page<Object[]> getAggregatedInventory(
       @Param("isAdminAllScope") boolean isAdminAllScope,
@@ -785,7 +784,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       SELECT i.gameItem as gameItem, SUM(i.amount) as amount
       FROM InventoryItem i WHERE i.personal = false AND i.gameItem IS NOT NULL AND
       """
-          + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE
+          + InventoryScope.TRIPLE
           + " GROUP BY i.gameItem")
   Page<Object[]> getAggregatedItemInventory(
       @Param("isAdminAllScope") boolean isAdminAllScope,
@@ -871,7 +870,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.JobOrderMaterialStockRow(a.jobOrderId, a.inventoryItem.id, a.inventoryItem.material.id, a.inventoryItem.quality, a.amount)
+      SELECT new de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderMaterialStockRow(a.jobOrderId, a.inventoryItem.id, a.inventoryItem.material.id, a.inventoryItem.quality, a.amount)
       FROM InventoryJobOrderAllocation a WHERE a.jobOrderId IN :jobOrderIds
       AND a.inventoryItem.material IS NOT NULL
       """)
@@ -1079,9 +1078,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * @return number of deleted rows
    */
   @Modifying
-  @Query(
-      "DELETE FROM InventoryItem i WHERE i.personal = false AND "
-          + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE)
+  @Query("DELETE FROM InventoryItem i WHERE i.personal = false AND " + InventoryScope.TRIPLE)
   int deleteAllNonPersonal(
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,

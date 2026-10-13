@@ -36,19 +36,19 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.admin.api.SystemSettings;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.model.FinanceType;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
-import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
-import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
-import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
+import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.mission.api.FinanceType;
+import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntry;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderFigures;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderFinanceReader;
-import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
-import de.greluc.krt.profit.basetool.backend.service.AuditService;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
@@ -1214,7 +1214,8 @@ class OperationPayoutServiceTest {
       assertEquals(1, events.size());
       var event = events.get(0);
       assertEquals(
-          de.greluc.krt.profit.basetool.backend.model.NotificationEventType.OPERATION_PAYOUT_MARKED,
+          de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType
+              .OPERATION_PAYOUT_MARKED,
           event.eventType());
       assertEquals(alice.getId(), event.contextRecipientUserId());
       assertEquals("Officer Bob", event.renderParams().get("actor"));
@@ -1222,7 +1223,8 @@ class OperationPayoutServiceTest {
           event
               .resolvesNotificationTypes()
               .contains(
-                  de.greluc.krt.profit.basetool.backend.model.NotificationType.OPERATION_COMPLETED),
+                  de.greluc.krt.profit.basetool.backend.notification.api.NotificationType
+                      .OPERATION_COMPLETED),
           "the last open payout clears the managers' completion notice");
     }
 
@@ -1242,7 +1244,7 @@ class OperationPayoutServiceTest {
       var events = publishedEvents();
       assertEquals(1, events.size());
       assertEquals(
-          de.greluc.krt.profit.basetool.backend.model.NotificationEventType
+          de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType
               .OPERATION_PAYOUT_UNMARKED,
           events.get(0).eventType());
       assertEquals(java.util.Set.of(alice.getId()), events.get(0).supersedeRecipients());
@@ -1277,7 +1279,7 @@ class OperationPayoutServiceTest {
       assertEquals(1, events.size());
       var event = events.get(0);
       assertEquals(
-          de.greluc.krt.profit.basetool.backend.model.NotificationEventType
+          de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType
               .OPERATION_COMPLETED_UNOWNED,
           event.eventType(),
           "an operation without an owning unit falls back to the officers");

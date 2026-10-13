@@ -21,18 +21,18 @@ package de.greluc.krt.profit.basetool.backend.blueprint.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintSource;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintCreateRequest;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintResponse;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Blueprint;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
+import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
-import de.greluc.krt.profit.basetool.backend.model.BlueprintSource;
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintCreateRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintResponse;
-import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
-import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;

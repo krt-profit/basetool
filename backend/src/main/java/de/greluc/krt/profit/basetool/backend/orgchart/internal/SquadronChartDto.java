@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.orgchart.internal;
 
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One Staffel column in the org chart: its Staffelleiter, up to four Kommandos and the Ensigns
@@ -40,7 +41,7 @@ public record SquadronChartDto(
     UUID orgUnitId,
     String name,
     String shorthand,
-    OrgChartNodeDto lead,
+    @Nullable OrgChartNodeDto lead,
     List<CommandChartDto> commands,
     List<OrgChartNodeDto> directEnsigns,
     boolean canAddCommand,

@@ -21,10 +21,12 @@
 
 /* global SYNC_MSG */
 
+import { showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
 document.addEventListener('DOMContentLoaded', () => {
-    if (window.krtFetch) {
-        window.krtFetch.bindSwap({ container: '#sync-results', history: true });
-    }
+    krtFetch.bindSwap({ container: '#sync-results', history: true });
 
     const form = /** @type {HTMLFormElement | null} */ (document.getElementById('purge-form'));
     const daysInput = /** @type {HTMLInputElement | null} */ (
@@ -43,12 +45,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    const purgeForm = form;
     const purgeDays = daysInput;
     const template = messageEl ? messageEl.getAttribute('data-template') || '' : '';
 
     function closeModal() {
-        window.krtModal.close(modal);
+        krtModal.close(modal);
     }
 
     function renderMessage() {
@@ -59,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     trigger.addEventListener('click', () => {
         renderMessage();
-        window.krtModal.open(modal);
+        krtModal.open(modal);
     });
     daysInput.addEventListener('input', renderMessage);
 
@@ -72,32 +73,25 @@ document.addEventListener('DOMContentLoaded', () => {
             purgeDays.reportValidity();
             return;
         }
-        if (!window.krtFetch) {
-            purgeForm.submit();
-            return;
-        }
+
         closeModal();
         const sourceValue = sourceInput ? sourceInput.value : '';
         const url = `/admin/sync-reports/delete-old?days=${encodeURIComponent(
             purgeDays.value,
         )}&source=${encodeURIComponent(sourceValue)}`;
-        window.krtFetch.write({
+        krtFetch.write({
             method: 'POST',
             url,
             toast: false,
             errorMessage: SYNC_MSG.deleteError,
             onSuccess(body) {
                 const count = body && body.deleted != null ? body.deleted : 0;
-                if (window.showFrontendSuccessToast) {
-                    window.showFrontendSuccessToast(SYNC_MSG.successTemplate.replace('{0}', count));
-                }
-                if (window.krtFetch) {
-                    window.krtFetch.swap({
-                        url: window.location.pathname + window.location.search,
-                        container: '#sync-results',
-                        history: false,
-                    });
-                }
+                showFrontendSuccessToast(SYNC_MSG.successTemplate.replace('{0}', count));
+                krtFetch.swap({
+                    url: window.location.pathname + window.location.search,
+                    container: '#sync-results',
+                    history: false,
+                });
             },
         });
     }

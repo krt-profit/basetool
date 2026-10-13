@@ -545,8 +545,8 @@ changes from `boolean` to `String` so it binds the `krtFetch.swap` helper's `fra
 toggles were removed: per-Staffel flags (REQ-SEC-005) are now edited on the member-edit page, whose
 two Staffel slots (REQ-ORG-017, up to two) each carry their own flags and save through the in-place
 `{field: message}` membership-delta twin (REQ-FE-007).
-The profile payout-preference form joins the description form on `krtFetch.write` (both echo the one
-shared user-row version), and the home-page mark-announcement-read posts in place and removes its
+The profile payout-preference form joins the description form on `krtFetch.write` (the description echoes the
+user-row version, the payout form its own setting version), and the home-page mark-announcement-read posts in place and removes its
 control. Since 2026-10-03 the profile is one settings page (REQ-UI-027): its four sections keep
 their forms and endpoints, and one save bar — shown only while a section differs from what was
 loaded — writes the changed sections one after another, each with the version the previous write
@@ -1076,7 +1076,7 @@ in `reconcile`, global `enhanceWithin` on
 `DOMContentLoaded` + `krt:swapped`, `id`/`data-*` passthrough, `setValue` API,
 `window.krtEnhanceComboboxes`), `krt-user-search.js`
 (the `remote-users` / `remote-bank-users` `window.krtComboboxRemoteSources` entries),
-`kernel/fragments/head.html` (global load + `window.krtComboboxI18n`), `UserController.searchUsersForBank` /
+`kernel/fragments/head.html` (global load + `window.krtComboboxI18n`), `BankMemberSearchController.searchUsersForBank` /
 `UserProxyController`, and the converted templates/selects · **ADR:** ADR-0053, ADR-0089
 
 ### REQ-FE-012 — A user's own back-to-back writes to one lock scope never self-collide
@@ -1787,8 +1787,9 @@ ADR-0106 · **Issues:** —
 
 The hand-written scripts under `static/js` are **statically type-checked** by the TypeScript
 compiler running in checker-only mode (`tsc --noEmit`, `frontend/tsconfig.json`). This is a
-*checking* requirement, not a language one: the sources stay JavaScript, stay classic non-module
-`<script>` tags sharing one global scope (ADR-0069), and nothing is compiled, bundled or renamed.
+*checking* requirement, not a language one: the sources stay JavaScript, stay ES modules served as
+they are (ADR-0250, REQ-FE-035; classic non-module tags sharing one global scope until 2026-10-12), and
+nothing is compiled, bundled or renamed.
 The decision and its rejected alternatives are ADR-0125.
 
 **The gate.** `:frontend:typecheckJs` runs strictly (`ignoreExitValue = false`) and is wired into
@@ -2005,7 +2006,7 @@ registry: the admin area is web-only permanently, so a room there would have no 
 > (`@EnableRedisIndexedHttpSession` — no session store, no login), and it fails one bean earlier
 > anyway, in the keyspace-notification initializer, before any `SmartLifecycle` runs.
 >
-> **Code:** `backend/…/controller/LiveSyncController`, `backend/…/service/LiveSyncStreamService`,
+> **Code:** `backend/…/livesync/web/LiveSyncController`, `backend/…/livesync/api/LiveSyncStreamService`,
 > `LiveSyncRelayService`, `LiveSyncSubscriptionAuthorizer`, `backend/…/livesync/api/LiveSyncTopicAuthorizer`
 > and its `*LiveSyncTopicAuthorizer` implementations, `RedisLiveSyncFanout`,
 > `LocalLiveSyncFanout`, `LiveSyncRedisConfig`, `NotificationRedisConfig`,
@@ -2189,7 +2190,8 @@ compression instead (`gzip_types` for JavaScript, CSS and JSON, PR #2021).
 **Acceptance**
 
 - [x] Every `<script src>` in the templates is `defer` except `krt-client-error.js`, which is the
-  head's first script and synchronous.
+  head's first script and synchronous. Since 2026-10-12 (REQ-FE-035) a page module is
+  `type="module"` instead, which is deferred too.
 - [x] No inline page script makes a top-level call other than element look-ups, listener and
   `krtEvents` registrations, and no inline page script is an immediately invoked function.
 - [x] On every core page, after load, the shared globals exist, the `krtEvents` stub is replaced, no
@@ -2572,6 +2574,9 @@ what it needs; the parameters start with `page` so that they cannot collide with
 **Enforced by:** `PageChromeSnapshotTest`, `ChromeNeutraliserTest`, `PageLayoutCompositionTest` ·
 **Code:** `templates/kernel/fragments/layout.html` · **Related:** REQ-UI-026, REQ-FE-023, REQ-UI-023
 
+> **Amended (2026-10-12):** the head now also renders the page's import map (REQ-FE-035), so the
+> head's fixed part changed once in the golden file.
+
 ### REQ-FE-034 — Templates, scripts and stylesheets live in their domain's folder
 
 Since 2026-10-11 (plan §5.9, F5) the frontend's templates and static assets are laid out like its
@@ -2618,6 +2623,83 @@ Java packages: the folder is the domain, and the domains are the packages of the
 `StaticResourceHandlerMappingTest#everyAssetATemplateLinksIsServedAtItsContentHashedUrl`,
 `ViewNameResolutionTest`, `:frontend:testTypecheckRatchet` · **Related:** REQ-FE-018, REQ-FE-032,
 REQ-FE-033, REQ-UI-023, REQ-OPS-038
+
+### REQ-FE-035 — Scripts are ES modules behind a per-page import map
+
+Since 2026-10-12 (plan §8.2, F5, ADR-0250) every script under `static/js` is an ES module except the
+ones `frontend/module-ratchet.json` lists as classic — today only `kernel/krt-client-error.js`, the
+head's first, synchronous script. The list only shrinks.
+
+- **Linking.** A module is `<script type="module" th:src="@{/js/<domain>/<file>.js}"
+  th:attr="nonce=${cspNonce}">` and carries no `defer` (a module is deferred and runs in document order
+  with the other deferred scripts, so REQ-FE-023's load order is unchanged). A classic script is linked
+  without `type`.
+- **Imports are static, absolute and bounded.** `import … from '/js/<domain>/<file>.js'` and
+  `export … from` name an absolute asset path of the module's own domain or of the kernel. A relative
+  path, a bare specifier, a dynamic `import()`, an import of another domain and an import cycle are
+  rejected. The kernel API is imported too: every kernel script exports its API and its consumers import
+  it, `tsconfig.json` maps `/js/*` and sets `moduleDetection: force`, and a kernel name stays on `window`
+  only where something outside the module graph reads it (a Playwright source, a node test, the head's
+  `krtEvents` stub, the classic beacon's `krtI18nText`).
+- **Every page renders an import map.** `kernel/fragments/head.html` renders, before its first module
+  script and with the request's CSP nonce, `<script type="importmap">` mapping each module the page's
+  module scripts import — transitively, the entry scripts themselves excluded unless imported — to the
+  content-hashed URL `ResourceUrlProvider` gives it, i.e. the URL a `@{…}` link to it produces. The
+  assets are cached for a year as `immutable`; the map is what makes a changed module a new URL. The
+  CSP is unchanged: `script-src 'nonce-…' 'strict-dynamic'` admits the static imports of a nonced
+  module and the nonced map.
+- **No module is wrapped in an immediately invoked function.** A body that opens with an early
+  `return` is a named function with one call (`initBankGrants()`), never a wrapper expression.
+- **The seams between the parts of a page are hook registries**, never `window` names:
+  `mission/mission-hooks.js`, `joborder/joborder-hooks.js`, `operation/operation-hooks.js`,
+  `inventory/inventory-hooks.js` and `kernel/krt-hooks.js`. The registry is a leaf module with no
+  effect, so the parts keep their load order; a `window` name stays only where a Playwright source,
+  a node test, a classic script or an inline bootstrap reads it (today `krtFetch`, `krtCsrf`,
+  `krtLiveSync`, `krtModal`, `krtSearchableSelect`, `krtHtml`, `krtComboboxRemoteSources`,
+  `krtEvents`, `krtI18nText`, `krtMaterialRelease`, `krtMaterialRequest`).
+- **A URL read from the DOM reaches a form `action` only through `safeSameOriginUrl`**, which accepts a
+  same-origin absolute path and nothing else: one `/` first, no `//` or `/\` after it, no whitespace (a tab
+  inside `/<tab>/host` is dropped by the URL parser and would make it `//host`), and a parsed origin equal to
+  the page's. The assignment goes through `assignFormAction`, which percent-encodes `"`, `<` and `>` (a URL parser encodes them anyway) before it sets the `action`; the replacement is also the one step CodeQL's `js/xss-through-dom` models as a sanitizer (`scripts/safe-url.test.mjs`, `:frontend:testSafeUrl`).
+- **A script under its plain URL is revalidated.** `/js/**` answers `Cache-Control: no-cache`; only a
+  content-hashed name answers `max-age=31536000, public, immutable`, so a module the scan missed is
+  never held stale for a year.
+- **The map is found by scanning**, not declared: the page template, `kernel/fragments/layout` and every
+  fragment they include by a literal `~{template :: name}` reference are searched for module
+  scripts. A module a page loads through a construct the scan cannot follow would be requested under
+  its plain URL; there is none today.
+- **`bank.js` is an entry module** that calls the `init…` functions of 16 modules in the order the
+  former single function registered its document listeners (REQ-BANK-* behaviour, REQ-FE-005, REQ-FE-015
+  unchanged).
+
+**Acceptance**
+
+- [x] 147 of 148 scripts are modules; the order of the document listeners, their handler bodies and the
+  live-sync receivers of the split `bank.js` is identical to the former file's when recorded against a
+  stub document (2026-10-12).
+- [x] A rendered page carries the import map before its first module script, with the hashed URL of an
+  imported bank module; every entry of a page's map equals the resource chain's URL for its key and is
+  served; every page finds its own module scripts and renders exactly its import closure.
+- [x] A module linked as a classic script, a classic script linked as a module, a module with a
+  `defer`, an import outside the boundary, a dynamic import and a cycle are each reported; the classic
+  list cannot grow.
+- [x] The import graph of the modules, registries left out, is identical before and after the move of
+  the page seams into registries, so the modules evaluate in the old tag order (compared by script on
+  the two revisions); the mission dialog, the order material removal and the catalogue table filter
+  work through their hooks on the rendered pages under the real CSP.
+- [x] A script under its plain URL answers `no-cache` with `Last-Modified`, under its hashed URL `immutable`,
+  and a hashed name with a wrong hash answers 404.
+- [x] The two rendered pages checked in a browser under the real CSP (`org-unit-bank`, `inventory-admin`)
+  load every module without a violation or script error.
+
+**Enforced by:** `ModuleScriptsTest`, `ModuleImportMapTest`,
+`StaticResourceHandlerMappingTest#everyImportMapEntryIsTheContentHashedUrlAndIsServed`,
+`StaticResourceHandlerMappingTest#aScriptIsImmutableOnlyUnderItsContentHashedUrl`,
+`OrgUnitBankPageControllerMvcTest#orgUnitBank_rendersTheImportMapBeforeItsModuleScripts`,
+`:frontend:testEslintBans`, `:frontend:lintJs` (`no-restricted-imports` per domain),
+`InlineScriptLoadOrderTest` · **Code:** `kernel/layout/ModuleImportMap.java`,
+`templates/kernel/fragments/head.html`, `module-ratchet.json` · **Related:** REQ-FE-018, REQ-FE-023,
+REQ-FE-033, REQ-FE-034, ADR-0250
 
 ## Out of scope
 

@@ -21,8 +21,9 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonSearchHitDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonMentionSource.Target;
+import de.greluc.krt.profit.basetool.backend.privacy.api.PersonSearchHitDto;
+import de.greluc.krt.profit.basetool.backend.privacy.api.PersonSearchService;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.MentionSourceDeclarations;
 import java.io.IOException;
 import java.io.InputStream;

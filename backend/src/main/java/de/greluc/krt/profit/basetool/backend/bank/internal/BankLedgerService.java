@@ -22,21 +22,22 @@ package de.greluc.krt.profit.basetool.backend.bank.internal;
 import static de.greluc.krt.profit.basetool.backend.bank.api.BankAmounts.plain;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -159,15 +160,14 @@ public class BankLedgerService {
   private BankTransactionDto bookSplitDeposit(
       @NotNull BankDepositRequest request, @NotNull BankHolder holder) {
     BigDecimal gross = request.amount();
+    BigDecimal splitPercent = Objects.requireNonNull(request.splitPercent());
     BigDecimal slice =
-        gross
-            .multiply(request.splitPercent())
-            .divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
+        gross.multiply(splitPercent).divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
     if (slice.signum() <= 0) {
       throw new BankConflictException(
           BankConflictException.CODE_BANK_SPLIT_TOO_SMALL,
           "The split percentage of the amount rounds to less than 1 aUEC",
-          Map.of("amount", plain(gross), "percent", plain(request.splitPercent())));
+          Map.of("amount", plain(gross), "percent", plain(splitPercent)));
     }
 
     List<UUID> squadronIds =
@@ -190,11 +190,13 @@ public class BankLedgerService {
     for (UUID id : lockOrder) {
       locked.put(id, writer.lockAccount(id));
     }
-    BankAccount named = locked.get(request.accountId());
+    BankAccount named = Objects.requireNonNull(locked.get(request.accountId()));
     guards.requireActive(named);
     List<UUID> targets =
         squadronIds.stream()
-            .filter(id -> locked.get(id).getStatus() == BankAccountStatus.ACTIVE)
+            .filter(
+                id ->
+                    Objects.requireNonNull(locked.get(id)).getStatus() == BankAccountStatus.ACTIVE)
             .sorted()
             .toList();
     if (targets.isEmpty()) {
@@ -226,7 +228,9 @@ public class BankLedgerService {
     if (namedShare.signum() > 0) {
       writer.persistAccountPosting(tx, named, namedShare, now);
     }
-    shares.forEach((id, share) -> writer.persistAccountPosting(tx, locked.get(id), share, now));
+    shares.forEach(
+        (id, share) ->
+            writer.persistAccountPosting(tx, Objects.requireNonNull(locked.get(id)), share, now));
     writer.persistHolderPosting(tx, holder, gross, now);
     bankAuditService.record(
         BankAuditEventType.DEPOSIT_SPLIT_BOOKED,
@@ -239,7 +243,7 @@ public class BankLedgerService {
             + holder.getHandle()
             + counterpartyDetail(counterparty, "<-")
             + " split "
-            + plain(request.splitPercent())
+            + plain(splitPercent)
             + "% ("
             + plain(distributed)
             + " aUEC -> "
@@ -545,7 +549,7 @@ public class BankLedgerService {
     for (BankCounterLeg leg : accountLegs) {
       BigDecimal negated = leg.amount().negate();
       if (negated.signum() < 0) {
-        BankAccount account = lockedAccounts.get(leg.accountId());
+        BankAccount account = Objects.requireNonNull(lockedAccounts.get(leg.accountId()));
         BigDecimal removal = negated.negate();
         BigDecimal balance = postingRepository.accountBalance(leg.accountId());
         if (balance.compareTo(removal) < 0) {
@@ -560,7 +564,10 @@ public class BankLedgerService {
             BankTransactionType.REVERSAL, note, null, null, original, BigDecimal.ZERO, now, null);
     for (BankCounterLeg leg : accountLegs) {
       writer.persistAccountPosting(
-          reversal, lockedAccounts.get(leg.accountId()), leg.amount().negate(), now);
+          reversal,
+          Objects.requireNonNull(lockedAccounts.get(leg.accountId())),
+          leg.amount().negate(),
+          now);
     }
     Map<UUID, BankHolder> reversalHolders =
         writer.loadHolders(holderLegs.stream().map(BankHolderLeg::holderId).toList());
@@ -622,7 +629,7 @@ public class BankLedgerService {
             null);
     BigDecimal totalZeroed = BigDecimal.ZERO;
     for (BankAccount account : accounts) {
-      BigDecimal balance = accountBalances.get(account.getId());
+      BigDecimal balance = Objects.requireNonNull(accountBalances.get(account.getId()));
       if (balance.signum() != 0) {
         writer.persistAccountPosting(tx, account, balance.negate(), now);
         totalZeroed = totalZeroed.add(balance);
@@ -698,8 +705,9 @@ public class BankLedgerService {
       return new CounterpartySnapshot(
           user.getId(), user.getEffectiveName(), membership.orgUnitId(), membership.orgUnitName());
     }
+    String externalHandle = Objects.requireNonNull(external);
     if (orgUnitId == null) {
-      return new CounterpartySnapshot(null, external, null, null);
+      return new CounterpartySnapshot(null, externalHandle, null, null);
     }
     OrgUnitMembershipOptionDto orgUnit =
         orgUnitMembershipQueryService.listAllActiveOrgUnitOptionsAllKinds().stream()
@@ -709,7 +717,8 @@ public class BankLedgerService {
                 () ->
                     new BadRequestException(
                         "The selected counterparty org unit does not exist or is inactive"));
-    return new CounterpartySnapshot(null, external, orgUnit.orgUnitId(), orgUnit.orgUnitName());
+    return new CounterpartySnapshot(
+        null, externalHandle, orgUnit.orgUnitId(), orgUnit.orgUnitName());
   }
 
   /**

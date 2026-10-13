@@ -28,16 +28,16 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.model.Ship;
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
-import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
@@ -92,8 +92,8 @@ class HangarImportServiceTest {
             objectMapper,
             ownerScopeService,
             auditService);
-    de.greluc.krt.profit.basetool.backend.model.Squadron stubSquadron =
-        new de.greluc.krt.profit.basetool.backend.model.Squadron();
+    de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron stubSquadron =
+        new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
     stubSquadron.setId(UUID.randomUUID());
     org.mockito.Mockito.lenient()
         .when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(any(), any()))

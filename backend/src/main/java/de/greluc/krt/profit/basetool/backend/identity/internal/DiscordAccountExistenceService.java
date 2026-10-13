@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.identity.internal;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;

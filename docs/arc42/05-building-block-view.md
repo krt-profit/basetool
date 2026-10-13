@@ -71,8 +71,9 @@ Layered, with the direction enforced by ArchUnit rather than by convention:
 | `metrics` / `health` / `logging` | `basetool_*` business metrics, health indicators, MDC enrichment |
 | `filter` / `annotation` / `validation` / `util` / `web` / `exception` / `config` | The usual Spring surface |
 
-These layer packages are being cut into domain modules (the
-[domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md), §5.1). Until a class has moved, the
+These layer packages were cut into domain modules (the
+[domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md), §5.1); since 2026-10-12 every domain
+class lies in a module package and the table above describes the roles the layers had. The business gauges are published per module (`platform.api.BusinessGaugeSource`, one `…BusinessGauges` bean in each owning module's `internal`); `app.internal.BusinessMetricsCollector` only schedules them. The
 **domain map** [`backend/src/test/resources/architecture/domain-map.txt`](../../backend/src/test/resources/architecture/domain-map.txt)
 is the source of truth for its target module and that module's rank: every class is assigned there
 by the first matching rule, and a class no rule assigns fails the build
@@ -82,8 +83,8 @@ The first module package is `audit.api`, the audit module's published interface 
 `AuditRecorder` every other module records through, and the vocabulary `AuditEventType`,
 `AuditDomain` and `AuditDetails`. Recording stays a direct call inside the business transaction
 (`MANDATORY`), never an event. The recorder's implementation `AuditService`, the `AuditEvent`
-entity, its repository, the viewer and the retention purge are the module's internals and still sit
-in the layer packages.
+entity, its repository, the viewer and the retention purge lie in the module's `api`, `internal` and
+`web` packages (umbrella step 2).
 
 The domain events live in their publisher's `<module>.api.events` package (plan §5.2, §5.3); there
 is no central `event` package. Every listener runs after commit (`@TransactionalEventListener`),
@@ -127,7 +128,7 @@ request settings form the `platform` module (`platform.api`: `AuthenticatedSubje
 window, the resilient Redis listener container and the shared rate-limit, role-scope and
 authorities-cache settings; `platform.internal`: the metric client list and the body limit);
 every other helper sits in `<module>.internal`, or in `<module>.api` when another module uses it
-(for example `inventory.api.InventoryAllocations`, `livesync.api.LiveSyncTopic`,
+(for example `inventory.api.StockRow`, `livesync.api.LiveSyncTopic`,
 `catalogue.api.QuantityTypeRounding`, `orgunit.api.StaffelMembershipResolver`). `mission`
 publishes one command (`MissionCommands`); its section-version counters and peer redaction are
 internal, and the mapper's viewer-access seam `MissionViewerAccess` sits beside `MissionMapper` in
@@ -234,13 +235,9 @@ three repositories, `InventoryItemMapper`, `InventoryItemCatalogService` (the `S
 request and read DTOs. `inventory.api` publishes what other modules use: `StockCommands`, `StockReads`
 (the exchange's lots, the stock earmarked to a job order as `LinkedStockRow` or Lager DTOs, the rows the
 Materialbörse offers), `StockItemCatalogue`, `InventoryItemDto` with its two allocation DTOs and the
-projection rows. The three entities (`InventoryItem` and the two allocations) still stay in the layer
-package `model`, because seven classes of the exchange, the job order and the Materialbörse hold the row
-(plan §7.6, P4-1 part 2). Four layer types keep a seam beside the module, as `MissionViewerAccess`
-does: `mapper.StockViewerAccess` (the caller's `canEdit`, read by `JobOrderMapper`),
-`service.OrderLinkedStockRows` (the material rows the job order's stock projection reads), and the
-records the job-order and mission repositories return, `model.projection.JobOrderEarmark` and
-`MissionEarmark`, so the layer packages and the module stay acyclic.
+projection rows. The other modules see a Lager row as `StockRow`, a read-only live view of the managed row (getters, the two reservation sums and the order slice), and change it only through `StockCommands`, which take the row's id and act on the managed instance the caller already holds, so locks, the persistence context and the optimistic version are the row's own. The three entities (`InventoryItem`, which implements `StockRow`, and the two allocations) lie in `inventory.internal` with `InventoryAllocations` and `InventoryAuditLabels` (P4-1 part 3, option A2, confirmed by the owner 2026-10-12; `StockWriteOwnershipTest`, `StockRowViewCharacterisationTest`, `ExchangeStockWritePathCharacterisationTest`). Four more
+seams lie in `inventory.api` as well: `StockViewerAccess` (the caller's `canEdit`, read by `JobOrderMapper`), `OrderLinkedStockRows` (the material rows
+the job order's stock projection reads), and the records the job-order and mission repositories return, `JobOrderEarmark` and `MissionEarmark`.
 
 The blueprint moved in part since P4-2: the five controllers sit in `blueprint.web`, and
 `blueprint.internal` holds the personal and default blueprint services, the command service behind
@@ -249,14 +246,14 @@ families, `BlueprintAccessPolicy`, the default-blueprint grant observer and prov
 mappers, the default-blueprint and alias entities and repositories, the DTOs only the blueprint
 controllers use, and its four GDPR participants. No layer class names any of them, so the move closed
 no package cycle. `PersonalBlueprint`, `PersonalBlueprintRepository`, `BlueprintSource`, the import
-preview, suggestion and status DTOs, the create request and response and `BlueprintOwnerProduct` stay in
-the layer packages, because the exchange (feed, write, undo and demand services, the draft and resolve
-services) and the job order's blueprint-owner service read them directly (plan §7.6, P4-2).
+preview, entry, suggestion and status DTOs, the create request and response and `BlueprintOwnerProduct` lie in
+`blueprint.api` (umbrella step 10), because the exchange (feed, write, undo and demand services, the draft and resolve
+services) and the job order's blueprint-owner service read them directly; the repository is published there rather than
+behind a read API (plan §7.6).
 
 The scope kernel moved in part since P4-6 (plan §7.6). `scope.api` holds the request-scope kernel and
 the scope hub: `RequestScopeResolver`, `ScopePredicate`, `OrgUnitStampingService`,
-`ScopeSpecifications` (the JPQL scope fragments, all public now because the repositories that splice
-them lie in other packages), `OwnerScopeService` (bean `ownerScopeService`) and `AccessGateService`,
+the scope kernel's JPQL fragments no longer live here: each aggregate's fragment sits beside its repository in the module's `api` (`MissionScope`, `ShipScope`, `JobOrderScope`, `InventoryScope`) or in its access policy (refinery, operation), and `ScopeFragmentsGoldenTest` pins all six, `OwnerScopeService` (bean `ownerScopeService`) and `AccessGateService`,
 beside the problem codes. `scope.internal` holds `ScopeActiveOrgUnitProvider`, which implements the
 `platform.api.ActiveOrgUnitProvider` SPI for the logging MDC. `OrgUnitCascadeService` moved to
 `orgunit.api` as a prerequisite, because the scope kernel calls it. `CustomJwtGrantedAuthoritiesConverter`
@@ -269,12 +266,21 @@ client (`KeycloakService`, `KeycloakTrustSupport`, `KeycloakUserDto`), the two a
 registration request and result records beside the events; `identity.web` holds the role, terms and
 Discord-existence controllers, `identity.internal` their services, mappers and DTOs. `RestClientConfig`
 lies in `platform.api`, which `KeycloakTrustSupport` needs. `UserService`, `UserRegistrationService`,
-`UserReconciliationService`, the `User` entity and `UserRepository` stay in the layer packages until two
-calls are inverted through identity-owned SPIs. Slice b is done: `UserService` reaches the org-unit
+`UserReconciliationService` now lie in `identity.api` (P4-7 slice c); `User`, `Role`, their repositories and `UserDto` / `UserReferenceDto`
+followed with the org-unit module (umbrella steps 6 and 7). The calls out of the identity module are inverted through identity-owned SPIs:  `UserService` reaches the org-unit
 membership services only through `identity.api.MembershipOperations`, which
-`service.OrgUnitMembershipOperations` implements as a pass-through (it also sets the initial flags of a
-new Spezialkommando member). The seam names no org-unit type and has no type parameter. The account-erasure call
-towards the GDPR orchestrator follows in slice c.
+`orgunit.internal.OrgUnitMembershipOperations` implements as a pass-through (it also sets the initial flags of a
+new Spezialkommando member; the seam names no org-unit type and has no type parameter),
+`identity.api.AccountErasure` (the registration flow's deletion, implemented by the GDPR orchestrator) and
+`identity.api.SquadronVisibility` (the two scope questions of the user queries, implemented by
+`OwnerScopeService`). `CustomJwtGrantedAuthoritiesConverter` lies in `scope.api`, because the exchange calls it.
+
+The org-unit module (rank 4) owns the Staffeln, Spezialkommandos, Bereiche, the Organisationsleitung, Kommandogruppen and the memberships:
+the entities, repositories, DTOs and services other modules call lie in `orgunit.api`, the departure notifier, the membership operations
+and the recipient directory in `orgunit.internal`, the eight controllers in `orgunit.web`. Two placements follow the dependency direction
+rather than the names: `UserMapper` lies in `orgunit.api` (it reads memberships, and `orgunit` may depend on `identity`, not the reverse),
+and `OrgUnitKind` and `SquadronReferenceDto` lie in the kernel, which lets `notification` and `identity` name them. `MeController` lies in the composition root (`app.web`), which may depend on every module it reads; the former `UserController` is split by the module that owns the data (`UserProfileController` and `MemberMembershipController` in `orgunit.web`, the announcement read marker in `dashboard.web`, the bank member searches in `bank.web`, the payout preference in `mission.web`, the blueprint sharing in `blueprint.web`, the account removal in `privacy.web`, the identity-only rest in `identity.web`), with the shared searches in `orgunit.api.UserDirectoryService` and `identity.api.UserReferenceSearchService`; the registration queue (`DiscordRegistrationAdminController`) lies in `identity.web` and the rejected-registration retention in `identity.internal`, which deletes accounts through the `AccountErasure` SPI; only the merge endpoint (`DiscordRegistrationMergeController`) lies in `privacy.web`. The module baseline is empty. `privacy.api` holds the GDPR services, the deletion-request entity and the data-export and person-search
+types; the module is dissolved into `identity` with the GDPR SPIs, not before.
 
 The platform modules reach the domains only through SPIs they own and the domains implement
 (plan §5.3); Spring injects the implementations, so the platform names no domain class:
@@ -312,7 +318,7 @@ anywhere else.
 | `kernel.backend` | The backend seam — `BackendApiClient` with its catalogue cache and URI-template verbs for every verb, `BackendErrorMapper` (the one mapping of a failed call, a sealed `Outcome`), `BackendSideChannels` (the SSE relay and the live-sync probe), `CatalogueCacheEviction`, `WebClientConfig` with Resilience4j, the outbound relays (org unit, client IP, locale, logging), Reactor context propagation, `ParallelPageLoader`, the ingest handoff |
 | `kernel.security` | `SecurityConfig`, the access gates (role sync, terms gate), `Roles`, CSP, Trusted Types and security headers, the login and logout handlers, the monitoring and management port security |
 | `kernel.session` | `RedisSessionConfig`, `SessionTypeAllowList`, the fault-tolerant serializer and same-request repair, session metrics and cookie settings |
-| `kernel.layout` | `UsesLayoutModel`, `LayoutContextLoader` and the layout advices |
+| `kernel.layout` | `UsesLayoutModel`, `LayoutContextLoader`, the layout advices and `ModuleImportMap`, which renders each page's import map of content-hashed module URLs (REQ-FE-035) |
 | `kernel.web` | `GlobalExceptionHandler`, `BackendErrorResponses`, `RelayParams`, binding and string normalisation, the request contexts (correlation id, client IP, active org unit), MVC and locale configuration, the template beans `moneyFormat`, `relativeDays`, `markdown` and `handles` |
 | `kernel.livesync` | `/ws/sync`, the handler, the Redis fanout and presence |
 | `kernel.observability` | Request logging, log masking, the startup banner, metric names, tracing and observation filters |

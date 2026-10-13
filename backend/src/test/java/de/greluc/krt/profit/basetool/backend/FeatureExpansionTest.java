@@ -33,12 +33,23 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarSystemRepository;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDto;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.FinanceType;
+import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.model.*;
-import de.greluc.krt.profit.basetool.backend.model.Squadron;
-import de.greluc.krt.profit.basetool.backend.model.dto.ShipDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.ShipRequestDto;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.*;
-import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -247,9 +258,9 @@ class FeatureExpansionTest {
             .getResponse()
             .getContentAsString();
 
-    de.greluc.krt.profit.basetool.backend.model.dto.MissionDto savedSub =
+    de.greluc.krt.profit.basetool.backend.mission.api.MissionDto savedSub =
         objectMapper.readValue(
-            response, de.greluc.krt.profit.basetool.backend.model.dto.MissionDto.class);
+            response, de.greluc.krt.profit.basetool.backend.mission.api.MissionDto.class);
     Mission fromDb = missionRepository.findById(savedSub.id()).orElseThrow();
     assertEquals(parent.getId(), fromDb.getParent().getId());
   }
@@ -289,9 +300,10 @@ class FeatureExpansionTest {
             .getResponse()
             .getContentAsString();
 
-    de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryDto entryDto =
+    de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryDto entryDto =
         objectMapper.readValue(
-            response, de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryDto.class);
+            response,
+            de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryDto.class);
     assertEquals(new BigDecimal("50.00"), entryDto.amount());
     assertEquals(FinanceType.EXPENSE, entryDto.type());
 
@@ -356,9 +368,10 @@ class FeatureExpansionTest {
             .getResponse()
             .getContentAsString();
 
-    de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryDto entryDto =
+    de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryDto entryDto =
         objectMapper.readValue(
-            response, de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryDto.class);
+            response,
+            de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryDto.class);
 
     mockMvc
         .perform(

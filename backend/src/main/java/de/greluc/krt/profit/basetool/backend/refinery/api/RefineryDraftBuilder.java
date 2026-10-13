@@ -35,8 +35,8 @@ public interface RefineryDraftBuilder {
    * @param extract the validated {@code RefineryExtract} payload
    * @param callerId id of the uploading member; becomes the draft's owner when it resolves
    * @return the draft order plus issues and match counters
-   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException with an i18n key
-   *     when the schema version or the panel type is not supported
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException with an i18n key when
+   *     the schema version or the panel type is not supported
    */
   @NotNull
   RefineryImportDraftDto buildDraft(@NotNull RefineryExtractDto extract, @Nullable UUID callerId);

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Slim reference to a {@code GameItem} embedded in item-order payloads.
@@ -28,4 +29,4 @@ import java.util.UUID;
  * @param name the item's display name
  * @param kind the {@code GameItemKind} name (e.g. {@code WEAPON}, {@code ARMOR})
  */
-public record GameItemReferenceDto(UUID id, String name, String kind) {}
+public record GameItemReferenceDto(UUID id, String name, @Nullable String kind) {}

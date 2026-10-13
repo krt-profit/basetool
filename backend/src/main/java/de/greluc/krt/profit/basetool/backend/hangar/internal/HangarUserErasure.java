@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant;
-import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

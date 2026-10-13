@@ -23,13 +23,13 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.HandoverReportPreviewRequestDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverReportService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderService;
 import de.greluc.krt.profit.basetool.backend.joborder.web.JobOrderController;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;

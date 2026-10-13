@@ -25,7 +25,7 @@ import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
-import de.greluc.krt.profit.basetool.backend.config.ApiDomains;
+import de.greluc.krt.profit.basetool.backend.platform.internal.ApiDomains;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -52,16 +52,47 @@ class ApiDomainsMatchTheDomainMapTest {
 
   /** Controllers whose API domain differs from their module's, each with the reason. */
   static final Map<String, String> CONTROLLER_TO_API =
-      Map.of(
-          "LeitungController",
-          "leadership: the REST cut keeps the Leitung endpoints a domain; the code places the"
-              + " Leitung view in orgchart",
-          "BlueprintController",
-          "blueprint: the REST cut serves the recipe graph with the blueprints; the code keeps"
-              + " the synced graph in the catalogue",
-          "UexLocationController",
-          "catalogue: the REST cut serves the UEX locations with the catalogue; the code"
-              + " serves the picker from the personal inventory");
+      Map.ofEntries(
+          Map.entry(
+              "LeitungController",
+              "leadership: the REST cut keeps the Leitung endpoints a domain; the code places the"
+                  + " Leitung view in orgchart"),
+          Map.entry(
+              "BlueprintController",
+              "blueprint: the REST cut serves the recipe graph with the blueprints; the code keeps"
+                  + " the synced graph in the catalogue"),
+          Map.entry(
+              "UexLocationController",
+              "catalogue: the REST cut serves the UEX locations with the catalogue; the code"
+                  + " serves the picker from the personal inventory"),
+          Map.entry(
+              "MeController",
+              "identity: the REST cut serves the caller's own context under identity; the code"
+                  + " hosts the read across seven modules in the composition root"),
+          Map.entry(
+              "UserProfileController",
+              "identity: the REST cut serves the user list, search and profile under identity; the"
+                  + " code needs the user mapper of the org-unit module"),
+          Map.entry(
+              "MemberMembershipController",
+              "identity: the REST cut serves the member memberships under identity; the code keeps"
+                  + " them with the org-unit module"),
+          Map.entry(
+              "AnnouncementReadController",
+              "identity: the REST cut serves the member's read marker under identity; the code"
+                  + " keeps it with the announcements of the dashboard"),
+          Map.entry(
+              "BankMemberSearchController",
+              "identity: the REST cut serves the member searches under identity; the code serves"
+                  + " the bank pickers' twins from the bank module"),
+          Map.entry(
+              "MyPayoutPreferenceController",
+              "identity: the REST cut serves the payout preference under identity; the code keeps"
+                  + " the setting with the mission module"),
+          Map.entry(
+              "MyBlueprintSharingController",
+              "identity: the REST cut serves the blueprint sharing under identity; the code keeps"
+                  + " the setting with the blueprint module"));
 
   /** The controllers today; a smaller selection would check less. */
   private static final int CONTROLLER_FLOOR = 98;

@@ -21,6 +21,10 @@
 
 /* global MSG_OWNER_UPDATED, MSG_LOCATION_UPDATED, MSG_DELIVERED_UPDATED, MSG_ERROR_GENERIC */
 
+import { showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+
 /**
  * Finds the collection row of an inventory entry.
  *
@@ -109,12 +113,8 @@ function updateCollectionProgress() {
 }
 
 function broadcastCollectionChanged() {
-    if (
-        window.orderId &&
-        window.krtLiveSync &&
-        typeof window.krtLiveSync.sendChanged === 'function'
-    ) {
-        window.krtLiveSync.sendChanged(`order:${window.orderId}`, ['materials', 'aggregated']);
+    if (window.orderId && typeof krtLiveSync.sendChanged === 'function') {
+        krtLiveSync.sendChanged(`order:${window.orderId}`, ['materials', 'aggregated']);
     }
 }
 
@@ -127,13 +127,13 @@ function broadcastCollectionChanged() {
  */
 async function collectionTransfer(inventoryId, target, successMessage) {
     const row = collectionRow(inventoryId);
-    if (!window.krtFetch || !row) return;
+    if (!row) return;
     const amount = parseFloat(row.getAttribute('data-amount') ?? '');
     const version = parseInt(row.getAttribute('data-version') ?? '', 10);
     row.querySelectorAll('select').forEach((s) => {
         s.disabled = true;
     });
-    const _result = await window.krtFetch.write({
+    const _result = await krtFetch.write({
         method: 'POST',
         url: `/inventory/${inventoryId}/transfer`,
         payload: {
@@ -148,7 +148,7 @@ async function collectionTransfer(inventoryId, target, successMessage) {
         toast: false,
         errorMessage: MSG_ERROR_GENERIC,
         onSuccess(body) {
-            window.showFrontendSuccessToast(successMessage);
+            showFrontendSuccessToast(successMessage);
             if (body && body.id) {
                 row.setAttribute('data-inventory-id', body.id);
                 if (body.version != null) {
@@ -201,9 +201,9 @@ document.addEventListener('change', (e) => {
 async function onDeliveredToggle(cb) {
     const inventoryId = cb.getAttribute('data-inventory-id');
     const row = collectionRow(inventoryId);
-    if (!window.krtFetch || !row) return;
+    if (!row) return;
     const previous = !cb.checked;
-    const result = await window.krtFetch.write({
+    const result = await krtFetch.write({
         method: 'PATCH',
         url: `/inventory/${inventoryId}/delivered`,
         payload: {
@@ -215,7 +215,7 @@ async function onDeliveredToggle(cb) {
         toast: false,
         errorMessage: MSG_ERROR_GENERIC,
         onSuccess() {
-            window.showFrontendSuccessToast(MSG_DELIVERED_UPDATED);
+            showFrontendSuccessToast(MSG_DELIVERED_UPDATED);
             broadcastCollectionChanged();
         },
     });
@@ -230,20 +230,13 @@ const MATERIAL_COLLECTION_SECTIONS = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (
-        window.orderId &&
-        window.krtLiveSync &&
-        typeof window.krtLiveSync.createReceiver === 'function' &&
-        window.krtFetch &&
-        typeof window.krtFetch.swap === 'function' &&
-        document.getElementById('material-collection-results')
-    ) {
-        window.krtLiveSync.createReceiver({
+    if (window.orderId && document.getElementById('material-collection-results')) {
+        krtLiveSync.createReceiver({
             topic: `order:${window.orderId}`,
             sections: MATERIAL_COLLECTION_SECTIONS,
             coalesceMs: 1500,
             refresh() {
-                window.krtFetch.swap({
+                krtFetch.swap({
                     url: `/orders/${window.orderId}/material-collection`,
                     container: '#material-collection-results',
                     fragmentValue: MATERIAL_COLLECTION_SECTIONS.materials.fragmentValue,

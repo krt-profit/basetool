@@ -38,13 +38,13 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientSta
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSettings;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSettingsRepository;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClients;
+import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
+import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
-import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
-import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -487,7 +487,7 @@ class ExchangeBulkUndoControllerTest {
     user.setUsername(prefix + "-" + UUID.randomUUID());
     user.setApprovalStatus(ApprovalStatus.ACTIVE);
     user.setInKeycloak(true);
-    Set<de.greluc.krt.profit.basetool.backend.model.Role> granted = new HashSet<>();
+    Set<de.greluc.krt.profit.basetool.backend.identity.api.Role> granted = new HashSet<>();
     for (String role : roles) {
       granted.add(roleRepository.findByCode(role).orElseThrow());
     }

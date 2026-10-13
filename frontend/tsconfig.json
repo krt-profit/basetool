@@ -10,12 +10,10 @@
     "which every file must have opted in (the ratchet, REQ-FE-018). Nothing",
     "under `exclude` may hide a checked script.",
     "",
-    "moduleDetection MUST stay `legacy`: package.json declares `type: module`,",
-    "so under the default `auto` TypeScript would classify every .js file as an",
-    "ES module and give each its own scope. The scripts are loaded as classic",
-    "<script> tags sharing ONE global lexical environment (ADR-0069) — `legacy`",
-    "reproduces that, and is what lets the checker see cross-file globals and",
-    "cross-file redeclaration collisions."
+    "moduleDetection is `force`: every script is checked as an ES module with its",
+    "own scope, as the browser runs it (ADR-0250); the one classic script, the",
+    "krt-client-error.js beacon, shares nothing with another file. `paths` maps the",
+    "absolute /js/ specifiers of the modules to the script folder."
   ],
   "compilerOptions": {
     "allowJs": true,
@@ -29,7 +27,12 @@
     ],
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "moduleDetection": "legacy",
+    "moduleDetection": "force",
+    "paths": {
+      "/js/*": [
+        "./src/main/resources/static/js/*"
+      ]
+    },
     "strict": true,
     "noImplicitAny": false,
     "useUnknownInCatchVariables": false,

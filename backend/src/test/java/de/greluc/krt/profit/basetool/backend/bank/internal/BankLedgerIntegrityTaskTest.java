@@ -23,9 +23,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankLedgerIntegrityService.IntegrityReport;
-import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
-import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
+import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
+import de.greluc.krt.profit.basetool.backend.platform.api.ScheduledJob;
+import de.greluc.krt.profit.basetool.backend.platform.api.TaskMetrics;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import java.util.UUID;

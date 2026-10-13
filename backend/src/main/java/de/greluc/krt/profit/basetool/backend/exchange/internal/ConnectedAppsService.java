@@ -22,13 +22,13 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.exception.ExternalServiceException;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRevocationRow;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakService;
-import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.model.NotificationType;
-import de.greluc.krt.profit.basetool.backend.repository.NotificationRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.ExternalServiceException;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRepository;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
+import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import java.time.Clock;
@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -144,7 +145,7 @@ public class ConnectedAppsService {
                               i.getLastSeenAt(),
                               unseen.contains(i.getId())))
                   .toList(),
-              writes.get(client.getClientId()).stream()
+              Objects.requireNonNull(writes.get(client.getClientId())).stream()
                   .map(
                       w ->
                           new ConnectedAppActivityDto(

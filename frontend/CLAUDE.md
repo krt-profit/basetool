@@ -90,9 +90,10 @@ decides, before specificity:
 
 ### Script load order (binding — it has regressed three times)
 
-Every external `<script>` is `defer` — head and page modules alike — except `krt-client-error.js`,
-which stays the head's first, synchronous script (`REQ-FE-023`). Deferred scripts run in document
-order after parsing, so a page module may use every head global at load.
+Every external `<script>` is a module (`type="module"`, no `defer` — a module is deferred) except
+`krt-client-error.js`, which stays the head's first, synchronous classic script (`REQ-FE-023`,
+`REQ-FE-035`). Module scripts run in document order after parsing, with the other deferred ones, so a
+page module may use every head global at load.
 
 **An inline script is a data bootstrap and nothing else** (ADR-0069). It is a
 `th:inline="javascript"` block of `const` / `let` / `var NAME = literal` and `window.NAME = literal`
@@ -111,7 +112,8 @@ The CSP sends `require-trusted-types-for 'script'` (ADR-0239, REQ-FE-022, REQ-SE
 report-only by default, enforced with `APP_SECURITY_TRUSTED_TYPES=enforce`. Under enforcement a
 string written into an HTML sink throws, even `innerHTML = ''`. So:
 
-- **Markup built in script:** ``krtHtml.set(el, krtHtml`<li data-id="${id}">${name}</li>`)``. Every
+- **Markup built in script:** `import { krtHtml } from '/js/kernel/krt-html.js';`, then
+  ``krtHtml.set(el, krtHtml`<li data-id="${id}">${name}</li>`)``. Every
   interpolation is escaped unless it is itself `krtHtml` markup; pass arrays of `krtHtml` pieces
   (`items.map((it) => krtHtml`…`)`) instead of concatenating strings, and never pre-escape a value.
   `krtHtml.set` writes anything that is not `krtHtml` markup as text.
@@ -128,13 +130,14 @@ dialog page walk (`DialogA11yE2eTest`) fails on any violation the browser report
 ### Dialogs: one contract (binding)
 
 Every dialog is a `<dialog class="krt-modal-overlay">` > `.krt-modal` (REQ-UI-013, ADR-0177) and
-opens and closes **only** through `window.krtModal.open(el | id)` / `window.krtModal.close(el | id)`
+opens and closes **only** through `krtModal.open(el | id)` / `krtModal.close(el | id)` (imported from
+`/js/kernel/krt-modal.js`)
 — or the shared `data-trigger="open-modal-display"` / `"close-modal-display"` triggers, which call
 it. Never write `overlay.style.display`, never toggle `is-open` yourself: the contract
 calls `showModal()`, moves focus in and back, handles Escape, and keeps the class state that live
 sync and the tests read. While a dialog is open the page behind it is inert, so anything you append
 for the user to see or click — a toast, a confirm, a download link — goes into
-`window.krtModal.layerRoot()`, not `document.body`.
+`krtModal.layerRoot()`, not `document.body`.
 
 **Never write a dialog shell by hand.** Every dialog is a call of `fragments/modal-wrapper :: modal`
 (`SingleModalShapeTest` fails on `.krt-modal-overlay`, `.krt-modal`, `.krt-modal-head` or
@@ -159,7 +162,7 @@ The fragment declares no signature; a call names only the parameters it needs:
 | `variant` | Extra class on `.krt-modal`: `krt-modal--wide`, `--xwide`, `--danger`, or a page's own frame class. |
 | `titleId` | Id of the `<h2>` for a script that retitles the dialog; the dialog is then labelled by the heading (`aria-labelledby`), otherwise it carries the title as `aria-label`. |
 | `open` | `true` renders the dialog open (e.g. after a server-side validation error). |
-| `closeTrigger` | The ✕'s `data-trigger`; default `close-modal-display`. A page handler must end in `window.krtModal.close`. `''` when a script binds the close by `closeClass`. |
+| `closeTrigger` | The ✕'s `data-trigger`; default `close-modal-display`. A page handler must end in `krtModal.close`. `''` when a script binds the close by `closeClass`. |
 | `closeClass` / `closeId` | Class / id on the close control for a page script. |
 
 A condition or iteration goes on a `<th:block>` around the call. In a fragment file, name the body with its template
@@ -186,7 +189,7 @@ hands over its parts and **never calls the head, sidebar, header or toast fragme
 </head>
 <body>
 <th:block th:fragment="pageContent"><main>…</main></th:block>
-<th:block th:fragment="pageTail"><script th:src="@{/js/bank/x.js}" defer th:attr="nonce=${cspNonce}"></script></th:block>
+<th:block th:fragment="pageTail"><script type="module" th:src="@{/js/bank/x.js}" th:attr="nonce=${cspNonce}"></script></th:block>
 </body>
 </html>
 ```
@@ -240,8 +243,8 @@ whitelist and a page's JS seam map disagree.
 
 The scripts under `static/js` are statically type-checked by `:frontend:typecheckJs`
 (`tsc --noEmit`, strict, wired into `check`). **TypeScript is a checker here, not a language:**
-the sources stay JavaScript, stay classic non-module `<script>` tags sharing one global scope
-(ADR-0069), and nothing is compiled, bundled or renamed. Do **not** convert files to `.ts` — the
+the sources stay JavaScript, stay ES modules served as they are (ADR-0250), and nothing is
+compiled, bundled or renamed. Do **not** convert files to `.ts` — the
 full migration is an unscheduled, costed option in
 [`docs/TYPESCRIPT_MIGRATION_PLAN.md`](../docs/TYPESCRIPT_MIGRATION_PLAN.md), not a default.
 
@@ -292,10 +295,12 @@ debt rather than anything TS 7 introduced.
   first commit, and a new domain is added to `"domains"`, to `"migrated"` and to `MIGRATED_FLOOR`
   (raise `CHECKED_FILES_FLOOR` too) in `scripts/typecheck-ratchet.mjs`; the list and the floors never
   shrink.
-  A script that is too large to check is split first at top-level statement boundaries into parts
-  loaded by consecutive `defer` tags in the original order, the first part keeping the file name.
-- **Declare shared contracts in the same change.** A new `window.krt*` API, a new custom DOM event
-  or a new Thymeleaf bootstrap constant goes into `frontend/types/globals.d.ts` or
+  A script that is too large to check is split first into modules by responsibility (see *ES modules*
+  below), the first keeping the file name.
+- **Declare shared contracts in the same change.** A new kernel API is an `export` of its module and is
+  imported (it gets a `window.` property only when something outside the module graph reads it: a
+  Playwright source, a node test, a classic script); a new custom DOM event, a `window.` property or a
+  new Thymeleaf bootstrap constant goes into `frontend/types/globals.d.ts` or
   `frontend/types/thymeleaf-bootstrap.d.ts` as part of the change that introduces it. A bootstrap
   constant additionally goes into the module's `/* global */` header — ESLint's `no-undef` keeps
   the per-page visibility check that the global declaration cannot.
@@ -306,6 +311,37 @@ debt rather than anything TS 7 introduced.
 - **In a checked file, JSDoc must be real JSDoc.** The Javadoc spellings used elsewhere in this
   repo — `{@code …}`, `{@link …}`, `@param name {shape}` — are parsed as type syntax and are hard
   errors. Convert them when you opt a file in.
+
+## ES modules (REQ-FE-035, ADR-0250)
+
+Every script under `static/js` is an ES module except the ones `frontend/module-ratchet.json` lists as
+classic (today only `kernel/krt-client-error.js`; the list only shrinks). The rules:
+
+- **Link it as `<script type="module" th:src="@{/js/<domain>/<file>.js}" th:attr="nonce=${cspNonce}">`**
+  — no `defer`. `ModuleScriptsTest` fails on a module linked as a classic script and the other way round.
+- **Import by the absolute asset path, statically**: `import { x } from '/js/bank/bank-messages.js';`.
+  Only your own domain's `/js/<domain>/` and `/js/kernel/` — never another domain, never a relative
+  path, never `import()` (`:frontend:lintJs`, `ModuleScriptsTest`, which also rejects a cycle). A
+  script another domain's page needs is a page-level `<script>` tag, as before.
+- **The head renders the page's import map** (`moduleImportMap` bean): the content-hashed URL of every
+  module the page's scripts import, found by scanning the page template and its fragments. You do not
+  write it; a module reachable only through a construct the scan cannot follow (a dynamic fragment
+  name) would be fetched unhashed, so keep a page's script tags in its own file's `pageTail`.
+- **A module has no hidden shared scope.** It reads server values from a Thymeleaf data bootstrap or
+  a `data-*` attribute, imports the kernel API it uses (`krtFetch`, `krtModal`, `krtLiveSync`, `krtEvents`, the toasts, …) from
+  `/js/kernel/`, and hands another module only what it `export`s. The few `window.` names that remain
+  are listed in ADR-0250. A module that registers document listeners does it
+  in an exported `init…` function the entry module calls, so the order of listeners per event type is
+  visible in one place (`bank/bank.js` is the example).
+- **No immediately invoked function, no `window` seam.** A body that opens with an early `return`
+  is a named function and one call (`function initBankGrants() { … }`, then `initBankGrants();`). The
+  parts of one page that offer something to each other at run time (a section writer, a dialog
+  opener, a reload) set a member of the domain's hook registry (`mission/mission-hooks.js`,
+  `joborder/joborder-hooks.js`, `operation/operation-hooks.js`, `inventory/inventory-hooks.js`,
+  `kernel/krt-hooks.js` across the kernel boundary) where they used to set `window.<name>`, and the
+  others read it where they need it: a registry has no effect and no imports, so the parts keep their
+  tag order. A `window` name stays only where a Playwright source, a node test or the classic beacon
+  reads it (ADR-0250).
 
 ## Package layout (REQ-FE-032, plan §5.9)
 

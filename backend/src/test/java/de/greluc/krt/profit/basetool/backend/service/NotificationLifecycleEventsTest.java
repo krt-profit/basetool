@@ -27,8 +27,8 @@ import de.greluc.krt.profit.basetool.backend.bank.api.events.BankAccountResponsi
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestNoticesReconciledEvent;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationDecidedEvent;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderClosedEvent;
-import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
-import de.greluc.krt.profit.basetool.backend.model.NotificationType;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.Map;

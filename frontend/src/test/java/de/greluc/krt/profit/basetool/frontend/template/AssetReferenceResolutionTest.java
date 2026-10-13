@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.template;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.ModuleImportMap;
 import de.greluc.krt.profit.basetool.frontend.support.AssetReferences;
 import de.greluc.krt.profit.basetool.frontend.support.AssetReferences.Reference;
 import java.io.IOException;
@@ -44,7 +45,7 @@ import org.junit.jupiter.api.io.TempDir;
 class AssetReferenceResolutionTest {
 
   /** Selection floor: asset links of all templates when the test was added. */
-  private static final int MIN_REFERENCES = 290;
+  private static final int MIN_REFERENCES = 283;
 
   private static final Path RESOURCES = AssetReferences.MAIN_RESOURCES;
 
@@ -65,9 +66,10 @@ class AssetReferenceResolutionTest {
     Set<String> linked = new TreeSet<>();
     AssetReferences.inTemplates(RESOURCES.resolve("templates"))
         .forEach(reference -> linked.add(reference.url()));
+    linked.addAll(new ModuleImportMap(path -> path).importClosure(Set.copyOf(linked)));
 
     assertThat(orphans(RESOURCES, linked))
-        .as("scripts and stylesheets no template links")
+        .as("scripts and stylesheets no template links and no linked module imports")
         .isEmpty();
   }
 

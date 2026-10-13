@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
-import de.greluc.krt.profit.basetool.backend.config.AsyncConfig;
-import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
-import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
+import de.greluc.krt.profit.basetool.backend.platform.api.AsyncConfig;
+import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
+import de.greluc.krt.profit.basetool.backend.platform.api.ScheduledJob;
+import de.greluc.krt.profit.basetool.backend.platform.api.TaskMetrics;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import java.util.function.IntSupplier;

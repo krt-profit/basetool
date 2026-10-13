@@ -19,7 +19,12 @@
 
 // @ts-check
 
-(function () {
+import { showKrtConfirm } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
+
+function initConnectedApps() {
     const BASE = '/connected-apps';
 
     const host = document.getElementById('ca-host');
@@ -38,7 +43,7 @@
         /** @param {string} key */
         const text = function (key) {
             const attribute = `data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
-            return window.krtI18nText(data[key], attribute);
+            return krtI18nText(data[key], attribute);
         };
         return {
             disconnected: text('disconnected'),
@@ -58,7 +63,7 @@
         /** @param {string} key */
         const text = function (key) {
             const attribute = `data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
-            return window.krtI18nText(data[key], attribute);
+            return krtI18nText(data[key], attribute);
         };
         return {
             done: text('done'),
@@ -111,7 +116,7 @@
     if (undoForm instanceof HTMLFormElement) {
         undoForm.addEventListener('submit', (event) => {
             event.preventDefault();
-            if (!undoClientId || !window.krtFetch) {
+            if (!undoClientId) {
                 return;
             }
             const span = /** @type {HTMLSelectElement | null} */ (
@@ -120,7 +125,7 @@
             const hours = span ? Number(span.value) : 24;
             const since = new Date(Date.now() - hours * HOUR_MS).toISOString();
             const submitter = undoForm.querySelector('button[type="submit"]');
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: `${BASE}/${encodeURIComponent(undoClientId)}/undo`,
                 payload: { since },
@@ -128,7 +133,7 @@
                 errorMessage: i18n.error,
                 submitter,
                 onSuccess(result) {
-                    window.krtModal.close('ca-undo-modal');
+                    krtModal.close('ca-undo-modal');
                     showUndoResult(result);
                     return refreshApps();
                 },
@@ -142,10 +147,7 @@
      * @param {Element} submitter
      */
     function markSeen(id, submitter) {
-        if (!window.krtFetch) {
-            return;
-        }
-        window.krtFetch.write({
+        krtFetch.write({
             method: 'POST',
             url: `${BASE}/installations/${encodeURIComponent(id)}/seen`,
             toast: false,
@@ -159,7 +161,7 @@
 
     /** Re-renders the list in place from the `apps` fragment. */
     function refreshApps() {
-        return window.krtFetch.swap({
+        return krtFetch.swap({
             url: BASE,
             container: '#ca-host',
             fragmentValue: 'apps',
@@ -175,11 +177,8 @@
      * @param {Element} submitter
      */
     function disconnect(titleText, bodyText, url, submitter) {
-        if (!window.krtFetch) {
-            return;
-        }
         const send = function () {
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'DELETE',
                 url,
                 successMessage: i18n.disconnected,
@@ -190,17 +189,12 @@
                 },
             });
         };
-        if (typeof window.showKrtConfirm !== 'function') {
-            send();
-            return;
-        }
-        window
-            .showKrtConfirm(titleText, bodyText, i18n.confirmOk, i18n.confirmCancel)
-            .then((ok) => {
-                if (ok) {
-                    send();
-                }
-            });
+
+        showKrtConfirm(titleText, bodyText, i18n.confirmOk, i18n.confirmCancel).then((ok) => {
+            if (ok) {
+                send();
+            }
+        });
     }
 
     host.addEventListener('click', (event) => {
@@ -212,8 +206,8 @@
         if (undoBtn) {
             const app = undoBtn.closest('[data-client-id]');
             undoClientId = app ? app.getAttribute('data-client-id') : null;
-            if (undoClientId && window.krtModal) {
-                window.krtModal.open('ca-undo-modal');
+            if (undoClientId) {
+                krtModal.open('ca-undo-modal');
             }
             return;
         }
@@ -254,4 +248,6 @@
             }
         }
     });
-})();
+}
+
+initConnectedApps();

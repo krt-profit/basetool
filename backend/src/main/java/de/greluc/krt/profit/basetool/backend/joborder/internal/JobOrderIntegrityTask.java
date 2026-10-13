@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
-import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
-import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
+import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
+import de.greluc.krt.profit.basetool.backend.platform.api.ScheduledJob;
+import de.greluc.krt.profit.basetool.backend.platform.api.TaskMetrics;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;

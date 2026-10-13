@@ -147,7 +147,7 @@ public class ExchangeFeedReader {
     Map<String, String> installations = installationIds(member, latest.values());
     Map<String, Removal> removals = new HashMap<>();
     for (ExchangeChangeRepository.ChangedKey key : delivered) {
-      ExchangeChange change = latest.get(key.getSeq());
+      ExchangeChange change = Objects.requireNonNull(latest.get(key.getSeq()));
       removals.put(
           key.getEntityKey(),
           new Removal(
@@ -212,7 +212,7 @@ public class ExchangeFeedReader {
      * @return the tombstone
      */
     public @NotNull ExchangeTombstoneDto tombstone(@NotNull String key, @NotNull String opaqueKey) {
-      Removal removal = removals.get(key);
+      Removal removal = Objects.requireNonNull(removals.get(key));
       return new ExchangeTombstoneDto(opaqueKey, removal.at(), removal.by());
     }
 

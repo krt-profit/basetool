@@ -45,7 +45,8 @@ class HttpCachingTest {
   private MockMvc mockMvc;
 
   @Autowired
-  private de.greluc.krt.profit.basetool.backend.filter.ApiCacheControlFilter apiCacheControlFilter;
+  private de.greluc.krt.profit.basetool.backend.platform.internal.ApiCacheControlFilter
+      apiCacheControlFilter;
 
   @Autowired private ShallowEtagHeaderFilter shallowEtagHeaderFilter;
 

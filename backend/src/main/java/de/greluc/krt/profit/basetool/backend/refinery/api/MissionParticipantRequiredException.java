@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.api;
 
-import de.greluc.krt.profit.basetool.backend.exception.DomainProblem;
+import de.greluc.krt.profit.basetool.backend.kernel.DomainProblem;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.http.HttpStatus;
 

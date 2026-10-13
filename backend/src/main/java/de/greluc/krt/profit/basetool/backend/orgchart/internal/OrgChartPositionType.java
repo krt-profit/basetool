@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.orgchart.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 

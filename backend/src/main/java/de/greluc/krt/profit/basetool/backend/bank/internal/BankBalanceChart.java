@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
-import de.greluc.krt.profit.basetool.backend.service.pdf.KrtPdfSupport;
+import de.greluc.krt.profit.basetool.backend.platform.api.KrtPdfSupport;
 import java.awt.Color;
 import java.math.BigDecimal;
 import java.time.Instant;

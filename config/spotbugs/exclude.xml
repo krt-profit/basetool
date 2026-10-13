@@ -13,7 +13,7 @@
   </Match>
 
   <Match>
-    <Class name="de.greluc.krt.profit.basetool.backend.controller.BasetoolErrorController"/>
+    <Class name="de.greluc.krt.profit.basetool.backend.platform.api.BasetoolErrorController"/>
     <Bug pattern="SPRING_CSRF_UNRESTRICTED_REQUEST_MAPPING"/>
   </Match>
 </FindBugsFilter>

@@ -23,6 +23,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.tngtech.archunit.ArchConfiguration;
+import com.tngtech.archunit.core.domain.Dependency;
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.EvaluationResult;
@@ -34,6 +36,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
+import java.util.TreeSet;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -49,6 +53,8 @@ class ModuleBaselineTest {
 
   private static final DomainMap MAP = DomainMap.load();
 
+  private static final int MODULE_PAIR_FLOOR = 167;
+
   private static final String FIXTURE_DESCRIPTION = "fixture modules respect the ranks";
 
   private static final String FIXTURE_VIOLATION = "low -> high: LowService -> HighService";
@@ -63,10 +69,28 @@ class ModuleBaselineTest {
     freeze(rule, store).check(CLASSES);
 
     List<String> actual = sortedDetails(rule.evaluate(CLASSES));
-    assertThat(actual).isNotEmpty();
     assertThat(Files.readAllLines(store.fileFor(rule), StandardCharsets.UTF_8))
         .as("the frozen baseline lists exactly today's violations")
         .isEqualTo(actual);
+  }
+
+  @Test
+  void theRuleSeesTheRealModuleGraphSoAnEmptyBaselineIsNotVacuous() {
+    Set<String> edges = new TreeSet<>();
+    for (JavaClass origin : CLASSES) {
+      String from = moduleOf(origin);
+      for (Dependency dependency : origin.getDirectDependenciesFromSelf()) {
+        String to = moduleOf(dependency.getTargetClass().getBaseComponentType());
+        if (!from.equals(to) && !"?".equals(from) && !"?".equals(to)) {
+          edges.add(from + " -> " + to);
+        }
+      }
+    }
+
+    assertThat(edges)
+        .as("module pairs with at least one class dependency in the imported main classes")
+        .hasSizeGreaterThanOrEqualTo(MODULE_PAIR_FLOOR);
+    assertThat(edges).allSatisfy(edge -> assertThat(isAllowed(edge)).as(edge).isTrue());
   }
 
   @Test
@@ -178,6 +202,17 @@ class ModuleBaselineTest {
     Path file = store.fileFor(fixtureRule());
     assertThat(file.getFileName()).hasToString("fixture-modules-respect-the-ranks.txt");
     assertThat(Files.readString(file)).isEqualTo(FIXTURE_VIOLATION + "\n");
+  }
+
+  private static String moduleOf(JavaClass javaClass) {
+    return MAP.ruleFor(ModuleSubjects.subjectOf(javaClass, CLASSES).getName())
+        .map(DomainMap.Rule::module)
+        .orElse("?");
+  }
+
+  private static boolean isAllowed(String edge) {
+    String[] modules = edge.split(" -> ");
+    return MAP.mayDependOn(modules[0], modules[1]);
   }
 
   private static ArchRule fixtureRule() {

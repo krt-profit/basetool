@@ -21,6 +21,15 @@
 
 /* global noteI18n, inventoryConflictI18n */
 
+import {
+    showFrontendErrorToast,
+    showFrontendSuccessToast,
+    showKrtConfirm,
+} from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { inventoryHooks } from '/js/inventory/inventory-hooks.js';
+
 /** @type {HTMLElement | null} */
 let activeNoteButton = null;
 
@@ -29,7 +38,7 @@ let activeNoteButton = null;
  *
  * @param {HTMLElement} btn the note button that was activated
  */
-function openNoteModal(btn) {
+export function openNoteModal(btn) {
     activeNoteButton = btn;
     const modal = document.getElementById('noteModal');
     const ta = /** @type {HTMLTextAreaElement | null} */ (
@@ -39,19 +48,19 @@ function openNoteModal(btn) {
     const note = btn.getAttribute('data-note') || '';
     ta.value = note;
     updateNoteCounter();
-    window.krtModal.open(modal);
+    krtModal.open(modal);
     setTimeout(() => {
         ta.focus();
     }, 0);
 }
 
-function closeNoteModal() {
+export function closeNoteModal() {
     const modal = document.getElementById('noteModal');
-    window.krtModal.close(modal);
+    krtModal.close(modal);
     activeNoteButton = null;
 }
 
-function updateNoteCounter() {
+export function updateNoteCounter() {
     const ta = /** @type {HTMLTextAreaElement | null} */ (
         document.getElementById('noteModalTextarea')
     );
@@ -59,17 +68,15 @@ function updateNoteCounter() {
     if (ta && counter) counter.textContent = `${ta.value ? ta.value.length : 0} / 1000`;
 }
 
-function showInventoryToast(type, msg) {
+export function showInventoryToast(type, msg) {
     if (type === 'error') {
-        if (typeof window.showFrontendErrorToast === 'function') {
-            window.showFrontendErrorToast(msg);
-        }
-    } else if (typeof window.showFrontendSuccessToast === 'function') {
-        window.showFrontendSuccessToast(msg);
+        showFrontendErrorToast(msg);
+    } else {
+        showFrontendSuccessToast(msg);
     }
 }
 
-function saveNote() {
+export function saveNote() {
     if (!activeNoteButton) return;
     const ta = /** @type {HTMLTextAreaElement | null} */ (
         document.getElementById('noteModalTextarea')
@@ -78,13 +85,10 @@ function saveNote() {
     submitNoteUpdate(ta.value || '');
 }
 
-function removeNote() {
+export function removeNote() {
     if (!activeNoteButton) return;
-    if (typeof window.showKrtConfirm !== 'function') {
-        submitNoteUpdate('');
-        return;
-    }
-    window.showKrtConfirm(noteI18n.confirmTitle, noteI18n.confirmMessage).then((confirmed) => {
+
+    showKrtConfirm(noteI18n.confirmTitle, noteI18n.confirmMessage).then((confirmed) => {
         if (confirmed) submitNoteUpdate('');
     });
 }
@@ -99,12 +103,9 @@ function submitNoteUpdate(noteValue) {
     const btn = activeNoteButton;
     if (!btn) return;
     const id = /** @type {string} */ (btn.getAttribute('data-id'));
-    if (window.krtFetch && typeof window.krtFetch.serialize === 'function') {
-        return window.krtFetch.serialize(`inv-note:${id}`, () => {
-            return runNoteUpdate(btn, id, noteValue);
-        });
-    }
-    return runNoteUpdate(btn, id, noteValue);
+    return krtFetch.serialize(`inv-note:${id}`, () => {
+        return runNoteUpdate(btn, id, noteValue);
+    });
 }
 
 /**
@@ -116,7 +117,6 @@ function submitNoteUpdate(noteValue) {
  * @returns {Promise<unknown>} the write
  */
 function runNoteUpdate(btn, id, noteValue) {
-    if (!window.krtFetch) return Promise.resolve();
     const version = btn.getAttribute('data-version');
     const trimmed = (noteValue || '').trim();
     const isEmpty = trimmed.length === 0;
@@ -124,7 +124,7 @@ function runNoteUpdate(btn, id, noteValue) {
         typeof inventoryConflictI18n !== 'undefined'
             ? Object.assign({}, inventoryConflictI18n, { reloadDetailFallback: noteI18n.conflict })
             : { reloadDetailFallback: noteI18n.conflict };
-    return window.krtFetch.write({
+    return krtFetch.write({
         method: 'PUT',
         url: `/inventory/${encodeURIComponent(id)}/note`,
         payload: {
@@ -137,7 +137,7 @@ function runNoteUpdate(btn, id, noteValue) {
         onSuccess(updated) {
             closeNoteModal();
             if (updated && updated.version != null) {
-                window.krtFetch.syncVersion(btn.closest('.tree-row--leaf'), updated.version);
+                krtFetch.syncVersion(btn.closest('.tree-row--leaf'), updated.version);
             }
             const noteBtns = /** @type {NodeListOf<HTMLElement>} */ (
                 document.querySelectorAll(`button.inventory-note-btn[data-id="${id}"]`)
@@ -170,8 +170,8 @@ function runNoteUpdate(btn, id, noteValue) {
                     p.title = txt;
                 }
             });
-            if (typeof window.krtNotifyInventoryChanged === 'function') {
-                window.krtNotifyInventoryChanged();
+            if (typeof inventoryHooks.notifyChanged === 'function') {
+                inventoryHooks.notifyChanged();
             }
         },
         onError(status) {
@@ -189,10 +189,3 @@ function runNoteUpdate(btn, id, noteValue) {
         },
     });
 }
-
-window.openNoteModal = openNoteModal;
-window.closeNoteModal = closeNoteModal;
-window.updateNoteCounter = updateNoteCounter;
-window.saveNote = saveNote;
-window.removeNote = removeNote;
-window.showInventoryToast = showInventoryToast;

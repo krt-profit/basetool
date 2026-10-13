@@ -188,6 +188,13 @@ Two binding rules shape every UI change:
   `APP_SECURITY_TRUSTED_TYPES=enforce`; violations reach the client-error beacon as `csp_violation`
   (REQ-SEC-064). The dialog page walk fails on any violation. Enforcing in production is the one
   open step, an owner-approved configuration change.
+- **Scripts are ES modules behind a per-page import map** (ADR-0250, REQ-FE-035, 2026-10-12). Every
+  script but the error beacon is `<script type="module">`; modules import statically by absolute
+  `/js/<domain>/<file>.js` paths, only within their domain or the kernel (ESLint, `ModuleScriptsTest`).
+  Because the assets are cached `immutable` under content-hashed URLs and a specifier cannot carry the
+  hash, the head renders an inline `<script type="importmap">` with the CSP nonce that maps each import of
+  the page to its hashed URL; `script-src 'nonce-…' 'strict-dynamic'` admits the nonced map and the
+  static imports. No bundler.
 - **The browser baseline is "Baseline 2025"**: Chrome 122, Firefox 131, Safari / iOS 18.4; the type
   check and ESLint run at ES2025 (ADR-0239, REQ-FE-018).
 - **An ETag only where it pays** (FE-PERF-03, 2026-09-22; assets out 2026-09-23). The frontend's

@@ -22,13 +22,13 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
-import de.greluc.krt.profit.basetool.backend.model.JobOrder;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -65,7 +65,7 @@ public class JobOrderPriorityService {
    * @param id job order primary key
    * @param newPriority target slot (1-based)
    * @return the persisted order
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no match
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no match
    */
   @Transactional
   public JobOrderDto updateJobOrderPriority(UUID id, Integer newPriority) {

@@ -52,10 +52,8 @@ noticed.
 starting with the module `api` packages and widening package by package
 ([ADR-0237](../adr/0237-error-prone-and-nullaway-check-the-nullness-annotations-at-compile-time.md),
 2026-10-01). Until a package is covered, this entry holds for it. Since 2026-10-10 the backend's `compileJava` runs Error Prone
-2.50.0 with NullAway 0.14.2 over the 18 module `api` packages and their sub-packages and over the
-whole `joborder`, `refinery`, `materialexchange` and `mission` modules, with NullAway findings as
-errors;
-outside them this entry still holds.
+2.50.0 with NullAway 0.14.2 over the 18 module `api` packages and their sub-packages and, since 2026-10-12, over the
+whole tree of every module, `kernel` included, with NullAway findings as errors.
 
 ## 11.5 One host, no failover
 
@@ -404,3 +402,6 @@ and forms live in `<domain>.web` and `<domain>.model` beside the typed clients, 
 eight `kernel.*` packages. The cross-domain references between domains are page composition and no
 frontend rule bounds them yet; the kernel's ten reaches into `orgunit`, `identity` and `catalogue`
 (§5.3) are frozen by `KernelDomainReachTest` and may only shrink.
+
+Status 2026-10-12 (umbrella pull request #2552): every domain class lies in a module package, the module baseline is empty and
+NullAway checks every module as a whole tree. The Gradle extraction of the exchange and the bank is struck (plan §5.8). The four scope fragments moved beside their repositories (REQ-DATA-010, option B1) and the Lager row became a read-only view with id commands, its entities in `inventory.internal` (P4-1 part 3, option A2), both confirmed by the owner 2026-10-12. No item of the plan's backend modularisation is left open.

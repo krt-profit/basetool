@@ -23,19 +23,16 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderAllocationDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MissionAllocationDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
-import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
-import de.greluc.krt.profit.basetool.backend.mapper.StockViewerAccess;
-import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
-import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
-import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryGameItemReferenceDto;
-import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderEarmark;
-import de.greluc.krt.profit.basetool.backend.model.projection.MissionEarmark;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import de.greluc.krt.profit.basetool.backend.platform.api.CentralMapperConfig;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -147,7 +144,7 @@ public abstract class InventoryItemMapper {
    * @return the reference DTO, or {@code null} for a {@code null} input
    */
   @Nullable
-  public InventoryGameItemReferenceDto gameItemToReferenceDto(GameItem gameItem) {
+  public InventoryGameItemReferenceDto gameItemToReferenceDto(@Nullable GameItem gameItem) {
     if (gameItem == null) {
       return null;
     }

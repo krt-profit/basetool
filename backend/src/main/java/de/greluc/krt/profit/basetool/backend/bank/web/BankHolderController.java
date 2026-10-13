@@ -30,7 +30,7 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.RegisterBankHolderReq
 import de.greluc.krt.profit.basetool.backend.bank.internal.UpdateBankHolderRequest;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
+import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import java.util.List;

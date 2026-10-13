@@ -67,3 +67,9 @@ We will name a library module of an application `<app>-<name>` (`<app>` being `b
   rejected: the name is the one fact all four consumers can read without parsing the others.
 - **`project(":x").projectDir` and `rootProject` for repository paths** — rejected: cross-project
   access that blocks isolated projects.
+
+## Amendment 2026-10-12
+
+`backend-exchange` and `backend-bank` are **not implemented**, by decision of the owner: a library that compiles against the whole `backend` (`compileOnly(project(":backend"))`, with `runtimeOnly` in the application, since `implementation` is a task cycle) gives no
+compile-time isolation, and the isolation needs the api packages the library uses as Gradle modules of their own (plan §5.8). The naming rule and the build's reading of it stay as built, prepared for a library module that may come one day; nothing schedules one. A library
+that the application does not compile against would also need the SBOM check and the coverage derivation to accept `runtimeOnly`, which they do not today (`implementation` only).

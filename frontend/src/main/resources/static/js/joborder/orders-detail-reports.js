@@ -19,15 +19,25 @@
 
 // @ts-check
 
-/* global MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_OWNER, MSG_LOCATION, MSG_STOLEN, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_LOAD_ERROR, MSG_INVENTORY_BELOW_FLOOR, MSG_INVENTORY_PART_OF, MSG_INVENTORY_UNLINK_TOOLTIP, IS_LOGISTICIAN, ORDER_REQUESTING_SQUADRON_ID, showFrontendErrorToast, ORDER_HANDOVER_I18N, fillPlaceholders, validateHandoverAmounts, cachedInventoryItems */
-/* exported downloadHandoverReport, downloadItemHandoverReport, validateItemHandoverForm, previewHandoverReport, toggleInventory */
+/* global MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_OWNER, MSG_LOCATION, MSG_STOLEN, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_LOAD_ERROR, MSG_INVENTORY_BELOW_FLOOR, MSG_INVENTORY_PART_OF, MSG_INVENTORY_UNLINK_TOOLTIP, IS_LOGISTICIAN, ORDER_REQUESTING_SQUADRON_ID, ORDER_HANDOVER_I18N */
+
+import {
+    cachedInventoryItems,
+    fillPlaceholders,
+    validateHandoverAmounts,
+} from '/js/joborder/orders-detail.js';
+import { showFrontendErrorToast } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtHtml } from '/js/kernel/krt-html.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 /**
  * Downloads the PDF report of a material handover.
  *
  * @param {Element} btn the download button carrying the order, handover and handover time
  */
-async function downloadHandoverReport(btn) {
+export async function downloadHandoverReport(btn) {
     const orderId = btn.getAttribute('data-order-id');
     const handoverId = btn.getAttribute('data-handover-id');
     const handoverTimeRaw = btn.getAttribute('data-handover-time');
@@ -58,7 +68,7 @@ async function downloadHandoverReport(btn) {
         if (userTimeZone) {
             downloadHeaders['X-User-Time-Zone'] = userTimeZone;
         }
-        const response = await window.krtFetch.get(
+        const response = await krtFetch.get(
             `/api/v1/orders/${orderId}/handovers/${handoverId}/report`,
             { headers: downloadHeaders },
         );
@@ -72,7 +82,7 @@ async function downloadHandoverReport(btn) {
         a.href = url;
         a.target = '_blank';
         a.download = filename;
-        window.krtModal.layerRoot().appendChild(a);
+        krtModal.layerRoot().appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
@@ -86,7 +96,7 @@ async function downloadHandoverReport(btn) {
  *
  * @param {Element} btn the download button carrying the order, handover and handover time
  */
-async function downloadItemHandoverReport(btn) {
+export async function downloadItemHandoverReport(btn) {
     const orderId = btn.getAttribute('data-order-id');
     const handoverId = btn.getAttribute('data-handover-id');
     const handoverTimeRaw = btn.getAttribute('data-handover-time');
@@ -117,7 +127,7 @@ async function downloadItemHandoverReport(btn) {
         if (userTimeZone) {
             downloadHeaders['X-User-Time-Zone'] = userTimeZone;
         }
-        const response = await window.krtFetch.get(
+        const response = await krtFetch.get(
             `/api/v1/orders/${orderId}/item-handovers/${handoverId}/report`,
             { headers: downloadHeaders },
         );
@@ -131,7 +141,7 @@ async function downloadItemHandoverReport(btn) {
         a.href = url;
         a.target = '_blank';
         a.download = filename;
-        window.krtModal.layerRoot().appendChild(a);
+        krtModal.layerRoot().appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
@@ -145,7 +155,7 @@ async function downloadItemHandoverReport(btn) {
  *
  * @returns {boolean} true when the form can be submitted
  */
-function validateItemHandoverForm() {
+export function validateItemHandoverForm() {
     const inputs = /** @type {NodeListOf<HTMLInputElement>} */ (
         document.querySelectorAll('#item-handover-modal input[type="number"]')
     );
@@ -164,7 +174,7 @@ function validateItemHandoverForm() {
  *
  * @param {Element} btn the preview button carrying the order id
  */
-async function previewHandoverReport(btn) {
+export async function previewHandoverReport(btn) {
     const orderId = btn.getAttribute('data-order-id');
     const orderNumber =
         document.getElementById('order-display-id')?.getAttribute('data-order-number') ||
@@ -246,8 +256,8 @@ async function previewHandoverReport(btn) {
         recipientHandle,
         items,
     };
-    if (!window.krtFetch) return;
-    const result = await window.krtFetch.write({
+
+    const result = await krtFetch.write({
         method: 'POST',
         url: `/api/v1/orders/${encodeURIComponent(String(orderId))}/handovers/report/preview`,
         payload,
@@ -282,7 +292,7 @@ async function previewHandoverReport(btn) {
             previewDate,
             previewTime,
         ]);
-        window.krtModal.layerRoot().appendChild(a);
+        krtModal.layerRoot().appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
@@ -303,7 +313,7 @@ async function previewHandoverReport(btn) {
 async function _loadStockAttribution(orderId, materialId, tierId) {
     if (!tierId || !orderId || !materialId) return null;
     try {
-        const list = await window.krtFetch.getJson(
+        const list = await krtFetch.getJson(
             `/orders/${orderId}/materials/${materialId}/attribution`,
         );
         /** @type {Map<string, number>} */
@@ -331,7 +341,7 @@ async function _loadStockAttribution(orderId, materialId, tierId) {
  *
  * @param {HTMLElement} row the material row
  */
-async function toggleInventory(row) {
+export async function toggleInventory(row) {
     const orderId = row.getAttribute('data-order-id');
     const materialId = row.getAttribute('data-material-id');
     const amountType = row.getAttribute('data-amount-type');
@@ -355,7 +365,7 @@ async function toggleInventory(row) {
     /** @type {Node} */ (row.parentNode).insertBefore(detailsRow, row.nextSibling);
 
     try {
-        const allItems = await window.krtFetch.getJson(
+        const allItems = await krtFetch.getJson(
             `/orders/${orderId}/materials/${materialId}/inventory`,
         );
         const attribution = await _loadStockAttribution(
@@ -481,7 +491,7 @@ async function toggleInventory(row) {
             detailsRow,
             krtHtml`
                 <td colspan="5" class="od-inv-cell">
-                    <div class="text-danger">${window.krtI18nText(MSG_INVENTORY_LOAD_ERROR, 'MSG_INVENTORY_LOAD_ERROR')}</div>
+                    <div class="text-danger">${krtI18nText(MSG_INVENTORY_LOAD_ERROR, 'MSG_INVENTORY_LOAD_ERROR')}</div>
                 </td>
             `,
         );

@@ -18,12 +18,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-(function () {
-    'use strict';
-    if (!window.krtFetch) {
-        return;
-    }
-    const krtFetch = window.krtFetch;
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
+function initProfileNotificationPrefs() {
     /** @type {Record<string, string>} */
     const i18n = window.krtProfileI18n || {};
 
@@ -36,9 +33,6 @@
      * @returns {Promise<boolean> | undefined} the swap, or undefined when no swap helper exists
      */
     function refreshCard() {
-        if (!krtFetch.swap) {
-            return undefined;
-        }
         return krtFetch.swap({
             url: BASE_URL,
             container: HOST,
@@ -79,4 +73,6 @@
             },
         });
     });
-})();
+}
+
+initProfileNotificationPrefs();

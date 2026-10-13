@@ -33,35 +33,34 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierMapperImpl;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
-import de.greluc.krt.profit.basetool.backend.model.JobOrder;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderItemMaterial;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
-import de.greluc.krt.profit.basetool.backend.model.MaterialClaim;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
-import de.greluc.krt.profit.basetool.backend.model.Squadron;
-import de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.ClaimDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.CreateClaimDto;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
+import de.greluc.krt.profit.basetool.backend.joborder.api.ClaimBucketDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.ClaimDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemMaterial;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
+import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialClaimRepository;
-import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
-import de.greluc.krt.profit.basetool.backend.service.AuditService;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.util.HashSet;
 import java.util.List;
@@ -95,6 +94,7 @@ class MaterialClaimServiceTest {
   @Mock private UserRepository userRepository;
   @Mock private AuthHelperService authHelperService;
   @Mock private OwnerScopeService ownerScopeService;
+  @Mock private OrgUnitAccessPolicy orgUnitAccessPolicy;
   @Mock private MaterialMapper materialMapper;
   @Mock private SquadronMapper squadronMapper;
   @Spy private QualityTierMapper qualityTierMapper = new QualityTierMapperImpl();
@@ -510,7 +510,7 @@ class MaterialClaimServiceTest {
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       when(authHelperService.isAdmin()).thenReturn(false);
       when(ownerScopeService.hasRoleInOrgUnit(SK_ID, "LOGISTICIAN")).thenReturn(false);
-      when(ownerScopeService.canEditOrgUnit(SQUADRON_A)).thenReturn(false);
+      when(orgUnitAccessPolicy.canEditOrgUnit(SQUADRON_A)).thenReturn(false);
 
       assertThrows(
           org.springframework.security.access.AccessDeniedException.class,
@@ -524,7 +524,7 @@ class MaterialClaimServiceTest {
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       when(authHelperService.isAdmin()).thenReturn(false);
       when(ownerScopeService.hasRoleInOrgUnit(SK_ID, "LOGISTICIAN")).thenReturn(false);
-      when(ownerScopeService.canEditOrgUnit(SQUADRON_A)).thenReturn(true);
+      when(orgUnitAccessPolicy.canEditOrgUnit(SQUADRON_A)).thenReturn(true);
       when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityTierId(
               ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID))
           .thenReturn(List.of());
@@ -700,9 +700,9 @@ class MaterialClaimServiceTest {
       verify(materialClaimRepository).deleteAll(claims);
     }
 
-    private de.greluc.krt.profit.basetool.backend.model.User member(String name) {
-      de.greluc.krt.profit.basetool.backend.model.User member =
-          new de.greluc.krt.profit.basetool.backend.model.User();
+    private de.greluc.krt.profit.basetool.backend.identity.api.User member(String name) {
+      de.greluc.krt.profit.basetool.backend.identity.api.User member =
+          new de.greluc.krt.profit.basetool.backend.identity.api.User();
       member.setId(UUID.randomUUID());
       member.setUsername(name);
       return member;
@@ -711,7 +711,7 @@ class MaterialClaimServiceTest {
     @Test
     void withdrawAllForOrder_tellsEachClaimantThatTheOrderWasDeEscalated() {
       JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
-      de.greluc.krt.profit.basetool.backend.model.User ada = member("ada");
+      de.greluc.krt.profit.basetool.backend.identity.api.User ada = member("ada");
       MaterialClaim byAda = claim(order, GOOD, squadronA, 3.0);
       byAda.setClaimedByUser(ada);
       MaterialClaim anonymous = claim(order, GOOD, squadronB, 2.0);
@@ -730,7 +730,7 @@ class MaterialClaimServiceTest {
           (de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent)
               captor.getValue();
       assertEquals(
-          de.greluc.krt.profit.basetool.backend.model.NotificationEventType
+          de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType
               .JOB_ORDER_CLAIM_WITHDRAWN,
           event.eventType());
       assertEquals(ada.getId(), event.contextRecipientUserId());
@@ -742,7 +742,7 @@ class MaterialClaimServiceTest {
       JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       MaterialClaim live = claim(order, GOOD, squadronA, 3.0);
       MaterialClaim orphan = claim(order, NONE, squadronB, 2.0);
-      de.greluc.krt.profit.basetool.backend.model.User bob = member("bob");
+      de.greluc.krt.profit.basetool.backend.identity.api.User bob = member("bob");
       orphan.setClaimedByUser(bob);
       when(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(ORDER_ID))
           .thenReturn(List.of(live, orphan));

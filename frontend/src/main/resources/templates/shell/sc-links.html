@@ -47,7 +47,7 @@
 </main>
 </th:block>
 <th:block th:fragment="pageTail">
-<script th:src="@{/js/shell/sc-links.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/shell/sc-links.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

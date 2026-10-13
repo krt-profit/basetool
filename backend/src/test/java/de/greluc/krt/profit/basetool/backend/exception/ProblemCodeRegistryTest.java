@@ -23,8 +23,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.api.CommittedOpenApi;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
-import de.greluc.krt.profit.basetool.backend.config.OpenApiProblemDetailsConfig;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
+import de.greluc.krt.profit.basetool.backend.kernel.AppExceptionKind;
+import de.greluc.krt.profit.basetool.backend.kernel.CoreProblemCode;
+import de.greluc.krt.profit.basetool.backend.kernel.ProblemCode;
+import de.greluc.krt.profit.basetool.backend.platform.internal.OpenApiProblemDetailsConfig;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -184,14 +187,14 @@ class ProblemCodeRegistryTest {
     }
     for (String type :
         List.of(
-            "de.greluc.krt.profit.basetool.backend.exception.ProblemSupport",
+            "de.greluc.krt.profit.basetool.backend.platform.api.ProblemSupport",
             "de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException",
             "de.greluc.krt.profit.basetool.backend.identity.api.TermsAcceptanceAccessFilter",
             "de.greluc.krt.profit.basetool.backend.identity.api.PendingApprovalAccessFilter",
             "de.greluc.krt.profit.basetool.backend.exchange.internal.ActingMemberFilter",
-            "de.greluc.krt.profit.basetool.backend.config.IdentityProviderUnavailableFilter",
-            "de.greluc.krt.profit.basetool.backend.config.SubjectRateLimitingFilter",
-            "de.greluc.krt.profit.basetool.backend.filter.RateLimitingFilter")) {
+            "de.greluc.krt.profit.basetool.backend.platform.api.IdentityProviderUnavailableFilter",
+            "de.greluc.krt.profit.basetool.backend.platform.api.SubjectRateLimitingFilter",
+            "de.greluc.krt.profit.basetool.backend.platform.internal.RateLimitingFilter")) {
       Set<String> constants = ProblemCodeRegistry.constantCodes(Class.forName(type), "CODE_");
       assertThat(constants).as("%s declares no CODE_ constant any more", type).isNotEmpty();
       produced.addAll(constants);

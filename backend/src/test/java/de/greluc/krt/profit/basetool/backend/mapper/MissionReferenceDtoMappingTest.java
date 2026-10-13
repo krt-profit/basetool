@@ -23,8 +23,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionMapper;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionMapperImpl;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionReferenceDto;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

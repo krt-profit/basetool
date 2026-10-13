@@ -21,21 +21,21 @@ package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankAmounts;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.model.Bereich;
-import de.greluc.krt.profit.basetool.backend.model.Department;
-import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
-import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Department;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.repository.BereichRepository;
-import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.math.BigDecimal;
@@ -45,6 +45,7 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -1122,7 +1123,8 @@ public class OrgUnitBankAccessService {
       boolean match =
           switch (grant.getGranteeKind()) {
             case GLOBAL_ROLE ->
-                authHelperService.hasReachableRole(Roles.authority(grant.getRoleCode()));
+                authHelperService.hasReachableRole(
+                    Roles.authority(Objects.requireNonNull(grant.getRoleCode())));
             case ALL_MEMBERS -> authHelperService.isMemberOrAbove();
             case USER -> userId.filter(id -> id.equals(grant.getGranteeUserId())).isPresent();
             case MEMBERSHIP_ROLE, AREA_MEMBERS -> false;
@@ -1177,7 +1179,7 @@ public class OrgUnitBankAccessService {
           yield false;
         }
         MembershipRole holderRole =
-            account.getOrgUnit().getKind() == OrgUnitKind.SPECIAL_COMMAND
+            Objects.requireNonNull(account.getOrgUnit()).getKind() == OrgUnitKind.SPECIAL_COMMAND
                 ? MembershipRole.SK_LEAD
                 : MembershipRole.STAFFELLEITER;
         yield ownerScopeService.currentUserHoldsRoleOnOrgUnit(owner, holderRole);
@@ -1358,7 +1360,8 @@ public class OrgUnitBankAccessService {
                   && ownerScopeService.currentUserHoldsRoleOnOrgUnit(owner, role);
             }
             case GLOBAL_ROLE ->
-                authHelperService.hasReachableRole(Roles.authority(limit.getRoleCode()));
+                authHelperService.hasReachableRole(
+                    Roles.authority(Objects.requireNonNull(limit.getRoleCode())));
             case AREA_MEMBERS -> owner != null && callerIsMemberOfAreaCascade(owner);
             case ALL_MEMBERS ->
                 owner != null && ownerScopeService.currentUserIsMemberOfOrgUnit(owner);

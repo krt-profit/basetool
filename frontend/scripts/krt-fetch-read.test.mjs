@@ -23,14 +23,10 @@
  */
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
+import { flattenModule, UI_STUBS } from './flatten-module.mjs';
 
-const SOURCE = readFileSync(
-    fileURLToPath(new URL('../src/main/resources/static/js/kernel/krt-fetch.js', import.meta.url)),
-    'utf8',
-);
+const SOURCE = flattenModule('kernel/krt-fetch.js', UI_STUBS);
 
 let failures = 0;
 

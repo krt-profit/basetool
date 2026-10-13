@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.OwnedRows;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserReassignmentParticipant;
+import de.greluc.krt.profit.basetool.backend.privacy.api.UserAccountMergeService;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -57,13 +58,15 @@ class UserReassignmentOrderTest {
           "20:HangarUserReassignment|ship.owner_id|",
           "30:RefineryUserReassignment|refinery_order.owner_id|",
           "40:PersonalInventoryUserReassignment|personal_inventory_item.owner_user_id|",
-          "50:PersonalBlueprintUserReassignment|personal_blueprint.owner_user_id[product_key]|",
+          "50:PersonalBlueprintUserReassignment|personal_blueprint.owner_user_id[product_key]"
+              + "|member_blueprint_sharing.user_id",
           "60:OrgUnitMembershipUserReassignment|org_unit_membership.user_id[org_unit_id]|",
           "70:OrgChartUserReassignment|org_chart_position.user_id[org_unit_id]|",
           "80:OrgUnitGrandAdmiralReassignment|org_unit.grand_admiral_user_id|",
           "90:MissionUserReassignment|mission.owner_id,mission_ownership.owner_id,"
               + "mission.party_lead_user_id,mission_unit.responsible_user_id,"
-              + "mission_managers.user_id[mission_id],mission_participant.user_id[mission_id]|",
+              + "mission_managers.user_id[mission_id],mission_participant.user_id[mission_id]"
+              + "|member_payout_setting.user_id",
           "100:JobOrderUserReassignment|job_order_assignees.user_id[job_order_id]"
               + "|job_order_handover.executing_user_id,job_order_item_handover.executing_user_id,"
               + "material_claim.claimed_by_user_id",
@@ -120,7 +123,7 @@ class UserReassignmentOrderTest {
   void noColumnIsDeclaredTwice() {
     List<String> all = new ArrayList<>(mergeService.followedColumns());
     all.addAll(mergeService.staysWithTheAct());
-    assertThat(all).doesNotHaveDuplicates().hasSize(56);
+    assertThat(all).doesNotHaveDuplicates().hasSize(58);
   }
 
   private static List<String> describe(List<UserReassignmentParticipant> participants) {

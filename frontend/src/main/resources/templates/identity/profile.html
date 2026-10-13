@@ -249,8 +249,8 @@
         notificationPrefsError: /*[[#{profile.notifications.error}]]*/ 'The setting could not be saved.'
     };
 </script>
-<script th:src="@{/js/identity/profile.js}" defer th:attr="nonce=${cspNonce}"></script>
-<script th:src="@{/js/identity/profile-notification-prefs.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/identity/profile.js}" th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/identity/profile-notification-prefs.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

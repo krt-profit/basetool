@@ -116,7 +116,7 @@ class PlatformMirrorParityTest {
     Path root = repoRoot();
     for (Path file :
         List.of(
-            root.resolve(BACKEND_MAIN + "config/ManagementPortSecurityConfig.java"),
+            root.resolve(BACKEND_MAIN + "platform/internal/ManagementPortSecurityConfig.java"),
             root.resolve(FRONTEND_MAIN + "kernel/security/ManagementPortSecurityConfig.java"),
             root.resolve(INGEST_MAIN + "assembly/ManagementPortSecurityConfig.java"))) {
       String code = code(file);
@@ -131,7 +131,9 @@ class PlatformMirrorParityTest {
       assertThat(code).as(file.toString()).doesNotContain("CsrfConfigurer");
       assertThat(code).as(file.toString()).doesNotContain("httpBasic");
     }
-    assertThat(code(root.resolve(BACKEND_MAIN + "config/ManagementPortSecurityConfig.java")))
+    assertThat(
+            code(
+                root.resolve(BACKEND_MAIN + "platform/internal/ManagementPortSecurityConfig.java")))
         .contains("\"/actuator/health\"", "\"/actuator/prometheus\"")
         .doesNotContain("\"/actuator/**\"");
     assertThat(

@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationUsage;
-import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;

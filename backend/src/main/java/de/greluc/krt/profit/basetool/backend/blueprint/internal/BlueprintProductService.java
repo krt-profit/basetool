@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.blueprint.internal;
 
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintProducts;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprint;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Blueprint;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIdNameRow;
@@ -28,8 +30,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormaliz
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintProductRow;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
-import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
-import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;

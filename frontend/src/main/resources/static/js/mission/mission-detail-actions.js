@@ -19,7 +19,14 @@
 
 // @ts-check
 
-/* global MSG_ERROR_PAYOUT_UPDATE, MSG_ERROR_MANAGER_ADD, MSG_ERROR_MANAGER_REMOVE, MSG_ERROR_OWNER_CHANGE, MSG_CONFIRM_OWNER_CHANGE, MSG_ERROR_OWNING_ORG_UNIT_CHANGE, MSG_CONFIRM_OWNING_ORG_UNIT_CHANGE, MSG_CONFIRM_MANAGER_REMOVE, MSG_ERROR_USER_REQUIRED, MSG_ERROR_MISSION_ID_MISSING, missionId, showFrontendErrorToast */
+/* global MSG_ERROR_PAYOUT_UPDATE, MSG_ERROR_MANAGER_ADD, MSG_ERROR_MANAGER_REMOVE, MSG_ERROR_OWNER_CHANGE, MSG_CONFIRM_OWNER_CHANGE, MSG_ERROR_OWNING_ORG_UNIT_CHANGE, MSG_CONFIRM_OWNING_ORG_UNIT_CHANGE, MSG_CONFIRM_MANAGER_REMOVE, MSG_ERROR_USER_REQUIRED, MSG_ERROR_MISSION_ID_MISSING, missionId */
+
+import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
+import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { missionHooks } from '/js/mission/mission-hooks.js';
 
 /**
  * Fills a date-time input (plain or split into date and time parts) with the current local time;
@@ -84,18 +91,13 @@ async function saveActualTimeInPlace(field, nowDate) {
         console.error(
             '[mission-detail] Schedule-Version nicht gefunden (mission-schedule-version input)',
         );
-        if (typeof window.showFrontendErrorToast === 'function') {
-            window.showFrontendErrorToast(
-                window.krtI18nText(
-                    window.MSG_MISSION_ACTUAL_TIME_ERROR,
-                    'MSG_MISSION_ACTUAL_TIME_ERROR',
-                ),
-            );
-        }
+        showFrontendErrorToast(
+            krtI18nText(window.MSG_MISSION_ACTUAL_TIME_ERROR, 'MSG_MISSION_ACTUAL_TIME_ERROR'),
+        );
         return;
     }
 
-    await window.krtMissionWrite({
+    await missionHooks.write({
         method: 'POST',
         url: `/missions/${encodeURIComponent(currentMissionId)}/actual-time`,
         payload() {
@@ -122,11 +124,11 @@ async function saveActualTimeInPlace(field, nowDate) {
             );
             if (span) {
                 span.setAttribute('data-utc', String(nowDate.getTime()));
-                if (typeof window.krtLocalizeDates === 'function') {
-                    window.krtLocalizeDates(span.parentNode || span);
+                if (typeof missionHooks.localizeDates === 'function') {
+                    missionHooks.localizeDates(span.parentNode || span);
                 }
             }
-            window.krtRefreshMissionSection(['finance', 'overview']);
+            missionHooks.refresh(['finance', 'overview']);
         },
     });
 }
@@ -134,21 +136,19 @@ async function saveActualTimeInPlace(field, nowDate) {
 async function changeMissionOwner() {
     const userId = /** @type {HTMLSelectElement} */ (document.getElementById('new-owner-id')).value;
     if (!userId || userId.trim() === '') {
-        showFrontendErrorToast(
-            window.krtI18nText(MSG_ERROR_USER_REQUIRED, 'MSG_ERROR_USER_REQUIRED'),
-        );
+        showFrontendErrorToast(krtI18nText(MSG_ERROR_USER_REQUIRED, 'MSG_ERROR_USER_REQUIRED'));
         return;
     }
 
-    const ownerConfirmed = await window.showKrtConfirm?.(
+    const ownerConfirmed = await showKrtConfirm?.(
         MSG_CONFIRM_OWNER_CHANGE,
         MSG_CONFIRM_OWNER_CHANGE,
-        window.krtI18nText(
+        krtI18nText(
             window.MISSION_SUBRES_I18N &&
                 window.MISSION_SUBRES_I18N['mission.conflict.action.reload'],
             'MISSION_SUBRES_I18N[mission.conflict.action.reload]',
         ),
-        window.krtI18nText(
+        krtI18nText(
             window.MISSION_SUBRES_I18N &&
                 window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss'],
             'MISSION_SUBRES_I18N[mission.conflict.action.dismiss]',
@@ -175,7 +175,7 @@ async function changeMissionOwner() {
             return attr != null && attr !== '' ? parseInt(attr, 10) : 0;
         };
 
-        await window.krtMissionWrite({
+        await missionHooks.write({
             method: 'PUT',
             url: `/missions/${cleanMissionId}/owner/ajax`,
             payload() {
@@ -192,13 +192,11 @@ async function changeMissionOwner() {
                         );
                     }
                 }
-                window.krtRefreshMissionSection('mgmt');
+                missionHooks.refresh('mgmt');
             },
         });
     } catch (_err) {
-        showFrontendErrorToast(
-            window.krtI18nText(MSG_ERROR_OWNER_CHANGE, 'MSG_ERROR_OWNER_CHANGE'),
-        );
+        showFrontendErrorToast(krtI18nText(MSG_ERROR_OWNER_CHANGE, 'MSG_ERROR_OWNER_CHANGE'));
     }
 }
 
@@ -239,15 +237,15 @@ async function changeMissionOwningOrgUnit() {
         return attr != null && attr !== '' ? parseInt(attr, 10) : 0;
     };
 
-    const confirmed = await window.showKrtConfirm?.(
+    const confirmed = await showKrtConfirm?.(
         MSG_CONFIRM_OWNING_ORG_UNIT_CHANGE,
         MSG_CONFIRM_OWNING_ORG_UNIT_CHANGE,
-        window.krtI18nText(
+        krtI18nText(
             window.MISSION_SUBRES_I18N &&
                 window.MISSION_SUBRES_I18N['mission.conflict.action.reload'],
             'MISSION_SUBRES_I18N[mission.conflict.action.reload]',
         ),
-        window.krtI18nText(
+        krtI18nText(
             window.MISSION_SUBRES_I18N &&
                 window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss'],
             'MISSION_SUBRES_I18N[mission.conflict.action.dismiss]',
@@ -267,7 +265,7 @@ async function changeMissionOwningOrgUnit() {
         }
         const cleanMissionId = String(currentMissionId).trim();
 
-        await window.krtMissionWrite({
+        await missionHooks.write({
             method: 'PUT',
             url: `/missions/${cleanMissionId}/owning-org-unit/ajax`,
             payload() {
@@ -287,18 +285,15 @@ async function changeMissionOwningOrgUnit() {
                 if (dto) {
                     updateMissionHeadOrgBadge(dto.owningSquadron);
                 }
-                window.krtRefreshMissionSection('mgmt');
-                if (window.krtNotifyMissionChanged) {
-                    window.krtNotifyMissionChanged('overview');
+                missionHooks.refresh('mgmt');
+                if (missionHooks.notify) {
+                    missionHooks.notify('overview');
                 }
             },
         });
     } catch (_err) {
         showFrontendErrorToast(
-            window.krtI18nText(
-                MSG_ERROR_OWNING_ORG_UNIT_CHANGE,
-                'MSG_ERROR_OWNING_ORG_UNIT_CHANGE',
-            ),
+            krtI18nText(MSG_ERROR_OWNING_ORG_UNIT_CHANGE, 'MSG_ERROR_OWNING_ORG_UNIT_CHANGE'),
         );
     }
 }
@@ -310,15 +305,15 @@ async function changeMissionOwningOrgUnit() {
  * @returns {Promise<void>} settles once the removal finished or was declined
  */
 async function removeMissionManager(userId) {
-    const removeConfirmed = await window.showKrtConfirm?.(
-        window.krtI18nText(MSG_CONFIRM_MANAGER_REMOVE, 'MSG_CONFIRM_MANAGER_REMOVE'),
-        window.krtI18nText(MSG_CONFIRM_MANAGER_REMOVE, 'MSG_CONFIRM_MANAGER_REMOVE'),
-        window.krtI18nText(
+    const removeConfirmed = await showKrtConfirm?.(
+        krtI18nText(MSG_CONFIRM_MANAGER_REMOVE, 'MSG_CONFIRM_MANAGER_REMOVE'),
+        krtI18nText(MSG_CONFIRM_MANAGER_REMOVE, 'MSG_CONFIRM_MANAGER_REMOVE'),
+        krtI18nText(
             window.MISSION_SUBRES_I18N &&
                 window.MISSION_SUBRES_I18N['mission.conflict.action.reload'],
             'MISSION_SUBRES_I18N[mission.conflict.action.reload]',
         ),
-        window.krtI18nText(
+        krtI18nText(
             window.MISSION_SUBRES_I18N &&
                 window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss'],
             'MISSION_SUBRES_I18N[mission.conflict.action.dismiss]',
@@ -333,13 +328,13 @@ async function removeMissionManager(userId) {
             return;
         }
 
-        const result = await window.krtMissionWrite({
+        const result = await missionHooks.write({
             method: 'DELETE',
             url: `/missions/${currentMissionId}/managers/${userId}`,
             sectionKey: 'manager',
         });
         if (result.ok) {
-            window.krtRefreshMissionSection('mgmt');
+            missionHooks.refresh('mgmt');
         }
     } catch (err) {
         console.error(err);
@@ -351,9 +346,7 @@ async function addMissionManager() {
     const userId = /** @type {HTMLSelectElement} */ (document.getElementById('new-manager-id'))
         .value;
     if (!userId || userId.trim() === '') {
-        showFrontendErrorToast(
-            window.krtI18nText(MSG_ERROR_USER_REQUIRED, 'MSG_ERROR_USER_REQUIRED'),
-        );
+        showFrontendErrorToast(krtI18nText(MSG_ERROR_USER_REQUIRED, 'MSG_ERROR_USER_REQUIRED'));
         return;
     }
     try {
@@ -367,13 +360,13 @@ async function addMissionManager() {
 
         const cleanMissionId = String(currentMissionId).trim();
         const cleanUserId = String(userId).trim();
-        const result = await window.krtMissionWrite({
+        const result = await missionHooks.write({
             method: 'POST',
             url: `/missions/${cleanMissionId}/managers/${cleanUserId}`,
             sectionKey: 'manager',
         });
         if (result.ok) {
-            window.krtRefreshMissionSection('mgmt');
+            missionHooks.refresh('mgmt');
         }
     } catch (err) {
         console.error('Network or unexpected error:', err);
@@ -390,13 +383,13 @@ async function addMissionManager() {
 async function updatePayoutPreference(selectElement) {
     const url = selectElement.getAttribute('data-payout-url');
     const value = selectElement.value;
-    const result = await window.krtFetch.write({
+    const result = await krtFetch.write({
         method: 'POST',
         url: /** @type {string} */ (url),
         payload: { preference: value },
         serialize: 'section:participant',
         toast: false,
-        errorMessage: window.krtI18nText(MSG_ERROR_PAYOUT_UPDATE, 'MSG_ERROR_PAYOUT_UPDATE'),
+        errorMessage: krtI18nText(MSG_ERROR_PAYOUT_UPDATE, 'MSG_ERROR_PAYOUT_UPDATE'),
     });
     if (!result.ok) {
         selectElement.value = selectElement.getAttribute('data-original-value') || 'PAYOUT';
@@ -405,8 +398,8 @@ async function updatePayoutPreference(selectElement) {
     const updatedParticipant = result.body;
     if (!updatedParticipant) return;
     selectElement.setAttribute('data-original-value', value);
-    if (window.krtNotifyMissionChanged) {
-        window.krtNotifyMissionChanged('finance');
+    if (missionHooks.notify) {
+        missionHooks.notify('finance');
     }
     const participantId = selectElement.getAttribute('data-participant-id');
     if (participantId) {
@@ -425,7 +418,7 @@ async function updatePayoutPreference(selectElement) {
                             10,
                         );
                         if (Number.isNaN(current) || updatedParticipant.version > current) {
-                            window.krtFetch.syncVersion(container, updatedParticipant.version);
+                            krtFetch.syncVersion(container, updatedParticipant.version);
                         }
                     });
             }
@@ -434,13 +427,13 @@ async function updatePayoutPreference(selectElement) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (!window.krtMissionWrite || !window.missionId) {
+    if (!missionHooks.write || !window.missionId) {
         return;
     }
     const financeMissionId = window.missionId;
 
     function refreshFinanceAndBadge() {
-        return window.krtRefreshMissionSection('finance');
+        return missionHooks.refresh('finance');
     }
 
     const addForm = /** @type {HTMLFormElement | null} */ (
@@ -450,7 +443,7 @@ document.addEventListener('DOMContentLoaded', () => {
         addForm.addEventListener('submit', async (ev) => {
             ev.preventDefault();
             const fd = new FormData(addForm);
-            const res = await window.krtMissionWrite({
+            const res = await missionHooks.write({
                 method: 'POST',
                 url: `/missions/${financeMissionId}/finance-entries/ajax`,
                 payload: {
@@ -462,7 +455,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 sectionKey: 'finance',
             });
             if (res.ok) {
-                window.krtModalClose(addForm.closest('.krt-modal-overlay'));
+                missionHooks.modalClose(addForm.closest('.krt-modal-overlay'));
                 addForm.reset();
                 refreshFinanceAndBadge();
             }
@@ -481,7 +474,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ev.preventDefault();
             const fd = new FormData(editForm);
             const versionRaw = fd.get('version');
-            const res = await window.krtMissionWrite({
+            const res = await missionHooks.write({
                 method: 'PUT',
                 url: `/missions/${financeMissionId}/finance-entries/${entryId}/ajax`,
                 payload: {
@@ -493,13 +486,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 sectionKey: 'finance',
             });
             if (res.ok) {
-                window.krtModalClose(editForm.closest('.krt-modal-overlay'));
+                missionHooks.modalClose(editForm.closest('.krt-modal-overlay'));
                 const dto = res.body;
-                if (dto && dto.version != null && window.krtFetch) {
+                if (dto && dto.version != null) {
                     document
                         .querySelectorAll(`.edit-finance-btn[data-id="${entryId}"]`)
                         .forEach((btn) => {
-                            window.krtFetch.syncVersion(btn, dto.version);
+                            krtFetch.syncVersion(btn, dto.version);
                         });
                     const hiddenVersion = /** @type {HTMLInputElement | null} */ (
                         document.getElementById('edit-finance-version')
@@ -527,13 +520,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!entryId) {
                 return;
             }
-            const res = await window.krtMissionWrite({
+            const res = await missionHooks.write({
                 method: 'DELETE',
                 url: `/missions/${financeMissionId}/finance-entries/${entryId}/ajax`,
                 sectionKey: 'finance',
             });
             if (res.ok) {
-                window.krtModalClose(dForm.closest('.krt-modal-overlay'));
+                missionHooks.modalClose(dForm.closest('.krt-modal-overlay'));
                 refreshFinanceAndBadge();
             }
         });
@@ -615,42 +608,38 @@ document.addEventListener('DOMContentLoaded', () => {
  */
 function openEditFinanceModal(id, note, type, amount, version) {
     const form = /** @type {HTMLFormElement} */ (document.getElementById('edit-finance-form'));
-    form.action = window.safeSameOriginUrl(
-        `/missions/${window.missionId}/finance-entries/${id}/update`,
-        form.action,
+    assignFormAction(
+        form,
+        safeSameOriginUrl(
+            `/missions/${window.missionId}/finance-entries/${id}/update`,
+            form.action,
+        ),
     );
     form.setAttribute('data-entry-id', /** @type {string} */ (id));
     /** @type {HTMLTextAreaElement} */ (document.getElementById('edit-finance-note')).value =
         note && note !== 'null' ? note : '';
-    window.krtSegSet('edit-finance-type', type === 'EXPENSE' ? 'EXPENSE' : 'INCOME');
+    missionHooks.segSet('edit-finance-type', type === 'EXPENSE' ? 'EXPENSE' : 'INCOME');
     /** @type {HTMLInputElement} */ (document.getElementById('edit-finance-amount')).value =
         /** @type {string} */ (amount);
     /** @type {HTMLInputElement} */ (document.getElementById('edit-finance-version')).value =
         /** @type {string} */ (version);
-    window.krtModalOpen(document.getElementById('edit-finance-entry-modal'));
+    missionHooks.modalOpen(document.getElementById('edit-finance-entry-modal'));
 }
 
 function registerMissionDetailEventHandlers() {
-    if (!window.krtEvents || typeof window.krtEvents.on !== 'function') {
-        console.error(
-            '[mission-detail] window.krtEvents missing — page click handlers not registered. ' +
-                'event-delegation.js must load before mission-detail body scripts.',
-        );
-        return;
-    }
-    window.krtEvents.on('click', 'mission-set-now', (el) => {
+    krtEvents.on('click', 'mission-set-now', (el) => {
         setNowToInput(/** @type {string} */ (el.getAttribute('data-input-id')));
     });
-    window.krtEvents.on('click', 'mission-change-owner', changeMissionOwner);
-    window.krtEvents.on('click', 'mission-change-owning-org-unit', changeMissionOwningOrgUnit);
-    window.krtEvents.on('click', 'mission-remove-manager', (el) => {
+    krtEvents.on('click', 'mission-change-owner', changeMissionOwner);
+    krtEvents.on('click', 'mission-change-owning-org-unit', changeMissionOwningOrgUnit);
+    krtEvents.on('click', 'mission-remove-manager', (el) => {
         removeMissionManager(el.getAttribute('data-manager-id'));
     });
-    window.krtEvents.on('click', 'mission-add-manager', addMissionManager);
-    window.krtEvents.on('change', 'mission-update-payout', (el) => {
+    krtEvents.on('click', 'mission-add-manager', addMissionManager);
+    krtEvents.on('change', 'mission-update-payout', (el) => {
         updatePayoutPreference(/** @type {HTMLSelectElement} */ (el));
     });
-    window.krtEvents.on('click', 'mission-open-edit-finance', (el) => {
+    krtEvents.on('click', 'mission-open-edit-finance', (el) => {
         openEditFinanceModal(
             el.getAttribute('data-id'),
             el.getAttribute('data-note'),

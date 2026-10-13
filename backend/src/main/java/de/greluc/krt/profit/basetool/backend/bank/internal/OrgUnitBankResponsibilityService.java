@@ -22,19 +22,20 @@ package de.greluc.krt.profit.basetool.backend.bank.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankAccountResponsibleAssignedEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestNoticesReconciledEvent;
-import de.greluc.krt.profit.basetool.backend.model.Bereich;
-import de.greluc.krt.profit.basetool.backend.model.Department;
-import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Department;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ResponsibleHolderTracker;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.repository.BereichRepository;
-import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -92,7 +93,7 @@ public class OrgUnitBankResponsibilityService implements ResponsibleHolderTracke
           yield Set.of();
         }
         MembershipRole holderRole =
-            account.getOrgUnit().getKind() == OrgUnitKind.SPECIAL_COMMAND
+            Objects.requireNonNull(account.getOrgUnit()).getKind() == OrgUnitKind.SPECIAL_COMMAND
                 ? MembershipRole.SK_LEAD
                 : MembershipRole.STAFFELLEITER;
         yield orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(owner, holderRole);

@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.operation.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
+import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
 import java.math.BigDecimal;
 import java.time.Instant;
 import org.jetbrains.annotations.Nullable;

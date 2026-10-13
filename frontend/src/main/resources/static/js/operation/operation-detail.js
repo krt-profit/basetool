@@ -21,6 +21,16 @@
 
 /* global OPS_DETAIL_MSG, MSG_PAYOUT_PAID_ERROR, MSG_PAYOUT_PAID_FORBIDDEN, MSG_PAYOUT_PAID_UNSET_LOCKED, OPS_FINANCE_DETAIL_ERROR */
 
+import { showFrontendErrorToast } from '/js/kernel/toast.js';
+import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { operationHooks } from '/js/operation/operation-hooks.js';
+
 const OPERATION_SECTIONS = {
     overview: { container: '#op-overview-results', fragmentValue: 'overview' },
     missions: { container: '#op-missions-results', fragmentValue: 'missions' },
@@ -43,11 +53,8 @@ function withOverview(keys) {
     return list;
 }
 
-(function () {
-    if (!window.krtFetch || typeof window.krtFetch.sectionWrite !== 'function') {
-        return;
-    }
-    const operationSeam = window.krtFetch.sectionWrite({
+function initOperationDetail() {
+    const operationSeam = krtFetch.sectionWrite({
         dict() {
             return { 'operation.section.refresh.error': OPS_DETAIL_MSG.sectionRefreshError };
         },
@@ -57,25 +64,21 @@ function withOverview(keys) {
             return window.operationId ? `/operations/${window.operationId}` : null;
         },
         broadcast(keys) {
-            if (
-                window.operationId &&
-                window.krtLiveSync &&
-                typeof window.krtLiveSync.sendChanged === 'function'
-            ) {
-                window.krtLiveSync.sendChanged(`operation:${window.operationId}`, keys);
+            if (window.operationId && typeof krtLiveSync.sendChanged === 'function') {
+                krtLiveSync.sendChanged(`operation:${window.operationId}`, keys);
             }
         },
     });
-    window.opRefreshSection = operationSeam.refresh;
-    window.opNotifyChanged = operationSeam.notify;
+    operationHooks.refreshSection = operationSeam.refresh;
+    operationHooks.notifyChanged = operationSeam.notify;
 
-    if (window.operationId && window.krtLiveSync && window.krtLiveSync.createReceiver) {
-        window.krtLiveSync.createReceiver({
+    if (window.operationId) {
+        krtLiveSync.createReceiver({
             topic: `operation:${window.operationId}`,
             sections: OPERATION_SECTIONS,
             refresh(keys) {
-                if (window.opRefreshSection) {
-                    window.opRefreshSection(withOverview(keys), { broadcast: false });
+                if (operationHooks.refreshSection) {
+                    operationHooks.refreshSection(withOverview(keys), { broadcast: false });
                 }
             },
             pill: {
@@ -132,9 +135,11 @@ function withOverview(keys) {
         setText('op-kpi-donated', meta.getAttribute('data-kpi-donated'));
         setText('op-kpi-participants', meta.getAttribute('data-kpi-participants'));
     });
-})();
+}
 
-(function () {
+initOperationDetail();
+
+function initOperationDetail2() {
     const tabs = Array.from(
         /** @type {NodeListOf<HTMLElement>} */ (
             document.querySelectorAll('#operation-tabs > .tab[data-tab]')
@@ -216,7 +221,9 @@ function withOverview(keys) {
             : tabs[0].getAttribute('data-tab'),
         false,
     );
-})();
+}
+
+initOperationDetail2();
 
 /**
  * Points the delete form at the operation and opens the confirmation dialog.
@@ -227,27 +234,23 @@ function openDeleteModal(id) {
     const deleteForm = /** @type {HTMLFormElement} */ (
         document.getElementById('delete-operation-form')
     );
-    deleteForm.action = window.safeSameOriginUrl(`/operations/${id}/delete`, deleteForm.action);
-    window.krtModal.open(document.getElementById('delete-operation-modal'));
+    assignFormAction(deleteForm, safeSameOriginUrl(`/operations/${id}/delete`, deleteForm.action));
+    krtModal.open(document.getElementById('delete-operation-modal'));
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (window.krtFetch) {
-        window.krtFetch.bindSwap({
-            container: '#op-missions-results',
-            fragmentValue: 'missions',
-            history: true,
-        });
-    }
+    krtFetch.bindSwap({
+        container: '#op-missions-results',
+        fragmentValue: 'missions',
+        history: true,
+    });
 });
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'operation-open-delete', (el) => {
-        openDeleteModal(el.getAttribute('data-id'));
-    });
-}
+krtEvents.on('click', 'operation-open-delete', (el) => {
+    openDeleteModal(el.getAttribute('data-id'));
+});
 
-(function () {
+function initOperationDetail3() {
     const editor = document.getElementById('op-md-editor');
     if (!editor) return;
     const input = /** @type {HTMLTextAreaElement | null} */ (document.getElementById('op-desc'));
@@ -281,15 +284,15 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     function renderPreview() {
         if (!input || !preview) return;
         preview.textContent = '';
-        if (!window.krtFetch) return;
-        window.krtFetch.write({
+
+        krtFetch.write({
             method: 'POST',
             url: '/operations/markdown-preview',
             payload: { markdown: input.value },
             accept: 'text/html, application/problem+json',
             toast: false,
             onSuccess(html) {
-                window.krtFetch.setTrustedHtml(preview, typeof html === 'string' ? html : '');
+                krtFetch.setTrustedHtml(preview, typeof html === 'string' ? html : '');
             },
             onError() {
                 return true;
@@ -340,7 +343,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             e = input.selectionEnd;
         const sel =
             input.value.slice(s, e) ||
-            window.krtI18nText(OPS_DETAIL_MSG.linkText, 'OPS_DETAIL_MSG.linkText');
+            krtI18nText(OPS_DETAIL_MSG.linkText, 'OPS_DETAIL_MSG.linkText');
         input.setRangeText(`[${sel}](https://)`, s, e, 'end');
         input.focus();
     }
@@ -371,12 +374,12 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
                 form.reset();
             }
             showView('edit');
-            if (typeof window.resetUnsavedChanges === 'function') {
-                window.resetUnsavedChanges();
-            }
+            resetUnsavedChanges();
         });
     }
-})();
+}
+
+initOperationDetail3();
 
 /**
  * The conflict dialog strings of this page.
@@ -409,9 +412,7 @@ function adoptOperationFormValues(form) {
     });
 }
 
-(function () {
-    if (!window.krtFetch) return;
-
+function initOperationDetail4() {
     const form = /** @type {HTMLFormElement | null} */ (document.getElementById('operation-form'));
     if (form) {
         form.addEventListener('submit', (event) => {
@@ -419,7 +420,7 @@ function adoptOperationFormValues(form) {
             const versionInput = /** @type {HTMLInputElement | null} */ (
                 form.querySelector('[name="version"]')
             );
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: /** @type {string} */ (form.getAttribute('action')),
                 serialize: 'operation:core',
@@ -446,9 +447,9 @@ function adoptOperationFormValues(form) {
                         versionInput.value = body.version;
                     }
                     adoptOperationFormValues(form);
-                    window.krtModal.close('edit-operation-modal');
-                    if (window.opRefreshSection) {
-                        window.opRefreshSection('overview');
+                    krtModal.close('edit-operation-modal');
+                    if (operationHooks.refreshSection) {
+                        operationHooks.refreshSection('overview');
                     }
                 },
             });
@@ -461,7 +462,7 @@ function adoptOperationFormValues(form) {
     if (deleteForm) {
         deleteForm.addEventListener('submit', (event) => {
             event.preventDefault();
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: deleteForm.action,
                 submitter: deleteForm.querySelector('button[type="submit"]'),
@@ -474,7 +475,9 @@ function adoptOperationFormValues(form) {
             });
         });
     }
-})();
+}
+
+initOperationDetail4();
 
 /**
  * The page's paid-out write URL.
@@ -562,38 +565,34 @@ async function handlePayoutPaidToggle(checkbox) {
     const previous = !desired;
     checkbox.disabled = true;
     try {
-        const result = await window.krtFetch.write({
+        const result = await krtFetch.write({
             method: 'POST',
             url,
             payload: { participantKey, paidOut: desired },
             toast: false,
             onError(status) {
                 checkbox.checked = previous;
-                if (window.showFrontendErrorToast) {
-                    window.showFrontendErrorToast(
-                        status === 401 || status === 403
-                            ? MSG_PAYOUT_PAID_FORBIDDEN
-                            : MSG_PAYOUT_PAID_ERROR,
-                    );
-                }
+                showFrontendErrorToast(
+                    status === 401 || status === 403
+                        ? MSG_PAYOUT_PAID_FORBIDDEN
+                        : MSG_PAYOUT_PAID_ERROR,
+                );
                 return true;
             },
             onNetworkError() {
                 checkbox.checked = previous;
-                if (window.showFrontendErrorToast) {
-                    window.showFrontendErrorToast(MSG_PAYOUT_PAID_ERROR);
-                }
+                showFrontendErrorToast(MSG_PAYOUT_PAID_ERROR);
                 return true;
             },
         });
         if (result && result.ok && result.body) {
             refreshPayoutPaidStatusCell(checkbox.closest('tr[data-participant-id]'), result.body);
             refreshPayoutPaidCount();
-            if (window.opRefreshSection) {
-                window.opRefreshSection('overview', { broadcast: false });
+            if (operationHooks.refreshSection) {
+                operationHooks.refreshSection('overview', { broadcast: false });
             }
-            if (window.opNotifyChanged) {
-                window.opNotifyChanged(['payout']);
+            if (operationHooks.notifyChanged) {
+                operationHooks.notifyChanged(['payout']);
             }
         }
     } finally {
@@ -614,7 +613,7 @@ document.addEventListener('change', (ev) => {
     }
 });
 
-(function () {
+function initOperationDetail5() {
     const currentOperationId = window.operationId;
     if (!currentOperationId) return;
     const opId = currentOperationId;
@@ -634,11 +633,11 @@ document.addEventListener('change', (ev) => {
         if (!missionId) return;
         body.setAttribute('data-loaded', 'loading');
         const url = `/operations/${encodeURIComponent(opId)}/finance/${encodeURIComponent(missionId)}`;
-        window.krtFetch
+        krtFetch
             .get(url)
             .then((r) => (r && r.ok ? r.text() : Promise.reject(r ? r.status : 0)))
             .then((html) => {
-                window.krtFetch.setTrustedHtml(body, html);
+                krtFetch.setTrustedHtml(body, html);
                 body.setAttribute('data-loaded', 'true');
             })
             .catch(() => {
@@ -662,4 +661,6 @@ document.addEventListener('change', (ev) => {
         },
         true,
     );
-})();
+}
+
+initOperationDetail5();

@@ -37,9 +37,9 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiProperties
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiScheduler;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiVehicleSyncService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncCoordinator;
-import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
-import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
+import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
+import de.greluc.krt.profit.basetool.backend.platform.api.ScheduledJob;
+import de.greluc.krt.profit.basetool.backend.platform.api.TaskMetrics;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

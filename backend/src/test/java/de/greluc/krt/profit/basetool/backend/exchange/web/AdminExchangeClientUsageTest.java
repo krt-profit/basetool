@@ -32,11 +32,11 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientRev
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientStatus;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeInstallation;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeInstallationRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
+import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.EnumSet;

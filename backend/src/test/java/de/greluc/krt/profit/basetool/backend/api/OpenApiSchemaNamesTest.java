@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.backend.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.backend.config.ApiDomains;
+import de.greluc.krt.profit.basetool.backend.platform.internal.ApiDomains;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import java.util.Map;

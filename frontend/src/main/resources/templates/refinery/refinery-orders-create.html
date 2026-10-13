@@ -5,7 +5,7 @@
     <th:block th:fragment="extraLinks">
         <link rel="stylesheet" th:href="@{/css/refinery/refinery-order-form.css}">
         <link rel="stylesheet" th:href="@{/css/pages/refinery/refinery-orders-create.css}">
-        <script th:src="@{/js/refinery/refinery-yield-badge.js}" defer th:attr="nonce=${cspNonce}"></script>
+        <script type="module" th:src="@{/js/refinery/refinery-yield-badge.js}" th:attr="nonce=${cspNonce}"></script>
     </th:block>
 </head>
 <body>
@@ -280,7 +280,7 @@
         3: /*[[#{refining.rating.speed.3}]]*/ 'Schnell'
     };
 </script>
-<script th:src="@{/js/refinery/refinery-orders-create.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/refinery/refinery-orders-create.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

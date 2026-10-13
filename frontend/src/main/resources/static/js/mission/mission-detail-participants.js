@@ -19,9 +19,14 @@
 
 // @ts-check
 
+import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { missionHooks } from '/js/mission/mission-hooks.js';
+
 document.addEventListener('DOMContentLoaded', () => {
     (function wireParticipantAjax() {
-        if (!window.krtMissionWrite || !window.missionId) {
+        if (!missionHooks.write || !window.missionId) {
             return;
         }
 
@@ -46,14 +51,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     comment: fd.get('comment') || null,
                     payoutPreference: fd.get('payoutPreference') || null,
                 };
-                const res = await window.krtMissionWrite({
+                const res = await missionHooks.write({
                     method: 'POST',
                     url: `/missions/${window.missionId}/participants/ajax`,
                     payload,
                     sectionKey: 'participant',
                 });
                 if (res.ok) {
-                    window.krtModalClose(addForm.closest('.krt-modal-overlay'));
+                    missionHooks.modalClose(addForm.closest('.krt-modal-overlay'));
                     addForm.reset();
                     const addUserId = /** @type {HTMLInputElement | null} */ (
                         addForm.querySelector('#participant-user-id')
@@ -61,7 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (addUserId) {
                         addUserId.value = '';
                     }
-                    window.krtRefreshMissionSection(['crew', 'finance']);
+                    missionHooks.refresh(['crew', 'finance']);
                 }
             });
         }
@@ -88,26 +93,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     endTime: fd.get('endTime') || null,
                     version: versionRaw ? parseInt(/** @type {string} */ (versionRaw), 10) : null,
                 };
-                const res = await window.krtMissionWrite({
+                const res = await missionHooks.write({
                     method: 'PUT',
                     url: `/missions/${window.missionId}/participants/${pId}/ajax`,
                     payload,
                     sectionKey: 'participant',
                 });
                 if (res.ok) {
-                    window.krtModalClose(editForm.closest('.krt-modal-overlay'));
+                    missionHooks.modalClose(editForm.closest('.krt-modal-overlay'));
                     const dto = res.body;
-                    if (
-                        dto &&
-                        dto.version !== undefined &&
-                        dto.version !== null &&
-                        window.krtFetch
-                    ) {
+                    if (dto && dto.version !== undefined && dto.version !== null) {
                         document.querySelectorAll(`[data-participant-id="${pId}"]`).forEach((c) => {
-                            window.krtFetch.syncVersion(c, dto.version);
+                            krtFetch.syncVersion(c, dto.version);
                         });
                     }
-                    window.krtRefreshMissionSection(['crew', 'finance', 'overview']);
+                    missionHooks.refresh(['crew', 'finance', 'overview']);
                 }
             });
         }
@@ -127,19 +127,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             ev.preventDefault();
-            const res = await window.krtMissionWrite({
+            const res = await missionHooks.write({
                 method: 'POST',
                 url: `/missions/${window.missionId}/participants/${pId}/${action}/ajax`,
                 sectionKey: 'participant',
             });
             if (res.ok) {
                 const dto = res.body;
-                if (dto && dto.version !== undefined && dto.version !== null && window.krtFetch) {
+                if (dto && dto.version !== undefined && dto.version !== null) {
                     document.querySelectorAll(`[data-participant-id="${pId}"]`).forEach((c) => {
-                        window.krtFetch.syncVersion(c, dto.version);
+                        krtFetch.syncVersion(c, dto.version);
                     });
                 }
-                window.krtRefreshMissionSection(['crew', 'finance']);
+                missionHooks.refresh(['crew', 'finance']);
             }
         });
 
@@ -152,14 +152,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 ev.preventDefault();
-                const res = await window.krtMissionWrite({
+                const res = await missionHooks.write({
                     method: 'DELETE',
                     url: `/missions/${window.missionId}/participants/${subId}/ajax`,
                     sectionKey: 'participant',
                 });
                 if (res.ok) {
-                    window.krtModalClose(dForm.closest('.krt-modal-overlay'));
-                    window.krtRefreshMissionSection(['crew', 'finance', 'overview']);
+                    missionHooks.modalClose(dForm.closest('.krt-modal-overlay'));
+                    missionHooks.refresh(['crew', 'finance', 'overview']);
                 }
             });
         }
@@ -174,10 +174,13 @@ document.addEventListener('DOMContentLoaded', () => {
     );
 
     if (editCrewModal && editCrewForm && editCrewJobs) {
-        window.krtOpenEditCrewModal = function (source) {
-            editCrewForm.action = window.safeSameOriginUrl(
-                source.getAttribute('data-action') || '/missions',
-                editCrewForm.action,
+        missionHooks.openEditCrewModal = function (source) {
+            assignFormAction(
+                editCrewForm,
+                safeSameOriginUrl(
+                    source.getAttribute('data-action') || '/missions',
+                    editCrewForm.action,
+                ),
             );
             editCrewForm.setAttribute(
                 'data-ajax-action',
@@ -192,19 +195,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 editCrewJobs.options[i].selected = jobIds.includes(editCrewJobs.options[i].value);
             }
 
-            window.krtModalOpen(editCrewModal);
+            missionHooks.modalOpen(editCrewModal);
         };
     }
 
     window.addEventListener('click', (event) => {
         const target = /** @type {Element} */ (event.target);
         if (target.classList && target.classList.contains('krt-modal-overlay')) {
-            window.krtModalClose(target);
+            missionHooks.modalClose(target);
         }
     });
 
     (function wireCrewAjax() {
-        if (!window.krtMissionWrite || !window.missionId) {
+        if (!missionHooks.write || !window.missionId) {
             return;
         }
 
@@ -241,15 +244,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     jobTypeIds: collectJobTypeIds(editForm),
                     version: versionAttr ? Number(versionAttr) : null,
                 };
-                const res = await window.krtMissionWrite({
+                const res = await missionHooks.write({
                     method: 'PUT',
                     url: ajaxUrl,
                     payload,
                     sectionKey: 'crew',
                 });
                 if (res.ok) {
-                    window.krtModalClose(editForm.closest('.krt-modal-overlay'));
-                    window.krtRefreshMissionSection('crew');
+                    missionHooks.modalClose(editForm.closest('.krt-modal-overlay'));
+                    missionHooks.refresh('crew');
                 }
             });
         }
@@ -264,14 +267,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 ev.preventDefault();
-                const res = await window.krtMissionWrite({
+                const res = await missionHooks.write({
                     method: 'DELETE',
                     url: `/missions/${window.missionId}/units/${unitId}/crew/${crewId}/ajax`,
                     sectionKey: 'crew',
                 });
                 if (res.ok) {
-                    window.krtModalClose(dForm.closest('.krt-modal-overlay'));
-                    window.krtRefreshMissionSection('crew');
+                    missionHooks.modalClose(dForm.closest('.krt-modal-overlay'));
+                    missionHooks.refresh('crew');
                 }
             });
         }
@@ -293,10 +296,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const hint = document.createElement('div');
         hint.className = 'autocomplete-notice';
         hint.setAttribute('aria-disabled', 'true');
-        hint.textContent = window.krtI18nText(
-            (window.krtComboboxI18n || {}).hint,
-            'krtComboboxI18n.hint',
-        );
+        hint.textContent = krtI18nText((window.krtComboboxI18n || {}).hint, 'krtComboboxI18n.hint');
         container.appendChild(hint);
     }
 
@@ -329,7 +329,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             debounceTimer = setTimeout(() => {
-                window.krtFetch
+                krtFetch
                     .getJson(`/users/search?query=${encodeURIComponent(val)}`)
                     .then((users) => {
                         closeAllLists();
@@ -417,7 +417,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         partyLeadDebounce = setTimeout(() => {
-            window.krtFetch
+            krtFetch
                 .getJson(`/users/search?query=${encodeURIComponent(val)}`)
                 .then((users) => {
                     partyLeadCloseLists();
@@ -500,7 +500,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const submittedUserId = userIdEl.value || null;
         const submittedGuestName = input.value || null;
-        const res = await window.krtMissionWrite({
+        const res = await missionHooks.write({
             method: 'PUT',
             url: `/missions/${window.missionId}/party-lead/ajax`,
             payload() {
@@ -534,8 +534,8 @@ document.addEventListener('DOMContentLoaded', () => {
         input.value = dto.partyLeadUser
             ? dto.partyLeadUser.effectiveName || ''
             : dto.partyLeadGuestName || '';
-        if (window.krtNotifyMissionChanged) {
-            window.krtNotifyMissionChanged(['overview', 'organisation']);
+        if (missionHooks.notify) {
+            missionHooks.notify(['overview', 'organisation']);
         }
     });
 });

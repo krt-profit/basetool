@@ -21,8 +21,8 @@ package de.greluc.krt.profit.basetool.backend.bank.api.events;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankAmounts;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
-import de.greluc.krt.profit.basetool.backend.model.NotificationContextRole;
-import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationContextRole;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;

@@ -375,8 +375,8 @@ by reading the `AuditEventDto.eventType` enum out of the committed `openapi.json
 **Enforced by:** `AuditServiceTest`, `AuditQueryIntegrationTest`, `AuditAdminControllerSecurityTest`,
 `RoleServiceTest`, `AdminAuditLogPageControllerTest`,
 per-domain emission assertions in the service tests · **Code:** `audit/api/AuditRecorder`,
-`service/AuditService`, `model/AuditEvent`, `audit/api/AuditDomain`, `audit/api/AuditEventType`,
-`controller/AuditAdminController`,
+`audit/api/AuditService`, `audit/api/AuditEvent`, `audit/api/AuditDomain`, `audit/api/AuditEventType`,
+`audit/web/AuditAdminController`,
 `db/migration/V179` · **Decision:** [ADR-0037](../adr/0037-shared-multi-domain-activity-audit-log.md)
 
 ### REQ-AUDIT-002 — Unified admin audit viewer
@@ -433,8 +433,8 @@ forwarding (defense-in-depth).
 - [ ] An inverted period is rejected (400); both export endpoints are admin-gated.
 
 **Enforced by:** `AuditReportServiceTest`, `BankAuditReportServiceTest`, `AuditAdminControllerSecurityTest`
-· **Code:** `service/AuditReportService`, `bank/internal/BankAuditReportService`,
-`service/pdf/AuditLogPdfFormat`, `audit/web/AuditReportProxyController`
+· **Code:** `audit/api/AuditReportService`, `bank/internal/BankAuditReportService`,
+`audit/api/AuditLogPdfFormat`, `audit/web/AuditReportProxyController`
 
 ### REQ-AUDIT-004 — Admin retention purge (delete entries older than a cutoff)
 
@@ -472,8 +472,8 @@ sweep"; that was true when written and is no longer.
   vanishing without a manual purge do not read as data loss.
 
 **Enforced by:** `AuditServiceTest`, `BankAuditServiceTest`, `AuditAdminControllerSecurityTest` ·
-**Code:** `service/AuditService#purgeBefore`, `bank/internal/BankAuditService#purgeBefore`,
-`controller/AuditAdminController`, `bank/web/BankAdminController`, `model/dto/AuditPurgeResultDto`,
+**Code:** `audit/api/AuditService#purgeBefore`, `bank/internal/BankAuditService#purgeBefore`,
+`audit/web/AuditAdminController`, `bank/web/BankAdminController`, `audit/api/AuditPurgeResultDto`,
 `templates/audit/admin/audit-log.html`, `static/js/audit/audit-log.js` · **Decision:**
 [ADR-0038](../adr/0038-admin-retention-purge-of-audit-logs.md)
 
@@ -568,8 +568,8 @@ than a feature, so the viewer offers the identical list everywhere.
 **Enforced by:** `AuditServiceTest`, `BankAuditServiceTest`, `ClientAttributionTest`,
 `AuditQueryIntegrationTest`, `BankAuditQueryIntegrationTest`, `AdminAuditLogPageControllerTest`,
 `AdminAuditLogModalRenderMvcTest`, `ApiClientMetricsFilterTest`, `AuditLogE2eTest` · **Code:**
-`platform/api/ClientAttribution`, `service/AuditService#record`, `bank/internal/BankAuditService#record`,
-`model/AuditEvent#clientId`, `bank/internal/BankAuditEvent#clientId`, `controller/AuditAdminController`,
+`platform/api/ClientAttribution`, `audit/api/AuditService#record`, `bank/internal/BankAuditService#record`,
+`audit/api/AuditEvent#clientId`, `bank/internal/BankAuditEvent#clientId`, `audit/web/AuditAdminController`,
 `bank/web/BankAdminController`, `audit/web/AdminAuditLogPageController`,
 `db/migration/V237`, `db/migration/V238` · **Decision:**
 [ADR-0152](../adr/0152-the-audit-row-records-which-client-a-mutation-came-through.md),
@@ -648,8 +648,8 @@ and swallowed there, so the scheduler thread survives a bad run.
 
 **Enforced by:** `AuditRetentionServiceTest`, `AuditRetentionTaskTest`,
 `BackendPropertiesValidationTest` (the floors) · **Code:**
-`service/AuditRetentionService`, `audit/api/RetentionParticipant`, `task/AuditRetentionTask`, `audit/internal/AuditRetentionProperties`, `metrics/ScheduledJob#AUDIT_RETENTION`,
-`repository/AuditEventRepository#existsByDomainAndOccurredAtBefore`,
+`audit/internal/AuditRetentionService`, `audit/api/RetentionParticipant`, `audit/internal/AuditRetentionTask`, `audit/internal/AuditRetentionProperties`, `platform/api/ScheduledJob#AUDIT_RETENTION`,
+`audit/api/AuditEventRepository#existsByDomainAndOccurredAtBefore`,
 `bank/internal/BankAuditService#holdsRowsBefore`,
 `bank/internal/BankAuditEventRepository#existsByOccurredAtBefore`, `templates/audit/admin/audit-log.html` ·
 **Decision:** [ADR-0179](../adr/0179-both-audit-trails-are-swept-on-a-retention-ceiling.md),
@@ -698,5 +698,5 @@ current principal and no request is bound.
   the compliant twins (`runAs`, `MANDATORY` on method or class) not. Selection floors: 8
   after-commit or asynchronous methods, 14 listener methods, 0 observer SPIs.
 
-**Enforced by:** `ListenerAndObserverRulesTest` · **Code:** `annotation/ObserverSpi`,
-`service/AuditService`, `bank/internal/BankAuditService`
+**Enforced by:** `ListenerAndObserverRulesTest` · **Code:** `platform/api/ObserverSpi`,
+`audit/api/AuditService`, `bank/internal/BankAuditService`

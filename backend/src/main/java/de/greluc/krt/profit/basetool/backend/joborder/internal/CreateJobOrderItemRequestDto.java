@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;

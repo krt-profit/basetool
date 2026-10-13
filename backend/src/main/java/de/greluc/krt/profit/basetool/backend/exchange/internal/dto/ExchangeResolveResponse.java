@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonValue;
 import java.util.List;
 import java.util.Locale;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * The answer to a {@code catalog/resolve} request, in the shape of the published {@code
@@ -33,7 +34,7 @@ import java.util.Locale;
  *     {@code null} when there is none
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public record ExchangeResolveResponse(List<Result> results, List<Warning> warnings) {
+public record ExchangeResolveResponse(List<Result> results, @Nullable List<Warning> warnings) {
 
   /** The most candidates an ambiguous result lists. */
   public static final int MAX_CANDIDATES = 10;
@@ -50,7 +51,8 @@ public record ExchangeResolveResponse(List<Result> results, List<Warning> warnin
    * @param candidates the entries it could mean, when {@code status} is {@code ambiguous}
    */
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  public record Result(int index, Status status, Entry ref, List<Entry> candidates) {}
+  public record Result(
+      int index, Status status, @Nullable Entry ref, @Nullable List<Entry> candidates) {}
 
   /**
    * A catalogue entry.

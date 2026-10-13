@@ -101,6 +101,15 @@ public class MissionExportSections implements PersonalDataExportSection {
             .keeping(
                 "ship_type",
                 "ship_type.name: a hull from the synced catalogue. Flagged because the statement"
-                    + " also reads mission and mission_unit, whose name columns are scrubbed."));
+                    + " also reads mission and mission_unit, whose name columns are scrubbed."),
+        new Section(
+            460,
+            "payoutPreference",
+            ART_15_20,
+            "Chosen by the member on the profile page.",
+            """
+            SELECT default_payout_preference, created_at, updated_at
+            FROM member_payout_setting WHERE user_id = :userId
+            """));
   }
 }

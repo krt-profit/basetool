@@ -106,7 +106,8 @@ public record AndroidClientProperties(
    * @return the override when set and not blank, otherwise the release default
    */
   public String releasesUrl() {
-    return releasesUrlOverridden() ? emergencyOverride.releasesUrl() : release.releasesUrl();
+    String override = emergencyOverride.releasesUrl();
+    return override != null && !override.isBlank() ? override : release.releasesUrl();
   }
 
   /**

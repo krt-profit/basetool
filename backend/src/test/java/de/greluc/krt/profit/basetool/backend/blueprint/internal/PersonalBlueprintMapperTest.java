@@ -24,10 +24,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintSource;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprint;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintResponse;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
-import de.greluc.krt.profit.basetool.backend.model.BlueprintSource;
-import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintResponse;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

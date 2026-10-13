@@ -27,31 +27,30 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInRule;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemMaterial;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemService;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.ProductionAllocationException;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.Quality;
-import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.JobOrder;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderItemMaterial;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemDto;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
-import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -209,16 +208,14 @@ public class JobOrderItemProductionService {
     final List<ConsumedItem> consumedItems = new ArrayList<>();
 
     for (JobOrderItemProductionConsumptionDto c : dto.consumption()) {
-      InventoryItem inventoryItem =
+      StockRow inventoryItem =
           Entities.require(
               stockCommands.lockRow(c.inventoryItemId()),
               () -> "Inventory item not found: " + c.inventoryItemId());
 
-      OptimisticLock.check(
-          inventoryItem.getVersion(), c.version(), InventoryItem.class, c.inventoryItemId());
+      stockCommands.requireRowVersion(c.inventoryItemId(), c.version());
 
-      var orderSlice = InventoryAllocations.jobOrderSlice(inventoryItem, jobOrderId);
-      if (orderSlice == null) {
+      if (!inventoryItem.isEarmarkedForJobOrder(jobOrderId)) {
         throw new BadRequestException(JobOrderHandoverService.ERROR_ITEM_NOT_LINKED_TO_ORDER);
       }
       if (inventoryItem.getMaterial() == null
@@ -235,7 +232,7 @@ public class JobOrderItemProductionService {
       if (consumed <= 0) {
         throw new BadRequestException("Consumption amount must be positive");
       }
-      double orderSliceAmount = orderSlice.getAmount() != null ? orderSlice.getAmount() : 0.0;
+      double orderSliceAmount = inventoryItem.jobOrderSliceAmount(jobOrderId);
       if (consumed > orderSliceAmount + QUANTITY_EPSILON) {
         throw ProductionAllocationException.overOrderSlice(
             c.materialId(), inventoryItem.getId(), consumed, orderSliceAmount);
@@ -268,7 +265,7 @@ public class JobOrderItemProductionService {
               depleted));
 
       stockCommands.takeFromEarmarkedRow(
-          inventoryItem, jobOrderId, consumed, null, StockChangeReason.PRODUCTION);
+          inventoryItem.getId(), jobOrderId, consumed, null, StockChangeReason.PRODUCTION);
     }
 
     line.setManufacturedAmount(line.getManufacturedAmount() + amount);

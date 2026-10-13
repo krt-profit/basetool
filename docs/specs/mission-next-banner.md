@@ -192,10 +192,10 @@ Amended 2026-10-04: the „Angemeldet" chip of the redesign's hand-off is built 
 `MissionParticipantSignedUpQueryDataTest` (PostgreSQL),
 `OrgUnitMembershipServiceTest` (`findDirectMembershipOrgUnitIds_returnsEveryKindWithoutCascade`,
 `findDirectMembershipOrgUnitIds_noMemberships_returnsEmpty`),
-`UserControllerTest` (`getMyOrgUnitIds_derivesCallerFromJwt_andDelegatesToService`).
+`MemberMembershipControllerTest` (`getMyOrgUnitIds_derivesCallerFromJwt_andDelegatesToService`).
 **Code:** `frontend/.../HomeController#home` (the next-7-days `/api/v1/missions` call + the
 `/api/v1/org-units/me/ids` own-unit lookup), `templates/dashboard/index.html` (the `upcomingMissions`
-row list `.home-missions` + the `myOrgUnitIds` chip gate + the `signedUp` chip), `static/css/pages/dashboard/index.css`; backend `UserController#getMyOrgUnitIds` +
+row list `.home-missions` + the `myOrgUnitIds` chip gate + the `signedUp` chip), `static/css/pages/dashboard/index.css`; backend `MemberMembershipController#getMyOrgUnitIds` +
 `MissionController#toListRows` + `MissionService#signedUpMissionIds` +
 `OrgUnitMembershipService#findDirectMembershipOrgUnitIds`. The mission grid reuses the existing
 `MissionController` `/api/v1/missions` endpoint; the only new backend surfaces are the

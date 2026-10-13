@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;

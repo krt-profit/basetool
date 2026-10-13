@@ -55,7 +55,7 @@ non-admins see the union of their memberships unless they pin one.
 ### REQ-ORG-003 — Aggregate scope kinds
 
 > The JPQL implementing every scope-predicate triple/escape below is centralised in
-> `scope.api.ScopeSpecifications` (one compile-time-constant fragment per aggregate) rather than
+> the owning module's `api` (`MissionScope`, `ShipScope`, `JobOrderScope`, `InventoryScope`; the refinery's and the operation's sit in their access policies; one compile-time-constant fragment per aggregate) rather than
 > hand-copied per query — see [`data-persistence.md`](data-persistence.md) REQ-DATA-010. This is an
 > implementation detail; the scope semantics documented here are unchanged.
 >
@@ -601,7 +601,7 @@ dropped to one:
   Bewertungsmatrix scope by the caller's **Staffel set** (`currentUserListScopeSquadronIds()`):
   unpinned, a two-Staffel officer sees the members of **both**; a pin narrows to the pinned one.
 - **Authorisation gates** OR across **all** of a target's Staffeln — the full-PII gate
-  (`UserController#isCrossSquadronNonAdmin`) and the member-evaluation gate grant when the caller
+  (`UserService#isCrossSquadronForNonAdmin`, used by `UserDirectoryService#get`) and the member-evaluation gate grant when the caller
   shares **any** of the target's Staffeln; an officer's own-Staffel **oversight scope** includes
   every Staffel they belong to.
 - **Order-aligned audit** — a Job-Order handover's `executingSquadron` snapshot records the executor's
@@ -851,7 +851,7 @@ pinned negative), `InventoryPageControllerMvcTest` (preselect, placeholder, hidd
 ### REQ-ORG-028 — A scoped aggregate carries `@TenantScoped`, and the scope rules select by it
 
 Every entity whose rows belong to an owning or responsible org unit carries the marker
-`backend.annotation.TenantScoped`, naming the field that holds that unit. Today that is `Mission`,
+`backend.platform.api.TenantScoped`, naming the field that holds that unit. Today that is `Mission`,
 `Operation`, `Ship`, `InventoryItem` and `RefineryOrder` (`owningOrgUnit`), `JobOrder`
 (`responsibleOrgUnit`), and `PromotionTopic` and `RankRequirement` (`owningSquadron`).
 

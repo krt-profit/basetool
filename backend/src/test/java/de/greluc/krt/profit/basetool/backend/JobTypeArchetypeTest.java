@@ -51,7 +51,7 @@ public class JobTypeArchetypeTest {
   @Autowired private JobTypeRepository jobTypeRepository;
 
   @Autowired
-  private de.greluc.krt.profit.basetool.backend.repository.MissionRepository missionRepository;
+  private de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository missionRepository;
 
   @Autowired private CacheManager cacheManager;
 

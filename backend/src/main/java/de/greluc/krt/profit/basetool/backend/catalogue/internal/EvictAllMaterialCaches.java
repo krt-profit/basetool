@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
-import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
+import de.greluc.krt.profit.basetool.backend.platform.api.CacheConfig;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

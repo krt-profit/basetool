@@ -34,6 +34,7 @@ import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.Response;
 import com.microsoft.playwright.assertions.LocatorAssertions;
+import com.microsoft.playwright.options.BoundingBox;
 import com.microsoft.playwright.options.SelectOption;
 import java.nio.file.Path;
 import java.util.regex.Pattern;
@@ -513,12 +514,22 @@ class InventoryOperationsE2eTest {
               .isEnabled(new LocatorAssertions.IsEnabledOptions().setTimeout(15_000));
           sellRadio.check();
           page.locator("#terminal").selectOption(new SelectOption().setIndex(1));
-          page.locator("#sellAmount").fill("1500");
+          Locator sellAmount = page.locator("#sellAmount");
+          sellAmount.fill("1500");
+          BoundingBox box = sellAmount.boundingBox();
+          page.mouse().move(box.x + box.width - 4, box.y + box.height / 2);
+          page.mouse().down();
+          page.mouse().move(2, 2);
+          page.mouse().up();
+          assertThat(page.locator("#bookOutModal")).isVisible();
           page.locator("#amount").fill("30");
           submitBookOutInPlace(page);
 
           assertEquals(
               50.0, totalAmount(stacksForMaterial(sellMatId)), AMOUNT_DELTA, "80 - 30 = 50");
+
+          openBookOutModal(page, sellMatId, sellItemId);
+          assertThat(page.locator("#sellAmount")).isEmpty();
         });
   }
 

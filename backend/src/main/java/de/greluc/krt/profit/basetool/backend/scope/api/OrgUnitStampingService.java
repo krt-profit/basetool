@@ -19,14 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.scope.api;
 
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
-import de.greluc.krt.profit.basetool.backend.model.Squadron;
-import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
-import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
@@ -122,7 +122,7 @@ public class OrgUnitStampingService {
    *
    * <p>Without a pick, a single direct membership is auto-stamped. An explicit pick is honoured
    * when it is a direct membership of the target user or an org unit the caller may edit ({@link
-   * AccessGateService#canEditOrgUnit(UUID)}, REQ-ORG-016).
+   * AccessGateService#canEditSquadron(UUID)}, REQ-ORG-016).
    *
    * @param targetUser the user whose memberships gate the picker output validation; never {@code
    *     null}.
@@ -190,7 +190,7 @@ public class OrgUnitStampingService {
    * (REQ-ORG-018), without any auto-stamp fallback.
    *
    * <p>An admin may pick any org unit or {@code null}. A non-admin may pick a direct membership or
-   * an org unit they may edit ({@link AccessGateService#canEditOrgUnit(UUID)}), and {@code null}
+   * an org unit they may edit ({@link AccessGateService#canEditSquadron(UUID)}), and {@code null}
    * only as a membershipless leadership caller.
    *
    * @param targetOrgUnitId the picker-supplied target org-unit id, or {@code null} for ownerless.
@@ -211,7 +211,7 @@ public class OrgUnitStampingService {
     }
     if (!admin
         && !requestScopeResolver.currentMemberOrgUnitIds().contains(targetOrgUnitId)
-        && !accessGateService.canEditOrgUnit(targetOrgUnitId)) {
+        && !accessGateService.canEditSquadron(targetOrgUnitId)) {
       throw new AccessDeniedException(
           "Target org unit is neither a membership of the caller nor within their editable scope");
     }
@@ -245,7 +245,7 @@ public class OrgUnitStampingService {
    *
    * <p>Without a pick, a single direct membership is auto-stamped. An explicit pick is accepted
    * when it is a direct membership or an org unit the caller may edit ({@link
-   * AccessGateService#canEditOrgUnit(UUID)}).
+   * AccessGateService#canEditSquadron(UUID)}).
    *
    * @param memberOrgUnitIds the target user's non-empty DIRECT membership set.
    * @param owningOrgUnitId the picker-supplied org unit id, or {@code null} for the auto-stamp
@@ -274,7 +274,7 @@ public class OrgUnitStampingService {
       }
     } else {
       if (!memberOrgUnitIds.contains(owningOrgUnitId)
-          && !accessGateService.canEditOrgUnit(owningOrgUnitId)) {
+          && !accessGateService.canEditSquadron(owningOrgUnitId)) {
         throw new BadRequestException(
             "Selected owner org unit is neither a membership of the target user nor within the"
                 + " caller's editable scope");

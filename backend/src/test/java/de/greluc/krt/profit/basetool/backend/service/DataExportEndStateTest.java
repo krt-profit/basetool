@@ -21,7 +21,11 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEvent;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprint;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
@@ -34,33 +38,30 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepository;
+import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.Role;
+import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
-import de.greluc.krt.profit.basetool.backend.model.AuditEvent;
-import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.JobOrder;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
-import de.greluc.krt.profit.basetool.backend.model.MaterialClaim;
-import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
-import de.greluc.krt.profit.basetool.backend.model.Role;
-import de.greluc.krt.profit.basetool.backend.model.Ship;
-import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
-import de.greluc.krt.profit.basetool.backend.model.Squadron;
-import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItem;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryLocationType;
+import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialClaimRepository;
-import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
-import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
-import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
-import de.greluc.krt.profit.basetool.backend.repository.SpecialCommandRepository;
-import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import jakarta.persistence.EntityManager;
 import java.io.IOException;
 import java.io.InputStream;
@@ -430,6 +431,13 @@ class DataExportEndStateTest {
         UUID.randomUUID(),
         owned,
         other.getId());
+    jdbc.update(
+        "INSERT INTO member_payout_setting (user_id, default_payout_preference) VALUES (?,"
+            + " 'DONATE')",
+        subject.getId());
+    jdbc.update(
+        "INSERT INTO member_blueprint_sharing (user_id, share_globally) VALUES (?, TRUE)",
+        subject.getId());
     jdbc.update(
         "INSERT INTO mission_managers (mission_id, user_id) VALUES (?, ?)", owned, subject.getId());
     jdbc.update(

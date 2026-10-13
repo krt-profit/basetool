@@ -34,10 +34,11 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethod;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodRepository;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.FuzzyNameMatcher;
-import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
-import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import de.greluc.krt.profit.basetool.backend.refinery.api.ImportIssueCode;
 import de.greluc.krt.profit.basetool.backend.refinery.api.ImportIssueDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.ImportIssueSeverity;
@@ -50,7 +51,6 @@ import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExtractOrderDt
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryGoodDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryImportDraftDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderDto;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -59,6 +59,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -133,7 +134,7 @@ public class RefineryImportService implements RefineryDraftBuilder {
     if (extract.schemaVersion() == null || extract.schemaVersion() != SUPPORTED_SCHEMA_VERSION) {
       throw new BadRequestException("error.refineryImport.unsupportedSchemaVersion");
     }
-    RefineryExtractOrderDto order = extract.orders().getFirst();
+    RefineryExtractOrderDto order = Objects.requireNonNull(extract.orders()).getFirst();
     if (order.panelType() == null || !PANEL_TYPE_SETUP.equalsIgnoreCase(order.panelType().trim())) {
       throw new BadRequestException("error.refineryImport.unsupportedPanelType");
     }
@@ -173,7 +174,8 @@ public class RefineryImportService implements RefineryDraftBuilder {
               null));
     }
 
-    List<RefineryExtractGoodDto> sourceGoods = sortedByRowIndex(order.goods());
+    List<RefineryExtractGoodDto> sourceGoods =
+        sortedByRowIndex(Objects.requireNonNull(order.goods()));
     boolean orderUnquoted =
         Boolean.FALSE.equals(order.quoted())
             || (!sourceGoods.isEmpty()

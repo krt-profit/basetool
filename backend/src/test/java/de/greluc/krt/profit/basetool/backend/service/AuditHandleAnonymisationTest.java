@@ -24,9 +24,10 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventRepository;
+import de.greluc.krt.profit.basetool.backend.audit.internal.AuditHandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.platform.api.HandleAnonymisationParticipant.Rewritten;
-import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;

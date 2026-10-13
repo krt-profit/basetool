@@ -19,20 +19,20 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.inventory.api.ExchangeStockLotRow;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow;
+import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderMaterialStockRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.LinkedStockRow;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockRows;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
-import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryGameItemReferenceDto;
-import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderMaterialStockRow;
-import de.greluc.krt.profit.basetool.backend.service.OrderLinkedStockRows;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -133,24 +133,25 @@ public class InventoryStockReads implements StockReads, OrderLinkedStockRows {
   }
 
   @Override
-  public @NotNull Optional<InventoryItem> findRow(@NotNull UUID rowId) {
-    return inventoryRepository.findById(rowId);
+  public @NotNull Optional<StockRow> findRow(@NotNull UUID rowId) {
+    return inventoryRepository.findById(rowId).map(StockRow.class::cast);
   }
 
   @Override
-  public @NotNull List<InventoryItem> findRowsWithMaterial(@NotNull Collection<UUID> rowIds) {
-    return inventoryRepository.findWithMaterialByIdIn(rowIds);
+  public @NotNull List<StockRow> findRowsWithMaterial(@NotNull Collection<UUID> rowIds) {
+    return new ArrayList<StockRow>(inventoryRepository.findWithMaterialByIdIn(rowIds));
   }
 
   @Override
-  public @NotNull List<InventoryItem> releasableRows(
+  public @NotNull List<StockRow> releasableRows(
       @NotNull UUID userId,
       @Nullable String query,
       boolean includeMaterial,
       boolean includeItem,
       int limit) {
-    return inventoryRepository.findReleasableForUser(
-        userId, query, includeMaterial, includeItem, PageRequest.of(0, limit));
+    return new ArrayList<StockRow>(
+        inventoryRepository.findReleasableForUser(
+            userId, query, includeMaterial, includeItem, PageRequest.of(0, limit)));
   }
 
   /**
@@ -175,7 +176,7 @@ public class InventoryStockReads implements StockReads, OrderLinkedStockRows {
         owner.getId(),
         item.getLocation().getName(),
         item.getLocation().getId(),
-        gameItem == null ? item.getMaterial().getName() : null,
+        gameItem == null ? Objects.requireNonNull(item.getMaterial()).getName() : null,
         item.getQuality(),
         gameItem,
         item.getAmount(),

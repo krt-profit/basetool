@@ -29,15 +29,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalDecision;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakService;
-import de.greluc.krt.profit.basetool.backend.model.ApprovalDecision;
-import de.greluc.krt.profit.basetool.backend.model.Role;
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.UserApprovalEvent;
-import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserApprovalEventRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.service.UserDeletionService;
+import de.greluc.krt.profit.basetool.backend.identity.api.Role;
+import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserApprovalEvent;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserApprovalEventRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.privacy.api.UserDeletionService;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;

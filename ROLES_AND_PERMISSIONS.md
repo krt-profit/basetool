@@ -8,13 +8,13 @@
 > This matrix was verified against the actual implementation:
 > the `@PreAuthorize` annotations of the backend controllers (and the service-level ones they
 > delegate to), the URL matrix in
-> [`backend/.../config/SecurityConfig.java`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/SecurityConfig.java)
+> [`backend/.../app/api/SecurityConfig.java`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/app/api/SecurityConfig.java)
 > and
 > [`frontend/.../kernel/security/SecurityConfig.java`](frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/kernel/security/SecurityConfig.java),
 > the role seeds in
-> [`DataInitializer`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/DataInitializer.java)
+> [`DataInitializer`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/app/internal/DataInitializer.java)
 > and the authority converter
-> [`CustomJwtGrantedAuthoritiesConverter`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/CustomJwtGrantedAuthoritiesConverter.java).
+> [`CustomJwtGrantedAuthoritiesConverter`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/scope/api/CustomJwtGrantedAuthoritiesConverter.java).
 > **When this document and the code disagree, the code always wins**
 > (`@PreAuthorize` + `SecurityConfig`).
 
@@ -230,7 +230,7 @@ The five application roles are the Keycloak realm roles `Admin`, `Officer`, `KRT
 syncs the token's realm roles by name onto the `app_user` row; the authority is the role name
 upper-cased with spaces turned into underscores (`KRT Member` → `ROLE_KRT_MEMBER`), plus the role's
 seeded permissions from
-[`DataInitializer`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/DataInitializer.java).
+[`DataInitializer`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/app/internal/DataInitializer.java).
 The constants live in `kernel.Roles` (backend) and `support.Roles` (frontend). In addition, a **role hierarchy**
 applies.
 
@@ -284,7 +284,7 @@ public route at all. See [`docs/specs/observability.md`](docs/specs/observabilit
 OrgUnit membership** (`org_unit_membership.is_logistician` /
 `is_mission_manager`) — and every leadership rank below (`SK_LEAD`, the four Staffel ranks, the
 Bereich ranks, `OL_MEMBER`) mints both on its own reach. The
-[`CustomJwtGrantedAuthoritiesConverter`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/CustomJwtGrantedAuthoritiesConverter.java)
+[`CustomJwtGrantedAuthoritiesConverter`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/scope/api/CustomJwtGrantedAuthoritiesConverter.java)
 promotes these into two authority surfaces:
 
 - **Flat** `ROLE_LOGISTICIAN` / `ROLE_MISSION_MANAGER`, as soon as **any**

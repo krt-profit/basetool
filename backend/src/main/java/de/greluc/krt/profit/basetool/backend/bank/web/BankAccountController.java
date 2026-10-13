@@ -37,9 +37,9 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.SetCartelApprovalTier
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
-import de.greluc.krt.profit.basetool.backend.web.PdfResponses;
-import de.greluc.krt.profit.basetool.backend.web.UserZone;
+import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
+import de.greluc.krt.profit.basetool.backend.platform.api.PdfResponses;
+import de.greluc.krt.profit.basetool.backend.platform.api.UserZone;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;

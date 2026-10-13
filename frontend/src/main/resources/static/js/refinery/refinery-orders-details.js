@@ -18,7 +18,17 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* global MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP, MATERIAL_ENTRY_TITLE_LABEL, MATERIAL_REMOVE_LABEL, MSG_SAVING, MSG_REFINERY_UPDATE_FAILED, MSG_REFINERY_STORE_FAILED, MSG_REFINERY_CANCEL_FAILED, MSG_CANCEL_CONFIRM, MSG_CANCEL_TITLE, MSG_CANCEL_DISMISS, REFINERY_DETAIL_MSG, STORE_INHERITED_ORG_UNIT_ID, STORE_ORG_UNIT_PLACEHOLDER, RATING_LEVELS, SPEED_LEVELS, showFrontendErrorToast */
+/* global MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP, MATERIAL_ENTRY_TITLE_LABEL, MATERIAL_REMOVE_LABEL, MSG_SAVING, MSG_REFINERY_UPDATE_FAILED, MSG_REFINERY_STORE_FAILED, MSG_REFINERY_CANCEL_FAILED, MSG_CANCEL_CONFIRM, MSG_CANCEL_TITLE, MSG_CANCEL_DISMISS, REFINERY_DETAIL_MSG, STORE_INHERITED_ORG_UNIT_ID, STORE_ORG_UNIT_PLACEHOLDER, RATING_LEVELS, SPEED_LEVELS */
+
+import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
+import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtHtml } from '/js/kernel/krt-html.js';
+import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';
+import { krtRefineryYield } from '/js/refinery/refinery-yield-badge.js';
 
 /**
  * A form control of a material or store row, whose `id`, `name` and `value` the renumbering
@@ -27,7 +37,7 @@
  * @typedef {HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement} RodFormControl
  */
 
-window.krtRefineryYield.init(MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP);
+krtRefineryYield.init(MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP);
 
 const REFINERY_ORDER_SECTIONS = {
     order: { container: '#refinery-order-results', fragmentValue: 'order' },
@@ -48,11 +58,8 @@ function refineryStoreModalOpen() {
     return !!modal && window.getComputedStyle(modal).display !== 'none';
 }
 
-(function () {
-    if (!window.krtFetch || typeof window.krtFetch.sectionWrite !== 'function') {
-        return;
-    }
-    refinerySeam = window.krtFetch.sectionWrite({
+function initRefineryOrdersDetails() {
+    refinerySeam = krtFetch.sectionWrite({
         dict() {
             return {
                 'refineryorder.section.refresh.error': REFINERY_DETAIL_MSG.sectionRefreshError,
@@ -65,18 +72,14 @@ function refineryStoreModalOpen() {
         },
         broadcast(keys) {
             const topic = refineryTopic();
-            if (
-                topic &&
-                window.krtLiveSync &&
-                typeof window.krtLiveSync.sendChanged === 'function'
-            ) {
-                window.krtLiveSync.sendChanged(topic, keys);
+            if (topic && typeof krtLiveSync.sendChanged === 'function') {
+                krtLiveSync.sendChanged(topic, keys);
             }
         },
     });
 
-    if (refineryTopic() && window.krtLiveSync && window.krtLiveSync.createReceiver) {
-        window.krtLiveSync.createReceiver({
+    if (refineryTopic()) {
+        krtLiveSync.createReceiver({
             topic: refineryTopic(),
             sections: REFINERY_ORDER_SECTIONS,
             refresh(keys) {
@@ -92,14 +95,13 @@ function refineryStoreModalOpen() {
             },
         });
     }
-})();
+}
+
+initRefineryOrdersDetails();
 
 function _submitRefinery(options) {
     const form = options.form;
-    if (!window.krtFetch) {
-        form.submit();
-        return;
-    }
+
     /**
      * @param {any} [_status] the HTTP status, or the network error on a transport failure
      * @param {any} [body] the parsed RFC 7807 problem body, if any
@@ -113,7 +115,7 @@ function _submitRefinery(options) {
         );
         return true;
     }
-    window.krtFetch.submitForm({
+    krtFetch.submitForm({
         form,
         submitter: options.submitter,
         serialize: `refinery-order:${window.refineryOrderId}`,
@@ -150,16 +152,14 @@ function calcScu(index) {
 }
 
 function closeStoreModal() {
-    if (typeof window.resetUnsavedChanges === 'function') {
-        window.resetUnsavedChanges();
-    }
+    resetUnsavedChanges();
     const modal = document.getElementById('storeModal');
-    if (modal) window.krtModal.close(modal);
+    if (modal) krtModal.close(modal);
 }
 
 function openStoreModal() {
     const modal = document.getElementById('storeModal');
-    if (modal) window.krtModal.open(modal);
+    if (modal) krtModal.open(modal);
 }
 
 function duplicateStoreItem(btn) {
@@ -231,9 +231,7 @@ function duplicateStoreItem(btn) {
     blockToCopy.after(newBlock);
     reindexStoreItems();
     syncStorePersonalJobOrder(newBlock);
-    if (window.krtEnhanceComboboxes) {
-        window.krtEnhanceComboboxes(newBlock);
-    }
+    krtEnhanceComboboxes(newBlock);
 }
 
 function reindexStoreItems() {
@@ -308,7 +306,7 @@ document.addEventListener('change', (e) => {
     const index = sel.id.substring('storeUser_'.length);
     const orgSelect = document.getElementById(`storeOrgUnit_${index}`);
     if (!orgSelect || !sel.value) return;
-    window.krtFetch
+    krtFetch
         .getJson(`/refinery-orders/users/${encodeURIComponent(sel.value)}/org-units`)
         .then((opts) => rebuildOrgUnitOptions(orgSelect, Array.isArray(opts) ? opts : []))
         .catch(() => rebuildOrgUnitOptions(orgSelect, []));
@@ -337,7 +335,7 @@ function updateOutputMaterial(selectElement) {
         outputDisplay.style.opacity = '0.7';
     }
 
-    window.krtRefineryYield.refreshFor(selectElement);
+    krtRefineryYield.refreshFor(selectElement);
 }
 
 function initRefineryOrderSection() {
@@ -367,7 +365,7 @@ function initRefineryOrderSection() {
     updateEndsAt();
     updateProfitPreview();
 
-    window.krtRefineryYield.refreshAll();
+    krtRefineryYield.refreshAll();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -384,7 +382,7 @@ document.addEventListener('krt:swapped', (ev) => {
         syncRefineryStatusBadge();
         revealRefineryStoreWhenReady();
         initRefineryOrderSection();
-        window.krtRefineryYield.onLocationChange(
+        krtRefineryYield.onLocationChange(
             /** @type {KrtRefineryControl | null} */ (document.getElementById('locationId')),
         );
     } else if (container.id === 'refinery-store-results') {
@@ -513,9 +511,7 @@ function addMaterialRow() {
     });
 
     container.appendChild(template);
-    if (window.krtEnhanceComboboxes) {
-        window.krtEnhanceComboboxes(template);
-    }
+    krtEnhanceComboboxes(template);
 }
 
 function removeMaterialRow(button) {
@@ -744,57 +740,53 @@ function markRefineryFormDirty(event) {
 document.addEventListener('input', markRefineryFormDirty);
 document.addEventListener('change', markRefineryFormDirty);
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('input', 'rod-update-profit', updateProfitPreview);
-    window.krtEvents.on('focusout', 'rod-update-profit', (el) => {
-        const field = /** @type {HTMLInputElement} */ (el);
-        if (field.value.trim() === '') {
-            field.value = '0';
-            updateProfitPreview();
+krtEvents.on('input', 'rod-update-profit', updateProfitPreview);
+krtEvents.on('focusout', 'rod-update-profit', (el) => {
+    const field = /** @type {HTMLInputElement} */ (el);
+    if (field.value.trim() === '') {
+        field.value = '0';
+        updateProfitPreview();
+    }
+});
+krtEvents.on('click', 'rod-set-started-now', setStartedAtNow);
+krtEvents.on('change', 'rod-update-method', updateMethodRatings);
+krtEvents.on('click', 'rod-add-material', addMaterialRow);
+krtEvents.on('click', 'rod-remove-material', (el) => {
+    removeMaterialRow(el);
+});
+krtEvents.on('change', 'rod-update-output', (el) => {
+    updateOutputMaterial(el);
+});
+krtEvents.on('change', 'rod-location-change', (el) => {
+    krtRefineryYield.onLocationChange(/** @type {KrtRefineryControl} */ (el));
+});
+krtEvents.on('input', 'rod-calc-scu', (el) => {
+    calcScu(el.getAttribute('data-index'));
+});
+krtEvents.on('click', 'rod-open-store', openStoreModal);
+krtEvents.on('click', 'rod-discard', discardRefineryEdits);
+krtEvents.on('click', 'rod-close-store', closeStoreModal);
+krtEvents.on('click', 'rod-duplicate-store', (el) => {
+    duplicateStoreItem(el);
+});
+krtEvents.on('submit', 'rod-disable-submit', (el) => {
+    const btn = /** @type {HTMLButtonElement | null} */ (el.querySelector('button[type=submit]'));
+    if (btn) {
+        btn.disabled = true;
+        const btnLabel = btn.querySelector('span');
+        if (btnLabel) {
+            btnLabel.textContent = MSG_SAVING;
+        } else {
+            btn.innerText = MSG_SAVING;
         }
-    });
-    window.krtEvents.on('click', 'rod-set-started-now', setStartedAtNow);
-    window.krtEvents.on('change', 'rod-update-method', updateMethodRatings);
-    window.krtEvents.on('click', 'rod-add-material', addMaterialRow);
-    window.krtEvents.on('click', 'rod-remove-material', (el) => {
-        removeMaterialRow(el);
-    });
-    window.krtEvents.on('change', 'rod-update-output', (el) => {
-        updateOutputMaterial(el);
-    });
-    window.krtEvents.on('change', 'rod-location-change', (el) => {
-        window.krtRefineryYield.onLocationChange(/** @type {KrtRefineryControl} */ (el));
-    });
-    window.krtEvents.on('input', 'rod-calc-scu', (el) => {
-        calcScu(el.getAttribute('data-index'));
-    });
-    window.krtEvents.on('click', 'rod-open-store', openStoreModal);
-    window.krtEvents.on('click', 'rod-discard', discardRefineryEdits);
-    window.krtEvents.on('click', 'rod-close-store', closeStoreModal);
-    window.krtEvents.on('click', 'rod-duplicate-store', (el) => {
-        duplicateStoreItem(el);
-    });
-    window.krtEvents.on('submit', 'rod-disable-submit', (el) => {
-        const btn = /** @type {HTMLButtonElement | null} */ (
-            el.querySelector('button[type=submit]')
-        );
-        if (btn) {
-            btn.disabled = true;
-            const btnLabel = btn.querySelector('span');
-            if (btnLabel) {
-                btnLabel.textContent = MSG_SAVING;
-            } else {
-                btn.innerText = MSG_SAVING;
-            }
-        }
-    });
-}
+    }
+});
 
 /**
  * Drops the unsaved edits of the order form by re-rendering its section from the server.
  */
 function discardRefineryEdits() {
-    if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
+    resetUnsavedChanges();
     if (refinerySeam) refinerySeam.refresh(['order'], { broadcast: false });
 }
 
@@ -805,7 +797,7 @@ function submitRefineryMainForm(form, submitter) {
         successMessage: REFINERY_DETAIL_MSG.updateSuccess,
         errorMessage: MSG_REFINERY_UPDATE_FAILED,
         onSuccess() {
-            if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
+            resetUnsavedChanges();
             return refinerySeam ? refinerySeam.refresh(['order', 'store']) : undefined;
         },
     });
@@ -834,8 +826,8 @@ function submitRefineryStoreForm(form, submitter) {
 }
 
 async function submitRefineryCancelForm(form, submitter) {
-    if (typeof window.showKrtConfirm === 'function') {
-        const ok = await window.showKrtConfirm(
+    {
+        const ok = await showKrtConfirm(
             MSG_CANCEL_TITLE,
             MSG_CANCEL_CONFIRM,
             MSG_CANCEL_TITLE,
@@ -848,7 +840,7 @@ async function submitRefineryCancelForm(form, submitter) {
         submitter,
         errorMessage: MSG_REFINERY_CANCEL_FAILED,
         onSuccess(body) {
-            if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
+            resetUnsavedChanges();
             if (refinerySeam) refinerySeam.notify(['order', 'store']);
             if (body && body.targetUrl) window.location.assign(body.targetUrl);
             else window.location.reload();
@@ -867,9 +859,9 @@ function refineryStoreJobOrderIds(form) {
 }
 
 function crossPublishStoredStock(jobOrderIds) {
-    if (!window.krtLiveSync || typeof window.krtLiveSync.sendChanged !== 'function') return;
+    if (typeof krtLiveSync.sendChanged !== 'function') return;
     jobOrderIds.forEach((jobOrderId) => {
-        window.krtLiveSync.sendChanged(`order:${jobOrderId}`, ['materials', 'aggregated']);
+        krtLiveSync.sendChanged(`order:${jobOrderId}`, ['materials', 'aggregated']);
     });
 }
 

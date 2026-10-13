@@ -21,6 +21,9 @@
 
 /* global ALIAS_MSG, ALIAS_CONFLICT */
 
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtHtml } from '/js/kernel/krt-html.js';
+
 document.addEventListener('DOMContentLoaded', () => {
     const table = document.getElementById('aliasesTable');
     const tbody = table ? table.querySelector('tbody') : null;
@@ -170,10 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         event.preventDefault();
-        if (!window.krtFetch) {
-            form.submit();
-            return;
-        }
+
         const submitBtn = /** @type {HTMLButtonElement | null} */ (
             form.querySelector('button[type="submit"]')
         );
@@ -223,7 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
             }
         }
-        window.krtFetch.write(opts).finally(() => {
+        krtFetch.write(opts).finally(() => {
             if (submitBtn) {
                 submitBtn.disabled = false;
             }

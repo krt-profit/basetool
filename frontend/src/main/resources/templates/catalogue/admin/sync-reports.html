@@ -102,7 +102,7 @@
         deleteError:     /*[[#{error.admin.syncReports.delete}]]*/ 'Löschen fehlgeschlagen.'
     };
 </script>
-<script th:src="@{/js/catalogue/sync-reports.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/catalogue/sync-reports.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

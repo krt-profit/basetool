@@ -24,24 +24,23 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.AllocationReductionDto;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
-import de.greluc.krt.profit.basetool.backend.mapper.JobOrderHandoverMapper;
-import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.JobOrder;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderHandover;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverDto;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.service.AuditService;
-import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipService;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverMapper;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -67,7 +66,7 @@ class JobOrderHandoverServiceTest {
   @Mock private OrgUnitMembershipService orgUnitMembershipService;
 
   @Mock
-  private de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository orgUnitRepository;
+  private de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository orgUnitRepository;
 
   @Mock private AuditService auditService;
   @InjectMocks private JobOrderHandoverService service;
@@ -78,7 +77,7 @@ class JobOrderHandoverServiceTest {
   private JobOrder order;
   private InventoryItem inventoryItem;
   private de.greluc.krt.profit.basetool.backend.catalogue.api.Material material;
-  private de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial jobOrderMaterial;
+  private de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial jobOrderMaterial;
 
   @BeforeEach
   void setUp() {
@@ -96,7 +95,7 @@ class JobOrderHandoverServiceTest {
     material = new de.greluc.krt.profit.basetool.backend.catalogue.api.Material();
     material.setId(materialId);
 
-    jobOrderMaterial = new de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial();
+    jobOrderMaterial = new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial();
     jobOrderMaterial.setId(UUID.randomUUID());
     jobOrderMaterial.setMaterial(material);
     jobOrderMaterial.setAmount(10.0);
@@ -114,7 +113,7 @@ class JobOrderHandoverServiceTest {
 
   @Test
   void createHandover_shouldRejectItemOrder_soProductionRemainsTheSoleMaterialConsumer() {
-    order.setType(de.greluc.krt.profit.basetool.backend.model.JobOrderType.ITEM);
+    order.setType(de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType.ITEM);
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null, null);
     JobOrderHandoverCreateDto createDto =
@@ -137,6 +136,9 @@ class JobOrderHandoverServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
+    org.mockito.Mockito.lenient()
+        .when(inventoryItemRepository.findById(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
     when(jobOrderHandoverRepository.save(any())).thenAnswer(i -> i.getArgument(0));
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
         .thenReturn(mock(JobOrderHandoverDto.class));
@@ -157,8 +159,8 @@ class JobOrderHandoverServiceTest {
 
   @Test
   void createHandover_shouldAutoClampMissionEarmark_whenDualTaggedPartialHandover() {
-    de.greluc.krt.profit.basetool.backend.model.Mission mission =
-        new de.greluc.krt.profit.basetool.backend.model.Mission();
+    de.greluc.krt.profit.basetool.backend.mission.api.Mission mission =
+        new de.greluc.krt.profit.basetool.backend.mission.api.Mission();
     mission.setId(UUID.randomUUID());
     InventoryAllocations.addMission(inventoryItem, mission.getId(), 10.0);
 
@@ -169,6 +171,9 @@ class JobOrderHandoverServiceTest {
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
+    org.mockito.Mockito.lenient()
+        .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
     when(jobOrderHandoverRepository.save(any())).thenAnswer(i -> i.getArgument(0));
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
@@ -184,11 +189,11 @@ class JobOrderHandoverServiceTest {
 
   @Test
   void createHandover_shouldApplyExplicitMissionPlan_whenAmbiguousMultiMission() {
-    de.greluc.krt.profit.basetool.backend.model.Mission missionA =
-        new de.greluc.krt.profit.basetool.backend.model.Mission();
+    de.greluc.krt.profit.basetool.backend.mission.api.Mission missionA =
+        new de.greluc.krt.profit.basetool.backend.mission.api.Mission();
     missionA.setId(UUID.randomUUID());
-    de.greluc.krt.profit.basetool.backend.model.Mission missionB =
-        new de.greluc.krt.profit.basetool.backend.model.Mission();
+    de.greluc.krt.profit.basetool.backend.mission.api.Mission missionB =
+        new de.greluc.krt.profit.basetool.backend.mission.api.Mission();
     missionB.setId(UUID.randomUUID());
     InventoryAllocations.addMission(inventoryItem, missionA.getId(), 6.0);
     InventoryAllocations.addMission(inventoryItem, missionB.getId(), 4.0);
@@ -201,6 +206,9 @@ class JobOrderHandoverServiceTest {
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
+    org.mockito.Mockito.lenient()
+        .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
     when(jobOrderHandoverRepository.save(any())).thenAnswer(i -> i.getArgument(0));
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
@@ -242,6 +250,9 @@ class JobOrderHandoverServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
+    org.mockito.Mockito.lenient()
+        .when(inventoryItemRepository.findById(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
 
     BadRequestException ex =
         assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
@@ -262,9 +273,12 @@ class JobOrderHandoverServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
+    org.mockito.Mockito.lenient()
+        .when(inventoryItemRepository.findById(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
 
-    de.greluc.krt.profit.basetool.backend.model.JobOrderHandover[] persistedHandover =
-        new de.greluc.krt.profit.basetool.backend.model.JobOrderHandover[1];
+    de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover[] persistedHandover =
+        new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover[1];
     when(jobOrderHandoverRepository.save(any()))
         .thenAnswer(
             i -> {
@@ -303,6 +317,9 @@ class JobOrderHandoverServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
+    org.mockito.Mockito.lenient()
+        .when(inventoryItemRepository.findById(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
 
     BadRequestException ex =
         assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
@@ -321,6 +338,9 @@ class JobOrderHandoverServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
+    org.mockito.Mockito.lenient()
+        .when(inventoryItemRepository.findById(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
 
     BadRequestException ex =
         assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
@@ -336,8 +356,8 @@ class JobOrderHandoverServiceTest {
         new de.greluc.krt.profit.basetool.backend.catalogue.api.Material();
     material2.setId(materialId2);
 
-    de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial jobOrderMaterial2 =
-        new de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial();
+    de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial jobOrderMaterial2 =
+        new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial();
     jobOrderMaterial2.setQualityTier(
         de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures.none());
     jobOrderMaterial2.setId(UUID.randomUUID());
@@ -362,7 +382,13 @@ class JobOrderHandoverServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
+    org.mockito.Mockito.lenient()
+        .when(inventoryItemRepository.findById(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId2))
+        .thenReturn(Optional.of(inventoryItem2));
+    org.mockito.Mockito.lenient()
+        .when(inventoryItemRepository.findById(inventoryId2))
         .thenReturn(Optional.of(inventoryItem2));
     when(jobOrderHandoverRepository.save(any())).thenAnswer(i -> i.getArgument(0));
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
@@ -396,8 +422,8 @@ class JobOrderHandoverServiceTest {
         new de.greluc.krt.profit.basetool.backend.catalogue.api.Material();
     material2.setId(materialId2);
 
-    de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial jobOrderMaterial2 =
-        new de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial();
+    de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial jobOrderMaterial2 =
+        new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial();
     jobOrderMaterial2.setQualityTier(
         de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures.none());
     jobOrderMaterial2.setId(UUID.randomUUID());
@@ -422,7 +448,13 @@ class JobOrderHandoverServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
+    org.mockito.Mockito.lenient()
+        .when(inventoryItemRepository.findById(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId2))
+        .thenReturn(Optional.of(inventoryItem2));
+    org.mockito.Mockito.lenient()
+        .when(inventoryItemRepository.findById(inventoryId2))
         .thenReturn(Optional.of(inventoryItem2));
     when(jobOrderHandoverRepository.save(any())).thenAnswer(i -> i.getArgument(0));
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
@@ -447,6 +479,9 @@ class JobOrderHandoverServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
+    org.mockito.Mockito.lenient()
+        .when(inventoryItemRepository.findById(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
     when(jobOrderHandoverRepository.save(any())).thenAnswer(i -> i.getArgument(0));
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
         .thenReturn(mock(JobOrderHandoverDto.class));
@@ -466,6 +501,9 @@ class JobOrderHandoverServiceTest {
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
+    org.mockito.Mockito.lenient()
+        .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
     when(jobOrderHandoverRepository.save(any())).thenAnswer(i -> i.getArgument(0));
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
@@ -496,6 +534,9 @@ class JobOrderHandoverServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
+    org.mockito.Mockito.lenient()
+        .when(inventoryItemRepository.findById(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
 
     BadRequestException ex =
         assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
@@ -510,6 +551,9 @@ class JobOrderHandoverServiceTest {
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
+    org.mockito.Mockito.lenient()
+        .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
 
     BadRequestException ex =
@@ -530,6 +574,9 @@ class JobOrderHandoverServiceTest {
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
+    org.mockito.Mockito.lenient()
+        .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
     when(jobOrderHandoverRepository.save(any())).thenAnswer(i -> i.getArgument(0));
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
@@ -558,6 +605,9 @@ class JobOrderHandoverServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
+    org.mockito.Mockito.lenient()
+        .when(inventoryItemRepository.findById(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
     when(jobOrderHandoverRepository.save(any())).thenAnswer(i -> i.getArgument(0));
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
         .thenReturn(mock(JobOrderHandoverDto.class));
@@ -583,6 +633,9 @@ class JobOrderHandoverServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
+    org.mockito.Mockito.lenient()
+        .when(inventoryItemRepository.findById(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
 
     BadRequestException ex =
         assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
@@ -595,12 +648,12 @@ class JobOrderHandoverServiceTest {
 
   @Test
   void createHandover_shouldSucceed_whenInventoryItemBelongsToForeignSquadron() {
-    de.greluc.krt.profit.basetool.backend.model.Squadron squadronA =
-        new de.greluc.krt.profit.basetool.backend.model.Squadron();
+    de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron squadronA =
+        new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
     squadronA.setId(UUID.randomUUID());
     squadronA.setShorthand("ALF");
-    de.greluc.krt.profit.basetool.backend.model.Squadron squadronB =
-        new de.greluc.krt.profit.basetool.backend.model.Squadron();
+    de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron squadronB =
+        new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
     squadronB.setId(UUID.randomUUID());
     squadronB.setShorthand("BRV");
 
@@ -616,6 +669,9 @@ class JobOrderHandoverServiceTest {
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
+    org.mockito.Mockito.lenient()
+        .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
     when(jobOrderHandoverRepository.save(any())).thenAnswer(i -> i.getArgument(0));
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
@@ -638,8 +694,8 @@ class JobOrderHandoverServiceTest {
         new de.greluc.krt.profit.basetool.backend.catalogue.api.Material();
     material2.setId(materialId2);
 
-    de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial jobOrderMaterial2 =
-        new de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial();
+    de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial jobOrderMaterial2 =
+        new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial();
     jobOrderMaterial2.setQualityTier(
         de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures.none());
     jobOrderMaterial2.setId(UUID.randomUUID());
@@ -664,7 +720,13 @@ class JobOrderHandoverServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
+    org.mockito.Mockito.lenient()
+        .when(inventoryItemRepository.findById(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId2))
+        .thenReturn(Optional.of(inventoryItem2));
+    org.mockito.Mockito.lenient()
+        .when(inventoryItemRepository.findById(inventoryId2))
         .thenReturn(Optional.of(inventoryItem2));
     when(jobOrderHandoverRepository.save(any())).thenAnswer(i -> i.getArgument(0));
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
@@ -699,6 +761,9 @@ class JobOrderHandoverServiceTest {
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
+    org.mockito.Mockito.lenient()
+        .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
     when(jobOrderHandoverRepository.save(any())).thenAnswer(i -> i.getArgument(0));
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
@@ -739,6 +804,9 @@ class JobOrderHandoverServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
+    org.mockito.Mockito.lenient()
+        .when(inventoryItemRepository.findById(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
     when(jobOrderHandoverRepository.save(any())).thenAnswer(i -> i.getArgument(0));
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
         .thenReturn(mock(JobOrderHandoverDto.class));
@@ -776,6 +844,9 @@ class JobOrderHandoverServiceTest {
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
+    org.mockito.Mockito.lenient()
+        .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
     when(jobOrderHandoverRepository.save(any())).thenAnswer(i -> i.getArgument(0));
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))

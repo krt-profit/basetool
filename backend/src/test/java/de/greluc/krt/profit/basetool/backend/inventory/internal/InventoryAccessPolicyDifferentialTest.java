@@ -25,22 +25,22 @@ import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
-import de.greluc.krt.profit.basetool.backend.model.Squadron;
-import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
-import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
+import de.greluc.krt.profit.basetool.backend.scope.api.UserAccessPolicy;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -255,8 +255,7 @@ class InventoryAccessPolicyDifferentialTest {
               cascade,
               new StaffelMembershipResolver(mock(SquadronRepository.class), orgUnits),
               request);
-      AccessGateService accessGateService =
-          new AccessGateService(resolver, authHelper, memberships);
+      AccessGateService accessGateService = new AccessGateService(resolver, authHelper);
       OwnerScopeService ownerScopeService =
           new OwnerScopeService(
               resolver,
@@ -266,7 +265,11 @@ class InventoryAccessPolicyDifferentialTest {
       scopeHub =
           new ScopeHubInventoryGates(
               accessGateService, authHelper, resolver, repository, memberships);
-      policy = new InventoryAccessPolicy(ownerScopeService, repository);
+      policy =
+          new InventoryAccessPolicy(
+              ownerScopeService,
+              repository,
+              new UserAccessPolicy(accessGateService, authHelper, memberships));
     }
 
     private void row(InventoryItemRepository repository, String label, UUID unit, UUID owner) {

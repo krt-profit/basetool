@@ -70,6 +70,7 @@ public class Manufacturer extends AbstractEntity<UUID> {
   @Column private String wiki;
 
   @Column(columnDefinition = "TEXT")
+  @Nullable
   private String description;
 
   private boolean hidden = false;

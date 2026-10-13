@@ -21,6 +21,14 @@
 
 /* global hangarI18n, hangarConflict */
 
+import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+
 document.addEventListener('DOMContentLoaded', () => {
     const modal = document.getElementById('ship-modal');
     const closeBtn = document.querySelector('.close-ship-modal');
@@ -46,13 +54,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function reswapHangar() {
-        if (window.krtFetch) {
-            window.krtFetch.swap({
-                url: currentListUrl(),
-                container: '#hangar-results',
-                history: false,
-            });
-        }
+        krtFetch.swap({
+            url: currentListUrl(),
+            container: '#hangar-results',
+            history: false,
+        });
     }
 
     const HANGAR_SECTIONS = { ships: { container: '#hangar-results' } };
@@ -61,21 +67,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function afterHangarWrite() {
         reswapHangar();
-        if (
-            hangarTopic &&
-            window.krtLiveSync &&
-            typeof window.krtLiveSync.sendChanged === 'function'
-        ) {
-            window.krtLiveSync.sendChanged(hangarTopic, Object.keys(HANGAR_SECTIONS));
+        if (hangarTopic && typeof krtLiveSync.sendChanged === 'function') {
+            krtLiveSync.sendChanged(hangarTopic, Object.keys(HANGAR_SECTIONS));
         }
     }
 
-    if (
-        hangarTopic &&
-        window.krtLiveSync &&
-        typeof window.krtLiveSync.createReceiver === 'function'
-    ) {
-        window.krtLiveSync.createReceiver({
+    if (hangarTopic) {
+        krtLiveSync.createReceiver({
             topic: hangarTopic,
             sections: HANGAR_SECTIONS,
             coalesceMs: 1500,
@@ -213,14 +211,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (insuranceMonths) insuranceMonths.addEventListener('input', syncInsurance);
 
     function openModal() {
-        window.krtModal.open(modal);
+        krtModal.open(modal);
     }
 
     function closeModal() {
-        if (typeof window.resetUnsavedChanges === 'function') {
-            window.resetUnsavedChanges();
-        }
-        window.krtModal.close(modal);
+        resetUnsavedChanges();
+        krtModal.close(modal);
     }
 
     if (closeBtn) closeBtn.addEventListener('click', closeModal);
@@ -233,7 +229,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.addEventListener('click', (e) => {
         if (e.target === modal) closeModal();
-        if (deleteModal && e.target === deleteModal) window.krtModal.close(deleteModal);
+        if (deleteModal && e.target === deleteModal) krtModal.close(deleteModal);
     });
 
     const modalDeleteBtn = /** @type {HTMLElement} */ (document.getElementById('modal-delete-btn'));
@@ -245,7 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function openAddModal(btn) {
         modalTitle.textContent = form.getAttribute('data-title-add');
-        form.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
+        assignFormAction(form, safeSameOriginUrl(btn.getAttribute('data-action'), form.action));
         shipField('ship-name').value = '';
         shipField('ship-type').value = '';
         setInsurance('');
@@ -263,7 +259,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function openEditModal(btn) {
         modalTitle.textContent = form.getAttribute('data-title-edit');
-        form.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
+        assignFormAction(form, safeSameOriginUrl(btn.getAttribute('data-action'), form.action));
         shipField('ship-name').value = btn.getAttribute('data-name') ?? '';
         shipField('ship-type').value = btn.getAttribute('data-type') ?? '';
         setInsurance(btn.getAttribute('data-ins'));
@@ -276,24 +272,22 @@ document.addEventListener('DOMContentLoaded', () => {
         openModal();
     }
 
-    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-        window.krtEvents.on('click', 'hangar-add-ship', openAddModal);
-        window.krtEvents.on('click', 'hangar-edit-ship', openEditModal);
-    }
+    krtEvents.on('click', 'hangar-add-ship', openAddModal);
+    krtEvents.on('click', 'hangar-edit-ship', openEditModal);
 
     modalDeleteBtn.addEventListener('click', () => {
         if (!deleteForm) return;
-        deleteForm.action = window.safeSameOriginUrl(
-            modalDeleteBtn.getAttribute('data-action'),
-            deleteForm.action,
+        assignFormAction(
+            deleteForm,
+            safeSameOriginUrl(modalDeleteBtn.getAttribute('data-action'), deleteForm.action),
         );
-        window.krtModal.open(deleteModal);
+        krtModal.open(deleteModal);
     });
 
     if (deleteModal) {
         closeDeleteBtns.forEach((btn) => {
             btn.addEventListener('click', () => {
-                window.krtModal.close(deleteModal);
+                krtModal.close(deleteModal);
             });
         });
     }
@@ -305,18 +299,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 deleteForm.querySelector('button[type="submit"]')
             );
             if (submitBtn) submitBtn.disabled = true;
-            window.krtFetch
+            krtFetch
                 .write({
                     method: 'POST',
-                    url: window.safeSameOriginUrl(
-                        deleteForm.getAttribute('action'),
-                        deleteForm.action,
-                    ),
+                    url: safeSameOriginUrl(deleteForm.getAttribute('action'), deleteForm.action),
                     successMessage: hangarI18n.deleteSuccess,
                     errorMessage: hangarI18n.deleteError,
                     conflict: hangarConflict,
                     onSuccess() {
-                        if (deleteModal) window.krtModal.close(deleteModal);
+                        if (deleteModal) krtModal.close(deleteModal);
                         closeModal();
                         afterHangarWrite();
                     },
@@ -352,9 +343,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function showError(msg) {
-            if (window.showFrontendErrorToast) {
-                window.showFrontendErrorToast(msg);
-            }
+            showFrontendErrorToast(msg);
         }
 
         function fillParagraphs(list, names) {
@@ -388,13 +377,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             dupSection.hidden = !hasDuplicates;
 
-            window.krtModal.open(resultModal);
+            krtModal.open(resultModal);
         }
 
         [closeResultBtn, closeResultX].forEach((btn) => {
             if (!btn) return;
             btn.addEventListener('click', () => {
-                window.krtModal.close(resultModal);
+                krtModal.close(resultModal);
                 if (resultElement('import-res-imported').textContent !== '0') {
                     afterHangarWrite();
                 }
@@ -403,7 +392,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         window.addEventListener('click', (e) => {
             if (e.target === resultModal) {
-                window.krtModal.close(resultModal);
+                krtModal.close(resultModal);
             }
         });
 
@@ -416,9 +405,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 showError(button.getAttribute('data-error-toolarge'));
                 return;
             }
-            if (!window.krtFetch) {
-                return;
-            }
+
             const formData = new FormData();
             formData.append('file', file);
 
@@ -429,7 +416,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             button.setAttribute('aria-busy', 'true');
-            window.krtFetch
+            krtFetch
                 .submitForm({
                     url: '/hangar/import/ships',
                     method: 'POST',
@@ -483,16 +470,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         deleteAllBtn.addEventListener('click', () => {
             if (deleteAllBtn.disabled) return;
-            window.krtModal.open(deleteAllModal);
+            krtModal.open(deleteAllModal);
         });
 
         deleteAllCancelBtn.addEventListener('click', () => {
-            window.krtModal.close(deleteAllModal);
+            krtModal.close(deleteAllModal);
         });
 
         window.addEventListener('click', (e) => {
             if (e.target === deleteAllModal) {
-                window.krtModal.close(deleteAllModal);
+                krtModal.close(deleteAllModal);
             }
         });
 
@@ -500,7 +487,7 @@ document.addEventListener('DOMContentLoaded', () => {
             deleteAllConfirmBtn.disabled = true;
             deleteAllCancelBtn.disabled = true;
 
-            window.krtFetch
+            krtFetch
                 .write({
                     method: 'DELETE',
                     url: '/hangar/ships/all',
@@ -510,13 +497,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     ),
                     conflict: hangarConflict,
                     onSuccess() {
-                        window.krtModal.close(deleteAllModal);
+                        krtModal.close(deleteAllModal);
                         afterHangarWrite();
-                        if (window.showFrontendSuccessToast) {
-                            window.showFrontendSuccessToast(
-                                /** @type {string} */ (deleteAllBtn.getAttribute('data-success')),
-                            );
-                        }
+                        showFrontendSuccessToast(
+                            /** @type {string} */ (deleteAllBtn.getAttribute('data-success')),
+                        );
                     },
                 })
                 .then(() => {
@@ -531,7 +516,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!homeModal) return;
 
         function closeHome() {
-            window.krtModal.close(homeModal);
+            krtModal.close(homeModal);
         }
 
         function refreshHomeBody() {
@@ -543,13 +528,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-            window.krtEvents.on('click', 'hangar-open-home', (btn) => {
-                if (btn && /** @type {HTMLButtonElement} */ (btn).disabled) return;
-                refreshHomeBody();
-                window.krtModal.open(homeModal);
-            });
-        }
+        krtEvents.on('click', 'hangar-open-home', (btn) => {
+            if (btn && /** @type {HTMLButtonElement} */ (btn).disabled) return;
+            refreshHomeBody();
+            krtModal.open(homeModal);
+        });
 
         homeModal.querySelectorAll('.close-home-cancel, .close-modal-home').forEach((el) => {
             el.addEventListener('click', closeHome);
@@ -577,13 +560,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 if (submitBtn) submitBtn.disabled = true;
-                window.krtFetch
+                krtFetch
                     .write({
                         method: 'POST',
-                        url: window.safeSameOriginUrl(
-                            homeForm.getAttribute('action'),
-                            homeForm.action,
-                        ),
+                        url: safeSameOriginUrl(homeForm.getAttribute('action'), homeForm.action),
                         payload: { locationId },
                         successMessage: hangarI18n.homeSuccess,
                         errorMessage: hangarI18n.homeError,
@@ -621,10 +601,10 @@ document.addEventListener('DOMContentLoaded', () => {
             form.querySelector('button[type="submit"]')
         );
         if (submitBtn) submitBtn.disabled = true;
-        window.krtFetch
+        krtFetch
             .write({
                 method: 'POST',
-                url: window.safeSameOriginUrl(action, action),
+                url: safeSameOriginUrl(action, action),
                 payload,
                 successMessage: isUpdate ? hangarI18n.updateSuccess : hangarI18n.addSuccess,
                 errorMessage: isUpdate ? hangarI18n.updateError : hangarI18n.addError,
@@ -687,11 +667,11 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function applyHangarFilter(url) {
         const target = url || filterUrl();
-        if (!hangarResults || !window.krtFetch) {
+        if (!hangarResults) {
             window.location.assign(target);
             return;
         }
-        window.krtFetch.swap({ url: target, container: hangarResults, history: true });
+        krtFetch.swap({ url: target, container: hangarResults, history: true });
     }
 
     if (filterForm) {
@@ -750,7 +730,5 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    if (window.krtFetch && typeof window.krtFetch.bindSwap === 'function') {
-        window.krtFetch.bindSwap({ container: '#hangar-results', history: true });
-    }
+    krtFetch.bindSwap({ container: '#hangar-results', history: true });
 });

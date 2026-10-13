@@ -20,11 +20,11 @@
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockSoldForTarget;
-import de.greluc.krt.profit.basetool.backend.model.FinanceType;
-import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
-import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
-import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.FinanceType;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntry;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;

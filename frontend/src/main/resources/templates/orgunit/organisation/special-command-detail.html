@@ -79,7 +79,7 @@
         reloadQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Neu laden?'
     };
 </script>
-<script th:src="@{/js/orgunit/special-command-detail.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/orgunit/special-command-detail.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

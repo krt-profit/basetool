@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.backend.inventory.api.events;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;

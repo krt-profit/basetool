@@ -27,23 +27,24 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeRepository;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
-import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
+import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.mission.api.MemberPayoutSettings;
+import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionUnit;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSectionVersions.MissionSection;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
-import de.greluc.krt.profit.basetool.backend.model.MissionUnit;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -82,6 +83,8 @@ public class MissionParticipantService {
 
   /** Repository used to resolve a linked user and the guest-name promotion match. */
   private final UserRepository userRepository;
+
+  private final MemberPayoutSettings memberPayoutSettings;
 
   /** Repository used to resolve the desired/planned mission job type references. */
   private final JobTypeRepository jobTypeRepository;
@@ -125,8 +128,8 @@ public class MissionParticipantService {
    * participant keeps the submitted {@code orgUnitIds}. A non-null {@code payoutPreference}
    * overrides the profile default (REQ-MISSION-002).
    *
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when any referenced
-   *     id is unknown
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when any referenced id
+   *     is unknown
    */
   @Transactional
   public Mission addParticipant(
@@ -182,9 +185,7 @@ public class MissionParticipantService {
       User user = Entities.require(userRepository.findPlainById(effectiveUserId), "User not found");
       participant.setUser(user);
       participant.setOrgUnits(resolveMembershipOrgUnits(user.getId()));
-      if (user.getDefaultPayoutPreference() != null) {
-        participant.setPayoutPreference(user.getDefaultPayoutPreference());
-      }
+      memberPayoutSettings.defaultFor(user.getId()).ifPresent(participant::setPayoutPreference);
     } else {
       participant.setGuestName(effectiveGuestName);
       participant.setOrgUnits(resolveSubmittedOrgUnits(orgUnitIds));
@@ -218,7 +219,7 @@ public class MissionParticipantService {
    * Returns a participant of the given mission; a participant of another mission counts as not
    * found.
    *
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the participant
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the participant
    *     does not exist on this mission
    */
   public MissionParticipant getParticipant(@NotNull UUID missionId, @NotNull UUID participantId) {
@@ -289,8 +290,8 @@ public class MissionParticipantService {
    *
    * @param authentication the caller; a caller who may not manage the mission can neither set the
    *     planned job type nor rename the row onto a member or another guest
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the participant
-   *     or any referenced id is unknown
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the participant or
+   *     any referenced id is unknown
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when stale
    */
   @Transactional
@@ -517,8 +518,8 @@ public class MissionParticipantService {
    *     clear
    * @param expectedPartyLeadVersion expected value of {@code Mission.partyLeadVersion}
    * @return the managed mission with the party lead applied
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the mission or
-   *     the referenced user is unknown
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the mission or the
+   *     referenced user is unknown
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
    *     expectedPartyLeadVersion} is stale
    */

@@ -18,7 +18,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-(function () {
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
+function initPendingApproval() {
     const POLL_INTERVAL_MS = 20000;
     const STATE_ACTIVE = 'ACTIVE';
     const STATE_REJECTED = 'REJECTED';
@@ -69,7 +71,7 @@
     }
 
     function poll() {
-        window.krtFetch
+        krtFetch
             .getJson(statusUrl)
             .then((data) => {
                 const status = data ? data.approvalStatus : null;
@@ -100,4 +102,6 @@
     });
 
     schedule();
-})();
+}
+
+initPendingApproval();

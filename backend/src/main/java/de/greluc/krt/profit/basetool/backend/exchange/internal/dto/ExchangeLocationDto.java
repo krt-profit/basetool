@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.exchange.internal.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A non-hidden Lager location for external clients, in the shape of the published {@code
@@ -29,7 +30,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
  * @param uex the UEX place the location stands for, or {@code null} when it has none
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public record ExchangeLocationDto(String name, UexRef uex) {
+public record ExchangeLocationDto(String name, @Nullable UexRef uex) {
 
   /**
    * A UEX place.

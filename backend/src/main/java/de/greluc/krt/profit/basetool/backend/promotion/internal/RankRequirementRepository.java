@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.promotion.internal;
 
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -62,7 +63,7 @@ public interface RankRequirementRepository extends JpaRepository<RankRequirement
       :owningSquadronId
       """)
   Page<RankRequirement> findAllScoped(
-      @Param("owningSquadronId") UUID owningSquadronId, Pageable pageable);
+      @Param("owningSquadronId") @Nullable UUID owningSquadronId, Pageable pageable);
 
   /**
    * Squadron-scoped variant of {@link #findAllByFromRankAndToRankOrderByIdAsc(int, int)}. Same
@@ -82,7 +83,7 @@ public interface RankRequirementRepository extends JpaRepository<RankRequirement
   List<RankRequirement> findScopedByFromRankAndToRank(
       @Param("fromRank") int fromRank,
       @Param("toRank") int toRank,
-      @Param("owningSquadronId") UUID owningSquadronId);
+      @Param("owningSquadronId") @Nullable UUID owningSquadronId);
 
   /**
    * Paginated variant of {@link #findAllByFromRankAndToRankOrderByIdAsc(int, int)} for admin REST
@@ -125,7 +126,7 @@ public interface RankRequirementRepository extends JpaRepository<RankRequirement
       OR r.owningSquadron.id = :owningSquadronId ORDER BY r.fromRank DESC, r.toRank DESC
       """)
   List<Object[]> findDistinctRankTransitionsScoped(
-      @Param("owningSquadronId") UUID owningSquadronId);
+      @Param("owningSquadronId") @Nullable UUID owningSquadronId);
 
   /**
    * JOIN-FETCH variant of {@link #findAllByFromRankAndToRankOrderByIdAsc(int, int)} used by the
@@ -174,5 +175,5 @@ public interface RankRequirementRepository extends JpaRepository<RankRequirement
   List<RankRequirement> findAllForRankTransitionWithRelationsScoped(
       @Param("fromRank") int fromRank,
       @Param("toRank") int toRank,
-      @Param("owningSquadronId") UUID owningSquadronId);
+      @Param("owningSquadronId") @Nullable UUID owningSquadronId);
 }

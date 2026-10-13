@@ -21,26 +21,26 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
-import de.greluc.krt.profit.basetool.backend.mapper.JobOrderMapper;
-import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
-import de.greluc.krt.profit.basetool.backend.model.JobOrder;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.LinkedStockAttributionDto;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemService;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMapper;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterialRequirementResolver;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterialRequirementResolver.MaterialRequirement;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService.OrderLinkedStockIndex;
+import de.greluc.krt.profit.basetool.backend.joborder.api.LinkedStockAttributionDto;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
-import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
-import de.greluc.krt.profit.basetool.backend.service.JobOrderMaterialRequirementResolver;
-import de.greluc.krt.profit.basetool.backend.service.JobOrderMaterialRequirementResolver.MaterialRequirement;
-import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService;
-import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService.OrderLinkedStockIndex;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -332,7 +332,7 @@ public class JobOrderQueryService {
    *
    * @param id job order primary key
    * @return the order as a DTO
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no match
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no match
    */
   public JobOrderDto getJobOrderById(UUID id) {
     JobOrder jobOrder =

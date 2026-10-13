@@ -20,14 +20,15 @@
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankNotices;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncFollowUp;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -80,7 +81,9 @@ public class BankHolderReconciliationService implements UserSyncFollowUp {
     Map<UUID, BankHolder> holderByUser =
         staffHolders.stream()
             .filter(h -> h.getUser() != null)
-            .collect(Collectors.toMap(h -> h.getUser().getId(), h -> h, (a, _) -> a));
+            .collect(
+                Collectors.toMap(
+                    h -> Objects.requireNonNull(h.getUser()).getId(), h -> h, (a, _) -> a));
 
     int created = 0;
     Set<UUID> missing =

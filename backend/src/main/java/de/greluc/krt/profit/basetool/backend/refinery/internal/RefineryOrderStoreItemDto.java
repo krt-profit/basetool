@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityAware;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ValidQuantityAmount;
-import de.greluc.krt.profit.basetool.backend.validation.QualityValue;
+import de.greluc.krt.profit.basetool.backend.kernel.QualityValue;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.util.UUID;

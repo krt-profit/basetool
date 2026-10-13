@@ -20,12 +20,12 @@
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankNotices;
-import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.List;
@@ -35,6 +35,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -177,7 +178,7 @@ public class BankHolderService {
    * @param sign the wanted amount sign (+1, -1)
    * @return the matching account leg, or {@code null}
    */
-  private static BankCounterLeg matchAccountLeg(
+  private static @Nullable BankCounterLeg matchAccountLeg(
       @NotNull List<BankCounterLeg> accountLegs, int sign) {
     return accountLegs.stream()
         .filter(leg -> leg.amount().signum() == sign)
@@ -194,7 +195,8 @@ public class BankHolderService {
    * @param sign the wanted amount sign (+1, -1)
    * @return the matching holder's handle, or {@code null}
    */
-  private static String matchHolderHandle(@NotNull List<BankHolderLeg> holderLegs, int sign) {
+  private static @Nullable String matchHolderHandle(
+      @NotNull List<BankHolderLeg> holderLegs, int sign) {
     return holderLegs.stream()
         .filter(leg -> leg.amount().signum() == sign)
         .map(BankHolderLeg::handle)

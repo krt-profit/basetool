@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.backend.identity.web;
 
 import de.greluc.krt.profit.basetool.backend.identity.internal.TermsAcceptanceService;
 import de.greluc.krt.profit.basetool.backend.identity.internal.TermsStatusDto;
-import de.greluc.krt.profit.basetool.backend.web.CurrentUserId;
+import de.greluc.krt.profit.basetool.backend.platform.api.CurrentUserId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;

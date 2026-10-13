@@ -36,7 +36,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobRunn
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportResultDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportService;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;

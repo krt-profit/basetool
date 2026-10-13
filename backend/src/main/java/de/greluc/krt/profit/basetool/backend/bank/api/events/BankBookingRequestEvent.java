@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.api.events;
 
-import de.greluc.krt.profit.basetool.backend.model.NotificationType;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
 import java.util.Set;
 import org.jetbrains.annotations.Unmodifiable;

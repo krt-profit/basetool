@@ -26,7 +26,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryGameItemReferenceDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryGameItemReferenceDto;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

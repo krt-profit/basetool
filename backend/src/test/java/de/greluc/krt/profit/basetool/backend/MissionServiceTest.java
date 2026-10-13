@@ -34,23 +34,24 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
+import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MemberPayoutSettings;
+import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantCount;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionNotificationPublisher;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.ParticipantTargetResolver;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
-import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
-import de.greluc.krt.profit.basetool.backend.model.Squadron;
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.projection.MissionParticipantCount;
-import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
-import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -74,6 +75,7 @@ class MissionServiceTest {
   @Mock private MissionRepository missionRepository;
 
   @Mock private UserRepository userRepository;
+  @Mock private MemberPayoutSettings memberPayoutSettings;
 
   @Mock private SquadronRepository squadronRepository;
 
@@ -81,13 +83,13 @@ class MissionServiceTest {
 
   @Mock private de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService ownerScopeService;
 
-  @Mock private de.greluc.krt.profit.basetool.backend.service.UserService userService;
+  @Mock private de.greluc.krt.profit.basetool.backend.identity.api.UserService userService;
 
   @Mock
   private de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService authHelperService;
 
   @Mock
-  private de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryService
+  private de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService
       orgUnitMembershipQueryService;
 
   @Mock private AuditService auditService;
@@ -271,10 +273,10 @@ class MissionServiceTest {
     User user = new User();
     user.setId(userId);
     user.setUsername("donator");
-    user.setDefaultPayoutPreference(PayoutPreference.DONATE);
 
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
+    when(memberPayoutSettings.defaultFor(userId)).thenReturn(Optional.of(PayoutPreference.DONATE));
     when(orgUnitMembershipQueryService.findAllMembershipsForUser(userId)).thenReturn(List.of());
 
     Mission result = missionService.addParticipant(missionId, userId, null, null, "No comment");
@@ -320,7 +322,6 @@ class MissionServiceTest {
     User user = new User();
     user.setId(userId);
     user.setUsername("explicit-chooser");
-    user.setDefaultPayoutPreference(PayoutPreference.DONATE);
 
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));

@@ -19,7 +19,12 @@
 
 // @ts-check
 
-(function () {
+import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
+
+function initNotificationRules() {
     const form = document.getElementById('rule-form');
     const container = document.getElementById('selectors-container');
     const template = document.getElementById('selector-row-template');
@@ -96,19 +101,16 @@
             const holder = document.getElementById('rule-i18n');
             const data = holder ? holder.dataset : /** @type {DOMStringMap} */ ({});
             return {
-                confirmDeleteTitle: window.krtI18nText(
+                confirmDeleteTitle: krtI18nText(
                     data.confirmDeleteTitle,
                     'data-confirm-delete-title',
                 ),
-                confirmDeleteBody: window.krtI18nText(
-                    data.confirmDeleteBody,
-                    'data-confirm-delete-body',
-                ),
-                confirmOk: window.krtI18nText(data.confirmOk, 'data-confirm-ok'),
-                confirmCancel: window.krtI18nText(data.confirmCancel, 'data-confirm-cancel'),
-                saved: window.krtI18nText(data.saved, 'data-saved'),
-                deleted: window.krtI18nText(data.deleted, 'data-deleted'),
-                error: window.krtI18nText(data.error, 'data-error'),
+                confirmDeleteBody: krtI18nText(data.confirmDeleteBody, 'data-confirm-delete-body'),
+                confirmOk: krtI18nText(data.confirmOk, 'data-confirm-ok'),
+                confirmCancel: krtI18nText(data.confirmCancel, 'data-confirm-cancel'),
+                saved: krtI18nText(data.saved, 'data-saved'),
+                deleted: krtI18nText(data.deleted, 'data-deleted'),
+                error: krtI18nText(data.error, 'data-error'),
                 unknownValue: data.unknownValue || '{0}',
             };
         }
@@ -229,9 +231,7 @@
          */
         function enhanceSelectorRow(row, selector) {
             const enhance = function () {
-                if (window.krtEnhanceComboboxes) {
-                    window.krtEnhanceComboboxes(row);
-                }
+                krtEnhanceComboboxes(row);
             };
             const userId = selector && selector.kind === 'SPECIFIC_USER' ? selector.userId : null;
             if (!userId) {
@@ -239,7 +239,7 @@
                 return;
             }
             const select = rowSelect(row, 'userId');
-            window.krtFetch
+            krtFetch
                 .getJson(`/users/${encodeURIComponent(userId)}`)
                 .catch(() => {
                     return null;
@@ -341,7 +341,7 @@
 
         /** @param {string} id */
         function editRule(id) {
-            window.krtFetch
+            krtFetch
                 .getJson(`/admin/notification-rules/${encodeURIComponent(id)}`)
                 .then((rule) => {
                     if (rule) {
@@ -349,15 +349,13 @@
                     }
                 })
                 .catch(() => {
-                    if (typeof window.showFrontendErrorToast === 'function') {
-                        window.showFrontendErrorToast(i18n.error);
-                    }
+                    showFrontendErrorToast(i18n.error);
                 });
         }
 
         /** Re-renders the rules table in place from the `rules` fragment. */
         function refreshRules() {
-            return window.krtFetch.swap({
+            return krtFetch.swap({
                 url: '/admin/notification-rules',
                 container: '#rules-host',
                 fragmentValue: 'rules',
@@ -368,12 +366,10 @@
         /** @param {SubmitEvent} event */
         function onSubmit(event) {
             event.preventDefault();
-            if (!window.krtFetch) {
-                return;
-            }
+
             const id = el.form.getAttribute('data-rule-id');
             const submitter = el.form.querySelector('button[type="submit"]');
-            window.krtFetch.write({
+            krtFetch.write({
                 method: id ? 'PUT' : 'POST',
                 url: `/admin/notification-rules${id ? `/${encodeURIComponent(id)}` : ''}`,
                 payload: buildPayload(),
@@ -392,11 +388,8 @@
          * @param {Element} submitter
          */
         function deleteRule(id, submitter) {
-            if (!window.krtFetch) {
-                return;
-            }
             confirmThen(() => {
-                window.krtFetch.write({
+                krtFetch.write({
                     method: 'DELETE',
                     url: `/admin/notification-rules/${encodeURIComponent(id)}`,
                     successMessage: i18n.deleted,
@@ -414,22 +407,16 @@
 
         /** @param {() => void} action */
         function confirmThen(action) {
-            if (typeof window.showKrtConfirm === 'function') {
-                window
-                    .showKrtConfirm(
-                        i18n.confirmDeleteTitle,
-                        i18n.confirmDeleteBody,
-                        i18n.confirmOk,
-                        i18n.confirmCancel,
-                    )
-                    .then((ok) => {
-                        if (ok) {
-                            action();
-                        }
-                    });
-            } else {
-                action();
-            }
+            showKrtConfirm(
+                i18n.confirmDeleteTitle,
+                i18n.confirmDeleteBody,
+                i18n.confirmOk,
+                i18n.confirmCancel,
+            ).then((ok) => {
+                if (ok) {
+                    action();
+                }
+            });
         }
 
         el.form.addEventListener('submit', onSubmit);
@@ -489,4 +476,6 @@
 
         resetForm();
     }
-})();
+}
+
+initNotificationRules();

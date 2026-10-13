@@ -34,6 +34,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
@@ -41,10 +42,9 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.AllocationReductionDto;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
@@ -53,22 +53,20 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTransferredFromUserEvent;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTransferredToUserEvent;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.TransferredLot;
-import de.greluc.krt.profit.basetool.backend.model.FinanceType;
-import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.JobOrder;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
-import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
-import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
-import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.mission.api.FinanceType;
+import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntry;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
-import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -543,8 +541,8 @@ class InventoryItemServiceBookOutTest {
 
       InventoryItem source = newItem(10.0, 1L);
 
-      de.greluc.krt.profit.basetool.backend.model.Squadron orgA =
-          new de.greluc.krt.profit.basetool.backend.model.Squadron();
+      de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron orgA =
+          new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
       orgA.setId(UUID.randomUUID());
       InventoryItem foreignOrgTarget = new InventoryItem();
       foreignOrgTarget.setId(UUID.randomUUID());
@@ -556,8 +554,8 @@ class InventoryItemServiceBookOutTest {
       foreignOrgTarget.setAmount(6.0);
       foreignOrgTarget.setOwningOrgUnit(orgA);
 
-      de.greluc.krt.profit.basetool.backend.model.Squadron orgB =
-          new de.greluc.krt.profit.basetool.backend.model.Squadron();
+      de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron orgB =
+          new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
       orgB.setId(UUID.randomUUID());
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(source));
@@ -1622,18 +1620,18 @@ class InventoryItemServiceBookOutTest {
     UUID targetUserId = UUID.randomUUID();
     UUID pickedOrgUnitId = UUID.randomUUID();
 
-    de.greluc.krt.profit.basetool.backend.model.User owner =
-        new de.greluc.krt.profit.basetool.backend.model.User();
+    de.greluc.krt.profit.basetool.backend.identity.api.User owner =
+        new de.greluc.krt.profit.basetool.backend.identity.api.User();
     owner.setId(UUID.randomUUID());
-    de.greluc.krt.profit.basetool.backend.model.User targetUser =
-        new de.greluc.krt.profit.basetool.backend.model.User();
+    de.greluc.krt.profit.basetool.backend.identity.api.User targetUser =
+        new de.greluc.krt.profit.basetool.backend.identity.api.User();
     targetUser.setId(targetUserId);
-    de.greluc.krt.profit.basetool.backend.model.Squadron picked =
-        new de.greluc.krt.profit.basetool.backend.model.Squadron();
+    de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron picked =
+        new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
     picked.setId(pickedOrgUnitId);
 
-    de.greluc.krt.profit.basetool.backend.model.InventoryItem item =
-        new de.greluc.krt.profit.basetool.backend.model.InventoryItem();
+    de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem item =
+        new de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem();
     item.setId(itemId);
     item.setVersion(1L);
     item.setAmount(10.0);
@@ -1652,12 +1650,14 @@ class InventoryItemServiceBookOutTest {
     org.mockito.Mockito.when(
             ownerScopeService.resolveOrgUnitForPickerOutputNullable(targetUser, pickedOrgUnitId))
         .thenReturn(picked);
-    org.mockito.ArgumentCaptor<de.greluc.krt.profit.basetool.backend.model.InventoryItem> captor =
-        org.mockito.ArgumentCaptor.forClass(
-            de.greluc.krt.profit.basetool.backend.model.InventoryItem.class);
+    org.mockito.ArgumentCaptor<
+            de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem>
+        captor =
+            org.mockito.ArgumentCaptor.forClass(
+                de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem.class);
     org.mockito.Mockito.when(
             inventoryItemRepository.save(
-                any(de.greluc.krt.profit.basetool.backend.model.InventoryItem.class)))
+                any(de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem.class)))
         .thenAnswer(i -> i.getArguments()[0]);
 
     InventoryItemBookOutDto dto =
@@ -1678,9 +1678,9 @@ class InventoryItemServiceBookOutTest {
 
     org.mockito.Mockito.verify(inventoryItemRepository, org.mockito.Mockito.atLeastOnce())
         .save(captor.capture());
-    java.util.List<de.greluc.krt.profit.basetool.backend.model.InventoryItem> saved =
+    java.util.List<de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem> saved =
         captor.getAllValues();
-    de.greluc.krt.profit.basetool.backend.model.InventoryItem newRow =
+    de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem newRow =
         saved.stream()
             .filter(i -> i.getUser() == targetUser)
             .findFirst()

@@ -19,14 +19,15 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
-import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
-import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
+import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
+import de.greluc.krt.profit.basetool.backend.platform.api.ScheduledJob;
+import de.greluc.krt.profit.basetool.backend.platform.api.TaskMetrics;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -112,21 +113,16 @@ public class BankLedgerIntegrityTask {
    * @param report the fresh integrity report whose per-invariant list sizes become the gauge values
    */
   private void updateViolationGauges(@NotNull BankLedgerIntegrityService.IntegrityReport report) {
-    violationGauges
-        .get(MetricNames.CATEGORY_NEGATIVE_ACCOUNT_BALANCE)
+    violationGauge(MetricNames.CATEGORY_NEGATIVE_ACCOUNT_BALANCE)
         .set(report.negativeAccountBalances().size());
-    violationGauges
-        .get(MetricNames.CATEGORY_UNBALANCED_TRANSFER)
+    violationGauge(MetricNames.CATEGORY_UNBALANCED_TRANSFER)
         .set(report.unbalancedTransfers().size());
-    violationGauges
-        .get(MetricNames.CATEGORY_UNBALANCED_HOLDER_MOVEMENT)
+    violationGauge(MetricNames.CATEGORY_UNBALANCED_HOLDER_MOVEMENT)
         .set(report.unbalancedHolderMovements().size());
-    violationGauges.get(MetricNames.CATEGORY_BROKEN_REVERSAL).set(report.brokenReversals().size());
-    violationGauges
-        .get(MetricNames.CATEGORY_BROKEN_HOLDER_REVERSAL)
+    violationGauge(MetricNames.CATEGORY_BROKEN_REVERSAL).set(report.brokenReversals().size());
+    violationGauge(MetricNames.CATEGORY_BROKEN_HOLDER_REVERSAL)
         .set(report.brokenHolderReversals().size());
-    violationGauges
-        .get(MetricNames.CATEGORY_TRANSACTION_WITHOUT_AUDIT)
+    violationGauge(MetricNames.CATEGORY_TRANSACTION_WITHOUT_AUDIT)
         .set(report.transactionsWithoutAudit().size());
   }
 
@@ -137,5 +133,15 @@ public class BankLedgerIntegrityTask {
   @PostConstruct
   void publishEnabledGauge() {
     taskMetrics.markEnabled(ScheduledJob.BANK_LEDGER_INTEGRITY);
+  }
+
+  /**
+   * Returns the holder registered for an integrity category at startup.
+   *
+   * @param category the category label
+   * @return the gauge holder of that category
+   */
+  private AtomicInteger violationGauge(String category) {
+    return Objects.requireNonNull(violationGauges.get(category));
   }
 }

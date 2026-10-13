@@ -232,6 +232,29 @@ class OrgUnitBankPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = {"OFFICER"})
+  void orgUnitBank_rendersTheImportMapBeforeItsModuleScripts() throws Exception {
+    stubData(UUID.randomUUID());
+
+    String html =
+        mockMvc
+            .perform(get("/org-unit-bank"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    int map = html.indexOf("<script type=\"importmap\"");
+    int firstModule = html.indexOf("<script type=\"module\"");
+    assertTrue(map > 0 && firstModule > map, "the import map precedes every module script");
+    Matcher imports =
+        Pattern.compile(
+                "\"/js/bank/bank-livesync\\.js\":\"(/js/bank/bank-livesync-[0-9a-f]{32}\\.js)\"")
+            .matcher(html);
+    assertTrue(imports.find(), "the page maps the bank modules to their content-hashed URLs");
+  }
+
+  @Test
+  @WithMockUser(roles = {"OFFICER"})
   void orgUnitBank_tableLayoutRendersDenseTable() throws Exception {
     stubData(UUID.randomUUID());
 

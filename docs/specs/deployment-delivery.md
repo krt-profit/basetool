@@ -2941,9 +2941,7 @@ isolated projects have nothing to reject and a module added later inherits no de
 ### REQ-OPS-047 — A library module of an application is named `<app>-<name>`, and the build reads the name
 
 A module that is compiled into an application's boot JAR and ships in its image, without being an
-application, is named `<app>-<name>` for `<app>` in `backend`, `frontend`, `ingest` (the planned
-`backend-exchange` and `backend-bank`). The build and its scripts act on that name, so extracting one
-needs no change to a convention or a script (ADR-0249).
+application, is named `<app>-<name>` for `<app>` in `backend`, `frontend`, `ingest` (none exists: `backend-exchange` and `backend-bank` were planned and are not implemented, by decision of the owner on 2026-10-12, plan §5.8). The build and its scripts act on that name, so a library module needs no change to a convention or a script (ADR-0249).
 
 - **Repository paths come from the settings directory.** A module script names a file or directory of
   the repository with `layout.settingsDirectory.file|dir(…)`; none names `rootProject`.

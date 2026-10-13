@@ -19,12 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.promotion.web;
 
+import de.greluc.krt.profit.basetool.backend.kernel.OnUpdate;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
+import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionLevelContentResponse;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionLevelContentService;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionLevelContentWriteRequest;
-import de.greluc.krt.profit.basetool.backend.validation.OnUpdate;
-import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;

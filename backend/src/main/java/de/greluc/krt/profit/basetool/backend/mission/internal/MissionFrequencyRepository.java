@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.MissionFrequency;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionFrequency;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;

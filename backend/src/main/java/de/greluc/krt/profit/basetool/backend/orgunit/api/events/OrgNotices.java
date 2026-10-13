@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.orgunit.api.events;
 
-import de.greluc.krt.profit.basetool.backend.model.NotificationContextRole;
-import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
-import de.greluc.krt.profit.basetool.backend.model.NotificationType;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationContextRole;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import java.util.LinkedHashMap;
@@ -112,7 +112,7 @@ public final class OrgNotices {
       @NotNull UUID userId,
       @NotNull String member,
       @NotNull OrgUnitRef unit,
-      @NotNull String unitName,
+      @Nullable String unitName,
       @NotNull String reasonCode,
       boolean seatVacant) {
     Map<String, String> params = new LinkedHashMap<>();

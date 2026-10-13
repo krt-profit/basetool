@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.identity.api;
 
-import de.greluc.krt.profit.basetool.backend.model.User;
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
@@ -49,9 +48,9 @@ public interface MembershipOperations {
    *
    * @param user the user to reconcile
    * @param desired the target Staffel set; an empty list removes every Staffel membership
-   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException on a duplicate, a
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException on a duplicate, a
    *     third Staffel or a user holding a leadership role
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when a Staffel id is
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when a Staffel id is
    *     unknown
    */
   void reconcileStaffelMemberships(@NotNull User user, @NotNull List<StaffelAssignment> desired);
@@ -66,10 +65,10 @@ public interface MembershipOperations {
    *     the flag unset
    * @param isMissionManager {@code true} to start as Mission Manager; {@code null} or {@code false}
    *     leaves the flag unset
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the
-   *     Spezialkommando or the user is unknown
-   * @throws de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException when the user
-   *     is already a member
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the Spezialkommando
+   *     or the user is unknown
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException when the user is
+   *     already a member
    */
   void addMember(
       @NotNull UUID specialCommandId,
@@ -82,8 +81,8 @@ public interface MembershipOperations {
    *
    * @param specialCommandId the Spezialkommando
    * @param userId the user to remove
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the
-   *     Spezialkommando is unknown or the user is not a member
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the Spezialkommando
+   *     is unknown or the user is not a member
    */
   void removeMember(@NotNull UUID specialCommandId, @NotNull UUID userId);
 
@@ -95,8 +94,8 @@ public interface MembershipOperations {
    * @param isLogistician the new Logistician flag, or {@code null} to leave it unchanged
    * @param isMissionManager the new Mission Manager flag, or {@code null} to leave it unchanged
    * @param version the row version the caller expects
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the
-   *     Spezialkommando is unknown or the user is not a member
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the Spezialkommando
+   *     is unknown or the user is not a member
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the version is
    *     stale
    */

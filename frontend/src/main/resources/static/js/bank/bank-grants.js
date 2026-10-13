@@ -18,9 +18,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-(function () {
-    'use strict';
-
+function initBankGrants() {
     const form = /** @type {HTMLFormElement | null} */ (
         document.getElementById('bank-grants-filter-form')
     );
@@ -36,4 +34,6 @@
         const view = target.value === 'employee' ? 'employee' : 'account';
         window.location.assign(`/bank/grants?view=${view}`);
     });
-})();
+}
+
+initBankGrants();

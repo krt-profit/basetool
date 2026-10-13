@@ -33,7 +33,7 @@ import org.springframework.stereotype.Service;
  * In-memory cache of the normalized product keys in the default-blueprint set (REQ-INV-016/017).
  *
  * <p>Answers whether an owned blueprint is a default, which marks a {@link
- * de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintResponse} non-removable and
+ * de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintResponse} non-removable and
  * guards the delete endpoint. Loaded lazily, warmed at startup and reloaded by {@link #refresh()}
  * on every change to the set.
  */

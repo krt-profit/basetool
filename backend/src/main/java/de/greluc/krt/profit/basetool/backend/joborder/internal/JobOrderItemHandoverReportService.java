@@ -19,13 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.exception.ReportGenerationException;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemHandover;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderItemHandover;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepository;
-import de.greluc.krt.profit.basetool.backend.service.pdf.KrtPdfSupport;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.ReportGenerationException;
+import de.greluc.krt.profit.basetool.backend.platform.api.KrtPdfSupport;
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.time.ZoneId;
@@ -126,7 +125,7 @@ public class JobOrderItemHandoverReportService {
       KrtPdfSupport.addMetaRow(
           metaTable,
           "EMPFÄNGER (HANDLE)",
-          HandleAnonymisation.humanise(recipientHandle, label("general.anonymisedHandle")));
+          HandleAnonymisation.humaniseRequired(recipientHandle, label("general.anonymisedHandle")));
       krt.document().add(metaTable);
 
       KrtPdfSupport.addSectionHeader(krt, "ÜBERGEBENE GÜTER");

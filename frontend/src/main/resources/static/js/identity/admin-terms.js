@@ -6,9 +6,9 @@
  * SPDX-License-Identifier: GPL-3.0-only
  */
 
-(function () {
-    'use strict';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
+function initAdminTerms() {
     const filterForm = /** @type {HTMLFormElement | null} */ (
         document.getElementById('admin-terms-filter-form')
     );
@@ -31,7 +31,7 @@
         );
     }
 
-    if (!results || !window.krtFetch) {
+    if (!results) {
         form.addEventListener('change', (event) => {
             if (isFilterRadio(event.target)) {
                 form.submit();
@@ -40,7 +40,6 @@
         return;
     }
 
-    const krtFetch = window.krtFetch;
     krtFetch.bindSwap({ container: results, history: true });
 
     form.addEventListener('change', (event) => {
@@ -60,4 +59,6 @@
             history: true,
         });
     });
-})();
+}
+
+initAdminTerms();

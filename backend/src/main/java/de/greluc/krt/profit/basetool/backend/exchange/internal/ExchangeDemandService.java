@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintFamilies;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintOwnerProduct;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
@@ -32,17 +34,15 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgDe
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeQuantityDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
-import de.greluc.krt.profit.basetool.backend.model.JobOrder;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
-import de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
-import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterialRequirementResolver;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
-import de.greluc.krt.profit.basetool.backend.service.JobOrderMaterialRequirementResolver;
-import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -51,6 +51,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -177,7 +178,7 @@ public class ExchangeDemandService {
     List<ExchangeDemandMaterialDto> lines = new ArrayList<>();
     open.forEach(
         (line, amount) -> {
-          MaterialDto material = materials.get(line.materialId());
+          MaterialDto material = Objects.requireNonNull(materials.get(line.materialId()));
           String unit =
               QuantityType.PIECE.name().equals(material.quantityType())
                   ? QuantityType.PIECE.name()
@@ -216,7 +217,8 @@ public class ExchangeDemandService {
     rawMaterials.sort(Comparator.comparing(Material::getName, String.CASE_INSENSITIVE_ORDER));
     for (Material raw : rawMaterials) {
       List<ExchangeItemRefDto> list =
-          raws.computeIfAbsent(raw.getRefinedMaterial().getId(), _ -> new ArrayList<>());
+          raws.computeIfAbsent(
+              Objects.requireNonNull(raw.getRefinedMaterial()).getId(), _ -> new ArrayList<>());
       if (list.size() < MAX_RAW_REFS) {
         list.add(new ExchangeItemRefDto(raw.getId().toString(), cut(raw.getName())));
       }
@@ -278,7 +280,7 @@ public class ExchangeDemandService {
       Map<UUID, Double> marks = earmarked.getOrDefault(order.getId(), Map.of());
       orderOpen.forEach(
           (gameItemId, open) ->
-              lines.get(gameItemId).open +=
+              Objects.requireNonNull(lines.get(gameItemId)).open +=
                   Math.max(0, open - (int) Math.round(marks.getOrDefault(gameItemId, 0.0))));
     }
     List<ExchangeDemandItemDto> result = new ArrayList<>();

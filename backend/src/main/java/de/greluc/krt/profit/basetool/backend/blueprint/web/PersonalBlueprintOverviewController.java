@@ -23,7 +23,7 @@ import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintOvervie
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintOverviewOwnerDto;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.PersonalBlueprintOverviewService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
-import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
+import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;

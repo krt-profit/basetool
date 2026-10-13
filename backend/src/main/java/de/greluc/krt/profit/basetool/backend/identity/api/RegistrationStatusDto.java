@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.identity.api;
 
-import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
-
 /**
  * The caller's own approval status, used by the frontend to route a pending or rejected user to the
  * waiting page.

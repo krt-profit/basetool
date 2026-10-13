@@ -21,14 +21,14 @@ package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankAmounts;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
-import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
@@ -544,7 +544,8 @@ public class BankAccountService {
    * @param sign the wanted amount sign (+1 or -1; 0 never matches)
    * @return the matching holder's handle, or {@code null}
    */
-  private static String matchHolderHandle(@NotNull List<BankHolderLeg> holderLegs, int sign) {
+  private static @Nullable String matchHolderHandle(
+      @NotNull List<BankHolderLeg> holderLegs, int sign) {
     return holderLegs.stream()
         .filter(leg -> leg.amount().signum() == sign)
         .map(BankHolderLeg::handle)

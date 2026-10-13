@@ -21,6 +21,12 @@
 
 /* global missionId */
 
+import { showKrtConfirm } from '/js/kernel/toast.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { missionHooks } from '/js/mission/mission-hooks.js';
+
 const MISSION_SECTIONS = {
     crew: { container: '#crew-board-results', fragmentValue: 'crew-board' },
     finance: { container: '#finance-results', fragmentValue: 'finance' },
@@ -48,11 +54,7 @@ const MISSION_SECTIONS = {
  */
 function crossPublishToParentOperation(keys) {
     const operationId = window.missionOperationId;
-    if (
-        !operationId ||
-        !window.krtLiveSync ||
-        typeof window.krtLiveSync.sendChanged !== 'function'
-    ) {
+    if (!operationId || typeof krtLiveSync.sendChanged !== 'function') {
         return;
     }
     const changed = Array.isArray(keys) ? keys : [keys];
@@ -64,11 +66,11 @@ function crossPublishToParentOperation(keys) {
         operationSections.push('finance');
     }
     if (operationSections.length) {
-        window.krtLiveSync.sendChanged(`operation:${operationId}`, operationSections);
+        krtLiveSync.sendChanged(`operation:${operationId}`, operationSections);
     }
 }
 
-const missionSeam = window.krtFetch.sectionWrite({
+const missionSeam = krtFetch.sectionWrite({
     dictName: 'MISSION_SUBRES_I18N',
     dict() {
         return window.MISSION_SUBRES_I18N || {};
@@ -90,17 +92,17 @@ const missionSeam = window.krtFetch.sectionWrite({
         return window.missionId ? `/missions/${window.missionId}` : null;
     },
     broadcast(keys) {
-        if (window.missionPresence && typeof window.missionPresence.sendChanged === 'function') {
-            window.missionPresence.sendChanged(keys);
+        if (missionHooks.presence && typeof missionHooks.presence.sendChanged === 'function') {
+            missionHooks.presence.sendChanged(keys);
         }
         crossPublishToParentOperation(keys);
     },
 });
-window.krtMissionWrite = missionSeam.write;
+missionHooks.write = missionSeam.write;
 
-window.krtRefreshMissionSection = missionSeam.refresh;
+missionHooks.refresh = missionSeam.refresh;
 
-window.krtNotifyMissionChanged = missionSeam.notify;
+missionHooks.notify = missionSeam.notify;
 
 document.addEventListener('krt:swapped', (ev) => {
     const container = ev && ev.detail && ev.detail.container;
@@ -169,8 +171,8 @@ document.addEventListener('krt:swapped', (ev) => {
         }
         const utc = /** @type {HTMLElement} */ (meta).getAttribute(utcAttr);
         el.setAttribute('data-utc', utc != null ? utc : 'null');
-        if (typeof window.krtLocalizeDates === 'function') {
-            window.krtLocalizeDates(el.parentNode || el);
+        if (typeof missionHooks.localizeDates === 'function') {
+            missionHooks.localizeDates(el.parentNode || el);
         }
     }
     patchFact('facts-planned-start', 'data-planned-start-utc');
@@ -196,19 +198,19 @@ document.addEventListener('krt:swapped', (ev) => {
     }
 });
 
-window.krtLiveSync.createReceiver({
+krtLiveSync.createReceiver({
     sections: MISSION_SECTIONS,
     events: { changed: 'krt:mission-changed', resync: 'krt:mission-resync' },
     refresh(keys) {
-        if (window.krtRefreshMissionSection) {
-            window.krtRefreshMissionSection(keys, { broadcast: false });
+        if (missionHooks.refresh) {
+            missionHooks.refresh(keys, { broadcast: false });
         }
     },
     pill: {
         id: 'mission-livesync-pill',
         label() {
             const dict = window.MISSION_LIVESYNC_I18N || {};
-            return window.krtI18nText(
+            return krtI18nText(
                 dict['mission.livesync.updates_available'],
                 'MISSION_LIVESYNC_I18N[mission.livesync.updates_available]',
             );
@@ -216,254 +218,252 @@ window.krtLiveSync.createReceiver({
     },
 });
 
-(function () {
-    function mid() {
-        return window.missionId || (typeof missionId !== 'undefined' ? missionId : null);
+function mid() {
+    return window.missionId || (typeof missionId !== 'undefined' ? missionId : null);
+}
+function stepsVersion() {
+    const holder = document.querySelector('[data-steps-version]');
+    const v = holder ? Number(holder.getAttribute('data-steps-version')) : null;
+    return v === null || Number.isNaN(v) ? null : v;
+}
+function refreshSteps() {
+    if (missionHooks.refresh) {
+        return missionHooks.refresh(['steps', 'overview']);
     }
-    function stepsVersion() {
-        const holder = document.querySelector('[data-steps-version]');
-        const v = holder ? Number(holder.getAttribute('data-steps-version')) : null;
-        return v === null || Number.isNaN(v) ? null : v;
-    }
-    function refreshSteps() {
-        if (window.krtRefreshMissionSection) {
-            return window.krtRefreshMissionSection(['steps', 'overview']);
-        }
-        return Promise.resolve();
-    }
-    function writeStep(opts) {
-        return window.krtMissionWrite(
-            Object.assign({ sectionKey: 'steps', onSuccess: refreshSteps }, opts),
-        );
-    }
-    function listOrder() {
-        return Array.prototype.map.call(
-            document.querySelectorAll('#mission-step-list .ae-row'),
-            (r) => {
-                return r.getAttribute('data-step-id');
-            },
-        );
-    }
+    return Promise.resolve();
+}
+function writeStep(opts) {
+    return missionHooks.write(
+        Object.assign({ sectionKey: 'steps', onSuccess: refreshSteps }, opts),
+    );
+}
+function listOrder() {
+    return Array.prototype.map.call(
+        document.querySelectorAll('#mission-step-list .ae-row'),
+        (r) => {
+            return r.getAttribute('data-step-id');
+        },
+    );
+}
 
-    function toggleStep(box) {
-        const sid = box.getAttribute('data-step-id');
-        if (!sid || stepsVersion() === null) {
-            return;
-        }
-        const done = box.getAttribute('data-done') !== 'true';
-        writeStep({
-            method: 'PATCH',
-            url: `/missions/${mid()}/steps/${sid}/done/ajax`,
-            payload() {
-                return { done, stepsVersion: stepsVersion() };
-            },
-        });
+function toggleStep(box) {
+    const sid = box.getAttribute('data-step-id');
+    if (!sid || stepsVersion() === null) {
+        return;
     }
-    function addStep(_btn) {
-        if (stepsVersion() === null) {
-            return;
-        }
-        const title = window.krtI18nText(
-            window.MISSION_STEP_I18N && window.MISSION_STEP_I18N.default_title,
-            'MISSION_STEP_I18N.default_title',
-        );
-        writeStep({
-            method: 'POST',
-            url: `/missions/${mid()}/steps/ajax`,
-            payload() {
-                return { title, meta: null, stepsVersion: stepsVersion() };
-            },
-        });
+    const done = box.getAttribute('data-done') !== 'true';
+    writeStep({
+        method: 'PATCH',
+        url: `/missions/${mid()}/steps/${sid}/done/ajax`,
+        payload() {
+            return { done, stepsVersion: stepsVersion() };
+        },
+    });
+}
+function addStep(_btn) {
+    if (stepsVersion() === null) {
+        return;
     }
-    function editStep(row) {
-        const sid = row.getAttribute('data-step-id');
-        const titleInput = row.querySelector('.ae-title');
-        if (!sid || stepsVersion() === null || !titleInput) {
-            return;
-        }
-        const title = titleInput.value.trim();
-        const metaInput = row.querySelector('.ae-meta');
-        const meta = metaInput ? metaInput.value : null;
-        if (!title) {
-            return;
-        }
-        writeStep({
-            method: 'PUT',
-            url: `/missions/${mid()}/steps/${sid}/ajax`,
-            payload() {
-                return { title, meta, stepsVersion: stepsVersion() };
-            },
-        });
+    const title = krtI18nText(
+        window.MISSION_STEP_I18N && window.MISSION_STEP_I18N.default_title,
+        'MISSION_STEP_I18N.default_title',
+    );
+    writeStep({
+        method: 'POST',
+        url: `/missions/${mid()}/steps/ajax`,
+        payload() {
+            return { title, meta: null, stepsVersion: stepsVersion() };
+        },
+    });
+}
+function editStep(row) {
+    const sid = row.getAttribute('data-step-id');
+    const titleInput = row.querySelector('.ae-title');
+    if (!sid || stepsVersion() === null || !titleInput) {
+        return;
     }
-    async function deleteStep(btn) {
-        const row = btn.closest('.ae-row');
-        if (!row) {
-            return;
-        }
-        const sid = row.getAttribute('data-step-id');
-        if (!sid || stepsVersion() === null) {
-            return;
-        }
-        const msg = window.krtI18nText(
-            window.MISSION_STEP_I18N && window.MISSION_STEP_I18N.delete_confirm,
-            'MISSION_STEP_I18N.delete_confirm',
-        );
-        const ok = await window.showKrtConfirm?.(
-            msg,
-            msg,
-            window.krtI18nText(
-                window.MISSION_SUBRES_I18N &&
-                    window.MISSION_SUBRES_I18N['mission.conflict.action.reload'],
-                'MISSION_SUBRES_I18N[mission.conflict.action.reload]',
-            ),
-            window.krtI18nText(
-                window.MISSION_SUBRES_I18N &&
-                    window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss'],
-                'MISSION_SUBRES_I18N[mission.conflict.action.dismiss]',
-            ),
-        );
-        if (!ok) {
-            return;
-        }
-        writeStep({
-            method: 'DELETE',
-            url() {
-                return `/missions/${mid()}/steps/${sid}/ajax?stepsVersion=${stepsVersion()}`;
-            },
-        });
+    const title = titleInput.value.trim();
+    const metaInput = row.querySelector('.ae-meta');
+    const meta = metaInput ? metaInput.value : null;
+    if (!title) {
+        return;
     }
-    function reorder(order) {
-        if (stepsVersion() === null) {
-            return;
-        }
-        writeStep({
-            method: 'PUT',
-            url: `/missions/${mid()}/steps/reorder/ajax`,
-            payload() {
-                return { stepIds: order, stepsVersion: stepsVersion() };
-            },
-        });
+    writeStep({
+        method: 'PUT',
+        url: `/missions/${mid()}/steps/${sid}/ajax`,
+        payload() {
+            return { title, meta, stepsVersion: stepsVersion() };
+        },
+    });
+}
+async function deleteStep(btn) {
+    const row = btn.closest('.ae-row');
+    if (!row) {
+        return;
     }
-    function moveStep(btn, dir) {
-        const row = btn.closest('.ae-row');
-        if (!row) {
-            return;
-        }
+    const sid = row.getAttribute('data-step-id');
+    if (!sid || stepsVersion() === null) {
+        return;
+    }
+    const msg = krtI18nText(
+        window.MISSION_STEP_I18N && window.MISSION_STEP_I18N.delete_confirm,
+        'MISSION_STEP_I18N.delete_confirm',
+    );
+    const ok = await showKrtConfirm?.(
+        msg,
+        msg,
+        krtI18nText(
+            window.MISSION_SUBRES_I18N &&
+                window.MISSION_SUBRES_I18N['mission.conflict.action.reload'],
+            'MISSION_SUBRES_I18N[mission.conflict.action.reload]',
+        ),
+        krtI18nText(
+            window.MISSION_SUBRES_I18N &&
+                window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss'],
+            'MISSION_SUBRES_I18N[mission.conflict.action.dismiss]',
+        ),
+    );
+    if (!ok) {
+        return;
+    }
+    writeStep({
+        method: 'DELETE',
+        url() {
+            return `/missions/${mid()}/steps/${sid}/ajax?stepsVersion=${stepsVersion()}`;
+        },
+    });
+}
+function reorder(order) {
+    if (stepsVersion() === null) {
+        return;
+    }
+    writeStep({
+        method: 'PUT',
+        url: `/missions/${mid()}/steps/reorder/ajax`,
+        payload() {
+            return { stepIds: order, stepsVersion: stepsVersion() };
+        },
+    });
+}
+function moveStep(btn, dir) {
+    const row = btn.closest('.ae-row');
+    if (!row) {
+        return;
+    }
+    const order = listOrder();
+    const i = order.indexOf(row.getAttribute('data-step-id'));
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= order.length) {
+        return;
+    }
+    const tmp = order[i];
+    order[i] = order[j];
+    order[j] = tmp;
+    reorder(order);
+}
+
+document.addEventListener('click', (e) => {
+    const t = /** @type {Element} */ (e.target).closest('[data-trigger]');
+    if (!t) {
+        return;
+    }
+    const trig = t.getAttribute('data-trigger');
+    if (trig === 'mission-toggle-step') {
+        e.preventDefault();
+        toggleStep(t);
+    } else if (trig === 'mission-step-add') {
+        e.preventDefault();
+        addStep(t);
+    } else if (trig === 'mission-step-delete') {
+        e.preventDefault();
+        deleteStep(t);
+    } else if (trig === 'mission-step-up') {
+        e.preventDefault();
+        moveStep(t, -1);
+    } else if (trig === 'mission-step-down') {
+        e.preventDefault();
+        moveStep(t, 1);
+    }
+});
+document.addEventListener('keydown', (e) => {
+    const t = /** @type {Element} */ (e.target).closest('[data-trigger="mission-toggle-step"]');
+    if (!t) {
+        return;
+    }
+    if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        toggleStep(t);
+    }
+});
+document.addEventListener('change', (e) => {
+    const inp = /** @type {Element} */ (e.target).closest(
+        '#mission-step-list .ae-title, #mission-step-list .ae-meta',
+    );
+    if (!inp) {
+        return;
+    }
+    const row = inp.closest('.ae-row');
+    if (row) {
+        editStep(row);
+    }
+});
+
+/** @type {Element | null} */
+let dragRow = null;
+document.addEventListener('dragstart', (e) => {
+    const row = /** @type {Element} */ (e.target).closest('#mission-step-list .ae-row');
+    if (!row) {
+        return;
+    }
+    dragRow = row;
+    if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+    }
+});
+document.addEventListener('dragover', (e) => {
+    const list = /** @type {Element} */ (e.target).closest('#mission-step-list');
+    if (!list || !dragRow) {
+        return;
+    }
+    e.preventDefault();
+    const row = /** @type {Element} */ (e.target).closest('.ae-row');
+    list.querySelectorAll('.ae-row').forEach((r) => {
+        r.classList.remove('drag-over');
+    });
+    if (row && row !== dragRow) {
+        row.classList.add('drag-over');
+    }
+});
+document.addEventListener('drop', (e) => {
+    const list = /** @type {Element} */ (e.target).closest('#mission-step-list');
+    if (!list || !dragRow) {
+        return;
+    }
+    e.preventDefault();
+    const target = /** @type {Element} */ (e.target).closest('.ae-row');
+    list.querySelectorAll('.ae-row').forEach((r) => {
+        r.classList.remove('drag-over');
+    });
+    if (target && target !== dragRow) {
         const order = listOrder();
-        const i = order.indexOf(row.getAttribute('data-step-id'));
-        const j = i + dir;
-        if (i < 0 || j < 0 || j >= order.length) {
-            return;
-        }
-        const tmp = order[i];
-        order[i] = order[j];
-        order[j] = tmp;
+        const from = order.indexOf(dragRow.getAttribute('data-step-id'));
+        order.splice(
+            order.indexOf(target.getAttribute('data-step-id')),
+            0,
+            order.splice(from, 1)[0],
+        );
         reorder(order);
     }
+    dragRow = null;
+});
+document.addEventListener('dragend', () => {
+    document.querySelectorAll('#mission-step-list .ae-row.drag-over').forEach((r) => {
+        r.classList.remove('drag-over');
+    });
+    dragRow = null;
+});
 
-    document.addEventListener('click', (e) => {
-        const t = /** @type {Element} */ (e.target).closest('[data-trigger]');
-        if (!t) {
-            return;
-        }
-        const trig = t.getAttribute('data-trigger');
-        if (trig === 'mission-toggle-step') {
-            e.preventDefault();
-            toggleStep(t);
-        } else if (trig === 'mission-step-add') {
-            e.preventDefault();
-            addStep(t);
-        } else if (trig === 'mission-step-delete') {
-            e.preventDefault();
-            deleteStep(t);
-        } else if (trig === 'mission-step-up') {
-            e.preventDefault();
-            moveStep(t, -1);
-        } else if (trig === 'mission-step-down') {
-            e.preventDefault();
-            moveStep(t, 1);
-        }
-    });
-    document.addEventListener('keydown', (e) => {
-        const t = /** @type {Element} */ (e.target).closest('[data-trigger="mission-toggle-step"]');
-        if (!t) {
-            return;
-        }
-        if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            toggleStep(t);
-        }
-    });
-    document.addEventListener('change', (e) => {
-        const inp = /** @type {Element} */ (e.target).closest(
-            '#mission-step-list .ae-title, #mission-step-list .ae-meta',
-        );
-        if (!inp) {
-            return;
-        }
-        const row = inp.closest('.ae-row');
-        if (row) {
-            editStep(row);
-        }
-    });
-
-    /** @type {Element | null} */
-    let dragRow = null;
-    document.addEventListener('dragstart', (e) => {
-        const row = /** @type {Element} */ (e.target).closest('#mission-step-list .ae-row');
-        if (!row) {
-            return;
-        }
-        dragRow = row;
-        if (e.dataTransfer) {
-            e.dataTransfer.effectAllowed = 'move';
-        }
-    });
-    document.addEventListener('dragover', (e) => {
-        const list = /** @type {Element} */ (e.target).closest('#mission-step-list');
-        if (!list || !dragRow) {
-            return;
-        }
-        e.preventDefault();
-        const row = /** @type {Element} */ (e.target).closest('.ae-row');
-        list.querySelectorAll('.ae-row').forEach((r) => {
-            r.classList.remove('drag-over');
-        });
-        if (row && row !== dragRow) {
-            row.classList.add('drag-over');
-        }
-    });
-    document.addEventListener('drop', (e) => {
-        const list = /** @type {Element} */ (e.target).closest('#mission-step-list');
-        if (!list || !dragRow) {
-            return;
-        }
-        e.preventDefault();
-        const target = /** @type {Element} */ (e.target).closest('.ae-row');
-        list.querySelectorAll('.ae-row').forEach((r) => {
-            r.classList.remove('drag-over');
-        });
-        if (target && target !== dragRow) {
-            const order = listOrder();
-            const from = order.indexOf(dragRow.getAttribute('data-step-id'));
-            order.splice(
-                order.indexOf(target.getAttribute('data-step-id')),
-                0,
-                order.splice(from, 1)[0],
-            );
-            reorder(order);
-        }
-        dragRow = null;
-    });
-    document.addEventListener('dragend', () => {
-        document.querySelectorAll('#mission-step-list .ae-row.drag-over').forEach((r) => {
-            r.classList.remove('drag-over');
-        });
-        dragRow = null;
-    });
-})();
-
-(function () {
+function initMissionDetail() {
     function mid() {
         return window.missionId || (typeof missionId !== 'undefined' ? missionId : null);
     }
@@ -473,13 +473,13 @@ window.krtLiveSync.createReceiver({
         return v === null || Number.isNaN(v) ? null : v;
     }
     function refreshObjectives() {
-        if (window.krtRefreshMissionSection) {
-            return window.krtRefreshMissionSection(['objectives', 'overview']);
+        if (missionHooks.refresh) {
+            return missionHooks.refresh(['objectives', 'overview']);
         }
         return Promise.resolve();
     }
     function writeObjective(opts) {
-        return window.krtMissionWrite(
+        return missionHooks.write(
             Object.assign({ sectionKey: 'objectives', onSuccess: refreshObjectives }, opts),
         );
     }
@@ -496,7 +496,7 @@ window.krtLiveSync.createReceiver({
         if (objectivesVersion() === null) {
             return;
         }
-        const title = window.krtI18nText(
+        const title = krtI18nText(
             window.MISSION_OBJECTIVE_I18N && window.MISSION_OBJECTIVE_I18N.default_title,
             'MISSION_OBJECTIVE_I18N.default_title',
         );
@@ -537,19 +537,19 @@ window.krtLiveSync.createReceiver({
         if (!oid || objectivesVersion() === null) {
             return;
         }
-        const msg = window.krtI18nText(
+        const msg = krtI18nText(
             window.MISSION_OBJECTIVE_I18N && window.MISSION_OBJECTIVE_I18N.delete_confirm,
             'MISSION_OBJECTIVE_I18N.delete_confirm',
         );
-        const ok = await window.showKrtConfirm?.(
+        const ok = await showKrtConfirm?.(
             msg,
             msg,
-            window.krtI18nText(
+            krtI18nText(
                 window.MISSION_SUBRES_I18N &&
                     window.MISSION_SUBRES_I18N['mission.conflict.action.reload'],
                 'MISSION_SUBRES_I18N[mission.conflict.action.reload]',
             ),
-            window.krtI18nText(
+            krtI18nText(
                 window.MISSION_SUBRES_I18N &&
                     window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss'],
                 'MISSION_SUBRES_I18N[mission.conflict.action.dismiss]',
@@ -683,4 +683,6 @@ window.krtLiveSync.createReceiver({
         });
         dragRow = null;
     });
-})();
+}
+
+initMissionDetail();

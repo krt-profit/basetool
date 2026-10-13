@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedMaterialDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.AggregatedMaterialDto;
 import java.util.List;
 
 /**

@@ -19,11 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.platform.api.HandleAnonymisationParticipant;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;

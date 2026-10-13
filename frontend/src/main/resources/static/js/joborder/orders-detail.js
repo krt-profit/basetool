@@ -19,15 +19,30 @@
 
 // @ts-check
 
-/* global labelPiece, labelScu, scuHintText, labelMenge, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_HANDOVER_MISSION_HERKUNFT, MSG_HANDOVER_MISSION_REST, MSG_HANDOVER_MISSION_MIN, MSG_STOLEN, showFrontendErrorToast, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR, ORDER_HANDOVER_I18N */
-/* exported openHandoverModal, addHandoverItemRow, validateHandoverAmounts, updateHandoverIndexes */
+/* global labelPiece, labelScu, scuHintText, labelMenge, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_HANDOVER_MISSION_HERKUNFT, MSG_HANDOVER_MISSION_REST, MSG_HANDOVER_MISSION_MIN, MSG_STOLEN, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR, ORDER_HANDOVER_I18N */
+
+import { showFrontendErrorToast } from '/js/kernel/toast.js';
+import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtHtml } from '/js/kernel/krt-html.js';
+import { joborderHooks } from '/js/joborder/joborder-hooks.js';
 
 /** @type {any[]} */
-// eslint-disable-next-line prefer-const
-let cachedInventoryItems = [];
+export let cachedInventoryItems = [];
 let isInventoryCached = false;
 /** @type {Map<string, string>} */
 let handoverTierSuggestion = new Map();
+
+/**
+ * Forgets the inventory fetched for the handover dialog, so the next opening loads it again.
+ */
+export function resetInventoryCache() {
+    isInventoryCached = false;
+    cachedInventoryItems = [];
+    handoverTierSuggestion = new Map();
+}
 
 const ORDER_SECTIONS = {
     header: { container: '#order-header-results', fragmentValue: 'header' },
@@ -52,11 +67,8 @@ const ORDER_SECTIONS = {
     assignees: { container: '#order-assignees-results', fragmentValue: 'assignees' },
 };
 
-(function () {
-    if (!window.krtFetch || typeof window.krtFetch.sectionWrite !== 'function') {
-        return;
-    }
-    const orderSeam = window.krtFetch.sectionWrite({
+function initOrdersDetail() {
+    const orderSeam = krtFetch.sectionWrite({
         dict() {
             return {
                 'orders.section.refresh.error':
@@ -71,25 +83,21 @@ const ORDER_SECTIONS = {
             return window.orderId ? `/orders/${window.orderId}` : null;
         },
         broadcast(keys) {
-            if (
-                window.orderId &&
-                window.krtLiveSync &&
-                typeof window.krtLiveSync.sendChanged === 'function'
-            ) {
-                window.krtLiveSync.sendChanged(`order:${window.orderId}`, keys);
+            if (window.orderId && typeof krtLiveSync.sendChanged === 'function') {
+                krtLiveSync.sendChanged(`order:${window.orderId}`, keys);
             }
         },
     });
-    window.krtRefreshOrderSection = orderSeam.refresh;
-    window.krtNotifyOrderChanged = orderSeam.notify;
+    joborderHooks.refreshOrderSection = orderSeam.refresh;
+    joborderHooks.notifyOrderChanged = orderSeam.notify;
 
-    if (window.orderId && window.krtLiveSync && window.krtLiveSync.createReceiver) {
-        window.krtLiveSync.createReceiver({
+    if (window.orderId) {
+        krtLiveSync.createReceiver({
             topic: `order:${window.orderId}`,
             sections: ORDER_SECTIONS,
             refresh(keys) {
-                if (window.krtRefreshOrderSection) {
-                    window.krtRefreshOrderSection(keys, { broadcast: false });
+                if (joborderHooks.refreshOrderSection) {
+                    joborderHooks.refreshOrderSection(keys, { broadcast: false });
                 }
             },
             pill: {
@@ -101,11 +109,13 @@ const ORDER_SECTIONS = {
             },
         });
     }
-})();
+}
 
-function _publishOrdersQueue() {
-    if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
-        window.krtLiveSync.sendChanged('orders', ['queue', 'demand']);
+initOrdersDetail();
+
+export function _publishOrdersQueue() {
+    if (typeof krtLiveSync.sendChanged === 'function') {
+        krtLiveSync.sendChanged('orders', ['queue', 'demand']);
     }
 }
 
@@ -115,7 +125,7 @@ function _publishOrdersQueue() {
  * @param {string} id the control's element id
  * @returns {string} the control's value, or an empty string when it is missing or empty
  */
-function _odFieldValue(id) {
+export function _odFieldValue(id) {
     const field = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (
         document.getElementById(id)
     );
@@ -128,7 +138,7 @@ function _odFieldValue(id) {
  * @param {string} id the element id
  * @returns {HTMLElement} the element; dereferencing it throws when the page lacks it
  */
-function _odElementById(id) {
+export function _odElementById(id) {
     return /** @type {HTMLElement} */ (document.getElementById(id));
 }
 
@@ -139,7 +149,7 @@ function _odElementById(id) {
  * @returns {HTMLInputElement | HTMLSelectElement} the control; dereferencing it throws when the
  *     page lacks it
  */
-function _odControlById(id) {
+export function _odControlById(id) {
     return /** @type {HTMLInputElement | HTMLSelectElement} */ (document.getElementById(id));
 }
 
@@ -148,7 +158,7 @@ function _odControlById(id) {
  *
  * @returns {HTMLInputElement | null} the input, or null when the page has none
  */
-function _odEditVersionInput() {
+export function _odEditVersionInput() {
     return /** @type {HTMLInputElement | null} */ (
         document.querySelector('#edit-modal input[name="version"]')
     );
@@ -164,7 +174,7 @@ function _odEditVersionInput() {
  *
  * @returns {{handoverTime: string, recipientHandle: string, recipientSquadron: string, items: OdHandoverItem[]}} the body
  */
-function _serializeHandoverForm() {
+export function _serializeHandoverForm() {
     /** @type {OdHandoverItem[]} */
     const items = [];
     document.querySelectorAll('#handover-items-container .handover-item-row').forEach((row) => {
@@ -175,12 +185,7 @@ function _serializeHandoverForm() {
             row.querySelector('input[name$=".amount"]')
         );
         const inventoryItemId = sel ? sel.value : '';
-        const amount =
-            amtInput && window.krtScuInput
-                ? window.krtScuInput.parse(amtInput.value)
-                : amtInput
-                  ? parseFloat(amtInput.value)
-                  : NaN;
+        const amount = amtInput ? krtScuInput.parse(amtInput.value) : NaN;
         if (!inventoryItemId || !(amount > 0)) return;
         const tierSel = /** @type {HTMLSelectElement | null} */ (
             row.querySelector('select[data-role="handover-tier"]')
@@ -210,7 +215,7 @@ function _serializeHandoverForm() {
  *
  * @returns {{handoverTime: string, recipientHandle: string, entries: Array<{jobOrderItemId: string, amount: number}>}} the body
  */
-function _serializeItemHandoverForm() {
+export function _serializeItemHandoverForm() {
     /** @type {Array<{jobOrderItemId: string, amount: number}>} */
     const entries = [];
     document.querySelectorAll('#item-handover-modal .item-handover-line').forEach((line) => {
@@ -309,7 +314,7 @@ async function _loadHandoverTierSuggestions(materialIds, orderId) {
         const tiers = _orderTiersForMaterial(materialId);
         if (tiers.length < 2) continue;
         try {
-            const entries = await window.krtFetch.getJson(
+            const entries = await krtFetch.getJson(
                 `/orders/${orderId}/materials/${materialId}/attribution`,
             );
             /** @type {Map<string, {code: string, amount: number}>} */
@@ -363,8 +368,8 @@ function _refreshHandoverTierChoice(row, inv) {
     holder.classList.toggle('is-hidden', eligible.length === 0);
 }
 
-async function openHandoverModal() {
-    window.krtModal.open(document.getElementById('handover-modal'));
+export async function openHandoverModal() {
+    krtModal.open(document.getElementById('handover-modal'));
     if (!isInventoryCached) {
         try {
             /** @type {Map<string, HTMLElement>} */
@@ -380,7 +385,7 @@ async function openHandoverModal() {
                 const orderId = row.dataset.orderId;
                 const matId = row.dataset.materialId;
                 if (orderId && matId) {
-                    return window.krtFetch
+                    return krtFetch
                         .getJson(`/orders/${orderId}/materials/${matId}/inventory`)
                         .catch(() => []);
                 }
@@ -413,14 +418,14 @@ async function openHandoverModal() {
  * @param {Array<unknown>} values the values for {0}, {1}, …
  * @returns {string} the filled-in text
  */
-function fillPlaceholders(template, values) {
+export function fillPlaceholders(template, values) {
     return values.reduce((/** @type {string} */ text, value, i) => {
         return text.split(`{${i}}`).join(value == null ? '' : String(value));
     }, template);
 }
 
 /** Appends a handover row with the inventory entry, amount and tier controls. */
-function addHandoverItemRow() {
+export function addHandoverItemRow() {
     const container = document.getElementById('handover-items-container');
     if (!container) return;
     const index = container.children.length;
@@ -532,8 +537,7 @@ function _refreshHandoverMissionPicker(row) {
     const missions = inv && Array.isArray(inv.missionAllocations) ? inv.missionAllocations : [];
     const missionRest = inv && typeof inv.missionRest === 'number' ? inv.missionRest : 0;
     const isPiece = !!(inv && inv.material && inv.material.quantityType === 'PIECE');
-    const handed =
-        amtInput && window.krtScuInput ? window.krtScuInput.parse(amtInput.value) : Number.NaN;
+    const handed = amtInput ? krtScuInput.parse(amtInput.value) : Number.NaN;
     const ambiguous = missions.length >= 2 && isFinite(handed) && handed > missionRest + 0.0005;
 
     let holder = /** @type {HTMLElement | null} */ (
@@ -616,9 +620,7 @@ function _updateHandoverMissionRest(row) {
     const inv = cachedInventoryItems.find((i) => i.id === sel.value);
     const missionRest = inv && typeof inv.missionRest === 'number' ? inv.missionRest : 0;
     const isPiece = !!(inv && inv.material && inv.material.quantityType === 'PIECE');
-    const handed = window.krtScuInput
-        ? window.krtScuInput.parse(amtInput.value)
-        : parseFloat(amtInput.value);
+    const handed = krtScuInput.parse(amtInput.value);
     let assigned = 0;
     holder.querySelectorAll('[data-mission-input]').forEach((el) => {
         const v = parseFloat(/** @type {HTMLInputElement} */ (el).value);
@@ -670,7 +672,7 @@ function _collectHandoverMissionReductions(row) {
  *
  * @returns {boolean} true when all rows are valid
  */
-function validateHandoverAmounts() {
+export function validateHandoverAmounts() {
     const rows = document.querySelectorAll('#handover-items-container .handover-item-row');
     for (const row of rows) {
         const sel = row.querySelector('select');
@@ -681,7 +683,7 @@ function validateHandoverAmounts() {
         const inv = cachedInventoryItems.find((i) => i.id === sel.value);
         if (!inv) continue;
         const isPiece = !!(inv.material && inv.material.quantityType === 'PIECE');
-        const entered = /** @type {KrtScuInputApi} */ (window.krtScuInput).parse(inp.value);
+        const entered = /** @type {KrtScuInputApi} */ (krtScuInput).parse(inp.value);
         const sliceMax = orderSliceAmount(inv);
         if (entered > sliceMax) {
             const available = _handoverFmtAmount(sliceMax, isPiece);
@@ -720,7 +722,7 @@ function validateHandoverAmounts() {
     return true;
 }
 
-function updateHandoverIndexes() {
+export function updateHandoverIndexes() {
     const rows = document.querySelectorAll('.handover-item-row');
     rows.forEach((row, index) => {
         const select = row.querySelector('select');

@@ -29,8 +29,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDomain;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventRepository;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.audit.api.RetentionParticipant;
-import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
+import de.greluc.krt.profit.basetool.backend.audit.internal.AuditRetentionService;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;

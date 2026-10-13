@@ -47,4 +47,14 @@ public final class ScuAmounts {
     }
     return BigDecimal.valueOf(value).setScale(SCALE, RoundingMode.HALF_UP).doubleValue();
   }
+
+  /**
+   * Rounds a present SCU amount to three decimals with {@link RoundingMode#HALF_UP}.
+   *
+   * @param value the raw amount, possibly carrying floating-point noise
+   * @return {@code value} rounded to three decimals
+   */
+  public static double roundToScuScale(double value) {
+    return BigDecimal.valueOf(value).setScale(SCALE, RoundingMode.HALF_UP).doubleValue();
+  }
 }

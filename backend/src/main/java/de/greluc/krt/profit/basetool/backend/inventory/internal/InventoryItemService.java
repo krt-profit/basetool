@@ -29,30 +29,25 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
-import de.greluc.krt.profit.basetool.backend.exception.AppException;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInRule;
 import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargets;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
+import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
+import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
+import de.greluc.krt.profit.basetool.backend.kernel.AppException;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
-import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
-import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderEarmark;
-import de.greluc.krt.profit.basetool.backend.model.projection.MissionEarmark;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.util.HashSet;
@@ -417,7 +412,7 @@ public class InventoryItemService {
    * mission.
    *
    * @throws NotFoundException when any referenced id is unknown
-   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the job-order
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when the job-order
    *     requirement, catalog-kind or quality rules are violated, or a game-item row names a mission
    */
   @Transactional
@@ -474,7 +469,7 @@ public class InventoryItemService {
     item.setGameItem(gameItem);
     item.setLocation(location);
     item.setQuality(dto.quality());
-    item.setAmount(ScuAmounts.roundToScuScale(dto.amount()));
+    item.setAmount(ScuAmounts.roundToScuScale(dto.amount().doubleValue()));
     item.setPersonal(isPersonal);
     item.setStolen(isStolen);
     List<InventoryAllocationInput> jobAllocations =
@@ -499,7 +494,10 @@ public class InventoryItemService {
         assertMaterialRequiredByJobOrder(Objects.requireNonNull(material), allocation.targetId());
       }
       InventoryAllocations.addJobOrder(
-          item, allocation.targetId(), ScuAmounts.roundToScuScale(allocation.amount()), false);
+          item,
+          allocation.targetId(),
+          ScuAmounts.roundToScuScale(allocation.amount().doubleValue()),
+          false);
     }
     Set<UUID> seenMissions = new HashSet<>();
     for (InventoryAllocationInput allocation : missionAllocations) {
@@ -510,7 +508,9 @@ public class InventoryItemService {
       Entities.require(
           Optional.ofNullable(earmarkTargets.mission(allocation.targetId())), "Mission not found");
       InventoryAllocations.addMission(
-          item, allocation.targetId(), ScuAmounts.roundToScuScale(allocation.amount()));
+          item,
+          allocation.targetId(),
+          ScuAmounts.roundToScuScale(allocation.amount().doubleValue()));
     }
     if (!InventoryAllocations.fits(item)) {
       throw new OverAllocationException();
@@ -633,7 +633,8 @@ public class InventoryItemService {
         if (item.getGameItem() != null) {
           assertGameItemRequiredByJobOrder(item.getGameItem(), dto.targetId());
         } else {
-          assertMaterialRequiredByJobOrder(item.getMaterial(), dto.targetId());
+          assertMaterialRequiredByJobOrder(
+              Objects.requireNonNull(item.getMaterial()), dto.targetId());
         }
         if (findJobOrderSlice(item, dto.targetId()) != null) {
           throw new BadRequestException("error.inventory.allocation.duplicate.jobOrder");
@@ -859,7 +860,7 @@ public class InventoryItemService {
               ? "An item allocation amount must be a whole number"
               : "A PIECE allocation amount must be a whole number");
     }
-    return ScuAmounts.roundToScuScale(raw);
+    return ScuAmounts.roundToScuScale(raw.doubleValue());
   }
 
   /**
@@ -973,7 +974,7 @@ public class InventoryItemService {
       AuditEventType type,
       InventoryItem item,
       InventoryAllocationDimension field,
-      String ref,
+      @Nullable String ref,
       @Nullable Double amount) {
     AuditDetails details = AuditDetails.of("dim", field).with("ref", ref);
     if (amount != null) {
@@ -1128,7 +1129,7 @@ public class InventoryItemService {
    * @param isAdmin whether the caller is an admin (bypasses the owner check)
    * @return the reduced source or new target row, or {@code null} when the row is depleted
    * @throws NotFoundException when the item is unknown
-   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the amount
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when the amount
    *     exceeds stock, a SELL lacks terminal or amount, or a TRANSFER has no target (REQ-INV-025)
    */
   @Nullable

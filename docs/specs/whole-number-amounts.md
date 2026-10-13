@@ -70,7 +70,7 @@ amount.
 `MissionFinanceEntryE2eTest` (e2e create→view: add a finance entry, reopen the detail page, assert
 200 + the rendered `data-amount`). **Code:** `backend/.../model/dto/MissionFinanceEntry{Create,Update}Dto`
 (`@WholeNumber`, `@DecimalMin`, `@DecimalMax`), `frontend/.../mission/model/MissionFinanceEntryForm`
-(`@WholeNumber`), `backend/.../validation/WholeNumber` + `frontend/.../kernel/web/WholeNumber`,
+(`@WholeNumber`), `backend/.../kernel/WholeNumber` + `frontend/.../kernel/web/WholeNumber`,
 `frontend/.../kernel/web/MoneyFormat`, `templates/mission/mission-detail.html`, `templates/operation/operation-detail.html`.
 **Issues:** PR #465.
 
@@ -87,7 +87,7 @@ blank or `≤ 0` before calling the backend; `CreateJobOrderItemLineDto.amount` 
 - [ ] An item-order line amount is a whole number `≥ 1`; fractional or `≤ 0` input never reaches a persisted line (HTML `step`/`min` + the controller's `> 0` filter + backend `@Min(1)`).
 
 **Enforced by:** `JobOrderItemServiceTest`, `JobOrderPageControllerItemEditMvcTest`. **Code:**
-`backend/.../model/dto/CreateJobOrderItemLineDto`, `backend/.../model/JobOrderItem` (`amount` is
+`backend/.../joborder/api/CreateJobOrderItemLineDto`, `backend/.../joborder/api/JobOrderItem` (`amount` is
 `Integer`), `templates/joborder/orders-create.html`, `JobOrderWriteController` (line filter). **Issues:** PR #465.
 
 ### REQ-ORDERS-002 — Item-handover counts: positive whole numbers
@@ -105,7 +105,7 @@ over-delivery beyond the outstanding amount.
 
 **Enforced by:** `JobOrderItemHandoverServiceTest`. **Code:**
 `backend/.../joborder/internal/JobOrderItemHandoverEntryCreateDto`,
-`backend/.../model/JobOrderItemHandoverEntry` (`amount` is `Integer`),
+`backend/.../joborder/api/JobOrderItemHandoverEntry` (`amount` is `Integer`),
 `templates/joborder/orders-detail.html`, `JobOrderWriteController#createItemHandover`. **Issues:** PR #465.
 
 ### REQ-INV-045 — Personal-inventory quantity: positive whole numbers

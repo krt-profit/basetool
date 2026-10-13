@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
-import de.greluc.krt.profit.basetool.backend.validation.QualityValue;
+import de.greluc.krt.profit.basetool.backend.kernel.QualityValue;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

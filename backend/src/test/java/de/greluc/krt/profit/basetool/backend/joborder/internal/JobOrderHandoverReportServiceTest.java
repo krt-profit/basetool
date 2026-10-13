@@ -24,11 +24,10 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.model.JobOrder;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderHandover;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderHandoverItem;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverItem;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDateTime;

@@ -25,6 +25,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Envelope of the {@code RefineryExtract} v1 JSON contract produced by the desktop extractor.
@@ -48,4 +49,4 @@ public record RefineryExtractDto(
     @Size(max = 100) String model,
     Instant generatedAt,
     @Size(max = 16) String clientLanguage,
-    @NotEmpty @Size(max = 5) List<@NotNull @Valid RefineryExtractOrderDto> orders) {}
+    @NotEmpty @Size(max = 5) @Nullable List<@NotNull @Valid RefineryExtractOrderDto> orders) {}

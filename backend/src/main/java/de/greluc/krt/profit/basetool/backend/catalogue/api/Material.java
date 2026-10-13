@@ -69,6 +69,7 @@ public class Material extends AbstractEntity<UUID> {
   private QuantityType quantityType = QuantityType.SCU;
 
   @Column(columnDefinition = "TEXT")
+  @Nullable
   private String description;
 
   @Column(name = "code")

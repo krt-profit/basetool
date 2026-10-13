@@ -23,8 +23,8 @@ import de.greluc.krt.profit.basetool.backend.exchange.api.ActingMemberAuthoritie
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemCode;
 import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.kernel.ProblemResponseFactory;
-import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
+import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;

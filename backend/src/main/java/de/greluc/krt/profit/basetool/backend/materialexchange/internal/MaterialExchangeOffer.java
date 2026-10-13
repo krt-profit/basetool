@@ -19,10 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
-import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -49,7 +48,7 @@ import org.jetbrains.annotations.Nullable;
  * quantity; negotiation and handover happen off-tool.
  *
  * <ul>
- *   <li>A {@link MaterialExchangeOfferKind#MATERIAL} offer overlays an {@link InventoryItem},
+ *   <li>A {@link MaterialExchangeOfferKind#MATERIAL} offer overlays an {@code InventoryItem},
  *       reading material and quality live from {@link #inventoryItemId} and offering {@link
  *       #offeredAmount}; the item's location is never exposed (REQ-MARKET-004).
  *   <li>A {@link MaterialExchangeOfferKind#ITEM} offer names a craftable item by {@link

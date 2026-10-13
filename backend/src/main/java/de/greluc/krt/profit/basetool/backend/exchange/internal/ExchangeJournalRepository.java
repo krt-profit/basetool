@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -138,8 +139,8 @@ public interface ExchangeJournalRepository extends JpaRepository<ExchangeJournal
   List<UUID> findUndoableMembers(
       @Param("clientId") String clientId,
       @Param("since") Instant since,
-      @Param("installationKey") String installationKey,
-      @Param("resource") String resource);
+      @Param("installationKey") @Nullable String installationKey,
+      @Param("resource") @Nullable String resource);
 
   /**
    * Counts a client's writes in a bulk undo's scope that are not undone.
@@ -154,8 +155,8 @@ public interface ExchangeJournalRepository extends JpaRepository<ExchangeJournal
   long countUndoable(
       @Param("clientId") String clientId,
       @Param("since") Instant since,
-      @Param("installationKey") String installationKey,
-      @Param("resource") String resource);
+      @Param("installationKey") @Nullable String installationKey,
+      @Param("resource") @Nullable String resource);
 
   /**
    * Counts a client's writes that are not undone since a point in time per member and installation,

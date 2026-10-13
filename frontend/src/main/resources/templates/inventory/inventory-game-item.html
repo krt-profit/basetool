@@ -54,7 +54,7 @@
 </main>
 </th:block>
 <th:block th:fragment="pageTail">
-<script th:src="@{/js/inventory/inventory-game-item.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/inventory/inventory-game-item.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

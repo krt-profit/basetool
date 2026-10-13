@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
-import de.greluc.krt.profit.basetool.backend.validation.WholeNumber;
+import de.greluc.krt.profit.basetool.backend.kernel.WholeNumber;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exception;
 
+import de.greluc.krt.profit.basetool.backend.kernel.ProblemCode;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Field;

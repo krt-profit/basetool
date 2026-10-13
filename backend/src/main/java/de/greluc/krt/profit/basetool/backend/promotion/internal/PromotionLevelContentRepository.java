@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.promotion.internal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -64,7 +65,7 @@ public interface PromotionLevelContentRepository
       lc.category.topic.owningSquadron.id = :owningSquadronId
       """)
   Page<PromotionLevelContent> findAllScoped(
-      @Param("owningSquadronId") UUID owningSquadronId, Pageable pageable);
+      @Param("owningSquadronId") @Nullable UUID owningSquadronId, Pageable pageable);
 
   /**
    * Squadron-scoped unpaginated read of one category's level contents ordered by {@link
@@ -82,7 +83,8 @@ public interface PromotionLevelContentRepository
       :owningSquadronId) ORDER BY lc.level ASC
       """)
   List<PromotionLevelContent> findAllByCategoryIdScopedOrdered(
-      @Param("categoryId") UUID categoryId, @Param("owningSquadronId") UUID owningSquadronId);
+      @Param("categoryId") UUID categoryId,
+      @Param("owningSquadronId") @Nullable UUID owningSquadronId);
 
   /**
    * Looks up the single {@link PromotionLevelContent} entry that describes the expectations of the

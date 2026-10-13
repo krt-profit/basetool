@@ -19,8 +19,29 @@
 
 // @ts-check
 
-/* global MSG_HANDOVER_SUCCESS, MSG_HANDOVER_FAILED, MSG_HANDOVER_NOITEMS, ORDER_AGE_YELLOW, ORDER_AGE_RED, MSG_UNIT_SCU, MSG_UNIT_PIECE, ORDER_CONFLICT, MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL, MSG_DELETE_ERROR, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_MATERIAL_INVALID, MSG_INVENTORY_UNLINK_SUCCESS, MSG_INVENTORY_UNLINK_ERROR, showFrontendErrorToast, showFrontendSuccessToast, ORDER_HANDOVER_I18N, validateHandoverAmounts, _serializeHandoverForm, isInventoryCached:writable, cachedInventoryItems:writable, handoverTierSuggestion:writable, _publishOrdersQueue, validateItemHandoverForm, _serializeItemHandoverForm, _odEditVersionInput, _odFieldValue */
-/* exported unlinkInventoryItem, isInventoryCached, cachedInventoryItems, handoverTierSuggestion */
+/* global MSG_HANDOVER_SUCCESS, MSG_HANDOVER_FAILED, MSG_HANDOVER_NOITEMS, ORDER_AGE_YELLOW, ORDER_AGE_RED, MSG_UNIT_SCU, MSG_UNIT_PIECE, ORDER_CONFLICT, MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL, MSG_DELETE_ERROR, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_MATERIAL_INVALID, MSG_INVENTORY_UNLINK_SUCCESS, MSG_INVENTORY_UNLINK_ERROR, ORDER_HANDOVER_I18N */
+
+import { validateItemHandoverForm } from '/js/joborder/orders-detail-reports.js';
+import {
+    _odEditVersionInput,
+    _odFieldValue,
+    _publishOrdersQueue,
+    _serializeHandoverForm,
+    _serializeItemHandoverForm,
+    resetInventoryCache,
+    validateHandoverAmounts,
+} from '/js/joborder/orders-detail.js';
+import {
+    showFrontendErrorToast,
+    showFrontendSuccessToast,
+    showKrtConfirm,
+} from '/js/kernel/toast.js';
+import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';
+import { joborderHooks } from '/js/joborder/joborder-hooks.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const handoverForm = /** @type {HTMLFormElement | null} */ (
@@ -31,7 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             if (!validateHandoverAmounts()) return;
             const orderId = handoverForm.getAttribute('data-order-id');
-            if (!orderId || !window.krtFetch || typeof krtOrderWrite !== 'function') {
+            if (!orderId || typeof krtOrderWrite !== 'function') {
                 handoverForm.submit();
                 return;
             }
@@ -50,10 +71,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     const editVer = _odEditVersionInput();
                     if (editVer && order && order.version != null) editVer.value = order.version;
                     const modal = document.getElementById('handover-modal');
-                    if (modal) window.krtModal.close(modal);
-                    isInventoryCached = false;
-                    cachedInventoryItems = [];
-                    handoverTierSuggestion = new Map();
+                    if (modal) krtModal.close(modal);
+                    resetInventoryCache();
                     const itemsContainer = document.getElementById('handover-items-container');
                     if (itemsContainer) itemsContainer.replaceChildren();
                     showFrontendSuccessToast(MSG_HANDOVER_SUCCESS);
@@ -75,7 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             if (!validateItemHandoverForm()) return;
             const orderId = itemHandoverForm.getAttribute('data-order-id');
-            if (!orderId || !window.krtFetch || typeof krtOrderWrite !== 'function') {
+            if (!orderId || typeof krtOrderWrite !== 'function') {
                 itemHandoverForm.submit();
                 return;
             }
@@ -94,18 +113,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     const editVer = _odEditVersionInput();
                     if (editVer && order && order.version != null) editVer.value = order.version;
                     const modal = document.getElementById('item-handover-modal');
-                    if (modal) window.krtModal.close(modal);
+                    if (modal) krtModal.close(modal);
                     showFrontendSuccessToast(MSG_HANDOVER_SUCCESS);
                     _swapOrderSection(orderId, 'order-items-results', 'items');
                     _swapOrderSection(orderId, 'order-item-handovers-results', 'item-handovers');
                     _swapOrderSection(orderId, 'item-handover-lines', 'item-handover-lines');
                     _swapOrderSection(orderId, 'order-header-results', 'header');
                     _swapOrderSection(orderId, 'order-kpi-results', 'kpi');
-                    if (
-                        window.krtLiveSync &&
-                        typeof window.krtLiveSync.sendChanged === 'function'
-                    ) {
-                        window.krtLiveSync.sendChanged('inventory', ['stock']);
+                    if (typeof krtLiveSync.sendChanged === 'function') {
+                        krtLiveSync.sendChanged('inventory', ['stock']);
                     }
                     if (order && (order.status === 'COMPLETED' || order.status === 'REJECTED')) {
                         _publishOrdersQueue();
@@ -231,9 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             materialsContainer.appendChild(fragment);
             const newRow = /** @type {Element} */ (materialsContainer.lastElementChild);
-            if (window.krtEnhanceComboboxes) {
-                window.krtEnhanceComboboxes(newRow);
-            }
+            krtEnhanceComboboxes(newRow);
             refreshEditMaterialUnit(newRow);
         });
 
@@ -245,27 +259,30 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         materialsContainer.querySelectorAll('.material-row').forEach(refreshEditMaterialUnit);
 
+        /** @type {Element | null} */
+        let materialRowToDelete = null;
+
         materialsContainer.addEventListener('click', (e) => {
             const target = /** @type {Element} */ (e.target);
             const removeBtn = target.closest && target.closest('.remove-material-btn');
             if (removeBtn) {
                 const row = removeBtn.closest('.material-row');
                 if (materialsContainer.querySelectorAll('.material-row').length > 1) {
-                    window.krtModal.open(document.getElementById('material-delete-confirm-modal'));
-                    window.materialRowToDelete = row;
+                    krtModal.open(document.getElementById('material-delete-confirm-modal'));
+                    materialRowToDelete = row;
                 } else {
                     showFrontendErrorToast(ORDER_HANDOVER_I18N.keepOneMaterial);
                 }
             }
         });
 
-        window.confirmRemoveMaterial = function () {
-            if (window.materialRowToDelete) {
-                window.materialRowToDelete.remove();
+        joborderHooks.confirmRemoveMaterial = function () {
+            if (materialRowToDelete) {
+                materialRowToDelete.remove();
                 reindexMaterials();
-                window.materialRowToDelete = null;
+                materialRowToDelete = null;
             }
-            window.krtModal.close(document.getElementById('material-delete-confirm-modal'));
+            krtModal.close(document.getElementById('material-delete-confirm-modal'));
         };
 
         /** Renumbers the names and ids of the material rows after a row was removed. */
@@ -297,8 +314,8 @@ document.addEventListener('DOMContentLoaded', () => {
  * @param {KrtWriteOpts} opts the write options
  * @returns {Promise<KrtWriteResult>} the outcome of the write
  */
-function krtOrderWrite(opts) {
-    return window.krtFetch.write(
+export function krtOrderWrite(opts) {
+    return krtFetch.write(
         Object.assign({}, opts, {
             serialize: opts.serialize || 'order',
             conflict: {
@@ -312,7 +329,7 @@ function krtOrderWrite(opts) {
     );
 }
 
-(function () {
+function initOrdersDetailEdit() {
     const form = /** @type {HTMLFormElement | null} */ (
         document.getElementById('delete-order-form')
     );
@@ -320,11 +337,11 @@ function krtOrderWrite(opts) {
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const orderId = form.getAttribute('data-order-id');
-        if (!orderId || typeof window.showKrtConfirm !== 'function' || !window.krtFetch) {
+        if (!orderId) {
             form.submit();
             return;
         }
-        const ok = await window.showKrtConfirm(
+        const ok = await showKrtConfirm(
             MSG_DELETE_TITLE,
             MSG_DELETE_MESSAGE,
             MSG_DELETE_CONFIRM,
@@ -342,7 +359,9 @@ function krtOrderWrite(opts) {
             window.location.assign('/orders');
         }
     });
-})();
+}
+
+initOrdersDetailEdit();
 
 /**
  * Collects the order edit form into the request body.
@@ -363,12 +382,7 @@ function _serializeEditForm() {
             row.querySelector('[name$=".amount"]')
         );
         const materialId = matSel ? matSel.value : '';
-        const amount =
-            amtInput && window.krtScuInput
-                ? window.krtScuInput.parse(amtInput.value)
-                : amtInput
-                  ? parseFloat(amtInput.value)
-                  : NaN;
+        const amount = amtInput ? krtScuInput.parse(amtInput.value) : NaN;
         if (!materialId || !(amount > 0)) return;
         materials.push({
             materialId,
@@ -385,13 +399,13 @@ function _serializeEditForm() {
         materials,
     };
 }
-(function () {
+function initOrdersDetailEdit2() {
     const form = /** @type {HTMLFormElement | null} */ (document.getElementById('edit-order-form'));
     if (!form) return;
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const orderId = form.getAttribute('data-order-id');
-        if (!orderId || !window.krtFetch) {
+        if (!orderId) {
             form.submit();
             return;
         }
@@ -414,7 +428,7 @@ function _serializeEditForm() {
                 const editVer = _odEditVersionInput();
                 if (editVer && dto && dto.version != null) editVer.value = dto.version;
                 const modal = document.getElementById('edit-modal');
-                if (modal) window.krtModal.close(modal);
+                if (modal) krtModal.close(modal);
                 showFrontendSuccessToast(MSG_UPDATE_SUCCESS);
                 _swapOrderSection(orderId, 'order-header-results', 'header');
                 _refreshMaterialsSection(orderId);
@@ -422,7 +436,9 @@ function _serializeEditForm() {
             },
         });
     });
-})();
+}
+
+initOrdersDetailEdit2();
 
 /**
  * Re-renders the materials, aggregated and KPI sections of the order in place.
@@ -431,17 +447,16 @@ function _serializeEditForm() {
  * @param {KrtSectionRefreshOpts} [broadcastOpts] the live-sync broadcast options
  * @returns {Promise<boolean> | void} the swap outcome, absent when the section seam handled it
  */
-function _refreshMaterialsSection(orderId, broadcastOpts) {
-    if (window.krtRefreshOrderSection) {
-        return window.krtRefreshOrderSection(['materials', 'aggregated', 'kpi'], broadcastOpts);
+export function _refreshMaterialsSection(orderId, broadcastOpts) {
+    if (joborderHooks.refreshOrderSection) {
+        return joborderHooks.refreshOrderSection(['materials', 'aggregated', 'kpi'], broadcastOpts);
     }
     orderId ||= window.orderId || _odFieldValue('claim-order-id');
     const mat = document.getElementById('order-materials-results');
     const agg = document.getElementById('order-aggregated-results');
     const container = mat || agg;
-    if (!orderId || !container || !window.krtFetch || !window.krtFetch.swap)
-        return Promise.resolve(false);
-    return window.krtFetch.swap({
+    if (!orderId || !container) return Promise.resolve(false);
+    return krtFetch.swap({
         url: `/orders/${orderId}`,
         container,
         fragmentValue: mat ? 'materials' : 'aggregated',
@@ -459,13 +474,13 @@ function _refreshMaterialsSection(orderId, broadcastOpts) {
  * @param {KrtSectionRefreshOpts} [broadcastOpts] the live-sync broadcast options
  * @returns {Promise<boolean> | void} the swap outcome, absent when the section seam handled it
  */
-function _swapOrderSection(orderId, containerId, fragmentValue, broadcastOpts) {
-    if (window.krtRefreshOrderSection) {
-        return window.krtRefreshOrderSection(fragmentValue, broadcastOpts);
+export function _swapOrderSection(orderId, containerId, fragmentValue, broadcastOpts) {
+    if (joborderHooks.refreshOrderSection) {
+        return joborderHooks.refreshOrderSection(fragmentValue, broadcastOpts);
     }
     const c = document.getElementById(containerId);
-    if (!c || !orderId || !window.krtFetch || !window.krtFetch.swap) return Promise.resolve(false);
-    return window.krtFetch.swap({
+    if (!c || !orderId) return Promise.resolve(false);
+    return krtFetch.swap({
         url: `/orders/${orderId}`,
         container: c,
         fragmentValue,
@@ -479,7 +494,7 @@ function _swapOrderSection(orderId, containerId, fragmentValue, broadcastOpts) {
  *
  * @param {Element} btn the unlink button carrying the order and entry ids
  */
-async function unlinkInventoryItem(btn) {
+export async function unlinkInventoryItem(btn) {
     const orderId = btn.getAttribute('data-order-id');
     const invId = btn.getAttribute('data-inventory-item-id');
     if (!orderId || !invId) return;

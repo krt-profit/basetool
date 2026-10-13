@@ -20,7 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInPolicy;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryScope;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.UserAccessPolicy;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -31,6 +33,8 @@ import org.springframework.transaction.annotation.Transactional;
  * The inventory module's access policy: the read and edit gates of a Lager row and the on-behalf
  * book-in pre-check, evaluated on the scope kernel (plan §5.4, ADR-0236). It also answers the other
  * modules' book-in checks ({@link BookInPolicy}).
+ *
+ * <p>The list-side half of the rule is {@link InventoryScope#TRIPLE}; both widen together.
  *
  * <p>Invoked from SpEL as {@code @inventoryAccessPolicy}. Unknown ids are refused. Read-only
  * transactional.
@@ -45,6 +49,7 @@ public class InventoryAccessPolicy implements BookInPolicy {
 
   private final OwnerScopeService ownerScopeService;
   private final InventoryItemRepository inventoryItemRepository;
+  private final UserAccessPolicy userAccessPolicy;
 
   /**
    * Checks whether the caller may read Lager row {@code itemId}, applying the owner escape
@@ -82,7 +87,7 @@ public class InventoryAccessPolicy implements BookInPolicy {
    * @return {@code true} iff the caller may create Lager rows in that member's name
    */
   public boolean canManageUserInventory(@NotNull UUID targetUserId) {
-    return ownerScopeService.canActOnTargetUser(targetUserId, true);
+    return userAccessPolicy.canActOnTargetUser(targetUserId, true);
   }
 
   @Override

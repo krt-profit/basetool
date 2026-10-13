@@ -4,7 +4,7 @@
 - **Date:** 2026-07-10
 - **Deciders:** @greluc
 - **Related:** ADR-0053 (searchable-combobox standard) · ADR-0085 (5000-account scaling, which deferred
-  this) · REQ-FE-011 · REQ-BANK-008/009/044 · `UserController.searchUsersForBank` ·
+  this) · REQ-FE-011 · REQ-BANK-008/009/044 · `BankMemberSearchController.searchUsersForBank` ·
   `UserProxyController` · `krt-user-search.js` · #1193
 
 ## Context

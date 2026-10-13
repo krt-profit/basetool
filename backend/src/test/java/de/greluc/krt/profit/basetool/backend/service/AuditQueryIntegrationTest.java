@@ -25,10 +25,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDomain;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEvent;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventDto;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
-import de.greluc.krt.profit.basetool.backend.model.AuditEvent;
-import de.greluc.krt.profit.basetool.backend.model.dto.AuditEventDto;
-import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;

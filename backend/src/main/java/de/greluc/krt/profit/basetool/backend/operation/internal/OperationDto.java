@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.operation.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.SquadronReferenceDto;
+import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
 import java.time.Instant;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;

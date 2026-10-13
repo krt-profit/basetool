@@ -176,6 +176,7 @@ exempt-column|material_external_alias.external_key
 exempt-column|material_external_alias.external_name
 exempt-column|material_external_alias.source_system
 exempt-column|member_evaluation.assigned_level
+exempt-column|member_payout_setting.default_payout_preference
 exempt-column|mission.calendar_link
 exempt-column|mission.status
 exempt-column|mission_finance_entry.type

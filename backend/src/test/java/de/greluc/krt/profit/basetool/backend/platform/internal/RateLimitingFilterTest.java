@@ -1,0 +1,991 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.platform.internal;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import de.greluc.krt.profit.basetool.backend.kernel.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
+import de.greluc.krt.profit.basetool.backend.platform.api.RateLimitProperties;
+import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import java.io.IOException;
+import java.time.Duration;
+import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.MessageSource;
+import org.springframework.context.support.StaticMessageSource;
+import org.springframework.mock.web.MockFilterChain;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+
+/**
+ * Unit tests for {@link RateLimitingFilter}, focused on which bucket a request lands in.
+ *
+ * <p>{@code X-Forwarded-For} is honoured only from a trusted proxy, and {@code "*"} is not a valid
+ * trust value.
+ */
+class RateLimitingFilterTest {
+
+  /** The configuration the current test describes; see {@link Spec}. */
+  private Spec properties;
+
+  private AppProblemProperties problemProperties;
+
+  /** The filter {@link #filter()} built last, and the configuration it was built from. */
+  private RateLimitingFilter builtFilter;
+
+  private RateLimitProperties builtFrom;
+
+  /**
+   * Empty message source: unresolved keys fall back to the English default passed at the call site,
+   * so the 429 body carries the hardcoded English title/detail the assertions expect.
+   */
+  private final MessageSource messageSource = new StaticMessageSource();
+
+  private final MeterRegistry meterRegistry = new SimpleMeterRegistry();
+
+  @BeforeEach
+  void setUp() {
+    properties = new Spec();
+    properties.setEnabled(true);
+    properties.setPaths(List.of("/api/**"));
+    properties.setCapacity(2);
+    properties.setRefillTokens(2);
+    properties.setRefillPeriod(Duration.ofMinutes(1));
+
+    problemProperties = new AppProblemProperties("https://profit-base.online/problems/");
+  }
+
+  /**
+   * Returns the filter under test, rebuilt whenever {@link #properties} changed since the last
+   * build.
+   *
+   * @return the filter over the current configuration
+   */
+  private RateLimitingFilter filter() {
+    RateLimitProperties current = properties.toProperties();
+    if (builtFilter == null || !current.equals(builtFrom)) {
+      builtFilter =
+          new RateLimitingFilter(current, problemProperties, messageSource, meterRegistry);
+      builtFrom = current;
+    }
+    return builtFilter;
+  }
+
+  /**
+   * Runs the production filter pair in order: client-IP resolution, then rate limiting.
+   *
+   * @param limiter the rate-limiting filter under test
+   * @param request the request to send through the pair
+   * @param response the response the pair writes to
+   * @throws ServletException if the chain fails
+   * @throws IOException if the chain fails
+   */
+  private void runChain(
+      RateLimitingFilter limiter, MockHttpServletRequest request, MockHttpServletResponse response)
+      throws ServletException, IOException {
+    new ClientIpContextFilter(properties.getTrustedProxies())
+        .doFilter(
+            request, response, (req, res) -> limiter.doFilter(req, res, new MockFilterChain()));
+  }
+
+  @Nested
+  class ShouldNotFilterTests {
+
+    @Test
+    void disabled_globally_bypassesEntirely() {
+      properties.setEnabled(false);
+      MockHttpServletRequest req = newRequest("/api/v1/missions");
+
+      assertTrue(
+          filter().shouldNotFilter(req), "enabled=false must short-circuit before path matching");
+    }
+
+    @Test
+    void nullPathsList_bypasses() {
+      properties.setPaths(null);
+      MockHttpServletRequest req = newRequest("/api/v1/missions");
+
+      assertTrue(filter().shouldNotFilter(req));
+    }
+
+    @Test
+    void emptyPathsList_bypasses() {
+      properties.setPaths(List.of());
+      MockHttpServletRequest req = newRequest("/api/v1/missions");
+
+      assertTrue(filter().shouldNotFilter(req));
+    }
+
+    @Test
+    void pathMatchesPattern_filterApplies() {
+      properties.setPaths(List.of("/api/**"));
+      MockHttpServletRequest req = newRequest("/api/v1/missions");
+
+      assertEquals(
+          false,
+          filter().shouldNotFilter(req),
+          "matching path must NOT be skipped (filter applies)");
+    }
+
+    @Test
+    void pathDoesNotMatchPattern_bypasses() {
+      properties.setPaths(List.of("/api/**"));
+      MockHttpServletRequest req = newRequest("/health");
+
+      assertTrue(filter().shouldNotFilter(req));
+    }
+
+    @Test
+    void multiplePatterns_anyMatchTriggersFilter() {
+      properties.setPaths(List.of("/health", "/api/**"));
+      MockHttpServletRequest req = newRequest("/api/v1/missions");
+
+      assertEquals(false, filter().shouldNotFilter(req));
+    }
+
+    @Test
+    void singleSegmentWildcard_matchesOneSegmentOnly() {
+      properties.setPaths(List.of("/api/v1/missions/*"));
+
+      assertEquals(false, filter().shouldNotFilter(newRequest("/api/v1/missions/m1")));
+      assertTrue(filter().shouldNotFilter(newRequest("/api/v1/missions/m1/participants")));
+    }
+
+    @Test
+    void globalUmbrella_matchesSubPathsAndTrailingSlash() {
+      properties.setPaths(List.of("/api/**"));
+
+      assertEquals(false, filter().shouldNotFilter(newRequest("/api/v1/missions")));
+      assertEquals(
+          false, filter().shouldNotFilter(newRequest("/api/v1/missions/m1/participants/p1")));
+      assertEquals(false, filter().shouldNotFilter(newRequest("/api/")));
+    }
+  }
+
+  @Nested
+  class StartupValidationTests {
+
+    @Test
+    void constructor_failsFast_onUnparseableGlobalPattern() {
+      Spec bad = newValidProperties();
+      bad.setPaths(List.of("/api/**/legacy/**"));
+
+      IllegalStateException ex =
+          assertThrows(
+              IllegalStateException.class,
+              () ->
+                  new RateLimitingFilter(
+                      bad.toProperties(), problemProperties, messageSource, meterRegistry),
+              "an unparseable global pattern must abort startup");
+      assertTrue(
+          ex.getMessage().contains("/api/**/legacy/**"),
+          "the failure must name the offending pattern: " + ex.getMessage());
+      assertTrue(
+          ex.getMessage().contains("app.rate-limit.paths"),
+          "the failure must name the offending config key: " + ex.getMessage());
+    }
+
+    @Test
+    void constructor_failsFast_onUnparseableRulePattern() {
+      Spec bad = newValidProperties();
+      RateLimitProperties.Rule rule =
+          new RateLimitProperties.Rule(
+              "broken-rule", List.of("/api/**/x/**"), List.of("POST"), 1, 1, Duration.ofMinutes(1));
+      bad.setRules(List.of(rule));
+
+      IllegalStateException ex =
+          assertThrows(
+              IllegalStateException.class,
+              () ->
+                  new RateLimitingFilter(
+                      bad.toProperties(), problemProperties, messageSource, meterRegistry));
+      assertTrue(
+          ex.getMessage().contains("broken-rule"),
+          "the failure must name the offending rule: " + ex.getMessage());
+    }
+
+    @Test
+    void constructor_failsFast_onBlankPattern() {
+      Spec bad = newValidProperties();
+      bad.setPaths(List.of("   "));
+
+      assertThrows(
+          IllegalStateException.class,
+          () ->
+              new RateLimitingFilter(
+                  bad.toProperties(), problemProperties, messageSource, meterRegistry));
+    }
+
+    @Test
+    void constructor_succeeds_onAllValidPatterns() {
+      Spec ok = newValidProperties();
+      RateLimitProperties.Rule rule =
+          new RateLimitProperties.Rule(
+              "participant-mutations",
+              List.of("/api/v1/missions/*/participants", "/api/v1/missions/*/participants/**"),
+              List.of("POST", "PUT", "DELETE"),
+              30,
+              30,
+              Duration.ofMinutes(1));
+      ok.setRules(List.of(rule));
+
+      assertNotNull(
+          new RateLimitingFilter(
+              ok.toProperties(), problemProperties, messageSource, meterRegistry));
+    }
+
+    private Spec newValidProperties() {
+      Spec p = new Spec();
+      p.setEnabled(true);
+      p.setPaths(List.of("/api/**"));
+      p.setCapacity(300);
+      p.setRefillTokens(300);
+      p.setRefillPeriod(Duration.ofMinutes(1));
+      return p;
+    }
+  }
+
+  @Nested
+  class ClientIpResolutionTests {
+
+    @Test
+    void noTrustedProxies_ignoresXForwardedFor() throws Exception {
+      properties.setTrustedProxies(null);
+      MockHttpServletRequest req = newRequest("/api/v1/missions");
+      req.setRemoteAddr("198.51.100.10");
+      req.addHeader("X-Forwarded-For", "1.1.1.1");
+
+      assertConsumesBucketKeyContaining("198.51.100.10", req);
+    }
+
+    @Test
+    void emptyTrustedProxies_ignoresXForwardedFor() throws Exception {
+      properties.setTrustedProxies(List.of());
+      MockHttpServletRequest req = newRequest("/api/v1/missions");
+      req.setRemoteAddr("198.51.100.10");
+      req.addHeader("X-Forwarded-For", "1.1.1.1");
+
+      assertConsumesBucketKeyContaining("198.51.100.10", req);
+    }
+
+    @Test
+    void wildcardOnlyTrustedProxies_ignoresXForwardedFor() throws Exception {
+      properties.setTrustedProxies(List.of("*"));
+      MockHttpServletRequest req = newRequest("/api/v1/missions");
+      req.setRemoteAddr("198.51.100.10");
+      req.addHeader("X-Forwarded-For", "1.1.1.1");
+
+      assertConsumesBucketKeyContaining("198.51.100.10", req);
+    }
+
+    @Test
+    void trustedPeerWithNullXff_fallsBackToRemoteAddr() throws Exception {
+      properties.setTrustedProxies(List.of("10.0.0.1"));
+      MockHttpServletRequest req = newRequest("/api/v1/missions");
+      req.setRemoteAddr("10.0.0.1");
+
+      assertConsumesBucketKeyContaining("10.0.0.1", req);
+    }
+
+    @Test
+    void trustedPeerWithBlankXff_fallsBackToRemoteAddr() throws Exception {
+      properties.setTrustedProxies(List.of("10.0.0.1"));
+      MockHttpServletRequest req = newRequest("/api/v1/missions");
+      req.setRemoteAddr("10.0.0.1");
+      req.addHeader("X-Forwarded-For", "   ");
+
+      assertConsumesBucketKeyContaining("10.0.0.1", req);
+    }
+
+    @Test
+    void untrustedPeerWithXff_ignoresXForwardedFor() throws Exception {
+      properties.setTrustedProxies(List.of("10.0.0.1"));
+      MockHttpServletRequest req = newRequest("/api/v1/missions");
+      req.setRemoteAddr("198.51.100.10");
+      req.addHeader("X-Forwarded-For", "1.1.1.1");
+
+      assertConsumesBucketKeyContaining("198.51.100.10", req);
+    }
+
+    @Test
+    void trustedPeerWithSingleXff_usesXffIp() throws Exception {
+      properties.setTrustedProxies(List.of("10.0.0.1"));
+      MockHttpServletRequest req = newRequest("/api/v1/missions");
+      req.setRemoteAddr("10.0.0.1");
+      req.addHeader("X-Forwarded-For", "203.0.113.7");
+
+      assertConsumesBucketKeyContaining("203.0.113.7", req);
+    }
+
+    @Test
+    void trustedPeerWithCommaSeparatedXff_usesRightmostUntrustedHop() throws Exception {
+      properties.setTrustedProxies(List.of("10.0.0.1"));
+      MockHttpServletRequest req = newRequest("/api/v1/missions");
+      req.setRemoteAddr("10.0.0.1");
+      req.addHeader("X-Forwarded-For", "203.0.113.7, 10.0.0.1, 198.51.100.99");
+
+      assertConsumesBucketKeyContaining("198.51.100.99", req);
+    }
+
+    @Test
+    void spoofedLeadingEntry_cannotMintAFreshBucket() throws Exception {
+      properties.setTrustedProxies(List.of("10.0.0.1"));
+      properties.setCapacity(1);
+      properties.setRefillTokens(1);
+
+      MockHttpServletRequest first = newRequest("/api/v1/missions");
+      first.setRemoteAddr("10.0.0.1");
+      first.addHeader("X-Forwarded-For", "1.1.1.1, 198.51.100.99");
+      MockHttpServletResponse firstResponse = new MockHttpServletResponse();
+      runChain(filter(), first, firstResponse);
+      assertEquals(200, firstResponse.getStatus(), "first request must consume cleanly");
+
+      MockHttpServletRequest second = newRequest("/api/v1/missions");
+      second.setRemoteAddr("10.0.0.1");
+      second.addHeader("X-Forwarded-For", "2.2.2.2, 198.51.100.99");
+      MockHttpServletResponse secondResponse = new MockHttpServletResponse();
+      runChain(filter(), second, secondResponse);
+
+      assertEquals(
+          429,
+          secondResponse.getStatus(),
+          "rotating the spoofable leading entry must not yield a second bucket");
+    }
+
+    @Test
+    void everyHopTrusted_fallsBackToPeer() throws Exception {
+      properties.setTrustedProxies(List.of("10.0.0.0/24"));
+      MockHttpServletRequest req = newRequest("/api/v1/missions");
+      req.setRemoteAddr("10.0.0.1");
+      req.addHeader("X-Forwarded-For", "10.0.0.5, 10.0.0.9");
+
+      assertConsumesBucketKeyContaining("10.0.0.1", req);
+    }
+
+    @Test
+    void trustedPeerWithXffWhitespace_trimsBeforeUsing() throws Exception {
+      properties.setTrustedProxies(List.of("10.0.0.1"));
+      MockHttpServletRequest req = newRequest("/api/v1/missions");
+      req.setRemoteAddr("10.0.0.1");
+      req.addHeader("X-Forwarded-For", "   203.0.113.7   ,  10.0.0.1  ");
+
+      assertConsumesBucketKeyContaining("203.0.113.7", req);
+    }
+
+    @Test
+    void trustedProxiesListContainsBothWildcardAndRealIp_realIpStillWorks() throws Exception {
+      properties.setTrustedProxies(List.of("*", "10.0.0.1"));
+      MockHttpServletRequest req = newRequest("/api/v1/missions");
+      req.setRemoteAddr("10.0.0.1");
+      req.addHeader("X-Forwarded-For", "203.0.113.7");
+
+      assertConsumesBucketKeyContaining("203.0.113.7", req);
+    }
+
+    @Test
+    void twoRequestsFromSameSpoofedXffShareABucket_whenTrustedProxyNotConfigured()
+        throws Exception {
+      properties.setTrustedProxies(List.of());
+      properties.setCapacity(1);
+      properties.setRefillTokens(1);
+
+      MockHttpServletRequest req1 = newRequest("/api/v1/missions");
+      req1.setRemoteAddr("198.51.100.10");
+      req1.addHeader("X-Forwarded-For", "1.1.1.1");
+      MockHttpServletResponse resp1 = new MockHttpServletResponse();
+      filter().doFilter(req1, resp1, new MockFilterChain());
+      assertEquals(200, resp1.getStatus(), "first request must pass");
+
+      MockHttpServletRequest req2 = newRequest("/api/v1/missions");
+      req2.setRemoteAddr("198.51.100.10");
+      req2.addHeader("X-Forwarded-For", "2.2.2.2");
+      MockHttpServletResponse resp2 = new MockHttpServletResponse();
+      filter().doFilter(req2, resp2, new MockFilterChain());
+
+      assertEquals(
+          429,
+          resp2.getStatus(),
+          "spoofed XFF must NOT yield a fresh bucket when proxy not in trust list");
+    }
+
+    private void assertConsumesBucketKeyContaining(String expectedIp, MockHttpServletRequest req)
+        throws ServletException, IOException {
+      MockHttpServletRequest probe = copy(req);
+      new ClientIpContextFilter(properties.getTrustedProxies())
+          .doFilter(probe, new MockHttpServletResponse(), new MockFilterChain());
+      assertEquals(
+          expectedIp,
+          probe.getAttribute(ClientIpContextFilter.CLIENT_IP_ATTRIBUTE),
+          "the resolver must key on " + expectedIp);
+
+      properties.setCapacity(1);
+      properties.setRefillTokens(1);
+
+      MockHttpServletResponse resp1 = new MockHttpServletResponse();
+      runChain(filter(), copy(req), resp1);
+      assertEquals(200, resp1.getStatus(), "first request must consume cleanly");
+
+      MockHttpServletResponse resp2 = new MockHttpServletResponse();
+      runChain(filter(), copy(req), resp2);
+      assertEquals(
+          429,
+          resp2.getStatus(),
+          "second request with the same resolved IP (" + expectedIp + ") must be rate-limited");
+    }
+
+    private MockHttpServletRequest copy(MockHttpServletRequest src) {
+      MockHttpServletRequest copy =
+          new MockHttpServletRequest(src.getMethod(), src.getRequestURI());
+      copy.setRemoteAddr(src.getRemoteAddr());
+      String xff = src.getHeader("X-Forwarded-For");
+      if (xff != null) {
+        copy.addHeader("X-Forwarded-For", xff);
+      }
+      return copy;
+    }
+  }
+
+  @Nested
+  class DoFilterInternalTests {
+
+    @Test
+    void firstRequest_consumesBucket_andAddsHeaders() throws Exception {
+      MockHttpServletRequest req = newRequest("/api/v1/missions");
+      req.setRemoteAddr("192.0.2.10");
+      MockHttpServletResponse resp = new MockHttpServletResponse();
+
+      filter().doFilter(req, resp, new MockFilterChain());
+
+      assertEquals(200, resp.getStatus());
+      assertEquals("2", resp.getHeader("X-Rate-Limit-Limit"), "capacity exposed via header");
+      assertNotNull(
+          resp.getHeader("X-Rate-Limit-Remaining"),
+          "remaining-tokens header must be set after a successful consume");
+    }
+
+    @Test
+    void exhaustedBucket_returns429ProblemJson_withRetryAfterHeader() throws Exception {
+      properties.setCapacity(1);
+      properties.setRefillTokens(1);
+
+      MockHttpServletRequest req = newRequest("/api/v1/missions");
+      req.setRemoteAddr("192.0.2.20");
+
+      filter().doFilter(req, new MockHttpServletResponse(), new MockFilterChain());
+
+      MockHttpServletResponse resp2 = new MockHttpServletResponse();
+      filter().doFilter(copyRequest(req), resp2, new MockFilterChain());
+
+      assertEquals(429, resp2.getStatus());
+      assertEquals("application/problem+json", resp2.getContentType());
+      assertEquals("1", resp2.getHeader("X-Rate-Limit-Limit"));
+      assertEquals("0", resp2.getHeader("X-Rate-Limit-Remaining"));
+      assertNotNull(resp2.getHeader("X-Rate-Limit-Retry-After-Seconds"));
+      assertEquals(
+          resp2.getHeader("X-Rate-Limit-Retry-After-Seconds"),
+          resp2.getHeader("Retry-After"),
+          "Retry-After must carry the same delta-seconds as the vendor header");
+      String body = resp2.getContentAsString();
+      assertTrue(body.contains("\"status\":429"), body);
+      assertTrue(body.contains("\"title\":\"Too Many Requests\""), body);
+      assertTrue(body.contains("\"instance\":\"/api/v1/missions\""), body);
+      assertTrue(
+          body.contains(problemProperties.baseUri() + "rate-limit-exceeded"),
+          "type URI must be built off AppProblemProperties.baseUri");
+      assertTrue(
+          body.contains("\"code\":\"RATE_LIMIT_EXCEEDED\""),
+          "body must carry the stable machine-readable code");
+      assertTrue(
+          body.matches("(?s).*\"correlationId\":\"[0-9a-fA-F-]{36}\".*"),
+          "body must carry a per-response UUID correlationId: " + body);
+      String correlationHeader = resp2.getHeader("X-Correlation-Id");
+      assertNotNull(correlationHeader, "429 response must echo X-Correlation-Id");
+      assertTrue(
+          body.contains("\"correlationId\":\"" + correlationHeader + "\""),
+          "X-Correlation-Id header must match the body correlationId");
+      assertEquals(
+          1.0d,
+          meterRegistry
+              .get(MetricNames.RATELIMIT_REJECTIONS)
+              .tag(MetricNames.TAG_BUCKET, MetricNames.BUCKET_GLOBAL)
+              .counter()
+              .count());
+      assertTrue(
+          meterRegistry
+                  .get(MetricNames.RATELIMIT_REQUESTS)
+                  .tag(MetricNames.TAG_BUCKET, MetricNames.BUCKET_GLOBAL)
+                  .counter()
+                  .count()
+              > 1.0d,
+          "requests counter must include the successful evaluations, not just the rejection");
+    }
+
+    private MockHttpServletRequest copyRequest(MockHttpServletRequest src) {
+      MockHttpServletRequest copy =
+          new MockHttpServletRequest(src.getMethod(), src.getRequestURI());
+      copy.setRemoteAddr(src.getRemoteAddr());
+      return copy;
+    }
+  }
+
+  @Test
+  void successful_consume_invokesNextFilterInChain() throws Exception {
+    MockHttpServletRequest req = newRequest("/api/v1/missions");
+    req.setRemoteAddr("192.0.2.30");
+    MockHttpServletResponse resp = new MockHttpServletResponse();
+
+    InvocationTrackingChain chain = new InvocationTrackingChain();
+    filter().doFilter(req, resp, chain);
+
+    assertTrue(chain.wasCalled, "the next filter in the chain must be invoked");
+  }
+
+  @Test
+  void rateLimited_request_doesNOTInvokeNextFilter() throws Exception {
+    properties.setCapacity(1);
+    properties.setRefillTokens(1);
+
+    MockHttpServletRequest req = newRequest("/api/v1/missions");
+    req.setRemoteAddr("192.0.2.40");
+    filter().doFilter(req, new MockHttpServletResponse(), new MockFilterChain());
+
+    MockHttpServletRequest req2 = new MockHttpServletRequest("GET", "/api/v1/missions");
+    req2.setRemoteAddr("192.0.2.40");
+    MockHttpServletResponse resp2 = new MockHttpServletResponse();
+    InvocationTrackingChain chain = new InvocationTrackingChain();
+
+    filter().doFilter(req2, resp2, chain);
+
+    assertEquals(429, resp2.getStatus());
+    assertEquals(
+        false,
+        chain.wasCalled,
+        "downstream filters must NOT be invoked when the request is rate-limited");
+  }
+
+  @Nested
+  class EndpointSpecificRuleTests {
+
+    @Test
+    void specificRule_runsOutFirst_andDoesNotDrainGlobalBucket() throws Exception {
+      properties.setCapacity(10);
+      properties.setRefillTokens(10);
+
+      RateLimitProperties.Rule missionCreate =
+          newRule("mission-create", List.of("POST"), List.of("/api/v1/missions"), 2);
+      properties.setRules(List.of(missionCreate));
+
+      assertEquals(200, post("/api/v1/missions", "192.0.2.50"));
+      assertEquals(200, post("/api/v1/missions", "192.0.2.50"));
+      MockHttpServletResponse blocked = postResponse("/api/v1/missions", "192.0.2.50");
+      assertEquals(429, blocked.getStatus());
+      assertEquals("2", blocked.getHeader("X-Rate-Limit-Limit"));
+
+      assertEquals(200, get("/api/v1/orders", "192.0.2.50"));
+    }
+
+    @Test
+    void specificRule_consumed_alsoDebitsGlobalBucket() throws Exception {
+      properties.setCapacity(3);
+      properties.setRefillTokens(3);
+
+      RateLimitProperties.Rule missionCreate =
+          newRule("mission-create", List.of("POST"), List.of("/api/v1/missions"), 100);
+      properties.setRules(List.of(missionCreate));
+
+      assertEquals(200, post("/api/v1/missions", "192.0.2.60"));
+      assertEquals(200, post("/api/v1/missions", "192.0.2.60"));
+      assertEquals(200, post("/api/v1/missions", "192.0.2.60"));
+      MockHttpServletResponse blocked = postResponse("/api/v1/missions", "192.0.2.60");
+      assertEquals(429, blocked.getStatus());
+      assertEquals("3", blocked.getHeader("X-Rate-Limit-Limit"));
+    }
+
+    @Test
+    void specificRule_doesNotApply_whenMethodMismatches() throws Exception {
+      properties.setCapacity(10);
+      properties.setRefillTokens(10);
+
+      RateLimitProperties.Rule missionCreate =
+          newRule("mission-create", List.of("POST"), List.of("/api/v1/missions"), 1);
+      properties.setRules(List.of(missionCreate));
+
+      assertEquals(200, get("/api/v1/missions", "192.0.2.70"));
+      assertEquals(200, get("/api/v1/missions", "192.0.2.70"));
+      assertEquals(200, get("/api/v1/missions", "192.0.2.70"));
+    }
+
+    @Test
+    void specificRule_emptyMethodsList_matchesAnyMethod() throws Exception {
+      properties.setCapacity(10);
+      properties.setRefillTokens(10);
+
+      RateLimitProperties.Rule mutateParticipants =
+          newRule(
+              "participant-mutations", List.of(), List.of("/api/v1/missions/*/participants/**"), 1);
+      properties.setRules(List.of(mutateParticipants));
+
+      assertEquals(200, put("/api/v1/missions/abc/participants/xyz", "192.0.2.71"));
+      MockHttpServletResponse blocked =
+          postResponse("/api/v1/missions/abc/participants/xyz/check-in", "192.0.2.71");
+      assertEquals(429, blocked.getStatus());
+    }
+
+    @Test
+    void twoRulesMatchSameRequest_tightestRunsOutFirst() throws Exception {
+      properties.setCapacity(50);
+      properties.setRefillTokens(50);
+
+      RateLimitProperties.Rule wide =
+          newRule("participant-wide", List.of(), List.of("/api/v1/missions/*/participants/**"), 5);
+      RateLimitProperties.Rule tight =
+          newRule(
+              "participant-check-in",
+              List.of("POST"),
+              List.of("/api/v1/missions/*/participants/*/check-in"),
+              2);
+      properties.setRules(List.of(wide, tight));
+
+      String path = "/api/v1/missions/m1/participants/p1/check-in";
+      assertEquals(200, post(path, "192.0.2.80"));
+      assertEquals(200, post(path, "192.0.2.80"));
+      MockHttpServletResponse blocked = postResponse(path, "192.0.2.80");
+      assertEquals(429, blocked.getStatus());
+      assertEquals("2", blocked.getHeader("X-Rate-Limit-Limit"));
+    }
+
+    @Test
+    void specificRule_buckets_perIp_independently() throws Exception {
+      properties.setCapacity(100);
+      properties.setRefillTokens(100);
+
+      RateLimitProperties.Rule missionCreate =
+          newRule("mission-create", List.of("POST"), List.of("/api/v1/missions"), 1);
+      properties.setRules(List.of(missionCreate));
+
+      assertEquals(200, post("/api/v1/missions", "203.0.113.1"));
+      assertEquals(429, postResponse("/api/v1/missions", "203.0.113.1").getStatus());
+      assertEquals(200, post("/api/v1/missions", "203.0.113.2"));
+    }
+
+    @Test
+    void orderCreateRule_coversTheItemOrderChildPath() throws Exception {
+      properties.setCapacity(100);
+      properties.setRefillTokens(100);
+
+      RateLimitProperties.Rule orderCreate =
+          newRule(
+              "order-create",
+              List.of("POST"),
+              List.of("/api/v1/orders", "/api/v1/orders/items"),
+              1);
+      properties.setRules(List.of(orderCreate));
+
+      assertEquals(200, post("/api/v1/orders/items", "203.0.113.10"));
+      MockHttpServletResponse blocked = postResponse("/api/v1/orders/items", "203.0.113.10");
+      assertEquals(429, blocked.getStatus());
+      assertEquals("1", blocked.getHeader("X-Rate-Limit-Limit"));
+    }
+
+    @Test
+    void orderCreateRule_parentPathAlone_doesNotCoverItemChild() throws Exception {
+      properties.setCapacity(100);
+      properties.setRefillTokens(100);
+
+      RateLimitProperties.Rule orderCreateParentOnly =
+          newRule("order-create", List.of("POST"), List.of("/api/v1/orders"), 1);
+      properties.setRules(List.of(orderCreateParentOnly));
+
+      assertEquals(200, post("/api/v1/orders/items", "203.0.113.11"));
+      assertEquals(200, post("/api/v1/orders/items", "203.0.113.11"));
+    }
+
+    private RateLimitProperties.Rule newRule(
+        String name, List<String> methods, List<String> paths, int capacity) {
+      return new RateLimitProperties.Rule(
+          name, paths, methods, capacity, capacity, Duration.ofMinutes(1));
+    }
+
+    private int post(String path, String ip) throws ServletException, IOException {
+      return postResponse(path, ip).getStatus();
+    }
+
+    private MockHttpServletResponse postResponse(String path, String ip)
+        throws ServletException, IOException {
+      MockHttpServletRequest req = new MockHttpServletRequest("POST", path);
+      req.setRemoteAddr(ip);
+      MockHttpServletResponse resp = new MockHttpServletResponse();
+      filter().doFilter(req, resp, new MockFilterChain());
+      return resp;
+    }
+
+    private int get(String path, String ip) throws ServletException, IOException {
+      MockHttpServletRequest req = new MockHttpServletRequest("GET", path);
+      req.setRemoteAddr(ip);
+      MockHttpServletResponse resp = new MockHttpServletResponse();
+      filter().doFilter(req, resp, new MockFilterChain());
+      return resp.getStatus();
+    }
+
+    private int put(String path, String ip) throws ServletException, IOException {
+      MockHttpServletRequest req = new MockHttpServletRequest("PUT", path);
+      req.setRemoteAddr(ip);
+      MockHttpServletResponse resp = new MockHttpServletResponse();
+      filter().doFilter(req, resp, new MockFilterChain());
+      return resp.getStatus();
+    }
+  }
+
+  @Nested
+  class KeySourceTests {
+
+    /**
+     * Drains a fresh capacity-1 bucket through {@link #runChain} and returns the rejected second
+     * response.
+     */
+    private MockHttpServletResponse drainAndReject(String remoteAddr, String xff) throws Exception {
+      properties.setCapacity(1);
+      properties.setRefillTokens(1);
+      RateLimitingFilter freshFilter =
+          new RateLimitingFilter(
+              properties.toProperties(), problemProperties, messageSource, meterRegistry);
+      runChain(freshFilter, request(remoteAddr, xff), new MockHttpServletResponse());
+      MockHttpServletResponse rejected = new MockHttpServletResponse();
+      runChain(freshFilter, request(remoteAddr, xff), rejected);
+      return rejected;
+    }
+
+    private MockHttpServletRequest request(String remoteAddr, String xff) {
+      MockHttpServletRequest req = newRequest("/api/v1/missions");
+      req.setRemoteAddr(remoteAddr);
+      if (xff != null) {
+        req.addHeader("X-Forwarded-For", xff);
+      }
+      return req;
+    }
+
+    @Test
+    void rejection_fromAnUntrustedPeer_isTaggedPeer() throws Exception {
+      properties.setTrustedProxies(List.of());
+
+      assertEquals(429, drainAndReject("198.51.100.10", "1.1.1.1").getStatus());
+
+      assertEquals(
+          1.0d,
+          meterRegistry
+              .get(MetricNames.RATELIMIT_REJECTIONS)
+              .tag(MetricNames.TAG_BUCKET, MetricNames.BUCKET_GLOBAL)
+              .tag(MetricNames.TAG_KEY_SOURCE, MetricNames.KEY_SOURCE_PEER)
+              .counter()
+              .count(),
+          "an ignored X-Forwarded-For means everyone behind that hop shares one budget");
+    }
+
+    @Test
+    void rejection_behindATrustedProxy_isTaggedForwarded() throws Exception {
+      properties.setTrustedProxies(List.of("10.0.0.1"));
+
+      assertEquals(429, drainAndReject("10.0.0.1", "203.0.113.7").getStatus());
+
+      assertEquals(
+          1.0d,
+          meterRegistry
+              .get(MetricNames.RATELIMIT_REJECTIONS)
+              .tag(MetricNames.TAG_BUCKET, MetricNames.BUCKET_GLOBAL)
+              .tag(MetricNames.TAG_KEY_SOURCE, MetricNames.KEY_SOURCE_FORWARDED)
+              .counter()
+              .count(),
+          "per-client bucketing behind the edge must report `forwarded`");
+    }
+
+    @Test
+    void rejection_withAnEmptyLeadingXffEntry_stillFindsTheClientAndReportsForwarded()
+        throws Exception {
+      properties.setTrustedProxies(List.of("10.0.0.1"));
+
+      assertEquals(429, drainAndReject("10.0.0.1", " , 203.0.113.7").getStatus());
+
+      assertEquals(
+          1.0d,
+          meterRegistry
+              .get(MetricNames.RATELIMIT_REJECTIONS)
+              .tag(MetricNames.TAG_KEY_SOURCE, MetricNames.KEY_SOURCE_FORWARDED)
+              .counter()
+              .count(),
+          "the client is resolvable despite the empty element, so the tag must say so");
+    }
+
+    @Test
+    void rejection_withoutTheResolverInTheChain_isTaggedPeer() throws Exception {
+      properties.setTrustedProxies(List.of("10.0.0.1"));
+      properties.setCapacity(1);
+      properties.setRefillTokens(1);
+      RateLimitingFilter lone =
+          new RateLimitingFilter(
+              properties.toProperties(), problemProperties, messageSource, meterRegistry);
+
+      lone.doFilter(
+          request("10.0.0.1", "203.0.113.7"), new MockHttpServletResponse(), new MockFilterChain());
+      MockHttpServletResponse rejected = new MockHttpServletResponse();
+      lone.doFilter(request("10.0.0.1", "203.0.113.7"), rejected, new MockFilterChain());
+
+      assertEquals(429, rejected.getStatus());
+      assertEquals(
+          1.0d,
+          meterRegistry
+              .get(MetricNames.RATELIMIT_REJECTIONS)
+              .tag(MetricNames.TAG_KEY_SOURCE, MetricNames.KEY_SOURCE_PEER)
+              .counter()
+              .count(),
+          "without a resolved attribute the peer is the only trustworthy key");
+    }
+
+    /** A rejection logs its key source at DEBUG and never the client IP (REQ-OBS-004). */
+    @Test
+    void rejection_logsTheKeySourceAtDebug_andNeverTheClientIp() throws Exception {
+      properties.setTrustedProxies(List.of());
+
+      Logger logger = (Logger) LoggerFactory.getLogger(RateLimitingFilter.class);
+      Level original = logger.getLevel();
+      ListAppender<ILoggingEvent> appender = new ListAppender<>();
+      appender.start();
+      logger.addAppender(appender);
+      logger.setLevel(Level.DEBUG);
+      try {
+        drainAndReject("198.51.100.10", "1.1.1.1");
+
+        ILoggingEvent event =
+            appender.list.stream()
+                .filter(e -> e.getFormattedMessage().contains("Rate limit exceeded"))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("expected the rejection log line"));
+        assertEquals(Level.DEBUG, event.getLevel(), "anonymous-reachable — must stay at DEBUG");
+        String formatted = event.getFormattedMessage();
+        assertTrue(
+            formatted.contains("keySource=" + MetricNames.KEY_SOURCE_PEER),
+            "the rejection line must name the branch: " + formatted);
+        assertFalse(
+            formatted.contains("198.51.100.10") || formatted.contains("1.1.1.1"),
+            "no client IP may reach the log stream: " + formatted);
+      } finally {
+        logger.setLevel(original);
+        logger.detachAppender(appender);
+      }
+    }
+  }
+
+  private static MockHttpServletRequest newRequest(String path) {
+    return new MockHttpServletRequest("GET", path);
+  }
+
+  private static class InvocationTrackingChain implements FilterChain {
+    boolean wasCalled = false;
+
+    @Override
+    public void doFilter(
+        jakarta.servlet.ServletRequest request, jakarta.servlet.ServletResponse response) {
+      wasCalled = true;
+    }
+  }
+
+  /**
+   * Mutable test description of {@code app.rate-limit.*}, turned into an immutable {@link
+   * RateLimitProperties} by {@link #toProperties()}.
+   */
+  private static final class Spec {
+    /** The production per-subject budget, bound once; this filter does not read it. */
+    private static final RateLimitProperties.Subject DEFAULT_SUBJECT =
+        BoundProperties.defaults(RateLimitProperties.class).subject();
+
+    private boolean enabled = true;
+    private List<String> paths = List.of("/api/**");
+    private int capacity = 5000;
+    private int refillTokens = 5000;
+    private Duration refillPeriod = Duration.ofMinutes(1);
+    private List<RateLimitProperties.Rule> rules = List.of();
+    private List<String> trustedProxies = List.of();
+
+    void setEnabled(boolean enabled) {
+      this.enabled = enabled;
+    }
+
+    void setPaths(List<String> paths) {
+      this.paths = paths;
+    }
+
+    void setCapacity(int capacity) {
+      this.capacity = capacity;
+    }
+
+    void setRefillTokens(int refillTokens) {
+      this.refillTokens = refillTokens;
+    }
+
+    void setRefillPeriod(Duration refillPeriod) {
+      this.refillPeriod = refillPeriod;
+    }
+
+    void setRules(List<RateLimitProperties.Rule> rules) {
+      this.rules = rules;
+    }
+
+    void setTrustedProxies(List<String> trustedProxies) {
+      this.trustedProxies = trustedProxies;
+    }
+
+    List<String> getTrustedProxies() {
+      return trustedProxies;
+    }
+
+    /**
+     * Builds the record this description stands for; the per-subject budget, which this filter does
+     * not read, keeps its production default.
+     *
+     * @return the rate-limit properties
+     */
+    RateLimitProperties toProperties() {
+      return new RateLimitProperties(
+          enabled,
+          paths,
+          capacity,
+          refillTokens,
+          refillPeriod,
+          rules,
+          trustedProxies,
+          DEFAULT_SUBJECT);
+    }
+  }
+}

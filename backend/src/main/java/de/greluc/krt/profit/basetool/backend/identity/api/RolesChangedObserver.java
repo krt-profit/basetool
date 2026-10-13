@@ -19,8 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.identity.api;
 
-import de.greluc.krt.profit.basetool.backend.annotation.ObserverSpi;
-import de.greluc.krt.profit.basetool.backend.model.Role;
+import de.greluc.krt.profit.basetool.backend.platform.api.ObserverSpi;
 import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;

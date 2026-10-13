@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionReferenceDto;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 

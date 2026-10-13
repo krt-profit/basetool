@@ -510,10 +510,10 @@
 </main>
 </th:block>
 <th:block th:fragment="pageTail">
-<script th:src="@{/js/bank/bank.js}" defer th:attr="nonce=${cspNonce}"></script>
-<script th:src="@{/js/bank/bank-layout-prefs.js}" defer th:attr="nonce=${cspNonce}"></script>
-<script th:src="@{/js/bank/bank-grants-chart-prefs.js}" defer th:attr="nonce=${cspNonce}"></script>
-<script th:src="@{/js/bank/bank-manage.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/bank/bank.js}" th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/bank/bank-layout-prefs.js}" th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/bank/bank-grants-chart-prefs.js}" th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/bank/bank-manage.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

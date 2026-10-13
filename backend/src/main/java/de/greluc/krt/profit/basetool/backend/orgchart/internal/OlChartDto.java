@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.orgchart.internal;
 
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * The Organisationsleitung tier at the top of the org chart: the OL org unit's identity plus its
@@ -38,5 +39,5 @@ public record OlChartDto(
     UUID orgUnitId,
     String name,
     String shorthand,
-    OrgChartNodeDto grandAdmiral,
+    @Nullable OrgChartNodeDto grandAdmiral,
     List<OrgChartNodeDto> members) {}

@@ -19,10 +19,17 @@
 
 // @ts-check
 
-/* global MSG_STOLEN, MSG_QUALITY, MSG_INVENTORY_BELOW_FLOOR, MSG_PRODUCTION_COUNTED_HIGHER, showFrontendErrorToast, showFrontendSuccessToast, PRODUCTION_I18N, krtOrderWrite */
-/* exported openProductionModal, bookProduction */
+/* global MSG_STOLEN, MSG_QUALITY, MSG_INVENTORY_BELOW_FLOOR, MSG_PRODUCTION_COUNTED_HIGHER, PRODUCTION_I18N */
 
-(function () {
+import { krtOrderWrite } from '/js/joborder/orders-detail-edit.js';
+import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtHtml } from '/js/kernel/krt-html.js';
+import { joborderHooks } from '/js/joborder/joborder-hooks.js';
+
+function initOrdersDetailProduction() {
     const nav = /** @type {HTMLElement | null} */ (
         document.querySelector('.tab-nav[role="tablist"]')
     );
@@ -188,7 +195,9 @@
         apply(resolveInitial(false));
     });
     apply(resolveInitial(true));
-})();
+}
+
+initOrdersDetailProduction();
 
 document.addEventListener('krt:swapped', (ev) => {
     const container = ev && ev.detail && ev.detail.container;
@@ -316,7 +325,7 @@ function _prodDemand(mat, k) {
  *
  * @param {HTMLElement | null} control the expand control
  */
-function _odToggleDemandRow(control) {
+export function _odToggleDemandRow(control) {
     if (!control) {
         return;
     }
@@ -334,7 +343,7 @@ function _odToggleDemandRow(control) {
  *
  * @param {HTMLElement} button the record-production button carrying the line's data attributes
  */
-function openProductionModal(button) {
+export function openProductionModal(button) {
     const orderId = button.getAttribute('data-order-id');
     const itemId = button.getAttribute('data-item-id');
     const itemName = button.getAttribute('data-item-name') || '';
@@ -373,7 +382,7 @@ function openProductionModal(button) {
 
     _prodResetBookIn();
 
-    window.krtModal.open('production-modal');
+    krtModal.open('production-modal');
 
     const row = button.closest('tr');
     const demandLis = row ? row.querySelectorAll('.od-production-demand li') : [];
@@ -437,7 +446,7 @@ function openProductionModal(button) {
             skipCb.addEventListener('change', _prodReconcile);
         }
         Promise.all([
-            window.krtFetch
+            krtFetch
                 .getJson(`/orders/${orderId}/materials/${mat.materialId}/inventory`)
                 .catch(() => []),
             _prodLoadHigherAttribution(orderId, mat),
@@ -567,7 +576,7 @@ async function _prodLoadHigherAttribution(orderId, mat) {
     });
     if (tiers.size < 2 || !orderId) return higher;
     try {
-        const entries = await window.krtFetch.getJson(
+        const entries = await krtFetch.getJson(
             `/orders/${orderId}/materials/${mat.materialId}/attribution`,
         );
         for (const entry of entries) {
@@ -684,7 +693,7 @@ function _prodResetBookIn() {
 }
 
 /** Keeps the allocate-to-order checkbox opposite to the personal checkbox. */
-function _prodSyncPersonalAllocate() {
+export function _prodSyncPersonalAllocate() {
     const personalCb = _prodInput('production-personal');
     const allocateCb = _prodInput('production-allocate');
     if (!allocateCb) {
@@ -696,7 +705,7 @@ function _prodSyncPersonalAllocate() {
 }
 
 /** Disables the personal checkbox while the booking is made for another owner. */
-function _prodSyncPersonalForOwner() {
+export function _prodSyncPersonalForOwner() {
     const personalCb = _prodInput('production-personal');
     if (!personalCb) {
         return;
@@ -712,7 +721,7 @@ function _prodSyncPersonalForOwner() {
 }
 
 /** Reloads the owning org-unit choices for the chosen owner and shows or hides the picker. */
-function _prodRefreshOrgUnitPicker() {
+export function _prodRefreshOrgUnitPicker() {
     const wrapper = document.getElementById('production-orgunit-wrapper');
     const select = /** @type {HTMLSelectElement | null} */ (
         document.getElementById('production-orgunit')
@@ -727,7 +736,7 @@ function _prodRefreshOrgUnitPicker() {
         wrapper.hidden = true;
         return;
     }
-    window.krtFetch
+    krtFetch
         .getJson(`/users/${encodeURIComponent(ownerId)}/memberships?allKinds=true`)
         .then((memberships) => {
             if (!Array.isArray(memberships) || memberships.length < 1) {
@@ -785,7 +794,7 @@ function _prodCollectBookIn() {
 }
 
 /** Recomputes each material card's reconcile chip and the book button's enabled state. */
-function _prodReconcile() {
+export function _prodReconcile() {
     if (!_prodContext) {
         return;
     }
@@ -851,7 +860,7 @@ function _prodReconcile() {
 }
 
 /** Validates the allocations and books the production of the open order line. */
-function bookProduction() {
+export function bookProduction() {
     if (!_prodContext) {
         return;
     }
@@ -924,10 +933,10 @@ function bookProduction() {
         toast: false,
         errorMessage: PRODUCTION_I18N.allocError,
         onSuccess() {
-            window.krtModal.close('production-modal');
+            krtModal.close('production-modal');
             showFrontendSuccessToast(PRODUCTION_I18N.booked);
-            if (window.krtRefreshOrderSection) {
-                window.krtRefreshOrderSection([
+            if (joborderHooks.refreshOrderSection) {
+                joborderHooks.refreshOrderSection([
                     'items',
                     'aggregated',
                     'header',
@@ -936,8 +945,8 @@ function bookProduction() {
                     'item-handover-lines',
                 ]);
             }
-            if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
-                window.krtLiveSync.sendChanged('inventory', ['stock']);
+            if (typeof krtLiveSync.sendChanged === 'function') {
+                krtLiveSync.sendChanged('inventory', ['stock']);
             }
         },
     });

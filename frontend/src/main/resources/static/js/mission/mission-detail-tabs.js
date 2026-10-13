@@ -19,7 +19,12 @@
 
 // @ts-check
 
-(function () {
+import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { missionHooks } from '/js/mission/mission-hooks.js';
+
+function initMissionDetailTabs() {
     const tabs = /** @type {HTMLElement[]} */ (
         Array.from(document.querySelectorAll('.tab-nav .tab[data-tab]'))
     );
@@ -79,13 +84,13 @@
         if (!validKeys.includes(key) || key === currentKey()) {
             return false;
         }
-        if (dirty && typeof window.showKrtConfirm === 'function') {
+        if (dirty) {
             const i18n = window.MISSION_TAB_I18N || {};
-            const go = await window.showKrtConfirm(
-                window.krtI18nText(i18n['unsaved.title'], 'MISSION_TAB_I18N[unsaved.title]'),
-                window.krtI18nText(i18n['unsaved.message'], 'MISSION_TAB_I18N[unsaved.message]'),
-                window.krtI18nText(i18n['unsaved.continue'], 'MISSION_TAB_I18N[unsaved.continue]'),
-                window.krtI18nText(i18n['unsaved.cancel'], 'MISSION_TAB_I18N[unsaved.cancel]'),
+            const go = await showKrtConfirm(
+                krtI18nText(i18n['unsaved.title'], 'MISSION_TAB_I18N[unsaved.title]'),
+                krtI18nText(i18n['unsaved.message'], 'MISSION_TAB_I18N[unsaved.message]'),
+                krtI18nText(i18n['unsaved.continue'], 'MISSION_TAB_I18N[unsaved.continue]'),
+                krtI18nText(i18n['unsaved.cancel'], 'MISSION_TAB_I18N[unsaved.cancel]'),
             );
             if (!go) return false;
             dirty = false;
@@ -189,9 +194,11 @@
     }
     window.addEventListener('resize', syncStickyOffset);
     syncStickyOffset();
-})();
+}
 
-(function () {
+initMissionDetailTabs();
+
+function initMissionDetailTabs2() {
     const missionForm = /** @type {HTMLFormElement | null} */ (
         document.getElementById('mission-form')
     );
@@ -205,7 +212,7 @@
      * @returns {string} the localized string
      */
     function msg(key) {
-        return window.krtI18nText(D[key], `MISSION_SUBRES_I18N[${key}]`);
+        return krtI18nText(D[key], `MISSION_SUBRES_I18N[${key}]`);
     }
     const SAVED = msg('mission.save.section.ok');
     const FAILED = msg('mission.save.section.error');
@@ -231,32 +238,23 @@
         Object.keys(map || {}).forEach((field) => {
             const slot = form.querySelector(`.field-error[data-error-for="${field}"]`);
             if (slot) slot.textContent = map[field];
-            else if (window.showFrontendErrorToast) window.showFrontendErrorToast(map[field]);
+            else showFrontendErrorToast(map[field]);
         });
     }
     function handleConflict(problem) {
         const code = problem && problem.code;
         if (code === 'OPTIMISTIC_LOCK' || code === 'PESSIMISTIC_LOCK') {
-            if (typeof window.showKrtConfirm === 'function') {
-                window
-                    .showKrtConfirm(
-                        msg('mission.conflict.toast.title'),
-                        msg('mission.conflict.action.reload.question'),
-                        msg('mission.conflict.action.reload'),
-                        msg('mission.conflict.action.dismiss'),
-                    )
-                    .then((ok) => {
-                        if (ok) window.location.reload();
-                    });
-            } else {
-                window.location.reload();
-            }
-        } else if (window.showFrontendErrorToast) {
-            const ownerRequired =
-                window.krtFetch && window.krtFetch.ownerOrgUnitRequiredMessage
-                    ? window.krtFetch.ownerOrgUnitRequiredMessage(problem)
-                    : null;
-            window.showFrontendErrorToast(
+            showKrtConfirm(
+                msg('mission.conflict.toast.title'),
+                msg('mission.conflict.action.reload.question'),
+                msg('mission.conflict.action.reload'),
+                msg('mission.conflict.action.dismiss'),
+            ).then((ok) => {
+                if (ok) window.location.reload();
+            });
+        } else {
+            const ownerRequired = krtFetch.ownerOrgUnitRequiredMessage(problem);
+            showFrontendErrorToast(
                 ownerRequired ||
                     (problem && problem.detail) ||
                     msg('mission.conflict.toast.detail'),
@@ -309,12 +307,8 @@
     }
 
     async function submitInPlace() {
-        if (!window.krtFetch) {
-            form.submit();
-            return;
-        }
         markDirtySections();
-        await window.krtFetch.submitForm({
+        await krtFetch.submitForm({
             form,
             url: form.action,
             serialize: 'section:schedule',
@@ -335,8 +329,8 @@
             onSuccess(body) {
                 writeVersions(body);
                 clearFieldErrors();
-                if (window.krtRefreshMissionSection) {
-                    return window.krtRefreshMissionSection('overview');
+                if (missionHooks.refresh) {
+                    return missionHooks.refresh('overview');
                 }
                 return undefined;
             },
@@ -346,9 +340,11 @@
         e.preventDefault();
         submitInPlace();
     });
-})();
+}
 
-(function () {
+initMissionDetailTabs2();
+
+function initMissionDetailTabs3() {
     if (!window.missionCanEdit) {
         return;
     }
@@ -438,7 +434,7 @@
     }
 
     async function moveParticipant(row, zone) {
-        if (!window.krtMissionWrite || !window.missionId) return;
+        if (!missionHooks.write || !window.missionId) return;
         const participantId = row.getAttribute('data-participant-id');
         const srcCrewId = row.getAttribute('data-crew-id') || '';
         const srcUnitId = row.getAttribute('data-unit-id') || '';
@@ -446,25 +442,25 @@
         if (!participantId || srcUnitId === targetUnitId) return;
 
         if (srcCrewId && srcUnitId) {
-            const del = await window.krtMissionWrite({
+            const del = await missionHooks.write({
                 method: 'DELETE',
                 url: `/missions/${window.missionId}/units/${srcUnitId}/crew/${srcCrewId}/ajax`,
                 sectionKey: 'crew',
             });
             if (!del.ok) return;
             if (!targetUnitId) {
-                window.krtRefreshMissionSection('crew');
+                missionHooks.refresh('crew');
                 return;
             }
         }
         if (targetUnitId) {
-            await window.krtMissionWrite({
+            await missionHooks.write({
                 method: 'POST',
                 url: `/missions/${window.missionId}/units/${targetUnitId}/crew/ajax`,
                 payload: { participantId, jobTypeIds: [] },
                 sectionKey: 'crew',
             });
-            window.krtRefreshMissionSection('crew');
+            missionHooks.refresh('crew');
         }
     }
 
@@ -714,8 +710,8 @@
         const value = sel.value;
         if (value === '__edit') {
             sel.value = sel.getAttribute('data-current') || '';
-            if (typeof window.krtOpenEditCrewModal === 'function') {
-                window.krtOpenEditCrewModal(sel);
+            if (typeof missionHooks.openEditCrewModal === 'function') {
+                missionHooks.openEditCrewModal(sel);
             }
             return;
         }
@@ -723,9 +719,9 @@
             return;
         }
         const ajaxUrl = sel.getAttribute('data-action-ajax');
-        if (!ajaxUrl || !window.krtMissionWrite) return;
+        if (!ajaxUrl || !missionHooks.write) return;
         const versionAttr = sel.getAttribute('data-version');
-        const res = await window.krtMissionWrite({
+        const res = await missionHooks.write({
             method: 'PUT',
             url: ajaxUrl,
             payload: {
@@ -735,7 +731,7 @@
             sectionKey: 'crew',
         });
         if (res.ok) {
-            window.krtRefreshMissionSection('crew');
+            missionHooks.refresh('crew');
         } else {
             sel.value = sel.getAttribute('data-current') || '';
         }
@@ -750,7 +746,9 @@
             stopAutoScroll();
         }
     });
-})();
+}
+
+initMissionDetailTabs3();
 
 /**
  * Renders the element's `data-utc` epoch-millisecond value in the viewer's local time zone.
@@ -778,7 +776,7 @@ function krtFormatLocalDateTime(el) {
     el.innerText = '—';
 }
 
-window.krtLocalizeDates = function (root) {
+missionHooks.localizeDates = function (root) {
     const scope = root && typeof root.querySelectorAll === 'function' ? root : document;
     /** @type {NodeListOf<HTMLElement>} */ (scope.querySelectorAll('.krt-local-dt')).forEach(
         krtFormatLocalDateTime,
@@ -796,8 +794,8 @@ window.krtLocalizeDates = function (root) {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    window.krtLocalizeDates(document);
+    missionHooks.localizeDates(document);
 });
 document.addEventListener('krt:swapped', (ev) => {
-    window.krtLocalizeDates((ev.detail && ev.detail.container) || document);
+    missionHooks.localizeDates((ev.detail && ev.detail.container) || document);
 });

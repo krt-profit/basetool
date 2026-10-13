@@ -14,7 +14,7 @@
 `OwnerScopeService` and its slice `AccessGateService` (ADR-0065) decide access for nine domains (audit of 2026-09-29):
 `OwnerScopeService` is used by 34 classes in 14 domains, `AccessGateService` reads nine
 repositories of seven domains, and `@PreAuthorize` reaches `ownerScopeService` by bean name in 66 SpEL references.
-The per-aggregate JPQL scope fragments live as package-private constants in `ScopeSpecifications`,
+The per-aggregate JPQL scope fragments lived as constants in `ScopeSpecifications` (since 2026-10-12 each sits beside its aggregate's repository, REQ-DATA-010),
 spliced into seven repositories, where javac folds them so no dependency tool sees them. The rule
 "a list query and its per-row gate widen together" is kept by review across two classes in two
 places. After a package move, neither the hub nor the spliced fragments can stay where they are.
@@ -29,7 +29,7 @@ places. After a package move, neither the hub nor the spliced fragments can stay
 2. **A policy owns both the per-row gate and the aggregate's JPQL scope fragment**, so a list query
    and its per-row gate change in one class.
 3. **The `scope` module keeps the kernel**: `RequestScopeResolver`, `ScopePredicate`,
-   `OrgUnitStampingService`, `ScopeSpecifications` for what is not aggregate-specific, the
+   `OrgUnitStampingService`, the
    authorities converter — and `OwnerScopeService` and `AccessGateService` only until the policies
    have taken their methods over.
 4. **Migration without a big bang**, the ADR-0065 pattern: name the `ownerScopeService` bean

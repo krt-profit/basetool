@@ -20,9 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemStockEntryDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemStockGroupDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCollectionEntryDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.MaterialCollectionEntryDto;
 import java.util.List;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;

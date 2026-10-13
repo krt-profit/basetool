@@ -20,11 +20,12 @@
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargetPolicy;
-import de.greluc.krt.profit.basetool.backend.mapper.StockViewerAccess;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
 /**
@@ -41,7 +42,7 @@ public class StockViewerAccessService implements StockViewerAccess {
 
   /** {@inheritDoc} */
   @Override
-  public boolean mayEditInventoryItem(UUID inventoryItemId, UUID ownerId) {
+  public boolean mayEditInventoryItem(UUID inventoryItemId, @Nullable UUID ownerId) {
     return inventoryItemId != null
         && inventoryAccessPolicy.canEditInventoryItem(inventoryItemId)
         && (isCaller(ownerId) || authHelperService.isLogisticianOrAbove());
@@ -59,7 +60,7 @@ public class StockViewerAccessService implements StockViewerAccess {
    * @param userId the user to compare; {@code null} never matches.
    * @return {@code true} iff the caller is authenticated and has that id.
    */
-  private boolean isCaller(UUID userId) {
+  private boolean isCaller(@Nullable UUID userId) {
     return userId != null && authHelperService.currentUserId().filter(userId::equals).isPresent();
   }
 }

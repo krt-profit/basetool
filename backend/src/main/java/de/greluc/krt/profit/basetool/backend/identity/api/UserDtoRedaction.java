@@ -19,10 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.identity.api;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderAssigneeDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
-import java.util.List;
 import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -71,23 +69,6 @@ public final class UserDtoRedaction {
   }
 
   /**
-   * Peer-shapes every assignee's nested user record of a job order.
-   *
-   * @param assignees the assignee rows as mapped, or {@code null}.
-   * @return the same rows with peer-shaped users, or {@code null} for a {@code null} input.
-   */
-  @Contract("null -> null; !null -> !null")
-  public static @Nullable List<JobOrderAssigneeDto> toPeerShapedAssignees(
-      @Nullable List<JobOrderAssigneeDto> assignees) {
-    if (assignees == null) {
-      return null;
-    }
-    return assignees.stream()
-        .map(a -> new JobOrderAssigneeDto(toPeerShape(a.user()), a.note(), a.version()))
-        .toList();
-  }
-
-  /**
    * Convenience overload used where a caller-dependent decision has already been made.
    *
    * @param dto the persisted user DTO, or {@code null}.
@@ -96,5 +77,35 @@ public final class UserDtoRedaction {
    */
   public static @Nullable UserDto toPeerShapeIf(@Nullable UserDto dto, boolean redact) {
     return redact ? toPeerShape(dto) : dto;
+  }
+
+  /**
+   * Re-attaches the caller's own email to a DTO the mapper produced without it, for the {@code
+   * /me*} self endpoints; every other projection keeps the email {@code null}.
+   *
+   * @param dto the email-free DTO from the mapper
+   * @param user the caller's own entity, the source of the email
+   * @return a copy of {@code dto} with {@code email} taken from {@code user}
+   */
+  public static @NotNull UserDto withSelfEmail(@NotNull UserDto dto, @NotNull User user) {
+    return new UserDto(
+        dto.id(),
+        dto.username(),
+        dto.displayName(),
+        dto.effectiveName(),
+        user.getEmail(),
+        dto.rank(),
+        dto.description(),
+        dto.roles(),
+        dto.permissions(),
+        dto.lastReadAnnouncementId(),
+        dto.isLogistician(),
+        dto.isMissionManager(),
+        dto.inKeycloak(),
+        dto.squadron(),
+        dto.squadrons(),
+        dto.version(),
+        dto.joinDate(),
+        dto.discordLinked());
   }
 }

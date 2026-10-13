@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.exchange.api;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import java.util.List;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
@@ -53,7 +54,7 @@ public record IngestGatewayProperties(@DefaultValue List<String> clientIds) {
    * @param azp the authorized-party claim from the caller's token, may be {@code null}
    * @return {@code true} when this caller is a configured gateway
    */
-  public boolean isGatewayClient(String azp) {
+  public boolean isGatewayClient(@Nullable String azp) {
     return azp != null && !azp.isBlank() && clientIds.contains(azp);
   }
 
@@ -63,7 +64,7 @@ public record IngestGatewayProperties(@DefaultValue List<String> clientIds) {
    * @param username the username Keycloak reports, may be {@code null}
    * @return {@code true} when the name equals {@value #SERVICE_ACCOUNT_PREFIX} plus a gateway id
    */
-  public boolean isGatewayServiceAccount(String username) {
+  public boolean isGatewayServiceAccount(@Nullable String username) {
     return username != null
         && clientIds.stream()
             .anyMatch(clientId -> username.equals(SERVICE_ACCOUNT_PREFIX + clientId));

@@ -25,8 +25,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionReferences;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.Map;

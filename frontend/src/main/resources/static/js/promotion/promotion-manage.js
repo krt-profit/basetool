@@ -21,16 +21,21 @@
 
 /* global MSG_SAVED, MSG_ERROR, MSG_CONFLICT, MSG_LAST_EVAL, MSG_BULK_CONFIRM_TITLE, MSG_BULK_CONFIRM_MSG, MSG_BULK_NEED_CAT, MSG_BULK_NEED_LEVEL, MSG_CSV_NAME, MSG_CSV_HEADER_MEMBER, MSG_CSV_HEADER_RANK, MSG_CSV_HEADER_ELIG, MSG_CSV_HEADER_LAST, SORT_LABELS, STORAGE_KEY_COLLAPSED, STORAGE_KEY_SORT, STORAGE_KEY_FILTERS, MSG_REFRESH_FAILED */
 
+import {
+    showFrontendErrorToast,
+    showFrontendSuccessToast,
+    showKrtConfirm,
+} from '/js/kernel/toast.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
+import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
+
 function pmPutEvaluation(url, payload) {
-    if (!window.krtFetch) {
-        return Promise.resolve(null);
-    }
     function toastError(message) {
-        if (typeof window.showFrontendErrorToast === 'function') {
-            window.showFrontendErrorToast(message);
-        }
+        showFrontendErrorToast(message);
     }
-    return window.krtFetch
+    return krtFetch
         .write({
             method: 'PUT',
             url,
@@ -60,11 +65,7 @@ function pmPutEvaluation(url, payload) {
 const pmEligibilityDirty = new Set();
 
 function pmRefreshMatrix() {
-    if (!window.krtFetch || typeof window.krtFetch.swap !== 'function') {
-        window.location.reload();
-        return Promise.resolve(false);
-    }
-    return window.krtFetch.swap({
+    return krtFetch.swap({
         url: '/promotion/manage',
         container: '#pm-matrix-results',
         fragmentValue: 'matrixBody',
@@ -76,10 +77,10 @@ function pmRefreshEligibility(userId) {
     const row = document.querySelector(`tr[data-pm-user-id="${userId}"]`);
     if (!row) return Promise.resolve(false);
     const cell = row.querySelector('.pm-eligibility-cell');
-    if (!cell || !window.krtFetch || typeof window.krtFetch.swap !== 'function') {
+    if (!cell) {
         return Promise.resolve(false);
     }
-    return window.krtFetch
+    return krtFetch
         .swap({
             url: `/promotion/manage?userId=${encodeURIComponent(userId)}`,
             container: cell,
@@ -166,15 +167,11 @@ function pmProcessNextSave() {
                         cell.classList.remove('pm-cell-saved');
                     }, 850);
                 }
-                if (typeof window.showFrontendSuccessToast === 'function') {
-                    window.showFrontendSuccessToast(MSG_SAVED);
-                }
+                showFrontendSuccessToast(MSG_SAVED);
             }
         })
         .catch(() => {
-            if (typeof window.showFrontendErrorToast === 'function') {
-                window.showFrontendErrorToast(MSG_ERROR);
-            }
+            showFrontendErrorToast(MSG_ERROR);
         })
         .finally(() => {
             select.classList.remove('pm-pending');
@@ -449,15 +446,11 @@ function pmBulkApply() {
     const categoryId = catSel ? catSel.value : '';
     const level = lvlSel ? lvlSel.value : '';
     if (!categoryId) {
-        if (typeof window.showFrontendErrorToast === 'function') {
-            window.showFrontendErrorToast(MSG_BULK_NEED_CAT);
-        }
+        showFrontendErrorToast(MSG_BULK_NEED_CAT);
         return;
     }
     if (!level) {
-        if (typeof window.showFrontendErrorToast === 'function') {
-            window.showFrontendErrorToast(MSG_BULK_NEED_LEVEL);
-        }
+        showFrontendErrorToast(MSG_BULK_NEED_LEVEL);
         return;
     }
     const rows = pmGetSelectedRows();
@@ -470,11 +463,7 @@ function pmBulkApply() {
         .replace('{count}', String(rows.length))
         .replace('{category}', catLabel);
 
-    const confirmFn =
-        window.showKrtConfirm ||
-        function () {
-            return Promise.resolve(true);
-        };
+    const confirmFn = showKrtConfirm;
     confirmFn(MSG_BULK_CONFIRM_TITLE, msg).then((ok) => {
         if (!ok) return;
         const apiLevel = level === '__NONE__' ? '' : level;
@@ -607,8 +596,8 @@ document.addEventListener('DOMContentLoaded', () => {
     pmApplyCollapsedState(pmLoadCollapsedTopics());
     pmFormatLastEvaluated();
     pmRestoreFilters();
-    if (window.krtFilterPanel) window.krtFilterPanel.refresh('pm-filter-panel');
-    if (window.krtFilterChips) window.krtFilterChips.refresh();
+    krtFilterPanel.refresh('pm-filter-panel');
+    krtFilterChips.refresh();
     const initialSort = pmRestoreSortMode();
     pmSetSortMode(initialSort);
     pmApplySort(initialSort);
@@ -618,26 +607,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const search = document.getElementById('pm-member-search');
     if (search) search.addEventListener('input', pmApplyFilters);
 
-    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-        window.krtEvents.on('change', 'pm-save-evaluation', (el) => {
-            pmEnqueueSave(el);
-            pmRefreshLastEvaluatedFor(el.getAttribute('data-user-id'));
-        });
-        window.krtEvents.on('click', 'pm-toggle-topic', pmToggleTopic);
-        window.krtEvents.on('click', 'pm-expand-all', pmExpandAllTopics);
-        window.krtEvents.on('click', 'pm-collapse-all', pmCollapseAllTopics);
-        window.krtEvents.on('click', 'pm-export-csv', pmExportCsv);
-        window.krtEvents.on('click', 'pm-cycle-sort', pmCycleSort);
-        window.krtEvents.on('change', 'pm-filter-change', () => {
-            pmSaveFilters();
-            pmApplyFilters();
-            pmRefreshBulkPanel();
-        });
-        window.krtEvents.on('change', 'pm-row-check', pmOnRowCheck);
-        window.krtEvents.on('change', 'pm-select-all', pmOnSelectAll);
-        window.krtEvents.on('click', 'pm-bulk-apply', pmBulkApply);
-        window.krtEvents.on('click', 'pm-bulk-clear', pmClearSelection);
-    }
+    krtEvents.on('change', 'pm-save-evaluation', (el) => {
+        pmEnqueueSave(el);
+        pmRefreshLastEvaluatedFor(el.getAttribute('data-user-id'));
+    });
+    krtEvents.on('click', 'pm-toggle-topic', pmToggleTopic);
+    krtEvents.on('click', 'pm-expand-all', pmExpandAllTopics);
+    krtEvents.on('click', 'pm-collapse-all', pmCollapseAllTopics);
+    krtEvents.on('click', 'pm-export-csv', pmExportCsv);
+    krtEvents.on('click', 'pm-cycle-sort', pmCycleSort);
+    krtEvents.on('change', 'pm-filter-change', () => {
+        pmSaveFilters();
+        pmApplyFilters();
+        pmRefreshBulkPanel();
+    });
+    krtEvents.on('change', 'pm-row-check', pmOnRowCheck);
+    krtEvents.on('change', 'pm-select-all', pmOnSelectAll);
+    krtEvents.on('click', 'pm-bulk-apply', pmBulkApply);
+    krtEvents.on('click', 'pm-bulk-clear', pmClearSelection);
 
     document.addEventListener('krt:swapped', (e) => {
         const c = e.detail && e.detail.container;

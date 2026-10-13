@@ -27,6 +27,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -66,9 +67,9 @@ public class ExchangeInstallationController {
     SubjectAuthentication caller = (SubjectAuthentication) authentication;
     return ResponseEntity.ok(
         installationService.current(
-            caller.externalClient(),
+            Objects.requireNonNull(caller.externalClient()),
             UUID.fromString(caller.subject()),
-            caller.exchangeInstallationKey()));
+            Objects.requireNonNull(caller.exchangeInstallationKey())));
   }
 
   /**
@@ -92,9 +93,9 @@ public class ExchangeInstallationController {
     SubjectAuthentication caller = (SubjectAuthentication) authentication;
     return ResponseEntity.ok(
         installationService.label(
-            caller.externalClient(),
+            Objects.requireNonNull(caller.externalClient()),
             UUID.fromString(caller.subject()),
-            caller.exchangeInstallationKey(),
+            Objects.requireNonNull(caller.exchangeInstallationKey()),
             request.label()));
   }
 }

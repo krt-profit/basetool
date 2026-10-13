@@ -28,7 +28,7 @@ import de.greluc.krt.profit.basetool.backend.identity.internal.DiscordAccountExi
 import de.greluc.krt.profit.basetool.backend.identity.internal.DiscordAccountExistenceResponse;
 import de.greluc.krt.profit.basetool.backend.identity.internal.DiscordAccountExistenceService;
 import de.greluc.krt.profit.basetool.backend.identity.internal.DiscordSpiPrecheckProperties;
-import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;

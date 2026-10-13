@@ -3,6 +3,11 @@
 
 # TypeScript migration plan
 
+> **Update 2026-10-12:** the scripts are ES modules since ADR-0250 (all but `krt-client-error.js`), linked
+> `type="module"` behind a per-page import map. The ordering hazard and the shared-scope constraint
+> below describe the state before that; a `.ts` migration would now start from modules with absolute
+> `/js/` imports.
+
 ## Status
 
 **Not started, and deliberately not scheduled.** The current decision (ADR-0125) is to type-check

@@ -21,6 +21,10 @@
 
 /* global KRT_ORDERS_REORDER_I18N */
 
+import { showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { joborderHooks } from '/js/joborder/joborder-hooks.js';
+
 /**
  * Moves a job order to a priority slot, refreshes the queue and toasts the outcome.
  *
@@ -29,26 +33,26 @@
  */
 async function persistOrderReorder(orderId, targetPriority) {
     const container = document.getElementById('orders-results');
-    let res = { ok: false };
-    if (window.krtFetch) {
-        res = await window.krtFetch.write({
-            method: 'PUT',
-            url: `/orders/${orderId}/priority/ajax?priority=${targetPriority}`,
-            toast: false,
-            errorMessage: KRT_ORDERS_REORDER_I18N.error,
-            conflict: {
-                title: KRT_ORDERS_REORDER_I18N.conflict.title,
-                reloadLabel: KRT_ORDERS_REORDER_I18N.conflict.reloadLabel,
-                reloadQuestion: KRT_ORDERS_REORDER_I18N.conflict.reloadQuestion,
-                dismissLabel: KRT_ORDERS_REORDER_I18N.conflict.dismissLabel,
-                reloadDetailFallback: KRT_ORDERS_REORDER_I18N.conflict.detail,
-            },
-        });
-    }
-    if (window.krtRefreshOrdersQueue) {
-        await window.krtRefreshOrdersQueue(['queue'], res.ok ? undefined : { broadcast: false });
-    } else if (container && window.krtFetch && window.krtFetch.swap) {
-        await window.krtFetch.swap({
+    const res = await krtFetch.write({
+        method: 'PUT',
+        url: `/orders/${orderId}/priority/ajax?priority=${targetPriority}`,
+        toast: false,
+        errorMessage: KRT_ORDERS_REORDER_I18N.error,
+        conflict: {
+            title: KRT_ORDERS_REORDER_I18N.conflict.title,
+            reloadLabel: KRT_ORDERS_REORDER_I18N.conflict.reloadLabel,
+            reloadQuestion: KRT_ORDERS_REORDER_I18N.conflict.reloadQuestion,
+            dismissLabel: KRT_ORDERS_REORDER_I18N.conflict.dismissLabel,
+            reloadDetailFallback: KRT_ORDERS_REORDER_I18N.conflict.detail,
+        },
+    });
+    if (joborderHooks.refreshOrdersQueue) {
+        await joborderHooks.refreshOrdersQueue(
+            ['queue'],
+            res.ok ? undefined : { broadcast: false },
+        );
+    } else if (container) {
+        await krtFetch.swap({
             url: window.location.pathname + window.location.search,
             container,
             fragmentValue: 'results',
@@ -56,8 +60,8 @@ async function persistOrderReorder(orderId, targetPriority) {
             preserveScroll: true,
         });
     }
-    if (res.ok && typeof window.showFrontendSuccessToast === 'function') {
-        window.showFrontendSuccessToast(KRT_ORDERS_REORDER_I18N.success);
+    if (res.ok) {
+        showFrontendSuccessToast(KRT_ORDERS_REORDER_I18N.success);
     }
 }
 
@@ -87,7 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
         draggedRow = rowOf(e);
         if (!draggedRow) return;
 
-        window.__ordersDragging = true;
+        joborderHooks.ordersDragging = true;
         draggedRow.style.opacity = '0.5';
         if (e.dataTransfer) {
             e.dataTransfer.effectAllowed = 'move';
@@ -99,7 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     container.addEventListener('dragend', (_e) => {
-        window.__ordersDragging = false;
+        joborderHooks.ordersDragging = false;
         if (!draggedRow) return;
         draggedRow.style.opacity = '1';
         draggedRow = null;

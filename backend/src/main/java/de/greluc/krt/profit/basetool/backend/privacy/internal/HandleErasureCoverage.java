@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.privacy.internal;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import java.util.Map;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Registers what happens to each place a person is named when that person's Art. 17 erasure is
@@ -268,6 +269,7 @@ public final class HandleErasureCoverage {
    * @param tableColumn {@code table.column}
    * @return the coverage entry, or {@code null} when the column is not registered
    */
+  @Nullable
   public static Coverage of(@NotNull String tableColumn) {
     return COVERAGE.get(tableColumn);
   }

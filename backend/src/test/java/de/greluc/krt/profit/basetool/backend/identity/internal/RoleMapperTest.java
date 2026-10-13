@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.backend.identity.internal;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import de.greluc.krt.profit.basetool.backend.model.Role;
+import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import java.util.HashSet;
 import java.util.Set;
 import org.junit.jupiter.api.Test;

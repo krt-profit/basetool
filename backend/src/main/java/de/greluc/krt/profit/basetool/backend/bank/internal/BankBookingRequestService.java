@@ -29,21 +29,22 @@ import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestC
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestRejectedEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestUpdatedEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankNotices;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryService;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -128,7 +129,7 @@ public class BankBookingRequestService {
       @NotNull UUID accountId,
       @NotNull BankBookingRequestType type,
       @NotNull BigDecimal amount,
-      String note,
+      @Nullable String note,
       @Nullable String justification,
       @Nullable UUID targetAccountId,
       boolean requiresOwnerApproval,
@@ -806,7 +807,7 @@ public class BankBookingRequestService {
               request.getType(),
               request.getAmount(),
               request.getAccount().getAccountNo(),
-              request.getOwnerApprovalGrantedByHandle(),
+              Objects.requireNonNull(request.getOwnerApprovalGrantedByHandle()),
               actor));
     } else {
       eventPublisher.publishEvent(BankNotices.approvalRevoked(request.getId()));
@@ -909,7 +910,7 @@ public class BankBookingRequestService {
    * @param userId the user id, possibly {@code null}
    * @return the effective name, or {@code "unknown"}
    */
-  private String resolveHandle(UUID userId) {
+  private String resolveHandle(@Nullable UUID userId) {
     return Optional.ofNullable(userId)
         .flatMap(userRepository::findById)
         .map(User::getEffectiveName)

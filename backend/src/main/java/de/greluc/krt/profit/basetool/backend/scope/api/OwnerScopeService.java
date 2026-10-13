@@ -19,10 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.scope.api;
 
-import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.model.Squadron;
-import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.SquadronVisibility;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -51,7 +52,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service("ownerScopeService")
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class OwnerScopeService {
+public class OwnerScopeService implements SquadronVisibility {
 
   /**
    * Name of the HTTP request header relaying the caller's active OrgUnit selection; same value as
@@ -118,6 +119,7 @@ public class OwnerScopeService {
    *     admin/leadership all-scope.
    */
   @Nullable
+  @Override
   public Set<UUID> currentUserListScopeSquadronIds() {
     return requestScopeResolver.currentUserListScopeSquadronIds();
   }
@@ -272,8 +274,8 @@ public class OwnerScopeService {
    * @param owningOrgUnitId the picker output from the form, or {@code null} when the picker was not
    *     used.
    * @return the Squadron whose stock / aggregate list this row should join; never {@code null}.
-   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the picker
-   *     output is invalid for the target user.
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when the picker output
+   *     is invalid for the target user.
    */
   public Squadron resolveSquadronForPickerOutput(
       @NotNull User targetUser, @Nullable UUID owningOrgUnitId) {
@@ -289,8 +291,8 @@ public class OwnerScopeService {
    * @param owningOrgUnitId the picker-supplied org unit id; {@code null} triggers the auto-stamp
    *     path when the user has exactly one membership.
    * @return the resolved {@link OrgUnit}; never {@code null}.
-   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException on an invalid
-   *     picker output.
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException on an invalid picker
+   *     output.
    */
   public OrgUnit resolveOrgUnitForPickerOutput(
       @NotNull User targetUser, @Nullable UUID owningOrgUnitId) {
@@ -307,7 +309,7 @@ public class OwnerScopeService {
    *     used.
    * @return the resolved {@link OrgUnit}, or {@code null} for the ownerless-personal-aggregate
    *     case.
-   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException for every rejection
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException for every rejection
    *     other than the ownerless case.
    */
   @Nullable
@@ -337,8 +339,8 @@ public class OwnerScopeService {
    * @return the resolved managed {@link OrgUnit}, or {@code null} for an ownerless target.
    * @throws org.springframework.security.access.AccessDeniedException when the caller may not
    *     assign to the requested target.
-   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when a non-null
-   *     target id does not resolve to a known org unit.
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when a non-null target
+   *     id does not resolve to a known org unit.
    */
   @Nullable
   public OrgUnit resolveReassignTargetOrgUnit(@Nullable UUID targetOrgUnitId) {
@@ -352,19 +354,9 @@ public class OwnerScopeService {
    * @param squadronId the org-unit id whose data the caller wants to read; never {@code null}.
    * @return {@code true} iff the caller may see the given org unit's data.
    */
+  @Override
   public boolean canSeeSquadron(@NotNull UUID squadronId) {
     return accessGateService.canSeeSquadron(squadronId);
-  }
-
-  /**
-   * Delegates to {@link AccessGateService#canSeeOrgUnit(UUID)}: the plan-aligned alias of {@link
-   * #canSeeSquadron(UUID)}.
-   *
-   * @param orgUnitId the org-unit id whose data the caller wants to read; never {@code null}.
-   * @return {@code true} iff the caller may see the given org unit's data.
-   */
-  public boolean canSeeOrgUnit(@NotNull UUID orgUnitId) {
-    return accessGateService.canSeeOrgUnit(orgUnitId);
   }
 
   /**
@@ -376,17 +368,6 @@ public class OwnerScopeService {
    */
   public boolean canEditSquadron(@NotNull UUID squadronId) {
     return accessGateService.canEditSquadron(squadronId);
-  }
-
-  /**
-   * Delegates to {@link AccessGateService#canEditOrgUnit(UUID)}: the plan-aligned alias of {@link
-   * #canEditSquadron(UUID)}.
-   *
-   * @param orgUnitId the org-unit id whose data the caller wants to write; never {@code null}.
-   * @return {@code true} iff the caller may write to the given org unit's data.
-   */
-  public boolean canEditOrgUnit(@NotNull UUID orgUnitId) {
-    return accessGateService.canEditOrgUnit(orgUnitId);
   }
 
   /**
@@ -412,17 +393,5 @@ public class OwnerScopeService {
    */
   public boolean permitsOwnedRow(@Nullable User owner, @Nullable OrgUnit orgUnit, boolean edit) {
     return accessGateService.permitsOwnedRow(owner, orgUnit, edit);
-  }
-
-  /**
-   * Delegates to {@link AccessGateService#canActOnTargetUser}: the scope kernel's coarse on-behalf
-   * pre-check, for the module access policies (plan §5.4).
-   *
-   * @param targetUserId the member being acted upon; never {@code null}
-   * @param edit {@code true} for the write check, {@code false} for the read check
-   * @return {@code true} iff the caller shares at least one in-scope org unit with the member
-   */
-  public boolean canActOnTargetUser(@NotNull UUID targetUserId, boolean edit) {
-    return accessGateService.canActOnTargetUser(targetUserId, edit);
   }
 }

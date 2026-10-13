@@ -43,11 +43,10 @@ the new participant's `payoutPreference` is **seeded from the user's default**. 
 - [ ] An external participant's row is unaffected (remains `PAYOUT`).
 - [ ] A concurrent profile edit surfaces as a 409 (optimistic lock), not a silent overwrite.
 
-**Enforced by:** `MissionServiceTest` (sign-up pre-fill), `UserServiceSyncTest`
-(`UpdateUserDefaultPayoutPreferenceTests`), `UserControllerTest` (`/me/payout-preference` GET/PUT),
+**Enforced by:** `MissionServiceTest` (sign-up pre-fill), `MemberPayoutSettingsTest`, `V283MemberSettingsMigrationTest`, `MyPayoutPreferenceControllerTest` (`/me/payout-preference` GET/PUT),
 `UserPayoutPreferenceValidationTest` (`@Valid` → 400 on a missing preference/version),
-`ProfileControllerTest`. **Code:** `User.defaultPayoutPreference` (migration `V142`),
-`UserService#updateUserDefaultPayoutPreference`, `UserController` `/api/v1/missions/me/payout-preference`,
+`ProfileControllerTest`. **Code:** `MemberPayoutSetting` in `mission.api` (table `member_payout_setting`, migration `V283`, which copied the former `app_user.default_payout_preference` of V142; the old column stays until a later release drops it),
+`MemberPayoutSettings`, `MyPayoutPreferenceController` `/api/v1/missions/me/payout-preference`,
 `MissionParticipantService#addParticipant` (reached through `MissionService#addParticipant`),
 `frontend/.../ProfileController` (`POST /profile/payout-preference`) + `templates/identity/profile.html`.
 **Issues:** #469.

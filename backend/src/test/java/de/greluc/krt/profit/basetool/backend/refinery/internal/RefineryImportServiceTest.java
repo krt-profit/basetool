@@ -38,12 +38,15 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethod;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodRepository;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.FuzzyNameMatcher;
-import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
-import de.greluc.krt.profit.basetool.backend.mapper.UserMapperImpl;
-import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapperImpl;
 import de.greluc.krt.profit.basetool.backend.refinery.api.ImportIssueCode;
 import de.greluc.krt.profit.basetool.backend.refinery.api.ImportIssueDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.ImportIssueSeverity;
@@ -52,9 +55,6 @@ import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExtractGoodDto
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExtractImageDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExtractOrderDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryImportDraftDto;
-import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
-import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import java.time.Instant;
 import java.util.List;
@@ -141,7 +141,7 @@ class RefineryImportServiceTest {
         new StaffelMembershipResolver(
             Mockito.mock(SquadronRepository.class),
             Mockito.mock(
-                de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository.class)));
+                de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository.class)));
 
     service =
         new RefineryImportService(

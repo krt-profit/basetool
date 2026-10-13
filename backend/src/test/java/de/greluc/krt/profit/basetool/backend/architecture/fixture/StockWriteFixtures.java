@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.architecture.fixture;
 
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
-import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import java.util.UUID;
 
 /**

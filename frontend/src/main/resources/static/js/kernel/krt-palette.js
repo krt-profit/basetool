@@ -18,6 +18,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtChrome } from '/js/kernel/krt-chrome.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
+
 document.addEventListener('DOMContentLoaded', () => {
     const RECENT_KEY = 'krt.recent';
     const RECENT_MAX = 4;
@@ -103,7 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const createHref = data.createOrderHref;
         if (createHref) {
             out.push({
-                label: window.krtI18nText(data.actionCreateOrder, 'data-action-create-order'),
+                label: krtI18nText(data.actionCreateOrder, 'data-action-create-order'),
                 crumb,
                 icon: 'plus',
                 run() {
@@ -114,18 +118,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const select = document.getElementById('squadron-switcher-select');
         if (select) {
             out.push({
-                label: window.krtI18nText(data.actionOuSwitch, 'data-action-ou-switch'),
+                label: krtI18nText(data.actionOuSwitch, 'data-action-ou-switch'),
                 crumb,
                 icon: 'swap',
                 run() {
-                    if (window.krtNav) window.krtNav.open(select);
+                    if (krtChrome.nav) krtChrome.nav.open(select);
                 },
             });
         }
         const logoutForm = document.getElementById('nav-logout-form');
         if (logoutForm instanceof HTMLFormElement) {
             out.push({
-                label: window.krtI18nText(data.actionLogout, 'data-action-logout'),
+                label: krtI18nText(data.actionLogout, 'data-action-logout'),
                 crumb,
                 icon: 'logout',
                 run() {
@@ -196,13 +200,13 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (recent.length) {
                 groups.push({
-                    label: window.krtI18nText(data.recent, 'data-recent'),
+                    label: krtI18nText(data.recent, 'data-recent'),
                     items: recent,
                 });
             }
             if (actions.length) {
                 groups.push({
-                    label: window.krtI18nText(data.actions, 'data-actions'),
+                    label: krtI18nText(data.actions, 'data-actions'),
                     items: actions,
                 });
             }
@@ -226,10 +230,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return a.label.toLowerCase().includes(q);
         });
         if (pages.length) {
-            groups.push({ label: window.krtI18nText(data.pages, 'data-pages'), items: pages });
+            groups.push({ label: krtI18nText(data.pages, 'data-pages'), items: pages });
         }
         if (acts.length) {
-            groups.push({ label: window.krtI18nText(data.actions, 'data-actions'), items: acts });
+            groups.push({ label: krtI18nText(data.actions, 'data-actions'), items: acts });
         }
         return groups;
     };
@@ -306,7 +310,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * @param {PaletteItem} item the chosen row
      */
     const choose = function (item) {
-        window.krtModal.close(dialog);
+        krtModal.close(dialog);
         if (item.run) {
             item.run();
         } else if (item.href) {
@@ -373,12 +377,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const open = function (prefill) {
         paletteInput.value = prefill || '';
         render();
-        window.krtModal.open(dialog, { focus: paletteInput });
+        krtModal.open(dialog, { focus: paletteInput });
         const end = paletteInput.value.length;
         paletteInput.setSelectionRange(end, end);
     };
 
-    window.krtPalette = { open };
+    krtChrome.palette = { open };
 
     paletteInput.addEventListener('input', render);
     paletteInput.addEventListener('keydown', (e) => {
@@ -398,7 +402,7 @@ document.addEventListener('DOMContentLoaded', () => {
     dialog.addEventListener('click', (e) => {
         const target = e.target instanceof Element ? e.target : null;
         if (target === dialog || (target && target.closest('.palette-cancel'))) {
-            window.krtModal.close(dialog);
+            krtModal.close(dialog);
         }
     });
 
@@ -408,7 +412,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.querySelectorAll('[data-palette-open]').forEach((trigger) => {
         trigger.addEventListener('click', () => {
-            if (window.krtNav) window.krtNav.close();
+            if (krtChrome.nav) krtChrome.nav.close();
             open('');
         });
     });
@@ -416,15 +420,15 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('keydown', (e) => {
         if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
         if (e.key !== 'k' && e.key !== 'K') return;
-        const top = window.krtModal.topmost();
+        const top = krtModal.topmost();
         if (top && top !== dialog) return;
         e.preventDefault();
-        if (window.krtModal.isOpen(dialog)) {
+        if (krtModal.isOpen(dialog)) {
             paletteInput.focus();
             paletteInput.select();
             return;
         }
-        if (window.krtNav) window.krtNav.close();
+        if (krtChrome.nav) krtChrome.nav.close();
         open('');
     });
 

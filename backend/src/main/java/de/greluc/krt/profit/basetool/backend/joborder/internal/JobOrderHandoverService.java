@@ -23,34 +23,33 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverItem;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverMapper;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.Quality;
-import de.greluc.krt.profit.basetool.backend.mapper.JobOrderHandoverMapper;
-import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.JobOrder;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderHandover;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderHandoverItem;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.model.Squadron;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverDto;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryService;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -154,10 +153,10 @@ public class JobOrderHandoverService {
   @Nullable
   private static String bookAgainstLines(
       @NotNull JobOrder jobOrder,
-      @NotNull InventoryItem inventoryItem,
+      @NotNull StockRow inventoryItem,
       double amount,
       @Nullable String tierCode) {
-    UUID materialId = inventoryItem.getMaterial().getId();
+    UUID materialId = Objects.requireNonNull(inventoryItem.getMaterial()).getId();
     int quality = Quality.orMin(inventoryItem.getQuality());
     List<JobOrderMaterial> eligible =
         jobOrder.getMaterials().stream()
@@ -214,7 +213,7 @@ public class JobOrderHandoverService {
    * <ul>
    *   <li>reduces inventory amounts, deleting fully consumed rows,
    *   <li>reduces the open amount per {@link
-   *       de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial},
+   *       de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial},
    *   <li>persists the handover and its items,
    *   <li>unlinks remaining inventory of fully fulfilled materials,
    *   <li>completes the order once every material is fulfilled.
@@ -261,11 +260,11 @@ public class JobOrderHandoverService {
     final List<HandedItem> handedItems = new ArrayList<>();
 
     for (JobOrderHandoverItemCreateDto itemDto : dto.items()) {
-      InventoryItem inventoryItem =
+      StockRow inventoryItem =
           Entities.require(
               stockCommands.lockRow(itemDto.inventoryItemId()), "Inventory item not found");
 
-      if (InventoryAllocations.jobOrderSlice(inventoryItem, jobOrderId) == null) {
+      if (!inventoryItem.isEarmarkedForJobOrder(jobOrderId)) {
         throw new BadRequestException(ERROR_ITEM_NOT_LINKED_TO_ORDER);
       }
 
@@ -279,9 +278,7 @@ public class JobOrderHandoverService {
       if (itemDto.amount() > inventoryItem.getAmount() + QUANTITY_EPSILON) {
         throw new BadRequestException("Cannot hand over more than the available amount");
       }
-      var orderSlice = InventoryAllocations.jobOrderSlice(inventoryItem, jobOrderId);
-      double orderSliceAmount =
-          orderSlice != null && orderSlice.getAmount() != null ? orderSlice.getAmount() : 0.0;
+      double orderSliceAmount = inventoryItem.jobOrderSliceAmount(jobOrderId);
       if (itemDto.amount() > orderSliceAmount + QUANTITY_EPSILON) {
         throw new BadRequestException(
             "Cannot hand over more than the amount earmarked to this job order");
@@ -322,7 +319,7 @@ public class JobOrderHandoverService {
               null));
 
       stockCommands.takeFromEarmarkedRow(
-          inventoryItem,
+          inventoryItem.getId(),
           jobOrderId,
           itemDto.amount(),
           itemDto.missionReductions(),

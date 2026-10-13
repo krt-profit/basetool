@@ -1,13 +1,25 @@
-> **Doc type:** Living plan — the direction was decided by the owner on 2026-09-29, every
-> open decision on 2026-10-01, the delivery of the remaining phases on 2026-10-04 (D-23 … D-27).
-> **Status:** Phase −1 done (merged 2026-10-01, PRs #2299–#2312); Phase 0 done (2026-10-03,
-> merged as one chain of pull requests, #2350 … #2353): the decision records (ADR-0231 … ADR-0239
-> and the amendments of §14) and every guard of §6.1 that Phase 0 owns; the app's re-read of the
-> version policy shipped with app v0.5.0 (basetool-android#209, published 2026-10-03). Phase 1:
-> the error model (P1-12) is done (2026-10-04) — the first classes moved into module packages;
-> the module declarations (P1-13) are in place for every module package on `main` (2026-10-04)
-> and grow with each move.
-> Last reviewed: 2026-10-04.
+> **Doc type:** Historical plan — frozen 2026-10-13 by the owner's decision, kept as the record of
+> the domain modularisation and no longer updated. The direction was decided on 2026-09-29, every
+> open decision on 2026-10-01, the delivery of the remaining phases on 2026-10-04 (D-23 … D-27); the
+> rest of the plan was built in one umbrella pull request (#2552, 2026-10-12).
+> **The living truth is elsewhere:** the module structure and its known debt in
+> [`arc42/05-building-block-view.md`](arc42/05-building-block-view.md) and
+> [`arc42/11-risks-and-technical-debt.md`](arc42/11-risks-and-technical-debt.md); the requirements in
+> [`specs/INDEX.md`](specs/INDEX.md) and the specs it lists (`module-boundaries.md`, REQ-MOD-\*);
+> the decisions in [`adr/README.md`](adr/README.md) (ADR-0231 … ADR-0239 and later); and the
+> Basetool Knowledge Base. When this document and those disagree, they are right.
+> **Not done, and why:** P5-c (`backend-exchange`) and P5-d (`backend-bank`) are not implemented, by
+> decision of the owner on 2026-10-12 (§5.8: an extraction that compiles against the whole `backend`
+> gives no compile-time isolation); P3-11, the per-command audit contract, is struck (it was never
+> defined); the REST API cut (§7.9) waits for the owner's release decision and an app release. The
+> Phase −1 defects are all closed: C-03 is done (§9.3) and both items of §9.4 are investigated and
+> closed (observed 2026-10-13, see §9.4). Every step that only the owner can take is tracked in
+> [`OWNER_STEPS_2026-10.md`](OWNER_STEPS_2026-10.md).
+> **Status:** every step of the plan that was in scope is done and ticked in the checklist of §7.6
+> (kept as the end state): Phase −1 (2026-10-01), Phase 0 (2026-10-03), the move of every domain class
+> out of the layer packages, the access policies, the member-settings tables, the Lager row as a
+> read-only view, the scope fragments beside their repositories, NullAway on every module, and
+> `build-logic` (P5-a, P5-b). Last reviewed: 2026-10-13.
 > **Owner area:** BE · FE · API · SEC · **Related ADRs:** ADR-0020, ADR-0028, ADR-0032, ADR-0047,
 > ADR-0060, ADR-0065, ADR-0069, ADR-0130, ADR-0135, ADR-0136, ADR-0205, ADR-0206, ADR-0212,
 > ADR-0214, ADR-0216, ADR-0219, ADR-0223, ADR-0229, ADR-0231 … ADR-0239 · **Specs:**
@@ -30,14 +42,16 @@ refuses code that reaches past that API. It is the report of a whole-repository 
   APIs — and two secondary ones: use modern, final language features where they pay off, and
   re-evaluate the findings of the previous audits under today's rules. It names every change with
   its implementation, pros, cons, risks and regressions, and the guard that catches a regression.
-- **What it is not.** A record of finished work: Phase −1 (§7.1) and Phase 0 (§7.2) are merged,
-  and no class has moved yet. Section 2 lists every decision; section 13 maps the
-  former open decisions onto them.
+- **What it is now.** A record of finished work: Phase −1 (§7.1), Phase 0 (§7.2) and the moves
+  of §7.3 to §7.6 are merged, and every domain class lies in its module package. What was not done is
+  named in the header. Section 2 lists every decision; section 13 maps the former open decisions
+  onto them. The sections below keep the tense and the numbers of the day they were written; the
+  checklist of §7.6 is the end state.
 - **Scope.** All modules of `basetool`: `backend`, `frontend`, `ingest`, `keycloak-spi`,
   `keycloak-theme`, `logging-support`, `test-support`, the build and the delivery path. Sibling
   repositories are out of scope, except the Android app's forced-update path, which the API cut
   depends on.
-- **Code state.** `origin/main` at `95e945326` (2026-09-29).
+- **Code state.** The audit was measured on `origin/main` at `95e945326` (2026-09-29); the plan was frozen on the tree of the umbrella pull request #2552 (2026-10-13).
 - **How it was done.** Eleven read-only analyses, each writing evidence (`file:line`, counts with
   the script that produced them) — the backend domain graph from a class-level `jdeps` graph of the
   compiled classes, cross-cutting concerns and refactor safety, the frontend's Java side, its
@@ -249,7 +263,7 @@ the modules its row allows; a dependency upward is inverted through an SPI or an
 | 2 | `catalogue` | Materials, items, locations, ship types, refining methods, job and frequency types, and the UEX, SC Wiki and P4K imports — including the recipe graph (`catalogue.api.Blueprint`). |
 | 3 | `identity` | Users, registration, profile, terms consent, and the GDPR orchestration, which calls the other modules through identity-owned SPIs. |
 | 4 | `orgunit` | Squadrons, special commands, Bereiche, Organisationsleitung, memberships and appointments (the Leitung write paths), and the leadership cascade (`OrgUnitCascadeService`). |
-| 5 | `scope` | The request-scoped scope kernel: `RequestScopeResolver`, `ScopePredicate`, `OrgUnitStampingService`, `ScopeSpecifications`, the authorities converter — and `OwnerScopeService` and `AccessGateService` until the per-domain access policies (§5.4) have taken their methods over. |
+| 5 | `scope` | The request-scoped scope kernel: `RequestScopeResolver`, `ScopePredicate`, `OrgUnitStampingService`, the authorities converter — and `OwnerScopeService` and `AccessGateService` until the per-domain access policies (§5.4) have taken their methods over. |
 | 6 | `admin`, `dashboard` | System settings, announcements. |
 | 7 | `orgchart`, `promotion`, `personalinventory`, `hangar`, `blueprint` | Org chart and the Leitung view, Beförderung, Mein Inventar, ships, personal and default blueprints. |
 | 8 | `inventory` | Lager: stock, holders, allocations, checkout, rebooking, the lot-lock protocol. |
@@ -257,7 +271,7 @@ the modules its row allows; a dependency upward is inverted through an SPI or an
 | 10 | `refinery`, `joborder`, `materialexchange` | Raffinerie, Aufträge, Materialbörse. |
 | 11 | `operation`, `bank` | Operationen and payouts; the Kartellbank (org-unit-blind by design, ADR-0020). |
 | 12 | `exchange` | The external client exchange — an adapter over the other modules' APIs. |
-| 14 | `app` | The composition root: `BackendApplication`, `SecurityConfig`, `DataInitializer`, and `BusinessMetricsCollector` until each module publishes its own gauges. |
+| 14 | `app` | The composition root: `BackendApplication`, `SecurityConfig`, `DataInitializer`, the cross-module `MeController` (`app.web`, plan §7.6), and the schedule of the business gauges that every module publishes (`BusinessGaugeSource`, plan §7.6). |
 
 Rank 13 (`privacy`) exists only during the migration: the 31 GDPR classes are re-homed there first
 and then dissolved into identity-owned SPIs (§7.6).
@@ -413,6 +427,9 @@ module verifier alone would be a green check that checks nothing: a large share 
 lives in strings (the last row), which is why the targeted tests are part of the gate, not an extra.
 
 ### 5.8 Gradle modules for exchange and bank
+
+> [!important] Not implemented, by decision of the owner on 2026-10-12
+> P5-c (`backend-exchange`) and P5-d (`backend-bank`) are not done and not scheduled. An extraction that compiles against the whole `backend` (the only shape a spike found, `compileOnly(project(":backend"))` in the library and `runtimeOnly` in the application, because `implementation` is a task cycle) gives no compile-time isolation: the library still sees everything. The promise below needs the api packages the extracted module uses to be Gradle modules of their own first. The P5-a and P5-b preparation stays. The text below is the original intent, and the entry "Umbrella steps 18 and 19" in §7.6 records the spike.
 
 After Phase 4, and only once the package boundary of each has been green for some releases:
 
@@ -2643,6 +2660,495 @@ owner decided on 2026-10-12 to leave that as it is.
    left (the return type is gone). `UserService -> MembershipDeltaRequest` stays, because the request is
    still the parameter of the public method. No floor, domain-map rule or declaration changed.
 
+**P4-7, slice c — the account-erasure SPI, the three user services and the JWT converter move — done 2026-10-12**
+1. *Account-erasure SPI*: `identity.api.AccountErasure#deleteAccount(UUID, KeycloakPresence)` with the
+   identity-owned enum `KeycloakPresence` (`ENFORCED`, `WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER`).
+   `UserDeletionService` implements it, `@Transactional` like the method it forwards to (REQUIRED, read
+   from the code), and maps the enum with an exhaustive switch without a `default`. The method is named
+   `deleteAccount` because a second `deleteUser` overload made `any(), any()` ambiguous in existing tests.
+   `UserRegistrationService` depends on the SPI only. `UserAccountErasureSeamTest` (real schema, one
+   rolled-back transaction) pins the mapping of every constant, that the seam is the orchestrator bean, and
+   that unknown user, still-in-Keycloak, waived and enforced probe leave the same rows and audit rows and
+   fail with the same exception as the orchestrator's own method.
+2. *Fresh probe on `affe46d76`*: the three services moved together close no cycle at top level and none
+   inside the module. Placement: all three are named by other modules or layer classes, so all three are
+   in `identity.api` (`UserService` has 29 foreign users).
+3. *A finding the plan did not have*: `ModularityTest` refused `identity.api.UserService -> OwnerScopeService`,
+   because identity may not declare `scope::api` (rank 3 against 5). While `UserService` lay in a layer
+   package, Spring Modulith did not see the baselined `identity -> scope` edge. It is gone now: an
+   identity-owned `identity.api.SquadronVisibility` with the two calls `UserService` made
+   (`canSeeSquadron`, `currentUserListScopeSquadronIds`), which `OwnerScopeService` implements with the
+   same method bodies (bean name unchanged; the `scope -> identity` edge is a lower-rank one). **The shape of
+   this SPI is the two verbatim calls; the plan did not name it. Confirmed by the owner on 2026-10-12.** It also removes the cycle the converter's move
+   would have closed (`scope -> identity: converter -> UserReconciliationService` against `identity -> scope`).
+4. *The converter*: `CustomJwtGrantedAuthoritiesConverter` moved to `scope.api`, not `scope.internal`:
+   `exchange.internal.DatabaseActingMemberAuthorities` calls `assembleFor(User)`, and a class another
+   module calls belongs to `api`. Its logger name follows the package.
+5. *NullAway* (the whole `identity` tree was already checked): `PartialRoleScopeProperties.isPartialRoleScopeClient`
+   takes a `@Nullable` claim (its Javadoc always said so), one `discordUserId` null check in
+   `UserReconciliationService`, and the converter's final `AuthenticationServiceException` is built with the
+   cause only when there is one. No suppression.
+6. *Gates*: baseline **28 → 26**, measured by `ModuleBaselineTest`: `identity -> privacy: UserRegistrationService ->
+   UserDeletionService` and `identity -> scope: UserService -> OwnerScopeService` left; `UserService ->
+   MembershipDeltaRequest` stays (public parameter). One domain-map class rule (the converter) left. No floor
+   changed. The tests of the moved classes stay in their packages and compile against the new ones.
+   Four logger names follow the packages (`UserService`, `UserReconciliationService`, `UserRegistrationService`, the converter); nothing in `monitoring/` or the observability spec matches them.
+
+**Umbrella step 5a — the kernel's exception and validation types move into the `kernel` package — done 2026-10-12**
+1. *Probe*: the 15 types of `exception` (`AppException` and its eight generic kinds, `DomainProblem`, `ProblemCode`, `CoreProblemCode`,
+   `ErrorDisclosurePolicy`, `Entities`) and the five of `validation` (`DtoConstraints`, `OnUpdate`, `QualityValue`, `WholeNumber`,
+   `WholeNumberValidator`) that the domain map assigns to `kernel`, moved together with the 65 platform types of step 5b, close no
+   cycle at top level.
+2. *Move*: all 20 into `kernel` (§5.1 gives the kernel no sub-package), same class names; `git mv` and the import script rewrote 340
+   files (imports, qualified names in code, Javadoc and strings). Nothing else changed: the sealed `AppException` still permits
+   its subclasses from one package, error codes and `openapi.json` are untouched.
+3. *Gates*: `ArchitectureTest` anchored the validation layer on `DtoConstraints`, whose package is `kernel` now, so the layer would
+   have selected the whole kernel; the layer takes no legacy package any more (the `validation` package is empty), and its
+   selection floor falls 7 → **5**, measured from the failing assertion. No other floor, baseline line or declaration changed.
+4. *Text scan* of all tracked files for `backend.exception.<kernel type>` and `backend.validation.<type>`: none left in code or
+   resources; the source-path link of `whole-number-amounts.md` is corrected; the two remaining `backend.exception.…` strings name
+   `ProblemSupport` and `GlobalExceptionHandler`, which are platform types (step 5b).
+
+**Umbrella step 5b — the platform's 65 types leave the layer packages for `platform.api` / `platform.internal` — done 2026-10-12**
+Owner decision 2026-10-12: yes, `kernel` and `platform` physically leave their layer packages, mechanically.
+1. *Probe*: the 65 types the domain map assigns to `platform` (`config` 33, `web` 6, `exception` 6, `filter` 5, `logging` 4,
+   `metrics` 4, `service` 3, `annotation` 2, `controller` 1, `health` 1), together with the kernel's 20, close no cycle at top level.
+2. *Placement* (§5.2): a class another module or a layer class uses goes to `api`, and so does everything an `api` type
+   depends on, because the layers inside a module must stay acyclic: **35 in `api`, 30 in `internal`**. The two existing
+   `internal` records `ApiClientMetricsProperties` and `RequestBodyLimitProperties` moved to `api`, because `ClientAttribution`
+   and `RequestBodySizeLimitFilter` take them. `BasetoolErrorController` lies in `platform.api` (no `platform.web`).
+   Members the new foreign users reach became `public` (`RedisJsonFanout`, `SseSendFailureCause`,
+   `BackpressureRejectedExecutionHandler`); 374 files were rewritten by `git mv` and the import script.
+3. *Tests*: 47 tests moved with their subjects (they reach package-private members); the test fixture `PathControlInventory` is
+   public now so `RateLimitRuleCoverageTest` and `FilterExemptionSetsTest` can stay in `config` beside their other fixtures.
+4. *NullAway* checks the moved `platform.api` classes (`platform.internal` stays unchecked until step 16): eight sites, fixed by
+   `@Nullable` (`ThrowingItemWork`, the argument-resolver parameters, `maskQuotedValues`, `emitJobMetrics`) and by `Objects.requireNonNull` where
+   a default message makes the result non-null; no suppression and no behaviour change.
+5. *Gates*: the service layer's selection floor 507 → **504**; the controller layer anchored on `BasetoolErrorController`, so it
+   takes `UserController` now; the six `layer … platform` rules of the domain map assign no class any more and left;
+   `ModularityTest` caught the package-private `BackpressureRejectedExecutionHandler` (now public) and the layers rule the
+   two properties records. Baseline unchanged. `compileJava --rerun` shows 0 warnings.
+6. *Text scan* of all tracked files: the path-reading tests `PlatformMirrorParityTest` and `ObservationPrivacyFilterMirrorParityTest`, the
+   SpotBugs exclude for `BasetoolErrorController`, and the source paths in nine docs were rewritten; no logger name of a moved
+   class appears in `monitoring/`, the logging configuration or the observability spec; the historical audit appendices were left.
+
+**Umbrella step 2 — the audit module's 12 classes move into `audit.api` / `audit.internal` / `audit.web` — done 2026-10-12**
+1. *Probe*: `audit`, `livesync` and `notification` moved together close no cycle at top level; the audit repository leaving `repository` is
+   what lets the handle-anonymisation participant leave `service` (the P4 slice-b note).
+2. *Move* (103 files by `git mv` and the import script): `AuditEvent`, `AuditEventDto`, `AuditPurgeResultDto`, `AuditEventMapper`,
+   `AuditEventRepository`, `AuditService`, `AuditReportService`, `AuditRetentionService`, `AuditRetentionTask`, `AuditLogPdfFormat` to `audit.api`
+   (what other modules use, plus what those depend on), `AuditHandleAnonymisation` and two more to `audit.internal`, `AuditAdminController` to
+   `audit.web`. Entity name, table, bean names, REST paths and `openapi.json` are unchanged.
+3. *NullAway*: `AuditEventRepository.findFiltered` takes five optional filters (the JPQL tests `IS NULL`); they carry `@Nullable`.
+4. *Gates*: the layers of `ArchitectureTest` were anchored on a class (`AuditService`, `UserMapper`, `UserRepository`, `User`, `UserController`), so a
+   move of the anchor re-aimed the layer. They are anchored on the legacy package name now (`service`, `mapper`, `repository`, `model`,
+   `controller`) and need no re-anchoring again. Floors from the failing assertions: service layer 504 → **495**, join-column selection 224 → **222**;
+   the domain-map rule `name ^Audit audit` assigns no class any more and left. Baseline unchanged.
+5. *Text scan*: no code or resource names the old packages; nine source paths in `audit.md` and `security-and-access.md` follow.
+
+**Umbrella step 3 — the live-sync module's nine classes move into `livesync.api` / `livesync.internal` / `livesync.web` — done 2026-10-12**
+1. *Move* (19 files, six tests follow because they read package-private limits): the request record, the fan-out SPI, the relay, stream and
+   subscription-authorizer services and the Redis fan-out to `livesync.api`, the two Redis/local transport classes to `livesync.internal`, `LiveSyncController` to
+   `livesync.web`. Paths, bean names and metrics are unchanged.
+2. *NullAway*: `RedisLiveSyncFanout.onMessage` takes a `@Nullable` pattern (the Spring listener contract), the authorizer map lookup is wrapped in
+   `Objects.requireNonNull` inside the existing `try`, so a missing authorizer still refuses the subscription as a failed check. No suppression.
+3. *Gates*: the domain-map rule `name ^(LiveSync|LocalLiveSync|RedisLiveSync)` assigns no class any more and left; no floor or baseline line changed.
+4. *Text scan*: source paths in `frontend-ajax-mutations.md`; nothing in code or resources.
+
+**Umbrella step 4 — the notification module's 47 classes move into `notification.api` / `notification.internal` / `notification.web` — done 2026-10-12**
+1. *Move* (161 files by script; 21 tests and the test fixtures `StubNotificationEvent` and the recipient-directory test follow, because they read
+   package-private members): the entities and enums (`Notification`, the rule and selector entities, `NotificationType`, `NotificationEventType`,
+   `NotificationContextRole`, `OrgRelativeRole`, `SelectorKind`), their repositories, mappers and DTOs, the mail types (`MailService`, `MailMessage`,
+   `MailProperties`), the notification, mute, rule and stream services to `notification.api` (33 types: what other modules and layer classes use, plus what
+   those depend on); the creation, event-listener, recipient, rule-evaluation and timed-runner services, the Redis wiring, the retention and timed tasks,
+   the SMTP implementation and the erasure participant to `notification.internal` (12); the two controllers to `notification.web`. The existing
+   `NotificationParamsCodec` moved from `internal` to `api`, because `NotificationMapper` names it in an annotation member.
+2. *NullAway*: `RedisNotificationFanout.onMessage` takes a `@Nullable` pattern (the Spring listener contract); nothing else.
+3. *Gates* from the failing assertions: service layer 495 → **489**, join-column selection 222 → **208**, `mutatingServiceMethodsInReadOnlyClassesNeedExplicitTransactional`
+   498 → **492**; the domain-map name rule `^(Notification|LocalNotification|…)` assigns no class any more and left. Baseline unchanged.
+4. *Text scan*: source paths in `notifications.md`, `bank.md` and `materialboerse.md` rewritten; nothing in code or resources named the old packages.
+   Paths, bean names, cache names and metrics are unchanged.
+
+**Umbrella steps 6 and 7 — the org-unit module and the identity remainder leave the layer packages — done 2026-10-12**
+1. *Probe*: assigning the whole `orgunit` and `identity` census to its module closes cycles through the layer packages that still hold other domains
+   (`model`, `mapper`, `repository`, `service`). Four things had to be placed differently from the domain map before the block closed no cycle at
+   top level (**derived from the existing calls, not individually reviewed by the owner**): `OrgUnitKind` and `SquadronReferenceDto` go to `kernel`
+   (§7.3 already names `OrgUnitKind` as the precondition of a kernel `OrgUnitRef`; `SquadronReferenceDto` is a three-field record `UserDto` embeds);
+   `MembershipDeltaRequest` goes to `identity.api`, because `UserService` takes it and `orgunit` may depend on `identity` but not the reverse;
+   `UserMapper` goes to `orgunit.api`, because it reads memberships, squadrons and `StaffelMembershipResolver`. Each is a class rule in the domain map.
+2. *Move* (636 files by `git mv` and the import script, plus a pass for wildcard imports in 14 tests): `orgunit.api` 48 types (entities, enums, repositories,
+   DTOs, mappers and the services other modules call), `orgunit.internal` 3 (`OrgUnitDepartureNotifier`, `OrgUnitMembershipOperations`,
+   `OrgUnitMembershipRecipientDirectory`), `orgunit.web` the eight controllers; `identity.api` 14 (`User`, `Role`, `UserApprovalEvent`, `ApprovalStatus`,
+   `ApprovalDecision`, `PayoutPreference`, the repositories, `UserDto`, `UserReferenceDto`, `MembershipDeltaRequest`, `UserSyncService`),
+   `identity.internal` 9 (terms-acceptance data, the two mail services and listeners, the sync task, the plain-lookup fragment), `identity.web`
+   `MyRegistrationStatusController`. `OrgUnitLabels` moved from `orgunit.internal` to `orgunit.api` because the services call it. 29 tests followed their subjects.
+   Entity and table names, bean names, SpEL bean references, REST paths and `openapi.json` are unchanged.
+3. *Left behind on purpose*: `UserController`, `MeController`, `DiscordRegistrationAdminController`, `RejectedRegistrationRetentionService` and its task stay in
+   `controller` / `service`. They call the GDPR services (`UserDeletionService`, `AccountConsolidationService`, `UserAccountMergeService`), which are rank 13, and
+   `MeController` reaches the inventory properties and `OwnerScopeService`; their host module is the REST-surface and GDPR step. The domain map assigns the five to the
+   transitional `privacy` module (class rules), so their 14 upward edges left the baseline **by reclassification, not by being resolved** (the other 12 of the 26 were resolved by the moves). *Corrected 2026-10-12: the five classes were then resolved for real; see the entry "the 14 baseline edges are resolved, not reclassified".*
+4. *Gates*: the module baseline went **26 → 0** and `ModuleBaselineTest` no longer asserted a non-empty selection (restored in the correction entry as a floor on the module graph; the planted-fixture tests still prove the rule fires);
+   the two domain-map name rules for `orgunit` and the one for `identity` assign no class any more and left. `UserDto`, `UserReferenceDto` and
+   `SquadronReferenceDto` joined the leaf helpers (the rule let leaf helpers depend on the legacy `model` package, which they left). Floors from the failing
+   assertions: service layer 489 → **486**, join-column selection 208 → **180**, `mutatingServiceMethodsInReadOnlyClassesNeedExplicitTransactional` 492 → **489**, controller targets 113 → **111**.
+5. *NullAway* (the `api` packages and the whole `identity` tree are checked): `User.displayName`, `User.email`, `UserApprovalEvent.id`, `OrgUnit.description` / `department` / `parent`,
+   `Organisationsleitung.grandAdmiral*`, `OrgUnitMembership.kommandoGroup` and five `UserDto` components carry `@Nullable`; `User.username` takes a nullable setter argument only
+   (the column is mandatory); the seven scope parameters of `UserRepository`, `JobOrderReferenceDto.requestingOrgUnit`, `UserMapper.resolveSquadron`
+   and the version parameter of `assertVersionMatches` too; the plain-lookup fragment takes its `EntityManager` by constructor; `OrgUnitMembershipService` unwraps the group with
+   `Objects.requireNonNull` (the same `NullPointerException` as before). No suppression. `UserDtoRedaction.toPeerShapedAssignees` went to `JobOrderController`, its only caller.
+6. *Text scan* of all tracked files: source paths in `bank.md`, `discord-integration.md`, `org-notifications.md` and `security-and-access.md` rewritten; nothing in code, resources
+   or `monitoring/` names the old packages. `compileJava --rerun` shows 0 warnings.
+7. *Correction (found by `MissionUnitFrequencyTest` on the pull request's CI)*: the move put `UserRepositoryPlainLookupFragmentImpl` in `identity.internal` and its
+   interface in `identity.api`. Spring Data finds a fragment implementation beside its interface, so it did not find it and derived `findPlainById` from the method name as a
+   query, which auto-flushes; nine tests that persist a ship without insurance went red. The implementation lies in `identity.api` now, and `RepositoryFragmentPlacementTest`
+   pins that every `*Fragment` interface has its `*FragmentImpl` in the same package. The move script keeps fragment implementations beside their interface from here on.
+
+**Umbrella step 8 — the transitional privacy module leaves the layer packages — done 2026-10-12**
+1. *Probe*: the 28 classes the domain map assigns to `privacy` (the 23 of the census plus the five identity classes step 7 left behind) close no cycle at top level.
+2. *Move* (82 files; 16 tests follow): `privacy.api` 18 types (the deletion-request, data-export, person-search, merge and consolidation services and their
+   DTOs, the entity and its repository), `privacy.web` the eight controllers (`UserController`, `MeController` and `DiscordRegistrationAdminController` among them, paths unchanged),
+   `privacy.internal` the rejected-registration retention service and its task. The layer rule and `ModularityTest` then moved three existing `privacy.internal` types the api services take
+   (`PersonMentionRegistry`, `PersonalDataExportRegistry`, `HandleSpellings`) to `privacy.api` and `RejectedRegistrationRetentionProperties` from `identity.internal` to `identity.api`
+   (the task reads it). `DataExportPdfFormat` lost its `service.pdf` subpackage.
+3. *NullAway*: `DeletionRequest.id` carries `@Nullable` (the constructor does not set it), `DataExportService` and `PersonSearchService` take their `EntityManager` by constructor
+   instead of `@PersistenceContext` (`PersonSearchServiceAuditTest` passes a mock), `DataExportReportService.label` wraps the nullable message lookup in `Objects.requireNonNullElse`
+   with the key as the fallback it already used. No suppression.
+4. *Gates* from the failing assertions: service layer 486 -> **485**, join-column selection 180 -> **173**, read-only mutation rule 489 -> **488**. The module baseline stays empty.
+   `compileJava --rerun` shows 0 warnings.
+5. *Text scan*: source paths in `bank.md`, `personal-inventory-blueprints.md` and `security-and-access.md` rewritten; one test javadoc named the old package of a moved test.
+   The module stays transitional (§5.1 rank 13); dissolving it into `identity` is the REST-surface and GDPR-SPI work, not this step.
+
+**Umbrella step 10 — the blueprint module's last ten types move into `blueprint.api` — done 2026-10-12**
+1. *Probe*: the ten types close no cycle at top level, alone or together with the inventory's ten.
+2. *Move* (61 files; `PersonalBlueprintRepositoryTest` follows): `PersonalBlueprint`, `PersonalBlueprintRepository`, `BlueprintSource`, `BlueprintOwnerProduct`, the import
+   preview, entry, suggestion and status DTOs, the create request and `PersonalBlueprintResponse` to `blueprint.api`. **Derived, not individually reviewed:** the plan names "a read API for
+   the seven finders"; the repository is published in `blueprint.api` instead, as the catalogue and identity do, because the exchange's feed, write, undo and demand services and the
+   job order's blueprint-owner service already call its finders and `blueprint` ranks below both. A read API can replace the published repository later without a path or data change.
+   `PersonalBlueprintResponse` first went to `internal` and moved to `api` when the layer rule showed `PersonalBlueprintCommands` returns it.
+3. *NullAway* (`blueprint` is checked as a whole tree): `PersonalBlueprint.acquiredAt`, `note` and `sourceClientId` and the four optional components of `BlueprintImportEntryDto` carry
+   `@Nullable`; no suppression, no behaviour change.
+4. *Gates*: the domain-map name rule `^(PersonalBlueprint|DefaultBlueprint|…)` assigns no class any more and left; join-column selection 173 -> **165**. The module baseline stays empty.
+   `compileJava --rerun` shows 0 warnings.
+5. *Text scan*: source paths in `hangar-notifications.md` and `personal-inventory-blueprints.md`; nothing in code or resources.
+
+**Umbrella step 9 — the inventory's last ten types move into `inventory.api` — done 2026-10-12**
+1. *Probe*: the ten types close no cycle at top level once the blueprint's ten have moved (`InventoryCraftableStock -> CraftabilitySlice` needed the blueprint first).
+2. *Move* (122 files by script; `InventoryItemTest` follows): `InventoryItem`, `InventoryJobOrderAllocation`, `InventoryMissionAllocation`, `InventoryGameItemReferenceDto`, `JobOrderEarmark`,
+   `MissionEarmark`, `JobOrderMaterialStockRow`, `MaterialCollectionEntryDto`, `OrderLinkedStockRows` and `StockViewerAccess` to `inventory.api`. **Not as planned, derived, not individually
+   reviewed:** the plan converts the Lager row to a record plus id commands and then moves `InventoryItem` into `inventory.internal`. That conversion is **not done**: the entity is published in
+   `inventory.api` because the exchange, the job order and the Materialbörse (rank above the inventory) still read the row. `StockWriteOwnershipTest` passes, so no foreign module writes it. The
+   record-plus-commands conversion stayed open as the remainder of P4-1 part 3 and was built later as a read-only view with id commands (entry "Umbrella follow-up: the Lager row as a read-only view with id commands").
+3. *NullAway* (`inventory` is checked as a whole tree, and the entity now reaches `joborder` and `materialexchange`): `InventoryItem.material`, `gameItem`, `quality`, `note` and `owningOrgUnit` carry
+   `@Nullable` (a game-item row has no material and no quality); so do the optional components of `InventoryGameItemReferenceDto`, `MaterialCollectionEntryDto` (the redacted owner and location) and
+   `JobOrderMaterialStockRow`, the owner id of `StockViewerAccess.mayEditInventoryItem`, the audit reference of `recordAllocation` and `collectNote`. Eleven dereferences of a getter that is
+   null only for the other kind of row are wrapped in `Objects.requireNonNull`, which throws the same `NullPointerException` the dereference threw. No suppression.
+4. *Gates* from the failing assertions: mapper layer (two rules) 106 -> **105**, service layer 485 -> **484**, join-column selection 165 -> **160**, read-only mutation rule 488 -> **487**;
+   `InventoryGameItemReferenceDto` and `MaterialCollectionEntryDto` joined the leaf helpers (the rule let them depend on the legacy `model` package); the domain-map name rule
+   `^(Inventory|StockViewerAccess)` assigns no class any more and left. The module baseline stays empty. `compileJava --rerun` shows 0 warnings.
+5. *Text scan*: no code, resource or doc named the old packages.
+
+**Umbrella step 11a — the hangar module's six types move into `hangar.api` — done 2026-10-12**
+1. *Probe*: the six types close no cycle at top level; hangar, mission and job order are independent of each other in the probe.
+2. *Move* (62 files; `ShipMapperTest` and `ShipRepositoryPersonalHangarTest` follow): `Ship`, `ShipDto`, `ShipRequestDto`, `ShipMapper`, `ShipRepository` and `ShipTypeMatcher` to `hangar.api`
+   (the mission module, the exchange and the job order use all of them). Entity and table names, bean names, paths and `openapi.json` are unchanged.
+3. *NullAway* (`hangar` is checked as a whole tree): `Ship.name`, `location` and `owningOrgUnit`, the optional `location`, `owner` and `owningSquadron` of `ShipDto` and the scope, search
+   and fitted parameters of `ShipRepository` carry `@Nullable`; no suppression.
+4. *Gates* from the failing assertions: service layer 484 -> **483**, join-column selection 160 -> **158**, read-only mutation rule 487 -> **486**; `ShipDto`, `ShipTypeDto`, `LocationDto` and
+   `ManufacturerDto` joined the leaf helpers (pure records the mission peer redaction builds); the domain-map name rule for the hangar classes assigns no class any more and left.
+   The module baseline stays empty. `compileJava --rerun` shows 0 warnings.
+5. *Text scan*: source path in `hangar-notifications.md`. `MissionUnit.ship` is still an entity association (the eighth conversion of §5.6); it did not block the move, because `mission` ranks above `hangar`.
+
+**Umbrella step 11b — the mission module's 36 types move into `mission.api` / `mission.internal` — done 2026-10-12**
+1. *Probe*: the 36 types close no cycle at top level once the hangar's six have moved.
+2. *Move* (192 files; six tests follow): the mission, structure, participant, finance and frequency entities and enums, their repositories, mappers and DTOs, `MissionViewerAccess`,
+   `MissionOperationLookup` and the repository fragment pair to `mission.api` (33), the ownership entity and repository and `MissionRecipientDirectoryImpl` to `mission.internal` (3).
+   `MissionRepositoryAuthorizationFragmentImpl` stays beside its interface (the step-7 correction). Entity and table names, bean names, paths and `openapi.json` are unchanged.
+3. *NullAway* (`mission` is checked as a whole tree): `@Nullable` on the optional fields of `Mission`, `MissionParticipant`, `MissionUnit`, `MissionStep` and `MissionObjective`, on the matching
+   components of `MissionDto`, `MissionUnitDto`, `MissionParticipantDto` and `MissionOperationDto`, on `referenceTime()` and on the optional parameters of `MissionRepository.searchMissions`;
+   `MissionRepositoryAuthorizationFragmentImpl` takes its `EntityManager` by constructor. `MissionMapper.rosterUserMapper` is injected through a package-private `@Autowired` setter, because
+   `ModularityTest` rejects field injection of a type of another module (`UserMapper` is in `orgunit`). No suppression, no behaviour change.
+4. *Gates* from the failing assertions: mapper layer (two rules) 105 -> **103**, join-column selection 158 -> **143**, controller targets 111 -> **107**; the mission DTOs, `JobTypeDto`,
+   `FrequencyTypeDto`, `JobTypeArchetype`, `OrgUnitReferenceDto`, `OrgUnitKind`, `PayoutPreference` and `MissionOperationSummary` joined the leaf helpers (the mission peer redaction builds the DTOs);
+   the domain-map name rule for the mission classes assigns no class any more and left. The module baseline stays empty. `compileJava --rerun` shows 0 warnings.
+5. *Text scan*: nothing in code, resources or docs named the old packages. `MissionUnit.ship` is still an entity association (hangar ranks below mission); the eighth §5.6 conversion did not block the move.
+
+**Umbrella step 11c — the job-order module's 45 types move into `joborder.api` / `joborder.internal` — done 2026-10-12**
+1. *Probe*: the 45 types close no cycle at top level once the hangar's and the mission's types have moved.
+2. *Move* (150 files; six tests follow, among them `MaterialAmountRoundingTest`, which reads the package-private rounding of three entities): the order, material, item, assignee and handover
+   entities and enums, their repositories, mappers and DTOs, the material-claim entity, `ClaimBucketSource`, the item service, the material-requirement resolver, the stock projection service and
+   `QualityBucketAllocator` to `joborder.api` (39), the claim-create request, the two handover repositories, the claim repository and the stock-entry and stock-group DTOs to `joborder.internal` (6).
+   Entity and table names, bean names, paths and `openapi.json` are unchanged.
+3. *NullAway* (`joborder` is checked as a whole tree): `@Nullable` on `JobOrder.priority`, `JobOrderHandoverItem.quality` and `locationName`, and on the optional components of `LinkedStockAttributionDto`,
+   `AggregatedMaterialDto`, `JobOrderMaterialDto`, `JobOrderItemDto`, `ClaimDto`, `JobOrderItemStockEntryDto`, `JobOrderItemStockGroupDto` and the catalogue's `GameItemReferenceDto.kind`, and on the squadron
+   parameters of `JobOrderRepository`; three dereferences of a map lookup and one unboxing are wrapped in `Objects.requireNonNull`, which throws the same `NullPointerException`.
+   `JobOrderMapper` gets its `UserMapper` and `StockViewerAccess` through `@Autowired` setters, because `ModularityTest` rejects field injection of a type of another module. No suppression.
+4. *Gates* from the failing assertions: service layer 483 -> **481**, join-column selection 143 -> **120**, read-only mutation rule 486 -> **484**; the stock DTOs joined the leaf helpers; the two
+   domain-map name rules for the job-order classes assign no class any more and left. The module baseline stays empty. `compileJava --rerun` shows 0 warnings.
+5. *Text scan*: source paths in `security-and-access.md` and `whole-number-amounts.md`.
+
+**Umbrella step 11d — the composition root `app` is declared and takes two of its three classes — done 2026-10-12**
+1. *Probe*: the three classes the domain map assigns to `app` close no cycle. The census had listed them but the checklist named no step.
+2. *Move* (16 files; five `SecurityConfig*Test` follow): `SecurityConfig` to `app.api`, `DataInitializer` to `app.internal`, plus the `app` module declaration. `allowedDependencies` is every other
+   module's `api` and the kernel, which is what `ModularityTest` derives from the rank-14 row. `ModularityTest` lists `app` among the 26 declared modules. Bean names, the filter chains and paths are unchanged.
+3. *Not moved — then resolved (entry "Umbrella follow-up: the business gauges are published per module" below)*: `BusinessMetricsCollector` stayed in `task` because it read the internal repositories of five modules.
+4. *Gates*: no floor changed; the `Javadoc` link of `MonitoringScrapeSecurityConfig` to `SecurityConfig` is the only reference from `platform` and creates no bytecode dependency.
+   `compileJava --rerun` shows 0 warnings.
+5. *Text scan*: source paths in the role matrix, ADR-0034, the REST-cut appendix and four specs.
+
+**Umbrella step 12 — design of the org-unit and user gates (§5.4), not built; waits for the owner's decision**
+What the code says (2026-10-12): `canSeeOrgUnit` and `canEditOrgUnit` are pure aliases of `canSeeSquadron` and `canEditSquadron` (`scopePredicate.permits(unitId)` for both); `canActOnTargetUser(target, edit)`
+passes for an admin, for the member themselves, or when the read or edit scope accepts any membership of the target. Ten call sites, no `@PreAuthorize` expression: `JobOrderService` and `MaterialClaimService`
+(`canEditOrgUnit`), `InventoryAccessPolicy` and `RefineryAccessPolicy` (`canActOnTargetUser`, twice for refinery), `OrgUnitStampingService` (`canEditOrgUnit`, twice). Tests that name them: `OwnerScopeServiceTest`,
+`JobOrderServiceTest` (four), `MaterialClaimServiceTest` (two).
+*Why the plan's rule does not place them.* §5.4 makes the policy of an aggregate a bean of the module that owns the aggregate. The aggregates are the org unit (`orgunit`, rank 4) and the user (`identity`, rank 3), but both
+gates need `RequestScopeResolver` (`scope`, rank 5), so a policy in the owning module would depend upward. A policy that fits the ranks has to live in `scope`.
+*Options.*
+- **A. Two named policy beans in `scope.api`** (recommended, the `OperationAccessPolicy` precedent): `OrgUnitAccessPolicy` (bean `orgUnitAccessPolicy`, methods `canSeeOrgUnit(UUID)` and `canEditOrgUnit(UUID)`, delegating to the
+  scope kernel's `canSeeSquadron` / `canEditSquadron`) and `UserAccessPolicy` (bean `userAccessPolicy`, method `canActOnTargetUser(UUID, boolean)`, the body of `AccessGateService` verbatim). `OwnerScopeService` and
+  `AccessGateService` lose the three methods and the pass-through; the ten call sites change their receiver. Because no expression names the methods, no SpEL bean name changes and the authorization matrix does not change.
+  Pinned by a differential test that keeps a verbatim copy of the old methods and compares the verdicts over the same caller and unit matrix as `OperationAccessPolicyDifferentialTest` (admin unpinned and pinned, members of zero,
+  one and two units, a member pinned to an own and a foreign unit, a Bereich lead reaching a child by cascade, guests, self, an unknown target), before the old methods go. Gains little: a rename of receivers, and a smaller hub.
+- **B. Keep them and say so.** Declare the three as part of the scope kernel (they are its on-behalf and org-unit gates, rank 5 by construction), delete only the pass-through duplicates in `OwnerScopeService` so each
+  gate has one home (`AccessGateService`), and close step 12 with that sentence in §5.4. No behaviour and no test changes beyond the ten receivers.
+- **C. Policies in the aggregate modules behind an SPI.** `orgunit` owns `OrgUnitAccessPolicy`, `identity` owns `UserAccessPolicy`, each asking a scope-owned SPI for "does the caller's scope accept this unit". Follows §5.4
+  to the letter, adds two SPIs for a one-line delegation and an inverted dependency; not recommended.
+The question for the owner: A, B or C.
+
+**Umbrella step 16 — NullAway checks the whole tree of eleven more modules — done 2026-10-12, partly (completed by the follow-up entry below)**
+1. *Census with `-Xmaxerrs` raised*: `audit`, `livesync`, `notification` and `dashboard` had no finding; `admin` 1, `personalinventory` 1, `platform` 3, `privacy` 4, `orgunit` 11, `promotion` 27 and `orgchart` 40 were fixed;
+   `bank` (44) and `exchange` (69) were counted and left; adding `kernel` and `app` produced a cascade (the kernel's `ScuAmounts`, `StringNormalization` and `AppException` return nullable values every module uses).
+2. *Enabled* (`nullAwayPackages` in `backend/build.gradle.kts`): `admin`, `audit`, `dashboard`, `livesync`, `notification`, `orgchart`, `orgunit`, `personalinventory`, `platform`, `privacy`, `promotion` join the eleven already checked, 22 in all.
+3. *Fixes by annotation or restructuring, no suppression*: `@Nullable` on the optional fields of `OrgUnit`, `Organisationsleitung`, `OrgChartPosition`, `RankRequirement` and the optional components of 17 DTOs and records; the `owningSquadronId` parameter of
+   the promotion repositories; `HandleErasureCoverage.of` returns `@Nullable`; `AndroidClientProperties.releasesUrl` reads the override once; eleven dereferences of a value that is non-null by the surrounding rule are wrapped in `Objects.requireNonNull`
+   (the same `NullPointerException`). `OrgUnitMembershipService.patchFlags` got an overload on the plain values, which the `MembershipOperations` SPI calls, because the SPI's version may be `null` (an ADD or REMOVE carries none) and the request record
+   cannot say so without two conflicting nullness annotations; a `null` version still ends in the same 409.
+4. *Open — then done (entry "Umbrella follow-up: NullAway checks bank, exchange, kernel and app" below)*: `bank`, `exchange`, `kernel` and `app` stayed on the `api`-only list.
+
+**Umbrella step 17 — requirement status, arc42 and the CLAUDE.md files — done 2026-10-12, partly (completed by the follow-up entries below)**
+1. *Plan §14 status*: REQ-XCH-009/011 need nothing but the rewritten source paths; REQ-DATA-010 waits for the access-policy decision of step 12 (four of the six scope fragments are still `ScopeSpecifications`; the other two sit in their policies);
+   REQ-AUDIT-001 is not waiting for anything; P3-11 is struck (umbrella step 15).
+2. *arc42 §5*: the layer-package table is marked as the roles the layers had; the audit paragraph no longer says its classes sit in the layer packages; the per-module paragraphs were extended with every step.
+3. *CLAUDE.md*: the root file describes the backend as a modular monolith with `api` / `internal` / `web`; `backend/CLAUDE.md` gained three landmines found in this pull request (fragment implementation beside its
+   interface, no field injection of another module's type, tests that read backend sources by path).
+
+**Umbrella steps 13, 1, 18 and 19 — designs and reasons, not built; they wait for the owner**
+*Step 13 — D-17, the member settings leave `app_user` (design, nothing written).*
+1. *What moves.* `app_user.default_payout_preference` (VARCHAR 50, nullable, V142) and `app_user.share_blueprints_globally` (BOOLEAN NOT NULL DEFAULT FALSE, V163). Readers and writers: `User`, `UserService`
+   (`updateUserDefaultPayoutPreference`, `updateUserShareBlueprintsGlobally`, which also records `BLUEPRINT_SHARING_CHANGED`), `UserRepository.findIdsBySharingBlueprintsGlobally` (read by `PersonalBlueprintOverviewService` and
+   `JobOrderItemBlueprintOwnersService`), `MissionParticipantService` (pre-fills the sign-up), `UserController` (the four endpoints, now `MyPayoutPreferenceController` and `MyBlueprintSharingController`), `IdentityExportSections` and `IdentityMentionSource`.
+2. *Target.* Two tables with their own `@Version`: `member_payout_setting` (owner `mission`) and `member_blueprint_sharing` (owner `blueprint`), one row per member, `user_id` the primary key and a foreign key to `app_user` `ON DELETE CASCADE`.
+   A member with no row has the default (no preference; sharing off), so the sharing table holds only rows that were ever written.
+3. *Migration, phase 1 (additive, `V283`; the number is claimed by re-grepping `origin/main` and the open pull requests at push time; today `origin/main` ends at V282 and no other pull request is open):*
+
+```sql
+CREATE TABLE member_payout_setting (
+    user_id UUID PRIMARY KEY REFERENCES app_user (id) ON DELETE CASCADE,
+    default_payout_preference VARCHAR(50) NOT NULL,
+    version BIGINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+CREATE TABLE member_blueprint_sharing (
+    user_id UUID PRIMARY KEY REFERENCES app_user (id) ON DELETE CASCADE,
+    share_globally BOOLEAN NOT NULL,
+    version BIGINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+INSERT INTO member_payout_setting (user_id, default_payout_preference)
+SELECT id, default_payout_preference FROM app_user WHERE default_payout_preference IS NOT NULL;
+INSERT INTO member_blueprint_sharing (user_id, share_globally)
+SELECT id, TRUE FROM app_user WHERE share_blueprints_globally;
+```
+
+   The old columns stay (the repository's two-phase drop rule); the entities stop mapping them. Phase 2, a later release, is
+   `ALTER TABLE app_user DROP COLUMN default_payout_preference, DROP COLUMN share_blueprints_globally`. The types of `created_at` and `updated_at` follow what `AbstractEntity` maps; the final text is checked against
+   `ddl-auto: validate` before anything is pushed.
+4. *Data check, run read-only on the host before and after the release:*
+
+```sql
+SELECT (SELECT count(*) FROM app_user WHERE default_payout_preference IS NOT NULL) AS payout_users,
+       (SELECT count(*) FROM member_payout_setting) AS payout_rows,
+       (SELECT count(*) FROM app_user WHERE share_blueprints_globally) AS sharing_users,
+       (SELECT count(*) FROM member_blueprint_sharing WHERE share_globally) AS sharing_rows;
+```
+
+   `payout_users = payout_rows` and `sharing_users = sharing_rows` immediately after the migration.
+5. *Rollback.* Deploying the previous release is enough while phase 2 has not run: it reads the old columns, which still hold the values of the migration day. Changes made in the new tables after the upgrade are not in them;
+   to carry them back first:
+
+```sql
+UPDATE app_user u SET default_payout_preference = s.default_payout_preference
+FROM member_payout_setting s WHERE s.user_id = u.id;
+UPDATE app_user u SET share_blueprints_globally =
+    COALESCE((SELECT b.share_globally FROM member_blueprint_sharing b WHERE b.user_id = u.id), FALSE);
+```
+
+   The new tables can stay or be dropped afterwards; nothing in the old release reads them.
+6. *Consequences the owner should see.* (a) The `version` of the four endpoints (`/users/me/payout-preference` and `/users/me/blueprint-sharing` with their moved paths) becomes the setting's own counter, 0 for a member with no row.
+   The web profile page seeds both forms from the user-row version of `/users/me`, so it changes with this step (`ProfileController`, `profile.js`, the two forms). The Android app (`MemberPreferencesRepository`, T1 app contract)
+   reads `version` in the same GET it later PUTs, but whether it ever combines it with the user version cannot be proved from the call list, so an app release may be needed. (b) Fine-grained locking is the point: saving the payout
+   card no longer makes the profile and RSI-handle cards stale. (c) The account merge keeps the old outcome: the settings stay with the emptied source account (`staysWithTheAct`), because the old columns did.
+   (d) The GDPR registries gain the two tables: erasure by the cascade, an Art. 15 export section in each owning module, the two columns removed from the identity export, the mention-source exemption for the payout column,
+   `table-ownership.txt` and the coverage floors. (e) The audit event `BLUEPRINT_SHARING_CHANGED` moves with the sharing write into the blueprint module; its type, domain and payload do not change.
+
+*Step 1 — the mutation target.* `backend/build-settings.properties` aims PIT at `backend.service.*` and `backend.service.*Test`. No main class lies in `service` any more, so the target matches nothing. Options:
+A) the module internals, `de.greluc.krt.profit.basetool.backend.*.internal.*Service` with the tests of the same names (most of the old target's content); B) `*.internal.*` and `*.api.*Service` together (many more classes, a much longer run);
+C) retire the target until a module extraction gives it a natural place. Not decided here.
+
+*Steps 18 and 19 — `backend-exchange` and `backend-bank`.* Decided by the owner on 2026-10-12: not implemented (entry "Umbrella steps 18 and 19" below).
+
+
+**Umbrella step 12 — built: the org-unit and user gates are named policies in `scope.api` — done 2026-10-12 (option A, confirmed by the owner 2026-10-12)**
+1. *Built as designed above.* `OrgUnitAccessPolicy` (bean `orgUnitAccessPolicy`: `canSeeOrgUnit`, `canEditOrgUnit`, both delegating to the scope kernel's `canSeeSquadron` / `canEditSquadron`) and `UserAccessPolicy` (bean `userAccessPolicy`:
+   `canActOnTargetUser`, the body of the former `AccessGateService` method). `OwnerScopeService` and `AccessGateService` lost the three methods; `AccessGateService` lost its `OrgUnitMembershipRepository`. The ten call sites changed receiver:
+   `JobOrderService` and `MaterialClaimService` ask `orgUnitAccessPolicy`, `InventoryAccessPolicy` and `RefineryAccessPolicy` ask `userAccessPolicy`, `OrgUnitStampingService` calls `canEditSquadron` directly. No expression names the methods,
+   so no SpEL bean name changed and the authorization matrix did not change. `JobOrderService` no longer holds an `OwnerScopeService`.
+2. *Proof.* `OrgUnitAndUserAccessPolicyDifferentialTest` compares the policies with a verbatim copy of the old methods over nine callers (admin unpinned and pinned to either unit; members of zero, one and two units; a member pinned to an own and to a
+   foreign unit; a Bereich lead reaching a child Staffel by cascade) against four org units and seven targets (members of one unit, of both, of the child, of none, an unknown account and the caller themselves), 189 verdicts. It was proven able to fail:
+   dropping the self shortcut from `UserAccessPolicy` turned it red. The existing policy differential tests, `OwnerScopeServiceTest`, `JobOrderService*Test` and `MaterialClaimServiceTest` follow the new constructors; `TenancyGuardTest` and the
+   architecture gates pass unchanged. `compileJava --rerun` shows 0 warnings.
+
+**Umbrella step 13 — built: D-17, the member settings leave `app_user` — done 2026-10-12 (design approved by the owner 2026-10-12), pushed after the final SQL was reported and the owner said yes**
+1. *Migration* `V283__create_member_payout_setting_and_blueprint_sharing.sql` as designed, with named foreign keys, `ON CONFLICT (user_id) DO NOTHING` on the two copies (so a re-run changes nothing) and `COMMENT ON` for the tables and their key
+   columns; the old `app_user` columns stay (phase 2 is a later release). The version number is claimed at push time by re-grepping `origin/main` and the open pull requests. Applied to a real PostgreSQL by the suite and validated against the
+   entities (`ddl-auto: validate`).
+2. *Code.* `mission.api`: `MemberPayoutSetting`, its repository and `MemberPayoutSettings` (`snapshotOf`, `defaultFor`, `update`). `blueprint.api`: `MemberBlueprintSharing`, its repository and `MemberBlueprintSharings` (`snapshotOf`,
+   `userIdsSharingGlobally`, `update`, which records `BLUEPRINT_SHARING_CHANGED` on a change). Both read a member without a row at version 0 and accept version 0 for the first write. `User`, `UserService` and `UserRepository` lost the two
+   fields, the two update methods and the sharers query; `MissionParticipantService`, `PersonalBlueprintOverviewService`, `JobOrderItemBlueprintOwnersService` and `UserController` use the new services. The account export no longer selects the
+   two columns; each owning module has an Art. 15 section (positions 460 and 470), the payout column is exempt in the mission mention source, the account merge leaves both rows with the emptied source account (`staysWithTheAct`, as the columns did),
+   erasure is the foreign key's cascade, and `table-ownership.txt` names the owners.
+3. *Frontend.* The profile page seeds the payout and sharing forms with the version of their own endpoint (it seeded all four from `/users/me`); the client returns the PUT answer, the two AJAX endpoints answer with that version, and `profile.js`
+   writes a fresh user-row version only into the description and RSI-handle forms and a setting's own version only into its own form. The REST paths, the field names and the OpenAPI document are unchanged.
+4. *Proof.* `V283MemberSettingsMigrationTest` runs the data-transfer statements read from the migration file over members the old columns describe: the runbook's counts agree, nobody else gets a row, a second run changes nothing, and the rollback
+   statements restore the old columns from the new tables. `MemberPayoutSettingsTest` and `MemberBlueprintSharingsTest` pin the absent row, the own version, the lock and the audit event. The GDPR gates (`GdprParticipantCoverageTest`,
+   `UserAccountMergeCoverageTest`, `PersonalDataExportCatalogueTest`, `PersonMentionCatalogueTest`, `DataExportEndStateTest`, `TableOwnershipTest`) hold with the two new tables; the committed export catalogue, the mention catalogue and the end-state document
+   changed for them. Whether the Android app needs a release is for the owner to settle with the app repository.
+
+**Umbrella steps 1 and 15 — the mutation target and the struck P3-11 — done 2026-10-12**
+1. *Step 1 (option B, chosen by the owner 2026-10-12).* `backend/build-settings.properties` aims PIT at the module internals and the published services, `backend.*.internal.*` and `backend.*.api.*Service`, with the tests of the same packages
+   (`*.internal.*Test`, `*.api.*Test`) and the legacy `backend.service.*Test`, which still holds tests of moved classes. The old target matched nothing since the last class left `service`. The mutation run covers many more classes, so it takes much longer.
+   `help` runs with the configuration cache twice (the second reuses the entry); `:backend:pitest --dry-run` resolves.
+2. *Step 15 (struck by the owner 2026-10-12).* P3-11, "the per-command audit contract", was named in the plan and never defined, and is not implemented. REQ-AUDIT-001 keeps its text; its status in §14 no longer says it waits for it.
+
+**Umbrella steps 18 and 19 — P5-c and P5-d are not implemented, by decision of the owner 2026-10-12**
+1. *What a spike showed.* `backend-exchange` (178 main files) builds as a Gradle module with `compileOnly(project(":backend"))` plus the Spring starters it uses, `runtimeOnly(project(":backend-exchange"))` and `testImplementation` in `backend`
+   (`implementation` would be a task cycle), three javadoc-only imports in `identity` and `platform` replaced, and `META-INF/spring.factories` moved. `backend:compileJava`, `compileTestJava` and `bootJar` succeed.
+2. *Why it is not done.* The module compiles against all of `backend`, so it sees every class there: nothing is isolated at compile time, which is the one thing §5.8 promises. The isolation needs the api packages the extracted module uses as Gradle modules
+   of their own, which is a different and much larger cut. The same holds for `backend-bank`. The P5-a and P5-b preparation (the included `build-logic`, the `<app>-<name>` rules of the image-reuse and SBOM scripts, the JaCoCo aggregation) stays; the spike is
+   discarded (its stash was `064ec3b0be5a549fef5a21948e66ca7d98a9e87e`, "p5c-exchange-spike"). ADR-0249 and ADR-0231 carry an amendment; nothing in the repository says the extraction is scheduled any more.
+
+**Umbrella correction — the 14 baseline edges are resolved, not reclassified — done 2026-10-12 (owner instruction)**
+The owner did not accept the empty module baseline of steps 6 and 7: five classes had left it only because the domain map assigned them to the transitional `privacy` module. Resolved in four commits, one per group, each green on its targeted tests:
+1. *Retention* (`RejectedRegistrationRetentionService` and its task): back to `identity.internal`. The service deletes through the existing `identity.api.AccountErasure` SPI with `KeycloakPresence.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER`, the contract the registration flow already uses; no new SPI.
+2. *Registration queue*: `DiscordRegistrationAdminController` (list, approve, reject, reopen, link) to `identity.web`; the merge endpoint only needs the GDPR merge service, so it is its own class `DiscordRegistrationMergeController` in `privacy.web`, same path, method name and annotations. The row mapping is `PendingRegistrationDto.from`, shared by both. The merge endpoint gets a unit test.
+3. *Caller context* (`MeController`): moves whole to the composition root, `app.web`; its highest dependency is rank 8 (the inventory properties) and the composition root is the module that may depend on all of them. Paths, method names, annotations and `openapi.json` are unchanged. **Derived, not individually reviewed.**
+4. *Member endpoints* (`UserController`, 28 mappings): first moved whole to `app.web`, then **split by the module that owns the data, confirmed by the owner 2026-10-12**, in six commits. `orgunit.web`: `UserProfileController` (list, search, by id, `/users/me`, own description, admin attributes: they return the `UserDto` that `UserMapper` builds from the memberships, so orgunit is the lowest module that can host them) and `MemberMembershipController` (the six membership endpoints). `dashboard.web`: `AnnouncementReadController`. `bank.web`: `BankMemberSearchController`. `mission.web`: `MyPayoutPreferenceController`. `blueprint.web`: `MyBlueprintSharingController`. `privacy.web`: `AccountRemovalController` (delete and consolidate need the rank-13 services). `identity.web`: what is left of `UserController` (sync, lookup, reference search, RSI handle). The shared searches live with their owners: `orgunit.api.UserDirectoryService` (list, search, by id and the peer redaction), `identity.api.UserReferenceSearchService` (the reference search), `UserDtoRedaction.withSelfEmail`. Paths, HTTP methods, method names, `@PreAuthorize` expressions, validation, and the effective transaction attribute of every method (class-level `@Transactional`, `readOnly` where it was, `NOT_SUPPORTED` for the sync) are copied unchanged; `openapi.json` is byte-identical and every operation keeps the tag `identity` through `ApiDomains` and reviewed `CONTROLLER_TO_API` entries (six, for the new controllers outside identity and privacy). `PaginationUtil` marks its documented nullable parameters `@Nullable`. Every endpoint keeps at least the unit coverage it had; the delta write, the detail read, the consolidation and the two bank searches, which had none, gained some. The tenancy guard no longer selects the announcement read marker (it depended on the deletion service only through the old class), so its exception entry left and the selected-handler floor fell 125 to 124. The recorded controller count went 104 to 105 (queue split), then to **112**. **Derived, not individually reviewed.**
+5. *Gates*: the five class rules for `privacy` left the domain map (`MeController` has a class rule for `app`); the module baseline stays empty, and now it is empty because nothing violates the ranks. The removed non-empty assertion of `ModuleBaselineTest` is replaced by `theRuleSeesTheRealModuleGraphSoAnEmptyBaselineIsNotVacuous`: a floor of **167** module pairs with a class dependency, every one permitted by the map. `scratch_d17c.py`, a scratch script committed by mistake in the step 13 commit, is deleted.
+
+**Umbrella follow-up: the business gauges are published per module — done 2026-10-12**
+1. *Options* (from the code): (a) each module publishes its own gauges through a small `api` type, which is the end state §5.1 names ("until each module publishes its own gauges"); (b) five internal repositories published in `api`; (c) the collector in `app` with the dependencies it needs, which `ModularityTest` rejects because five of the nine repositories are `internal`. The plan text decides for (a).
+2. *Built*: `platform.api.BusinessGaugeSource` (`register(MeterRegistry)` and `sample()`) with the builders `BusinessGauges` (count gauge, age gauge, `ageSeconds`). Eight sources, each beside the repository it reads: `IdentityBusinessGauges` (registrations, orphaned accounts), `DeletionRequestBusinessGauges` (`privacy.internal`), `BankBusinessGauges`, `JobOrderBusinessGauges`, `OperationBusinessGauges`, `RefineryBusinessGauges`, `P4kImportBusinessGauges` (`catalogue.internal`), `MaterialExchangeBusinessGauges`. `BusinessMetricsCollector` is `app.internal` and only registers the sources once and samples them in one read-only transaction on the same interval, still as `ScheduledJob.BUSINESS_METRICS`. The `task` package is gone. The shape of the interface is **derived, not individually reviewed**.
+3. *Proof*: before the change the registered meter set was written down (22 gauges plus `scheduled.job.enabled{task=business_metrics}`: name, tags, base unit); `BusinessMetricsCollectorTest` compares the set of the new wiring with that list (`monitoring/business-gauges.txt`) and keeps every value test. Metric names, labels and values are unchanged, so `monitoring/` needs no edit. The module-pair floor of `ModuleBaselineTest` falls 174 to 167 because `app` no longer names five modules.
+
+**Umbrella follow-up: NullAway checks bank, exchange, kernel and app — done 2026-10-12**
+1. *Census*: with `bank`, `exchange`, `kernel` and `app` added, `-Xmaxerrs` raised: 215 findings (`bank` 53, `exchange` 71, `kernel` 2, the rest in the modules that call the kernel's helpers); the cascade came from the kernel's nullable returns (`ScuAmounts`, `StringNormalization`, `HandleAnonymisation`, `LikePatterns`) and from `AppException`. `app` had none.
+2. *Kernel, by making the contract explicit*: `ScuAmounts.roundToScuScale(double)` is a non-null overload (a primitive argument now selects it; the `Double` overload stays nullable); `HandleAnonymisation.humaniseRequired` is the non-null twin of `humanise`; the protected `AppException` constructors take a `@Nullable` kind (the `DomainProblem` constructors pass none); `ProblemResponseFactory.problem` takes a `@Nullable` title and detail, which `ProblemDetail` accepts; `AbstractEntity.setVersion` and `InventoryItem.setAmount` accept `null` (the create paths clear the version; a builder fills the amount last). `PaginationUtil`'s documented nullable page, size and sort parameters are `@Nullable`.
+3. *Modules, by annotation or restructuring, no suppression*: `@Nullable` on the optional JPQL parameters of the bank and exchange repositories, on the optional fields of `JobOrder.comment`, `GameItem`, `ShipType`, `Manufacturer`, `Material`, `BlueprintIngredient`, `MissionStep`, `NotificationRule` and on the optional components of the bank, exchange and blueprint DTOs and records they flow into; the entity amount hooks guard their `null` instead of rounding it; sites that read a `Map.get` or an optional association after the surrounding rule has established it are wrapped in `Objects.requireNonNull` (the same `NullPointerException` the dereference threw). Two reports (bank statement and management) print an empty cell for a missing holder, which is what the PDF cell already rendered for `null`.
+4. *Enabled*: `bank`, `exchange`, `kernel` and `app` join `nullAwayPackages` as whole trees; with them every module is checked as a whole tree.
+5. *Not individually reviewed*: the choice of `@Nullable` versus `requireNonNull` at each site follows the surrounding rule and is flagged for review.
+
+**Umbrella follow-ups that wait for the owner (2026-10-12): the Lager row and the scope fragments**
+1. *P4-1 part 3 — the Lager row as a record plus id commands.* **Decided: option A2, confirmed by the owner 2026-10-12, built; see the entry "Umbrella follow-up: the Lager row as a read-only view with id commands".** (Facts and options kept below for the record.)
+   - *Facts.* Six foreign classes hold the entity (`ExchangeStockWriteService`, `JobOrderHandoverService`, `JobOrderItemProductionService`, `JobOrderService`, `MaterialExchangeBoardService`, `MaterialExchangeService`) plus `StockCommands`, `StockReads`, `InventoryAllocations` and `InventoryAuditLabels` in `inventory.api`; about 25 test classes build or read it; the Materialbörse offer repository joins it by entity name in three queries. The foreign classes mostly read (`getAmount`, `getStolen`, `getMaterial`, `getLocation`, `getQuality`, `getUser`, `getOwningOrgUnit`, `getVersion`) and hand the row back to a command, so a record and id commands are derivable. **But the exchange relies on the in-place mutation**: `ExchangeStockWriteService.execute` filters `change.rows()` by `getStolen()` after `markRows` has set the flag on whole rows through `StockCommands.markStolen`, and `bookOut` sums `free(rows)` row by row between commands. A snapshot record would read stale state there.
+   - *Options.* **A1** an immutable `StockRow` record, every command returns the post-command rows, the callers re-read after each command (faithful to the plan's words; touches six classes and the 25 tests, and each re-read is a behaviour risk in the lock-ordered exchange write). **A2** a read-only live view `StockRow` (getters only) that the entity implements, published in `inventory.api`; commands take ids; the three entities move to `inventory.internal`. The foreign code reads the same managed instance, so the in-place semantics, the locks and the optimistic version stay identical; it deviates from the word "record". **A3** keep the entity published in `inventory.api` and amend this plan's text (the stated reason: nothing writes it from outside, `StockWriteOwnershipTest`).
+   - *Recommendation.* A2, with a differential test that runs the old and the new exchange write over one fixture matrix.
+2. *REQ-DATA-010 and the four scope fragments in `ScopeSpecifications`.* **Decided: option B1, confirmed by the owner 2026-10-12, built; see the entry "Umbrella follow-up: the scope fragments moved beside their repositories".** (Facts and options kept below for the record.)
+   - *Facts.* The requirement text and its acceptance already hold: `scope.api.ScopeSpecifications` carries one fragment per aggregate. What is waiting is the plan's wish (§5.4, §14) that each policy owns the fragment beside the per-row gate. Two of the six fragments already sit in their policy (`RefineryAccessPolicy`, `OperationAccessPolicy`, whose repositories are `internal`). The other four (`MISSION_SCOPE_PREDICATE`, `SHIP_SCOPE_TRIPLE`, `INVENTORY_ITEM_SCOPE_TRIPLE`, `JOB_ORDER_SCOPE_PREDICATE`) are spliced into `@Query` values by `MissionRepository`, `ShipRepository` and `JobOrderRepository` (published in `api`), by `InventoryItemRepository`, and by `MaterialExchangeOfferRepository` (a foreign module joins the Lager row). An annotation value needs a compile-time constant, and the policy beans are `internal`, which an `api` repository must not import.
+   - *Options.* **B1** one small public constant holder per owning module in its `api` (`mission.api.MissionScope`, `hangar.api.ShipScope`, `joborder.api.JobOrderScope`, `inventory.api.InventoryScope`), the same strings with the alias baked in; the policy bean cites and tests it; `ScopeSpecifications` goes. Tests: a golden file of the six JPQL texts captured before the move (byte-identical), and one parity test per aggregate that runs the list query and the per-row gate over the existing fixture matrix against the real schema and requires the same visible set. **B2** make the four policy classes public in `api` and put the constant on them (a bean full of internals becomes published surface). **B3** declare the requirement met as it stands and amend the plan's wish.
+   - *Recommendation.* B1.
+3. Both are done (checklist items 9 and 17).
+
+**Umbrella follow-up: the scope fragments moved beside their repositories — done 2026-10-12 (confirmed by the owner 2026-10-12, option B1)**
+1. *Before the move*: the six JPQL texts were recorded in `scope/scope-fragments.txt` and `ScopeFragmentsGoldenTest` was green on the old code. The fragments were then moved without changing a character: `mission.api.MissionScope#PREDICATE`, `hangar.api.ShipScope#TRIPLE`, `joborder.api.JobOrderScope#PREDICATE`, `inventory.api.InventoryScope#TRIPLE`; the refinery's and the operation's already sat in their policies. `ScopeSpecifications` is deleted, the five repositories that spliced it (including the Materialbörse's offer repository, which joins the Lager row) import the new holders, and the four access policies cite their fragment. The golden test is green after the move; a widened fragment fails it and the parity test (checked by mutation).
+2. *Parity*: one test per aggregate, `ScopeParityCallers` wires the real request-scope resolver and access gate for the nine callers of the access-policy differential tests (admin unpinned and pinned, members of zero, one and two units, pinned and foreign-pinned members, a Bereich lead). The list query runs against the real schema and the row gate over the same rows: the list never shows a row the gate refuses, and the two agree on every row another member owns in a unit (Mission, Operation and JobOrder on every row, for callers that count as member or above and for those that do not). The ownerless and owner-escape rows of the strict aggregates are compared one way only, because the gate adds those escapes.
+3. *Requirement*: REQ-DATA-010 is met as the plan wanted it (status and enforcing tests in the spec); checklist item 17 is ticked. The shape (constant holder in `api`, not a public policy) is **derived from the owner's choice B1**.
+
+**Umbrella follow-up: the Lager row as a read-only view with id commands — done 2026-10-12 (confirmed by the owner 2026-10-12, option A2)**
+1. *Decision*: the plan's wording "a record plus id commands" is departed from by the owner's decision: a snapshot record would read stale state where the exchange reads a row after a command changed it in place (`ExchangeStockWriteService.execute`), so the foreign modules read the managed instance through a **read-only live view** and change it only by id.
+2. *Characterised first* (a separate commit, green on the old code): `ExchangeStockWritePathCharacterisationTest` runs the exchange's stock write on PostgreSQL and asserts the rows it leaves (twin lots flipping a whole first row, the same with the later row split, a partial flip, a reserved row kept, a fall beyond the free stock refused, a stale expectation refused; seeded ids are fixed because the row order decides which row is split); `StockRowViewCharacterisationTest` pins that `lockRow`, `findRow`, `findRowsWithMaterial`, `lockLotRows` and `releasableRows` return the same managed instance with the stored values and both reservation sums, and that a command is visible on the instance the caller holds. Both are green after the move; the only edits to them are the helper methods that name how reservations are read.
+3. *Built*: `inventory.api.StockRow` (getters of owner, org unit, material, game item, location, quality, amount, stolen marker and version; `jobOrderReserved`, `missionReserved`, `isEarmarkedForJobOrder`, `jobOrderSliceAmount`). `StockCommands` and `StockReads` return `StockRow`; `bookOutRow`, `markStolen`, `takeFromEarmarkedRow` and `releaseJobOrderEarmark` take the row's id and look up the managed instance (`findById`, a persistence-context hit, no further SQL and no new lock); `requireRowVersion` carries the optimistic check that the production service made with `InventoryItem.class`, so its message is unchanged. `InventoryItem implements StockRow`; it and the two allocations move with `InventoryAllocations` and `InventoryAuditLabels` into `inventory.internal`. The six foreign classes (the exchange write service, `JobOrderHandoverService`, `JobOrderItemProductionService`, `JobOrderService`, the two Materialbörse services) use the view; no foreign class imports an inventory entity any more. The JPQL joins by entity name are unchanged. Four joborder unit tests stub `findById` next to `findByIdForUpdate` for the real command bean, and one counts it twice. Shape of the view: **derived from the getters the foreign classes called, not individually reviewed**.
+
+**The rest of the plan — one umbrella pull request (#2552), checklist — started 2026-10-12**
+Owner instruction 2026-10-12: all remaining steps in one pull request, one commit per step, each green
+on its targeted tests, the full suite being the pull request's CI. Built from this plan and the code
+after step 0 (census of the classes the domain map assigns to a module but that still lie in a layer
+package: `orgunit` 61, `platform` 65, `notification` 47, `joborder` 45, `mission` 36, `identity` 29,
+`privacy` 23, `kernel` 20, `audit` 12, `inventory` 10, `blueprint` 10, `livesync` 9, `hangar` 6, `app` 3).
+Every backend step begins with a throwaway probe on the current tree; a cycle that needs an SPI
+whose shape the plan does not give, a behaviour or contract change, or a production-data question
+ends the step with a question to the owner. Ticked as the steps land; `Q` marks a step that cannot start
+before a decision.
+
+- [x] **0.** P4-7 slice c (this pull request's first commit).
+- [x] **1.** done, option B chosen by the owner 2026-10-12 — Housekeeping: `backend/build-settings.properties` aims the mutation tests at
+      `backend.service.*`, which shrinks with every move (P4-5 "Open").
+- Rank 0–1 modules leave the layer packages (nothing below depends on them being late; **5a, the `kernel` half of step 5, is done**):
+  - [x] **2.** done — `audit` (12): `AuditEvent`, `AuditEventRepository`, `AuditService` and its report,
+        retention and handle-anonymisation participant, mapper, controller, task. The P4 slice-b entry
+        records that the participant waits for the repository.
+  - [x] **3.** done — `livesync` (9: controller, DTO, seven services).
+  - [x] **4.** done — `notification` (47: entities and enums, rules, mail, recipient services, the GDPR
+        participants that sit in `service`).
+  - [x] **5.** done (5a `kernel`, 5b `platform`; owner decision 2026-10-12) — `kernel` (20 types in the layer packages `exception` and `validation`) and `platform`
+        (65 in `config`, `filter`, `logging`, `metrics`, `web`, `exception`, `annotation`, `health`):
+        the domain map assigns whole layer packages to them and no plan step says they must move.
+- Foundation modules (§5.2 publishes their entities in `api`):
+  - [x] **6.** done — `orgunit` (61: the org-unit entities and enums, 7 repositories, 12 services, 4 mappers,
+        8 controllers). Prerequisite for the `User` entity (`OrgUnitMembership.user`).
+  - [x] **7.** done — `identity` remainder (29): `User`, `Role`, `TermsAcceptance`, `UserApprovalEvent`,
+        `PayoutPreference` (deferred "with `User`", §7.3), `UserRepository` (279 files name it),
+        `UserMapper`/`UserDto`/`UserReferenceDto`, `UserController`, `MeController`, the mail services,
+        `UserSyncService`/`UserSyncTask`, the rejected-registration retention.
+        `UserController`, `MeController`, `DiscordRegistrationAdminController`, `RejectedRegistrationRetentionService` and its task moved into the transitional
+        `privacy` module in step 8 and were resolved for real afterwards (retention to `identity.internal`, the registration queue to `identity.web` with the merge endpoint in `privacy.web`,
+        `MeController` to `app.web`, `UserController` split by data owner; see the correction entry); `UserMapper` went to `orgunit.api` (see the entry above).
+  - [x] **8.** done — `privacy` (23, 28 with the identity leftovers): the GDPR orchestration classes (§5.1 rank 13) into `privacy`, then
+        dissolved into identity as §5.1 and §7.6 say.
+- Business core leftovers (the entities other modules still hold):
+  - [x] **9.** done, option A2 (a read-only live view instead of a record) confirmed by the owner 2026-10-12 — P4-1 part 3, inventory: the Lager row becomes a view with id commands, then
+        `InventoryItem` and the two allocations move into `inventory.internal`; with them
+        `InventoryGameItemReferenceDto`, `JobOrderEarmark`/`MissionEarmark`, `JobOrderMaterialStockRow`
+        and `StockViewerAccess`.
+  - [x] **10.** done — P4-2 part 2, blueprint: a read API for the seven `PersonalBlueprintRepository` finders,
+        the data types the exchange names into `blueprint.api`, then the ten remaining types.
+  - [x] **11.** done — `hangar` (6), `joborder` (45), `mission` (36): what the foreign modules no longer
+        hold after steps 6, 7 and 9; of the eight association-to-id conversions of §5.6 seven are done,
+        `MissionUnit.ship` is still an entity association.
+  - [x] **12.** done, option A confirmed by the owner 2026-10-12 — Access policies left in the scope hub (§5.4): `OwnerScopeService` and
+        `AccessGateService` keep the org-unit and user gates; `Q` the plan names no policy for them.
+- Persistence:
+  - [x] **13.** done, approved by the owner 2026-10-12 — D-17, member settings move with their owner: the payout-preference and
+        blueprint-sharing columns into tables of the owning modules, each with its own version, by a
+        Flyway migration with data transfer. The api-cut notes say the columns stay in the cut, so this
+        step comes after the path moves; its SQL and rollback go to the owner before they are pushed.
+  - [x] **14.** Table-ownership map (§5.6): done before this branch (`table-ownership.txt`,
+        `TableOwnershipTest`); each move updates the owner of the tables it moves, nothing else.
+  - [x] **15.** struck by the owner 2026-10-12 — P3-11, the per-command audit contract: it was never defined and is not implemented.
+- Quality gates:
+  - [x] **16.** done — NullAway to the whole tree of every module (`bank`, `exchange`, `kernel` and `app` last, see the follow-up entry).
+  - [x] **17.** done, REQ-DATA-010 met by option B1 (confirmed by the owner 2026-10-12) — Requirements that were marked "waiting for a later move" in §14: REQ-DATA-010, REQ-AUDIT-001,
+        REQ-XCH-009/011; arc42 §5.2/§5.3 per module; CLAUDE.md files.
+- Gradle extraction, last (they move whole source trees):
+  - [x] **18.** and **19.** P5-c `backend-exchange` and P5-d `backend-bank`: **not implemented, by decision of the owner 2026-10-12** (§5.8, entry above). P5-a and P5-b stay.
+- Not in this branch:
+  - [x] The ES-module step of F5 (§7.8) was built on its own branch, `claude/mod-f5-es-modules`, and merged into this branch on 2026-10-12 (ADR-0250, REQ-FE-035).
+  - `Q` The REST API cut (§7.9, waves on `claude/api-cut` and `claude/api-cut-w1` … `w6`, the
+    forced app update, T0/T1 breaks) and with it "identity's REST surface sheds the six domains" (wave 2):
+    these are path changes that need the owner's release decision and an app release.
+  - Phase −1 defects (§9): S-07 is done (#2299, verified in the code); C-03 is done (§9.3); the two
+    items of §9.4 were investigated and closed on 2026-10-13, without a code change.
+
 ### 7.7 Phase 5 — Gradle modules for exchange and bank
 
 Right after Phases 2–4 (D-23, which drops the soak of some releases): `build-logic` convention
@@ -2653,7 +3159,7 @@ domain stays a package.
 | --- | --- |
 | P5-a — **done 2026-10-11** | `build-logic` as an included build of precompiled convention plugins, the typed `basetool { }` settings, and the verification metadata for it; no module is extracted yet |
 | P5-b — **done 2026-10-12** | The remaining prerequisites of §5.8: the 32 `rootProject` references of the module scripts, prefix rules in the image-reuse and SBOM scripts, JaCoCo aggregation, the context-shape test (already in place since Phase 0) |
-| P5-c, P5-d | `backend-exchange`, then `backend-bank` |
+| P5-c, P5-d | `backend-exchange`, then `backend-bank` — **not implemented, by decision of the owner 2026-10-12** (§5.8) |
 
 *P5-a as built (2026-10-11).* The included build `build-logic/` (`pluginManagement {
 includeBuild("build-logic") }`; ADR-0248, REQ-OPS-046) carries everything the root
@@ -2759,7 +3265,7 @@ the OWASP suppression file) are the root project's own and stay; `rootDir` in `w
 `args(rootDir…)` stays too, since it is the build's directory and no access to another project.
 (3) Gradle's `jacoco-report-aggregation` plugin was rejected: it takes every project dependency of the
 application, `logging-support` included, whose classes have no tests and would enter the floors at
-zero. (4) Still bound to the extraction itself, and so left to P5-c: the Dockerfile lists each module's
+zero. (4) Bound to an extraction itself, which is not scheduled (P5-c and P5-d are not implemented, §5.8): the Dockerfile lists each module's
 build script and `src/main` by name; the `sandbox-images.yml` path filter, the `docker-compose.build.yml`
 watch paths, `check_exchange_e2e_label.py`'s backend prefix, the `pitest.yml` module matrix and
 `CODEOWNERS`; the PIT target patterns of a library; and the test classes that read a backend source file
@@ -2775,7 +3281,7 @@ which break only if their file moves.
 | F2 — **done 2026-10-04** | Exact session allow-list in its own release (D-10): `SessionTypeAllowList.SESSION_BOUND_TYPES`, 21 exact names; the `…frontend.model.` prefix is gone, `SessionBoundTypeClosureTest` holds the list equal to the derived set in both directions. Corrections: the list lives in the security class, not in the G-16 golden file (`session-bound-types.txt` is deleted, so `-PupdateSnapshots` can no longer widen the allow-list); the admitted application classes fall from 325 to 21, not "about 20" of "about eleven" forms — the 21 are 10 flashed forms and DTOs with their nested types and enums |
 | F3 — **done 2026-10-05** | Typed client per domain, small domains first (audit, notification, settings, dashboard, exchange, orgchart), then the large four; untyped `Map` relays typed in the same step |
 | F4 — **done 2026-10-10** | Package-by-domain move in one pull request; route/gate snapshot byte-identical. Released only after a release carrying F2 is in production (D-10) |
-| F5 — **started 2026-10-11** | Templates and assets per domain (§8.2), with the page chrome as one layout fragment. Done so far: the type-check ratchet and the layout fragment (both below). The per-domain template and asset layout is done too (below). Open: the ES modules, with which `bank.js` is split (owner decision 2026-10-11) |
+| F5 — **started 2026-10-11** | Templates and assets per domain (§8.2), with the page chrome as one layout fragment. Done so far: the type-check ratchet and the layout fragment (both below). The per-domain template and asset layout is done too (below). **The ES modules, with which `bank.js` is split, are done 2026-10-12** (below); what is left of F5 is listed in that entry |
 
 *F1 as built (2026-10-04).* `service.BackendErrorMapper` classifies every failed call into one case
 of its sealed `Outcome` (`Problem`, `Reauthentication`, `CircuitOpen`, `BulkheadFull`, `Timeout`,
@@ -2963,6 +3469,12 @@ their own (REQ-OPS-041). Open in F5: the ES modules.
 
 *F5 templates and assets per domain as built (2026-10-11).* Section 5.9 only said "per-domain folders", so the layout was decided here: the folder is the domain and carries the Java package name (`kernel`, `shell`, 21 domains), under each asset root: `templates/<domain>/<old path>` (the old `admin/`, `fragments/` and `organisation/` sub-folders stay below the domain, which keeps `fragments/bank-account-detail` and the page of the same name apart), `static/js/<domain>/<name>.js` (the domain `typecheck-ratchet.json` already listed), `static/css/<domain>/<name>.css` for area stylesheets and `static/css/pages/<domain>/<page>.css` for page stylesheets (REQ-OPS-038 and `TemplateCommentHygieneTest` already assumed `css/pages/<domain>/`). Page templates follow the controller that renders them, a fragment follows the domain that includes it (the ones every domain uses, and `styles.css`, are `kernel`), an area stylesheet follows its owner. Moved with `git mv`, in five stacked commits by group of domains: 124 templates, 124 scripts and 88 stylesheets (kernel 16/24/2, shell 6/0/8, settings 1/1/1, bank 16/9/8, audit 1/1/1, exchange 3/3/3, dashboard 3/2/2, orgchart 2/1/1, notification 3/3/2, hangar 1/2/2, catalogue 15/13/13, blueprint 5/3/4, personalinventory 2/5/2, inventory 8/10/6, materialexchange 4/3/2, joborder 9/12/6, refinery 3/4/4, mission 2/7/1, operation 2/3/2, promotion 5/4/6, identity 12/10/7, leadership 1/1/1, orgunit 4/3/4; templates/scripts/stylesheets). The mapping and the rewrite of every reference (about 700 th:replace paths, 290 asset links, the controllers' view names, Gradle input paths, ESLint per-file settings, node and Java tests, docs) were a script over the ratchet manifest; no file's content changed other than a path (and the three font urls of `styles.css`, now `../../fonts/`). `AssetReferenceResolutionTest` (every `th:src`/`th:href` resolves, every script and stylesheet is linked, written first on the unchanged tree) and `StaticResourceHandlerMappingTest` (every linked asset resolves to a content-hashed URL and is served) stayed green through every commit; `AssetLayoutTest` fails on a flat file, proven with planted trees; the ratchet fails a script listed under another domain than its folder. The route and gate snapshot did not change; the chrome golden changed in its page keys and asset paths only. Corrections: five templates stay flat, because Spring Boot's error view resolver finds them by name (`error.html`, `error/403|404|500.html`, and `error/error.html` beside them); six area stylesheets and two script sets have a user in another domain (`bank.css` also on the audit log, `legal.css` on the terms, `materialboerse.css` on the inventory pages, `organisation-unit-detail.css` on the leadership page, `personal-inventory.css` on the blueprint pages, `promotion-admin.css` on the price page; the blueprint pages load the personal-inventory scripts and the kernel chrome loads `notifications.js`), each stays in its owner's folder and is the allow-list of the later boundary test; the served URLs changed (`/js/bank/bank.js`), the content hash does not depend on them. Not done here, by instruction: ES modules, the import map, the `bank.js` split, the boundary text test, and any E2E run.
 
+*F5 ES modules as built (2026-10-12).* ADR-0250, REQ-FE-035. **The preconditions held**, so nothing was forced: every inline script is a data bootstrap, the CSP is `script-src 'nonce-…' 'strict-dynamic'` (a nonced module's static imports and a nonced inline import map are admitted), the assets are served at content-hashed URLs from one `ResourceUrlProvider`, and the cross-file name coupling of the 140 scripts was four small clusters, found with a scope analysis of every file (63 sites: `krtAutocomplete` in 5 consumers, the inventory note dialog in 2, the six parts of the order detail page, and `window.filterTable`, which was published explicitly already). Built: (1) the `moduleImportMap` bean renders, in the head before the first module script, an inline `<script type="importmap">` with the request nonce for the page being rendered: the page template, the layout and the fragments they include by a literal reference are scanned for `type="module"` scripts, their static imports are followed, and each is mapped from its absolute path to the hashed URL the `@{…}` links use, so an entry script and an import of one module are one instance and a changed module is a new URL; (2) a script is a module unless `frontend/module-ratchet.json` lists it (only `kernel/krt-client-error.js`, which must stay synchronous and first; the list only shrinks, `ModuleScriptsTest`); (3) the boundary: ESLint `no-restricted-imports` per domain folder (own domain and kernel, absolute `/js/…` paths only, no dynamic `import()`; no dependency was added), the same in the Java test with a cycle check, and `tsconfig.json` `paths` so `tsc` follows the imports; (4) 139 of 140 scripts converted domain by domain with `type="module"` in place of `defer`, 153 script tags in 82 templates; (5) `bank.js` (2,081 lines in one function) became an entry plus 16 modules by responsibility (messages, form errors, controls, live sync, previews, counterparty, request rows, movement rows, confirm modal, modal priming, form submit, grant matrix, account type, downloads, type-to-confirm, account list), each registering its document listeners in an `init…` function that the entry calls in the order the one function registered them; (6) the explicit imports that replace globals: `krtAutocomplete` (kernel), the inventory note dialog (6 names), and the six order detail parts (63 names, the three mutable `let`s behind one exported `resetInventoryCache`, written once). Verification: a recorded comparison of the document listener registrations (type, normalised handler body, order) and the live-sync receivers of the split `bank.js` against the original is identical (28 records); `lintJs`, `lintProbeJs`, `lintCss`, `lintHtml`, `prettierCheck`, `typecheckJs`, the node tests and the template, asset, import-map and page tests are green; two rendered pages (`org-unit-bank`, `inventory-admin`) loaded in a browser under the real CSP, with Trusted Types reporting, without a violation or script error, and the bank modal priming and request-type sync worked. Type-check ratchet: files carrying `// @ts-check` 124 → 140 (the floor moved with them), all 22 domains still migrated; ESLint findings 0 before and after. Corrections: (a) the plan's "about 60 rewritten call sites and a shared object" for `bank.js` did not materialise: the sections called each other along a DAG, so imports were enough and no shared state was needed; (b) `#execInfo.templateName` names the fragment being processed (`kernel/fragments/head`), the page is `#execInfo.processedTemplateName`; and a `@bean` expression is "external access" that Thymeleaf forbids in `th:utext`, so the head evaluates it in `th:with`; (c) 62 of the 124 scripts then existing had no `'use strict'` anywhere and run strictly now; ESLint as a module and the type check found nothing, the rest is for the end-to-end suite; (d) the node tests that run `krt-fetch.js`, `krt-live-sync.js` and `krt-html.js` in a `vm` context needed no change, because a module without `import`/`export` is also a valid script. **What the first pass left open is closed in the next entry.**
+
+*F5 ES modules, the open items closed (2026-10-12).* (1) **The kernel API is imported**, in commits per API: the toasts and the confirm dialog (226 reads in 57 modules), `safeSameOriginUrl`, `krtScuInput`, `resetUnsavedChanges` and `krtSyncDatetimeSplitGroup` (104 reads), `krtModal` (158 in 46), `krtFetch` with `krtCsrf`, `krtReauth` and `krtTermsGate` (532 in 100), `krtLiveSync` and `krtEvents` (467 in 49), `krtHtml` (16 modules; it was a bare global and an ESLint global), the filter panel, filter chips, overflow menu and combobox enhancer (64 in 16), `krtI18nText` (200 in 33, through a one-line module facade over the classic beacon, which owns it), and the Herkunft picker, the Lager factory and the yield badge inside their domains (38 in 5). About 1,800 reads; the drawer and the palette, which are optional to each other, meet in `krt-chrome.js`, the combobox sources in `krt-combobox-sources.js`. A kernel name keeps its `window` property only where a reader outside the module graph needs it, recorded in ADR-0250: `krtFetch`, `krtCsrf`, `krtLiveSync`, `krtModal`, `krtSearchableSelect`, `krtHtml`, `krtComboboxRemoteSources` (Playwright sources and node tests), `krtEvents` (the head stub), `krtI18nText` (the beacon). The node harnesses that run `krt-fetch.js`, `krt-live-sync.js` and `krt-html.js` follow the new imports through `scripts/flatten-module.mjs` (a module graph as one classic script, with stand-ins for the two DOM-touching modules), and the chrome golden file masks the import map, whose hashed URLs would otherwise move with every script edit. (2) **IIFE wrappers:** 48 were removed by a script that proved each neutral (no `return`, `await`, `this`, `arguments` or `new.target` of its own, no colliding top-level name, and the same set of global names read before and after), and every `'use strict'` but the beacon's went; **49 stay**, 46 because they open with an early `return` (a module has no top-level `return`) and 3 because two wrappers of one file declare the same names (`bank-grants-chart-prefs`, `bank-layout-prefs`, `mission-detail`). The message of the unwrapping commit says 41 and 7; the count is 45 and 3 for that commit and 46 and 3 now. (3) **`modulepreload` was measured and not added.** Over HTTP/1.1 with 50 ms per script, the bank page (28 module scripts, a graph five levels deep) reached `DOMContentLoaded` in 518, 547 and 1,035 ms (first, cold load) with preload links carrying the nonce and 516, 517 and 570 ms without, because Chromium's six connections per host, not the depth, set the time; without the nonce on the link the preload is blocked and every module is fetched twice (971 ms), and a preload before the import map makes the browser ignore the map. HTTP/2, where depth would matter on a cold cache, could not be measured: the browser pane does not trust a local certificate. (4) **A script under its plain URL answers `no-cache`**, a content-hashed name `immutable`: two resource handlers over one resource chain, the hashed pattern being the more specific (`WebMvcConfig`, `StaticResourceHandlerMappingTest`); no edge-proxy rule touches `/js`. (5) **`moduleDetection: force`** in `tsconfig.json` reports nothing: every script is checked as a module. Corrections: (a) a `modulepreload` link or any other module fetch placed before the import map is not remapped; (b) a bare `krtHtml` needed its ESLint global and `declare const` removed with the import, and the ban test's planted source imports it; (c) the combined load order of the head modules changed by one edge (`common-handlers` now evaluates after `krt-modal`, `krt-fetch` after `toast`), checked as touching different event types or only making a collaborator available earlier. Type-check ratchet: files carrying `// @ts-check` 124 → 143 over the whole of F5's ES-module step (the floor moved with them); ESLint findings 0 and `tsc` errors 0 throughout. **What this entry left is closed in the next one.**
+
+*F5 ES modules, the last items (2026-10-12).* (1) **The 49 remaining wrappers are named functions.** A module has no top-level `return`, so the 46 scripts that open with an early-return guard and the 3 files that paired names (`bank-grants-chart-prefs`, `bank-layout-prefs`, `mission-detail`) became `function initBankGrants() { … }` and one call at the same place; neutral by construction (a plain call of a strict function sees the same `this` and `arguments` as the immediately invoked one, nothing is hoisted that was not, the name is checked free in the file, two functions of one file keep separate scopes). Three commits by domain. No script but the classic beacon is wrapped any more. (2) **The 23 page seams are hook registries** (one commit): `mission/mission-hooks.js` (9: write, refresh, notify, modalOpen, modalClose, segSet, localizeDates, openEditCrewModal, presence), `joborder/joborder-hooks.js` (5), `operation/operation-hooks.js` (3), `inventory/inventory-hooks.js` (1) and `kernel/krt-hooks.js` (filterTable, materialRelease, materialRequest: the catalogue pages offer the table filter to the kernel's `common-handlers.js`, the Materialbörse dialogs to the Lager page of another domain). 182 window reads and writes in 26 modules; `materialRowToDelete` became a local variable, `krtRefreshMembersResults` a direct call, the unread `window.MissionPresence` is gone. A registry is a leaf module with no effect, so a publisher assigns where it assigned the window property and a reader reads where it read it: every publication and read has the old timing. **Evaluation order is unchanged, verified:** a script reads the import statements of every module at the revision before and after and compares the graph with the registries left out: identical for all 143 modules (the only differences are the 5 new files); because a module's position in the evaluation order is a function of the tag order and that graph, the order of the page parts is the old tag order. `window.krtMaterialRelease` and `window.krtMaterialRequest` stay published next to the registry members, since five and one Playwright sources evaluate them in the page. Corrections: the first pass listed the seams as "late-bound on purpose, an import would reorder the parts"; that holds for imports between the parts, which the registries avoid, not for a registry. Type-check ratchet: files carrying `// @ts-check` 143 → 148 (the five registries), ESLint findings 0, `tsc` errors 0. Browser check under the real CSP on the rendered mission detail, order detail, order list, operation detail, Lager (own and global), org-unit bank, catalogue material admin and home pages: no script error or violation; the participant dialog opens through `missionHooks.modalOpen`, a second material row of the order is removed through `confirmRemoveMaterial`, the catalogue table filter runs through `krtHooks.filterTable`. Not browser-checked: the Materialbörse page, the operation list and the member list (no render test produces them); their changes are the same mechanical substitution and the Java tests that read their sources pass.
+
 ### 7.9 REST API track
 
 **Delivery decided 2026-10-04 (D-24):** the waves below are built and merged one by one, but ship
@@ -3027,7 +3539,7 @@ JSpecify stays out for now (ADR-0192).
 | **CSS** — **done 2026-10-04** (ADR-0243): lint the page stylesheets with the standard config (74 by then, not 54; 66 findings fixed without visual change); a custom-property existence test (it finds an undefined token that makes the material-demand search header transparent; B-03 was already fixed in Phase −1, and the test now also reads templates and scripts); `color-mix()` for alpha variants (120 hand-written token copies replaced, `ColourTokenCopyTest`); a z-index scale (18 `--z-*` tokens with the numbers they replaced, `ZIndexScaleTest`); container queries and nesting only where a design decision asks for them (none asked) | One lint standard; tokens as the single colour source | Visual changes | `CascadeLayerOrderTest`, screenshot review; a computed-style comparison of every touched declaration against `main` |
 | **One layout fragment** carrying head, sidebar, header and toast (83 pages copy the header in five variants) — native Thymeleaf, no Layout Dialect dependency. **Done 2026-10-11** (REQ-FE-033, §7.8): `fragments/layout :: page`, 90 templates converted, one left (no chrome); *Correction:* what the pages copied was the skeleton around fragments that already existed, and the variants are parameters | Chrome changes once | Touches 83–90 templates | `PageChromeSnapshotTest` (golden file, planted changes), `PageLayoutCompositionTest`, render tests, E2E |
 | **Templates and assets per domain** — **done 2026-10-11** (REQ-FE-034, §7.8, F5): `templates/<domain>/`, `static/js/<domain>/`, `static/css/<domain>/`, `static/css/pages/<domain>/`; 124 templates, 124 scripts and 88 stylesheets moved with their references | A domain's page, script and stylesheet sit together; the ratchet's domain names are the folders | Touches every template reference; served asset URLs change | `AssetLayoutTest`, `AssetReferenceResolutionTest`, `StaticResourceHandlerMappingTest`, `ViewNameResolutionTest`, the ratchet |
-| **ES modules** only after the global-scope and inline-script work, and only behind a server-rendered import map (unversioned asset URLs are cached immutably for a year) | Explicit dependencies, lint-enforced boundaries | Import-map and nonce plumbing | Every specifier must be in the map |
+| **ES modules** only after the global-scope and inline-script work, and only behind a server-rendered import map (unversioned asset URLs are cached immutably for a year). **Done 2026-10-12** (ADR-0250, REQ-FE-035, §7.8, F5): 147 of 148 scripts are modules; the head renders each page's import map of content-hashed URLs; imports are absolute, static and bounded to the own domain and the kernel; `bank.js` is split into 16 modules; the kernel API is imported, a script under its plain URL is revalidated, `moduleDetection` is `force`. `modulepreload` measured, not added; the 49 early-return wrappers are named functions and the 23 page seams hook registries | Explicit dependencies, lint-enforced boundaries | Import-map and nonce plumbing | Every specifier must be in the map: `ModuleScriptsTest`, `ModuleImportMapTest`, `StaticResourceHandlerMappingTest`, `:frontend:testEslintBans`, `:frontend:lintJs` |
 | **No bundler** | — | A compromised bundler release would be site-wide script injection the nonce CSP cannot stop; the served file would no longer be the checked file (ADR-0125) | — |
 
 ### 8.3 SQL, persistence, platform
@@ -3066,7 +3578,8 @@ configuration-cache entries (it never does today, because `setup-gradle` gets no
 
 ## 9 Defects found along the way — fixed first, in separate pull requests
 
-**Status:** fixed by PRs #2299–#2312, merged 2026-10-01 (§7.1); C-03 is left to the owner.
+**Status:** fixed by PRs #2299–#2312, merged 2026-10-01 (§7.1); C-03 is done too (§9.3, *corrected
+2026-10-13: this line still said it was left to the owner*).
 
 Every item below survived the adversarial round; the severity is the verified one, often lower
 than the first finding claimed. None allows another member's data to be read or changed; several
@@ -3110,12 +3623,40 @@ They are fixed before the refactor starts (D-07), independently of this plan.
 | C-03 | The repo-lint jobs `Self-tests` and `Container checks` (Prometheus rule unit tests, monitoring configuration checks, deploy-seam self-tests) are not required status checks | Low–medium | Add both to the ruleset — a repository-settings write by the owner; **done** (both required on `main`, checked 2026-10-04) |
 | C-04 | The only crash-loop alert has no absence guard for its Podman series | Low | An `absent()` rule or a conformance entry |
 
-### 9.4 To investigate
+### 9.4 To investigate — both closed 2026-10-13
 
-- The mass-change confirmation page echoes `stagedAt` and the change set from the browser without an
-  integrity check, so the expiry and revoked-since-staging checks trust a member-supplied time. Only
-  the member's own data under a capability the client holds is affected; a provenance question.
-- Whether the frontend session enforcement is really on in production (documented, not observed).
+- **The mass-change confirmation and its `stagedAt` — investigated from the code, no change.** The
+  premise (the page echoes `stagedAt` and the change set from the browser) does not hold. The
+  browser sends only a handoff id: `ConnectedAppsConfirmRelayController.HandoffRef` has the one
+  component `handoffId` (:239), and `load` (:87-115) takes the change set and `stagedAt` from the
+  gateway's staged entry, which `IngestHandoffService.consume` reads with an atomic `GETDEL` of
+  `ingest:handoff:<sub>:<id>` (:89), scoped to the session user's subject; the id is 160 bits of
+  `SecureRandom` (`HandoffStagingService.store`, :165-167), and the gateway sets `stagedAt` itself
+  from its own clock (`ExchangeController.staged`, :660). The consumed request then waits in the
+  member's server-side session (`keep`, :159-173) and `apply` (:126-136) takes it from there, so
+  the browser cannot alter the batch, its client or its time; every kept entry is re-checked
+  against the 30-minute lifetime on the way out (`live`, :199-209). The test
+  `ConnectedAppsConfirmControllerMvcTest.aBrowserSuppliedChangeSetOrStagingTimeIsNeverBelieved`
+  (:183) sends a hostile body with a changed client, resource, change set and a `stagedAt` an hour
+  ahead, and the backend still receives the staged values. The backend's DTO comment "as the member's
+  browser session hands it back" (`ConnectedAppMassChangeRequestDto`, :29-31) means the frontend
+  server, which is how the audit misread it. The backend trusts the request's `stagedAt` and
+  `clientId` (`ExchangeMassChangeService.admit`, :154-198), but only a bearer issued to the
+  configured web client reaches the endpoint (`ConnectedAppsGate.isMemberSession`, :46-54, on
+  `ConnectedAppsController`, :59); the member's browser never holds that token, and the member
+  whose data is written is read from the token, not from the request (`member`, :226-229). Were the
+  time forged by the one party that could (the frontend server), the gain would be a batch
+  confirmed past its 30 minutes or a suspension or client revocation older than the forged time not noticed (an
+  installation's disconnection is checked without `stagedAt`, :189-193), on that member's own data
+  and for a client capability they granted; the same changes are open to the member in the web
+  forms. Nothing is bound to an integrity tag because nothing crosses the browser. REQ-XCH-021
+  already states the property.
+- **Whether the frontend session enforcement is on in production — observed, closed.** On
+  2026-10-13 the production frontend container's environment was read read-only
+  (`podman inspect frontend`, filtered on the host to that one value): `APP_SESSION_TYPE_ALLOW_LIST`
+  is `enforce`; the code default in `RedisSessionConfig` (:90) and `application.yml` (:103) is
+  `enforce` too. Observed at the configuration level; the live gauge
+  `basetool_session_type_allow_list_mode` was not read (Prometheus needs credentials).
 
 ## 10 Frameworks and tools evaluated
 
@@ -3244,9 +3785,10 @@ Full tables, per finding with status, evidence and verdict:
   **Status 2026-10-10:** done — REQ-API-002 (the enforced rules, in place of the convention),
   REQ-API-007 (the annotation sentence corrected to what the build requires), REQ-DATA-001 (one
   location, one sequence; it keeps the plan's "REQ-DATA" row). Waiting for a later move — REQ-DATA-010
-  (the fragment per aggregate moves into each module with its repository, Phase 3), REQ-AUDIT-001
-  (the per-command contract, P3-11), REQ-XCH-009/011 (they name the domain APIs the exchange calls,
-  which exist when blueprint, inventory and hangar publish theirs, Phase 3).
+  (the fragment per aggregate moves into each module with its repository, Phase 3), REQ-XCH-009/011 (they name the domain APIs the exchange calls,
+  which exist when blueprint, inventory and hangar publish theirs, Phase 3). REQ-AUDIT-001 keeps its text; the "per-command contract" (P3-11) is not a status of it, see the entry of umbrella step 15.
+  **Status 2026-10-12 (umbrella step 17):** the three modules publish their entities and repositories in `api` since steps 9, 10 and 11a; that did not change what REQ-XCH-009/011 say, only the
+  source paths in the specs, which the text scans rewrote. REQ-DATA-010 was waiting for the fragments to leave `ScopeSpecifications`; they did on 2026-10-12 (option B1, see the follow-up entry). REQ-AUDIT-001 is not waiting for anything: P3-11 is struck (umbrella step 15).
 - **arc42:** §4.1, §4.2, §5.3 and §5.5 (corrected with this plan), §5.2 and §5.3 rewritten per
   module as the moves land, §8 (module rules, interaction styles — §8.14, done 2026-10-02), §11.9
   (the domain coupling as debt, opened with this plan; its decisions linked 2026-10-02).

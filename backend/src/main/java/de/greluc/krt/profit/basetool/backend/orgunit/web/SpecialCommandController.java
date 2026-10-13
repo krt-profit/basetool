@@ -1,0 +1,273 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.orgunit.web;
+
+import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandDto;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandMapper;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandSecurityService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandService;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import jakarta.validation.Valid;
+import java.util.Set;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * REST surface for {@link SpecialCommand} (Spezialkommando) CRUD, mirroring {@link
+ * SquadronController} without the promotion toggle.
+ *
+ * <p>Writes are ADMIN-only. The list is open to every authenticated caller for the owner picker;
+ * the single-row read uses the SK membership-management gate.
+ */
+@RestController
+@RequestMapping("/api/v1/special-commands")
+@RequiredArgsConstructor
+@Transactional
+public class SpecialCommandController {
+
+  private static final Set<String> ALLOWED_SORT = Set.of("name", "shorthand", "id");
+
+  private final SpecialCommandService specialCommandService;
+  private final SpecialCommandMapper specialCommandMapper;
+  private final AuthHelperService authHelperService;
+
+  /**
+   * Paged list of Spezialkommandos for the admin overview and the owner picker. Including inactive
+   * rows requires ADMIN.
+   *
+   * @param page page number, defaults to 0.
+   * @param size page size, defaults to the platform default.
+   * @param sort sort spec; whitelisted to {@code name}, {@code shorthand}, {@code id}.
+   * @param includeInactive include soft-deleted rows; ADMIN-only.
+   * @return paged Spezialkommando DTOs.
+   * @throws org.springframework.security.access.AccessDeniedException if {@code includeInactive} is
+   *     requested without ROLE_ADMIN.
+   */
+  @GetMapping
+  @PreAuthorize("isAuthenticated()")
+  @Operation(
+      summary = "List Spezialkommandos",
+      description =
+          "Returns a paged list of Spezialkommandos. Admins may include soft-deleted rows via"
+              + " includeInactive=true; everyone else sees only active rows. Use this endpoint to"
+              + " populate the owner-picker dropdown on create forms.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Paged list of Spezialkommandos."),
+    @ApiResponse(
+        responseCode = "403",
+        description = "includeInactive=true requested without ROLE_ADMIN."),
+    @ApiResponse(responseCode = "401", description = "Caller is not authenticated.")
+  })
+  public PageResponse<SpecialCommandDto> getAllSpecialCommands(
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String sort,
+      @RequestParam(required = false, defaultValue = "false") boolean includeInactive) {
+    if (includeInactive && !authHelperService.isAdmin()) {
+      throw new AccessDeniedException("includeInactive=true requires ROLE_ADMIN");
+    }
+    Pageable pageable = PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "name");
+    Page<SpecialCommand> p = specialCommandService.getAllSpecialCommands(pageable, includeInactive);
+    return PageResponse.of(p.map(specialCommandMapper::toDto));
+  }
+
+  /**
+   * Returns a single Spezialkommando by id, active or not, for the SK member-management page.
+   *
+   * <p>Gated by {@link SpecialCommandSecurityService#canManageMembers}: an admin reads any SK, a
+   * non-admin only an SK where they hold {@code SK_LEAD}.
+   *
+   * @param id Spezialkommando id.
+   * @return the matching DTO.
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException if no SK matches and the
+   *     caller is an admin.
+   */
+  @GetMapping("/{id}")
+  @PreAuthorize("@specialCommandSecurityService.canManageMembers(#id, authentication)")
+  @Operation(
+      summary = "Get a Spezialkommando by id",
+      description =
+          "Returns the full DTO for the requested Spezialkommando. Admin, or the SK lead of this"
+              + " Spezialkommando (the same gate as its member-management endpoints).")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Matching Spezialkommando."),
+    @ApiResponse(
+        responseCode = "403",
+        description =
+            "Caller is neither ADMIN nor Lead of this Spezialkommando — see"
+                + " SpecialCommandSecurityService.canManageMembers."),
+    @ApiResponse(responseCode = "404", description = "No Spezialkommando matches the given id.")
+  })
+  public SpecialCommandDto getSpecialCommand(@PathVariable @NotNull UUID id) {
+    return specialCommandMapper.toDto(specialCommandService.getSpecialCommandById(id));
+  }
+
+  /**
+   * Creates a new Spezialkommando. Duplicate name → 409 from the service-layer uniqueness check
+   * before the DB UNIQUE constraint trips. ADMIN-only.
+   *
+   * @param dto create payload; validated by Jakarta annotations on {@link SpecialCommandDto}.
+   * @return the persisted DTO.
+   */
+  @PostMapping
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
+  @Operation(
+      summary = "Create a Spezialkommando",
+      description = "Creates a new Spezialkommando. Name must be unique across all org units.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Created."),
+    @ApiResponse(responseCode = "400", description = "Validation error on the inbound payload."),
+    @ApiResponse(responseCode = "403", description = "Caller does not hold ROLE_ADMIN."),
+    @ApiResponse(responseCode = "409", description = "Name collides with an existing org unit.")
+  })
+  public SpecialCommandDto createSpecialCommand(@RequestBody @Valid SpecialCommandDto dto) {
+    var toCreate = specialCommandMapper.toEntity(dto);
+    toCreate.setId(null);
+    toCreate.setVersion(null);
+    return specialCommandMapper.toDto(specialCommandService.createSpecialCommand(toCreate));
+  }
+
+  /**
+   * Updates an existing Spezialkommando. Carries the optimistic-lock version in the DTO body.
+   * Duplicate name (against a different row) → 409. ADMIN-only.
+   *
+   * @param id Spezialkommando id.
+   * @param dto update payload; validated by Jakarta annotations on {@link SpecialCommandDto}.
+   * @return the persisted DTO with the bumped version.
+   */
+  @PutMapping("/{id}")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
+  @Operation(
+      summary = "Update a Spezialkommando",
+      description =
+          "Updates an existing Spezialkommando with optimistic-lock and duplicate-name checks.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Updated."),
+    @ApiResponse(responseCode = "400", description = "Validation error on the inbound payload."),
+    @ApiResponse(responseCode = "403", description = "Caller does not hold ROLE_ADMIN."),
+    @ApiResponse(responseCode = "404", description = "No Spezialkommando matches the given id."),
+    @ApiResponse(
+        responseCode = "409",
+        description = "Optimistic-lock conflict OR name collides with a different row.")
+  })
+  public SpecialCommandDto updateSpecialCommand(
+      @PathVariable @NotNull UUID id, @RequestBody @Valid SpecialCommandDto dto) {
+    return specialCommandMapper.toDto(specialCommandService.updateSpecialCommand(id, dto));
+  }
+
+  /**
+   * Soft-deletes a Spezialkommando by flipping {@code active = false}. Memberships and any
+   * aggregate that already references the SK as an owner stay in place; only the active-list
+   * dropdowns and the owner picker hide the row from then on. ADMIN-only.
+   *
+   * @param id Spezialkommando id.
+   */
+  @DeleteMapping("/{id}")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
+  @Operation(
+      summary = "Soft-delete a Spezialkommando",
+      description =
+          "Soft-deletes the Spezialkommando by flipping active=false. Reversible via the activate"
+              + " endpoint.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Soft-deleted."),
+    @ApiResponse(responseCode = "403", description = "Caller does not hold ROLE_ADMIN."),
+    @ApiResponse(responseCode = "404", description = "No Spezialkommando matches the given id.")
+  })
+  public void deleteSpecialCommand(@PathVariable @NotNull UUID id) {
+    specialCommandService.deleteSpecialCommand(id);
+  }
+
+  /**
+   * Reverses a soft-delete. ADMIN-only.
+   *
+   * @param id Spezialkommando id.
+   */
+  @PostMapping("/{id}/activate")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
+  @Operation(
+      summary = "Activate a soft-deleted Spezialkommando",
+      description = "Flips active=true on a previously soft-deleted Spezialkommando.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Activated."),
+    @ApiResponse(responseCode = "403", description = "Caller does not hold ROLE_ADMIN."),
+    @ApiResponse(responseCode = "404", description = "No Spezialkommando matches the given id.")
+  })
+  public void activateSpecialCommand(@PathVariable @NotNull UUID id) {
+    specialCommandService.activateSpecialCommand(id);
+  }
+
+  /**
+   * Toggles whether a Spezialkommando appears in the Job-Order responsible (processing) picker.
+   * ADMIN-only and separate from the regular update path.
+   *
+   * @param id Spezialkommando id.
+   * @param body request payload {@code { "eligible": true|false }}.
+   * @return the updated DTO with the new flag value.
+   */
+  @PatchMapping("/{id}/profit-eligible")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
+  @Operation(
+      summary = "Toggle Spezialkommando profit-eligibility",
+      description =
+          "Sets whether the Spezialkommando may be selected as the responsible (processing) org"
+              + " unit of a Job Order. ADMIN-only.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Updated."),
+    @ApiResponse(responseCode = "403", description = "Caller does not hold ROLE_ADMIN."),
+    @ApiResponse(responseCode = "404", description = "No Spezialkommando matches the given id.")
+  })
+  public SpecialCommandDto setProfitEligible(
+      @PathVariable @NotNull UUID id,
+      @NotNull @RequestBody @Valid SpecialCommandProfitEligibleToggleRequest body) {
+    return specialCommandMapper.toDto(specialCommandService.setProfitEligible(id, body.eligible()));
+  }
+
+  /**
+   * Request body for the per-SK profit-eligibility toggle endpoint. Carries a single boolean so a
+   * future expansion can be added without breaking the wire format.
+   *
+   * @param eligible new value of {@code SpecialCommand.isProfitEligible}.
+   */
+  public record SpecialCommandProfitEligibleToggleRequest(boolean eligible) {}
+}

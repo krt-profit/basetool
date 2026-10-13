@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.web;
 
+import de.greluc.krt.profit.basetool.backend.platform.api.CurrentUserId;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExtractDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryImportDraftDto;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryImportService;
-import de.greluc.krt.profit.basetool.backend.web.CurrentUserId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;

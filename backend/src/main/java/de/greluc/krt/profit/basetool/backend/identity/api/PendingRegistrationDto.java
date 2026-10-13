@@ -20,7 +20,11 @@
 package de.greluc.krt.profit.basetool.backend.identity.api;
 
 import java.time.Instant;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One row of the admin registration-approval queue; carries no Discord id.
@@ -37,8 +41,29 @@ import java.util.UUID;
 public record PendingRegistrationDto(
     UUID id,
     String username,
-    String serverNickname,
+    @Nullable String serverNickname,
     Instant registeredAt,
-    Instant decidedAt,
+    @Nullable Instant decidedAt,
     boolean callsignCollision,
-    Long version) {}
+    Long version) {
+
+  /**
+   * Maps one registration against a pre-resolved set of colliding callsigns.
+   *
+   * @param user the registration to map
+   * @param collidingCallsigns lower-cased usernames held by more than one account
+   * @return the DTO, with {@code callsignCollision} resolved from the set
+   */
+  public static @NotNull PendingRegistrationDto from(
+      @NotNull User user, @NotNull Set<String> collidingCallsigns) {
+    return new PendingRegistrationDto(
+        user.getId(),
+        user.getEffectiveName(),
+        user.getDiscordGuildNickname(),
+        user.getCreatedAt(),
+        user.getApprovedAt(),
+        user.getUsername() != null
+            && collidingCallsigns.contains(user.getUsername().toLowerCase(Locale.ROOT)),
+        user.getVersion());
+  }
+}

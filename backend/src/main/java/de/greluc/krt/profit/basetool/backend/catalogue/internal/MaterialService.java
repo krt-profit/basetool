@@ -29,12 +29,12 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialSourceSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
-import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.platform.api.CacheConfig;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -138,7 +138,7 @@ public class MaterialService {
    *
    * @param id material primary key
    * @return the material read model
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no match
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no match
    */
   @Cacheable(cacheNames = CacheConfig.MATERIAL_BY_ID_CACHE)
   public MaterialDto getMaterial(@NotNull UUID id) {

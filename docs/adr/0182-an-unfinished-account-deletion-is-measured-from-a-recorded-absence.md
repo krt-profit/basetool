@@ -98,7 +98,7 @@ transaction. Stamping there would write a column nobody can ever read.
   callers and their tests are untouched.
 - **The instant is the application's, not the database's.** `Instant.now()` is passed in rather than
   using JPQL `CURRENT_TIMESTAMP`, matching how every other age gauge computes its age
-  (`BusinessMetricsCollector#ageSeconds` also reads the app clock), so the two halves of the
+  (`BusinessGauges#ageSeconds` also reads the app clock), so the two halves of the
   subtraction come from the same clock.
 - For a short period after deploy, the alert reports a lower bound for historical rows. If any were
   already older than seven days, it fires 30 minutes after the first sample — which is the correct

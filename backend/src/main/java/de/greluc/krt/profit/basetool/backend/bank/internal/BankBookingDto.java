@@ -60,7 +60,7 @@ public record BankBookingDto(
     UUID transactionId,
     BankTransactionType type,
     BigDecimal amount,
-    String holderHandle,
+    @Nullable String holderHandle,
     @Nullable String note,
     @Nullable String justification,
     @Nullable String staffNote,

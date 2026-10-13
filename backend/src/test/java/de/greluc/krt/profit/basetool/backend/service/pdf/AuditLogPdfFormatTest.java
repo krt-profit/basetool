@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.backend.service.pdf;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditLogPdfFormat;
+import de.greluc.krt.profit.basetool.backend.platform.api.KrtPdfSupport;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;

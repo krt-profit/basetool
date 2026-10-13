@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.api;
 
-import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -127,7 +126,7 @@ public interface StockReads {
    * @return the row, or empty when unknown
    */
   @NotNull
-  Optional<InventoryItem> findRow(@NotNull UUID rowId);
+  Optional<StockRow> findRow(@NotNull UUID rowId);
 
   /**
    * Loads the given Lager rows with their material in one read.
@@ -136,7 +135,7 @@ public interface StockReads {
    * @return the existing rows
    */
   @NotNull
-  List<InventoryItem> findRowsWithMaterial(@NotNull Collection<UUID> rowIds);
+  List<StockRow> findRowsWithMaterial(@NotNull Collection<UUID> rowIds);
 
   /**
    * Returns the member's own material and game-item rows for the Materialbörse release picker,
@@ -151,7 +150,7 @@ public interface StockReads {
    * @return the matching rows
    */
   @NotNull
-  List<InventoryItem> releasableRows(
+  List<StockRow> releasableRows(
       @NotNull UUID userId,
       @Nullable String query,
       boolean includeMaterial,

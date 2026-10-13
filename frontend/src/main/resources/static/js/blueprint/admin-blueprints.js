@@ -19,129 +19,121 @@
 
 // @ts-check
 
-(function () {
-    function clamp01(t) {
-        return t < 0 ? 0 : t > 1 ? 1 : t;
-    }
-    function lerp(a, b, t) {
-        return a + (b - a) * t;
-    }
-    function num(el, attr) {
-        const v = el.getAttribute(attr);
-        return v === null || v === '' ? null : parseFloat(v);
-    }
-    function compute(slider) {
-        const range = slider.querySelector('.bp-range');
-        if (!range) {
-            return;
-        }
-        const q = parseFloat(range.value);
-        /** @type {number | null} */
-        let value = null;
-        const segs = slider.querySelectorAll('.bp-seg');
-        if (segs.length) {
-            const stepped =
-                (slider.getAttribute('data-vrt') || 'linear').toLowerCase() !== 'linear';
-            for (let i = 0; i < segs.length; i++) {
-                const a = num(segs[i], 'data-qmin');
-                const b = num(segs[i], 'data-qmax');
-                const vs = num(segs[i], 'data-vstart');
-                const ve = num(segs[i], 'data-vend');
-                if (a === null || b === null) {
-                    continue;
-                }
-                if (q <= b || i === segs.length - 1) {
-                    if (stepped) {
-                        value = vs === null ? ve : vs;
-                    } else {
-                        const t = b === a ? 0 : clamp01((q - a) / (b - a));
-                        value = vs === null || ve === null ? vs : lerp(vs, ve, t);
-                    }
-                    break;
-                }
-            }
-        } else {
-            const qmin = num(slider, 'data-qmin');
-            const qmax = num(slider, 'data-qmax');
-            const vmin = num(slider, 'data-vmin');
-            const vmax = num(slider, 'data-vmax');
-            if (qmin !== null && qmax !== null && vmin !== null && vmax !== null) {
-                const tt = qmax === qmin ? 0 : clamp01((q - qmin) / (qmax - qmin));
-                value = lerp(vmin, vmax, tt);
-            }
-        }
-        const qOut = slider.querySelector('.bp-q');
-        const vOut = slider.querySelector('.bp-out');
-        if (qOut) {
-            qOut.textContent = String(Math.round(q));
-        }
-        if (vOut) {
-            vOut.textContent = `×${value === null ? '?' : value.toFixed(2)}`;
-        }
-    }
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
-    const RESULTS_ID = 'admin-bp-results';
-
-    function computeAll(root) {
-        const sliders = (root || document).querySelectorAll('.bp-slider');
-        for (let i = 0; i < sliders.length; i++) {
-            compute(sliders[i]);
-        }
+function clamp01(t) {
+    return t < 0 ? 0 : t > 1 ? 1 : t;
+}
+function lerp(a, b, t) {
+    return a + (b - a) * t;
+}
+function num(el, attr) {
+    const v = el.getAttribute(attr);
+    return v === null || v === '' ? null : parseFloat(v);
+}
+function compute(slider) {
+    const range = slider.querySelector('.bp-range');
+    if (!range) {
+        return;
     }
-
-    document.addEventListener('input', (e) => {
-        const t = /** @type {Element | null} */ (e.target);
-        if (t && t.classList && t.classList.contains('bp-range')) {
-            const slider = t.closest('.bp-slider');
-            if (slider) {
-                compute(slider);
-            }
-        }
-    });
-
-    function search(form) {
-        const input = form.querySelector('input[name="search"]');
-        const term = input ? input.value.trim() : '';
-        const url =
-            form.getAttribute('action') + (term ? `?search=${encodeURIComponent(term)}` : '');
-        if (window.krtFetch) {
-            window.krtFetch.swap({ url, container: `#${RESULTS_ID}`, history: true });
-        } else {
-            window.location.assign(url);
-        }
-    }
-
+    const q = parseFloat(range.value);
     /** @type {number | null} */
-    let searchTimer = null;
-
-    document.addEventListener('submit', (e) => {
-        const form = /** @type {HTMLFormElement | null} */ (e.target);
-        if (!form || form.id !== 'admin-bp-filter') {
-            return;
+    let value = null;
+    const segs = slider.querySelectorAll('.bp-seg');
+    if (segs.length) {
+        const stepped = (slider.getAttribute('data-vrt') || 'linear').toLowerCase() !== 'linear';
+        for (let i = 0; i < segs.length; i++) {
+            const a = num(segs[i], 'data-qmin');
+            const b = num(segs[i], 'data-qmax');
+            const vs = num(segs[i], 'data-vstart');
+            const ve = num(segs[i], 'data-vend');
+            if (a === null || b === null) {
+                continue;
+            }
+            if (q <= b || i === segs.length - 1) {
+                if (stepped) {
+                    value = vs === null ? ve : vs;
+                } else {
+                    const t = b === a ? 0 : clamp01((q - a) / (b - a));
+                    value = vs === null || ve === null ? vs : lerp(vs, ve, t);
+                }
+                break;
+            }
         }
-        e.preventDefault();
+    } else {
+        const qmin = num(slider, 'data-qmin');
+        const qmax = num(slider, 'data-qmax');
+        const vmin = num(slider, 'data-vmin');
+        const vmax = num(slider, 'data-vmax');
+        if (qmin !== null && qmax !== null && vmin !== null && vmax !== null) {
+            const tt = qmax === qmin ? 0 : clamp01((q - qmin) / (qmax - qmin));
+            value = lerp(vmin, vmax, tt);
+        }
+    }
+    const qOut = slider.querySelector('.bp-q');
+    const vOut = slider.querySelector('.bp-out');
+    if (qOut) {
+        qOut.textContent = String(Math.round(q));
+    }
+    if (vOut) {
+        vOut.textContent = `×${value === null ? '?' : value.toFixed(2)}`;
+    }
+}
+
+const RESULTS_ID = 'admin-bp-results';
+
+function computeAll(root) {
+    const sliders = (root || document).querySelectorAll('.bp-slider');
+    for (let i = 0; i < sliders.length; i++) {
+        compute(sliders[i]);
+    }
+}
+
+document.addEventListener('input', (e) => {
+    const t = /** @type {Element | null} */ (e.target);
+    if (t && t.classList && t.classList.contains('bp-range')) {
+        const slider = t.closest('.bp-slider');
+        if (slider) {
+            compute(slider);
+        }
+    }
+});
+
+function search(form) {
+    const input = form.querySelector('input[name="search"]');
+    const term = input ? input.value.trim() : '';
+    const url = form.getAttribute('action') + (term ? `?search=${encodeURIComponent(term)}` : '');
+    krtFetch.swap({ url, container: `#${RESULTS_ID}`, history: true });
+}
+
+/** @type {number | null} */
+let searchTimer = null;
+
+document.addEventListener('submit', (e) => {
+    const form = /** @type {HTMLFormElement | null} */ (e.target);
+    if (!form || form.id !== 'admin-bp-filter') {
+        return;
+    }
+    e.preventDefault();
+    clearTimeout(searchTimer ?? undefined);
+    search(form);
+});
+
+const filterForm = document.getElementById('admin-bp-filter');
+if (filterForm) {
+    filterForm.addEventListener('input', () => {
         clearTimeout(searchTimer ?? undefined);
-        search(form);
+        searchTimer = setTimeout(() => {
+            search(filterForm);
+        }, 300);
     });
+}
 
-    const filterForm = document.getElementById('admin-bp-filter');
-    if (filterForm && window.krtFetch) {
-        filterForm.addEventListener('input', () => {
-            clearTimeout(searchTimer ?? undefined);
-            searchTimer = setTimeout(() => {
-                search(filterForm);
-            }, 300);
-        });
+computeAll(document);
+krtFetch.bindSwap({ container: `#${RESULTS_ID}`, history: true });
+document.addEventListener('krt:swapped', (e) => {
+    const c = e.detail && e.detail.container;
+    if (c && c.id === RESULTS_ID) {
+        computeAll(c);
     }
-
-    computeAll(document);
-    if (window.krtFetch) {
-        window.krtFetch.bindSwap({ container: `#${RESULTS_ID}`, history: true });
-    }
-    document.addEventListener('krt:swapped', (e) => {
-        const c = e.detail && e.detail.container;
-        if (c && c.id === RESULTS_ID) {
-            computeAll(c);
-        }
-    });
-})();
+});

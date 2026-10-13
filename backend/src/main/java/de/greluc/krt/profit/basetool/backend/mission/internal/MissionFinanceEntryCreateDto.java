@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.FinanceType;
-import de.greluc.krt.profit.basetool.backend.validation.WholeNumber;
+import de.greluc.krt.profit.basetool.backend.kernel.WholeNumber;
+import de.greluc.krt.profit.basetool.backend.mission.api.FinanceType;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;

@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
-import de.greluc.krt.profit.basetool.backend.scope.api.ScopeSpecifications;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryScope;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -268,7 +268,7 @@ public interface MaterialExchangeOfferRepository
         AND o.status = de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferStatus.ACTIVE
         AND
       """
-          + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE)
+          + InventoryScope.TRIPLE)
   List<OfferStock> findActiveStockOnNonPersonalRows(
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,

@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncRelayService;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
-import de.greluc.krt.profit.basetool.backend.service.LiveSyncRelayService;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

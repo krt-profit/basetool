@@ -98,6 +98,7 @@ public class ShipType extends AbstractEntity<UUID> {
 
   /** RSI engine class name (R4). */
   @Column(name = "class_name")
+  @Nullable
   private String className;
 
   /** Minimum crew complement. */
@@ -374,6 +375,7 @@ public class ShipType extends AbstractEntity<UUID> {
 
   /** English description, filled by the SC Wiki vehicle sync and the P4K import, never by UEX. */
   @Column(name = "description_en", columnDefinition = "TEXT")
+  @Nullable
   private String descriptionEn;
 
   /** German description (filled by R4 Wiki sync; UEX does not expose a DE field today). */

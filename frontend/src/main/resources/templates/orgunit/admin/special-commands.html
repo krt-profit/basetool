@@ -145,7 +145,7 @@
         reloadQuestion:       /*[[#{frontend.ajax.conflict.question}]]*/ ''
     };
 </script>
-<script th:src="@{/js/orgunit/special-commands.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/orgunit/special-commands.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

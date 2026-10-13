@@ -1191,7 +1191,7 @@ in the backend and frontend, `observability` in the ingest; the single source of
 tag keys and the non-enum label values). The backend
 `metrics` package is a dependency leaf (Micrometer only) so `service` / `task` / `filter` /
 `exception` reuse it without a package cycle (ADR-0047). Scheduled-job health flows through the
-shared `metrics.TaskMetrics` wrapper; queue depth is sampled by the `task.BusinessMetricsCollector`
+shared `platform.api.TaskMetrics` wrapper; queue depth is sampled by the `app.internal.BusinessMetricsCollector`, which runs the `platform.api.BusinessGaugeSource` each owning module publishes (`IdentityBusinessGauges`, `DeletionRequestBusinessGauges`, `BankBusinessGauges`, `JobOrderBusinessGauges`, `OperationBusinessGauges`, `RefineryBusinessGauges`, `P4kImportBusinessGauges`, `MaterialExchangeBusinessGauges`),
 on a fixed timer (`app.monitoring.business-metrics.interval-ms`, default 60 s, one read-only
 transaction per pass) rather than per-scrape.
 
@@ -1949,7 +1949,7 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   display id, the ordered item and the blueprint's current output — catalogue names only, never the
   order's user-entered handle.
 
-- Queue-depth gauges (`BusinessMetricsCollector`): `basetool_registration_pending_count` +
+- Queue-depth gauges (the `BusinessGaugeSource` beans, run by `BusinessMetricsCollector`; the registered meter set is pinned by `BusinessMetricsCollectorTest` against `monitoring/business-gauges.txt`): `basetool_registration_pending_count` +
   `_oldest_age_seconds`, `basetool_bank_booking_request_pending_count` + `_oldest_age_seconds`,
   and `{status}`-labelled `basetool_job_order_open_count` / `basetool_operation_open_count` /
   `basetool_refinery_order_open_count` / `basetool_p4k_import_job_pending_count` each with an
@@ -1960,7 +1960,7 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   first time the queue was measured — the oldest open refinery order stood at 29.65 d, hours from
   firing on five orders nobody had called abandoned; #1707). All three are baselines, and measuring
   the queue is how they get revisited. Every one of these gauges is registered eagerly in
-  `BusinessMetricsCollector.registerGauges()` (`@PostConstruct`), so an empty queue reports `0` and
+  `BusinessMetricsCollector.registerGauges()` (`@PostConstruct`, which has every source register), so an empty queue reports `0` and
   there is no `absent()` ambiguity — unlike the last-success gauge, which is registered lazily and
   needed the never-succeeded companion above.
 
@@ -3318,7 +3318,7 @@ redeploy.
 **Enforced by:** the module `application.yml` exposure lists ·
 `{frontend,ingest}/src/main/resources/application-prod.yml`
 (`management.endpoint.loggers.access: read-only`) ·
-`backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/SecurityConfig.java` (the
+`backend/src/main/java/de/greluc/krt/profit/basetool/backend/app/api/SecurityConfig.java` (the
 `ROLE_ADMIN` matcher on `POST /actuator/loggers/**`) ·
 `backend/src/test/java/de/greluc/krt/profit/basetool/backend/config/ActuatorLoggersAuthorizationTest.java` ·
 **Related:** ADR-0090 (management-port isolation and its 2026-08 mutator amendment), REQ-OBS-005

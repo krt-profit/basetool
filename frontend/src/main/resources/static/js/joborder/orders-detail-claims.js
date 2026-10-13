@@ -19,8 +19,22 @@
 
 // @ts-check
 
-/* global MSG_STATUS_SUCCESS, MSG_STATUS_ERROR, MSG_CLAIM_TITLE_ADD, MSG_CLAIM_TITLE_EDIT, MSG_CLAIM_MAX_HINT, MSG_CLAIM_SUCCESS, MSG_CLAIM_WITHDRAW_SUCCESS, MSG_CLAIM_ERROR, MSG_CLAIM_VALIDATION_SQUADRON, MSG_CLAIM_VALIDATION_AMOUNT, MSG_CLAIM_VALIDATION_OVERCLAIM, MSG_BP_COUNTING_SUCCESS, MSG_BP_COUNTING_ERROR, showFrontendErrorToast, showFrontendSuccessToast, krtOrderWrite, _refreshMaterialsSection, _swapOrderSection, _publishOrdersQueue, _odControlById, _odElementById, _odEditVersionInput */
-/* exported openClaimCreate, openClaimEdit, submitClaim, withdrawClaimAction, updateStatus, cancelStatusChange, confirmStatusChange */
+/* global MSG_STATUS_SUCCESS, MSG_STATUS_ERROR, MSG_CLAIM_TITLE_ADD, MSG_CLAIM_TITLE_EDIT, MSG_CLAIM_MAX_HINT, MSG_CLAIM_SUCCESS, MSG_CLAIM_WITHDRAW_SUCCESS, MSG_CLAIM_ERROR, MSG_CLAIM_VALIDATION_SQUADRON, MSG_CLAIM_VALIDATION_AMOUNT, MSG_CLAIM_VALIDATION_OVERCLAIM, MSG_BP_COUNTING_SUCCESS, MSG_BP_COUNTING_ERROR */
+
+import {
+    _refreshMaterialsSection,
+    _swapOrderSection,
+    krtOrderWrite,
+} from '/js/joborder/orders-detail-edit.js';
+import {
+    _odControlById,
+    _odEditVersionInput,
+    _odElementById,
+    _publishOrdersQueue,
+} from '/js/joborder/orders-detail.js';
+import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 /**
  * @typedef {object} OdClaimModalOptions
@@ -71,7 +85,7 @@ function _openClaimModal(opts) {
     }
     const claimScuHint = document.getElementById('claim-scu-hint');
     if (claimScuHint) claimScuHint.classList.toggle('is-hidden', opts.quantityType === 'PIECE');
-    window.krtModal.open(document.getElementById('claim-modal'));
+    krtModal.open(document.getElementById('claim-modal'));
 }
 
 /**
@@ -79,7 +93,7 @@ function _openClaimModal(opts) {
  *
  * @param {HTMLElement} el the control carrying the bucket's data attributes
  */
-function openClaimCreate(el) {
+export function openClaimCreate(el) {
     _openClaimModal({
         materialId: el.dataset.materialId,
         quality: el.dataset.quality,
@@ -96,7 +110,7 @@ function openClaimCreate(el) {
  *
  * @param {HTMLElement} el the control carrying the claim's and bucket's data attributes
  */
-function openClaimEdit(el) {
+export function openClaimEdit(el) {
     _openClaimModal({
         materialId: el.dataset.materialId,
         quality: el.dataset.quality,
@@ -112,12 +126,12 @@ function openClaimEdit(el) {
 }
 
 /** Validates the claim modal and creates the claim. */
-function submitClaim() {
+export function submitClaim() {
     const orderId = _odControlById('claim-order-id').value;
     const materialId = _odControlById('claim-material-id').value;
     const quality = _odControlById('claim-quality').value;
     const squadronId = _odControlById('claim-squadron').value;
-    const amount = /** @type {KrtScuInputApi} */ (window.krtScuInput).parse(
+    const amount = /** @type {KrtScuInputApi} */ (krtScuInput).parse(
         _odControlById('claim-amount').value,
     );
     const max = parseFloat(_odControlById('claim-max').value);
@@ -145,7 +159,7 @@ function submitClaim() {
         toast: false,
         errorMessage: MSG_CLAIM_ERROR,
         onSuccess() {
-            window.krtModal.close(document.getElementById('claim-modal'));
+            krtModal.close(document.getElementById('claim-modal'));
             showFrontendSuccessToast(MSG_CLAIM_SUCCESS);
             _refreshMaterialsSection();
         },
@@ -153,7 +167,7 @@ function submitClaim() {
 }
 
 /** Withdraws the claim open in the claim modal. */
-function withdrawClaimAction() {
+export function withdrawClaimAction() {
     const orderId = _odControlById('claim-order-id').value;
     const claimId = _odControlById('claim-id').value;
     if (!claimId) {
@@ -165,7 +179,7 @@ function withdrawClaimAction() {
         toast: false,
         errorMessage: MSG_CLAIM_ERROR,
         onSuccess() {
-            window.krtModal.close(document.getElementById('claim-modal'));
+            krtModal.close(document.getElementById('claim-modal'));
             showFrontendSuccessToast(MSG_CLAIM_WITHDRAW_SUCCESS);
             _refreshMaterialsSection();
         },
@@ -199,20 +213,20 @@ function _knownStatus(selectElement) {
  *
  * @param {HTMLSelectElement} selectElement the status select
  */
-function updateStatus(selectElement) {
+export function updateStatus(selectElement) {
     const newStatus = selectElement.value;
     if (newStatus === 'COMPLETED' || newStatus === 'REJECTED') {
         _pendingStatus = newStatus;
         _previousStatus = _knownStatus(selectElement);
-        window.krtModal.open(document.getElementById('status-warning-modal'));
+        krtModal.open(document.getElementById('status-warning-modal'));
     } else {
         _doStatusUpdate(selectElement.dataset.orderId, newStatus, selectElement);
     }
 }
 
 /** Dismisses the terminal-status warning and restores the previous status. */
-function cancelStatusChange() {
-    window.krtModal.close(document.getElementById('status-warning-modal'));
+export function cancelStatusChange() {
+    krtModal.close(document.getElementById('status-warning-modal'));
     const sel = /** @type {HTMLSelectElement | null} */ (document.getElementById('status-select'));
     if (sel && _previousStatus) {
         sel.value = _previousStatus;
@@ -222,8 +236,8 @@ function cancelStatusChange() {
 }
 
 /** Confirms the terminal-status warning and saves the pending status. */
-function confirmStatusChange() {
-    window.krtModal.close(document.getElementById('status-warning-modal'));
+export function confirmStatusChange() {
+    krtModal.close(document.getElementById('status-warning-modal'));
     const sel = /** @type {HTMLSelectElement | null} */ (document.getElementById('status-select'));
     if (!sel || !_pendingStatus) return;
     _doStatusUpdate(sel.dataset.orderId, _pendingStatus, sel);
@@ -291,10 +305,10 @@ function _doStatusUpdate(orderId, status, selectElement) {
  *
  * @param {HTMLInputElement} checkbox the switch, reverted on failure
  */
-function _toggleBlueprintCounting(checkbox) {
+export function _toggleBlueprintCounting(checkbox) {
     const orderId = checkbox.getAttribute('data-order-id');
     const desired = checkbox.checked;
-    if (!orderId || !window.krtFetch) {
+    if (!orderId) {
         return;
     }
     checkbox.disabled = true;

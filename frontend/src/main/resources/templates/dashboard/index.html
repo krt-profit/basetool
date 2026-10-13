@@ -99,7 +99,7 @@
     <th:block th:replace="~{shell/fragments/fankit :: band}" />
 
 </main>
-<script th:src="@{/js/dashboard/index.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/dashboard/index.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

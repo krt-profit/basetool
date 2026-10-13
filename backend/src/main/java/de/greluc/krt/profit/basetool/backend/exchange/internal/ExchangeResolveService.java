@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintImportSuggestionDto;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintImports;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintProducts;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.NameResolution;
@@ -43,10 +44,9 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResol
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse.Result;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse.Status;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse.Warning;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipTypeMatcher;
 import de.greluc.krt.profit.basetool.backend.kernel.FuzzyNameMatcher;
-import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportSuggestionDto;
-import de.greluc.krt.profit.basetool.backend.service.ShipTypeMatcher;
+import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
@@ -528,7 +528,7 @@ public class ExchangeResolveService {
     return meterRegistry.counter(
         MetricNames.EXCHANGE_RESOLVE_REFS,
         MetricNames.TAG_KIND,
-        lower(kind.name()),
+        kind.name().toLowerCase(Locale.ROOT),
         MetricNames.TAG_STATUS,
         status.wire());
   }

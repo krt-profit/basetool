@@ -26,11 +26,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeEffects;
@@ -42,16 +39,14 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryNotic
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTransferredFromUserEvent;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTransferredToUserEvent;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.TransferredLot;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
-import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
-import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.math.BigDecimal;
@@ -129,7 +124,7 @@ public class InventoryCheckoutService {
    * income.
    *
    * @throws NotFoundException when the item is unknown
-   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the amount
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when the amount
    *     exceeds the stock, is fractional on a whole-unit row without depleting it, a sale lacks its
    *     terminal or amount, or a {@code TRANSFER} has no target
    */
@@ -364,7 +359,7 @@ public class InventoryCheckoutService {
     newItem.setGameItem(item.getGameItem());
     newItem.setLocation(targetLocation);
     newItem.setQuality(item.getQuality());
-    newItem.setAmount(ScuAmounts.roundToScuScale(dto.amount()));
+    newItem.setAmount(ScuAmounts.roundToScuScale(dto.amount().doubleValue()));
     newItem.setPersonal(item.getPersonal());
     newItem.setStolen(item.getStolen());
     Map<UUID, Double> orderReductions =
@@ -411,7 +406,7 @@ public class InventoryCheckoutService {
                 sourceId,
                 sourceUser,
                 targetUser,
-                ScuAmounts.roundToScuScale(dto.amount()),
+                ScuAmounts.roundToScuScale(dto.amount().doubleValue()),
                 sourceLocation,
                 targetLocation)));
     final InventoryItem mergedTarget =
@@ -655,7 +650,7 @@ public class InventoryCheckoutService {
     newItem.setGameItem(item.getGameItem());
     newItem.setLocation(item.getLocation());
     newItem.setQuality(item.getQuality());
-    newItem.setAmount(ScuAmounts.roundToScuScale(dto.amount()));
+    newItem.setAmount(ScuAmounts.roundToScuScale(dto.amount().doubleValue()));
     newItem.setPersonal(targetPersonal);
     newItem.setStolen(item.getStolen());
     InventoryItem savedNew = inventoryItemRepository.save(newItem);
@@ -711,7 +706,8 @@ public class InventoryCheckoutService {
     if (material == null && !gameItemRow) {
       return row;
     }
-    final boolean autoMerge = gameItemRow || material.getQuantityType() == QuantityType.PIECE;
+    final boolean autoMerge =
+        gameItemRow || Objects.requireNonNull(material).getQuantityType() == QuantityType.PIECE;
     if (!autoMerge && !clientRequestedMerge) {
       return row;
     }
@@ -724,7 +720,7 @@ public class InventoryCheckoutService {
             ? inventoryItemRepository.findMergeGroupForUpdate(
                 row.getUser().getId(),
                 null,
-                row.getGameItem().getId(),
+                Objects.requireNonNull(row.getGameItem()).getId(),
                 row.getLocation().getId(),
                 null,
                 row.getPersonal(),
@@ -732,7 +728,7 @@ public class InventoryCheckoutService {
                 row.getOwningOrgUnit() != null ? row.getOwningOrgUnit().getId() : null)
             : inventoryItemRepository.findMergeGroupForUpdate(
                 row.getUser().getId(),
-                material.getId(),
+                Objects.requireNonNull(material).getId(),
                 row.getLocation().getId(),
                 row.getQuality(),
                 row.getPersonal(),
@@ -821,7 +817,7 @@ public class InventoryCheckoutService {
    * @param notes the ordered accumulator of distinct notes.
    * @param note the raw note of one folded row, possibly {@code null} or blank.
    */
-  private static void collectNote(Set<String> notes, String note) {
+  private static void collectNote(Set<String> notes, @Nullable String note) {
     final String normalized = StringNormalization.trimToNull(note);
     if (normalized != null) {
       notes.add(normalized);

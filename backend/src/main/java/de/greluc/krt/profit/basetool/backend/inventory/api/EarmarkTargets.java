@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.api;
 
-import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderEarmark;
-import de.greluc.krt.profit.basetool.backend.model.projection.MissionEarmark;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Set;

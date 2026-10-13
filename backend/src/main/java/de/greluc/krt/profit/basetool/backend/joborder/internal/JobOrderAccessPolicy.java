@@ -20,13 +20,12 @@
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargetPolicy;
-import de.greluc.krt.profit.basetool.backend.model.JobOrder;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderScope;
+import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +37,8 @@ import org.springframework.transaction.annotation.Transactional;
  * The job-order module's access policy: the read and edit gates of an order, of its owner panels
  * and of the requester side, evaluated on the scope kernel (plan §5.4, ADR-0236). It also decides
  * the Lager's earmarked stock of an order ({@link EarmarkTargetPolicy}).
+ *
+ * <p>The list-side half of the rule is {@link JobOrderScope#PREDICATE}; both widen together.
  *
  * <p>Invoked from SpEL as {@code @jobOrderAccessPolicy}. Unknown ids are refused. The queue
  * capability itself ({@code canViewJobOrders}) stays with the scope kernel, which the identity and

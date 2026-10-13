@@ -21,18 +21,20 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEvent;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleScrubber;
-import de.greluc.krt.profit.basetool.backend.model.AuditEvent;
-import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItem;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryLocationType;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.LegalBasis;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Section;
+import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportReportService;
+import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportService;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.ExportSectionDeclarations;
-import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;

@@ -24,6 +24,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -79,7 +80,7 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
           AND (:rawOnly = false OR m.type = :rawType OR m.isManualRawMaterial = true)
           """)
   Page<Material> searchPicker(
-      @Param("q") String q,
+      @Param("q") @Nullable String q,
       @Param("jobOrderOnly") boolean jobOrderOnly,
       @Param("rawType") MaterialType rawType,
       @Param("rawOnly") boolean rawOnly,

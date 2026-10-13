@@ -29,10 +29,19 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
+import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
+import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
-import de.greluc.krt.profit.basetool.backend.mapper.MissionMapper;
-import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
+import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionListDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionMapper;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.JoinMissionRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService;
@@ -42,16 +51,7 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.PatchMissionFlagsR
 import de.greluc.krt.profit.basetool.backend.mission.internal.PatchMissionScheduleRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.SetPartyLeadRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateMissionOwnerRequest;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
-import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionListDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -191,7 +191,7 @@ class MissionControllerLifecycleTest {
             "comment",
             null,
             null,
-            de.greluc.krt.profit.basetool.backend.model.PayoutPreference.PAYOUT,
+            de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference.PAYOUT,
             1L);
     return new MissionDto(
         id,

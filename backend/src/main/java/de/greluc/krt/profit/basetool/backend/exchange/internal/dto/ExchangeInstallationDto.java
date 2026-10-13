@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.Instant;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * The calling installation, in the shape of the published {@code installation.schema.json}
@@ -33,4 +34,4 @@ import java.time.Instant;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ExchangeInstallationDto(
-    String installationId, String label, Instant firstSeenAt, Instant lastSeenAt) {}
+    String installationId, @Nullable String label, Instant firstSeenAt, Instant lastSeenAt) {}

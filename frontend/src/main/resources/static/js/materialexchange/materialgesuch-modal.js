@@ -13,9 +13,15 @@
 
 // @ts-check
 
-(function () {
-    'use strict';
+import { showFrontendErrorToast } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtHtml } from '/js/kernel/krt-html.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { krtHooks } from '/js/kernel/krt-hooks.js';
 
+function initMaterialgesuchModal() {
     /**
      * The seed values `open` takes from its caller; absent fields are blank.
      *
@@ -47,7 +53,7 @@
 
     const i18n = { ...window.materialgesuchModalI18n, ...window.materialgesuchI18n };
     const modal = /** @type {HTMLElement} */ (document.getElementById('mg-modal'));
-    if (!modal || !window.krtFetch) {
+    if (!modal) {
         return;
     }
 
@@ -116,9 +122,7 @@
     }
 
     function showError(message) {
-        if (typeof window.showFrontendErrorToast === 'function') {
-            window.showFrontendErrorToast(message || i18n.error || '');
-        }
+        showFrontendErrorToast(message || i18n.error || '');
     }
 
     function updateCharCount() {
@@ -127,7 +131,7 @@
         const counter = q('[data-mg-charcount]');
         if (ta && counter) {
             counter.textContent = fmt(
-                window.krtI18nText(i18n.charCounter, 'materialgesuchModalI18n.charCounter'),
+                krtI18nText(i18n.charCounter, 'materialgesuchModalI18n.charCounter'),
                 ta.value.length.toLocaleString('de-DE'),
             );
         }
@@ -141,7 +145,7 @@
         const input = q('[data-mg-qty]');
         if (unit) {
             unit.textContent = isPiece
-                ? window.krtI18nText(i18n.unitPiece, 'materialgesuchModalI18n.unitPiece')
+                ? krtI18nText(i18n.unitPiece, 'materialgesuchModalI18n.unitPiece')
                 : i18n.unitScu || 'SCU';
         }
         if (input) {
@@ -220,7 +224,7 @@
         updateCharCount();
 
         lastFocused = /** @type {HTMLElement | null} */ (document.activeElement);
-        window.krtModal.open(modal);
+        krtModal.open(modal);
         const first = isEdit
             ? q('[data-mg-qty]')
             : state.kind === 'ITEM'
@@ -267,7 +271,7 @@
     }
 
     function hide() {
-        window.krtModal.close(modal);
+        krtModal.close(modal);
         if (lastFocused && typeof lastFocused.focus === 'function') {
             lastFocused.focus();
         }
@@ -292,7 +296,7 @@
     function loadMaterialPicker(query) {
         const seq = ++materialSeq;
         const url = `/materialboerse/request-materials${query ? `?q=${encodeURIComponent(query)}` : ''}`;
-        window.krtFetch
+        krtFetch
             .getJson(url)
             .then((page) => {
                 if (seq !== materialSeq) {
@@ -351,7 +355,7 @@
         const html = materialItems.map((it) => {
             const unit =
                 it.quantityType === 'PIECE'
-                    ? window.krtI18nText(i18n.unitPiece, 'materialgesuchModalI18n.unitPiece')
+                    ? krtI18nText(i18n.unitPiece, 'materialgesuchModalI18n.unitPiece')
                     : i18n.unitScu || 'SCU';
             return krtHtml`<li class="krt-combobox__option" role="option" data-material-id="${
                 it.id
@@ -379,7 +383,7 @@
     function loadItemPicker(query) {
         const seq = ++itemSeq;
         const url = `/materialboerse/offerable-products${query ? `?q=${encodeURIComponent(query)}` : ''}`;
-        window.krtFetch
+        krtFetch
             .getJson(url)
             .then((items) => {
                 if (seq !== itemSeq) {
@@ -508,7 +512,7 @@
         toggle('[data-mg-qty-error]', false);
 
         if (state.mode === 'edit') {
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'PUT',
                 url: `/materialboerse/requests/${state.requestId}/ajax`,
                 payload: {
@@ -534,7 +538,7 @@
                 showError(i18n.subjectRequired);
                 return;
             }
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: '/materialboerse/item-requests/ajax',
                 payload: {
@@ -558,7 +562,7 @@
             showError(i18n.subjectRequired);
             return;
         }
-        window.krtFetch.write({
+        krtFetch.write({
             method: 'POST',
             url: '/materialboerse/requests/ajax',
             payload: {
@@ -578,9 +582,7 @@
     }
 
     function notifyPeers() {
-        if (window.krtLiveSync) {
-            window.krtLiveSync.sendChanged(MATERIALBOARD_TOPIC, ['requests']);
-        }
+        krtLiveSync.sendChanged(MATERIALBOARD_TOPIC, ['requests']);
     }
 
     document.addEventListener('click', (e) => {
@@ -686,5 +688,8 @@
         }
     }
 
-    window.krtMaterialRequest = { open, close: cancel };
-})();
+    krtHooks.materialRequest = { open, close: cancel };
+    window.krtMaterialRequest = krtHooks.materialRequest;
+}
+
+initMaterialgesuchModal();

@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
-import de.greluc.krt.profit.basetool.backend.validation.DtoConstraints;
-import de.greluc.krt.profit.basetool.backend.validation.OnUpdate;
+import de.greluc.krt.profit.basetool.backend.kernel.DtoConstraints;
+import de.greluc.krt.profit.basetool.backend.kernel.OnUpdate;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;

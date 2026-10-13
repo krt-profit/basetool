@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.bank.internal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -62,12 +63,12 @@ public interface BankAuditEventRepository extends JpaRepository<BankAuditEvent, 
       AND (CAST(:clientId AS string) IS NULL OR e.clientId = :clientId)
       """)
   Page<BankAuditEvent> findFiltered(
-      @Param("from") Instant from,
-      @Param("to") Instant to,
-      @Param("actorUserId") UUID actorUserId,
-      @Param("accountId") UUID accountId,
-      @Param("eventType") BankAuditEventType eventType,
-      @Param("clientId") String clientId,
+      @Param("from") @Nullable Instant from,
+      @Param("to") @Nullable Instant to,
+      @Param("actorUserId") @Nullable UUID actorUserId,
+      @Param("accountId") @Nullable UUID accountId,
+      @Param("eventType") @Nullable BankAuditEventType eventType,
+      @Param("clientId") @Nullable String clientId,
       Pageable pageable);
 
   /**

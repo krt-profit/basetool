@@ -20,8 +20,12 @@
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintProducts;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintSource;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.DefaultBlueprintKeys;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintCommands;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintCreateRequest;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBlueprintChangeSet;
@@ -30,11 +34,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChang
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemRef;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveRequest;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse;
-import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.model.BlueprintSource;
-import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintCreateRequest;
-import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -42,6 +42,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -213,7 +214,7 @@ public class ExchangeBlueprintWriteService {
       if (op.key() != null && "remove".equals(op.op())) {
         productKey = productKeyOf(op.key(), keysByBt);
       } else if (op.ref() != null) {
-        ExchangeResolveResponse.Result result = resolved.get(i);
+        ExchangeResolveResponse.Result result = Objects.requireNonNull(resolved.get(i));
         if (result.status() == ExchangeResolveResponse.Status.UNMATCHED) {
           plan.add(new Skip(UNMATCHED, UNMATCHED_REASON));
           continue;
@@ -222,7 +223,7 @@ public class ExchangeBlueprintWriteService {
           plan.add(new Skip(AMBIGUOUS, AMBIGUOUS_REASON));
           continue;
         }
-        productKey = productKeyOf(result.ref().bt(), keysByBt);
+        productKey = productKeyOf(Objects.requireNonNull(result.ref()).bt(), keysByBt);
       } else {
         plan.add(new Skip(UNMATCHED, UNMATCHED_REASON));
         continue;

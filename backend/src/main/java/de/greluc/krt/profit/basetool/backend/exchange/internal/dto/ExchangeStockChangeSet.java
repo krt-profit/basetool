@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal.dto;
 
-import de.greluc.krt.profit.basetool.backend.validation.QualityValue;
+import de.greluc.krt.profit.basetool.backend.kernel.QualityValue;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;

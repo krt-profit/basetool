@@ -216,7 +216,7 @@
     const KRT_ORDERS_LIVESYNC_UPDATES = /*[[#{livesync.updates_available}]]*/ 'Aktualisierungen verfuegbar';
     const KRT_ORDERS_SECTION_REFRESH_ERROR = /*[[#{orders.section.refresh.error}]]*/ 'Die Liste konnte nicht aktualisiert werden. Bitte Seite neu laden.';
 </script>
-<script th:src="@{/js/joborder/orders-index.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/joborder/orders-index.js}" th:attr="nonce=${cspNonce}"></script>
 <script sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN)" th:inline="javascript" th:attr="nonce=${cspNonce}">
     const KRT_ORDERS_REORDER_I18N = {
         success: /*[[#{success.joborder.priority}]]*/ 'Priority updated.',
@@ -230,7 +230,7 @@
         }
     };
 </script>
-<script sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN)" th:src="@{/js/joborder/orders-index-reorder.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN)" th:src="@{/js/joborder/orders-index-reorder.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

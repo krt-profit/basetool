@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.api;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import de.greluc.krt.profit.basetool.backend.config.ApiDomains;
+import de.greluc.krt.profit.basetool.backend.platform.internal.ApiDomains;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.lang.reflect.Field;
 import java.lang.reflect.GenericArrayType;

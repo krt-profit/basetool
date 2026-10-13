@@ -127,7 +127,7 @@
         confirmMember: /*[[#{admin.deletionRequests.execute.member}]]*/ 'Member: {handle}'
     };
 </script>
-<script th:src="@{/js/identity/admin-deletion-requests.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/identity/admin-deletion-requests.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

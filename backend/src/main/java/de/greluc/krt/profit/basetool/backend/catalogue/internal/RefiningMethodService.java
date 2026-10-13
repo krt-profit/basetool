@@ -25,8 +25,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethod;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodRepository;
-import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.platform.api.CacheConfig;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -66,7 +66,7 @@ public class RefiningMethodService {
    *
    * @param id refining method primary key
    * @return the refining method
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no match
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no match
    */
   @Cacheable(cacheNames = CacheConfig.REFINING_METHODS_CACHE)
   public RefiningMethodDto getRefiningMethod(@NotNull UUID id) {

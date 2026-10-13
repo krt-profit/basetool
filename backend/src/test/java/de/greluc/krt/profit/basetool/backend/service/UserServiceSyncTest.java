@@ -25,11 +25,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
-import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
@@ -53,7 +53,6 @@ import org.springframework.security.oauth2.jwt.Jwt;
  *   <li>{@link UserService#getUserIdFromJwt} — JWT sub/UUID validation (fail-closed).
  *   <li>{@link UserService#updateUserDescription} — the version-check {@code
  *       ObjectOptimisticLockingFailureException} path.
- *   <li>{@link UserService#updateUserDefaultPayoutPreference}.
  *   <li>{@link UserService#getCurrentUser} — null/anonymous/non-JWT principal short-circuits.
  *   <li>{@link UserService#findById} — not-found path.
  * </ul>
@@ -159,56 +158,6 @@ class UserServiceSyncTest {
       userService.updateUserDescription(USER_ID, "x", null, null);
 
       assertEquals("x", user.getDescription());
-    }
-  }
-
-  @Nested
-  class UpdateUserDefaultPayoutPreferenceTests {
-
-    @Test
-    void throwsNotFoundException_whenUserMissing() {
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-
-      assertThrows(
-          NotFoundException.class,
-          () ->
-              userService.updateUserDefaultPayoutPreference(USER_ID, PayoutPreference.DONATE, 1L));
-    }
-
-    @Test
-    void throwsOptimisticLockingFailure_whenVersionMismatch() {
-      User user = newUser(USER_ID, "alice");
-      user.setVersion(7L);
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-
-      assertThrows(
-          ObjectOptimisticLockingFailureException.class,
-          () ->
-              userService.updateUserDefaultPayoutPreference(USER_ID, PayoutPreference.DONATE, 3L));
-    }
-
-    @Test
-    void setsPreference_whenVersionMatches() {
-      User user = newUser(USER_ID, "alice");
-      user.setVersion(1L);
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-      when(userRepository.saveAndFlush(user)).thenReturn(user);
-
-      userService.updateUserDefaultPayoutPreference(USER_ID, PayoutPreference.DONATE, 1L);
-
-      assertEquals(PayoutPreference.DONATE, user.getDefaultPayoutPreference());
-    }
-
-    @Test
-    void nullVersion_bypassesOptimisticCheck() {
-      User user = newUser(USER_ID, "alice");
-      user.setVersion(5L);
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-      when(userRepository.saveAndFlush(user)).thenReturn(user);
-
-      userService.updateUserDefaultPayoutPreference(USER_ID, PayoutPreference.PAYOUT, null);
-
-      assertEquals(PayoutPreference.PAYOUT, user.getDefaultPayoutPreference());
     }
   }
 

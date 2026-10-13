@@ -19,7 +19,8 @@
 
 // @ts-check
 
-/* global krtAutocomplete */
+import { krtAutocomplete } from '/js/kernel/autocomplete.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const dataEl = /** @type {HTMLDataListElement | null} */ (
@@ -185,11 +186,9 @@ function filterFlatView(filter) {
     return container ? filterCards(container, filter) : 0;
 }
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('input', 'materials-filter', filterMaterials);
-    window.krtEvents.on('change', 'materials-filter', filterMaterials);
-    window.krtEvents.on('click', 'materials-toggle-kind', (el) => {
-        toggleKindGroup(el);
-    });
-    window.krtEvents.on('change', 'materials-toggle-grouping', onToggleGrouping);
-}
+krtEvents.on('input', 'materials-filter', filterMaterials);
+krtEvents.on('change', 'materials-filter', filterMaterials);
+krtEvents.on('click', 'materials-toggle-kind', (el) => {
+    toggleKindGroup(el);
+});
+krtEvents.on('change', 'materials-toggle-grouping', onToggleGrouping);

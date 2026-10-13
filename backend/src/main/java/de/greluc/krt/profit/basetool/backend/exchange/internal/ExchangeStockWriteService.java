@@ -33,15 +33,14 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemR
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveRequest;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStockChangeSet;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeEffects;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
-import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
+import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -252,7 +251,7 @@ public class ExchangeStockWriteService {
     }
     Lot lot = parsed.get();
     stockCommands.lockLots(member, List.of(lotKey));
-    List<InventoryItem> rows = stockCommands.lockLotRows(member, lot.stock());
+    List<StockRow> rows = stockCommands.lockLotRows(member, lot.stock());
     BigDecimal delta = round(target, unit).subtract(round(sum(rows), unit));
     if (delta.signum() > 0) {
       stockCommands.bookIn(member, lot.stock(), delta.doubleValue());
@@ -317,7 +316,7 @@ public class ExchangeStockWriteService {
     List<Lot> lots = new ArrayList<>(ops.size());
     for (int i = 0; i < ops.size(); i++) {
       ExchangeStockChangeSet.Op op = ops.get(i);
-      Catalogue entry = catalogue.get(i);
+      Catalogue entry = Objects.requireNonNull(catalogue.get(i));
       Skip skip = null;
       Lot lot = null;
       if (entry.result() != null) {
@@ -343,7 +342,7 @@ public class ExchangeStockWriteService {
       early.add(skip);
       lots.add(lot);
     }
-    Map<String, List<InventoryItem>> locked = lockInKeyOrder(caller.member(), lots);
+    Map<String, List<StockRow>> locked = lockInKeyOrder(caller.member(), lots);
     Map<String, BigDecimal> quantities = new HashMap<>();
     List<Planned> plan = new ArrayList<>();
     for (int i = 0; i < ops.size(); i++) {
@@ -354,7 +353,7 @@ public class ExchangeStockWriteService {
       ExchangeStockChangeSet.Op op = ops.get(i);
       Lot lot = lots.get(i);
       String unit = lot.unit();
-      List<InventoryItem> rows = locked.get(lot.key());
+      List<StockRow> rows = Objects.requireNonNull(locked.get(lot.key()));
       BigDecimal current = quantities.computeIfAbsent(lot.key(), _ -> round(sum(rows), unit));
       BigDecimal expected = round(op.expectedQuantity().amount(), unit);
       BigDecimal target = round(op.quantity().amount(), unit);
@@ -398,7 +397,9 @@ public class ExchangeStockWriteService {
     for (ExchangeResolveResponse.Result result : materials.results()) {
       if (result.status() == ExchangeResolveResponse.Status.RESOLVED) {
         Material material =
-            materialRepository.findById(UUID.fromString(result.ref().bt())).orElseThrow();
+            materialRepository
+                .findById(UUID.fromString(Objects.requireNonNull(result.ref()).bt()))
+                .orElseThrow();
         byIndex.put(result.index(), Catalogue.of(material));
       } else if (result.status() == ExchangeResolveResponse.Status.AMBIGUOUS) {
         byIndex.put(result.index(), Catalogue.skip(AMBIGUOUS, "AMBIGUOUS"));
@@ -415,7 +416,9 @@ public class ExchangeStockWriteService {
         int index = retry.get(result.index());
         if (result.status() == ExchangeResolveResponse.Status.RESOLVED) {
           GameItem item =
-              gameItemRepository.findById(UUID.fromString(result.ref().bt())).orElseThrow();
+              gameItemRepository
+                  .findById(UUID.fromString(Objects.requireNonNull(result.ref()).bt()))
+                  .orElseThrow();
           byIndex.put(index, Catalogue.of(item));
         } else if (result.status() == ExchangeResolveResponse.Status.AMBIGUOUS) {
           byIndex.put(index, Catalogue.skip(AMBIGUOUS, "AMBIGUOUS"));
@@ -436,7 +439,7 @@ public class ExchangeStockWriteService {
    * @param lots the batch's lots by op, {@code null} for an op that ends before its lot
    * @return each lot's locked rows by the lot's key
    */
-  private @NotNull Map<String, List<InventoryItem>> lockInKeyOrder(
+  private @NotNull Map<String, List<StockRow>> lockInKeyOrder(
       @NotNull UUID member, @NotNull List<@Nullable Lot> lots) {
     Map<String, Lot> byKey = new TreeMap<>();
     for (Lot lot : lots) {
@@ -445,7 +448,7 @@ public class ExchangeStockWriteService {
       }
     }
     stockCommands.lockLots(member, byKey.keySet());
-    Map<String, List<InventoryItem>> locked = new HashMap<>();
+    Map<String, List<StockRow>> locked = new HashMap<>();
     byKey.forEach((key, lot) -> locked.put(key, stockCommands.lockLotRows(member, lot.stock())));
     return locked;
   }
@@ -571,7 +574,7 @@ public class ExchangeStockWriteService {
   private @NotNull BigDecimal markRows(
       @NotNull UUID member, @NotNull Change change, boolean stolen, @NotNull BigDecimal amount) {
     BigDecimal left = amount;
-    for (InventoryItem row : change.rows()) {
+    for (StockRow row : change.rows()) {
       if (left.signum() <= 0) {
         break;
       }
@@ -584,16 +587,14 @@ public class ExchangeStockWriteService {
       BigDecimal rowAmount = round(BigDecimal.valueOf(row.getAmount()), change.lot().unit());
       BigDecimal take = rowAmount.min(left);
       if (take.compareTo(rowAmount) < 0) {
-        BigDecimal earmarked =
-            BigDecimal.valueOf(
-                InventoryAllocations.sumJobOrder(row) + InventoryAllocations.sumMission(row));
+        BigDecimal earmarked = BigDecimal.valueOf(row.jobOrderReserved() + row.missionReserved());
         take = take.min(round(rowAmount.subtract(earmarked), change.lot().unit()));
       }
       if (take.signum() <= 0) {
         continue;
       }
       stockCommands.markStolen(
-          member, row, stolen, take.compareTo(rowAmount) == 0 ? null : take.doubleValue());
+          member, row.getId(), stolen, take.compareTo(rowAmount) == 0 ? null : take.doubleValue());
       left = left.subtract(take);
     }
     return amount.subtract(left);
@@ -684,7 +685,7 @@ public class ExchangeStockWriteService {
     if (booked.signum() > 0 && delta.signum() > 0) {
       stockCommands.bookIn(caller.member(), change.lot().stock(), booked.doubleValue());
     } else if (booked.signum() > 0) {
-      List<InventoryItem> stillInLot =
+      List<StockRow> stillInLot =
           change.rows().stream()
               .filter(row -> Boolean.TRUE.equals(row.getStolen()) == change.lot().stolen())
               .toList();
@@ -713,12 +714,12 @@ public class ExchangeStockWriteService {
    */
   private void bookOut(
       @NotNull UUID member,
-      @NotNull List<InventoryItem> rows,
+      @NotNull List<StockRow> rows,
       @NotNull BigDecimal amount,
       @NotNull String unit,
       @NotNull OfferEffects offers) {
     BigDecimal remaining = amount;
-    for (InventoryItem row : rows) {
+    for (StockRow row : rows) {
       if (remaining.signum() <= 0) {
         break;
       }
@@ -726,7 +727,8 @@ public class ExchangeStockWriteService {
       if (take.signum() <= 0) {
         continue;
       }
-      StockChangeEffects effects = stockCommands.bookOutRow(member, row, take.doubleValue());
+      StockChangeEffects effects =
+          stockCommands.bookOutRow(member, row.getId(), take.doubleValue());
       offers.reduced += effects.reduced();
       offers.removed += effects.removed();
       remaining = remaining.subtract(take);
@@ -749,9 +751,9 @@ public class ExchangeStockWriteService {
    * @param rows the rows
    * @return the sum
    */
-  private static @NotNull BigDecimal sum(@NotNull List<InventoryItem> rows) {
+  private static @NotNull BigDecimal sum(@NotNull List<StockRow> rows) {
     BigDecimal sum = BigDecimal.ZERO;
-    for (InventoryItem row : rows) {
+    for (StockRow row : rows) {
       sum = sum.add(BigDecimal.valueOf(row.getAmount()));
     }
     return sum;
@@ -763,11 +765,10 @@ public class ExchangeStockWriteService {
    * @param rows the rows
    * @return the free amount
    */
-  private static @NotNull BigDecimal free(@NotNull List<InventoryItem> rows) {
+  private static @NotNull BigDecimal free(@NotNull List<StockRow> rows) {
     BigDecimal free = BigDecimal.ZERO;
-    for (InventoryItem row : rows) {
-      double reserved =
-          Math.max(InventoryAllocations.sumJobOrder(row), InventoryAllocations.sumMission(row));
+    for (StockRow row : rows) {
+      double reserved = Math.max(row.jobOrderReserved(), row.missionReserved());
       free = free.add(BigDecimal.valueOf(Math.max(0.0, row.getAmount() - reserved)));
     }
     return free;
@@ -916,7 +917,7 @@ public class ExchangeStockWriteService {
      */
     @NotNull
     UUID catalogueId() {
-      return material != null ? material.getId() : gameItem.getId();
+      return material != null ? material.getId() : Objects.requireNonNull(gameItem).getId();
     }
 
     /**
@@ -926,7 +927,10 @@ public class ExchangeStockWriteService {
      */
     @NotNull
     String key() {
-      String head = material != null ? "m:" + material.getId() : "i:" + gameItem.getId();
+      String head =
+          material != null
+              ? "m:" + material.getId()
+              : "i:" + Objects.requireNonNull(gameItem).getId();
       return head
           + "|l:"
           + location.getId()
@@ -952,7 +956,7 @@ public class ExchangeStockWriteService {
       @NotNull Lot lot,
       @NotNull BigDecimal current,
       @NotNull BigDecimal target,
-      @NotNull List<InventoryItem> rows)
+      @NotNull List<StockRow> rows)
       implements Planned {}
 
   /**

@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityAware;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ValidQuantityAmount;
-import de.greluc.krt.profit.basetool.backend.validation.QualityValue;
+import de.greluc.krt.profit.basetool.backend.kernel.QualityValue;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;

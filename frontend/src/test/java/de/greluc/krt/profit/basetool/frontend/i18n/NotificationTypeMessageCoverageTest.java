@@ -47,7 +47,7 @@ class NotificationTypeMessageCoverageTest {
   /** The enum whose constants must each have a template. */
   private static final Path NOTIFICATION_TYPE =
       resolveModuleRelative(
-          "../backend/src/main/java/de/greluc/krt/profit/basetool/backend/model/"
+          "../backend/src/main/java/de/greluc/krt/profit/basetool/backend/notification/api/"
               + "NotificationType.java");
 
   /** The three bundles, by the name a failure should name. */

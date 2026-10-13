@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.orgchart.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 
 /**
  * The three places a {@link OrgChartPosition} can live in the Profit-Bereich org chart. Every

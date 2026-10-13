@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
-import de.greluc.krt.profit.basetool.backend.mapper.MissionOperationLookup;
+import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionOperationLookup;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionOperationSummary;
 import de.greluc.krt.profit.basetool.backend.mission.api.OperationSummaryProvider;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionOperationSummary;
 import jakarta.persistence.EntityManager;
 import java.util.HashMap;
 import java.util.LinkedHashSet;

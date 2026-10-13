@@ -28,20 +28,21 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintOwnerProduct;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.MemberBlueprintSharings;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintVariantAliasOverrides;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintVariantFamilyResolver;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Blueprint;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
-import de.greluc.krt.profit.basetool.backend.model.JobOrder;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
-import de.greluc.krt.profit.basetool.backend.model.Squadron;
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
-import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -69,6 +70,7 @@ class JobOrderItemBlueprintOwnersServiceTest {
   @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
   @Mock private PersonalBlueprintRepository personalBlueprintRepository;
   @Mock private UserRepository userRepository;
+  @Mock private MemberBlueprintSharings memberBlueprintSharings;
 
   private JobOrderItemBlueprintOwnersService service;
 
@@ -80,6 +82,7 @@ class JobOrderItemBlueprintOwnersServiceTest {
             orgUnitMembershipRepository,
             personalBlueprintRepository,
             userRepository,
+            memberBlueprintSharings,
             new BlueprintVariantFamilyResolver(
                 new BlueprintNameNormalizer(), new BlueprintVariantAliasOverrides()));
   }
@@ -362,7 +365,7 @@ class JobOrderItemBlueprintOwnersServiceTest {
     when(jobOrderRepository.findByIdWithItemBlueprints(ORDER_ID)).thenReturn(Optional.of(order));
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_ID)))
         .thenReturn(Set.of(ALICE));
-    when(userRepository.findIdsBySharingBlueprintsGlobally()).thenReturn(Set.of(CARLA));
+    when(memberBlueprintSharings.userIdsSharingGlobally()).thenReturn(Set.of(CARLA));
     ArgumentCaptor<Collection<UUID>> ownerUserIds = ArgumentCaptor.captor();
     when(personalBlueprintRepository.findOwnerProductByOwnerUserIdIn(ownerUserIds.capture()))
         .thenReturn(List.of(owned(ALICE, "Aurora MR"), owned(CARLA, "Aurora MR")));
@@ -389,7 +392,7 @@ class JobOrderItemBlueprintOwnersServiceTest {
     when(jobOrderRepository.findByIdWithItemBlueprints(ORDER_ID)).thenReturn(Optional.of(order));
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_ID)))
         .thenReturn(Set.of(ALICE));
-    when(userRepository.findIdsBySharingBlueprintsGlobally()).thenReturn(Set.of());
+    when(memberBlueprintSharings.userIdsSharingGlobally()).thenReturn(Set.of());
     ArgumentCaptor<Collection<UUID>> ownerUserIds = ArgumentCaptor.captor();
     when(personalBlueprintRepository.findOwnerProductByOwnerUserIdIn(ownerUserIds.capture()))
         .thenReturn(List.of(owned(ALICE, "Aurora MR")));

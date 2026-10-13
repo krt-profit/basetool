@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
-import de.greluc.krt.profit.basetool.backend.validation.DtoConstraints;
+import de.greluc.krt.profit.basetool.backend.kernel.DtoConstraints;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;

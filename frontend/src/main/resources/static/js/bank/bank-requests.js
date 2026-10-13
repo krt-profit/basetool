@@ -18,9 +18,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-(function () {
-    'use strict';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
+function initBankRequests() {
     /** The segments of the status control, in display order. */
     const SEGMENTS = ['PENDING', 'CONFIRMED', 'REJECTED', 'ALL'];
 
@@ -124,11 +124,7 @@
      * @param {string} segment the segment to show
      */
     function load(segment) {
-        if (!window.krtFetch || typeof window.krtFetch.swap !== 'function') {
-            window.location.assign(`/bank/requests?status=${encodeURIComponent(segment)}`);
-            return;
-        }
-        window.krtFetch.swap({
+        krtFetch.swap({
             url: `/bank/requests?status=${encodeURIComponent(segment)}`,
             container: `#${RESULTS_ID}`,
             fragmentValue: 'requestQueue',
@@ -191,4 +187,6 @@
             load(saved);
         }
     });
-})();
+}
+
+initBankRequests();

@@ -58,9 +58,9 @@ class CreateDeletionRequestRequest privacy GDPR orchestration, transitional modu
 class DecideDeletionRequestRequest privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class ConsolidateAccountRequest privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class MergeAccountRequest privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
+class MeController app composition root: the caller's context and layout read (plan 7.6)
 class PayoutPreference identity member preference on User (plan 7.3)
 class AuthHelperService platform the single SecurityContextHolder reader (ArchUnit rule)
-class CustomJwtGrantedAuthoritiesConverter scope JWT -> authorities, incl. contextual org-unit authorities
 class MaterialCollectionEntryDto inventory produced by InventoryAggregationService
 class JobOrderEarmark inventory what the Lager shows of an earmarked job order, in the layer because the job-order repository returns it
 class MissionEarmark inventory what the Lager shows of an earmarked mission, in the layer because the mission repository returns it
@@ -76,7 +76,6 @@ class RefineryYield catalogue UEX refinery-yield matrix row, written by UexRefin
 class RefineryYieldRepository catalogue repository of the UEX yield matrix
 class RefineryImportProperties refinery refinery screenshot import tuning
 class ShipTypeMatcher hangar ShipType resolver for the hangar import
-class MeController identity the caller's own profile surface (/me)
 class UserZone platform web argument binding
 class UserZoneArgumentResolver platform web argument binding
 class UserApprovalMailEventListener identity after-commit identity mail listener
@@ -85,7 +84,6 @@ class UserApprovalMailService identity identity mail composition
 class PendingRegistrationMailService identity identity mail composition
 class KeycloakHealthIndicator platform health probe
 class UserSyncTask identity Keycloak user-sync trigger
-class RejectedRegistrationRetentionTask identity rejected-registration purge (REQ-SEC-057)
 class SseSendFailureCause platform SSE failure tag shared by notification and live sync
 class RedisJsonFanout platform Redis pub/sub transport shared by notification and live sync
 class KrtPdfSupport platform shared PDF design layer
@@ -176,22 +174,3 @@ package operation operation the operation module's package tree (plan 5.2)
 package promotion promotion the promotion module's package tree (plan 5.2)
 package personalinventory personalinventory the personal-inventory module's package tree (plan 5.2)
 
-name ^(MaterialClaim|ClaimBucket|ClaimDto|CreateClaim|MaterialDemand) joborder
-name ^(JobOrder|CreateJobOrder|UpdateJobOrder|HandoverReport) joborder
-name ^(Inventory|StockViewerAccess) inventory
-name ^(PersonalBlueprint|DefaultBlueprint|BlueprintImport|BlueprintExport|BlueprintCraftability|Craftability|BlueprintOverview|BlueprintProduct|BlueprintUploadPreview|BlueprintOwner|BlueprintModifierMath|BlueprintVariant|BlueprintSource|BlueprintExternalAlias) blueprint
-name ^(Mission|AddCrew|AddExternalParticipant|AddParticipantById|AddUnit|JoinMission|UpdateCrew|UpdateParticipant|UpdatePayoutPreference|UpdateUnit|AddCustomFrequency|AddFrequency|UpdateCustomFrequency|CreateMission|PatchMission|ReorderMission|SetPartyLead|ToggleMissionStep|UpdateMission|AddMission|ParticipantTargetResolver) mission
-name ^(Hangar|Ship(?!Type)|Fleet|Starjump|Shiplist|SquadronShip|SetHomeLocation) hangar
-name ^(Notification|LocalNotification|RedisNotification|RuleEvaluation|RecipientResolution|SelectorKind|OrgRelativeRole|Mail|SmtpMail) notification
-name ^Audit audit
-name ^(OrgRoleManagement|AddOlMember|SquadronRole|AssignSquadronRank) orgunit leadership writes merged into orgunit (plan 7.3)
-name ^(OrgUnit|Squadron|SpecialCommand|Bereich|Organisationsleitung|KommandoGroup|CreateKommandoGroup|UpdateKommandoGroup|OrgHierarchy|Membership) orgunit
-name ^(User|Role|Registration|PendingRegistration|ApproveRegistration|RejectRegistration|ReopenRegistration|LinkRegistration|MyRegistration|Discord|Keycloak|Terms|DeletionRequest|CreateDeletionRequest|DecideDeletionRequest|DataExport|AdminDataExport|AccountDeletion|AccountConsolidation|ConsolidateAccount|MergeAccount|Handle|PersonSearch|AdminPersonSearch|AdminTerms|AdminDeletion|RejectedRegistration|ApprovalDecision|ApprovalStatus|AdminController$) identity
-name ^(LiveSync|LocalLiveSync|RedisLiveSync) livesync
-
-layer config platform infrastructure layer package
-layer filter platform infrastructure layer package
-layer logging platform infrastructure layer package
-layer metrics platform infrastructure layer package
-layer annotation platform infrastructure layer package
-layer web platform infrastructure layer package

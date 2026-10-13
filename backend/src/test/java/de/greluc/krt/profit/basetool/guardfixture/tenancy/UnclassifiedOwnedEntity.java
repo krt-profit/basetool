@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.guardfixture.tenancy;
 
-import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;

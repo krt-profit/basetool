@@ -19,10 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.orgchart.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
-import de.greluc.krt.profit.basetool.backend.model.dto.KommandoGroupDto;
+import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.KommandoGroupDto;
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One manageable org unit in the delegated Leitung view, with its roster and the two capability
@@ -53,4 +54,4 @@ public record LeitungUnitDto(
     boolean canManageRoster,
     List<LeitungMemberDto> members,
     List<KommandoGroupDto> groups,
-    UUID grandAdmiralUserId) {}
+    @Nullable UUID grandAdmiralUserId) {}

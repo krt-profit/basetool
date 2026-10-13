@@ -22,9 +22,9 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategory;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryMapper;
-import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.platform.api.CacheConfig;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -111,7 +111,7 @@ public class MaterialCategoryService {
 
   /**
    * Deletes a category. The backend rejects the delete with {@link
-   * de.greluc.krt.profit.basetool.backend.exception.EntityInUseException} when any material still
+   * de.greluc.krt.profit.basetool.backend.kernel.EntityInUseException} when any material still
    * references the category.
    *
    * @param id category primary key

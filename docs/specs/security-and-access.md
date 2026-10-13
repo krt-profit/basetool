@@ -373,7 +373,7 @@ authoritative in [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md).
 `LOGISTICIAN` and `MISSION_MANAGER` are granted contextually via `is_logistician` /
 `is_mission_manager` flags on `org_unit_membership` rows; the flag on *any* membership
 yields the flat authority via `CustomJwtGrantedAuthoritiesConverter`, with per-OrgUnit
-scoping enforced by `@PreAuthorize` SpEL against `OwnerScopeService.canEditOrgUnit(...)`.
+scoping enforced by `@PreAuthorize` SpEL against `OrgUnitAccessPolicy.canEditOrgUnit(...)`.
 An SK `is_lead` membership additionally grants both roles (flat + contextual
 `LOGISTICIAN@skId` / `MISSION_MANAGER@skId`) on that SK. Legacy `app_user.is_logistician`
 / `is_mission_manager` are read only as a fallback for users with no membership row;
@@ -3833,12 +3833,12 @@ narrowed against the allowlist the page itself renders, before it is relayed.
 |                      Relayed value                      |                    Bound as                    |                                                        Mirrors                                                         |
 |---------------------------------------------------------|------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
 | `from`, `to`, `before`                                  | `Instant` + `@DateTimeFormat(iso = DATE_TIME)` | `AuditAdminController`, `BankAccountController`, `OrgUnitBankController`                                               |
-| `userSub`, `actorUserId`, `userId`                      | `UUID`                                         | `AdminPersonalInventoryController`, `AdminPersonalBlueprintController`, `MemberEvaluationController`, `UserController` |
+| `userSub`, `actorUserId`, `userId`                      | `UUID`                                         | `AdminPersonalInventoryController`, `AdminPersonalBlueprintController`, `MemberEvaluationController`, `UserProfileController`, `UserController` |
 | `eventType`, `clientId`, `source`, the board `sort` key | narrowed to the rendered option list           | the page's own `<select>`                                                                                              |
 | a Spring sort specification                             | `RelayParams.sortSpecOrNull`, relayed as a `{sort}` URI-template variable (the personal inventory listing did `URLEncoder.encode` first, so the comma went out as `%252C`) | REQ-API-005's backend field whitelist |
 | free text (`q`, the list pages' `search`)               | a `WebClient` URI-template variable            | REQ-FE-016                                                                                                             |
 | the mission / operation list period (`start`, `end`)    | `Instant` + `@DateTimeFormat(iso = DATE_TIME)` | `MissionController#searchMissions`, `OperationController`                                                              |
-| an announcement id, a member id on the promotion eligibility fragment | `UUID`                           | `UserController#updateReadAnnouncement`, `PromotionEligibilityController`                                             |
+| an announcement id, a member id on the promotion eligibility fragment | `UUID`                           | `AnnouncementReadController#updateReadAnnouncement`, `PromotionEligibilityController`                                             |
 | a bank role bucket (`roleCode`), a default-blueprint id | `RelayParams.constantNameOrNull` (enum-literal shape, else `400`), `UUID` | `BankApprovalLimitService` role buckets, `AdminDefaultBlueprintController` |
 | the mission list `status`                               | narrowed to `PLANNED`/`ACTIVE`/`COMPLETED`/`CANCELLED` | the backend's mission status vocabulary                                                                          |
 | a star-system name (`starSystemNames`)                  | a `WebClient` URI-template variable            | REQ-UI-014's materials-matrix relay                                                                                    |
@@ -4077,7 +4077,7 @@ REQ-FE-025) ·
 `HomeControllerMvcTest#anonymousRootRendersTheLandingPageWithoutDataOrSession` ·
 `SecurityConfigStaticAssetPermitAllTest` · `ManagementPortIsolationTest` ·
 `ApiVhostAnonymousSurfaceTest` and the nightly `edge-deny-probe.yml` (the same statuses from outside
-the host) · **Code:** `backend/…/config/SecurityConfig`, `frontend/…/kernel/security/SecurityConfig`,
+the host) · **Code:** `backend/…/app/api/SecurityConfig`, `frontend/…/kernel/security/SecurityConfig`,
 `frontend/…/dashboard/web/HomeController`, `frontend/…/kernel/layout/SafeCsrfAdvice`,
 `templates/dashboard/landing.html` · **ADR:**
 [ADR-0159](../adr/0159-the-basetool-has-no-anonymous-or-guest-surface.md)
@@ -4270,7 +4270,7 @@ optimistic-lock version. Each is a `409`.
 it) · `UserRegistrationServiceTest` (the `PENDING` path passes the waiver) ·
 `MembersPageDiscordColumnRenderTest` (the action on every row + the dialog) · `DtoOpenApiContractTest`
 · `MessageBundleConsistencyTest` · **Code:** `AccountConsolidationService`,
-`UserController#consolidateAccount`, `ConsolidateAccountRequest` (backend + frontend),
+`AccountRemovalController#consolidateAccount`, `ConsolidateAccountRequest` (backend + frontend),
 `UserDeletionService.KeycloakPresenceCheck`, `MemberManagementController#consolidateMemberAjax`,
 `identity/members.html`, `messages*.properties` · **Issues:** #1827, #1828 · **Decision:**
 [ADR-0160](../adr/0160-a-duplicate-account-stays-consolidatable-after-approval.md)
@@ -4705,9 +4705,9 @@ data is no more disclosable to an admin serving somebody's Art. 15 request than 
 `DataExportControllerSecurityTest`, `PersonalDataExportCatalogueTest`,
 `DataExportEndStateTest`, `PersonalDataExportOwnershipTest`, `PersonalDataExportRegistryTest` ·
 **Code:** `platform/api/PersonalDataExportSection`, `privacy/internal/PersonalDataExportRegistry`,
-the `*ExportSections` of the modules, `kernel/HandleScrubber`, `service/DataExportService`, `service/DataExportReportService`,
-`service/pdf/DataExportPdfFormat`, `controller/DataExportController`,
-`controller/AdminDataExportController`, frontend `identity/web/DataExportProxyController`,
+the `*ExportSections` of the modules, `kernel/HandleScrubber`, `privacy/api/DataExportService`, `privacy/api/DataExportReportService`,
+`privacy/api/DataExportPdfFormat`, `privacy/web/DataExportController`,
+`privacy/web/AdminDataExportController`, frontend `identity/web/DataExportProxyController`,
 `templates/identity/profile.html` (`#profile-export-card` — the member's export buttons are plain `GET`
 links, beside the separate deletion card) · **Decision:**
 [ADR-0185](../adr/0185-the-data-export-excludes-third-parties-by-projection.md) ·
@@ -4809,10 +4809,10 @@ legitimate while an admin is mid-task and the roster sync is nightly.
 - [x] `UserDeletionUnfinished` fires past seven days and not on a count that merely stays non-zero.
 
 **Enforced by:** `OrphanedAccountRepositoryIntegrationTest`, `UserReconciliationServiceTest`,
-`BusinessMetricsCollectorTest` · **Code:** `model/User#keycloakAbsentSince`,
-`repository/UserRepository#markMissingUsers` / `#countOrphanedMemberAccounts` /
-`#findOldestOrphanedMemberAbsenceStamp`, `service/UserReconciliationService#syncUser`,
-`task/BusinessMetricsCollector`, `metrics/MetricNames#USERS_PENDING_DELETION`,
+`BusinessMetricsCollectorTest` · **Code:** `identity/api/User#keycloakAbsentSince`,
+`identity/api/UserRepository#markMissingUsers` / `#countOrphanedMemberAccounts` /
+`#findOldestOrphanedMemberAbsenceStamp`, `identity/api/UserReconciliationService#syncUser`,
+`identity/internal/IdentityBusinessGauges`, `app/internal/BusinessMetricsCollector`, `platform/api/MetricNames#USERS_PENDING_DELETION`,
 `db/migration/V241`, `monitoring/prometheus/alerts/business.yml`,
 `monitoring/grafana/dashboards/07-basetool-operations.json` · **Decision:**
 [ADR-0182](../adr/0182-an-unfinished-account-deletion-is-measured-from-a-recorded-absence.md) ·
@@ -4928,8 +4928,8 @@ aggregates.
 `PersonSearchEndStateTest`, `PersonMentionOwnershipTest`, `PersonMentionRegistryTest`,
 `AdminPersonSearchControllerSecurityTest` · **Code:**
 `platform/api/PersonMentionSource`, `privacy/internal/PersonMentionRegistry`, the
-`*MentionSource` classes of the modules, `service/PersonSearchService`,
-`controller/AdminPersonSearchController`, `model/dto/PersonSearchHitDto`,
+`*MentionSource` classes of the modules, `privacy/api/PersonSearchService`,
+`privacy/web/AdminPersonSearchController`, `privacy/api/PersonSearchHitDto`,
 `frontend/identity/web/AdminPersonSearchPageController`, `templates/identity/admin/person-search.html`,
 `static/js/identity/admin-person-search.js` · **Decision:**
 [ADR-0184](../adr/0184-the-person-search-is-a-checked-registry-not-a-schema-sweep.md) ·
@@ -5030,10 +5030,10 @@ from a statute rather than from operational taste.
   management are all refused.
 
 **Enforced by:** `DeletionRequestServiceTest`, `DeletionRequestControllerSecurityTest`,
-`BusinessMetricsCollectorTest` · **Code:** `model/DeletionRequest`,
-`model/DeletionRequestStatus`, `repository/DeletionRequestRepository`,
-`service/DeletionRequestService`, `controller/DeletionRequestController`,
-`controller/AdminDeletionRequestController`, `privacy/api/events/AccountDeletionRequestedEvent`,
+`BusinessMetricsCollectorTest` · **Code:** `privacy/api/DeletionRequest`,
+`privacy/api/DeletionRequestStatus`, `privacy/api/DeletionRequestRepository`,
+`privacy/api/DeletionRequestService`, `privacy/web/DeletionRequestController`,
+`privacy/web/AdminDeletionRequestController`, `privacy/api/events/AccountDeletionRequestedEvent`,
 `privacy/api/events/AccountDeletionRequestDeclinedEvent`, `db/migration/V242`, `db/migration/V243`,
 `frontend/identity/web/DeletionRequestProxyController`,
 `frontend/identity/web/AdminDeletionRequestsPageController`,
@@ -5173,16 +5173,16 @@ it.
 **Enforced by:** `HandleAnonymisationEndStateTest` (real Postgres: every covered column, the rows
 that must stay, the counts and both marker rows), `HandleAnonymisationServiceTest`,
 `HandleErasureCoverageTest`, `HandleAnonymisationCoverageTest` · **Code:**
-`service/HandleAnonymisationService`, `platform/api/HandleAnonymisationParticipant`,
-`service/AuditHandleAnonymisation`, `bank/internal/BankHandleAnonymisation`,
+`privacy/api/HandleAnonymisationService`, `platform/api/HandleAnonymisationParticipant`,
+`audit/internal/AuditHandleAnonymisation`, `bank/internal/BankHandleAnonymisation`,
 `joborder/internal/JobOrderHandleAnonymisation`, `kernel/HandleAnonymisation`,
 `privacy/internal/HandleErasureCoverage`,
-`repository/AuditEventRepository#anonymiseActorHandle`,
+`audit/api/AuditEventRepository#anonymiseActorHandle`,
 `bank/internal/BankAuditEventRepository#anonymiseActorHandle`,
 `bank/internal/BankTransactionRepository#anonymiseCounterpartyHandle`,
 `bank/internal/BankBookingRequestRepository#anonymiseHandles`,
-`repository/JobOrderHandoverRepository#anonymiseRecipientHandle`,
-`repository/JobOrderItemHandoverRepository#anonymiseRecipientHandle`,
+`joborder/internal/JobOrderHandoverRepository#anonymiseRecipientHandle`,
+`joborder/internal/JobOrderItemHandoverRepository#anonymiseRecipientHandle`,
 `frontend/kernel/web/HandleDisplay` · **Decision:**
 [ADR-0183](../adr/0183-a-granted-erasure-anonymises-the-handle-snapshots-in-place.md)
 

@@ -18,6 +18,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { krtEvents } from '/js/kernel/event-delegation.js';
+
 const COLLAPSED_KEY = 'sc_links_collapsed_categories';
 const TOGGLE_SELECTOR = '[data-trigger="sc-links-toggle-category"]';
 
@@ -89,6 +91,6 @@ function restore() {
 }
 
 restore();
-window.krtEvents.on('click', 'sc-links-toggle-category', (toggle) => {
+krtEvents.on('click', 'sc-links-toggle-category', (toggle) => {
     toggleCategory(toggle);
 });

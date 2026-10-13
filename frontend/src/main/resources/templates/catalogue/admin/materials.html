@@ -228,7 +228,6 @@
     </th:block>
 </th:block>
 
-<script th:src="@{/js/kernel/autocomplete.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     const CAT_MSG = {
         createSuccess: /*[[#{notification.success.save}]]*/ 'Gespeichert.',
@@ -250,7 +249,7 @@
     const MSG_CREATE_SUCCESS = /*[[#{admin.materials.create.success}]]*/ 'Material wurde angelegt.';
     const MSG_CREATE_ERROR = /*[[#{admin.materials.create.error}]]*/ 'Material konnte nicht angelegt werden.';
 </script>
-<script th:src="@{/js/catalogue/admin-materials.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/catalogue/admin-materials.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

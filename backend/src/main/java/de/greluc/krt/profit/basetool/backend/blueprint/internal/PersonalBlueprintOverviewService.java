@@ -19,12 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.blueprint.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct;
-import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
-import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintOwnerProduct;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.MemberBlueprintSharings;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprint;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.util.Comparator;
@@ -69,6 +70,7 @@ public class PersonalBlueprintOverviewService {
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
   private final PersonalBlueprintRepository personalBlueprintRepository;
   private final UserRepository userRepository;
+  private final MemberBlueprintSharings memberBlueprintSharings;
   private final BlueprintVariantFamilyResolver familyResolver;
   private final BlueprintVariantFamilyCatalog familyCatalog;
 
@@ -223,7 +225,7 @@ public class PersonalBlueprintOverviewService {
    */
   @NotNull
   private Set<UUID> globalSharerSubs() {
-    return new LinkedHashSet<>(userRepository.findIdsBySharingBlueprintsGlobally());
+    return new LinkedHashSet<>(memberBlueprintSharings.userIdsSharingGlobally());
   }
 
   /**

@@ -50,7 +50,8 @@ class RateLimitingTest {
   @Autowired private WebApplicationContext context;
 
   @Autowired
-  private de.greluc.krt.profit.basetool.backend.filter.RateLimitingFilter rateLimitingFilter;
+  private de.greluc.krt.profit.basetool.backend.platform.internal.RateLimitingFilter
+      rateLimitingFilter;
 
   private MockMvc mockMvc;
 

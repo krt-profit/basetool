@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.api;
 
-import de.greluc.krt.profit.basetool.backend.config.ApiDomains;
-import de.greluc.krt.profit.basetool.backend.config.ContractTiers;
-import de.greluc.krt.profit.basetool.backend.config.OpenApiDomainConfig;
+import de.greluc.krt.profit.basetool.backend.platform.internal.ApiDomains;
+import de.greluc.krt.profit.basetool.backend.platform.internal.ContractTiers;
+import de.greluc.krt.profit.basetool.backend.platform.internal.OpenApiDomainConfig;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;

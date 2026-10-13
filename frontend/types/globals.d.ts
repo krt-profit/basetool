@@ -105,15 +105,6 @@ interface KrtHtmlApi {
     readonly policyName: string;
 }
 
-/** The tagged-template HTML builder; see {@linkcode KrtHtmlApi}. Installed by `krt-html.js`. */
-declare const krtHtml: KrtHtmlApi;
-
-/** Shows a transient error toast. Installed by the layout's toast module. */
-declare function showFrontendErrorToast(message: string): void;
-
-/** Shows a transient success toast. Installed by the layout's toast module. */
-declare function showFrontendSuccessToast(message: string): void;
-
 /** CSRF token access and refresh, installed by `krt-fetch.js`. */
 interface KrtCsrfApi {
     /** The current CSRF token from the `_csrf` meta tag, or null when absent. */
@@ -747,47 +738,18 @@ interface Window {
 
     krtFetch: KrtFetchApi;
     krtCsrf: KrtCsrfApi;
-    krtReauth: KrtReauthApi;
-    krtTermsGate: KrtTermsGateApi;
 
     krtEvents: KrtEventsApi;
     krtLiveSync: KrtLiveSyncApi;
-    krtFilterPanel: KrtFilterPanelApi;
-    krtOverflowMenu: KrtOverflowMenuApi;
-    krtFilterChips: KrtFilterChipsApi;
     krtHtml: KrtHtmlApi;
     /** The browser's Trusted Types factory; absent where the browser has none. */
     trustedTypes?: TrustedTypePolicyFactory;
 
-    showFrontendErrorToast?: (message: string) => void;
-    showFrontendSuccessToast?: (message: string) => void;
-    showInventoryToast?: (message: string, isError?: boolean) => void;
-    /**
-     * KRT-styled confirmation modal replacing the native `window.confirm`; resolves true when the
-     * user confirmed. Omitted labels fall back to their `krtToastI18n` defaults.
-     */
-    showKrtConfirm?: (
-        title: string | null,
-        message: string,
-        confirmLabel?: string,
-        cancelLabel?: string,
-    ) => Promise<boolean>;
-
     krtModal: KrtModalApi;
-    krtNav?: KrtNavApi;
-    krtPalette?: KrtPaletteApi;
-    /** Alias of `krtModal.open` for the mission page. */
-    krtModalOpen: (overlay: Element | null) => void;
-    krtModalClose: (overlay: Element | null) => void;
     openModal?: (...args: any[]) => void;
 
-    krtEnhanceComboboxes?: (root: ParentNode) => void;
-    krtLocalizeDates: (root?: ParentNode | null) => void;
-    krtInitDatetimeSplitGroup?: (root: ParentNode) => void;
-    krtSyncDatetimeSplitGroup?: (root: ParentNode) => void;
     krtSearchableSelect?: (select: HTMLSelectElement, config: Record<string, unknown>) => unknown;
     krtComboboxRemoteSources?: Record<string, unknown>;
-    krtSegSet: (targetId: string, value: string) => void;
 
     krtComboboxI18n?: KrtComboboxI18n;
     krtProfileI18n?: KrtI18nDict;
@@ -839,15 +801,6 @@ interface Window {
     krtFetchI18n?: KrtI18nDict;
 
     /**
-     * Returns `url` when it is a same-origin absolute path, otherwise `fallback` (null when
-     * omitted). Installed by `safe-url.js` from the layout head, so every page has it.
-     */
-    safeSameOriginUrl: {
-        (url: unknown): string | null;
-        <T>(url: unknown, fallback: T): string | T;
-    };
-
-    /**
      * Whether a bank booking needs a justification, keyed by account id; filled as the remote
      * picker resolves accounts.
      */
@@ -868,30 +821,18 @@ interface Window {
         /** Endpoint the owners panel queries, with its own query string already applied. */
         ownersUrl?: string;
     };
-    krtHerkunft?: KrtHerkunftApi;
     /** The shared Lager behaviour of the two inventory pages (`inventory-common.js`). */
-    krtInventory?: KrtInventoryApi;
-    krtScuInput?: KrtScuInputApi;
     krtMaterialRelease?: KrtMaterialDialogApi;
     krtMaterialRequest?: KrtMaterialDialogApi;
     /**
      * The refinery yield-badge manager; required because both refinery-order modules call it
      * unguarded at parse time.
      */
-    krtRefineryYield: KrtRefineryYieldApi;
-    krtOpenEditCrewModal?: (source: Element) => void;
-    krtOperationsReload?: (...args: any[]) => void;
-    krtRefreshOrdersQueue?: (...args: any[]) => void;
     /**
      * Re-swaps the /members roster for the viewer's own filter and page, so the live-sync receiver
      * can apply a peer's change in place.
      */
-    krtRefreshMembersResults?: () => void;
 
-    krtMissionWrite: KrtSectionWriter['write'];
-    krtRefreshMissionSection: KrtSectionWriter['refresh'];
-    krtNotifyMissionChanged: KrtSectionWriter['notify'];
-    MissionPresence?: unknown;
     /** The viewer's user id on a saved mission, which starts the presence channel; else absent. */
     missionPresenceUserId?: string | null;
     /** The id of the saved mission on mission-detail.html; absent on a new mission. */
@@ -899,7 +840,6 @@ interface Window {
     /** Tooltip labels of the presence indicator, from `mission-detail.html`. */
     MISSION_PRESENCE_I18N?: KrtI18nDict;
     /** The running presence channel of the mission page; absent before `DOMContentLoaded`. */
-    missionPresence?: { sendChanged(sections: string[]): void };
     /** Whether the viewer may edit the mission; set by `mission-detail.html`. */
     missionCanEdit?: boolean;
     /** The id of the mission's parent operation, or null when it has none; from `mission-detail.html`. */
@@ -921,11 +861,6 @@ interface Window {
     /** Toast text of a failed actual-time save, from `mission-detail.html`. */
     MSG_MISSION_ACTUAL_TIME_ERROR?: string;
 
-    krtRefreshOrderSection?: (...args: any[]) => void;
-    krtNotifyOrderChanged?: (...args: any[]) => void;
-    krtNotifyInventoryChanged?: (...args: any[]) => void;
-    opRefreshSection?: (...args: any[]) => void;
-    opNotifyChanged?: (...args: any[]) => void;
     /** The id of the operation on operation-detail.html, keying its live-sync room and section URLs. */
     operationId?: string | null;
 
@@ -940,14 +875,4 @@ interface Window {
      */
     orderId?: string | null;
     __unsavedChangesInitialized?: boolean;
-    __ordersDragging?: boolean;
-    resetUnsavedChanges?: () => void;
-    filterTable?: (...args: any[]) => void;
-    openNoteModal?: (...args: any[]) => void;
-    closeNoteModal?: (...args: any[]) => void;
-    saveNote?: (...args: any[]) => void;
-    removeNote?: (...args: any[]) => void;
-    updateNoteCounter?: (...args: any[]) => void;
-    confirmRemoveMaterial?: (...args: any[]) => void;
-    materialRowToDelete?: Element | null;
 }

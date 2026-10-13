@@ -19,17 +19,17 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.Permissions;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
-import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
+import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntry;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import java.util.Collection;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -66,7 +66,7 @@ public class MissionSecurityService {
    * participant's own linked user. An external participant is accessible to elevated callers only.
    *
    * <p>A missing participant raises {@link
-   * de.greluc.krt.profit.basetool.backend.exception.NotFoundException}.
+   * de.greluc.krt.profit.basetool.backend.kernel.NotFoundException}.
    */
   public boolean canAccessParticipant(
       UUID missionId, UUID participantId, Authentication authentication) {
@@ -140,8 +140,8 @@ public class MissionSecurityService {
    * @param entryId finance entry id
    * @param authentication current Spring Security authentication
    * @return true if the caller may edit the entry
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the entry does
-   *     not exist
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the entry does not
+   *     exist
    */
   public boolean canEditFinanceEntry(UUID entryId, Authentication authentication) {
     if (authentication == null || !authentication.isAuthenticated()) {

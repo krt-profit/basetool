@@ -36,7 +36,7 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankAccessServ
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankAccountSettingsDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankBalanceDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.SetBankApprovalLimitRequest;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;

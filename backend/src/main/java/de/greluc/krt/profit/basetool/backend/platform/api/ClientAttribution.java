@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.platform.api;
 
-import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.platform.internal.ApiClientMetricsProperties;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

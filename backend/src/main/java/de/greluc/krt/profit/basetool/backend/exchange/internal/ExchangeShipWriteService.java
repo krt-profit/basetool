@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeCatalogKind;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
@@ -28,11 +27,12 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemR
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveRequest;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeShipChangeSet;
+import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipCommands;
-import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.model.Ship;
-import de.greluc.krt.profit.basetool.backend.model.dto.ShipRequestDto;
-import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
@@ -212,7 +212,7 @@ public class ExchangeShipWriteService {
           switch (op.op()) {
             case ExchangeShipChangeSet.LINK -> planLink(caller, op, links, touched);
             case ExchangeShipChangeSet.UPSERT ->
-                planUpsert(caller, op, types.get(i), links, touched);
+                planUpsert(caller, op, Objects.requireNonNull(types.get(i)), links, touched);
             case ExchangeShipChangeSet.REMOVE -> planRemove(caller, op, touched);
             default -> throw new IllegalArgumentException("Unknown ship operation: " + op.op());
           };
@@ -290,7 +290,7 @@ public class ExchangeShipWriteService {
           externalId,
           new ShipRequestDto(
               op.name(),
-              type.shipTypeId(),
+              Objects.requireNonNull(type.shipTypeId()),
               insurance,
               locationId,
               Boolean.TRUE.equals(op.fitted()),
@@ -305,20 +305,21 @@ public class ExchangeShipWriteService {
           : planReturn(caller, op, externalId, shipId, type, insurance, locationId, links);
     }
     Ship ship = locked.get();
-    if (touched.contains(shipId)) {
+    UUID ownedId = Objects.requireNonNull(shipId);
+    if (touched.contains(ownedId)) {
       return new Skip(REJECTED, VERSION_CONFLICT);
     }
     if (op.version() == null || !op.version().equals(ship.getVersion())) {
       return new Skip(REJECTED, VERSION_CONFLICT);
     }
-    String linked = links.externalOf(shipId);
+    String linked = links.externalOf(ownedId);
     if (linked != null && !linked.equals(externalId)) {
       return new Skip(REJECTED, LINK_TARGET_TAKEN);
     }
     ShipRequestDto dto =
         new ShipRequestDto(
             op.name(),
-            type.shipTypeId(),
+            Objects.requireNonNull(type.shipTypeId()),
             insurance,
             locationId,
             op.fitted() == null ? ship.isFitted() : op.fitted(),
@@ -328,12 +329,12 @@ public class ExchangeShipWriteService {
     if (!changes && linked != null) {
       return new Skip(UNCHANGED, null);
     }
-    touched.add(shipId);
-    links.link(externalId, shipId);
+    touched.add(ownedId);
+    links.link(externalId, ownedId);
     boolean removal =
         !Objects.equals(ship.getName(), dto.name())
             && !Objects.equals(ship.getShipType().getId(), dto.shipTypeId());
-    return new Update(externalId, shipId, state(ship), dto, changes, removal);
+    return new Update(externalId, ownedId, state(ship), dto, changes, removal);
   }
 
   /**
@@ -379,7 +380,7 @@ public class ExchangeShipWriteService {
         externalId,
         new ShipRequestDto(
             op.name(),
-            type.shipTypeId(),
+            Objects.requireNonNull(type.shipTypeId()),
             insurance,
             locationId,
             Boolean.TRUE.equals(op.fitted()),
@@ -413,11 +414,12 @@ public class ExchangeShipWriteService {
       return known ? new Skip(UNCHANGED, null) : new Skip(UNMATCHED, UNMATCHED_REASON);
     }
     Ship ship = locked.get();
-    if (touched.contains(shipId) || !version.equals(ship.getVersion())) {
+    UUID ownedId = Objects.requireNonNull(shipId);
+    if (touched.contains(ownedId) || !version.equals(ship.getVersion())) {
       return new Skip(REJECTED, VERSION_CONFLICT);
     }
-    touched.add(shipId);
-    return new Remove(shipId, state(ship));
+    touched.add(ownedId);
+    return new Remove(ownedId, state(ship));
   }
 
   /**
@@ -550,7 +552,9 @@ public class ExchangeShipWriteService {
       byIndex.put(
           index,
           switch (result.status()) {
-            case RESOLVED -> new ShipTypeMatch(UUID.fromString(result.ref().bt()), null, null);
+            case RESOLVED ->
+                new ShipTypeMatch(
+                    UUID.fromString(Objects.requireNonNull(result.ref()).bt()), null, null);
             case AMBIGUOUS -> new ShipTypeMatch(null, AMBIGUOUS, AMBIGUOUS_REASON);
             case UNMATCHED -> new ShipTypeMatch(null, UNMATCHED, UNMATCHED_REASON);
           });

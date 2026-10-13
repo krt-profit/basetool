@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.identity.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.Role;
+import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.platform.api.CentralMapperConfig;
 import org.mapstruct.Mapper;
 

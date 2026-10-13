@@ -19,7 +19,11 @@
 
 // @ts-check
 
-/* global krtAutocomplete, LOCATION_MSG, LOCATION_CONFLICT */
+/* global LOCATION_MSG, LOCATION_CONFLICT */
+
+import { krtAutocomplete } from '/js/kernel/autocomplete.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtHooks } from '/js/kernel/krt-hooks.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const dataList = /** @type {HTMLDataListElement | null} */ (
@@ -62,7 +66,7 @@ function filterTable(tableId, query) {
     }
 }
 
-window.filterTable = filterTable;
+krtHooks.filterTable = filterTable;
 
 document.addEventListener('DOMContentLoaded', () => {
     /**
@@ -120,10 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         event.preventDefault();
-        if (!window.krtFetch) {
-            form.submit();
-            return;
-        }
+
         const row = form.closest('tr');
         const button = /** @type {HTMLButtonElement | null} */ (
             form.querySelector('button[type="submit"]')
@@ -131,7 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (button) {
             button.disabled = true;
         }
-        window.krtFetch
+        krtFetch
             .write({
                 method: 'POST',
                 url: /** @type {string} */ (form.getAttribute('action')),

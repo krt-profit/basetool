@@ -31,12 +31,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionFrequency;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionUnit;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.model.MissionFrequency;
-import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
-import de.greluc.krt.profit.basetool.backend.model.MissionUnit;
-import de.greluc.krt.profit.basetool.backend.model.User;
 import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -70,7 +70,7 @@ class MissionControllerSlimEndpointsTest {
   private de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService
       missionSecurityService;
 
-  @MockitoBean private de.greluc.krt.profit.basetool.backend.service.UserService userService;
+  @MockitoBean private de.greluc.krt.profit.basetool.backend.identity.api.UserService userService;
 
   @MockitoBean
   private de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy

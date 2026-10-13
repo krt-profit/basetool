@@ -20,12 +20,12 @@
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.exception.ReportGenerationException;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
-import de.greluc.krt.profit.basetool.backend.service.pdf.KrtPdfSupport;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.ReportGenerationException;
+import de.greluc.krt.profit.basetool.backend.platform.api.KrtPdfSupport;
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
@@ -221,6 +221,7 @@ public class BankStatementReportService {
         KrtPdfSupport.addTableCell(table, stamp.format(row.createdAt()), bg, false);
         KrtPdfSupport.addTableCell(table, label("pdf.bank.type." + row.type().name()), bg, false);
         if (!redactHolders) {
+          @Nullable
           String holder =
               row.type() == BankTransactionType.WIPE_RESET
                   ? ""
@@ -229,7 +230,9 @@ public class BankStatementReportService {
                       row.amount().signum());
           KrtPdfSupport.addTableCell(
               table,
-              HandleAnonymisation.humanise(holder, label("general.anonymisedHandle")),
+              holder == null
+                  ? ""
+                  : HandleAnonymisation.humaniseRequired(holder, label("general.anonymisedHandle")),
               bg,
               false);
         }
@@ -282,7 +285,8 @@ public class BankStatementReportService {
         if (row.counterpartyHandle() == null) {
           yield "";
         }
-        String handle = HandleAnonymisation.humanise(row.counterpartyHandle(), anonymisedLabel);
+        String handle =
+            HandleAnonymisation.humaniseRequired(row.counterpartyHandle(), anonymisedLabel);
         yield row.counterpartyOrgUnitName() == null
             ? handle
             : handle + " (" + row.counterpartyOrgUnitName() + ")";

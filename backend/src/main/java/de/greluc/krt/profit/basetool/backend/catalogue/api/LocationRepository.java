@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.catalogue.api;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
@@ -79,7 +80,7 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
           SELECT COUNT(l) FROM Location l WHERE l.hidden = false AND (cast(:q as string) IS NULL
           OR LOWER(l.name) LIKE LOWER(CONCAT('%', cast(:q as string), '%')) ESCAPE '\\')
           """)
-  Page<LocationReferenceDto> searchReference(@Param("q") String q, Pageable pageable);
+  Page<LocationReferenceDto> searchReference(@Param("q") @Nullable String q, Pageable pageable);
 
   /** Derived Spring-Data query - returns entities matching {@code Name}. */
   Optional<Location> findByName(String name);

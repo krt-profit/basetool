@@ -25,8 +25,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.SpaceStationMapp
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SpaceStationService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
-import de.greluc.krt.profit.basetool.backend.web.PaginationUtil.PageCeiling;
+import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
+import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil.PageCeiling;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

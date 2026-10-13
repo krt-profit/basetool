@@ -19,7 +19,15 @@
 
 // @ts-check
 
-(function () {
+import { showKrtConfirm } from '/js/kernel/toast.js';
+import { krtSyncDatetimeSplitGroup } from '/js/kernel/datetime-splitter.js';
+import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { missionHooks } from '/js/mission/mission-hooks.js';
+
+function initMissionDetailModals() {
     const objectiveList = document.getElementById('mission-create-objective-list');
     const stepList = document.getElementById('mission-create-step-list');
     if (!objectiveList && !stepList) {
@@ -190,48 +198,46 @@
 
     hydrate(objectiveList, objectiveTemplate, objectivesJson);
     hydrate(stepList, stepTemplate, stepsJson);
-})();
+}
 
-(function () {
-    window.krtModalOpen = function (overlay) {
-        window.krtModal.open(overlay);
-    };
-    window.krtModalClose = function (overlay) {
-        window.krtModal.close(overlay);
-    };
-    window.krtSegSet = function (targetId, value) {
-        const seg = document.querySelector(`.seg[data-seg-target="${targetId}"]`);
-        const input = /** @type {HTMLInputElement | null} */ (document.getElementById(targetId));
-        if (!seg || !input) return;
-        input.value = value;
-        seg.querySelectorAll('button[data-type-value]').forEach((b) => {
-            const on = b.getAttribute('data-type-value') === value;
-            b.classList.toggle('on-pos', on && value === 'INCOME');
-            b.classList.toggle('on-neg', on && value === 'EXPENSE');
-            if (!on) {
-                b.classList.remove('on-pos', 'on-neg');
-            }
-            b.setAttribute('aria-pressed', String(on));
-        });
-    };
-    document.addEventListener('DOMContentLoaded', () => {
-        document.querySelectorAll('.seg[data-seg-target]').forEach((seg) => {
-            const targetId = /** @type {string} */ (seg.getAttribute('data-seg-target'));
-            const input = /** @type {HTMLInputElement | null} */ (
-                document.getElementById(targetId)
-            );
-            seg.querySelectorAll('button[data-type-value]').forEach((b) => {
-                b.addEventListener('click', () => {
-                    window.krtSegSet(
-                        targetId,
-                        /** @type {string} */ (b.getAttribute('data-type-value')),
-                    );
-                });
-            });
-            window.krtSegSet(targetId, input && input.value ? input.value : 'INCOME');
-        });
+initMissionDetailModals();
+
+missionHooks.modalOpen = function (overlay) {
+    krtModal.open(overlay);
+};
+missionHooks.modalClose = function (overlay) {
+    krtModal.close(overlay);
+};
+missionHooks.segSet = function (targetId, value) {
+    const seg = document.querySelector(`.seg[data-seg-target="${targetId}"]`);
+    const input = /** @type {HTMLInputElement | null} */ (document.getElementById(targetId));
+    if (!seg || !input) return;
+    input.value = value;
+    seg.querySelectorAll('button[data-type-value]').forEach((b) => {
+        const on = b.getAttribute('data-type-value') === value;
+        b.classList.toggle('on-pos', on && value === 'INCOME');
+        b.classList.toggle('on-neg', on && value === 'EXPENSE');
+        if (!on) {
+            b.classList.remove('on-pos', 'on-neg');
+        }
+        b.setAttribute('aria-pressed', String(on));
     });
-})();
+};
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.seg[data-seg-target]').forEach((seg) => {
+        const targetId = /** @type {string} */ (seg.getAttribute('data-seg-target'));
+        const input = /** @type {HTMLInputElement | null} */ (document.getElementById(targetId));
+        seg.querySelectorAll('button[data-type-value]').forEach((b) => {
+            b.addEventListener('click', () => {
+                missionHooks.segSet(
+                    targetId,
+                    /** @type {string} */ (b.getAttribute('data-type-value')),
+                );
+            });
+        });
+        missionHooks.segSet(targetId, input && input.value ? input.value : 'INCOME');
+    });
+});
 
 document.addEventListener('DOMContentLoaded', () => {
     const pModal = document.getElementById('participant-modal');
@@ -239,7 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (pBtn && pModal) {
         pBtn.onclick = function () {
-            window.krtModalOpen(pModal);
+            missionHooks.modalOpen(pModal);
         };
     }
 
@@ -262,9 +268,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (btn.dataset.epBound) return;
                 btn.dataset.epBound = '1';
                 btn.addEventListener('click', function () {
-                    eForm.action = window.safeSameOriginUrl(
-                        this.getAttribute('data-action'),
-                        eForm.action,
+                    assignFormAction(
+                        eForm,
+                        safeSameOriginUrl(this.getAttribute('data-action'), eForm.action),
                     );
                     eForm.setAttribute(
                         'data-participant-id',
@@ -364,26 +370,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     if (eStartTimeUi) {
                         eStartTimeUi.value = startUtc;
-                        if (typeof window.krtSyncDatetimeSplitGroup === 'function') {
-                            window.krtSyncDatetimeSplitGroup(
-                                /** @type {ParentNode} */ (
-                                    eStartTimeUi.closest('.datetime-split-group')
-                                ),
-                            );
-                        }
+                        krtSyncDatetimeSplitGroup(
+                            /** @type {ParentNode} */ (
+                                eStartTimeUi.closest('.datetime-split-group')
+                            ),
+                        );
                     }
                     if (eEndTimeUi) {
                         eEndTimeUi.value = endUtc;
-                        if (typeof window.krtSyncDatetimeSplitGroup === 'function') {
-                            window.krtSyncDatetimeSplitGroup(
-                                /** @type {ParentNode} */ (
-                                    eEndTimeUi.closest('.datetime-split-group')
-                                ),
-                            );
-                        }
+                        krtSyncDatetimeSplitGroup(
+                            /** @type {ParentNode} */ (eEndTimeUi.closest('.datetime-split-group')),
+                        );
                     }
 
-                    window.krtModalOpen(eModal);
+                    missionHooks.modalOpen(eModal);
                 });
             });
         }
@@ -451,14 +451,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 typeId;
             const current = btn.getAttribute('data-current-value') || '';
             /** @type {HTMLInputElement} */ (document.getElementById('freq-value')).value = current;
-            window.krtModalOpen(frequencyModal);
+            missionHooks.modalOpen(frequencyModal);
         });
 
         if (frequencyForm) {
             frequencyForm.addEventListener('submit', async (event) => {
                 event.preventDefault();
                 const url = frequencyForm.getAttribute('data-action');
-                if (!url || !window.krtMissionWrite) {
+                if (!url || !missionHooks.write) {
                     frequencyForm.submit();
                     return;
                 }
@@ -472,7 +472,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!typeId || Number.isNaN(parsed)) {
                     return;
                 }
-                const result = await window.krtMissionWrite({
+                const result = await missionHooks.write({
                     method: 'PUT',
                     url,
                     payload: { frequencyTypeId: typeId, value: parsed },
@@ -500,14 +500,14 @@ document.addEventListener('DOMContentLoaded', () => {
                                 });
                         }
                     }
-                    window.krtModalClose(frequencyModal);
-                    if (window.krtRefreshMissionSection) {
-                        window.krtRefreshMissionSection('overview');
-                        if (window.krtNotifyMissionChanged) {
-                            window.krtNotifyMissionChanged('organisation');
+                    missionHooks.modalClose(frequencyModal);
+                    if (missionHooks.refresh) {
+                        missionHooks.refresh('overview');
+                        if (missionHooks.notify) {
+                            missionHooks.notify('organisation');
                         }
-                    } else if (window.krtNotifyMissionChanged) {
-                        window.krtNotifyMissionChanged(['overview', 'organisation']);
+                    } else if (missionHooks.notify) {
+                        missionHooks.notify(['overview', 'organisation']);
                     }
                 }
             });
@@ -544,7 +544,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (titleEl && dict.add) {
                 titleEl.textContent = dict.add;
             }
-            window.krtModalOpen(customFreqModal);
+            missionHooks.modalOpen(customFreqModal);
             nameInput.focus();
         }
         /**
@@ -560,7 +560,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (titleEl && dict.edit) {
                 titleEl.textContent = dict.edit;
             }
-            window.krtModalOpen(customFreqModal);
+            missionHooks.modalOpen(customFreqModal);
             nameInput.focus();
         }
         /**
@@ -574,19 +574,16 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!fid) {
                 return;
             }
-            const msg = window.krtI18nText(
-                dict.delete_confirm,
-                'MISSION_CUSTOM_FREQ_I18N.delete_confirm',
-            );
-            const ok = await window.showKrtConfirm?.(
+            const msg = krtI18nText(dict.delete_confirm, 'MISSION_CUSTOM_FREQ_I18N.delete_confirm');
+            const ok = await showKrtConfirm?.(
                 msg,
                 msg,
-                window.krtI18nText(
+                krtI18nText(
                     window.MISSION_SUBRES_I18N &&
                         window.MISSION_SUBRES_I18N['mission.conflict.action.reload'],
                     'MISSION_SUBRES_I18N[mission.conflict.action.reload]',
                 ),
-                window.krtI18nText(
+                krtI18nText(
                     window.MISSION_SUBRES_I18N &&
                         window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss'],
                     'MISSION_SUBRES_I18N[mission.conflict.action.dismiss]',
@@ -595,13 +592,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!ok) {
                 return;
             }
-            const result = await window.krtMissionWrite({
+            const result = await missionHooks.write({
                 method: 'DELETE',
                 url: `/missions/${mid()}/frequencies/${fid}/ajax`,
                 sectionKey: 'frequency',
             });
-            if (result.ok && window.krtRefreshMissionSection) {
-                window.krtRefreshMissionSection(['frequencies', 'overview']);
+            if (result.ok && missionHooks.refresh) {
+                missionHooks.refresh(['frequencies', 'overview']);
             }
         }
 
@@ -641,7 +638,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const payload = isEdit
                 ? { name, value: parsed, version: Number(versionInput.value) }
                 : { name, value: parsed };
-            const result = await window.krtMissionWrite({
+            const result = await missionHooks.write({
                 method: isEdit ? 'PUT' : 'POST',
                 url: isEdit
                     ? `/missions/${mid()}/frequencies/custom/${fid}/ajax`
@@ -650,8 +647,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 sectionKey: 'frequency',
             });
             if (result.ok) {
-                window.krtModalClose(customFreqModal);
-                if (isEdit && Array.isArray(result.body) && window.krtFetch) {
+                missionHooks.modalClose(customFreqModal);
+                if (isEdit && Array.isArray(result.body)) {
                     const updated = result.body.find((e) => {
                         return e && e.id === fid;
                     });
@@ -659,13 +656,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         document
                             .querySelectorAll(`.custom-freq-row[data-custom-freq-id="${fid}"]`)
                             .forEach((row) => {
-                                window.krtFetch.syncVersion(row, updated.version);
+                                krtFetch.syncVersion(row, updated.version);
                             });
                         versionInput.value = updated.version;
                     }
                 }
-                if (window.krtRefreshMissionSection) {
-                    window.krtRefreshMissionSection(['frequencies', 'overview']);
+                if (missionHooks.refresh) {
+                    missionHooks.refresh(['frequencies', 'overview']);
                 }
             }
         });
@@ -700,9 +697,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (btn.dataset.delBound) return;
                 btn.dataset.delBound = '1';
                 btn.addEventListener('click', function () {
-                    deleteForm.action = window.safeSameOriginUrl(
-                        this.getAttribute('data-action'),
-                        deleteForm.action,
+                    assignFormAction(
+                        deleteForm,
+                        safeSameOriginUrl(this.getAttribute('data-action'), deleteForm.action),
                     );
                     const subSection = this.getAttribute('data-sub-section') || '';
                     let subId;
@@ -724,7 +721,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     deleteForm.setAttribute('data-sub-id', subId);
                     const msgEl = document.getElementById('delete-confirm-message');
                     if (msgEl) msgEl.textContent = deleteMessageFor(this);
-                    window.krtModalOpen(deleteModal);
+                    missionHooks.modalOpen(deleteModal);
                 });
             });
         }
@@ -738,7 +735,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (addUnitBtn && addUnitModal && !addUnitBtn.dataset.auBound) {
             addUnitBtn.dataset.auBound = '1';
             addUnitBtn.addEventListener('click', () => {
-                window.krtModalOpen(addUnitModal);
+                missionHooks.modalOpen(addUnitModal);
             });
         }
     }
@@ -763,9 +760,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (btn.dataset.euBound) return;
                 btn.dataset.euBound = '1';
                 btn.addEventListener('click', function () {
-                    editUnitForm.action = window.safeSameOriginUrl(
-                        this.getAttribute('data-action'),
-                        editUnitForm.action,
+                    assignFormAction(
+                        editUnitForm,
+                        safeSameOriginUrl(this.getAttribute('data-action'), editUnitForm.action),
                     );
                     editUnitForm.setAttribute(
                         'data-unit-id',
@@ -813,7 +810,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         const noteVal = this.getAttribute('data-note');
                         editUnitNote.value = noteVal && noteVal !== 'null' ? noteVal : '';
                     }
-                    window.krtModalOpen(editUnitModal);
+                    missionHooks.modalOpen(editUnitModal);
                 });
             });
         }
@@ -822,7 +819,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     (function wireUnitAjax() {
-        if (!window.krtMissionWrite || !window.missionId) {
+        if (!missionHooks.write || !window.missionId) {
             return;
         }
         const addForm = /** @type {HTMLFormElement | null} */ (
@@ -843,15 +840,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     responsibleUserId: fd.get('responsibleUserId') || null,
                     note: fd.get('note') || null,
                 };
-                const res = await window.krtMissionWrite({
+                const res = await missionHooks.write({
                     method: 'POST',
                     url: `/missions/${window.missionId}/units/ajax`,
                     payload,
                     sectionKey: 'unit',
                 });
                 if (res.ok) {
-                    window.krtModalClose(addForm.closest('.krt-modal-overlay'));
-                    window.krtRefreshMissionSection(['crew', 'overview']);
+                    missionHooks.modalClose(addForm.closest('.krt-modal-overlay'));
+                    missionHooks.refresh(['crew', 'overview']);
                 }
             });
         }
@@ -881,15 +878,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     note: fd.get('note') || null,
                     version: versionAttr ? Number(versionAttr) : null,
                 };
-                const res = await window.krtMissionWrite({
+                const res = await missionHooks.write({
                     method: 'PUT',
                     url: `/missions/${window.missionId}/units/${unitId}/ajax`,
                     payload,
                     sectionKey: 'unit',
                 });
                 if (res.ok) {
-                    window.krtModalClose(editForm.closest('.krt-modal-overlay'));
-                    window.krtRefreshMissionSection(['crew', 'overview']);
+                    missionHooks.modalClose(editForm.closest('.krt-modal-overlay'));
+                    missionHooks.refresh(['crew', 'overview']);
                 }
             });
         }
@@ -903,14 +900,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 ev.preventDefault();
-                const res = await window.krtMissionWrite({
+                const res = await missionHooks.write({
                     method: 'DELETE',
                     url: `/missions/${window.missionId}/units/${subId}/ajax`,
                     sectionKey: 'unit',
                 });
                 if (res.ok) {
-                    window.krtModalClose(dForm.closest('.krt-modal-overlay'));
-                    window.krtRefreshMissionSection(['crew', 'overview']);
+                    missionHooks.modalClose(dForm.closest('.krt-modal-overlay'));
+                    missionHooks.refresh(['crew', 'overview']);
                 }
             });
         }

@@ -18,12 +18,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-(function () {
-    'use strict';
-    if (!window.krtFetch) {
-        return;
-    }
-    const krtFetch = window.krtFetch;
+import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
+function initProfile() {
     /** @type {Record<string, string>} */
     const i18n = window.krtProfileI18n || {};
 
@@ -36,6 +35,8 @@
      * @property {(form: HTMLFormElement, version: number) => Record<string, unknown>} payload
      *     builds the JSON body for the section's endpoint
      * @property {(form: HTMLFormElement, body: any) => void} [onSaved] applies the response
+     * @property {boolean} [ownVersion] true when the section's row carries its own optimistic-lock
+     *     version instead of the user row's
      */
 
     /**
@@ -87,6 +88,7 @@
         },
         {
             formId: 'profile-payout-form',
+            ownVersion: true,
             payload(form, version) {
                 const checked = control(form, 'input[name="defaultPayoutPreference"]:checked');
                 return { defaultPayoutPreference: checked ? checked.value : null, version };
@@ -94,6 +96,7 @@
         },
         {
             formId: 'profile-blueprint-sharing-form',
+            ownVersion: true,
             payload(form, version) {
                 const checkbox = /** @type {HTMLInputElement | null} */ (
                     form.querySelector('input[name="shareBlueprintsGlobally"]')
@@ -198,8 +201,8 @@
             return isDirty(entry.form);
         });
         bar.hidden = dirty.length === 0;
-        if (!dirty.length && !saving && typeof window.resetUnsavedChanges === 'function') {
-            window.resetUnsavedChanges();
+        if (!dirty.length && !saving) {
+            resetUnsavedChanges();
         }
         if (summary) {
             const names = dirty.map((entry) => {
@@ -211,16 +214,32 @@
     }
 
     /**
-     * Writes the user row's fresh version into every section form; the forms share one version.
+     * Writes a fresh version into the section forms it belongs to: the user row's version into
+     * every section that shares it, a section's own version into that section's form alone.
      *
      * @param {unknown} version the version from the save response
+     * @param {ProfileSection} saved the section that was saved
+     * @param {HTMLFormElement} savedForm the form of the saved section
      */
-    function syncAllVersions(version) {
+    function syncVersions(version, saved, savedForm) {
         if (version == null) {
             return;
         }
-        document.querySelectorAll('#profile-settings input[name="version"]').forEach((input) => {
-            /** @type {HTMLInputElement} */ (input).value = String(version);
+        if (saved.ownVersion) {
+            const own = control(savedForm, 'input[name="version"]');
+            if (own) {
+                own.value = String(version);
+            }
+            return;
+        }
+        presentSections().forEach((entry) => {
+            if (entry.section.ownVersion) {
+                return;
+            }
+            const input = control(entry.form, 'input[name="version"]');
+            if (input) {
+                input.value = String(version);
+            }
         });
     }
 
@@ -282,7 +301,7 @@
                     break;
                 }
                 if (result.body) {
-                    syncAllVersions(result.body.version);
+                    syncVersions(result.body.version, entry.section, entry.form);
                     if (entry.section.onSaved) {
                         entry.section.onSaved(entry.form, result.body);
                     }
@@ -295,8 +314,8 @@
                 saveButton.disabled = false;
             }
         }
-        if (allSaved && typeof window.resetUnsavedChanges === 'function') {
-            window.resetUnsavedChanges();
+        if (allSaved) {
+            resetUnsavedChanges();
         }
         refreshBar();
     }
@@ -337,9 +356,7 @@
             });
         });
         updateCounter();
-        if (typeof window.resetUnsavedChanges === 'function') {
-            window.resetUnsavedChanges();
-        }
+        resetUnsavedChanges();
         refreshBar();
     }
 
@@ -419,9 +436,6 @@
      * @returns {Promise<boolean> | undefined} the swap, or undefined when no swap helper exists
      */
     function refreshDeletionCard() {
-        if (!krtFetch.swap) {
-            return undefined;
-        }
         return krtFetch.swap({
             url: DELETION_URL,
             container: '#profile-deletion-host',
@@ -442,7 +456,7 @@
                 successMessage: i18n.deletionRequested,
                 errorMessage: i18n.deletionError,
                 onSuccess() {
-                    window.krtModal.close('profile-deletion-modal');
+                    krtModal.close('profile-deletion-modal');
                     if (eraseHistory) {
                         eraseHistory.checked = false;
                     }
@@ -471,4 +485,6 @@
             });
         });
     }
-})();
+}
+
+initProfile();

@@ -41,7 +41,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kIngredien
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kItemDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kManufacturerDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kShipDto;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Quality;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import java.time.Instant;

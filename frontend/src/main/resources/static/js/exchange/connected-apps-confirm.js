@@ -19,7 +19,10 @@
 
 // @ts-check
 
-(function () {
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
+
+function initConnectedAppsConfirm() {
     const BASE = '/connected-apps/confirm';
 
     const box = document.getElementById('cac-box');
@@ -36,7 +39,7 @@
         /** @param {string} key */
         const text = function (key) {
             const attribute = `data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
-            return window.krtI18nText(data[key], attribute);
+            return krtI18nText(data[key], attribute);
         };
         return {
             error: text('error'),
@@ -114,12 +117,12 @@
         return false;
     }
 
-    if (!handoffId || !window.krtFetch) {
+    if (!handoffId) {
         show('cac-missing');
         return;
     }
 
-    window.krtFetch.write({
+    krtFetch.write({
         method: 'POST',
         url: `${BASE}/load`,
         payload: { handoffId },
@@ -144,7 +147,7 @@
     const confirmBtn = document.getElementById('cac-confirm');
     if (confirmBtn) {
         confirmBtn.addEventListener('click', () => {
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: `${BASE}/apply`,
                 payload: { handoffId },
@@ -162,7 +165,7 @@
     const discardBtn = document.getElementById('cac-discard');
     if (discardBtn) {
         discardBtn.addEventListener('click', () => {
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: `${BASE}/discard`,
                 payload: { handoffId },
@@ -175,4 +178,6 @@
             });
         });
     }
-})();
+}
+
+initConnectedAppsConfirm();

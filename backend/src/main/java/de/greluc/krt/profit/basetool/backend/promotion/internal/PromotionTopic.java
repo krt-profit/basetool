@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.promotion.internal;
 
-import de.greluc.krt.profit.basetool.backend.annotation.TenantScoped;
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
-import de.greluc.krt.profit.basetool.backend.model.Squadron;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
+import de.greluc.krt.profit.basetool.backend.platform.api.TenantScoped;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

@@ -18,9 +18,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-(function () {
-    'use strict';
-
+function initMaterialDetail() {
     const table = /** @type {HTMLTableElement | null} */ (document.getElementById('priceTable'));
     const input = /** @type {HTMLInputElement | null} */ (
         document.getElementById('terminalFilter')
@@ -117,4 +115,6 @@
             }
         });
     });
-})();
+}
+
+initMaterialDetail();

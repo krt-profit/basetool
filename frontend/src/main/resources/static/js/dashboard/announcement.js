@@ -21,6 +21,9 @@
 
 /* global ANNOUNCE_MSG, ANNOUNCE_CONFLICT */
 
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
 document.addEventListener('DOMContentLoaded', () => {
     const deleteModal = document.getElementById('delete-confirm-modal');
     const triggerDeleteBtn = /** @type {HTMLButtonElement | null} */ (
@@ -57,12 +60,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function closeDeleteModal() {
-        if (deleteModal) window.krtModal.close(deleteModal);
+        if (deleteModal) krtModal.close(deleteModal);
     }
 
     if (triggerDeleteBtn && deleteModal) {
         triggerDeleteBtn.onclick = function () {
-            window.krtModal.open(deleteModal);
+            krtModal.open(deleteModal);
         };
     }
 
@@ -79,17 +82,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (updateForm) {
         updateForm.addEventListener('submit', (event) => {
             event.preventDefault();
-            if (!window.krtFetch) {
-                updateForm.submit();
-                return;
-            }
+
             const versionInput = /** @type {HTMLInputElement | null} */ (
                 updateForm.querySelector('input[name="version"]')
             );
             const contentInput = /** @type {HTMLTextAreaElement | null} */ (
                 updateForm.querySelector('textarea[name="content"]')
             );
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: updateForm.getAttribute('action') || '',
                 payload: {
@@ -114,11 +114,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (deleteForm) {
         deleteForm.addEventListener('submit', (event) => {
             event.preventDefault();
-            if (!window.krtFetch) {
-                deleteForm.submit();
-                return;
-            }
-            window.krtFetch.write({
+
+            krtFetch.write({
                 method: 'POST',
                 url: deleteForm.getAttribute('action') || '',
                 successMessage: ANNOUNCE_MSG.deleteSuccess,

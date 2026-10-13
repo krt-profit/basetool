@@ -146,6 +146,9 @@ it held 33 in 7, and after plan §7.6 P4-1 part 1 (the org-unit module's members
 blueprint's controllers, services, mappers, default-blueprint data layer and participants move into
 `blueprint.web` / `blueprint.internal`) removed no edge and added none: no layer class names a moved type.
 
+After the identity slices the file held 26 edges; after plan §7.6 umbrella steps 6 and 7 it held 14, which were then resolved, so it is **empty**. Twelve edges were resolved by the moves (`UserMapper`, `UserDto`, `MembershipDeltaRequest`, `OrgUnitKind` and `SquadronReferenceDto` changed module, and
+`UserDtoRedaction` no longer names a job-order type). The other fourteen belonged to five classes that the domain map had assigned to the transitional `privacy` module to hide them; they are resolved: the retention returned to `identity.internal` and deletes through `AccountErasure`, the registration queue lies in `identity.web` with only the merge endpoint in `privacy.web`, `MeController` lies in the composition root `app.web`, which may depend on all of its modules, and `UserController` is split by the module that owns the data (`orgunit.web`, `dashboard.web`, `bank.web`, `mission.web`, `blueprint.web`, `privacy.web`, and the identity-only rest in `identity.web`; the correction entry of plan §7.6). An empty baseline is valid because it is not vacuous: `ModuleBaselineTest` asserts that the rule sees at least 167 module pairs with a class dependency, all permitted by the map, and the planted-fixture tests keep proving that the rule fires.
+
 **Acceptance**
 
 - [x] The backend's frozen baseline equals the rule's current violations.

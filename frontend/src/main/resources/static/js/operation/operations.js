@@ -1,8 +1,10 @@
 // @ts-check
 
-(function () {
-    'use strict';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
+import { operationHooks } from '/js/operation/operation-hooks.js';
 
+function initOperations() {
     const filterForm = /** @type {HTMLFormElement | null} */ (
         document.getElementById('operations-filter-form')
     );
@@ -10,7 +12,7 @@
     const loadingIndicator = document.getElementById('operations-loading-indicator');
     const resetBtn = document.getElementById('operations-filter-reset');
 
-    if (!filterForm || !resultsContainer || !window.krtFetch) return;
+    if (!filterForm || !resultsContainer) return;
     const form = filterForm;
 
     /** @type {number | null} */
@@ -32,7 +34,7 @@
 
     function loadResults() {
         const query = buildQueryString();
-        window.krtFetch.swap({
+        krtFetch.swap({
             url: `/operations${query ? `?${query}` : ''}`,
             container: resultsContainer,
             indicator: loadingIndicator,
@@ -40,7 +42,7 @@
         });
     }
 
-    window.krtOperationsReload = loadResults;
+    operationHooks.reload = loadResults;
 
     function onFilterChange() {
         clearTimeout(debounceTimer ?? undefined);
@@ -128,10 +130,12 @@
             });
             selectPeriod('UPCOMING');
             persistFilters();
-            if (window.krtFilterChips) window.krtFilterChips.refresh(form);
+            krtFilterChips.refresh(form);
             loadResults();
         });
     }
 
     restoreFilters();
-})();
+}
+
+initOperations();

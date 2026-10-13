@@ -25,42 +25,43 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
-import de.greluc.krt.profit.basetool.backend.annotation.TenantScoped;
 import de.greluc.krt.profit.basetool.backend.architecture.TenancyGuardRules.GateReport;
 import de.greluc.krt.profit.basetool.backend.architecture.TenancyGuardRules.HandlerKey;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccount;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankTransaction;
-import de.greluc.krt.profit.basetool.backend.controller.SpecialCommandController;
-import de.greluc.krt.profit.basetool.backend.controller.SpecialCommandMembershipController;
-import de.greluc.krt.profit.basetool.backend.controller.UserController;
 import de.greluc.krt.profit.basetool.backend.exchange.web.ConnectedAppsController;
+import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.hangar.web.HangarController;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.web.InventoryItemController;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemHandover;
+import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOffer;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeRequest;
+import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService;
 import de.greluc.krt.profit.basetool.backend.mission.web.MissionController;
 import de.greluc.krt.profit.basetool.backend.mission.web.MissionFinanceEntryController;
-import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.JobOrder;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderHandover;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderItemHandover;
-import de.greluc.krt.profit.basetool.backend.model.KommandoGroup;
-import de.greluc.krt.profit.basetool.backend.model.MaterialClaim;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
-import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.operation.internal.Operation;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.operation.web.OperationController;
 import de.greluc.krt.profit.basetool.backend.orgchart.internal.OrgChartPosition;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.KommandoGroup;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgRoleManagementSecurityService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandSecurityService;
+import de.greluc.krt.profit.basetool.backend.orgunit.web.SpecialCommandController;
+import de.greluc.krt.profit.basetool.backend.orgunit.web.SpecialCommandMembershipController;
+import de.greluc.krt.profit.basetool.backend.platform.api.TenantScoped;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.RankRequirement;
 import de.greluc.krt.profit.basetool.backend.promotion.web.MemberEvaluationController;
@@ -73,8 +74,6 @@ import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.web.RefineryOrderController;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
-import de.greluc.krt.profit.basetool.backend.service.OrgRoleManagementSecurityService;
-import de.greluc.krt.profit.basetool.backend.service.SpecialCommandSecurityService;
 import de.greluc.krt.profit.basetool.guardfixture.tenancy.FixtureAggregate;
 import de.greluc.krt.profit.basetool.guardfixture.tenancy.FixtureAggregateController;
 import de.greluc.krt.profit.basetool.guardfixture.tenancy.UnclassifiedOwnedEntity;
@@ -208,9 +207,6 @@ class TenancyGuardTest {
   /** Selected write handlers that write no tenant data, each with the reason. */
   private static final Map<HandlerKey, String> NOT_TENANT_WRITES =
       Map.of(
-          new HandlerKey(UserController.class, "updateReadAnnouncement"),
-          "marks an announcement read for the caller; the controller is selected only through"
-              + " UserDeletionService",
           new HandlerKey(ConnectedAppsController.class, "markSeen"),
           "marks one of the caller's own installations seen; the controller is selected only"
               + " through the undo, which restores the caller's own stock through StockCommands",
@@ -245,7 +241,7 @@ class TenancyGuardTest {
 
   private static final int CONTROLLER_FLOOR = 23;
 
-  private static final int HANDLER_FLOOR = 125;
+  private static final int HANDLER_FLOOR = 124;
 
   @Test
   void everyOrgUnitReferenceOfAnEntityIsClassified() {

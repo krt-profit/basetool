@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRevocationRow;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,7 +56,8 @@ public class ExchangeRevocationSync {
     int written = 0;
     for (ExchangeInstallation installation : installationRepository.findRevokedSince(since)) {
       if (!revocationMirror.isDenied(installation.getKeyThumbprint())) {
-        revocationMirror.deny(installation.getKeyThumbprint(), installation.getRevokedAt());
+        revocationMirror.deny(
+            installation.getKeyThumbprint(), Objects.requireNonNull(installation.getRevokedAt()));
         written++;
       }
     }

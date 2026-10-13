@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
-import de.greluc.krt.profit.basetool.backend.filter.NoStoreApiScopes;
+import de.greluc.krt.profit.basetool.backend.platform.internal.NoStoreApiScopes;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -42,7 +42,7 @@ import org.springframework.web.util.pattern.PathPatternParser;
  * Reads the real handler mappings as endpoints and holds the pure checks of the path-keyed control
  * guards (REQ-SEC-031, REQ-SEC-078…080), so each check can also be fed a planted violation.
  */
-final class PathControlInventory {
+public final class PathControlInventory {
 
   /** The value substituted for a path variable: a valid UUID no row carries. */
   static final String NIL_UUID = "00000000-0000-4000-8000-000000000000";
@@ -63,7 +63,7 @@ final class PathControlInventory {
    * @param verbs the declared verbs; empty means every verb
    * @param pattern the path pattern as declared
    */
-  record Endpoint(@NotNull Set<HttpMethod> verbs, @NotNull String pattern) {
+  public record Endpoint(@NotNull Set<HttpMethod> verbs, @NotNull String pattern) {
 
     /**
      * Answers whether the mapping answers a verb.
@@ -112,7 +112,7 @@ final class PathControlInventory {
    * @return every endpoint the dispatcher's request-mapping registry holds
    */
   @NotNull
-  static List<Endpoint> dispatcher(@NotNull ApplicationContext context) {
+  public static List<Endpoint> dispatcher(@NotNull ApplicationContext context) {
     return endpointsOf(
         List.of(context.getBean(DISPATCHER_MAPPING_BEAN, RequestMappingInfoHandlerMapping.class)));
   }
@@ -253,7 +253,7 @@ final class PathControlInventory {
    * @return the patterns that match nothing
    */
   @NotNull
-  static List<String> deadPatterns(
+  public static List<String> deadPatterns(
       @NotNull Collection<String> patterns,
       @NotNull Collection<HttpMethod> verbs,
       @NotNull Collection<Endpoint> endpoints) {
@@ -279,7 +279,7 @@ final class PathControlInventory {
    * @return the segments no endpoint carries
    */
   @NotNull
-  static List<String> unusedSegments(
+  public static List<String> unusedSegments(
       @NotNull Collection<String> segments, @NotNull Collection<Endpoint> endpoints) {
     return segments.stream()
         .filter(

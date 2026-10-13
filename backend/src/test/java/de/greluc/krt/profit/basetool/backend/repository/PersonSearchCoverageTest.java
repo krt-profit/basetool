@@ -23,8 +23,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonMentionSource.Target;
+import de.greluc.krt.profit.basetool.backend.privacy.api.PersonSearchService;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.MentionSourceDeclarations;
-import de.greluc.krt.profit.basetool.backend.service.PersonSearchService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.ArrayList;

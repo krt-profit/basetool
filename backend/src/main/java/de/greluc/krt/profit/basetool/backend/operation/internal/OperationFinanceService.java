@@ -19,17 +19,17 @@
 
 package de.greluc.krt.profit.basetool.backend.operation.internal;
 
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.mapper.MissionMapper;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryDto;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntry;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceGroupAggregate;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionMapper;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderFinanceReader;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderLine;
-import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceGroupAggregate;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -71,7 +71,7 @@ public class OperationFinanceService {
    *
    * @param operationId operation primary key
    * @return aggregated finance summary
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no operation
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no operation
    *     matches the id
    */
   @NotNull

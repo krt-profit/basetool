@@ -20,8 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargets;
-import de.greluc.krt.profit.basetool.backend.model.projection.MissionEarmark;
-import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;

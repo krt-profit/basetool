@@ -22,10 +22,11 @@ package de.greluc.krt.profit.basetool.backend.bank.internal;
 import static de.greluc.krt.profit.basetool.backend.bank.api.BankAmounts.plain;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.math.BigDecimal;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -226,9 +227,10 @@ public class OrgUnitBankApprovalLimitService {
         switch (kind) {
           case MEMBERSHIP_ROLE, GLOBAL_ROLE ->
               approvalLimitRepository.findByAccountIdAndGranteeKindAndRoleCode(
-                  account.getId(), kind, roleCode);
+                  account.getId(), kind, Objects.requireNonNull(roleCode));
           case USER ->
-              approvalLimitRepository.findByAccountIdAndGranteeUserId(account.getId(), userId);
+              approvalLimitRepository.findByAccountIdAndGranteeUserId(
+                  account.getId(), Objects.requireNonNull(userId));
           case ALL_MEMBERS, AREA_MEMBERS ->
               approvalLimitRepository.findByAccountIdAndGranteeKind(account.getId(), kind);
         };

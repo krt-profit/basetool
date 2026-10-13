@@ -27,8 +27,8 @@ import com.tngtech.archunit.core.domain.JavaMethodCall;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.City;
-import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
-import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import java.io.BufferedReader;
@@ -185,9 +185,9 @@ class TableOwnershipTest {
    */
   static final Map<String, String> DYNAMIC_NATIVE_SQL_CLASSES =
       Map.of(
-          "de.greluc.krt.profit.basetool.backend.service.DataExportService",
+          "de.greluc.krt.profit.basetool.backend.privacy.api.DataExportService",
           "Runs the Art. 15 export sections that every module declares.",
-          "de.greluc.krt.profit.basetool.backend.service.PersonSearchService",
+          "de.greluc.krt.profit.basetool.backend.privacy.api.PersonSearchService",
           "Runs the person search over the columns every module declares.",
           "de.greluc.krt.profit.basetool.backend.platform.api.OwnedRowsMover",
           "Re-points the member-referencing columns the modules declare during an account merge.",

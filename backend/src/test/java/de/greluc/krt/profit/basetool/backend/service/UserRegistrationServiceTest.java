@@ -33,18 +33,21 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.identity.api.AccountErasure;
+import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalDecision;
+import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
+import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakPresence;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakService;
+import de.greluc.krt.profit.basetool.backend.identity.api.Role;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserApprovalEvent;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserApprovalEventRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRegistrationService;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationDecidedEvent;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.UserApprovalDecidedEvent;
-import de.greluc.krt.profit.basetool.backend.model.ApprovalDecision;
-import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
-import de.greluc.krt.profit.basetool.backend.model.Role;
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.UserApprovalEvent;
-import de.greluc.krt.profit.basetool.backend.repository.UserApprovalEventRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -76,7 +79,7 @@ class UserRegistrationServiceTest {
   @Mock private UserApprovalEventRepository userApprovalEventRepository;
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private KeycloakService keycloakService;
-  @Mock private UserDeletionService userDeletionService;
+  @Mock private AccountErasure accountErasure;
   @Mock private ObjectProvider<UserRegistrationService> selfProvider;
 
   @InjectMocks private UserRegistrationService userRegistrationService;
@@ -275,14 +278,12 @@ class UserRegistrationServiceTest {
           userRegistrationService.linkRegistrationToExistingAccount(
               USER_ID, TARGET_ID, 0L, ADMIN_ID);
 
-      InOrder order = inOrder(keycloakService, userDeletionService);
+      InOrder order = inOrder(keycloakService, accountErasure);
       order.verify(keycloakService).unlinkDiscordIdentity(USER_ID);
       order.verify(keycloakService).linkDiscordIdentity(TARGET_ID, SNOWFLAKE, "examplehandle4711");
       order
-          .verify(userDeletionService)
-          .deleteUser(
-              USER_ID,
-              UserDeletionService.KeycloakPresenceCheck.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);
+          .verify(accountErasure)
+          .deleteAccount(USER_ID, KeycloakPresence.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);
       order.verify(keycloakService).deleteUser(USER_ID);
       assertFalse(pending.isInKeycloak());
       assertEquals(SNOWFLAKE, result.getDiscordUserId());
@@ -312,10 +313,8 @@ class UserRegistrationServiceTest {
 
       verify(keycloakService).linkDiscordIdentity(TARGET_ID, SNOWFLAKE, "examplehandle4711");
       verify(keycloakService).deleteUser(USER_ID);
-      verify(userDeletionService)
-          .deleteUser(
-              USER_ID,
-              UserDeletionService.KeycloakPresenceCheck.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);
+      verify(accountErasure)
+          .deleteAccount(USER_ID, KeycloakPresence.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);
       assertEquals(SNOWFLAKE, result.getDiscordUserId());
       ArgumentCaptor<UserApprovalEvent> audit = ArgumentCaptor.forClass(UserApprovalEvent.class);
       verify(userApprovalEventRepository).save(audit.capture());

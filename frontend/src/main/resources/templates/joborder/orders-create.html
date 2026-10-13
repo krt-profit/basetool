@@ -238,7 +238,7 @@
     const MSG_CREATE_FAILED = /*[[#{error.joborder.create.failed}]]*/ 'Create failed.';
     const MSG_UPDATE_FAILED = /*[[#{error.joborder.update.failed}]]*/ 'Update failed.';
 </script>
-<script th:src="@{/js/joborder/orders-create.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/joborder/orders-create.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

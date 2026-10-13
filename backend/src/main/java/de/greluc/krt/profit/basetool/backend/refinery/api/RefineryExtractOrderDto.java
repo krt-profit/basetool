@@ -27,6 +27,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import java.util.List;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One refinement order read from SETUP screenshots; {@code raw*} fields are verbatim reads that the
@@ -56,5 +57,5 @@ public record RefineryExtractOrderDto(
     @PositiveOrZero @DecimalMax("1000000000.0") Double expenses,
     @PositiveOrZero Long durationMinutes,
     @PositiveOrZero Double totalYieldScu,
-    @NotEmpty @Size(max = 50) List<@NotNull @Valid RefineryExtractImageDto> sourceImages,
-    @NotEmpty @Size(max = 100) List<@NotNull @Valid RefineryExtractGoodDto> goods) {}
+    @Nullable @NotEmpty @Size(max = 50) List<@NotNull @Valid RefineryExtractImageDto> sourceImages,
+    @Nullable @NotEmpty @Size(max = 100) List<@NotNull @Valid RefineryExtractGoodDto> goods) {}

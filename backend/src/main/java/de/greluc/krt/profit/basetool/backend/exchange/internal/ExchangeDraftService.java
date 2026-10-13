@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintImportPreviewDto;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintImports;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.ParsedEntry;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBlueprintDraftDto;
@@ -27,7 +28,6 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemR
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryDraftRequest;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveRequest;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportPreviewDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryDraftBuilder;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExtractDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExtractGoodDto;

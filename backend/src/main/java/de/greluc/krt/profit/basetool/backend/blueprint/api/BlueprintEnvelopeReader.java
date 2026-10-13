@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.blueprint.api;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportPreviewDto;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import tools.jackson.databind.JsonNode;
@@ -43,7 +42,7 @@ public interface BlueprintEnvelopeReader {
    * @param ownerUserId the {@code app_user.id} the preview is for
    * @param envelope the uploaded JSON object whose {@code format} is {@code basetool.blueprints}
    * @return the preview with per-name rows and per-status counts
-   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException with {@link
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException with {@link
    *     #FORMAT_VERSION_UNSUPPORTED} for another major format version, with {@link
    *     #INVALID_ENVELOPE} for an envelope that breaks its shape
    */

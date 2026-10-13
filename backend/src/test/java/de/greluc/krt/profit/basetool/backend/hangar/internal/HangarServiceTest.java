@@ -30,23 +30,23 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDeletionObserver;
-import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
-import de.greluc.krt.profit.basetool.backend.model.Ship;
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.ShipRequestDto;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
-import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
-import de.greluc.krt.profit.basetool.backend.service.AuditService;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
 import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.Optional;
@@ -73,7 +73,7 @@ class HangarServiceTest {
   @Mock private LocationRepository locationRepository;
   @Mock private ShipDeletionObserver shipDeletionObserver;
   @Mock private EntityManager entityManager;
-  @Mock private de.greluc.krt.profit.basetool.backend.repository.UserRepository userRepository;
+  @Mock private de.greluc.krt.profit.basetool.backend.identity.api.UserRepository userRepository;
   @Mock private de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService ownerScopeService;
   @Mock private ShipTypeMapper shipTypeMapper;
   @Mock private AuditService auditService;
@@ -377,16 +377,16 @@ class HangarServiceTest {
     java.util.UUID shipTypeId = java.util.UUID.randomUUID();
     java.util.UUID pickedOrgUnitId = java.util.UUID.randomUUID();
 
-    de.greluc.krt.profit.basetool.backend.model.User user =
-        new de.greluc.krt.profit.basetool.backend.model.User();
+    de.greluc.krt.profit.basetool.backend.identity.api.User user =
+        new de.greluc.krt.profit.basetool.backend.identity.api.User();
     user.setId(userId);
 
     de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType shipType =
         new de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType();
     shipType.setId(shipTypeId);
 
-    de.greluc.krt.profit.basetool.backend.model.Squadron resolved =
-        new de.greluc.krt.profit.basetool.backend.model.Squadron();
+    de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron resolved =
+        new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
     resolved.setId(pickedOrgUnitId);
 
     org.mockito.Mockito.when(userRepository.findPlainById(userId))
@@ -414,8 +414,8 @@ class HangarServiceTest {
   void addShip_membershiplessUser_savesOwnerlessShip() {
     UUID userId = UUID.randomUUID();
     UUID shipTypeId = UUID.randomUUID();
-    de.greluc.krt.profit.basetool.backend.model.User user =
-        new de.greluc.krt.profit.basetool.backend.model.User();
+    de.greluc.krt.profit.basetool.backend.identity.api.User user =
+        new de.greluc.krt.profit.basetool.backend.identity.api.User();
     user.setId(userId);
     de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType shipType =
         new de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType();

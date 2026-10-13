@@ -56,6 +56,9 @@ final class ChromeSnapshot {
       Pattern.compile(
           Pattern.quote(ChromeNeutraliser.CONTENT) + "|" + Pattern.quote(ChromeNeutraliser.TAIL));
 
+  private static final Pattern IMPORT_MAP =
+      Pattern.compile("(<script type=\"importmap\"[^>]*>)[^<]*");
+
   private static final Pattern NONCE = Pattern.compile("nonce=\"[^\"]*\"");
 
   private static final Pattern CSRF_META =
@@ -90,13 +93,16 @@ final class ChromeSnapshot {
   }
 
   /**
-   * Collapses whitespace between tags and masks the values that change on every request.
+   * Collapses whitespace between tags and masks the values that change on every request and the
+   * import map, whose content-hashed URLs change with every script edit (ModuleImportMapTest pins
+   * it).
    *
    * @param html the rendered page
    * @return the normalised markup
    */
   static @NotNull String normalise(@NotNull String html) {
-    String masked = NONCE.matcher(html).replaceAll("nonce=\"N\"");
+    String masked = IMPORT_MAP.matcher(html).replaceAll("$1M");
+    masked = NONCE.matcher(masked).replaceAll("nonce=\"N\"");
     masked = CSRF_META.matcher(masked).replaceAll("$1\"T\"");
     masked = CSRF_INPUT.matcher(masked).replaceAll("$1\"T\"");
     masked = VERSION.matcher(masked).replaceAll("$1V");

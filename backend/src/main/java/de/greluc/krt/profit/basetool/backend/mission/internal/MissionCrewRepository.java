@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.MissionCrew;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionCrew;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;

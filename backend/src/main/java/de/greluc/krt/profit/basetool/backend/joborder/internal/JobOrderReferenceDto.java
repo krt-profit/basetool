@@ -19,11 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.SquadronReferenceDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterialDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Lightweight job-order projection for typeaheads and pickers (refinery-order picker, Lager
@@ -49,7 +50,7 @@ public record JobOrderReferenceDto(
     Integer displayId,
     String handle,
     JobOrderStatus status,
-    SquadronReferenceDto requestingOrgUnit,
+    @Nullable SquadronReferenceDto requestingOrgUnit,
     List<JobOrderMaterialDto> materials,
     List<UUID> requiredMaterialIds,
     List<UUID> requiredGameItemIds,

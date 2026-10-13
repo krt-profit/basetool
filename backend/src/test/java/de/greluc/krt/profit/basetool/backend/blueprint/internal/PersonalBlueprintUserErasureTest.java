@@ -24,9 +24,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant.Erased;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant.Phase;
-import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

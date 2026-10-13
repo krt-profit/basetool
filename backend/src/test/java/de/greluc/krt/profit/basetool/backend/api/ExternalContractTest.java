@@ -22,8 +22,8 @@ package de.greluc.krt.profit.basetool.backend.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.greluc.krt.profit.basetool.backend.config.ContractTiers;
-import de.greluc.krt.profit.basetool.backend.config.OpenApiDomainConfig;
+import de.greluc.krt.profit.basetool.backend.platform.internal.ContractTiers;
+import de.greluc.krt.profit.basetool.backend.platform.internal.OpenApiDomainConfig;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;

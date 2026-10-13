@@ -26,7 +26,7 @@ import static org.mockito.Mockito.*;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.City;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.CityService;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

@@ -251,7 +251,7 @@ documented in `ROLES_AND_PERMISSIONS.md`, and added to the E2E realm export
 - [x] `hasRole('BANK_EMPLOYEE')` is satisfied by management and admins via the hierarchy.
 - [x] `ROLES_AND_PERMISSIONS.md` documents the bank column/row in the access matrix.
 
-**Enforced by:** `SecurityConfig` role hierarchy + `DataInitializer` seed · **Code:** `config/SecurityConfig`, `config/DataInitializer` · **Issues:** #556
+**Enforced by:** `SecurityConfig` role hierarchy + `DataInitializer` seed · **Code:** `app/api/SecurityConfig`, `app/internal/DataInitializer` · **Issues:** #556
 
 ### REQ-BANK-008 — Bank membership is independent of org-unit membership
 
@@ -703,7 +703,7 @@ client a bank mutation came through is recorded on the trail (REQ-BANK-012, REQ-
   relevant rule whitelists (`BankSecurityService` as accepted gate).
 - [x] `openapi.json` regenerated in every phase PR that touches the API.
 
-**Enforced by:** `OpenApiGeneratorTest`, `docs/specs/api-conventions.md` · **Code:** `controller/Bank*Controller`, `web/PaginationUtil` · **Issues:** #556
+**Enforced by:** `OpenApiGeneratorTest`, `docs/specs/api-conventions.md` · **Code:** `controller/Bank*Controller`, `platform/api/PaginationUtil` · **Issues:** #556
 
 ### REQ-BANK-019 — Season independence
 
@@ -726,7 +726,7 @@ PostgreSQL remains the **single datastore** for the bank (ADR-0009) — no addit
 database, cache layer or event store is introduced. Balance reads are SQL aggregates
 backed by a composite index on `bank_posting (account_id, created_at)`; the dashboard and
 statement queries are grouped single-statement reads. A scheduled integrity job (pattern:
-`task/UserSyncTask`) periodically verifies the ledger invariants (`TRANSFER` account legs and
+`identity/internal/UserSyncTask`) periodically verifies the ledger invariants (`TRANSFER` account legs and
 holder legs each sum to zero; `HOLDER_TRANSFER` holder legs sum to zero with no account leg;
 `REVERSAL` legs are the negated mirror on **both** ledgers; **no negative account
 balances** — the holder dimension is intentionally allowed to be negative (REQ-BANK-006), so
@@ -1103,9 +1103,9 @@ admin-editable at runtime.
 **Enforced by:** `RuleEvaluationServiceTest`, `BankBookingRequestServiceTest`,
 `NotificationCreationServiceTest` · **Code:**
 `bank/api/events/BankBookingRequest{Created,Confirmed,Rejected,Cancelled}Event`,
-`service/RecipientResolutionService#resolveAccountGrantHolders`,
+`notification/internal/RecipientResolutionService#resolveAccountGrantHolders`,
 `bank/internal/OrgUnitBankResponsibilityService#resolveResponsibleHolderUserIds`,
-`model/SelectorKind#{ACCOUNT_GRANT,EVENT_RECIPIENT,ACCOUNT_RESPONSIBLE}`, `db/migration/V160`,
+`notification/api/SelectorKind#{ACCOUNT_GRANT,EVENT_RECIPIENT,ACCOUNT_RESPONSIBLE}`, `db/migration/V160`,
 `db/migration/V161`, `db/migration/V194`;
 lifecycle-close removal in REQ-NOTIF-018 · **Issues:** #666, #673, #1252
 
@@ -1169,7 +1169,7 @@ foreign-Bereich exclusion, view-based request eligibility per REQ-BANK-039),
 creation + cardinality), `V168BankAreaCartelLinkageMigrationTest` (CHECK relax + one-account-per-org-unit),
 `ArchitectureTest` (both bank pins) · **Code:** `bank/internal/OrgUnitBankAccessService`,
 `scope/api/OwnerScopeService#currentOversightScope` (the own-level scope was removed 2026-10-10, unused since REQ-BANK-039),
-`bank/internal/BankAccountService`, `db/migration/V168`, `controller/OrgUnitController#listActiveOrgUnitsAllKinds`,
+`bank/internal/BankAccountService`, `db/migration/V168`, `orgunit/web/OrgUnitController#listActiveOrgUnitsAllKinds`,
 `templates/bank/bank-manage.html` + `static/js/bank/bank.js`, `templates/bank/org-unit-bank.html` ·
 **ADR:** [ADR-0028](../adr/0028-bank-bereich-ol-access-seam.md) · **Issues:** #692, #699.
 
@@ -1248,7 +1248,7 @@ reconcile; management may still register any tool user as a custodian.
 - [x] The reconcile never hard-deletes a holder and never alters a manual holder's
   `role_managed = false`.
 
-**Enforced by:** `BankHolderReconciliationServiceTest`, `BankHolderServiceTest` · **Code:** `bank/internal/BankHolderReconciliationService`, `service/UserSyncService` (sync hook), `task/UserSyncTask`, `repository/UserRepository#findUserIdsByRoleCode`, `bank/internal/BankHolder`, `db/migration/V182` · **ADR:** [ADR-0040](../adr/0040-bank-staff-are-holders-and-employee-administration-access.md) · **Issues:** #556
+**Enforced by:** `BankHolderReconciliationServiceTest`, `BankHolderServiceTest` · **Code:** `bank/internal/BankHolderReconciliationService`, `identity/api/UserSyncService` (sync hook), `identity/internal/UserSyncTask`, `identity/api/UserRepository#findUserIdsByRoleCode`, `bank/internal/BankHolder`, `db/migration/V182` · **ADR:** [ADR-0040](../adr/0040-bank-staff-are-holders-and-employee-administration-access.md) · **Issues:** #556
 
 ### REQ-BANK-030 — Employee bank-administration access (Sonderkonten + holder menu)
 
@@ -1523,7 +1523,7 @@ the bank surface stays org-unit-blind (REQ-BANK-008, ADR-0011). Naming note: the
 > other recipient is left alone. A holder change with no added holder (only a departure) tells nobody
 > and only reconciles.
 
-**Enforced by:** `OrgUnitBankAccessServiceTest` / `OrgUnitBankResponsibilityServiceTest` (holder resolution per type incl. CARTEL_BANK→PROFIT-Bereichsleiter, OL collegial; `snapshotResponsibleHolders` / `…ForUser` / `recordResponsibleHolderChanges` diff + audit + assignment and reconcile events), `NotificationCreationServiceTest` (reconcile), `NotificationRuleEngineIntegrationTest` (V269 rule), `OrgUnitMembershipServiceTest` (leadership + removal brackets), `UserDeletionServiceTest` / `UserDeletionForeignKeyIntegrityTest` (deletion bracket + flush) · **Code:** `bank/internal/OrgUnitBankResponsibilityService` (`resolveResponsibleHolderUserIds` / `snapshotResponsibleHolders(ForUser)` / `recordResponsibleHolderChanges`), `service/OrgUnitMembershipService` (leadership + `removeMember` + `reconcileStaffelMemberships` brackets), `service/UserDeletionService#deleteUser`, `repository/BereichRepository#findByDepartment`, `bank/internal/BankAccountRepository#findFirstByType` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md), [ADR-0070](../adr/0070-bank-responsible-holder-change-audit.md) · **Issues:** #556
+**Enforced by:** `OrgUnitBankAccessServiceTest` / `OrgUnitBankResponsibilityServiceTest` (holder resolution per type incl. CARTEL_BANK→PROFIT-Bereichsleiter, OL collegial; `snapshotResponsibleHolders` / `…ForUser` / `recordResponsibleHolderChanges` diff + audit + assignment and reconcile events), `NotificationCreationServiceTest` (reconcile), `NotificationRuleEngineIntegrationTest` (V269 rule), `OrgUnitMembershipServiceTest` (leadership + removal brackets), `UserDeletionServiceTest` / `UserDeletionForeignKeyIntegrityTest` (deletion bracket + flush) · **Code:** `bank/internal/OrgUnitBankResponsibilityService` (`resolveResponsibleHolderUserIds` / `snapshotResponsibleHolders(ForUser)` / `recordResponsibleHolderChanges`), `orgunit/api/OrgUnitMembershipService` (leadership + `removeMember` + `reconcileStaffelMemberships` brackets), `privacy/api/UserDeletionService#deleteUser`, `orgunit/api/BereichRepository#findByDepartment`, `bank/internal/BankAccountRepository#findFirstByType` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md), [ADR-0070](../adr/0070-bank-responsible-holder-change-audit.md) · **Issues:** #556
 
 ### REQ-BANK-035 — Configurable balance visibility
 
@@ -2143,15 +2143,15 @@ target + detail, transfers leave it null), `BankReportServiceTest` (Quell-/Zielk
 full and the redacted statement), `OrgUnitBankAccessServiceTest` (counterparty kept, Halter nulled
 for org-unit viewers), `OrgUnitMembershipQueryServiceTest` (`listDirectMembershipOptions` spans all four kinds; primary
 resolution), `BankBookingRequestServiceTest` (confirmed request records the requester + their primary
-org unit), `UserControllerTest`/`UserMembershipsSecurityTest` (`allKinds` delegation; `BANK_EMPLOYEE`
+org unit), `MemberMembershipControllerTest`/`UserMembershipsSecurityTest` (`allKinds` delegation; `BANK_EMPLOYEE`
 reaches `/memberships`) · **Code:**
 `bank/internal/BankTransaction`, `model/dto/request/Bank{Deposit,Withdrawal}Request`, `bank/internal/BankLedgerService`
 (`resolveCounterparty`), `bank/internal/BankBookingRequestService`,
-`service/OrgUnitMembershipQueryService#listDirectMembershipOptions`, `bank/internal/BankBookingRow`,
+`orgunit/api/OrgUnitMembershipQueryService#listDirectMembershipOptions`, `bank/internal/BankBookingRow`,
 `bank/internal/BankPostingRepository`, `bank/internal/BankBookingDto`, `service/Bank{Statement,Management}ReportService`,
-`bank/internal/OrgUnitBankAccessService#redact`, `controller/UserController`, `config/SecurityConfig`,
+`bank/internal/OrgUnitBankAccessService#redact`, `orgunit/web/MemberMembershipController`, `bank/web/BankMemberSearchController`, `app/api/SecurityConfig`,
 `db/migration/V197`, `db/migration/V205` (#994 constraint relax),
-`service/OrgUnitMembershipQueryService#listAllActiveOrgUnitOptionsAllKinds` (#994),
+`orgunit/api/OrgUnitMembershipQueryService#listAllActiveOrgUnitOptionsAllKinds` (#994),
 frontend `bank/web/BankPageController`, `bank/web/BankRequestQueuePageController`,
 `identity/web/UserProxyController`, `templates/bank/fragments/bank-counterparty.html` (#994),
 `templates/bank/fragments/bank-movement-modal.html`, `templates/bank/bank-account-detail.html`,
@@ -2379,7 +2379,7 @@ membership-based notification seam; the Bankleitung instead picks the request up
 `bank/internal/BankBookingOutcomeDto`, `bank/web/BankAccountController#setCartelApprovalTiers`,
 `db/migration/V203` + `V222` (approver rename), frontend `templates/bank/bank-manage.html` +
 `bank/org-unit-bank-account-detail.html` + `static/js/bank/bank.js` (202 `pendingRequest` notice) +
-`exception/GlobalExceptionHandler` (bank-409 message map) ·
+`platform/api/GlobalExceptionHandler` (bank-409 message map) ·
 **ADR:** [ADR-0066](../adr/0066-krt-account-amount-tiered-approval-ladder.md) (supersedes the
 single-approver assumption of [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md)),
 amended by [ADR-0109](../adr/0109-krt-middle-band-bankleitung-and-over-ceiling-auto-request.md)
@@ -2719,7 +2719,7 @@ expandable) • **Code:** `bank/internal/BankTransaction`, `bank/internal/BankBo
 `bank/internal/ConfirmBankBookingRequest`, `bank/internal/BankBookingRow`,
 `model/dto/Bank{Booking,BookingRequest}Dto`, `bank/internal/BankPostingWriter`, `bank/internal/BankLedgerService`,
 `bank/internal/BankBookingRequestService`, `bank/internal/OrgUnitBankAccessService`,
-`service/Bank{Statement,Management}ReportService`, `service/pdf/KrtPdfSupport`, `db/migration/V231`
+`service/Bank{Statement,Management}ReportService`, `platform/api/KrtPdfSupport`, `db/migration/V231`
 
 ### REQ-BANK-055 — Empfänger on a withdrawal request
 

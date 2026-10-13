@@ -18,6 +18,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
 /**
  * Opens or closes the owner rows of one ship type in the org-unit overview.
  *
@@ -77,11 +79,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const query = params.toString();
             target = `/hangar/squadron${query ? `?${query}` : ''}`;
         }
-        if (!resultsContainer || !window.krtFetch) {
+        if (!resultsContainer) {
             window.location.assign(target);
             return;
         }
-        window.krtFetch.swap({ url: target, container: resultsContainer, history: true });
+        krtFetch.swap({ url: target, container: resultsContainer, history: true });
     }
 
     if (filterForm) {
@@ -114,7 +116,5 @@ document.addEventListener('DOMContentLoaded', () => {
             applySquadronFilter(clear.getAttribute('href'));
         });
     }
-    if (window.krtFetch && typeof window.krtFetch.bindSwap === 'function') {
-        window.krtFetch.bindSwap({ container: '#squadron-results', history: true });
-    }
+    krtFetch.bindSwap({ container: '#squadron-results', history: true });
 });

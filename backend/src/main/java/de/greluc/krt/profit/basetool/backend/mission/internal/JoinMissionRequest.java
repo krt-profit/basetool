@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
+import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
 import java.util.UUID;
 
 /**

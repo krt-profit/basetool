@@ -22,20 +22,20 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintCommands;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintCreateRequest;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipCommands;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
-import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
-import de.greluc.krt.profit.basetool.backend.model.Ship;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintCreateRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.ShipRequestDto;
-import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
-import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.math.BigDecimal;
@@ -47,6 +47,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
@@ -309,11 +310,12 @@ public class ExchangeUndoService {
    */
   private boolean restoreLot(
       @NotNull UUID member, @NotNull String lotKey, @Nullable JsonNode before) {
-    if (before == null || before.get("quantity") == null || text(before, "unit") == null) {
+    String unit = text(before, "unit");
+    if (before == null || before.get("quantity") == null || unit == null) {
       return false;
     }
     BigDecimal quantity = before.get("quantity").decimalValue();
-    return stockWriteService.restoreLot(member, lotKey, quantity, text(before, "unit"));
+    return stockWriteService.restoreLot(member, lotKey, quantity, unit);
   }
 
   /**
@@ -351,7 +353,7 @@ public class ExchangeUndoService {
         new ShipRequestDto(
             text(before, "name"),
             shipType,
-            text(before, "insurance"),
+            Objects.requireNonNull(text(before, "insurance")),
             locationId,
             fitted != null && fitted.asBoolean(),
             ship.map(Ship::getVersion).orElse(null),

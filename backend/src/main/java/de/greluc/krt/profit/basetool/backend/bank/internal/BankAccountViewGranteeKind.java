@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 
 /**
  * The kind of audience a {@link BankAccountViewGrant} opens access to (REQ-BANK-035), also used as

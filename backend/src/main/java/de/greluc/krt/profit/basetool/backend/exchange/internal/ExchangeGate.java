@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
@@ -211,7 +211,10 @@ public class ExchangeGate {
       return false;
     }
     return installationRepository
-        .findByKey(subject.externalClient(), UUID.fromString(subject.subject()), key)
+        .findByKey(
+            Objects.requireNonNull(subject.externalClient()),
+            UUID.fromString(subject.subject()),
+            key)
         .map(ExchangeInstallation::getRevokedAt)
         .isPresent();
   }

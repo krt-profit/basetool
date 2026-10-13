@@ -153,8 +153,8 @@ hard account deletion ([REQ-DATA-008 in `data-persistence.md`](data-persistence.
   hold and those rows become removable.
 
 **Code links:** [`DefaultBlueprintProvisioningService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/DefaultBlueprintProvisioningService.java),
-[`PersonalBlueprintRepository#grantDefaultBlueprintsToAllUsers`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/repository/PersonalBlueprintRepository.java),
-[`UserReconciliationService#syncUser`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/UserReconciliationService.java),
+[`PersonalBlueprintRepository#grantDefaultBlueprintsToAllUsers`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/api/PersonalBlueprintRepository.java),
+[`UserReconciliationService#syncUser`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/identity/api/UserReconciliationService.java),
 [`DefaultBlueprintKeyService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/DefaultBlueprintKeyService.java)
 (cached default-key set behind the `removable` flag and the delete guard),
 [`DefaultBlueprintProvisioningTask`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/DefaultBlueprintProvisioningTask.java),
@@ -226,7 +226,7 @@ By default a user's owned `personal_blueprint` rows count toward the leadership
 blueprint-availability overview (REQ-INV-012) and the item-order blueprint-coverage view
 (REQ-ORDERS-015) **only for the org units the user is a member of**. A user MAY opt in, via a
 toggle on their profile page, to share their blueprints **globally**: while
-`app_user.share_blueprints_globally` is `true`, the user is counted in **both** views for
+a `member_blueprint_sharing` row with `share_globally = true` exists for the user (before `V283`: `app_user.share_blueprints_globally`), the user is counted in **both** views for
 **every** org unit, even when org-unit membership would otherwise exclude them — so a Staffel
 member's blueprint can satisfy an SK order's coverage across org-unit boundaries.
 
@@ -270,11 +270,11 @@ and a global sharer is counted once.
 - [ ] Given a user who never opts in, then they are counted only in their own org units
   (unchanged behaviour).
 
-**Code links:** [`UserService#updateUserShareBlueprintsGlobally`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/UserService.java),
-[`UserController`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/UserController.java) (`/me/blueprint-sharing`),
+**Code links:** [`MemberBlueprintSharings`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/api/MemberBlueprintSharings.java),
+[`MyBlueprintSharingController`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/web/MyBlueprintSharingController.java) (`/me/blueprint-sharing`),
 [`PersonalBlueprintOverviewService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/PersonalBlueprintOverviewService.java),
 [`JobOrderItemBlueprintOwnersService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/joborder/internal/JobOrderItemBlueprintOwnersService.java),
-[`V163__add_share_blueprints_globally_to_user.sql`](../../backend/src/main/resources/db/migration/V163__add_share_blueprints_globally_to_user.sql).
+[`V163__add_share_blueprints_globally_to_user.sql`](../../backend/src/main/resources/db/migration/V163__add_share_blueprints_globally_to_user.sql) and [`V283__create_member_payout_setting_and_blueprint_sharing.sql`](../../backend/src/main/resources/db/migration/V283__create_member_payout_setting_and_blueprint_sharing.sql).
 
 ### REQ-INV-048 — Craftability of own blueprints from "My Inventory" stock
 
@@ -547,7 +547,7 @@ caller's **entire removable owned-blueprint set** in one action, so a user who w
 
 **Code links:** [`PersonalBlueprintController#deleteAll`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/web/PersonalBlueprintController.java),
 [`PersonalBlueprintService#deleteAllOwn`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/PersonalBlueprintService.java),
-[`PersonalBlueprintRepository#deleteRemovableByOwnerUserId`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/repository/PersonalBlueprintRepository.java),
+[`PersonalBlueprintRepository#deleteRemovableByOwnerUserId`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/api/PersonalBlueprintRepository.java),
 [`PersonalInventoryBlueprintsPageController#deleteAll`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/blueprint/web/PersonalInventoryBlueprintsPageController.java),
 [`personal-inventory-blueprints.js`](../../frontend/src/main/resources/static/js/personalinventory/personal-inventory-blueprints.js)
 (`submitDeleteAll`).
@@ -586,7 +586,7 @@ removable owned blueprints of **every** user at once — a maintenance/reset too
 
 **Code links:** [`AdminPersonalBlueprintController#deleteAllForAllUsers`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/web/AdminPersonalBlueprintController.java),
 [`PersonalBlueprintService#deleteAllForAllUsers`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/PersonalBlueprintService.java),
-[`PersonalBlueprintRepository#deleteAllRemovable`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/repository/PersonalBlueprintRepository.java),
+[`PersonalBlueprintRepository#deleteAllRemovable`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/api/PersonalBlueprintRepository.java),
 [`AdminPersonalBlueprintsPageController#deleteAllUsers`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/blueprint/web/AdminPersonalBlueprintsPageController.java),
 [`admin-personal-blueprints-purge.js`](../../frontend/src/main/resources/static/js/personalinventory/admin-personal-blueprints-purge.js).
 
