@@ -39,6 +39,7 @@ frequency_type catalogue
 game_item catalogue
 game_item_price catalogue
 inventory_item inventory
+inventory_item_donation_allocation inventory
 inventory_item_job_order_allocation inventory
 inventory_item_mission_allocation inventory
 job_order joborder

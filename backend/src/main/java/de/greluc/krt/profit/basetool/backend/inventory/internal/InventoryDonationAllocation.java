@@ -1,0 +1,92 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.inventory.internal;
+
+import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
+import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import jakarta.validation.constraints.Min;
+import java.util.UUID;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
+
+/**
+ * One donation slice of an {@link InventoryItem}'s quantity, the third allocation kind beside the
+ * job-order and mission slices (REQ-INV-057, REQ-INV-058).
+ *
+ * <p>The slice names the pledge by id only; the donation itself belongs to another module. Deleting
+ * the entry removes the slice.
+ */
+@Entity
+@Table(
+    name = "inventory_item_donation_allocation",
+    uniqueConstraints =
+        @UniqueConstraint(
+            name = "uq_inv_donation_alloc",
+            columnNames = {"inventory_item_id", "donation_id"}))
+@Getter
+@Setter
+@ToString
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class InventoryDonationAllocation extends AbstractEntity<UUID> {
+
+  @Getter(onMethod_ = @__(@Override))
+  @Id
+  @GeneratedValue(strategy = GenerationType.UUID)
+  private UUID id;
+
+  @ManyToOne(optional = false, fetch = FetchType.LAZY)
+  @JoinColumn(name = "inventory_item_id", nullable = false)
+  @ToString.Exclude
+  private InventoryItem inventoryItem;
+
+  @Column(name = "donation_id", nullable = false)
+  private UUID donationId;
+
+  @Min(0)
+  @Column(nullable = false)
+  private Double amount;
+
+  /** Rounds {@link #amount} to SCU storage precision before every insert and update. */
+  @PrePersist
+  @PreUpdate
+  void roundAmountToScuScale() {
+    if (amount != null) {
+      amount = ScuAmounts.roundToScuScale(amount.doubleValue());
+    }
+  }
+}

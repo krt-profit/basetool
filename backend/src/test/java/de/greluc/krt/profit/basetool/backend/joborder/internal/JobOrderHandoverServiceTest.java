@@ -85,7 +85,7 @@ class JobOrderHandoverServiceTest {
         service,
         "stockCommands",
         new InventoryStockCommands(
-            inventoryItemRepository, null, null, null, auditService, null, offerRatchet));
+            inventoryItemRepository, null, null, null, auditService, null, offerRatchet, null));
     orderId = UUID.randomUUID();
     inventoryId = UUID.randomUUID();
     materialId = UUID.randomUUID();

@@ -155,6 +155,17 @@ public class InventoryItem extends AbstractEntity<UUID> implements StockRow {
   @ToString.Exclude
   private List<InventoryMissionAllocation> missionAllocations = new ArrayList<>();
 
+  /**
+   * The donation quantity slices of this entry (REQ-INV-057): what its owner pledged as a donation
+   * and has not yet handed over. Split independently of the other two dimensions; the sum must stay
+   * ≤ {@link #amount}.
+   */
+  @OneToMany(mappedBy = "inventoryItem", cascade = CascadeType.ALL, orphanRemoval = true)
+  @BatchSize(size = 100)
+  @OrderBy("createdAt ASC, id ASC")
+  @ToString.Exclude
+  private List<InventoryDonationAllocation> donationAllocations = new ArrayList<>();
+
   @Column(name = "note", length = 1000)
   @Nullable
   private String note;
@@ -191,6 +202,11 @@ public class InventoryItem extends AbstractEntity<UUID> implements StockRow {
   @Override
   public double missionReserved() {
     return InventoryAllocations.sumMission(this);
+  }
+
+  @Override
+  public double donationReserved() {
+    return InventoryAllocations.sumDonation(this);
   }
 
   @Override

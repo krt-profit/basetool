@@ -171,6 +171,73 @@ public interface StockCommands {
       @NotNull StockChangeReason reason);
 
   /**
+   * Books stock in as a shared row of an org unit's pool, held by {@code holder}, and merges it
+   * into the holder's existing pool row of the same lot (REQ-INV-057). Records {@code
+   * INVENTORY_ITEM_CREATED} with the booking reason. The caller has taken the holder's lot lock
+   * ({@link #lockLots}, {@link StockLot#key}) first.
+   *
+   * @param holder the member who holds the pool row, recorded as the actor
+   * @param poolUnit the org unit whose pool receives the stock
+   * @param lot the lot
+   * @param amount the amount, whole units for piece-counted stock
+   * @param reason why the stock is booked in
+   * @return the id of the pool row that holds the stock afterwards
+   */
+  @NotNull
+  UUID bookIntoPool(
+      @NotNull UUID holder,
+      @NotNull OrgUnit poolUnit,
+      @NotNull StockLot lot,
+      double amount,
+      @NotNull StockBookingReason reason);
+
+  /**
+   * Moves an amount of one row into an org unit's pool, held by {@code holder} at {@code location},
+   * without the owner-change notices of a member-to-member transfer (REQ-INV-057, REQ-INV-055). The
+   * source is lowered or deleted with its job-order and mission slices shrunk by the default plan,
+   * and its offers kept in step. Records {@code INVENTORY_ITEM_TRANSFERRED} with the booking
+   * reason. The caller has locked the source's lot and the holder's target lot, and released the
+   * source's donation earmark.
+   *
+   * @param sourceRowId the locked source row
+   * @param amount the amount to move, whole units for piece-counted stock
+   * @param poolUnit the org unit whose pool receives the stock
+   * @param holder the member who holds the pool row, recorded as the actor
+   * @param location the location the receiver names
+   * @param reason why the stock moves
+   * @return the id of the pool row that holds the stock afterwards
+   * @throws OverAllocationException when the source's remaining earmarks no longer fit
+   */
+  @NotNull
+  UUID transferToPool(
+      @NotNull UUID sourceRowId,
+      double amount,
+      @NotNull OrgUnit poolUnit,
+      @NotNull UUID holder,
+      @NotNull Location location,
+      @NotNull StockBookingReason reason);
+
+  /**
+   * Earmarks an amount of a locked row for a pledged donation, raising the donation's slice when it
+   * already has one on the row. The earmarked amount cannot be booked out, sold, transferred or
+   * rebooked until it is released (REQ-INV-058).
+   *
+   * @param rowId the locked row
+   * @param donationId the pledged donation
+   * @param amount the amount to earmark
+   * @throws OverAllocationException when the donation slices would exceed the row's amount
+   */
+  void earmarkForDonation(@NotNull UUID rowId, @NotNull UUID donationId, double amount);
+
+  /**
+   * Releases the earmark of a donation on every row it lies on, as the donation is received,
+   * declined or withdrawn.
+   *
+   * @param donationId the donation
+   */
+  void releaseDonationEarmark(@NotNull UUID donationId);
+
+  /**
    * Tells the Lager's observers that a row was lowered to {@code remaining}.
    *
    * @param rowId the row

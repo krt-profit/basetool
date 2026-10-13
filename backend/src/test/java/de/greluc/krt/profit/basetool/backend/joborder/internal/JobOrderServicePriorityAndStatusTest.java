@@ -114,7 +114,8 @@ class JobOrderServicePriorityAndStatusTest {
             jobOrderRepository,
             materialRepository,
             new InventoryStockReads(inventoryItemRepository, inventoryItemMapper),
-            new InventoryStockCommands(inventoryItemRepository, null, null, null, null, null, null),
+            new InventoryStockCommands(
+                inventoryItemRepository, null, null, null, null, null, null, null),
             null,
             null,
             null,

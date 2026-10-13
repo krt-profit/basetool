@@ -25,11 +25,14 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.AllocationReductionDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInPolicy;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInRule;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockBookingReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeEffects;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
@@ -37,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockConsumption;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
@@ -84,6 +88,7 @@ public class InventoryStockCommands implements StockCommands {
   private final AuditRecorder auditRecorder;
   private final BookInPolicy bookInPolicy;
   private final StockChangeObserver stockChangeObserver;
+  private final InventoryDonationAllocationRepository donationAllocationRepository;
 
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
@@ -256,6 +261,7 @@ public class InventoryStockCommands implements StockCommands {
     InventoryItem row = managedRow(rowId);
     final double remainingAmount = row.getAmount() - amount;
     if (remainingAmount <= QUANTITY_EPSILON) {
+      InventoryDonationGuards.requireNoDonation(row);
       stockChangeObserver.beforeDelete(List.of(row.getId()), reason);
       inventoryRepository.delete(row);
       return true;
@@ -265,6 +271,7 @@ public class InventoryStockCommands implements StockCommands {
     InventoryAllocations.reduceJobOrder(row, jobOrderId, amount);
     AllocationReductions.applyPlan(row, missionPlan, false);
     row.setAmount(remainingAmount);
+    InventoryDonationGuards.requireDonationFits(row);
     inventoryRepository.save(row);
     return false;
   }
@@ -308,15 +315,199 @@ public class InventoryStockCommands implements StockCommands {
 
       InventoryAllocations.reduceJobOrder(row, jobOrderId, take);
       if (depleted) {
+        InventoryDonationGuards.requireNoDonation(row);
         stockChangeObserver.beforeDelete(List.of(row.getId()), reason);
         inventoryRepository.delete(row);
       } else {
         row.setAmount(rowRemaining);
+        InventoryDonationGuards.requireDonationFits(row);
         inventoryRepository.save(row);
       }
       remainingToConsume -= take;
     }
     return consumed;
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public @NotNull UUID bookIntoPool(
+      @NotNull UUID holder,
+      @NotNull OrgUnit poolUnit,
+      @NotNull StockLot lot,
+      double amount,
+      @NotNull StockBookingReason reason) {
+    requirePositive(amount);
+    User user = userRepository.findById(holder).orElseThrow();
+    InventoryItem item = poolRow(user, poolUnit, lot, amount);
+    requireWholeUnits(item);
+    InventoryItem saved = inventoryRepository.save(item);
+    auditRecorder.record(
+        AuditEventType.INVENTORY_ITEM_CREATED,
+        saved.getId(),
+        InventoryAuditLabels.label(saved),
+        holder,
+        AuditDetails.of("qty", saved.getAmount())
+            .with("q", saved.getQuality())
+            .with("personal", false)
+            .with("pool", poolUnit.getId())
+            .with("reason", reason.name()));
+    return checkoutService.mergeStockIfRequested(saved, true).getId();
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public @NotNull UUID transferToPool(
+      @NotNull UUID sourceRowId,
+      double amount,
+      @NotNull OrgUnit poolUnit,
+      @NotNull UUID holder,
+      @NotNull Location location,
+      @NotNull StockBookingReason reason) {
+    requirePositive(amount);
+    InventoryItem source = managedRow(sourceRowId);
+    double moved = ScuAmounts.roundToScuScale(amount);
+    double sourceAmount = source.getAmount() == null ? 0.0 : source.getAmount();
+    if (moved > sourceAmount + QUANTITY_EPSILON) {
+      throw new BadRequestException("Cannot move more than the available amount");
+    }
+    User user = userRepository.findById(holder).orElseThrow();
+    StockLot targetLot =
+        new StockLot(
+            source.getMaterial(),
+            source.getGameItem(),
+            location,
+            source.getQuality(),
+            Boolean.TRUE.equals(source.getStolen()));
+    InventoryItem target = poolRow(user, poolUnit, targetLot, moved);
+    requireWholeUnits(target);
+    final String sourceLabel = InventoryAuditLabels.label(source);
+    UUID sourceId = source.getId();
+    double remaining = ScuAmounts.roundToScuScale(sourceAmount - moved);
+    Map<UUID, Double> orderPlan =
+        AllocationReductions.resolveReductionPlan(source, null, moved, true);
+    Map<UUID, Double> missionPlan =
+        AllocationReductions.resolveReductionPlan(source, null, moved, false);
+    AllocationReductions.applyPlan(source, orderPlan, true);
+    AllocationReductions.applyPlan(source, missionPlan, false);
+    if (remaining <= QUANTITY_EPSILON) {
+      InventoryDonationGuards.requireNoDonation(source);
+      stockChangeObserver.beforeDelete(List.of(sourceId), StockChangeReason.TRANSFER);
+      inventoryRepository.delete(source);
+    } else {
+      source.setAmount(remaining);
+      if (!InventoryAllocations.fits(source)) {
+        throw new OverAllocationException();
+      }
+      inventoryRepository.saveAndFlush(source);
+      stockChangeObserver.lower(sourceId, remaining, StockChangeReason.TRANSFER);
+    }
+    InventoryItem saved = inventoryRepository.save(target);
+    auditRecorder.record(
+        AuditEventType.INVENTORY_ITEM_TRANSFERRED,
+        sourceId,
+        sourceLabel,
+        holder,
+        AuditDetails.of("amount", moved)
+            .with("toLoc", location.getName())
+            .with("newRow", saved.getId())
+            .with("pool", poolUnit.getId())
+            .with("reason", reason.name())
+            .with("depleted", remaining <= QUANTITY_EPSILON));
+    return checkoutService.mergeStockIfRequested(saved, true).getId();
+  }
+
+  /**
+   * Builds the unsaved pool row of a lot: shared, held by the member and stamped with the pool's
+   * org unit.
+   *
+   * @param holder the holding member
+   * @param poolUnit the pool's org unit
+   * @param lot the lot
+   * @param amount the amount
+   * @return the new row
+   */
+  private static @NotNull InventoryItem poolRow(
+      @NotNull User holder, @NotNull OrgUnit poolUnit, @NotNull StockLot lot, double amount) {
+    InventoryItem item = new InventoryItem();
+    item.setUser(holder);
+    item.setOwningOrgUnit(poolUnit);
+    item.setMaterial(lot.material());
+    item.setGameItem(lot.gameItem());
+    item.setLocation(lot.location());
+    item.setQuality(lot.material() == null ? null : lot.quality() == null ? 0 : lot.quality());
+    item.setAmount(ScuAmounts.roundToScuScale(amount));
+    item.setPersonal(false);
+    item.setStolen(lot.stolen());
+    return item;
+  }
+
+  /**
+   * Refuses a non-positive amount.
+   *
+   * @param amount the amount
+   * @throws BadRequestException when the amount is not positive
+   */
+  private static void requirePositive(double amount) {
+    if (amount <= 0.0) {
+      throw new BadRequestException("The amount must be positive");
+    }
+  }
+
+  /**
+   * Refuses a fractional amount on a row that counts whole units.
+   *
+   * @param item the row with its amount
+   * @throws BadRequestException when a game item or piece-counted material row holds a fraction
+   */
+  private static void requireWholeUnits(@NotNull InventoryItem item) {
+    boolean whole =
+        item.getGameItem() != null
+            || (item.getMaterial() != null
+                && item.getMaterial().getQuantityType() == QuantityType.PIECE);
+    if (whole && item.getAmount() % 1 != 0) {
+      throw new BadRequestException("This stock is counted in whole units");
+    }
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void earmarkForDonation(@NotNull UUID rowId, @NotNull UUID donationId, double amount) {
+    requirePositive(amount);
+    InventoryItem row = managedRow(rowId);
+    if (Boolean.TRUE.equals(row.getStolen())) {
+      throw new BadRequestException("Stolen stock cannot be donated");
+    }
+    InventoryAllocations.addDonation(row, donationId, ScuAmounts.roundToScuScale(amount));
+    if (!InventoryAllocations.fits(row)) {
+      throw new OverAllocationException();
+    }
+    inventoryRepository.saveAndFlush(row);
+    auditRecorder.record(
+        AuditEventType.INVENTORY_ALLOCATION_ADDED,
+        row.getId(),
+        InventoryAuditLabels.label(row),
+        row.getUser().getId(),
+        AuditDetails.of("dim", "DONATION")
+            .with("ref", donationId)
+            .with("qty", ScuAmounts.roundToScuScale(amount)));
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void releaseDonationEarmark(@NotNull UUID donationId) {
+    for (InventoryDonationAllocation slice :
+        donationAllocationRepository.findByDonationId(donationId)) {
+      InventoryItem row = slice.getInventoryItem();
+      double released = slice.getAmount() == null ? 0.0 : slice.getAmount();
+      row.getDonationAllocations().remove(slice);
+      inventoryRepository.saveAndFlush(row);
+      auditRecorder.record(
+          AuditEventType.INVENTORY_ALLOCATION_REMOVED,
+          row.getId(),
+          InventoryAuditLabels.label(row),
+          row.getUser().getId(),
+          AuditDetails.of("dim", "DONATION").with("ref", donationId).with("qty", released));
+    }
   }
 
   @Override

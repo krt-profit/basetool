@@ -88,7 +88,7 @@ class JobOrderHandoverQualityTierTest {
         service,
         "stockCommands",
         new InventoryStockCommands(
-            inventoryItemRepository, null, null, null, auditService, null, offerRatchet));
+            inventoryItemRepository, null, null, null, auditService, null, offerRatchet, null));
     orderId = UUID.randomUUID();
     order = new JobOrder();
     order.setId(orderId);

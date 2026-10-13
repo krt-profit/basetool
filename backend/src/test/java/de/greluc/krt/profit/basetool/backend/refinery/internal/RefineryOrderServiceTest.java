@@ -133,7 +133,14 @@ class RefineryOrderServiceTest {
         refineryOrderService,
         "stockCommands",
         new InventoryStockCommands(
-            inventoryItemRepository, userRepository, null, null, auditService, bookInPolicy, null));
+            inventoryItemRepository,
+            userRepository,
+            null,
+            null,
+            auditService,
+            bookInPolicy,
+            null,
+            null));
     lenient().when(userService.currentActor()).thenReturn(ActorRef.system());
     owner = new User();
     owner.setId(OWNER_ID);

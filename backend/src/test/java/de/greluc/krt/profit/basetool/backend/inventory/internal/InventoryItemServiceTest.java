@@ -138,7 +138,8 @@ class InventoryItemServiceTest {
             inventoryItemMapper,
             ownerScopeService,
             inventoryAccessPolicy,
-            new InventoryStockCommands(null, null, null, null, null, inventoryAccessPolicy, null),
+            new InventoryStockCommands(
+                null, null, null, null, null, inventoryAccessPolicy, null, null),
             new JobOrderEarmarkTargets(jobOrderRepository, jobOrderItemService),
             auditService,
             realAggregationService,
@@ -653,7 +654,8 @@ class InventoryItemServiceTest {
             inventoryItemMapper,
             ownerScopeService,
             inventoryAccessPolicy,
-            new InventoryStockCommands(null, null, null, null, null, inventoryAccessPolicy, null),
+            new InventoryStockCommands(
+                null, null, null, null, null, inventoryAccessPolicy, null, null),
             new JobOrderEarmarkTargets(jobOrderRepository, jobOrderItemService),
             auditService,
             realAggregationService,

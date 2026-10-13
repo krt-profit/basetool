@@ -129,6 +129,13 @@ public interface StockRow {
   double missionReserved();
 
   /**
+   * Sums the amounts of the row's donation slices (its donation allocations must be loaded).
+   *
+   * @return the total pledged as donations
+   */
+  double donationReserved();
+
+  /**
    * Tells whether the row has a slice for a job order.
    *
    * @param jobOrderId the job order

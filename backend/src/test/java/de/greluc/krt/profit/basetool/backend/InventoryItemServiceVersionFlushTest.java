@@ -111,7 +111,7 @@ class InventoryItemServiceVersionFlushTest {
             inventoryItemMapper,
             ownerScopeService,
             null,
-            new InventoryStockCommands(null, null, null, null, null, null, null),
+            new InventoryStockCommands(null, null, null, null, null, null, null, null),
             null,
             auditService,
             null,
