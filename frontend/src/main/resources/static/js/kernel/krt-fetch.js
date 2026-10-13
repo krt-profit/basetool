@@ -1,5 +1,3 @@
-// @ts-check
-
 import {
     showFrontendErrorToast,
     showFrontendSuccessToast,
@@ -47,12 +45,25 @@ function defaults() {
     return window.krtFetchI18n || {};
 }
 
+/**
+ * Reads a `<meta>` tag's content.
+ *
+ * @param {string} name the tag's `name`
+ * @returns {string | null} the content; null when the tag is absent, empty or the string
+ *     `undefined`
+ */
 function metaContent(name) {
     const el = document.querySelector(`meta[name="${name}"]`);
     const content = el ? el.getAttribute('content') : null;
     return content && content !== 'undefined' ? content : null;
 }
 
+/**
+ * Writes a `<meta>` tag's content, creating the tag in the head when it is missing.
+ *
+ * @param {string} name the tag's `name`
+ * @param {string} value the content to store
+ */
 function setMetaContent(name, value) {
     let el = document.querySelector(`meta[name="${name}"]`);
     if (!el) {
@@ -74,8 +85,12 @@ function csrfHeaderName() {
 /**
  * Builds the JSON-write headers (Accept, Content-Type, X-Requested-With) plus the CSRF header
  * read fresh from the meta tags; `base` is merged first, so the CSRF header always wins.
+ *
+ * @param {Record<string, string>} [base] extra headers merged over the defaults
+ * @returns {Record<string, string>} the merged header map
  */
 function csrfHeaders(base) {
+    /** @type {Record<string, string>} */
     const headers = Object.assign(
         {
             Accept: 'application/json',
@@ -140,6 +155,12 @@ const REAUTH_GUARD_KEY = 'krtReauthAt';
 const REAUTH_MIN_INTERVAL_MS = 10000;
 const DEFAULT_REAUTH_PATH = '/oauth2/authorization/keycloak';
 
+/**
+ * Navigates to the re-authentication path, at most once per ten seconds.
+ *
+ * @param {string} [url] the same-origin path the server named; the Keycloak login path otherwise
+ * @returns {boolean} false when the guard suppressed the navigation, true when it started
+ */
 function reauthRedirect(url) {
     const target = typeof url === 'string' && url.charAt(0) === '/' ? url : DEFAULT_REAUTH_PATH;
     try {
@@ -157,6 +178,9 @@ function reauthRedirect(url) {
 /**
  * If response is a 401 carrying the X-Reauthenticate header, redirects the browser to the
  * Keycloak login flow and returns true; otherwise returns false. Safe to call with any Response.
+ *
+ * @param {Response} response the response to inspect
+ * @returns {boolean} true when the browser was sent to the login flow
  */
 function maybeReauthenticate(response) {
     if (!response || response.status !== 401 || !response.headers) {
@@ -172,6 +196,9 @@ function maybeReauthenticate(response) {
 /**
  * If response carries the X-Terms-Acceptance-Required header, navigates to the consent page it
  * names and returns true; otherwise returns false. Safe to call with any Response (REQ-SEC-028).
+ *
+ * @param {Response} response the response to inspect
+ * @returns {boolean} true when the browser was sent to the consent page
  */
 function maybeTermsGate(response) {
     if (!response || !response.headers) {
@@ -211,11 +238,12 @@ export const krtTermsGate = { check: maybeTermsGate, redirect: termsGateRedirect
  * X-Requested-With and the CSRF header read fresh from the meta tags. Content-Type is set only
  * for JSON, so a FormData body gets its multipart boundary from the browser.
  *
- * @param json whether the body is JSON (adds Content-Type) rather than FormData (omits it)
- * @param accept the Accept header value; defaults to application/json
- * @return a plain headers object for `fetch`
+ * @param {boolean} json whether the body is JSON (adds Content-Type) rather than FormData
+ * @param {string} [accept] the Accept header value; defaults to application/json
+ * @returns {Record<string, string>} a plain headers object for `fetch`
  */
 function writeHeaders(json, accept) {
+    /** @type {Record<string, string>} */
     const headers = {
         Accept: accept || 'application/json',
         'X-Requested-With': 'XMLHttpRequest',
@@ -234,6 +262,9 @@ function writeHeaders(json, accept) {
 /**
  * Writes newVersion to the container and every descendant carrying [data-version]. No-op when
  * newVersion is null or the container cannot be resolved.
+ *
+ * @param {KrtElementRef} containerSelector the container or a selector for it
+ * @param {number | string | null | undefined} newVersion the version to write
  */
 function syncVersion(containerSelector, newVersion) {
     if (newVersion == null) {
@@ -252,10 +283,20 @@ function syncVersion(containerSelector, newVersion) {
     });
 }
 
+/**
+ * Shows an error toast.
+ *
+ * @param {string} message the text to show
+ */
 function errorToast(message) {
     showFrontendErrorToast(message);
 }
 
+/**
+ * Shows a success toast.
+ *
+ * @param {string} message the text to show
+ */
 function successToast(message) {
     showFrontendSuccessToast(message);
 }
@@ -263,6 +304,9 @@ function successToast(message) {
 /**
  * Logs a developer-facing, unlocalized console warning; a no-op when no console exists.
  * `detail` is passed only when defined.
+ *
+ * @param {string} message the warning text
+ * @param {unknown} [detail] extra data logged beside the message
  */
 function devWarn(message, detail) {
     if (typeof console === 'undefined' || typeof console.warn !== 'function') {
@@ -416,6 +460,16 @@ async function getJson(url, opts) {
     return response.json();
 }
 
+/**
+ * A swapped container with the bookkeeping `swap` keeps on it.
+ *
+ * @typedef {Element & {
+ *     _krtSwapSeq?: number,
+ *     _krtSwapAbort?: AbortController | null,
+ *     _krtSwapBound?: boolean,
+ * }} SwapContainer
+ */
+
 /** @type {Element | null} */
 let pendingSubmitter = null;
 document.addEventListener(
@@ -440,17 +494,32 @@ function consumePendingSubmitter() {
     return s;
 }
 
+/**
+ * Defaults the options' submitter to the control that submitted the form and disables it.
+ *
+ * @param {KrtSendOpts} opts the request options, updated in place
+ */
 function resolveSubmitter(opts) {
     if (opts.submitter == null) {
         opts.submitter = consumePendingSubmitter();
     }
     if (opts.submitter) {
-        opts.submitter.disabled = true;
+        /** @type {HTMLButtonElement} */ (opts.submitter).disabled = true;
     }
 }
 
+/** @type {Map<string, Promise<unknown>>} */
 const serialChains = new Map();
 function noop() {}
+
+/**
+ * Runs `task` after the previous task with the same key settled; without a key it runs at once.
+ *
+ * @template T
+ * @param {string | null | undefined} key the lock-scope key
+ * @param {() => Promise<T>} task the work to run
+ * @returns {Promise<T>} the task's own outcome
+ */
 function runSerialized(key, task) {
     if (key == null || key === '') {
         return Promise.resolve().then(task);
@@ -473,6 +542,10 @@ function runSerialized(key, task) {
  *
  * opts carries the localized strings: conflictSectionLabel (prefix), errorMessage (fallback)
  * and conflict.{title,reloadLabel,dismissLabel,reloadQuestion,reloadDetailFallback}.
+ *
+ * @param {Response} response the non-ok response
+ * @param {any} problem the parsed RFC 7807 body, or null
+ * @param {KrtSendOpts} [opts] the localized strings
  */
 async function handleProblem(response, problem, opts) {
     const options = opts || {};
@@ -487,6 +560,7 @@ async function handleProblem(response, problem, opts) {
             problem && typeof problem === 'object' && problem.code ? String(problem.code) : null;
         const stale = code === 'OPTIMISTIC_LOCK' || code === 'PESSIMISTIC_LOCK';
         if (stale) {
+            /** @type {KrtConflictStrings} */
             const conflict = options.conflict || {};
             const detail =
                 problem && problem.detail
@@ -600,9 +674,14 @@ async function parseBody(response, responseType) {
  *  - responseType         'blob' delivers a 2xx body to onSuccess as a Blob
  *
  * Returns { ok, status, body } (plus `redirected` on a 2xx).
+ *
+ * @param {KrtSendOpts} opts the shared write options
+ * @param {() => RequestInit} buildInit builds the request init afresh for each attempt
+ * @param {string} url the target URL
+ * @returns {Promise<KrtWriteResult>} the outcome
  */
 async function send(opts, buildInit, url) {
-    const submitter = opts.submitter || null;
+    const submitter = /** @type {HTMLButtonElement | null} */ (opts.submitter || null);
     if (submitter) {
         submitter.disabled = true;
     }
@@ -618,6 +697,7 @@ async function send(opts, buildInit, url) {
             }
         } catch (networkError) {
             devWarn('krtFetch network error', networkError);
+            /** @type {unknown} */
             let handled = false;
             if (typeof opts.onNetworkError === 'function') {
                 try {
@@ -644,6 +724,7 @@ async function send(opts, buildInit, url) {
 
         if (!response.ok) {
             if (typeof opts.onError === 'function') {
+                /** @type {unknown} */
                 let handled = false;
                 try {
                     handled = opts.onError(response.status, body, response);
@@ -697,6 +778,9 @@ async function send(opts, buildInit, url) {
  *                         after the preceding write has settled.
  *
  * Returns { ok, status, body }.
+ *
+ * @param {KrtWriteOpts} opts the write options
+ * @returns {Promise<KrtWriteResult>} the outcome
  */
 async function write(opts) {
     const method = opts.method || 'PATCH';
@@ -708,6 +792,7 @@ async function write(opts) {
         const payload = typeof opts.payload === 'function' ? opts.payload() : opts.payload;
         function buildInit() {
             const headers = writeHeaders(true, opts.accept);
+            /** @type {RequestInit} */
             const init = { method, headers };
             const sendsBody =
                 method !== 'GET' && (method !== 'DELETE' || opts.bodyOnDelete === true);
@@ -734,9 +819,14 @@ async function write(opts) {
  *  - formData             explicit FormData (default: new FormData(form))
  *
  * Returns { ok, status, body }.
+ *
+ * @param {KrtSubmitFormOpts} opts the form options
+ * @returns {Promise<KrtWriteResult>} the outcome
  */
 async function submitForm(opts) {
-    const form = typeof opts.form === 'string' ? document.querySelector(opts.form) : opts.form;
+    const form = /** @type {HTMLFormElement | null | undefined} */ (
+        typeof opts.form === 'string' ? document.querySelector(opts.form) : opts.form
+    );
 
     resolveSubmitter(opts);
 
@@ -757,7 +847,7 @@ async function submitForm(opts) {
             return { method, headers, body };
         }
 
-        return send(opts, buildInit, url);
+        return send(opts, buildInit, /** @type {string} */ (url));
     }
 
     return runSerialized(opts.serialize, exec);
@@ -810,6 +900,11 @@ function replaceWithTrustedHtml(el, html) {
 /**
  * Returns the same-origin path+query of url with the fragment query parameter set, so the
  * controller renders only the fragment.
+ *
+ * @param {string} url the source URL
+ * @param {string} paramName the fragment query parameter's name
+ * @param {string} paramValue the fragment query parameter's value
+ * @returns {string} path and query with the parameter set
  */
 function withFragmentParam(url, paramName, paramValue) {
     const resolved = new URL(url, window.location.origin);
@@ -820,6 +915,10 @@ function withFragmentParam(url, paramName, paramValue) {
 /**
  * Returns the same-origin path+query of url without the fragment query parameter, as shown in
  * the address bar after a swap.
+ *
+ * @param {string} url the source URL
+ * @param {string} paramName the fragment query parameter's name
+ * @returns {string} path and query without the parameter
  */
 function withoutFragmentParam(url, paramName) {
     const resolved = new URL(url, window.location.origin);
@@ -845,22 +944,23 @@ function withoutFragmentParam(url, paramName) {
  *
  * Only a non-redirected 2xx body is injected. Afterwards, contained a.page-btn[href] and
  * a[data-swap][href] anchors re-swap in place. Resolves to true when the container was updated.
+ *
+ * @param {KrtSwapOpts} opts the swap options
+ * @returns {Promise<boolean>} true when the container was updated
  */
 function swap(opts) {
-    const container =
-        typeof opts.container === 'string'
-            ? document.querySelector(opts.container)
-            : opts.container;
+    const container = /** @type {SwapContainer | null} */ (
+        typeof opts.container === 'string' ? document.querySelector(opts.container) : opts.container
+    );
     if (!container) {
         return Promise.resolve(false);
     }
-    const indicator =
-        typeof opts.indicator === 'string'
-            ? document.querySelector(opts.indicator)
-            : opts.indicator;
+    const indicator = /** @type {HTMLElement | null | undefined} */ (
+        typeof opts.indicator === 'string' ? document.querySelector(opts.indicator) : opts.indicator
+    );
     const paramName = opts.fragmentParam || 'fragment';
     const paramValue = opts.fragmentValue || 'results';
-    const url = withFragmentParam(opts.url, paramName, paramValue);
+    const url = withFragmentParam(/** @type {string} */ (opts.url), paramName, paramValue);
     const scrollY = window.scrollY;
 
     const seq = (container._krtSwapSeq = (container._krtSwapSeq || 0) + 1);
@@ -870,7 +970,7 @@ function swap(opts) {
     const aborter = typeof AbortController === 'function' ? new AbortController() : null;
     container._krtSwapAbort = aborter;
     function isCurrent() {
-        return container._krtSwapSeq === seq;
+        return /** @type {SwapContainer} */ (container)._krtSwapSeq === seq;
     }
     function hideIndicatorIfCurrent() {
         if (indicator && isCurrent()) {
@@ -878,8 +978,9 @@ function swap(opts) {
         }
     }
     function releaseAborter() {
-        if (container._krtSwapAbort === aborter) {
-            container._krtSwapAbort = null;
+        const owner = /** @type {SwapContainer} */ (container);
+        if (owner._krtSwapAbort === aborter) {
+            owner._krtSwapAbort = null;
         }
     }
 
@@ -925,7 +1026,7 @@ function swap(opts) {
                 window.history.replaceState(
                     window.history.state,
                     '',
-                    withoutFragmentParam(opts.url, paramName),
+                    withoutFragmentParam(/** @type {string} */ (opts.url), paramName),
                 );
             }
             if (opts.preserveScroll !== false) {
@@ -944,13 +1045,21 @@ function swap(opts) {
         });
 }
 
+/**
+ * Intercepts clicks on the container's pagination and swap anchors once, re-swapping in place.
+ *
+ * @param {SwapContainer} container the swapped container
+ * @param {KrtSwapOpts} opts the options each re-swap starts from
+ */
 function bindSwapAnchorInterception(container, opts) {
     if (container._krtSwapBound) {
         return;
     }
     container._krtSwapBound = true;
     container.addEventListener('click', (event) => {
-        const anchor = event.target.closest('a.page-btn[href], a[data-swap][href]');
+        const anchor = /** @type {Element} */ (event.target).closest(
+            'a.page-btn[href], a[data-swap][href]',
+        );
         if (!anchor || !container.contains(anchor)) {
             return;
         }
@@ -960,19 +1069,20 @@ function bindSwapAnchorInterception(container, opts) {
         }
         event.preventDefault();
         event.stopPropagation();
-        swap(Object.assign({}, opts, { url: anchor.getAttribute('href') }));
+        swap(Object.assign({}, opts, { url: /** @type {string} */ (anchor.getAttribute('href')) }));
     });
 }
 
 /**
  * Binds the in-container pagination/sort anchor interception without an initial fetch; a click
  * on a contained a.page-btn[href] / a[data-swap][href] re-swaps with the given opts.
+ *
+ * @param {KrtSwapOpts} opts the swap options
  */
 function bindSwap(opts) {
-    const container =
-        typeof opts.container === 'string'
-            ? document.querySelector(opts.container)
-            : opts.container;
+    const container = /** @type {SwapContainer | null} */ (
+        typeof opts.container === 'string' ? document.querySelector(opts.container) : opts.container
+    );
     if (!container) {
         return;
     }
@@ -1002,10 +1112,14 @@ function bindSwap(opts) {
  *  - refresh(sectionKeys, opts)  re-renders one or more sections via {@link swap}; resolves when
  *                         all swaps complete
  *  - notify(sectionKeys)  broadcasts without re-rendering
+ *
+ * @param {KrtSectionWriteConfig} config the page's section configuration
+ * @returns {KrtSectionWriter} the section-write seam
  */
 function sectionWrite(config) {
     return {
         write(opts) {
+            /** @type {KrtI18nDict} */
             const dict = config.dict() || {};
             /**
              * The page dictionary's string for `key`, visibly reported when missing; undefined
@@ -1057,7 +1171,10 @@ function sectionWrite(config) {
                         fragmentValue: cfg.fragmentValue,
                         history: false,
                         preserveScroll: true,
-                        errorMessage: (config.dict() || {})[config.keys.refreshErrorKey] || '',
+                        errorMessage:
+                            /** @type {KrtI18nDict} */ (config.dict() || {})[
+                                config.keys.refreshErrorKey
+                            ] || '',
                     });
                 }),
             );

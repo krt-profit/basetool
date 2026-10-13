@@ -1,5 +1,3 @@
-// @ts-check
-
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';

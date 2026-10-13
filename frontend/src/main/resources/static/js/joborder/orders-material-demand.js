@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 /* global KRT_DEMAND_LIVESYNC_UPDATES, KRT_DEMAND_SECTION_REFRESH_ERROR */
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
@@ -70,10 +68,14 @@ function readDemandState() {
         if (!parsed || typeof parsed !== 'object') return;
         demandState = {
             excludedMaterials: Array.isArray(parsed.excludedMaterials)
-                ? parsed.excludedMaterials.filter((v) => typeof v === 'string')
+                ? parsed.excludedMaterials.filter(
+                      (/** @type {unknown} */ v) => typeof v === 'string',
+                  )
                 : null,
             excludedQualities: Array.isArray(parsed.excludedQualities)
-                ? parsed.excludedQualities.filter((v) => typeof v === 'string')
+                ? parsed.excludedQualities.filter(
+                      (/** @type {unknown} */ v) => typeof v === 'string',
+                  )
                 : null,
             hideCovered: parsed.hideCovered === true,
             sortKey: typeof parsed.sortKey === 'string' ? parsed.sortKey : null,

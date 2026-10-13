@@ -1,4 +1,3 @@
-// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -80,8 +79,9 @@ function initRefineryOrdersDetails() {
 
     if (refineryTopic()) {
         krtLiveSync.createReceiver({
-            topic: refineryTopic(),
+            topic: refineryTopic() ?? undefined,
             sections: REFINERY_ORDER_SECTIONS,
+            /** @param {string[]} keys the changed sections to re-render */
             refresh(keys) {
                 refinerySeam?.refresh(keys, { broadcast: false });
             },
@@ -99,6 +99,21 @@ function initRefineryOrdersDetails() {
 
 initRefineryOrdersDetails();
 
+/**
+ * @typedef {object} RefinerySubmitOptions
+ * @property {HTMLFormElement} form the form to submit
+ * @property {HTMLElement | null} [submitter] the submit control disabled while in flight
+ * @property {string} [successMessage] the success toast text; no toast when omitted
+ * @property {string} errorMessage the error toast text
+ * @property {() => void} [onFailure] runs when the submit failed
+ * @property {(body: any) => void | Promise<unknown>} [onSuccess] runs with the parsed response body
+ */
+
+/**
+ * Submits one of the refinery-order forms through `krtFetch`, serialized per order.
+ *
+ * @param {RefinerySubmitOptions} options the form, its messages and the outcome callbacks
+ */
 function _submitRefinery(options) {
     const form = options.form;
 
@@ -128,6 +143,11 @@ function _submitRefinery(options) {
     });
 }
 
+/**
+ * Derives the SCU field of a material row from its unit quantity.
+ *
+ * @param {number | string | null} index the row index, as a number or its `data-index` text
+ */
 function calcScu(index) {
     const unitInput = /** @type {HTMLInputElement | null} */ (
         document.getElementById(`outputQuantity_${index}`)
@@ -162,18 +182,25 @@ function openStoreModal() {
     if (modal) krtModal.open(modal);
 }
 
+/**
+ * Appends a copy of the clicked store-item block with renumbered ids and a fresh user select.
+ *
+ * @param {HTMLElement} btn the duplicate button inside the block to copy
+ */
 function duplicateStoreItem(btn) {
     const container = document.getElementById('storeItemsContainer');
     if (!container) return;
-    const blockToCopy = btn.closest('.store-item-block');
-    const newBlock = blockToCopy.cloneNode(true);
+    const blockToCopy = /** @type {HTMLElement} */ (btn.closest('.store-item-block'));
+    const newBlock = /** @type {HTMLElement} */ (blockToCopy.cloneNode(true));
 
     const allBlocks = container.querySelectorAll('.store-item-block');
     const newIndex = allBlocks.length;
 
     const nameRegex = /items\[\d+\]/g;
 
-    newBlock.querySelectorAll('input, select, textarea').forEach((el) => {
+    /** @type {NodeListOf<RodFormControl>} */ (
+        newBlock.querySelectorAll('input, select, textarea')
+    ).forEach((el) => {
         if (el.name) {
             el.name = el.name.replace(nameRegex, `items[${newIndex}]`);
         }
@@ -198,9 +225,13 @@ function duplicateStoreItem(btn) {
         document.getElementById('store-user-select-tpl')
     );
     const tplSelect = tpl ? tpl.content.firstElementChild : null;
-    const sourceUser = blockToCopy.querySelector('[id^="storeUser_"]');
+    const sourceUser = /** @type {HTMLSelectElement | null} */ (
+        blockToCopy.querySelector('[id^="storeUser_"]')
+    );
     const sourceUserValue = sourceUser ? sourceUser.value : '';
-    const sourceUserInput = blockToCopy.querySelector('.krt-combobox__input');
+    const sourceUserInput = /** @type {HTMLInputElement | null} */ (
+        blockToCopy.querySelector('.krt-combobox__input')
+    );
     const sourceUserLabel = sourceUserInput ? sourceUserInput.value : '';
     const clonedUser = newBlock.querySelector('[id^="storeUser_"]');
     if (tplSelect && clonedUser) {
@@ -259,10 +290,19 @@ function reindexStoreItems() {
     });
 }
 
+/**
+ * Disables the job-order select of a store row while its "personal" checkbox is ticked.
+ *
+ * @param {Element | null} block the store-item block
+ */
 function syncStorePersonalJobOrder(block) {
     if (!block) return;
-    const personalCb = block.querySelector('[id^="storePersonal_"]');
-    const jobOrderSelect = block.querySelector('[id^="storeJobOrder_"]');
+    const personalCb = /** @type {HTMLInputElement | null} */ (
+        block.querySelector('[id^="storePersonal_"]')
+    );
+    const jobOrderSelect = /** @type {HTMLSelectElement | null} */ (
+        block.querySelector('[id^="storeJobOrder_"]')
+    );
     if (!jobOrderSelect) return;
     const personal = !!(personalCb && personalCb.checked);
     jobOrderSelect.disabled = personal;
@@ -271,6 +311,12 @@ function syncStorePersonalJobOrder(block) {
     }
 }
 
+/**
+ * Replaces the options of an org-unit select, keeping the previous or the inherited choice.
+ *
+ * @param {HTMLSelectElement} selectEl the org-unit select
+ * @param {{orgUnitId: string, orgUnitName: string}[]} options the org units to offer
+ */
 function rebuildOrgUnitOptions(selectEl, options) {
     const previous = selectEl.value;
     while (selectEl.firstChild) {
@@ -290,7 +336,7 @@ function rebuildOrgUnitOptions(selectEl, options) {
         if (o.orgUnitId === STORE_INHERITED_ORG_UNIT_ID) hasInherited = true;
         if (previous && o.orgUnitId === previous) hasPrevious = true;
     });
-    if (hasInherited) selectEl.value = STORE_INHERITED_ORG_UNIT_ID;
+    if (hasInherited) selectEl.value = /** @type {string} */ (STORE_INHERITED_ORG_UNIT_ID);
     else if (hasPrevious) selectEl.value = previous;
     else selectEl.value = '';
 }
@@ -304,7 +350,9 @@ document.addEventListener('change', (e) => {
     }
     if (!sel.id.startsWith('storeUser_')) return;
     const index = sel.id.substring('storeUser_'.length);
-    const orgSelect = document.getElementById(`storeOrgUnit_${index}`);
+    const orgSelect = /** @type {HTMLSelectElement | null} */ (
+        document.getElementById(`storeOrgUnit_${index}`)
+    );
     if (!orgSelect || !sel.value) return;
     krtFetch
         .getJson(`/refinery-orders/users/${encodeURIComponent(sel.value)}/org-units`)
@@ -318,13 +366,21 @@ function initRefineryStoreSection() {
     storeItemsContainer.querySelectorAll('.store-item-block').forEach(syncStorePersonalJobOrder);
 }
 
+/**
+ * Shows the refined material of the selected raw material in its row.
+ *
+ * @param {KrtRefineryControl} selectElement the raw-material select or its combobox's hidden input
+ */
 function updateOutputMaterial(selectElement) {
-    const entryBlock = selectElement.closest('.material-entry');
-    const outputDisplay = entryBlock.querySelector('span[id^="outputMaterialDisplay_"]');
+    const entryBlock = /** @type {HTMLElement} */ (selectElement.closest('.material-entry'));
+    const outputDisplay = /** @type {HTMLElement} */ (
+        entryBlock.querySelector('span[id^="outputMaterialDisplay_"]')
+    );
 
     let refinedName = selectElement.dataset.refinedName || '';
     if (!refinedName && selectElement.tagName === 'SELECT') {
-        const selectedOption = selectElement.options[selectElement.selectedIndex];
+        const select = /** @type {HTMLSelectElement} */ (selectElement);
+        const selectedOption = select.options[select.selectedIndex];
         refinedName = (selectedOption && selectedOption.getAttribute('data-refined-name')) || '';
     }
     if (refinedName) {
@@ -514,8 +570,13 @@ function addMaterialRow() {
     krtEnhanceComboboxes(template);
 }
 
+/**
+ * Removes a material row and renumbers the remaining ones.
+ *
+ * @param {HTMLElement} button the remove button inside the row
+ */
 function removeMaterialRow(button) {
-    const entry = button.closest('.material-entry');
+    const entry = /** @type {Element} */ (button.closest('.material-entry'));
     entry.remove();
 
     const container = document.getElementById('materials-container');
@@ -755,7 +816,7 @@ krtEvents.on('click', 'rod-remove-material', (el) => {
     removeMaterialRow(el);
 });
 krtEvents.on('change', 'rod-update-output', (el) => {
-    updateOutputMaterial(el);
+    updateOutputMaterial(/** @type {KrtRefineryControl} */ (el));
 });
 krtEvents.on('change', 'rod-location-change', (el) => {
     krtRefineryYield.onLocationChange(/** @type {KrtRefineryControl} */ (el));
@@ -790,6 +851,12 @@ function discardRefineryEdits() {
     if (refinerySeam) refinerySeam.refresh(['order'], { broadcast: false });
 }
 
+/**
+ * Submits the order form and refreshes the order and store sections.
+ *
+ * @param {HTMLFormElement} form the order form
+ * @param {HTMLElement | null} submitter the submit control
+ */
 function submitRefineryMainForm(form, submitter) {
     _submitRefinery({
         form,
@@ -803,8 +870,14 @@ function submitRefineryMainForm(form, submitter) {
     });
 }
 
+/**
+ * Submits the store dialog's form, then closes the dialog and refreshes the sections.
+ *
+ * @param {HTMLFormElement} form the store form
+ * @param {HTMLElement | null} submitter the submit control
+ */
 function submitRefineryStoreForm(form, submitter) {
-    const btn = form.querySelector('button[type=submit]');
+    const btn = /** @type {HTMLButtonElement | null} */ (form.querySelector('button[type=submit]'));
     const btnLabel = btn ? btn.querySelector('span') : null;
     const originalLabel = btnLabel ? btnLabel.textContent : null;
     const jobOrderIds = refineryStoreJobOrderIds(form);
@@ -825,6 +898,12 @@ function submitRefineryStoreForm(form, submitter) {
     });
 }
 
+/**
+ * Asks for confirmation, then submits the cancel form and leaves the page.
+ *
+ * @param {HTMLFormElement} form the cancel form
+ * @param {HTMLElement | null} submitter the submit control
+ */
 async function submitRefineryCancelForm(form, submitter) {
     {
         const ok = await showKrtConfirm(
@@ -848,8 +927,14 @@ async function submitRefineryCancelForm(form, submitter) {
     });
 }
 
-/** The distinct job orders the store dialog's rows earmark their output to (blank rows skipped). */
+/**
+ * The distinct job orders the store dialog's rows earmark their output to (blank rows skipped).
+ *
+ * @param {HTMLFormElement} form the store form
+ * @returns {string[]} the job-order ids
+ */
 function refineryStoreJobOrderIds(form) {
+    /** @type {string[]} */
     const ids = [];
     form.querySelectorAll('[id^="storeJobOrder_"]').forEach((sel) => {
         const value = /** @type {HTMLSelectElement} */ (sel).value;
@@ -858,6 +943,11 @@ function refineryStoreJobOrderIds(form) {
     return ids;
 }
 
+/**
+ * Tells peers viewing the given job orders that their stock changed.
+ *
+ * @param {string[]} jobOrderIds the job orders that received stored output
+ */
 function crossPublishStoredStock(jobOrderIds) {
     if (typeof krtLiveSync.sendChanged !== 'function') return;
     jobOrderIds.forEach((jobOrderId) => {

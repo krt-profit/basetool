@@ -1,4 +1,3 @@
-// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -89,6 +88,12 @@ function setMyDisplay(id, display) {
     if (el) el.style.display = display;
 }
 
+/**
+ * The selector of the entry checkboxes a group checkbox governs.
+ *
+ * @param {Element} groupCb the group's select-all checkbox
+ * @returns {string} the selector
+ */
 function bulkGroupSelector(groupCb) {
     const materialId = groupCb.getAttribute('data-material-id');
     if (materialId) {
@@ -99,12 +104,23 @@ function bulkGroupSelector(groupCb) {
     )}"]`;
 }
 
+/** @type {Set<string>} */
 const bulkSelectedIds = new Set();
 
+/**
+ * The ids of the marked entries.
+ *
+ * @returns {string[]} the ids
+ */
 function getCheckedItemIds() {
     return Array.from(bulkSelectedIds);
 }
 
+/**
+ * Ticks the entry checkboxes of the marked ids.
+ *
+ * @param {ParentNode | null} [root] the subtree to update; the whole document when omitted
+ */
 function applyBulkSelectionToLoaded(root) {
     /** @type {NodeListOf<HTMLInputElement>} */ (
         (root || document).querySelectorAll('.inventory-item-checkbox')
@@ -158,6 +174,11 @@ function updateBulkCheckoutState() {
     });
 }
 
+/**
+ * Records one entry checkbox in the selection and refreshes the bar.
+ *
+ * @param {HTMLInputElement} cb the entry checkbox
+ */
 function onEntryCheckboxToggle(cb) {
     const id = cb.getAttribute('data-id');
     if (id) {
@@ -168,6 +189,11 @@ function onEntryCheckboxToggle(cb) {
     updateBulkCheckoutState();
 }
 
+/**
+ * Applies a group checkbox to all entries of its group.
+ *
+ * @param {HTMLInputElement} groupCb the group's select-all checkbox
+ */
 function toggleGroupCheckboxes(groupCb) {
     const groupBoxes = /** @type {NodeListOf<HTMLInputElement>} */ (
         document.querySelectorAll(bulkGroupSelector(groupCb))
@@ -186,6 +212,11 @@ function toggleGroupCheckboxes(groupCb) {
 
 let bulkSelectAllInFlight = false;
 
+/**
+ * Switches the select-all button between its select and clear state.
+ *
+ * @param {boolean} on true when the whole view is selected
+ */
 function setSelectAllButtonState(on) {
     const btn = /** @type {HTMLButtonElement | null} */ (
         document.getElementById('bulkSelectAllBtn')
@@ -290,6 +321,7 @@ async function executeBulkCheckout() {
     }
     closeBulkCheckoutModal();
 
+    /** @type {string[]} */
     const affectedOrderIds = [];
     ids.forEach((itemId) => {
         myLager.collectLeafOrderIds(itemId).forEach((orderId) => {
@@ -329,6 +361,11 @@ function bulkRebookMode() {
     return checked ? checked.value : 'LOCATION';
 }
 
+/**
+ * Shows an error toast of the bulk dialogs.
+ *
+ * @param {string} message the toast text
+ */
 function showBulkRebookError(message) {
     showFrontendErrorToast(message);
 }
@@ -427,6 +464,11 @@ function closeBulkRebookModal() {
     setMyDisplay('bulkRebookModal', 'none');
 }
 
+/**
+ * Reports a bulk rebook's counts as a toast.
+ *
+ * @param {{ rebooked?: number, skipped?: number } | null} body the result counts
+ */
 function reportBulkRebookOutcome(body) {
     const rebooked = body && typeof body.rebooked === 'number' ? body.rebooked : 0;
     const skipped = body && typeof body.skipped === 'number' ? body.skipped : 0;
@@ -443,6 +485,11 @@ function reportBulkRebookOutcome(body) {
     showFrontendSuccessToast(message);
 }
 
+/**
+ * Submits the bulk rebook of the marked rows, then re-renders the list in place and tells peers.
+ *
+ * @param {Event} event the form submit
+ */
 function submitBulkRebook(event) {
     if (event) event.preventDefault();
     if (bulkRebookInFlight) return;
@@ -479,6 +526,7 @@ function submitBulkRebook(event) {
         document.getElementById('bulkRebookMergeStock')
     );
 
+    /** @type {string[]} */
     const affectedOrderIds = [];
     ids.forEach((itemId) => {
         myLager.collectLeafOrderIds(itemId).forEach((orderId) => {
@@ -612,6 +660,11 @@ const MY_INVENTORY_FILTER_PARAMS = [
     'nonStolenOnly',
 ];
 
+/**
+ * Reads the stored filter preference.
+ *
+ * @returns {any} the stored object, or null when absent or unreadable
+ */
 function readMyInventoryFilterPref() {
     try {
         const raw = localStorage.getItem(MY_INVENTORY_FILTER_KEY);
@@ -622,12 +675,23 @@ function readMyInventoryFilterPref() {
     }
 }
 
+/**
+ * Stores the filter preference; a storage failure is ignored.
+ *
+ * @param {unknown} value the JSON-serialisable preference
+ */
 function writeMyInventoryFilterPref(value) {
     try {
         localStorage.setItem(MY_INVENTORY_FILTER_KEY, JSON.stringify(value));
     } catch (_e) {}
 }
 
+/**
+ * The values of a filter family's ticked boxes.
+ *
+ * @param {string} className the family's checkbox class
+ * @returns {string[] | null} the ticked values, or null when none or all are ticked
+ */
 function myInventoryFilterSelection(className) {
     const boxes = /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
         document.getElementsByClassName(className)
@@ -640,6 +704,24 @@ function myInventoryFilterSelection(className) {
     return picked.length === 0 || picked.length === boxes.length ? null : picked;
 }
 
+/**
+ * @typedef {object} MyFilterSnapshot
+ * @property {string[] | null} [materials] the material filter
+ * @property {string[] | null} [gameItems] the game-item filter
+ * @property {string[] | null} [locations] the location filter
+ * @property {string[] | null} [jobOrders] the job-order filter
+ * @property {string[] | null} [missions] the mission filter
+ * @property {string} [minQuality] the minimum quality
+ * @property {boolean} personalOnly whether only personal entries are shown
+ * @property {boolean} nonPersonalOnly whether only shared entries are shown
+ * @property {string} stolen the stolen filter value
+ */
+
+/**
+ * The current filter selection of the active view.
+ *
+ * @returns {MyFilterSnapshot} the selection
+ */
 function snapshotMyInventoryFilters() {
     if (myLager.lagerIsItemsView()) {
         return {
@@ -666,12 +748,22 @@ function snapshotMyInventoryFilters() {
     };
 }
 
+/** Stores the current filter selection under the active view's key. */
 function persistMyInventoryFilters() {
     const stored = readMyInventoryFilterPref() || {};
     stored[myLager.lagerIsItemsView() ? 'items' : 'material'] = snapshotMyInventoryFilters();
     writeMyInventoryFilterPref(stored);
 }
 
+/**
+ * Ticks the boxes of a family from a stored selection.
+ *
+ * @param {unknown} saved the stored values
+ * @param {string} checkClass the family's checkbox class
+ * @param {string} allId the family's select-all box id
+ * @param {string} headerId the family's header id
+ * @returns {boolean} true when at least one box was ticked
+ */
 function applyMySavedSelection(saved, checkClass, allId, headerId) {
     if (!Array.isArray(saved) || saved.length === 0) return false;
     const boxes = /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
@@ -688,6 +780,11 @@ function applyMySavedSelection(saved, checkClass, allId, headerId) {
     return any;
 }
 
+/**
+ * Restores the stored filters unless the address already carries filter parameters.
+ *
+ * @returns {boolean} true when a stored filter was applied
+ */
 function restoreMyInventoryFilters() {
     let params;
     try {
@@ -743,10 +840,21 @@ function restoreMyInventoryFilters() {
     return changed;
 }
 
+/**
+ * The number of active filters, for the filter panel's badge.
+ *
+ * @returns {number} the count
+ */
 function countActiveMyInventoryFilters() {
     const snapshot = snapshotMyInventoryFilters();
     let active = 0;
-    ['materials', 'gameItems', 'locations', 'jobOrders', 'missions'].forEach((dimension) => {
+    /** @type {Array<'materials' | 'gameItems' | 'locations' | 'jobOrders' | 'missions'>} */ ([
+        'materials',
+        'gameItems',
+        'locations',
+        'jobOrders',
+        'missions',
+    ]).forEach((dimension) => {
         if (Array.isArray(snapshot[dimension]) && snapshot[dimension].length > 0) active++;
     });
     if (typeof snapshot.minQuality === 'string' && snapshot.minQuality !== '') active++;
@@ -754,6 +862,7 @@ function countActiveMyInventoryFilters() {
     return active;
 }
 
+/** Re-pulls the grouped table with the current filters and mirrors them into the address. */
 function filterMyInventory() {
     clearBulkSelection();
     persistMyInventoryFilters();
@@ -825,6 +934,7 @@ function filterMyInventory() {
         });
 }
 
+/** Clears every filter and re-pulls the table. */
 function resetMyInventoryFilter() {
     ['matCheck', 'gameItemCheck', 'locCheck', 'jobOrderCheck', 'missionCheck'].forEach((cls) => {
         const boxes = /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
@@ -872,6 +982,7 @@ const INVENTORY_MY_SECTIONS = {
     stock: { container: '#myInventoryTableContainer', fragmentValue: 'stock' },
 };
 
+/** Tells peers viewing the personal Lager that the stock changed. */
 function broadcastInventoryChanged() {
     if (typeof krtLiveSync.sendChanged === 'function') {
         krtLiveSync.sendChanged('inventory', Object.keys(INVENTORY_MY_SECTIONS));
@@ -963,7 +1074,9 @@ document.addEventListener('change', (event) => {
     }
 });
 
+/** @type {string | null} */
 let umbuchenItemId = null;
+/** @type {string | null} */
 let umbuchenCurrentOwningOrgUnitId = null;
 let umbuchenInFlight = false;
 /** @type {{ userId: string | null, locationId: string | null }} */
@@ -973,6 +1086,8 @@ let umbuchenSource = { userId: null, locationId: null };
  * Fills the de-personalize org-unit picker with the row owner's memberships of all four org-unit
  * kinds, preset to the row's owning unit or else the owner's primary unit; hidden when the owner
  * has no membership.
+ *
+ * @param {string | null} ownerId the row owner's user id
  */
 function refreshUmbuchenPersonalOrgUnitPicker(ownerId) {
     const wrapper = document.getElementById('umbuchenPersonalOrgUnitWrapper');
@@ -1008,6 +1123,7 @@ function refreshUmbuchenPersonalOrgUnitPicker(ownerId) {
         });
 }
 
+/** Shows the transfer or the personalize fields of the Umbuchen dialog for the chosen mode. */
 function toggleUmbuchenMode() {
     const modeInput = /** @type {HTMLInputElement | null} */ (
         document.querySelector('input[name="umbuchenMode"]:checked')
@@ -1036,6 +1152,21 @@ function toggleUmbuchenMode() {
     krtHerkunft.recompute('umbuchen');
 }
 
+/**
+ * Opens the Umbuchen dialog for one entry.
+ *
+ * @param {string} id the entry id
+ * @param {string | null} amount the entry's amount
+ * @param {string | null} version the entry's optimistic-lock version
+ * @param {string | null} materialId the entry's material (unused here, kept for the call shape)
+ * @param {string} userId the current owner's id
+ * @param {string} locationId the current location's id
+ * @param {string} locationName the current location's label
+ * @param {string | null} quantityType `PIECE` or `SCU`
+ * @param {boolean} personal whether the entry is personal
+ * @param {boolean} hasAssoc whether the entry carries job-order or mission earmarks
+ * @param {string | null} owningOrgUnitId the row's owning org unit
+ */
 function openUmbuchenModal(
     id,
     amount,
@@ -1132,6 +1263,12 @@ function openUmbuchenModal(
     krtHerkunft.populate('umbuchen', id);
 }
 
+/**
+ * Submits the Umbuchen transfer or personal rebook in place, then re-pulls the table and tells
+ * peers.
+ *
+ * @param {Event} event the form submit
+ */
 function submitUmbuchen(event) {
     if (event && event.defaultPrevented) return;
     if (event) event.preventDefault();
@@ -1311,6 +1448,7 @@ function openBulkOrgUnitChangeModal() {
     setMyDisplay('orgUnitChangeModal', 'flex');
 }
 
+/** Unticks the merge option of the org-unit change dialog. */
 function resetOrgUnitChangeMerge() {
     const merge = /** @type {HTMLInputElement | null} */ (
         document.getElementById('orgUnitChangeMergeStock')
@@ -1318,6 +1456,7 @@ function resetOrgUnitChangeMerge() {
     if (merge) merge.checked = false;
 }
 
+/** Closes the org-unit change dialog. */
 function closeOrgUnitChangeModal() {
     setMyDisplay('orgUnitChangeModal', 'none');
 }
@@ -1473,21 +1612,21 @@ krtEvents.on('click', 'inv-my-reset-filter', resetMyInventoryFilter);
 krtEvents.on('click', 'inv-my-clear-selection', clearBulkSelection);
 krtEvents.on('click', 'inv-my-open-bulk', openBulkCheckoutModal);
 krtEvents.on('change', 'inv-my-toggle-group-cb', (el) => {
-    toggleGroupCheckboxes(el);
+    toggleGroupCheckboxes(/** @type {HTMLInputElement} */ (el));
 });
 krtEvents.on('change', 'inv-my-update-bulk-state', (el) => {
-    onEntryCheckboxToggle(el);
+    onEntryCheckboxToggle(/** @type {HTMLInputElement} */ (el));
 });
 krtEvents.on('click', 'inv-my-select-all', toggleSelectAllInView);
 krtEvents.on('click', 'inv-my-umbuchen', (el) => {
     openUmbuchenModal(
-        el.getAttribute('data-id'),
+        /** @type {string} */ (el.getAttribute('data-id')),
         el.getAttribute('data-amount'),
         el.getAttribute('data-version'),
         el.getAttribute('data-material-id'),
-        el.getAttribute('data-user-id'),
-        el.getAttribute('data-location-id'),
-        el.getAttribute('data-location-name'),
+        /** @type {string} */ (el.getAttribute('data-user-id')),
+        /** @type {string} */ (el.getAttribute('data-location-id')),
+        /** @type {string} */ (el.getAttribute('data-location-name')),
         el.getAttribute('data-quantity-type'),
         el.getAttribute('data-personal') === 'true',
         el.getAttribute('data-has-assoc') === 'true',

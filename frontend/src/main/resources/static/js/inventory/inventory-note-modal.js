@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 /* global noteI18n, inventoryConflictI18n */
 
 import {
@@ -68,6 +66,12 @@ export function updateNoteCounter() {
     if (ta && counter) counter.textContent = `${ta.value ? ta.value.length : 0} / 1000`;
 }
 
+/**
+ * Shows an error or success toast for the inventory note flow.
+ *
+ * @param {string} type 'error' for an error toast, anything else for a success toast
+ * @param {string} msg the toast text
+ */
 export function showInventoryToast(type, msg) {
     if (type === 'error') {
         showFrontendErrorToast(msg);

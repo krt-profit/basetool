@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 /* global OPS_DETAIL_MSG, MSG_PAYOUT_PAID_ERROR, MSG_PAYOUT_PAID_FORBIDDEN, MSG_PAYOUT_PAID_UNSET_LOCKED, OPS_FINANCE_DETAIL_ERROR */
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
@@ -76,6 +74,7 @@ function initOperationDetail() {
         krtLiveSync.createReceiver({
             topic: `operation:${window.operationId}`,
             sections: OPERATION_SECTIONS,
+            /** @param {string[] | string} keys the changed section keys */
             refresh(keys) {
                 if (operationHooks.refreshSection) {
                     operationHooks.refreshSection(withOverview(keys), { broadcast: false });

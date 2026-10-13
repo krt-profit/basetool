@@ -1,8 +1,23 @@
-// @ts-check
 /* exported krtSearchableSelect */
 
 import { krtComboboxRemoteSources } from '/js/kernel/krt-combobox-sources.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
+
+/**
+ * Per-option metadata: camelCased `data-*` keys mapped to their values.
+ *
+ * @typedef {Record<string, string | undefined>} ComboboxData
+ */
+
+/**
+ * A combobox option model.
+ *
+ * @typedef {object} ComboboxItem
+ * @property {string} value the option value
+ * @property {string} label the visible label
+ * @property {string} search the lower-cased search haystack
+ * @property {ComboboxData | undefined} data the metadata mirrored while selected
+ */
 
 let comboboxSeq = 0;
 
@@ -74,10 +89,9 @@ function appendHighlighted(el, label, query) {
  * @param {string} value the option value (submitted via the hidden input)
  * @param {string} label the visible option label
  * @param {string} [extra] optional extra search terms not shown in the label
- * @param {Object} [data] optional per-option metadata (camelCased dataset keys) mirrored onto
- *     the hidden input while this option is selected (REQ-FE-016)
- * @returns {{value: string, label: string, search: string, data: (Object|undefined)}} the
- *     option model
+ * @param {ComboboxData} [data] optional per-option metadata (camelCased dataset keys) mirrored
+ *     onto the hidden input while this option is selected (REQ-FE-016)
+ * @returns {ComboboxItem} the option model
  */
 function makeItem(value, label, extra, data) {
     const terms = extra && extra.trim() ? `${label} ${extra.trim()}` : label;
@@ -89,9 +103,10 @@ function makeItem(value, label, extra, data) {
  * later mirrored onto the hidden input while the option is selected (REQ-FE-016).
  *
  * @param {HTMLOptionElement} option the source option
- * @returns {Object|undefined} the metadata map, or undefined when the option carries none
+ * @returns {ComboboxData | undefined} the metadata map, or undefined when the option carries none
  */
 function optionData(option) {
+    /** @type {ComboboxData | undefined} */
     let map;
     Object.keys(option.dataset).forEach((key) => {
         if (COMBOBOX_DATA_KEYS.indexOf(key) !== -1) {
@@ -110,7 +125,7 @@ function optionData(option) {
  * an already-enhanced one.
  *
  * @param {HTMLSelectElement} select the select to upgrade
- * @param {Object} [config] optional overrides, each text key with a `data-combobox-*`
+ * @param {KrtComboboxConfig} [config] optional overrides, each text key with a `data-combobox-*`
  *     fallback: `placeholder`, `noResultsText`, `hintText` (shown when capped),
  *     `invalidText` (custom validity for unmatched text), `loadingText`, `maxResults`
  *     (default 50) and `remoteSource`, a `(query) => Promise<Array<{value,label,data?}>>`
@@ -137,8 +152,12 @@ function krtSearchableSelect(select, config) {
         loading: opts.loadingText || data.comboboxLoading || '',
     };
     const remoteSource = typeof opts.remoteSource === 'function' ? opts.remoteSource : null;
-    const maxResults = Math.max(1, parseInt(opts.maxResults || data.comboboxMax || '50', 10) || 50);
+    const maxResults = Math.max(
+        1,
+        parseInt(String(opts.maxResults || data.comboboxMax || '50'), 10) || 50,
+    );
 
+    /** @type {ComboboxItem[]} */
     let items = [];
     let placeholder = opts.placeholder || data.comboboxPlaceholder || '';
     let optional = false;
@@ -179,6 +198,7 @@ function krtSearchableSelect(select, config) {
     if (select.id) {
         hidden.id = select.id;
     }
+    /** @type {string[]} */
     const reservedKeys = [];
     Object.keys(data).forEach((key) => {
         if (COMBOBOX_DATA_KEYS.indexOf(key) === -1) {
@@ -227,8 +247,14 @@ function krtSearchableSelect(select, config) {
     wrapper.appendChild(input);
     wrapper.appendChild(listbox);
 
+    /** @type {string[]} */
     let mirroredKeys = [];
 
+    /**
+     * Replaces the metadata mirrored onto the hidden input with the item's own.
+     *
+     * @param {ComboboxItem | null} item the selected item, or null to clear
+     */
     function mirrorItemData(item) {
         mirroredKeys.forEach((key) => {
             delete hidden.dataset[key];
@@ -269,6 +295,7 @@ function krtSearchableSelect(select, config) {
 
     /** @type {Node} */ (select.parentNode).replaceChild(wrapper, select);
 
+    /** @type {{item: ComboboxItem, el: HTMLLIElement}[]} */
     let rendered = [];
     let activeIndex = -1;
     let remoteSeq = 0;
@@ -337,6 +364,12 @@ function krtSearchableSelect(select, config) {
         repositionHandler = null;
     }
 
+    /**
+     * Builds a disabled notice row.
+     *
+     * @param {string} message the notice text
+     * @returns {HTMLLIElement} the row
+     */
     function noticeRow(message) {
         const li = document.createElement('li');
         li.className = 'krt-combobox__notice';
@@ -345,6 +378,12 @@ function krtSearchableSelect(select, config) {
         return li;
     }
 
+    /**
+     * Marks the option at the index as active, or clears the active option for an index outside
+     * the rendered list.
+     *
+     * @param {number} index the rendered option index
+     */
     function setActive(index) {
         if (activeIndex >= 0 && rendered[activeIndex]) {
             rendered[activeIndex].el.classList.remove('krt-combobox__option--active');
@@ -366,6 +405,11 @@ function krtSearchableSelect(select, config) {
         }
     }
 
+    /**
+     * Renders the options matching the query into the listbox.
+     *
+     * @param {string} query the filter text
+     */
     function renderOptions(query) {
         const q = (query || '').trim().toLowerCase();
         listbox.textContent = '';
@@ -426,6 +470,11 @@ function krtSearchableSelect(select, config) {
         }
     }
 
+    /**
+     * Opens the listbox filtered by the query.
+     *
+     * @param {string} query the filter text
+     */
     function open(query) {
         renderOptions(query);
         listbox.hidden = false;
@@ -442,9 +491,14 @@ function krtSearchableSelect(select, config) {
         listbox.appendChild(noticeRow(texts.loading || texts.hint || ''));
     }
 
+    /**
+     * Fetches the options for the query from the remote source and renders them.
+     *
+     * @param {string} query the filter text
+     */
     function loadRemote(query) {
         const token = ++remoteSeq;
-        Promise.resolve(remoteSource(query))
+        Promise.resolve(/** @type {KrtComboboxRemoteSource} */ (remoteSource)(query))
             .then((list) => {
                 if (token !== remoteSeq || !isOpen()) {
                     return;
@@ -464,6 +518,12 @@ function krtSearchableSelect(select, config) {
             });
     }
 
+    /**
+     * Opens the listbox with a loading notice and fetches the options after the delay.
+     *
+     * @param {string} query the filter text
+     * @param {number} delay the debounce in milliseconds
+     */
     function openRemote(query, delay) {
         renderLoading();
         listbox.hidden = false;
@@ -488,6 +548,11 @@ function krtSearchableSelect(select, config) {
         resetListboxPosition();
     }
 
+    /**
+     * Commits the item as the selection and fires `change` when the value moves.
+     *
+     * @param {ComboboxItem} item the chosen item; an empty value clears the selection
+     */
     function commit(item) {
         const next = item ? item.value : '';
         const changed = hidden.value !== next;
@@ -664,7 +729,7 @@ function krtSearchableSelect(select, config) {
      * @param {string} value the option value to select, or empty/unknown to clear
      * @param {string} [label] the label for a value outside the loaded items; ignored when the
      *     value resolves locally
-     * @param {Object} [data] option metadata mirrored onto the hidden input (REQ-FE-016)
+     * @param {ComboboxData} [data] option metadata mirrored onto the hidden input (REQ-FE-016)
      */
     function setValue(value, label, data) {
         const v = value == null ? '' : String(value);
@@ -693,12 +758,21 @@ function krtSearchableSelect(select, config) {
     wrapper.krtCombobox = controller;
 }
 
+/**
+ * Derives the combobox configuration from the select's `data-combobox-*` attributes and the
+ * page's combobox i18n dictionary.
+ *
+ * @param {HTMLElement} select the select carrying `data-krt-combobox`
+ * @returns {KrtComboboxConfig} the configuration
+ */
 function autoConfig(select) {
     const i18n = window.krtComboboxI18n || {};
     const d = select.dataset;
     const remoteSources = krtComboboxRemoteSources;
-    const remoteSource = remoteSources[d.krtCombobox];
-    const kind = (i18n.kinds || {})[d.krtCombobox] || {};
+    const kindKey = /** @type {string} */ (d.krtCombobox);
+    const remoteSource = remoteSources[kindKey];
+    /** @type {{placeholder?: string, noResults?: string, maxResults?: string | number}} */
+    const kind = (i18n.kinds || {})[kindKey] || {};
     return {
         placeholder: d.comboboxPlaceholder || kind.placeholder || i18n.placeholder,
         noResultsText: d.comboboxNoResults || kind.noResults || i18n.noResults,
@@ -710,6 +784,11 @@ function autoConfig(select) {
     };
 }
 
+/**
+ * Enhances every `select[data-krt-combobox]` below the root.
+ *
+ * @param {ParentNode | null | undefined} root the container to scan
+ */
 function enhanceWithin(root) {
     if (!root || typeof root.querySelectorAll !== 'function') {
         return;

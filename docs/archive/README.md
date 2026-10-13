@@ -46,6 +46,7 @@ section number, not because it describes the system today.
 | [`WIRE_PROTOCOL_EVALUATION.md`](WIRE_PROTOCOL_EVALUATION.md) | Whether to leave REST/JSON (an analysis) | Decided 2026-09-10 → ADR-0161 |
 | [`domain-modularisation-audit-2026-09/`](domain-modularisation-audit-2026-09/README.md) | The raw evidence of the domain modularisation audit (reports, finding data, scripts) | Frozen 2026-10-01; the plan built from it is [`DOMAIN_MODULARISATION_PLAN.md`](DOMAIN_MODULARISATION_PLAN.md), itself frozen 2026-10-13 |
 | [`DOMAIN_MODULARISATION_PLAN.md`](DOMAIN_MODULARISATION_PLAN.md) | The backend cut into domains (modular monolith) | Frozen 2026-10-13; P5-c and P5-d not implemented |
+| [`TYPESCRIPT_MIGRATION_PLAN.md`](TYPESCRIPT_MIGRATION_PLAN.md) | Type-checking the browser scripts, and a costed option to convert them to TypeScript | Checker done 2026-10-13 (every script under `checkJs` + `noImplicitAny`); ES modules came without a build step (ADR-0250); the conversion is not pursued |
 | [`DESIGN_SC_EXTRACTOR.md`](DESIGN_SC_EXTRACTOR.md) | The binding design of the SC Extractor GUI (epic #439) | Implemented 2026-06-10; archived 2026-10-13 |
 | [`MGMT_VPN_PLAN.md`](MGMT_VPN_PLAN.md) | Management access over WireGuard | **Not carried out** beyond its inventory; closed 2026-07-08 |
 | [`PODMAN_MIGRATION_PLAN.md`](PODMAN_MIGRATION_PLAN.md) | Rootless Podman under Quadlet on a rebuilt host | Cut over 2026-09-22 |
@@ -83,5 +84,4 @@ These are still in use and stay in [`docs/`](../):
 - [`backup.md`](../backup.md) — backup, restore and the restore drill
 - [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md) — ADR-0001,
   not yet carried out
-- [`TYPESCRIPT_MIGRATION_PLAN.md`](../TYPESCRIPT_MIGRATION_PLAN.md) — a costed option, not scheduled
 - [`privacy/data-breach-runbook.md`](../privacy/data-breach-runbook.md) — the GDPR breach procedure

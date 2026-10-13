@@ -144,3 +144,7 @@ follow-up that makes the bullet true.
 **Closed** (2026-10-03, #2327): `:frontend:lintJs`, `:frontend:prettierCheck` and
 `:frontend:prettierApply` now pass `scripts/**/*.mjs` and declare the files as task inputs, so the
 decision bullet holds as written.
+
+**Superseded in part** (2026-10-13): `noImplicitAny` is on since the amendment of
+[ADR-0125](0125-typed-javascript-via-checkjs-not-typescript.md); the annotation debt priced above
+was paid in full.

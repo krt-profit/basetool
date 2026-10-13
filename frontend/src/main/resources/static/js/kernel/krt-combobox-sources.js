@@ -1,4 +1,3 @@
-// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -22,7 +21,7 @@
  * The remote option sources of the searchable comboboxes, keyed by `data-krt-combobox` kind. The
  * kernel search modules register theirs here and krt-searchable-select.js reads them.
  *
- * @type {Record<string, (query: string) => Promise<any[]>>}
+ * @type {Record<string, KrtComboboxRemoteSource>}
  */
 export const krtComboboxRemoteSources = {};
 

@@ -1,5 +1,3 @@
-// @ts-check
-
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 /**
@@ -11,11 +9,18 @@ import { krtI18nText } from '/js/kernel/krt-i18n.js';
  * `Z`. `window.krtSyncDatetimeSplitGroup(group)` re-fills the visible parts after the hidden value
  * was set programmatically.
  */
-const pad = (n) => String(n).padStart(2, '0');
-const hasZoneInfo = (val) => /Z$|[+-]\d{2}:?\d{2}$/.test(val);
+const pad = /** @param {number} n */ (n) => String(n).padStart(2, '0');
+const hasZoneInfo = /** @param {string} val */ (val) => /Z$|[+-]\d{2}:?\d{2}$/.test(val);
 const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
 const isoLocalRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
 
+/**
+ * Fills the visible date and time inputs from the hidden value.
+ *
+ * @param {HTMLInputElement | null} hidden the hidden input carrying the value
+ * @param {HTMLInputElement | null} datePart the date input
+ * @param {HTMLInputElement | null} timePart the time input
+ */
 function applyHiddenToParts(hidden, datePart, timePart) {
     if (!hidden || !datePart || !timePart) return;
     if (!hidden.value) {
@@ -46,11 +51,18 @@ function applyHiddenToParts(hidden, datePart, timePart) {
     }
 }
 
+/**
+ * Re-fills the visible parts of one group from its hidden value.
+ *
+ * @param {Element | null} group the `.datetime-split-group`
+ */
 function syncGroup(group) {
     if (!group) return;
-    const hidden = group.querySelector('input[type="hidden"]');
-    const datePart = group.querySelector('.date-part');
-    const timePart = group.querySelector('.time-part');
+    const hidden = /** @type {HTMLInputElement | null} */ (
+        group.querySelector('input[type="hidden"]')
+    );
+    const datePart = /** @type {HTMLInputElement | null} */ (group.querySelector('.date-part'));
+    const timePart = /** @type {HTMLInputElement | null} */ (group.querySelector('.time-part'));
     applyHiddenToParts(hidden, datePart, timePart);
 }
 
@@ -60,11 +72,15 @@ export { syncGroup as krtSyncDatetimeSplitGroup };
  * Initializes one `.datetime-split-group`: adds its error element, fills the visible parts from
  * the hidden value and binds the listeners that keep the hidden UTC value current. Idempotent
  * through the `data-krt-dt-initialized` marker.
+ *
+ * @param {HTMLElement} group the `.datetime-split-group`
  */
 function initGroup(group) {
-    const hidden = group.querySelector('input[type="hidden"]');
-    const datePart = group.querySelector('.date-part');
-    const timePart = group.querySelector('.time-part');
+    const hidden = /** @type {HTMLInputElement | null} */ (
+        group.querySelector('input[type="hidden"]')
+    );
+    const datePart = /** @type {HTMLInputElement | null} */ (group.querySelector('.date-part'));
+    const timePart = /** @type {HTMLInputElement | null} */ (group.querySelector('.time-part'));
 
     if (!hidden || !datePart || !timePart) return;
     if (group.dataset.krtDtInitialized === '1') return;
@@ -135,7 +151,7 @@ function initGroup(group) {
             }
 
             if (group.hasAttribute('data-validate-after')) {
-                const targetId = group.getAttribute('data-validate-after');
+                const targetId = /** @type {string} */ (group.getAttribute('data-validate-after'));
                 const targetHidden = /** @type {HTMLInputElement | null} */ (
                     document.getElementById(targetId)
                 );
@@ -162,10 +178,14 @@ function initGroup(group) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.datetime-split-group').forEach(initGroup);
+    /** @type {NodeListOf<HTMLElement>} */ (
+        document.querySelectorAll('.datetime-split-group')
+    ).forEach(initGroup);
 });
 
 document.addEventListener('krt:swapped', (e) => {
     const root = (e.detail && e.detail.container) || document;
-    root.querySelectorAll('.datetime-split-group').forEach(initGroup);
+    /** @type {NodeListOf<HTMLElement>} */ (root.querySelectorAll('.datetime-split-group')).forEach(
+        initGroup,
+    );
 });

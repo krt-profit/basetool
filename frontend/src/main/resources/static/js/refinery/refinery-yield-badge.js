@@ -1,7 +1,6 @@
-// @ts-check
-
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 
+/** @type {{ yieldByMaterialId: Record<string, number>, helpText: string }} */
 const state = {
     yieldByMaterialId: {},
     helpText: '',
@@ -9,6 +8,9 @@ const state = {
 
 /**
  * Replaces the in-memory yield map and help text with the server-rendered initial state.
+ *
+ * @param {Record<string, number> | null | undefined} initialMap the bonus percent per material id
+ * @param {string | null | undefined} helpText the badge tooltip text
  */
 function init(initialMap, helpText) {
     state.yieldByMaterialId = initialMap || {};
@@ -18,6 +20,9 @@ function init(initialMap, helpText) {
 /**
  * Sets, updates or removes the yield-bonus badge of a row; a null or undefined bonus
  * removes it.
+ *
+ * @param {string | number} rowIndex the material row's index
+ * @param {number | null | undefined} bonus the bonus percent
  */
 function setBadge(rowIndex, bonus) {
     const label = document.querySelector(`label[for="outputQuantity_${rowIndex}"]`);
@@ -49,6 +54,8 @@ function setBadge(rowIndex, bonus) {
 
 /**
  * Refreshes the badge of the row that owns the given input-material select from the yield map.
+ *
+ * @param {KrtRefineryControl | null | undefined} inputMaterialSelect the row's material control
  */
 function refreshFor(inputMaterialSelect) {
     if (!inputMaterialSelect || !inputMaterialSelect.id) return;
@@ -64,13 +71,16 @@ function refreshFor(inputMaterialSelect) {
 /** Re-renders every row's badge against the current map. */
 function refreshAll() {
     document.querySelectorAll('[id^="inputMaterialId_"]').forEach((sel) => {
-        refreshFor(sel);
+        refreshFor(/** @type {KrtRefineryControl} */ (sel));
     });
 }
 
 /**
  * Re-fetches the yield map for the chosen refinery and re-renders every badge; any failure
  * falls back to an empty map.
+ *
+ * @param {KrtRefineryControl | null | undefined} selectElement the refinery location control
+ * @returns {Promise<void>} resolves once the badges are re-rendered
  */
 function onLocationChange(selectElement) {
     const locationId = selectElement && selectElement.value;

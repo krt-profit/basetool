@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 /* global MSG_SAVED, MSG_DELETED, MSG_ERROR, MSG_CONFLICT, MSG_DELETE_TOPIC_TITLE, MSG_DELETE_TOPIC_MSG, MSG_DELETE_CATEGORY_TITLE, MSG_DELETE_CATEGORY_MSG, MSG_OK, MSG_CANCEL, MSG_DIRTY_LEAVE, MSG_REFRESH_FAILED */
 
 import {
@@ -30,9 +28,19 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 
+/**
+ * Shows a success toast.
+ *
+ * @param {string} msg the message text
+ */
 function toastSuccess(msg) {
     showFrontendSuccessToast(msg);
 }
+/**
+ * Shows an error toast.
+ *
+ * @param {string} msg the message text
+ */
 function toastError(msg) {
     showFrontendErrorToast(msg);
 }
@@ -47,9 +55,19 @@ function paControl(id) {
     return /** @type {HTMLInputElement} */ (document.getElementById(id));
 }
 
+/**
+ * Closes a dialog.
+ *
+ * @param {string} id the dialog's element id
+ */
 function closeModal(id) {
     krtModal.close(id);
 }
+/**
+ * Opens a dialog.
+ *
+ * @param {string} id the dialog's element id
+ */
 function openModal(id) {
     krtModal.open(id);
 }
@@ -117,8 +135,14 @@ function paSyncSelectionFromDom() {
     paSelectTopic(active ? active.getAttribute('data-pa-select-topic') : null, false);
 }
 
+/**
+ * Moves the topic selection with the arrow, Home and End keys while the topic list has focus.
+ *
+ * @param {KeyboardEvent} e the keydown event
+ */
 function paOnTopicListKeydown(e) {
-    const list = e.target && e.target.closest ? e.target.closest('#pa-topic-list') : null;
+    const target = /** @type {Element | null} */ (e.target);
+    const list = target && target.closest ? target.closest('#pa-topic-list') : null;
     if (!list) return;
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') {
         return;
@@ -137,6 +161,14 @@ function paOnTopicListKeydown(e) {
     paSelectTopic(rows[idx].getAttribute('data-pa-select-topic'), true);
 }
 
+/**
+ * Sends one proxied write and resolves its JSON body, or null after the failure was toasted.
+ *
+ * @param {string} url the proxy URL
+ * @param {'POST' | 'PUT' | 'DELETE'} method the HTTP method
+ * @param {object | null} body the JSON payload; none for a DELETE
+ * @returns {Promise<any>} the parsed body (an empty object for a body-less success), or null
+ */
 function apiCall(url, method, body) {
     return krtFetch
         .write({
@@ -172,6 +204,11 @@ function openCreateTopicModal() {
     paControl('ct-sort').value = '0';
     openModal('modal-create-topic');
 }
+/**
+ * Fills and opens the edit-topic dialog from the trigger's data attributes.
+ *
+ * @param {HTMLElement} btn the edit button
+ */
 function openEditTopicModal(btn) {
     paControl('et-id').value = btn.getAttribute('data-pa-id') ?? '';
     paControl('et-version').value = btn.getAttribute('data-pa-version') ?? '';
@@ -209,6 +246,11 @@ function updateTopic() {
         paRefreshTopics();
     });
 }
+/**
+ * Asks for confirmation, then deletes the topic of the trigger.
+ *
+ * @param {HTMLElement} btn the delete button
+ */
 function deleteTopic(btn) {
     const id = btn.getAttribute('data-pa-id');
     const name = btn.getAttribute('data-pa-name') || '';
@@ -230,6 +272,11 @@ function deleteTopic(btn) {
     });
 }
 
+/**
+ * Opens the create-category dialog for the trigger's topic.
+ *
+ * @param {HTMLElement} btn the add-category button
+ */
 function openCreateCategoryModal(btn) {
     paControl('cc-topic-id').value = btn.getAttribute('data-pa-topic-id') ?? '';
     paControl('cc-name').value = '';
@@ -237,6 +284,11 @@ function openCreateCategoryModal(btn) {
     paControl('cc-sort').value = '0';
     openModal('modal-create-category');
 }
+/**
+ * Fills and opens the edit-category dialog from the trigger's data attributes.
+ *
+ * @param {HTMLElement} btn the edit button
+ */
 function openEditCategoryModal(btn) {
     paControl('ec-id').value = btn.getAttribute('data-pa-id') ?? '';
     paControl('ec-version').value = btn.getAttribute('data-pa-version') ?? '';
@@ -276,6 +328,11 @@ function updateCategory() {
         paRefreshTopics();
     });
 }
+/**
+ * Asks for confirmation, then deletes the category of the trigger.
+ *
+ * @param {HTMLElement} btn the delete button
+ */
 function deleteCategory(btn) {
     const id = btn.getAttribute('data-pa-id');
     const name = btn.getAttribute('data-pa-name') || '';
@@ -296,21 +353,47 @@ function deleteCategory(btn) {
     });
 }
 
+/**
+ * @typedef {object} PaCardBody
+ * @property {number} version the optimistic-lock version
+ * @property {string | null} name the name
+ * @property {string | null} description the description
+ * @property {number} sortOrder the sort position
+ * @property {string} [topicId] the owning topic, for a category
+ */
+
+/**
+ * Reads the update body of a topic or category card from its edit button's data attributes.
+ *
+ * @param {Element} card the topic pane or category card
+ * @param {string} trigger the `data-trigger` of the card's edit button
+ * @returns {PaCardBody | null} the body, or null when the button or its version is missing
+ */
 function paReadCardBody(card, trigger) {
     const btn = card.querySelector(`[data-trigger="${trigger}"]`);
     if (!btn) return null;
-    const version = parseInt(btn.getAttribute('data-pa-version'), 10);
+    const version = parseInt(/** @type {string} */ (btn.getAttribute('data-pa-version')), 10);
     if (!Number.isFinite(version)) return null;
+    /** @type {PaCardBody} */
     const body = {
         version,
         name: btn.getAttribute('data-pa-name'),
         description: btn.getAttribute('data-pa-description') || null,
-        sortOrder: parseInt(btn.getAttribute('data-pa-sort'), 10) || 0,
+        sortOrder: parseInt(/** @type {string} */ (btn.getAttribute('data-pa-sort')), 10) || 0,
     };
     const topicId = btn.getAttribute('data-pa-topic-id');
     if (topicId) body.topicId = topicId;
     return body;
 }
+/**
+ * Swaps the sort positions of two sibling cards with two PUT requests.
+ *
+ * @param {Element} currentCard the card being moved
+ * @param {Element} otherCard the adjacent card it trades places with
+ * @param {string} putUrl the collection URL the cards are updated under
+ * @param {'topic' | 'category'} kind the card kind
+ * @returns {Promise<any>} the second response body, or null when a read or request failed
+ */
 function swapSort(currentCard, otherCard, putUrl, kind) {
     const trigger = kind === 'topic' ? 'pa-edit-topic' : 'pa-edit-category';
     const idAttr = kind === 'topic' ? 'data-pa-topic-id' : 'data-pa-category-id';
@@ -338,16 +421,31 @@ function swapSort(currentCard, otherCard, putUrl, kind) {
         return apiCall(`${putUrl}/${bId}`, 'PUT', b);
     });
 }
+/**
+ * Finds the sibling element of the same tag next to a card.
+ *
+ * @param {Element} card the reference card
+ * @param {'up' | 'down'} direction which neighbour to return
+ * @returns {Element | null} the neighbour, or null at the edge
+ */
 function findAdjacentSibling(card, direction) {
     const sel = card.tagName.toLowerCase();
-    const siblings = card.parentElement.querySelectorAll(`:scope > ${sel}`);
+    const siblings = /** @type {HTMLElement} */ (card.parentElement).querySelectorAll(
+        `:scope > ${sel}`,
+    );
     const arr = Array.from(siblings);
     const idx = arr.indexOf(card);
     const target = direction === 'up' ? arr[idx - 1] : arr[idx + 1];
     return target || null;
 }
+/**
+ * Moves a topic one position up or down.
+ *
+ * @param {HTMLElement} btn the move button
+ * @param {'up' | 'down'} direction the direction
+ */
 function moveTopic(btn, direction) {
-    const card = btn.closest('.pa-topic-pane');
+    const card = /** @type {Element} */ (btn.closest('.pa-topic-pane'));
     const other = findAdjacentSibling(card, direction);
     if (!other) return;
     swapSort(card, other, '/api/proxy/promotion/topics', 'topic').then((r) => {
@@ -356,8 +454,14 @@ function moveTopic(btn, direction) {
         paRefreshTopics();
     });
 }
+/**
+ * Moves a category one position up or down.
+ *
+ * @param {HTMLElement} btn the move button
+ * @param {'up' | 'down'} direction the direction
+ */
 function moveCategory(btn, direction) {
-    const card = btn.closest('.pa-category-card');
+    const card = /** @type {Element} */ (btn.closest('.pa-category-card'));
     const other = findAdjacentSibling(card, direction);
     if (!other) return;
     swapSort(card, other, '/api/proxy/promotion/categories', 'category').then((r) => {
@@ -367,6 +471,7 @@ function moveCategory(btn, direction) {
     });
 }
 
+/** @type {Set<HTMLTextAreaElement>} */
 const paDirtyTextareas = new Set();
 
 function paUpdateSaveAllBanner() {
@@ -377,7 +482,13 @@ function paUpdateSaveAllBanner() {
     count.textContent = String(n);
     banner.classList.toggle('visible', n > 0);
 }
-function paMarkDirty(textarea) {
+/**
+ * Tracks whether a level-content textarea differs from its saved text.
+ *
+ * @param {HTMLElement} el the textarea that fired `input`
+ */
+function paMarkDirty(el) {
+    const textarea = /** @type {HTMLTextAreaElement} */ (el);
     const original = textarea.getAttribute('data-original') || '';
     const dirty = textarea.value !== original;
     textarea.classList.toggle('pa-dirty', dirty);
@@ -385,6 +496,12 @@ function paMarkDirty(textarea) {
     else paDirtyTextareas.delete(textarea);
     paUpdateSaveAllBanner();
 }
+/**
+ * Creates or updates the level content held by a textarea.
+ *
+ * @param {HTMLTextAreaElement} textarea the textarea carrying the content and its ids
+ * @returns {Promise<any>} the saved DTO, or null when the request failed
+ */
 function paSaveLevelContent(textarea) {
     const categoryId = textarea.getAttribute('data-category-id');
     const level = textarea.getAttribute('data-level');
@@ -394,7 +511,7 @@ function paSaveLevelContent(textarea) {
     let p;
     if (lcId) {
         const body = {
-            version: parseInt(lcVersion, 10) || 0,
+            version: parseInt(/** @type {string} */ (lcVersion), 10) || 0,
             categoryId,
             level,
             description,
@@ -419,10 +536,17 @@ function paSaveLevelContent(textarea) {
         return data;
     });
 }
+/**
+ * Saves the level content in the row of the clicked button.
+ *
+ * @param {HTMLElement} btn the save button
+ */
 function paSaveLevelContentFromButton(btn) {
     const row = btn.closest('.pa-level-row');
     if (!row) return;
-    const textarea = row.querySelector('textarea.lc-textarea');
+    const textarea = /** @type {HTMLTextAreaElement | null} */ (
+        row.querySelector('textarea.lc-textarea')
+    );
     if (!textarea) return;
     paSaveLevelContent(textarea).then((data) => {
         if (data) toastSuccess(MSG_SAVED);

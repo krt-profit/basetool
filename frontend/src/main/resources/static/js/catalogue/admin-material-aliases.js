@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 /* global ALIAS_MSG, ALIAS_CONFLICT */
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
@@ -28,13 +26,45 @@ document.addEventListener('DOMContentLoaded', () => {
     const table = document.getElementById('aliasesTable');
     const tbody = table ? table.querySelector('tbody') : null;
 
+    /**
+     * @param {HTMLFormElement} form the alias form
+     * @returns {Record<string, HTMLInputElement | undefined>} the form's named controls
+     */
+    function controlsOf(form) {
+        return /** @type {Record<string, HTMLInputElement | undefined>} */ (
+            /** @type {unknown} */ (form.elements)
+        );
+    }
+
+    /**
+     * @param {HTMLFormElement} form the alias form
+     * @param {string} name the control name
+     * @returns {string | null} the trimmed value, or null when blank or absent
+     */
     function fieldOrNull(form, name) {
-        const el = form.elements[name];
+        const el = controlsOf(form)[name];
         const value = el && el.value != null ? el.value.trim() : '';
         return value === '' ? null : value;
     }
 
+    /**
+     * @typedef {object} AliasPayload
+     * @property {string | null} materialId
+     * @property {string | null} sourceSystem
+     * @property {string | null} externalName
+     * @property {string | null} externalKey
+     * @property {string | null} externalUuid
+     * @property {string | null} externalCode
+     * @property {string | null} note
+     * @property {number} [version]
+     */
+
+    /**
+     * @param {HTMLFormElement} form the alias form
+     * @returns {AliasPayload} the write payload
+     */
     function aliasPayload(form) {
+        /** @type {AliasPayload} */
         const payload = {
             materialId: fieldOrNull(form, 'materialId'),
             sourceSystem: fieldOrNull(form, 'sourceSystem'),
@@ -44,7 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
             externalCode: fieldOrNull(form, 'externalCode'),
             note: fieldOrNull(form, 'note'),
         };
-        const versionEl = form.elements['version'];
+        const versionEl = controlsOf(form)['version'];
         if (versionEl && versionEl.value !== '') {
             payload.version = Number(versionEl.value);
         }
@@ -74,7 +104,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /**
+     * @param {string | null | undefined} code the source-system code
+     * @returns {string} the localized label, or the code itself when unknown
+     */
     function sourceLabel(code) {
+        /** @type {Record<string, string>} */
         const labels = {
             SCWIKI: ALIAS_MSG.sourceScwiki,
             UEX: ALIAS_MSG.sourceUex,
@@ -83,6 +118,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return code != null && labels[code] ? labels[code] : code != null ? code : '';
     }
 
+    /**
+     * @param {string | null} field the `data-alias-field` name, if any
+     * @param {string | null | undefined} value the cell text
+     * @param {string} label the `data-label` for the stacked layout
+     * @returns {HTMLTableCellElement} the new cell
+     */
     function textCell(field, value, label) {
         const td = document.createElement('td');
         if (field) {
@@ -95,6 +136,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return td;
     }
 
+    /**
+     * @param {ApiDto<'MaterialExternalAliasDto'> & {id: string}} alias the created alias
+     * @returns {HTMLTableRowElement} the new table row
+     */
     function buildAliasRow(alias) {
         const tr = document.createElement('tr');
         tr.setAttribute('data-alias-id', alias.id);
@@ -145,12 +190,17 @@ document.addEventListener('DOMContentLoaded', () => {
         return tr;
     }
 
+    /**
+     * @param {ApiDto<'MaterialExternalAliasDto'>} alias the updated alias
+     */
     function patchAliasRow(alias) {
         const row = tbody ? tbody.querySelector(`tr[data-alias-id="${alias.id}"]`) : null;
         if (!row) {
             return;
         }
-        ['externalName', 'materialName', 'externalKey', 'externalCode'].forEach((key) => {
+        /** @type {Array<'externalName' | 'materialName' | 'externalKey' | 'externalCode'>} */
+        const keys = ['externalName', 'materialName', 'externalKey', 'externalCode'];
+        keys.forEach((key) => {
             const cell = row.querySelector(`[data-alias-field="${key}"]`);
             if (cell) {
                 cell.textContent = alias[key] != null ? alias[key] : '';
@@ -215,7 +265,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!updated) {
                         return;
                     }
-                    const versionInput = form.elements['version'];
+                    const versionInput = controlsOf(form)['version'];
                     if (versionInput && updated.version != null) {
                         versionInput.value = updated.version;
                     }

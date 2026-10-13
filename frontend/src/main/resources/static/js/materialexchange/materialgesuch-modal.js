@@ -11,8 +11,6 @@
  * window.materialgesuchI18n. No native dialogs, no full-page reload.
  */
 
-// @ts-check
-
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
@@ -78,13 +76,22 @@ function initMaterialgesuchModal() {
     /** @type {number | null} */
     let materialTimer = null;
     let materialListOpen = false;
+    /** @type {Array<{ id: string, name: string, quantityType: string }>} */
     let materialItems = [];
     let itemSeq = 0;
     /** @type {number | null} */
     let itemTimer = null;
     let itemListOpen = false;
+    /** @type {Array<{ productKey: string, name: string, manufacturerName?: string }>} */
     let productItems = [];
 
+    /**
+     * Fills the `{0}` placeholder of a localized template.
+     *
+     * @param {string | undefined} template the localized template
+     * @param {string} value the value to insert
+     * @returns {string} the filled text
+     */
     function fmt(template, value) {
         return String(template || '').replace('{0}', value);
     }
@@ -107,6 +114,12 @@ function initMaterialgesuchModal() {
         );
     }
 
+    /**
+     * Sets the text of an element inside the modal.
+     *
+     * @param {string} sel the selector
+     * @param {string | null} text the text
+     */
     function setText(sel, text) {
         const el = q(sel);
         if (el) {
@@ -114,6 +127,12 @@ function initMaterialgesuchModal() {
         }
     }
 
+    /**
+     * Shows or hides an element inside the modal.
+     *
+     * @param {string} sel the selector
+     * @param {boolean} on true to show
+     */
     function toggle(sel, on) {
         const el = q(sel);
         if (el) {
@@ -121,6 +140,11 @@ function initMaterialgesuchModal() {
         }
     }
 
+    /**
+     * Shows an error toast.
+     *
+     * @param {string | undefined} message the text; the generic error label when empty
+     */
     function showError(message) {
         showFrontendErrorToast(message || i18n.error || '');
     }
@@ -235,6 +259,12 @@ function initMaterialgesuchModal() {
         }
     }
 
+    /**
+     * Sets the value of an input inside the modal.
+     *
+     * @param {string} sel the selector
+     * @param {unknown} value the value; null, undefined and the empty string clear the input
+     */
     function setValue(sel, value) {
         /** @type {HTMLInputElement | null} */
         const el = q(sel);
@@ -243,6 +273,11 @@ function initMaterialgesuchModal() {
         }
     }
 
+    /**
+     * Checks the kind radio with the value.
+     *
+     * @param {string} kind `MATERIAL` or `ITEM`
+     */
     function setKindRadio(kind) {
         const radio = /** @type {HTMLInputElement | null} */ (
             modal.querySelector(`[data-mg-kind-radio][value="${kind}"]`)
@@ -259,6 +294,11 @@ function initMaterialgesuchModal() {
         toggle('[data-mg-item-block]', isItem);
     }
 
+    /**
+     * Switches the request kind and resets the pick.
+     *
+     * @param {string} kind `ITEM` for an item request, anything else for a material request
+     */
     function setKind(kind) {
         state.kind = kind === 'ITEM' ? 'ITEM' : 'MATERIAL';
         state.materialId = null;
@@ -285,6 +325,12 @@ function initMaterialgesuchModal() {
         }
     }
 
+    /**
+     * Closes the dialog and hands the response body to the opener's callback.
+     *
+     * @param {any} body the response body
+     * @returns {void | Promise<unknown>} what the callback returns
+     */
     function finish(body) {
         const onDone = state.onDone;
         hide();
@@ -293,6 +339,11 @@ function initMaterialgesuchModal() {
         }
     }
 
+    /**
+     * Loads the materials matching a query into the material picker.
+     *
+     * @param {string} query the search text; empty for the unfiltered list
+     */
     function loadMaterialPicker(query) {
         const seq = ++materialSeq;
         const url = `/materialboerse/request-materials${query ? `?q=${encodeURIComponent(query)}` : ''}`;
@@ -314,6 +365,11 @@ function initMaterialgesuchModal() {
             });
     }
 
+    /**
+     * Reloads the material picker after the typing pause.
+     *
+     * @param {string} query the search text
+     */
     function searchMaterialPicker(query) {
         if (materialTimer) {
             clearTimeout(materialTimer);
@@ -380,6 +436,11 @@ function initMaterialgesuchModal() {
         closeMaterialList();
     }
 
+    /**
+     * Loads the offerable products matching a query into the item picker.
+     *
+     * @param {string} query the search text; empty for the unfiltered list
+     */
     function loadItemPicker(query) {
         const seq = ++itemSeq;
         const url = `/materialboerse/offerable-products${query ? `?q=${encodeURIComponent(query)}` : ''}`;
@@ -401,6 +462,11 @@ function initMaterialgesuchModal() {
             });
     }
 
+    /**
+     * Reloads the item picker after the typing pause.
+     *
+     * @param {string} query the search text
+     */
     function searchItemPicker(query) {
         if (itemTimer) {
             clearTimeout(itemTimer);
@@ -667,13 +733,20 @@ function initMaterialgesuchModal() {
         }
     });
 
+    /**
+     * Keeps Tab focus inside the modal.
+     *
+     * @param {KeyboardEvent} e the Tab keydown event
+     */
     function trapFocus(e) {
         const focusable = modal.querySelectorAll(
             'button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])',
         );
-        const visible = Array.prototype.filter.call(focusable, (el) => {
-            return el.offsetParent !== null && !el.hidden;
-        });
+        const visible = /** @type {HTMLElement[]} */ (
+            Array.prototype.filter.call(focusable, (/** @type {HTMLElement} */ el) => {
+                return el.offsetParent !== null && !el.hidden;
+            })
+        );
         if (!visible.length) {
             return;
         }

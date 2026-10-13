@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 /* global hangarI18n, hangarConflict */
 
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
@@ -342,10 +340,21 @@ document.addEventListener('DOMContentLoaded', () => {
             return /** @type {HTMLElement} */ (document.getElementById(id));
         }
 
+        /**
+         * Shows an error toast.
+         *
+         * @param {string} msg the message
+         */
         function showError(msg) {
             showFrontendErrorToast(msg);
         }
 
+        /**
+         * Replaces the list's children with one paragraph per name.
+         *
+         * @param {HTMLElement} list the list container
+         * @param {string[]} names the names to show
+         */
         function fillParagraphs(list, names) {
             list.replaceChildren(
                 ...names.map((n) => {
@@ -356,24 +365,29 @@ document.addEventListener('DOMContentLoaded', () => {
             );
         }
 
+        /**
+         * Fills and opens the import result dialog.
+         *
+         * @param {ApiDto<'FleetviewImportResponseDto'>} data the import outcome
+         */
         function openResultModal(data) {
-            resultElement('import-res-imported').textContent = data.importedCount;
-            resultElement('import-res-skipped').textContent = data.skippedCount;
-            resultElement('import-res-duplicates').textContent = data.duplicateCount;
+            resultElement('import-res-imported').textContent = String(data.importedCount ?? '');
+            resultElement('import-res-skipped').textContent = String(data.skippedCount ?? '');
+            resultElement('import-res-duplicates').textContent = String(data.duplicateCount ?? '');
 
             const skipSection = resultElement('import-skip-section');
-            const skipList = document.getElementById('import-skip-list');
+            const skipList = resultElement('import-skip-list');
             const hasSkipped = !!(data.skippedShips && data.skippedShips.length > 0);
             if (hasSkipped) {
-                fillParagraphs(skipList, data.skippedShips);
+                fillParagraphs(skipList, /** @type {string[]} */ (data.skippedShips));
             }
             skipSection.hidden = !hasSkipped;
 
             const dupSection = resultElement('import-dup-section');
-            const dupList = document.getElementById('import-dup-list');
+            const dupList = resultElement('import-dup-list');
             const hasDuplicates = !!(data.duplicateShips && data.duplicateShips.length > 0);
             if (hasDuplicates) {
-                fillParagraphs(dupList, data.duplicateShips);
+                fillParagraphs(dupList, /** @type {string[]} */ (data.duplicateShips));
             }
             dupSection.hidden = !hasDuplicates;
 
@@ -396,22 +410,33 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        /**
+         * Uploads the chosen FleetView export and shows the result dialog.
+         *
+         * @param {File} file the chosen file
+         */
         function upload(file) {
             if (!importBtn || !fileInput) return;
             const button = importBtn;
             const input = fileInput;
             const maxBytes = Number(button.getAttribute('data-max-bytes'));
             if (maxBytes > 0 && file.size > maxBytes) {
-                showError(button.getAttribute('data-error-toolarge'));
+                showError(/** @type {string} */ (button.getAttribute('data-error-toolarge')));
                 return;
             }
 
             const formData = new FormData();
             formData.append('file', file);
 
+            /**
+             * Shows the upload failure toast with an optional detail.
+             *
+             * @param {string} detail the failure detail, empty for none
+             */
             function showFailure(detail) {
                 showError(
-                    button.getAttribute('data-error-failed') + (detail ? ` (${detail})` : ''),
+                    /** @type {string} */ (button.getAttribute('data-error-failed')) +
+                        (detail ? ` (${detail})` : ''),
                 );
             }
 

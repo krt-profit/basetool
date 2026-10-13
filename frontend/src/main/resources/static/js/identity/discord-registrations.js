@@ -17,13 +17,21 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 /* global DISCORD_MSG */
 
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+
+/**
+ * @typedef {object} DiscordRegistration
+ * @property {string} id
+ * @property {number | null} [version]
+ * @property {string | null} [username]
+ * @property {string | null} [serverNickname]
+ * @property {string | null} [registeredAt] ISO instant
+ * @property {string | null} [decidedAt] ISO instant
+ */
 
 document.addEventListener('DOMContentLoaded', () => {
     const body = document.getElementById('registrationsBody');
@@ -57,6 +65,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return /** @type {HTMLInputElement | null} */ (document.getElementById('merge-source'));
     }
 
+    /**
+     * @param {HTMLElement | null} tbody the table body whose rows are counted
+     * @param {string} tableId id of the table shown while rows exist
+     * @param {string} emptyId id of the empty state shown otherwise
+     * @param {string} countKey `data-reg-count` key of the tab chip
+     */
     function syncList(tbody, tableId, emptyId, countKey) {
         const rows = tbody ? tbody.querySelectorAll('tr[data-id]').length : 0;
         const table = document.getElementById(tableId);
@@ -87,25 +101,39 @@ document.addEventListener('DOMContentLoaded', () => {
         syncList(rejectedBody, 'rejectedTable', 'rejectedEmpty', 'rejected');
     }
 
+    /**
+     * @param {Element} row the pending-registration row to remove
+     */
     function removeRow(row) {
         row.remove();
         syncPending();
     }
 
+    /**
+     * @param {Element} row the rejected-registration row to remove
+     */
     function removeRejectedRow(row) {
         row.remove();
         syncRejected();
     }
 
-    const tabs = Array.prototype.slice.call(document.querySelectorAll('[data-reg-tab]'));
+    const tabs = /** @type {HTMLElement[]} */ (
+        Array.prototype.slice.call(document.querySelectorAll('[data-reg-tab]'))
+    );
 
+    /**
+     * @param {HTMLElement} tab the tab to select
+     * @param {boolean} focus whether the tab also takes focus
+     */
     function selectTab(tab, focus) {
         tabs.forEach((other) => {
             const selected = other === tab;
             other.classList.toggle('active', selected);
             other.setAttribute('aria-selected', selected ? 'true' : 'false');
             other.tabIndex = selected ? 0 : -1;
-            const panel = document.getElementById(other.getAttribute('aria-controls'));
+            const panel = document.getElementById(
+                /** @type {string} */ (other.getAttribute('aria-controls')),
+            );
             if (panel) {
                 panel.hidden = !selected;
             }
@@ -119,7 +147,8 @@ document.addEventListener('DOMContentLoaded', () => {
         tab.addEventListener('click', () => {
             selectTab(tab, false);
         });
-        tab.addEventListener('keydown', (event) => {
+        tab.addEventListener('keydown', (/** @type {KeyboardEvent} */ event) => {
+            /** @type {HTMLElement | null} */
             let next = null;
             if (event.key === 'ArrowRight') {
                 next = tabs[(index + 1) % tabs.length];
@@ -137,10 +166,18 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    /**
+     * @param {number | string} value the value to left-pad with zeros
+     * @returns {string} the value padded to two characters
+     */
     function pad(value) {
         return String(value).padStart(2, '0');
     }
 
+    /**
+     * @param {string | null | undefined} iso an ISO instant
+     * @returns {string} `dd.MM.yyyy HH:mm` in UTC, or an empty string when absent or invalid
+     */
     function formatUtc(iso) {
         if (!iso) {
             return '';
@@ -154,6 +191,12 @@ document.addEventListener('DOMContentLoaded', () => {
         )}.${date.getUTCFullYear()} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
     }
 
+    /**
+     * @param {string} action the `data-action` value
+     * @param {string} className the button classes
+     * @param {string} label the button text
+     * @returns {HTMLButtonElement} the new button
+     */
     function actionButton(action, className, label) {
         const button = document.createElement('button');
         button.type = 'button';
@@ -163,6 +206,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return button;
     }
 
+    /**
+     * @param {string} text the cell text
+     * @param {string} className the cell classes, or an empty string
+     * @param {string} label the `data-label` for the stacked layout, or an empty string
+     * @returns {HTMLTableCellElement} the new cell
+     */
     function textCell(text, className, label) {
         const cell = document.createElement('td');
         if (className) {
@@ -175,11 +224,22 @@ document.addEventListener('DOMContentLoaded', () => {
         return cell;
     }
 
+    /**
+     * @param {HTMLElement | null} table the table whose header is read
+     * @param {number} index the column index
+     * @returns {string} the trimmed header text, or an empty string
+     */
     function headerLabel(table, index) {
         const th = table ? table.querySelectorAll('thead th')[index] : null;
         return th ? (th.textContent || '').trim() : '';
     }
 
+    /**
+     * @param {DiscordRegistration} reg the registration
+     * @param {string} idPrefix prefix of the row id
+     * @param {HTMLElement | null} table the table the row joins
+     * @returns {HTMLTableRowElement} the row with its name, nickname and date cells
+     */
     function baseRow(reg, idPrefix, table) {
         const row = document.createElement('tr');
         row.id = idPrefix + reg.id;
@@ -211,6 +271,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return row;
     }
 
+    /**
+     * @param {HTMLButtonElement[]} buttons the action buttons
+     * @returns {HTMLTableCellElement} the actions cell
+     */
     function actionsCell(buttons) {
         const cell = document.createElement('td');
         cell.className = 'cell-actions';
@@ -223,6 +287,9 @@ document.addEventListener('DOMContentLoaded', () => {
         return cell;
     }
 
+    /**
+     * @param {DiscordRegistration | null | undefined} reg the reopened registration
+     */
     function insertPendingRow(reg) {
         if (!body || !reg || !reg.id) {
             return;
@@ -240,6 +307,9 @@ document.addEventListener('DOMContentLoaded', () => {
         syncPending();
     }
 
+    /**
+     * @param {DiscordRegistration | null | undefined} reg the rejected registration
+     */
     function insertRejectedRow(reg) {
         if (!rejectedBody || !reg || !reg.id) {
             return;
@@ -260,8 +330,11 @@ document.addEventListener('DOMContentLoaded', () => {
         syncRejected();
     }
 
+    /**
+     * @param {Element} row the pending-registration row to approve
+     */
     function approve(row) {
-        const id = row.getAttribute('data-id');
+        const id = /** @type {string} */ (row.getAttribute('data-id'));
         const version = row.getAttribute('data-version');
         krtFetch.write({
             method: 'POST',
@@ -276,6 +349,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    /**
+     * @param {Element} row the row to reject
+     */
     function openReject(row) {
         rejectTarget = row;
         if (reasonInput) {
@@ -289,6 +365,9 @@ document.addEventListener('DOMContentLoaded', () => {
         rejectTarget = null;
     }
 
+    /**
+     * @param {Element} row the row to link
+     */
     function openLink(row) {
         linkTarget = row;
         const picker = linkPicker();
@@ -303,6 +382,9 @@ document.addEventListener('DOMContentLoaded', () => {
         linkTarget = null;
     }
 
+    /**
+     * @param {Element} row the row to merge
+     */
     function openMerge(row) {
         mergeTarget = row;
         const picker = mergePicker();
@@ -317,6 +399,9 @@ document.addEventListener('DOMContentLoaded', () => {
         mergeTarget = null;
     }
 
+    /**
+     * @param {Element} row the rejected row to reopen
+     */
     function openReopen(row) {
         reopenTarget = row;
         if (reopenReasonInput) {

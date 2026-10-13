@@ -1,4 +1,3 @@
-// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -26,6 +25,8 @@ import { krtBankAccountMeta } from '/js/kernel/krt-bank-account-search.js';
 /**
  * Maps a movement type on the unified "Kontobewegung" modal onto its backend endpoint and the
  * JSON field the source-account id is submitted under.
+ *
+ * @type {Record<string, {endpoint: string, accountField: string}>}
  */
 const MOVEMENT_ENDPOINTS = {
     DEPOSIT: { endpoint: '/api/proxy/bank/deposits', accountField: 'accountId' },

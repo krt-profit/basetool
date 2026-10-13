@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 /* global OC_I18N */
 
 import {
@@ -44,6 +42,7 @@ const modalContent = modal ? modal.querySelector('.krt-modal') : null;
 /** @type {HTMLElement | null} */
 let lastTrigger = null;
 
+/** @param {number} [keepScroll] the scroll position to restore instead of the current one */
 function refreshChart(keepScroll) {
     if (!chart) {
         window.location.reload();
@@ -97,11 +96,19 @@ if (chart) {
     });
 }
 
+/**
+ * @param {string} id the input id
+ * @returns {string} the input's value, or an empty string when absent
+ */
 function field(id) {
     const el = /** @type {HTMLInputElement | null} */ (document.getElementById(id));
     return el ? el.value : '';
 }
 
+/**
+ * @param {string} id the input id
+ * @param {string | null | undefined} value the value to set; null and undefined clear it
+ */
 function setField(id, value) {
     const el = /** @type {HTMLInputElement | null} */ (document.getElementById(id));
     if (el) {
@@ -121,6 +128,10 @@ function closeModal() {
     lastTrigger = null;
 }
 
+/**
+ * @param {string} id the element id
+ * @param {boolean} hidden whether the element is hidden
+ */
 function setHidden(id, hidden) {
     const el = document.getElementById(id);
     if (el) {
@@ -128,6 +139,7 @@ function setHidden(id, hidden) {
     }
 }
 
+/** @param {boolean} inert whether the page regions behind the dialog are made inert */
 function setBackgroundInert(inert) {
     const regions = ['header', 'main', '#sidebar', '#sidebar-overlay'];
     regions.forEach((sel) => {
@@ -150,6 +162,7 @@ function setBackgroundInert(inert) {
     });
 }
 
+/** @returns {HTMLElement[]} the visible focusable elements of the dialog */
 function modalFocusable() {
     if (!modalContent) {
         return [];
@@ -161,6 +174,26 @@ function modalFocusable() {
     });
 }
 
+/**
+ * @typedef {object} OrgChartModalContext
+ * @property {string | null} [positionType]
+ * @property {string | null} [orgUnitId]
+ * @property {string | null} [parentId]
+ * @property {string | null} [positionId]
+ * @property {string | null} [version]
+ * @property {string | null} [name]
+ * @property {string | null} [displayName]
+ * @property {string | null} [rankLabel]
+ * @property {string | null} [userId]
+ * @property {boolean} [userOptional]
+ * @property {boolean} [staffChoice]
+ * @property {boolean} [needsName]
+ */
+
+/**
+ * @param {string} mode `create`, `reassign`, `rename` or `grandAdmiral`
+ * @param {OrgChartModalContext} ctx the values the dialog is prefilled with
+ */
 function openModal(mode, ctx) {
     if (!modal) {
         return;
@@ -218,6 +251,11 @@ function openModal(mode, ctx) {
     setBackgroundInert(true);
 }
 
+/**
+ * @param {string} method the HTTP method
+ * @param {string} url the target URL
+ * @param {Record<string, unknown> | null} body the JSON payload, or null for none
+ */
 function send(method, url, body) {
     krtFetch.write({
         method,
@@ -294,6 +332,7 @@ function submitModal() {
         showFrontendErrorToast(OC_I18N.displayNameRequired);
         return;
     }
+    /** @type {{positionType: string, displayName?: string, name?: string, orgUnitId?: string, parentId?: string}} */
     const body = { positionType };
     if (displayName) {
         body.displayName = displayName;
@@ -465,10 +504,12 @@ if (modal) {
     });
 }
 
+/** @param {HTMLElement | null | undefined} tree the `.oc-tree` element */
 function initOneTree(tree) {
     if (!tree) {
         return;
     }
+    /** @returns {HTMLElement[]} the visible tree items */
     const treeItems = function () {
         return Array.prototype.slice
             .call(tree.querySelectorAll('[role="treeitem"]'))
@@ -476,8 +517,12 @@ function initOneTree(tree) {
                 return el.offsetParent !== null;
             });
     };
+    /**
+     * @param {Element} el a tree item
+     * @returns {number} its `aria-level`, or 1
+     */
     const levelOf = function (el) {
-        return parseInt(el.getAttribute('aria-level'), 10) || 1;
+        return parseInt(/** @type {string} */ (el.getAttribute('aria-level')), 10) || 1;
     };
 
     const initial = treeItems();
@@ -489,6 +534,7 @@ function initOneTree(tree) {
         }
     });
 
+    /** @param {HTMLElement | null} el the tree item to focus */
     const focusItem = function (el) {
         if (!el) {
             return;
@@ -499,6 +545,11 @@ function initOneTree(tree) {
         el.focus();
     };
 
+    /**
+     * @param {HTMLElement[]} list the visible tree items
+     * @param {number} i the current index
+     * @returns {HTMLElement | null} the next item on the same level, if any
+     */
     const nextSibling = function (list, i) {
         const lvl = levelOf(list[i]);
         for (let j = i + 1; j < list.length; j++) {
@@ -512,6 +563,11 @@ function initOneTree(tree) {
         }
         return null;
     };
+    /**
+     * @param {HTMLElement[]} list the visible tree items
+     * @param {number} i the current index
+     * @returns {HTMLElement | null} the previous item on the same level, if any
+     */
     const prevSibling = function (list, i) {
         const lvl = levelOf(list[i]);
         for (let j = i - 1; j >= 0; j--) {
@@ -525,10 +581,20 @@ function initOneTree(tree) {
         }
         return null;
     };
+    /**
+     * @param {HTMLElement[]} list the visible tree items
+     * @param {number} i the current index
+     * @returns {HTMLElement | null} the item's first child, if any
+     */
     const firstChild = function (list, i) {
         const next = list[i + 1];
         return next && levelOf(next) === levelOf(list[i]) + 1 ? next : null;
     };
+    /**
+     * @param {HTMLElement[]} list the visible tree items
+     * @param {number} i the current index
+     * @returns {HTMLElement | null} the item's parent, if any
+     */
     const parentOf = function (list, i) {
         const lvl = levelOf(list[i]);
         for (let j = i - 1; j >= 0; j--) {
@@ -540,7 +606,7 @@ function initOneTree(tree) {
     };
 
     tree.addEventListener('keydown', (event) => {
-        const current = event.target;
+        const current = /** @type {HTMLElement | null} */ (event.target);
         if (!current || current.getAttribute('role') !== 'treeitem') {
             return;
         }
@@ -549,6 +615,7 @@ function initOneTree(tree) {
         if (i < 0) {
             return;
         }
+        /** @type {HTMLElement | null | undefined} */
         let target;
         switch (event.key) {
             case 'ArrowDown':
@@ -616,6 +683,10 @@ function initOrgChart() {
         scroller.classList.add('oc-chart--proxied');
     }
 
+    /**
+     * @param {HTMLElement} from the element that scrolled
+     * @param {HTMLElement} to the element that follows proportionally
+     */
     function mirror(from, to) {
         const fromRange = from.scrollWidth - from.clientWidth;
         const toRange = to.scrollWidth - to.clientWidth;

@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';

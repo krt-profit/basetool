@@ -1,5 +1,3 @@
-// @ts-check
-
 import { krtModal } from '/js/kernel/krt-modal.js';
 
 let isDirty = false;
@@ -110,7 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    const beforeUnloadHandler = function (event) {
+    const beforeUnloadHandler = function (/** @type {BeforeUnloadEvent} */ event) {
         if (isDirty) {
             event.preventDefault();
             event.returnValue = '';

@@ -1,4 +1,3 @@
-// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -69,12 +68,24 @@ function readSaved() {
     }
 }
 
+/**
+ * @typedef {object} BankViewState
+ * @property {string} layout `table` or `card`.
+ * @property {string} group `bereich` or `alpha`.
+ */
+
+/**
+ * @param {BankViewState} state the dashboard view to persist
+ */
 function writeSaved(state) {
     try {
         localStorage.setItem(storageKey(), JSON.stringify(state));
     } catch {}
 }
 
+/**
+ * @param {BankViewState} state the view whose toggles are applied
+ */
 function applyCheckboxStates(state) {
     const layoutEl = layoutCheckbox();
     const groupEl = groupCheckbox();
@@ -95,6 +106,9 @@ function reapplyNameFilter() {
     }
 }
 
+/**
+ * @param {BankViewState} state the view to fetch and swap in
+ */
 function fetchView(state) {
     krtFetch
         .swap({
@@ -177,6 +191,9 @@ function initBankLayoutPrefs() {
         }
     }
 
+    /**
+     * @param {string} layout `table` or `card`
+     */
     function writeSaved(layout) {
         try {
             localStorage.setItem(storageKey(), JSON.stringify({ layout }));
@@ -192,6 +209,9 @@ function initBankLayoutPrefs() {
         }
     }
 
+    /**
+     * @param {string} layout `table` or `card`
+     */
     function fetchView(layout) {
         krtFetch
             .swap({

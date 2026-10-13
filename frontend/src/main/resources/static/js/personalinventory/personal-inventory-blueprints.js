@@ -1,5 +1,3 @@
-// @ts-check
-
 import { showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtModal } from '/js/kernel/krt-modal.js';

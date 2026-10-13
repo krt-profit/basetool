@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 /* global MSG_UNIT_PIECE, MSG_UNIT_SCU, INV_ADD_MSG, INV_ORDER_NEED_MSG, INV_OWNER_PICKER_MSG */
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
@@ -668,6 +666,16 @@ function filterOrderSelects(catalogId) {
     updateAllocOver();
 }
 
+/**
+ * One outstanding need of an order, as embedded in `data-order-needs`.
+ *
+ * @typedef {object} OrderNeedBucket
+ * @property {string} [materialId] the material the need is for
+ * @property {string} [gameItemId] the game item the need is for
+ * @property {number} [outstandingAmount] the amount still missing
+ * @property {number} [qualityFloor] the minimum quality required
+ */
+
 let orderNeeds = readEmbeddedOrderNeeds();
 
 /**
@@ -711,7 +719,7 @@ function orderNeedFor(orderId, materialId) {
     /** @type {number | null} */
     let floor = null;
     let matched = false;
-    buckets.forEach((bucket) => {
+    buckets.forEach((/** @type {OrderNeedBucket} */ bucket) => {
         if (bucket.materialId !== materialId) return;
         matched = true;
         if (typeof bucket.outstandingAmount === 'number') outstanding += bucket.outstandingAmount;
@@ -735,7 +743,7 @@ function orderNeedFor(orderId, materialId) {
 function orderItemNeedFor(orderId, gameItemId) {
     const needs = needsMapFor(true)[orderId];
     if (!needs || !needs.length || !gameItemId) return null;
-    const match = needs.find((need) => {
+    const match = needs.find((/** @type {OrderNeedBucket} */ need) => {
         return need.gameItemId === gameItemId;
     });
     if (!match) return null;

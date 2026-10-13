@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 /* global KRT_ORDERS_AGE_YELLOW, KRT_ORDERS_AGE_RED, KRT_ORDERS_LIVESYNC_UPDATES, KRT_ORDERS_SECTION_REFRESH_ERROR */
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
@@ -60,6 +58,7 @@ function initOrdersIndex() {
         topic: 'orders',
         sections: ORDERS_SECTIONS,
         coalesceMs: 1500,
+        /** @param {string[]} keys the section keys a peer changed */
         refresh(keys) {
             if (joborderHooks.refreshOrdersQueue) {
                 joborderHooks.refreshOrdersQueue(keys, { broadcast: false });
@@ -80,9 +79,14 @@ function initOrdersIndex() {
 
 initOrdersIndex();
 
+/**
+ * @param {ParentNode | null | undefined} root the subtree to colour; defaults to the document
+ */
 function colorOrderAges(root) {
     const now = new Date();
-    (root || document).querySelectorAll('.order-id-display').forEach((el) => {
+    /** @type {NodeListOf<HTMLElement>} */ (
+        (root || document).querySelectorAll('.order-id-display')
+    ).forEach((el) => {
         const utcDateStr = el.getAttribute('data-utc');
         if (utcDateStr) {
             const date = new Date(utcDateStr);
@@ -104,6 +108,7 @@ function colorOrderAges(root) {
 
 const ORDERS_MATERIALS_EXPANDED_KEY = 'orders_materials_expanded';
 
+/** @returns {string[]} the persisted ids of the orders whose materials are expanded */
 function readExpandedOrderMaterials() {
     try {
         return JSON.parse(localStorage.getItem(ORDERS_MATERIALS_EXPANDED_KEY) || '[]');
@@ -112,12 +117,17 @@ function readExpandedOrderMaterials() {
     }
 }
 
+/** @param {string[]} values the ids of the orders whose materials are expanded */
 function writeExpandedOrderMaterials(values) {
     try {
         localStorage.setItem(ORDERS_MATERIALS_EXPANDED_KEY, JSON.stringify(values));
     } catch (_e) {}
 }
 
+/**
+ * @param {string} orderId the order id
+ * @param {boolean} expanded whether the materials row is shown
+ */
 function applyOrderMaterialsState(orderId, expanded) {
     const body = document.querySelector(
         `[data-order-materials="${window.CSS && CSS.escape ? CSS.escape(orderId) : orderId}"]`,
@@ -137,6 +147,7 @@ function applyOrderMaterialsState(orderId, expanded) {
     }
 }
 
+/** @param {Element} btn the clicked toggle button */
 function toggleOrderMaterials(btn) {
     const orderId = btn.getAttribute('data-order-id');
     if (!orderId) return;
@@ -151,10 +162,11 @@ function toggleOrderMaterials(btn) {
     }
 }
 
+/** @param {ParentNode | null | undefined} root the subtree to restore; defaults to the document */
 function restoreOrderMaterials(root) {
     const expandedList = readExpandedOrderMaterials();
     (root || document).querySelectorAll('[data-order-materials]').forEach((body) => {
-        const orderId = body.getAttribute('data-order-materials');
+        const orderId = /** @type {string} */ (body.getAttribute('data-order-materials'));
         applyOrderMaterialsState(orderId, expandedList.indexOf(orderId) >= 0);
     });
 }
@@ -162,6 +174,7 @@ function restoreOrderMaterials(root) {
 const ORDERS_SQUADRON_FILTER_KEY = 'orders_squadron_filter';
 const ORDERS_SQUADRON_NONE_SENTINEL = '00000000-0000-0000-0000-000000000000';
 
+/** @returns {string[] | null} the persisted checked squadron ids, or null when none are saved */
 function readSquadronFilter() {
     try {
         const raw = localStorage.getItem(ORDERS_SQUADRON_FILTER_KEY);
@@ -171,6 +184,7 @@ function readSquadronFilter() {
     }
 }
 
+/** @param {string[]} ids the checked squadron ids */
 function writeSquadronFilter(ids) {
     try {
         localStorage.setItem(ORDERS_SQUADRON_FILTER_KEY, JSON.stringify(ids));
@@ -281,6 +295,7 @@ function restoreSquadronFilter() {
         .map((b) => b.value)
         .sort();
     const savedSel = saved.slice().sort();
+    /** @type {Record<string, boolean>} */
     const savedSet = {};
     saved.forEach((id) => {
         savedSet[id] = true;
@@ -305,6 +320,7 @@ function statusBoxes() {
     );
 }
 
+/** @returns {string[] | null} the persisted checked statuses, or null when none are saved */
 function readStatusFilter() {
     try {
         const raw = localStorage.getItem(ORDERS_STATUS_FILTER_KEY);
@@ -314,6 +330,7 @@ function readStatusFilter() {
     }
 }
 
+/** @param {string[]} values the checked statuses */
 function writeStatusFilter(values) {
     try {
         localStorage.setItem(ORDERS_STATUS_FILTER_KEY, JSON.stringify(values));
@@ -337,6 +354,7 @@ function restoreStatusFilter() {
         .filter((b) => b.checked)
         .map((b) => b.value)
         .sort();
+    /** @type {Record<string, boolean>} */
     const savedSet = {};
     saved.forEach((s) => {
         savedSet[s] = true;
@@ -371,6 +389,7 @@ function scopeHidesSquadronFilter() {
     return scope === null ? field === null || field.hidden : scope !== 'ALL';
 }
 
+/** @param {string} value the scope to check */
 function selectScope(value) {
     scopeInputs().forEach((el) => {
         el.checked = el.value === value;

@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 import { showKrtConfirm } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
@@ -27,6 +25,26 @@ import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
 import { krtOverflowMenu } from '/js/kernel/krt-overflow-menu.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { krtHooks } from '/js/kernel/krt-hooks.js';
+
+/**
+ * The toolbar values stored for one board view.
+ *
+ * @typedef {object} BoardFilters
+ * @property {string} minQuality the minimum quality
+ * @property {string} minAmount the minimum amount
+ * @property {string} sort the sort key
+ * @property {boolean} excludeStolen whether stolen offers are left out
+ */
+
+/**
+ * The stored board state: the active view and scope plus each view's filters.
+ *
+ * @typedef {object} BoardFilterState
+ * @property {string} mode `offers` or `requests`
+ * @property {string} tab `mein` or `alle`
+ * @property {BoardFilters} offers the Angebote filters
+ * @property {BoardFilters} requests the Gesuche filters
+ */
 
 function initMaterialboerse() {
     const i18n = { ...window.materialboerseModalI18n, ...window.materialboerseI18n };
@@ -47,8 +65,15 @@ function initMaterialboerse() {
     /** @type {number | null} */
     let searchTimer = null;
 
+    /**
+     * Fills the `{0}` placeholder of a localized template.
+     *
+     * @param {string | undefined} template the localized template
+     * @param {string | number} value the value to insert
+     * @returns {string} the filled text
+     */
     function fmt(template, value) {
-        return String(template || '').replace('{0}', value);
+        return String(template || '').replace('{0}', /** @type {string} */ (value));
     }
 
     function readSelectedId() {
@@ -61,6 +86,12 @@ function initMaterialboerse() {
         return active ? active.getAttribute('data-request-id') : null;
     }
 
+    /**
+     * The trimmed value of a toolbar control.
+     *
+     * @param {string} selector the control's selector
+     * @returns {string} the value; empty when the control is missing
+     */
     function val(selector) {
         const el = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (
             document.querySelector(selector)
@@ -107,10 +138,20 @@ function initMaterialboerse() {
         });
     }
 
+    /**
+     * The filters a view starts with.
+     *
+     * @returns {BoardFilters} the defaults
+     */
     function defaultBoardFilters() {
         return { minQuality: '', minAmount: '', sort: 'qual', excludeStolen: false };
     }
 
+    /**
+     * Reads the stored board state.
+     *
+     * @returns {any} the parsed JSON; null when nothing is stored or it cannot be read
+     */
     function readFilterPref() {
         try {
             const raw = localStorage.getItem(FILTER_PREF_KEY);
@@ -120,12 +161,23 @@ function initMaterialboerse() {
         }
     }
 
+    /**
+     * Stores the board state.
+     *
+     * @param {unknown} value the state to store as JSON
+     */
     function writeFilterPref(value) {
         try {
             localStorage.setItem(FILTER_PREF_KEY, JSON.stringify(value));
         } catch (_e) {}
     }
 
+    /**
+     * Copies the valid members of a stored view onto its filters.
+     *
+     * @param {BoardFilters} target the filters to update
+     * @param {any} saved the stored view, untyped JSON
+     */
     function mergeBoardFilters(target, saved) {
         if (!saved || typeof saved !== 'object') {
             return;
@@ -144,7 +196,14 @@ function initMaterialboerse() {
         }
     }
 
+    /**
+     * Builds a valid board state from the stored one.
+     *
+     * @param {any} saved the stored state, untyped JSON
+     * @returns {BoardFilterState} the state with defaults for everything invalid or missing
+     */
     function normalizeFilterPref(saved) {
+        /** @type {BoardFilterState} */
         const state = {
             mode: 'offers',
             tab: 'alle',
@@ -208,6 +267,13 @@ function initMaterialboerse() {
         writeFilterPref(filterState);
     }
 
+    /**
+     * Writes a value into a toolbar control unless it already holds it.
+     *
+     * @param {string} selector the control's selector
+     * @param {unknown} value the value to write; null and undefined write the empty string
+     * @returns {boolean} true when the control changed
+     */
     function setIfDifferent(selector, value) {
         const el = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (
             document.querySelector(selector)
@@ -224,8 +290,7 @@ function initMaterialboerse() {
      * Writes a view's stored filters into the shared toolbar; the stolen filter is disabled and
      * hidden on the Gesuche.
      *
-     * @param {{minQuality: string, minAmount: string, sort: string, excludeStolen: boolean}} saved
-     *     the stored filters of the view
+     * @param {BoardFilters} saved the stored filters of the view
      * @param {string} mode the view the toolbar now serves
      * @returns {boolean} true when a control changed
      */
@@ -310,18 +375,30 @@ function initMaterialboerse() {
         });
     }
 
+    /**
+     * Swaps the offer detail pane.
+     *
+     * @param {string | null} id the selected offer's id
+     * @returns {Promise<boolean>} true when the pane was updated
+     */
     function swapDetail(id) {
         return krtFetch.swap({
-            url: `/materialboerse?fragment=detail&selected=${encodeURIComponent(id)}`,
+            url: `/materialboerse?fragment=detail&selected=${encodeURIComponent(/** @type {string} */ (id))}`,
             container: '#mb-detail',
             fragmentValue: 'detail',
             history: false,
         });
     }
 
+    /**
+     * Swaps the request detail pane.
+     *
+     * @param {string | null} id the selected request's id
+     * @returns {Promise<boolean>} true when the pane was updated
+     */
     function swapRequestDetail(id) {
         return krtFetch.swap({
-            url: `/materialboerse?view=requests&fragment=detail&selected=${encodeURIComponent(id)}`,
+            url: `/materialboerse?view=requests&fragment=detail&selected=${encodeURIComponent(/** @type {string} */ (id))}`,
             container: '#mg-detail',
             fragmentValue: 'detail',
             history: false,
@@ -342,6 +419,11 @@ function initMaterialboerse() {
         } catch (_e) {}
     }
 
+    /**
+     * Renders the relative age of every `[data-mb-ago]` element below a root.
+     *
+     * @param {ParentNode | null | undefined} root the subtree to render; the document when absent
+     */
     function applyAgo(root) {
         (root || document).querySelectorAll('[data-mb-ago]').forEach((el) => {
             const ts = el.getAttribute('data-ts');
@@ -387,6 +469,12 @@ function initMaterialboerse() {
         });
     }
 
+    /**
+     * Sets an element's text when a value is given.
+     *
+     * @param {string} selector the element's selector
+     * @param {string | null | undefined} value the text; null and undefined leave it unchanged
+     */
     function setText(selector, value) {
         const el = document.querySelector(selector);
         if (el && value != null) {
@@ -416,6 +504,11 @@ function initMaterialboerse() {
         );
     }
 
+    /**
+     * Marks the offer row with the id as active.
+     *
+     * @param {string | null} id the selected offer's id
+     */
     function markActiveRow(id) {
         document.querySelectorAll('.mb-mrow[data-offer-id]').forEach((row) => {
             const on = row.getAttribute('data-offer-id') === id;
@@ -424,6 +517,11 @@ function initMaterialboerse() {
         });
     }
 
+    /**
+     * Marks the request row with the id as active.
+     *
+     * @param {string | null} id the selected request's id
+     */
     function markActiveRequestRow(id) {
         document.querySelectorAll('.mb-mrow[data-request-id]').forEach((row) => {
             const on = row.getAttribute('data-request-id') === id;
@@ -503,6 +601,11 @@ function initMaterialboerse() {
         swapList();
     }
 
+    /**
+     * Registers or withdraws the viewer's interest in an offer.
+     *
+     * @param {Element} button the interest button
+     */
     function toggleInterest(button) {
         const id = button.getAttribute('data-offer-id');
         const interested = button.getAttribute('data-interested') === 'true';
@@ -519,6 +622,11 @@ function initMaterialboerse() {
         });
     }
 
+    /**
+     * Deactivates an offer after confirmation.
+     *
+     * @param {string | null} id the offer's id
+     */
     function deactivateOffer(id) {
         showKrtConfirm(
             i18n.deactivateConfirmTitle,
@@ -544,6 +652,12 @@ function initMaterialboerse() {
         });
     }
 
+    /**
+     * Selects the offer the release dialog created and re-renders the board.
+     *
+     * @param {{ id?: string } | null} body the created offer
+     * @returns {Promise<boolean>} true when the board was updated
+     */
     function onReleased(body) {
         if (body && body.id) {
             selectedId = body.id;
@@ -551,6 +665,11 @@ function initMaterialboerse() {
         return swapBoard();
     }
 
+    /**
+     * Registers or withdraws the viewer's interest in fulfilling a request.
+     *
+     * @param {Element} button the interest button
+     */
     function toggleFulfillment(button) {
         const id = button.getAttribute('data-request-id');
         const interested = button.getAttribute('data-interested') === 'true';
@@ -567,6 +686,11 @@ function initMaterialboerse() {
         });
     }
 
+    /**
+     * Deactivates a request after confirmation.
+     *
+     * @param {string | null} id the request's id
+     */
     function deactivateRequest(id) {
         showKrtConfirm(
             gi18n.deactivateConfirmTitle,
@@ -592,6 +716,12 @@ function initMaterialboerse() {
         });
     }
 
+    /**
+     * Selects the request the dialog created and re-renders the board.
+     *
+     * @param {{ id?: string } | null} body the created request
+     * @returns {Promise<boolean>} true when the board was updated
+     */
     function onRequestCreated(body) {
         if (body && body.id) {
             selectedRequestId = body.id;
@@ -607,6 +737,11 @@ function initMaterialboerse() {
         krtLiveSync.sendChanged(MATERIALBOARD_TOPIC, ['requests']);
     }
 
+    /**
+     * Runs the offer action the clicked control stands for.
+     *
+     * @param {Element} el the control carrying a `data-mb-*` action marker
+     */
     function handleAction(el) {
         if (el.hasAttribute('data-mb-interest')) {
             toggleInterest(el);
@@ -637,6 +772,11 @@ function initMaterialboerse() {
         }
     }
 
+    /**
+     * Runs the request action the clicked control stands for.
+     *
+     * @param {Element} el the control carrying a `data-mg-*` action marker
+     */
     function handleRequestAction(el) {
         if (el.hasAttribute('data-mg-interest')) {
             toggleFulfillment(el);
@@ -759,6 +899,11 @@ function initMaterialboerse() {
 
     /** @type {number | null} */
     let peerTimer = null;
+    /**
+     * Re-renders the list after a peer changed the board, unless a dialog is open.
+     *
+     * @param {string[]} sections the section keys the peer changed
+     */
     function onPeerChanged(sections) {
         const secs = Array.isArray(sections) ? sections : [];
         if (peerTimer) {

@@ -1,4 +1,3 @@
-// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -44,6 +43,22 @@ function toGameItemOption(row) {
     return { value: row.id, label: row.name || row.id };
 }
 
+/**
+ * @typedef {object} CatalogOption
+ * @property {string | undefined} value the option value
+ * @property {string | undefined} label the option label
+ * @property {Record<string, string>} [data] extra `data-*` values of the option
+ */
+
+/**
+ * Fetches a catalogue search endpoint and maps every row to a combobox option; resolves an empty
+ * list when the request fails.
+ *
+ * @param {string} path the search endpoint, with or without a query string
+ * @param {string | null | undefined} query the typed search text
+ * @param {(row: any) => CatalogOption} toOption maps one result row to an option
+ * @returns {Promise<CatalogOption[]>} the options
+ */
 function fetchCatalog(path, query, toOption) {
     return krtFetch
         .getJson(

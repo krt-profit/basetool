@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
@@ -56,6 +54,7 @@ function initMissionDetailTabs() {
         return current;
     }
 
+    /** @param {string} key the tab key to show */
     function apply(key) {
         current = key;
         if (key !== EDIT_KEY) {
@@ -80,6 +79,11 @@ function initMissionDetailTabs() {
         } catch {}
     }
 
+    /**
+     * @param {string} key the tab key to show
+     * @param {boolean} push whether to push a history entry
+     * @returns {Promise<boolean>} whether the tab changed
+     */
     async function show(key, push) {
         if (!validKeys.includes(key) || key === currentKey()) {
             return false;
@@ -120,6 +124,10 @@ function initMissionDetailTabs() {
         }
     }
 
+    /**
+     * @param {boolean} useStore whether the remembered tab may be used
+     * @returns {string} the tab key to show initially
+     */
     function resolveInitial(useStore) {
         const q = new URLSearchParams(window.location.search).get('tab');
         if (q && validKeys.includes(q)) return q;
@@ -141,7 +149,7 @@ function initMissionDetailTabs() {
 
     tabs.forEach((t) =>
         t.addEventListener('click', () => {
-            show(t.getAttribute('data-tab'), true);
+            show(/** @type {string} */ (t.getAttribute('data-tab')), true);
         }),
     );
 
@@ -169,7 +177,7 @@ function initMissionDetailTabs() {
             e.preventDefault();
             const next = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
             next.focus();
-            show(next.getAttribute('data-tab'), true);
+            show(/** @type {string} */ (next.getAttribute('data-tab')), true);
         },
     );
 
@@ -179,7 +187,7 @@ function initMissionDetailTabs() {
 
     document.querySelectorAll('[data-tab-jump]').forEach((card) => {
         card.addEventListener('click', () => {
-            show(card.getAttribute('data-tab-jump'), true);
+            show(/** @type {string} */ (card.getAttribute('data-tab-jump')), true);
         });
     });
 
@@ -217,11 +225,20 @@ function initMissionDetailTabs2() {
     const SAVED = msg('mission.save.section.ok');
     const FAILED = msg('mission.save.section.error');
 
+    /**
+     * @param {{version?: number | null, coreVersion?: number | null,
+     *     scheduleVersion?: number | null, flagsVersion?: number | null} | null | undefined} v
+     *     the saved mission's section versions
+     */
     function writeVersions(v) {
         if (!v) return;
+        /**
+         * @param {string} id the hidden version input id
+         * @param {number | null | undefined} val the version to write
+         */
         function set(id, val) {
             const el = /** @type {HTMLInputElement | null} */ (document.getElementById(id));
-            if (el && val != null) el.value = val;
+            if (el && val != null) el.value = String(val);
         }
         set('mission-version', v.version);
         set('mission-core-version', v.coreVersion);
@@ -233,6 +250,7 @@ function initMissionDetailTabs2() {
             el.textContent = '';
         });
     }
+    /** @param {Record<string, string>} map the validation message per field name */
     function renderFieldErrors(map) {
         clearFieldErrors();
         Object.keys(map || {}).forEach((field) => {
@@ -241,6 +259,7 @@ function initMissionDetailTabs2() {
             else showFrontendErrorToast(map[field]);
         });
     }
+    /** @param {ApiProblem & {code?: string}} problem the 409 problem body */
     function handleConflict(problem) {
         const code = problem && problem.code;
         if (code === 'OPTIMISTIC_LOCK' || code === 'PESSIMISTIC_LOCK') {
@@ -261,6 +280,7 @@ function initMissionDetailTabs2() {
             );
         }
     }
+    /** @type {Record<string, string[]>} */
     const SECTION_FIELDS = {
         core: ['name', 'description', 'calendarLink', 'status', 'operationId', 'meetingPoint'],
         schedule: [
@@ -272,6 +292,11 @@ function initMissionDetailTabs2() {
         ],
         flags: ['isInternal'],
     };
+    /**
+     * @param {FormData} fd the form data
+     * @param {string[]} fields the field names of one section
+     * @returns {string} a comparable snapshot of the section's values
+     */
     function sectionSnapshot(fd, fields) {
         return fields
             .map((n) => {
@@ -279,6 +304,7 @@ function initMissionDetailTabs2() {
             })
             .join('|');
     }
+    /** @type {Record<string, string>} */
     const initialSnapshot = {};
     (function captureInitialSnapshot() {
         const fd0 = new FormData(form);
@@ -288,6 +314,10 @@ function initMissionDetailTabs2() {
     })();
     function markDirtySections() {
         const fd = new FormData(form);
+        /**
+         * @param {string} id the hidden dirty-flag input id
+         * @param {boolean} dirty whether the section changed
+         */
         function setFlag(id, dirty) {
             const el = /** @type {HTMLInputElement | null} */ (document.getElementById(id));
             if (el) el.value = dirty ? 'true' : 'false';
@@ -401,6 +431,7 @@ function initMissionDetailTabs3() {
         return bottom;
     }
 
+    /** @param {number} y the pointer's client y */
     function driveEdgeScroll(y) {
         const h = visibleBottom();
         if (y <= EDGE_ZONE_PX) {
@@ -421,6 +452,7 @@ function initMissionDetailTabs3() {
         }
     }
 
+    /** @param {Element | null} row the row to select, or null to clear */
     function setSelected(row) {
         if (selected) {
             selected.classList.remove('is-selected');
@@ -433,6 +465,10 @@ function initMissionDetailTabs3() {
         }
     }
 
+    /**
+     * @param {Element} row the participant row
+     * @param {Element} zone the target drop zone
+     */
     async function moveParticipant(row, zone) {
         if (!missionHooks.write || !window.missionId) return;
         const participantId = row.getAttribute('data-participant-id');
@@ -589,6 +625,11 @@ function initMissionDetailTabs3() {
         }
     }
 
+    /**
+     * @param {number} x the client x
+     * @param {number} y the client y
+     * @returns {Element | null} the drop zone under the point
+     */
     function zoneAt(x, y) {
         const el = document.elementFromPoint(x, y);
         if (!el || typeof el.closest !== 'function') return null;
@@ -596,6 +637,7 @@ function initMissionDetailTabs3() {
         return zone && board.contains(zone) ? zone : null;
     }
 
+    /** @param {Element | null} zone the zone under the touch, or null */
     function setTouchZone(zone) {
         if (touchZone === zone) return;
         if (touchZone) touchZone.classList.remove('is-over');

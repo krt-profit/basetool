@@ -19,44 +19,22 @@
 
 /**
  * The type-check ratchet (REQ-FE-018, ADR-0125): every script under static/js, subfolders included,
- * belongs to exactly one domain of typecheck-ratchet.json, every domain is migrated, and a migrated
- * domain holds only files that opt into the type check. The set of migrated domains and the number
- * of checked files may only grow.
+ * belongs to exactly one domain of typecheck-ratchet.json and lives in that domain's folder, no
+ * script suppresses the type check, and tsconfig.json keeps every script checked with the strict
+ * options on.
  */
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/** The migrated domains that may never leave the manifest's "migrated" list. */
-export const MIGRATED_FLOOR = [
-    'audit',
-    'bank',
-    'blueprint',
-    'catalogue',
-    'dashboard',
-    'exchange',
-    'hangar',
-    'identity',
-    'inventory',
-    'joborder',
-    'kernel',
-    'leadership',
-    'materialexchange',
-    'mission',
-    'notification',
-    'operation',
-    'orgchart',
-    'orgunit',
-    'personalinventory',
-    'promotion',
-    'refinery',
-    'settings',
-    'shell',
-];
-
-/** The number of scripts carrying the `// @ts-check` pragma that may never fall. */
-export const CHECKED_FILES_FLOOR = 149;
+/** The compiler options that must stay on, with the value each must hold. */
+export const REQUIRED_OPTIONS = {
+    strict: true,
+    checkJs: true,
+    noImplicitAny: true,
+    useUnknownInCatchVariables: true,
+};
 
 const ALLOWED_EXCLUDES = ['src/main/resources/static/js/vendor/**', 'node_modules', 'build'];
 const EXCLUDED_DIRECTORIES = ['vendor/', 'node_modules/'];
@@ -64,50 +42,15 @@ const SUPPRESSION = /@ts-(?:nocheck|ignore|expect-error)\b/;
 const DOMAIN_NAME = /^[a-z][a-z0-9-]*$/;
 
 /**
- * Tells whether a script opts into the type check: a `// @ts-check` line in its leading comments.
- *
- * @param {string} source the script's text
- * @returns {boolean} true when the pragma precedes the first statement
- */
-export function isChecked(source) {
-    let pos = 0;
-    for (;;) {
-        while (pos < source.length && /\s/.test(source[pos])) {
-            pos += 1;
-        }
-        if (source.startsWith('//', pos)) {
-            let end = source.indexOf('\n', pos);
-            if (end === -1) {
-                end = source.length;
-            }
-            if (source.slice(pos, end).trim() === '// @ts-check') {
-                return true;
-            }
-            pos = end;
-        } else if (source.startsWith('/*', pos)) {
-            const end = source.indexOf('*/', pos + 2);
-            if (end === -1) {
-                return false;
-            }
-            pos = end + 2;
-        } else {
-            return false;
-        }
-    }
-}
-
-/**
  * Evaluates the ratchet over a set of scripts.
  *
  * @param {object} input the tree to judge
  * @param {Map<string, string>} input.scripts script file name to its text, vendor excluded
- * @param {{domains: Record<string, string[]>, migrated: string[]}} input.manifest typecheck-ratchet.json
- * @param {{compilerOptions?: {strict?: boolean, checkJs?: boolean}, include?: string[], exclude?: string[]}} input.tsconfig tsconfig.json
- * @param {string[]} input.migratedFloor the migrated domains that must stay migrated
- * @param {number} input.checkedFloor the least number of checked scripts
+ * @param {{domains: Record<string, string[]>}} input.manifest typecheck-ratchet.json
+ * @param {{compilerOptions?: Record<string, boolean>, include?: string[], exclude?: string[]}} input.tsconfig tsconfig.json
  * @returns {string[]} one message per violation, empty when the ratchet holds
  */
-export function evaluate({ scripts, manifest, tsconfig, migratedFloor, checkedFloor }) {
+export function evaluate({ scripts, manifest, tsconfig }) {
     const violations = [];
     const owner = new Map();
 
@@ -125,46 +68,9 @@ export function evaluate({ scripts, manifest, tsconfig, migratedFloor, checkedFl
             }
         }
     }
-    for (const file of scripts.keys()) {
+    for (const [file, source] of scripts) {
         if (!owner.has(file)) {
             violations.push(`${file} belongs to no domain of typecheck-ratchet.json`);
-        }
-    }
-
-    const migrated = new Set(manifest.migrated);
-    if (migrated.size !== manifest.migrated.length) {
-        violations.push('"migrated" lists a domain twice');
-    }
-    for (const domain of migrated) {
-        if (!(domain in manifest.domains)) {
-            violations.push(`"migrated" names ${domain}, which is not a domain`);
-        }
-    }
-    for (const domain of migratedFloor) {
-        if (!migrated.has(domain)) {
-            violations.push(`${domain} was migrated and left the "migrated" list`);
-        }
-    }
-    for (const domain of Object.keys(manifest.domains)) {
-        if (!migrated.has(domain)) {
-            violations.push(`${domain} is a domain but is not migrated; every domain must be`);
-        }
-    }
-    for (const domain of migrated) {
-        for (const file of manifest.domains[domain] ?? []) {
-            const source = scripts.get(file);
-            if (source !== undefined && !isChecked(source)) {
-                violations.push(
-                    `${file} is in the migrated domain ${domain} but has no // @ts-check`,
-                );
-            }
-        }
-    }
-
-    let checked = 0;
-    for (const [file, source] of scripts) {
-        if (isChecked(source)) {
-            checked += 1;
         }
         if (SUPPRESSION.test(source)) {
             violations.push(
@@ -172,18 +78,12 @@ export function evaluate({ scripts, manifest, tsconfig, migratedFloor, checkedFl
             );
         }
     }
-    if (checked < checkedFloor) {
-        violations.push(
-            `${checked} scripts are type-checked, fewer than the floor of ${checkedFloor}`,
-        );
-    }
 
     const options = tsconfig.compilerOptions ?? {};
-    if (options.strict !== true) {
-        violations.push('tsconfig.json must keep "strict": true');
-    }
-    if (options.checkJs === undefined) {
-        violations.push('tsconfig.json must state "checkJs"');
+    for (const [option, required] of Object.entries(REQUIRED_OPTIONS)) {
+        if (options[option] !== required) {
+            violations.push(`tsconfig.json must keep "${option}": ${required}`);
+        }
     }
     for (const entry of tsconfig.exclude ?? []) {
         if (!ALLOWED_EXCLUDES.includes(entry)) {
@@ -244,10 +144,7 @@ export function loadTree(root) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const root = fileURLToPath(new URL('..', import.meta.url));
     const tree = loadTree(root);
-    const violations = [
-        ...evaluate({ ...tree, migratedFloor: MIGRATED_FLOOR, checkedFloor: CHECKED_FILES_FLOOR }),
-        ...layoutViolations(tree.manifest),
-    ];
+    const violations = [...evaluate(tree), ...layoutViolations(tree.manifest)];
     for (const violation of violations) {
         console.error(`type-check ratchet: ${violation}`);
     }

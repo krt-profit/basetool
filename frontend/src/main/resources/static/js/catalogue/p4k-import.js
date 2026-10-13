@@ -1,9 +1,10 @@
-// @ts-check
-
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
+
+/** @typedef {ApiDto<'P4kImportJobDto'>} P4kJob */
+/** @typedef {ApiDto<'P4kImportResultDto'>} P4kResult */
 
 /** @type {HTMLInputElement | null} */
 let fileInput = null;
@@ -26,6 +27,7 @@ let seedEl = null;
 /** @type {HTMLButtonElement | null} */
 let applyConfirmBtn = null;
 
+/** @type {P4kJob[]} */
 let lastJobs = [];
 /** @type {string | null} */
 let applyTargetId = null;
@@ -34,6 +36,12 @@ let pollTimer = null;
 
 let gated = false;
 
+/**
+ * Looks up an element by id.
+ *
+ * @param {string} id the element id
+ * @returns {HTMLElement | null} the element, or null
+ */
 function $(id) {
     return document.getElementById(id);
 }
@@ -80,6 +88,11 @@ function toastError() {
     showFrontendErrorToast(krtI18nText(i18n().error, 'krtP4kImportI18n.error'));
 }
 
+/**
+ * Shows a success toast.
+ *
+ * @param {string} msg the message
+ */
 function toastOk(msg) {
     showFrontendSuccessToast(msg);
 }
@@ -139,7 +152,7 @@ function resetFile() {
  *
  * @param {KrtWriteResult} result the krtFetch outcome
  * @param {boolean} reported whether an onError / onNetworkError hook already surfaced the failure
- * @returns {any} the job DTO, or null when the answer is not job data
+ * @returns {P4kJob | null} the job DTO, or null when the answer is not job data
  */
 function jobFromWrite(result, reported) {
     if (result.ok && result.body && typeof result.body === 'object') {
@@ -207,10 +220,21 @@ function loadJobs() {
         .catch(() => {});
 }
 
+/**
+ * Tells whether a job is still queued or running.
+ *
+ * @param {P4kJob | null | undefined} job the job
+ * @returns {boolean} true while the job is pending or running
+ */
 function isActive(job) {
     return !!job && (job.status === 'PENDING' || job.status === 'RUNNING');
 }
 
+/**
+ * Arms the poll while any job is active and disarms it otherwise.
+ *
+ * @param {P4kJob[]} jobs the current jobs
+ */
 function pollControl(jobs) {
     const anyActive = jobs.some(isActive);
     if (anyActive && !pollTimer) {
@@ -233,7 +257,7 @@ function stopPolling() {
 /**
  * Maps a job status onto the chip modifier that colours it.
  *
- * @param {any} job the job as the proxy returns it
+ * @param {P4kJob} job the job as the proxy returns it
  * @returns {string} the chip modifier class
  */
 function statusChip(job) {
@@ -249,6 +273,11 @@ function statusChip(job) {
     }
 }
 
+/**
+ * Renders the job table rows.
+ *
+ * @param {P4kJob[]} jobs the jobs to show
+ */
 function renderJobs(jobs) {
     if (!jobsBody) return;
     if (jobsEmptyEl) jobsEmptyEl.hidden = jobs.length > 0;
@@ -289,12 +318,24 @@ function renderJobs(jobs) {
     krtHtml.set(jobsBody, html);
 }
 
+/**
+ * Localised label of the job kind.
+ *
+ * @param {P4kJob} job the job
+ * @returns {string} the label
+ */
 function kindLabel(job) {
     return job.kind === 'APPLY'
         ? krtI18nText(i18n().kindApply, 'krtP4kImportI18n.kindApply')
         : krtI18nText(i18n().kindPreview, 'krtP4kImportI18n.kindPreview');
 }
 
+/**
+ * Localised label of the job status.
+ *
+ * @param {P4kJob} job the job
+ * @returns {string} the label
+ */
 function statusLabel(job) {
     switch (job.status) {
         case 'PENDING':
@@ -310,12 +351,24 @@ function statusLabel(job) {
     }
 }
 
+/**
+ * Formats an ISO timestamp in the browser locale.
+ *
+ * @param {string | undefined} iso the timestamp
+ * @returns {string} the formatted time, the input when unparseable, or an empty string
+ */
 function fmtTime(iso) {
     if (!iso) return '';
     const d = new Date(iso);
     return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
 }
 
+/**
+ * Sums the created counts of all result blocks.
+ *
+ * @param {P4kResult | undefined} result the import result
+ * @returns {number} the total number of created rows
+ */
 function createdTotal(result) {
     if (!result) return 0;
     const blocks = [
@@ -332,6 +385,12 @@ function createdTotal(result) {
     return sum;
 }
 
+/**
+ * Summary column text of a job.
+ *
+ * @param {P4kJob} job the job
+ * @returns {string} the summary
+ */
 function summaryText(job) {
     if (job.status === 'FAILED')
         return (
@@ -345,6 +404,12 @@ function summaryText(job) {
     return krtI18nText(i18n().summaryRunning, 'krtP4kImportI18n.summaryRunning');
 }
 
+/**
+ * Finds a loaded job by id.
+ *
+ * @param {string} id the job id
+ * @returns {P4kJob | null} the job, or null
+ */
 function findJob(id) {
     return (
         lastJobs.find((j) => {
@@ -353,9 +418,15 @@ function findJob(id) {
     );
 }
 
+/**
+ * Handles a click on a job row action button.
+ *
+ * @param {MouseEvent} e the click
+ */
 function onJobsClick(e) {
-    if (!e.target || !e.target.closest) return;
-    const btn = e.target.closest('[data-action]');
+    const target = /** @type {Element | null} */ (e.target);
+    if (!target || !target.closest) return;
+    const btn = target.closest('[data-action]');
     if (!btn) return;
     const id = btn.getAttribute('data-job-id');
     const action = btn.getAttribute('data-action');
@@ -364,6 +435,11 @@ function onJobsClick(e) {
     else if (action === 'apply') openApply(id);
 }
 
+/**
+ * Shows the result panel of a job.
+ *
+ * @param {string} id the job id
+ */
 function viewDetails(id) {
     const job = findJob(id);
     if (!job || !job.result) return;
@@ -378,6 +454,11 @@ function closeDetails() {
     if (resultsEl) resultsEl.hidden = true;
 }
 
+/**
+ * Renders an import result into the result panel.
+ *
+ * @param {P4kResult} result the import result
+ */
 function renderResult(result) {
     const modeEl = $('krt-p4k-mode');
     if (modeEl)
@@ -390,6 +471,7 @@ function renderResult(result) {
             ? krtI18nText(i18n().seedingOn, 'krtP4kImportI18n.seedingOn')
             : krtI18nText(i18n().seedingOff, 'krtP4kImportI18n.seedingOff');
 
+    /** @type {[string, ApiDto<'Counts'> | undefined][]} */
     const rows = [
         [
             krtI18nText(i18n().rowManufacturers, 'krtP4kImportI18n.rowManufacturers'),
@@ -433,6 +515,11 @@ function renderResult(result) {
     }
 }
 
+/**
+ * Opens the apply confirmation panel for a preview job.
+ *
+ * @param {string} id the job id
+ */
 function openApply(id) {
     const job = findJob(id);
     if (!job) return;

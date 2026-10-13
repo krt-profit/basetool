@@ -1,5 +1,3 @@
-// @ts-check
-
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtCsrf, krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
@@ -22,6 +20,11 @@ if (form && resultsContainer) {
         return `/admin/audit-log${query ? `?${query}` : ''}`;
     };
 
+    /**
+     * Swaps the results container for the given list URL, or for the current filter's URL.
+     *
+     * @param {string | null} [url] the list URL; the filter form's URL when omitted or empty
+     */
     const loadResults = function (url) {
         krtFetch.swap({
             url: url || buildUrl(),
@@ -138,7 +141,13 @@ if (eventSelect && activeDomain && form && resultsContainer) {
     }
 }
 
+/**
+ * Builds the request headers, with the CSRF header when one is available.
+ *
+ * @returns {Record<string, string>} the header map
+ */
 const csrfHeaders = function () {
+    /** @type {Record<string, string>} */
     const base = { Accept: 'application/json' };
     try {
         return krtCsrf.headers(base);
@@ -146,6 +155,14 @@ const csrfHeaders = function () {
     return base;
 };
 
+/**
+ * Downloads a report through `krtFetch` and offers it as a file, or calls `onError` when the
+ * request fails.
+ *
+ * @param {string} url the report URL
+ * @param {string} filename the file name offered to the user
+ * @param {() => void} onError runs when the download failed
+ */
 const downloadBlob = async function (url, filename, onError) {
     const headers = csrfHeaders();
     delete headers['Content-Type'];
@@ -175,12 +192,24 @@ const downloadBlob = async function (url, filename, onError) {
     URL.revokeObjectURL(objectUrl);
 };
 
+/**
+ * Empties every field-error slot of the download form.
+ *
+ * @param {HTMLFormElement} frm the download form
+ */
 const clearErrors = function (frm) {
     frm.querySelectorAll('.bank-field-error').forEach((el) => {
         el.textContent = '';
     });
 };
 
+/**
+ * Writes a message into the form's error slot for `field`, falling back to the global slot.
+ *
+ * @param {HTMLFormElement} frm the download form
+ * @param {string} field the field name, or `_global`
+ * @param {string} message the already-localized message
+ */
 const showError = function (frm, field, message) {
     const slot =
         frm.querySelector(`.bank-field-error[data-error-for="${field}"]`) ||

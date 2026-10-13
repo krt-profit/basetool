@@ -1,4 +1,3 @@
-// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -45,6 +44,11 @@ function readSaved() {
     }
 }
 
+/**
+ * Stores the grants page's last view and selection.
+ *
+ * @param {{ view: string, accountId: string | null, userId: string | null }} state the selection
+ */
 function writeSaved(state) {
     try {
         localStorage.setItem(storageKey(), JSON.stringify(state));
@@ -140,6 +144,11 @@ function initBankGrantsChartPrefs() {
         }
     }
 
+    /**
+     * Stores the chart's last range.
+     *
+     * @param {string} range the range key
+     */
     function writeSaved(range) {
         try {
             localStorage.setItem(storageKey(), JSON.stringify({ range }));

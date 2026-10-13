@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 /* global ANNOUNCE_MSG, ANNOUNCE_CONFLICT */
 
 import { krtModal } from '/js/kernel/krt-modal.js';

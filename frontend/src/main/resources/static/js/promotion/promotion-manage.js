@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 /* global MSG_SAVED, MSG_ERROR, MSG_CONFLICT, MSG_LAST_EVAL, MSG_BULK_CONFIRM_TITLE, MSG_BULK_CONFIRM_MSG, MSG_BULK_NEED_CAT, MSG_BULK_NEED_LEVEL, MSG_CSV_NAME, MSG_CSV_HEADER_MEMBER, MSG_CSV_HEADER_RANK, MSG_CSV_HEADER_ELIG, MSG_CSV_HEADER_LAST, SORT_LABELS, STORAGE_KEY_COLLAPSED, STORAGE_KEY_SORT, STORAGE_KEY_FILTERS, MSG_REFRESH_FAILED */
 
 import {
@@ -31,7 +29,21 @@ import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
 import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
 
+/**
+ * @typedef {object} PmSaveJob
+ * @property {string} key the user and category the save belongs to
+ * @property {HTMLSelectElement} select the level select to save
+ */
+
+/**
+ * Writes one evaluation; a conflict clears the queue and re-pulls the matrix.
+ *
+ * @param {string} url the proxy endpoint
+ * @param {unknown} payload the JSON payload
+ * @returns {Promise<any>} the response body, null when the write failed
+ */
 function pmPutEvaluation(url, payload) {
+    /** @param {string} message the toast text */
     function toastError(message) {
         showFrontendErrorToast(message);
     }
@@ -62,6 +74,7 @@ function pmPutEvaluation(url, payload) {
         });
 }
 
+/** @type {Set<string>} */
 const pmEligibilityDirty = new Set();
 
 function pmRefreshMatrix() {
@@ -73,6 +86,12 @@ function pmRefreshMatrix() {
     });
 }
 
+/**
+ * Re-renders the eligibility cell of one member row.
+ *
+ * @param {string} userId the member's user id
+ * @returns {Promise<boolean>} true when the cell was swapped
+ */
 function pmRefreshEligibility(userId) {
     const row = document.querySelector(`tr[data-pm-user-id="${userId}"]`);
     if (!row) return Promise.resolve(false);
@@ -104,7 +123,9 @@ function pmFlushEligibility() {
     });
 }
 
+/** @type {PmSaveJob[]} */
 let pmSaveQueue = [];
+/** @type {string | null} */
 let pmInFlightKey = null;
 
 function pmUpdateQueueIndicator() {
@@ -116,6 +137,11 @@ function pmUpdateQueueIndicator() {
     indicator.hidden = total === 0;
 }
 
+/**
+ * Queues a level save, replacing a queued one for the same user and category.
+ *
+ * @param {HTMLSelectElement} select the level select
+ */
 function pmEnqueueSave(select) {
     const userId = select.getAttribute('data-user-id');
     const catId = select.getAttribute('data-category-id');
@@ -136,13 +162,13 @@ function pmProcessNextSave() {
         pmFlushEligibility();
         return;
     }
-    const job = pmSaveQueue.shift();
+    const job = /** @type {PmSaveJob} */ (pmSaveQueue.shift());
     pmInFlightKey = job.key;
     pmUpdateQueueIndicator();
 
     const select = job.select;
-    const userId = select.getAttribute('data-user-id');
-    const categoryId = select.getAttribute('data-category-id');
+    const userId = /** @type {string} */ (select.getAttribute('data-user-id'));
+    const categoryId = /** @type {string} */ (select.getAttribute('data-category-id'));
     const versionStr = select.getAttribute('data-version');
     const version = versionStr ? parseInt(versionStr, 10) : null;
     const assignedLevel = select.value || null;
@@ -180,6 +206,11 @@ function pmProcessNextSave() {
         });
 }
 
+/**
+ * Reads the collapsed topic ids from local storage.
+ *
+ * @returns {string[]} the ids; empty when none are stored
+ */
 function pmLoadCollapsedTopics() {
     try {
         const raw = localStorage.getItem(STORAGE_KEY_COLLAPSED);
@@ -190,12 +221,23 @@ function pmLoadCollapsedTopics() {
         return [];
     }
 }
+/**
+ * Stores the collapsed topic ids in local storage; a storage failure is ignored.
+ *
+ * @param {Array<string | null>} ids the collapsed topic ids
+ */
 function pmSaveCollapsedTopics(ids) {
     try {
         localStorage.setItem(STORAGE_KEY_COLLAPSED, JSON.stringify(ids));
     } catch {}
 }
 
+/**
+ * Collapses or expands the columns of one topic.
+ *
+ * @param {string | null} topicId the topic id
+ * @param {boolean} collapsed true to collapse
+ */
 function pmSetTopicCollapsed(topicId, collapsed) {
     const topicHeader = document.querySelector(`th.pm-topic-cell[data-pm-topic-id="${topicId}"]`);
     if (!topicHeader) return;
@@ -211,6 +253,11 @@ function pmSetTopicCollapsed(topicId, collapsed) {
     });
 }
 
+/**
+ * Applies the collapsed state to every topic header.
+ *
+ * @param {Array<string | null>} collapsedIds the collapsed topic ids
+ */
 function pmApplyCollapsedState(collapsedIds) {
     const topicHeaders = document.querySelectorAll('th.pm-topic-cell[data-pm-topic-id]');
     topicHeaders.forEach((th) => {
@@ -219,6 +266,11 @@ function pmApplyCollapsedState(collapsedIds) {
     });
 }
 
+/**
+ * Toggles one topic between collapsed and expanded and stores the state.
+ *
+ * @param {HTMLElement} button the topic toggle button
+ */
 function pmToggleTopic(button) {
     const topicId = button.getAttribute('data-pm-topic-id');
     if (!topicId) return;
@@ -241,6 +293,7 @@ function pmExpandAllTopics() {
     });
 }
 function pmCollapseAllTopics() {
+    /** @type {Array<string | null>} */
     const ids = [];
     document.querySelectorAll('th.pm-topic-cell[data-pm-topic-id]').forEach((th) => {
         const id = th.getAttribute('data-pm-topic-id');
@@ -317,6 +370,11 @@ function pmGetSortMode() {
     const btn = document.querySelector('.pm-sort-toggle');
     return btn ? parseInt(btn.getAttribute('data-pm-sort-mode') || '0', 10) : 0;
 }
+/**
+ * Shows and stores the sort mode.
+ *
+ * @param {number} mode the sort mode, an index into the sort labels
+ */
 function pmSetSortMode(mode) {
     const btn = document.querySelector('.pm-sort-toggle');
     if (btn) btn.setAttribute('data-pm-sort-mode', String(mode));
@@ -336,6 +394,11 @@ function pmRestoreSortMode() {
         return 0;
     }
 }
+/**
+ * Reorders the member rows for a sort mode.
+ *
+ * @param {number} mode the sort mode
+ */
 function pmApplySort(mode) {
     const tbody = document.querySelector('.pm-matrix tbody');
     if (!tbody) return;
@@ -403,20 +466,30 @@ function pmRefreshBulkPanel() {
         selectAll.indeterminate = !allChecked && count > 0;
     }
 }
+/**
+ * Mirrors a row checkbox onto its row's selected state.
+ *
+ * @param {HTMLElement} checkbox the row checkbox
+ */
 function pmOnRowCheck(checkbox) {
     const row = checkbox.closest('tr');
     if (!row) return;
-    row.classList.toggle('pm-row-selected', checkbox.checked);
+    row.classList.toggle('pm-row-selected', /** @type {HTMLInputElement} */ (checkbox).checked);
     pmRefreshBulkPanel();
 }
+/**
+ * Selects or deselects every visible member row.
+ *
+ * @param {HTMLElement} checkbox the select-all checkbox
+ */
 function pmOnSelectAll(checkbox) {
     const visible = document.querySelectorAll(
         '.pm-matrix tbody tr[data-pm-username]:not(.pm-row-hidden)',
     );
     visible.forEach((row) => {
-        row.classList.toggle('pm-row-selected', checkbox.checked);
+        row.classList.toggle('pm-row-selected', /** @type {HTMLInputElement} */ (checkbox).checked);
         const cb = /** @type {HTMLInputElement | null} */ (row.querySelector('.pm-row-checkbox'));
-        if (cb) cb.checked = checkbox.checked;
+        if (cb) cb.checked = /** @type {HTMLInputElement} */ (checkbox).checked;
     });
     pmRefreshBulkPanel();
 }
@@ -494,6 +567,11 @@ function pmFormatLastEvaluated() {
         node.setAttribute('title', `${MSG_LAST_EVAL}: ${d.toLocaleString()}`);
     });
 }
+/**
+ * Stamps a member row as evaluated just now.
+ *
+ * @param {string | null} userId the member's user id
+ */
 function pmRefreshLastEvaluatedFor(userId) {
     const row = document.querySelector(`tr[data-pm-user-id="${userId}"]`);
     if (!row) return;
@@ -507,6 +585,12 @@ function pmRefreshLastEvaluatedFor(userId) {
     row.setAttribute('data-pm-has-evaluations', 'true');
 }
 
+/**
+ * Quotes and neutralises a value for a CSV cell.
+ *
+ * @param {unknown} value the cell value
+ * @returns {string} the escaped cell
+ */
 function pmCsvEscape(value) {
     if (value === null || value === undefined) return '';
     let s = String(value);
@@ -521,6 +605,12 @@ function pmCsvEscape(value) {
     }
     return s;
 }
+/**
+ * Maps a level constant to its short label.
+ *
+ * @param {string} value the level constant
+ * @returns {string} the label; empty for no level
+ */
 function pmLevelLabel(value) {
     if (!value) return '';
     if (value === 'LEVEL_A') return 'A';
@@ -538,6 +628,7 @@ function pmExportCsv() {
         MSG_CSV_HEADER_ELIG,
         MSG_CSV_HEADER_LAST,
     ];
+    /** @type {Array<string | null>} */
     const catIds = [];
     catHeaders.forEach((th) => {
         const topicName = th.getAttribute('data-pm-topic-name') || '';
@@ -608,7 +699,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (search) search.addEventListener('input', pmApplyFilters);
 
     krtEvents.on('change', 'pm-save-evaluation', (el) => {
-        pmEnqueueSave(el);
+        pmEnqueueSave(/** @type {HTMLSelectElement} */ (el));
         pmRefreshLastEvaluatedFor(el.getAttribute('data-user-id'));
     });
     krtEvents.on('click', 'pm-toggle-topic', pmToggleTopic);

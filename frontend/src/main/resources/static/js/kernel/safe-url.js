@@ -1,5 +1,3 @@
-// @ts-check
-
 /** Whitespace, which a URL parser drops (tab, line feed) or encodes: `/<tab>/host` would resolve as `//host`. */
 const WHITESPACE = /\s/;
 

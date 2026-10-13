@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// @ts-check
-
 /* global MSG_STOLEN, MSG_QUALITY, MSG_INVENTORY_BELOW_FLOOR, MSG_PRODUCTION_COUNTED_HIGHER, PRODUCTION_I18N */
 
 import { krtOrderWrite } from '/js/joborder/orders-detail-edit.js';
@@ -232,6 +230,18 @@ document.addEventListener('krt:swapped', (ev) => {
  * @property {number} stock the entry's total amount
  * @property {number} version the entry's version
  * @property {boolean} [belowFloor] whether the quality is below the material's floor
+ */
+
+/**
+ * @typedef {object} OdProdInventoryItem
+ * @property {string} id the inventory entry
+ * @property {number} [amount] the entry's total amount
+ * @property {number | null} [quality] the entry's quality
+ * @property {boolean} [stolen] whether the entry is stolen stock
+ * @property {number} version the entry's version
+ * @property {{ effectiveName: string } | null} [user] the entry's owner
+ * @property {{ name: string } | null} [location] the entry's location
+ * @property {{ jobOrderId?: string, amount?: number | null }[]} [jobOrderAllocations] the earmarks
  */
 
 /**
@@ -452,6 +462,7 @@ export function openProductionModal(button) {
             _prodLoadHigherAttribution(orderId, mat),
         ])
             .then((results) => {
+                /** @type {OdProdInventoryItem[] | null} */
                 const items = results[0];
                 mat.countedHigher = results[1];
                 mat.entries = (items || [])

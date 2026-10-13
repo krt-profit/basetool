@@ -1,4 +1,3 @@
-// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -133,11 +132,21 @@ export function showKrtConfirm(title, message, confirmLabel, cancelLabel) {
         btnOk.className = 'btn btn-danger krt-confirm-ok';
         btnOk.textContent = confirmLabel || window.krtToastI18n.confirm;
 
+        /**
+         * Removes the dialog and settles the promise.
+         *
+         * @param {boolean} result the answer to resolve with
+         */
         function close(result) {
             document.removeEventListener('keydown', onKey, true);
             overlay.remove();
             resolve(result);
         }
+        /**
+         * Escape cancels, Enter confirms.
+         *
+         * @param {KeyboardEvent} e the key event
+         */
         function onKey(e) {
             if (e.key === 'Escape') {
                 e.preventDefault();

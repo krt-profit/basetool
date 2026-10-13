@@ -1,4 +1,3 @@
-// @ts-check
 /** Focus to restore on close, per dialog. */
 /** @type {WeakMap<HTMLElement, Element | null>} */
 const returnFocus = new WeakMap();
