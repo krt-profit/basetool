@@ -11,9 +11,9 @@
 > **Not done, and why:** P5-c (`backend-exchange`) and P5-d (`backend-bank`) are not implemented, by
 > decision of the owner on 2026-10-12 (§5.8: an extraction that compiles against the whole `backend`
 > gives no compile-time isolation); P3-11, the per-command audit contract, is struck (it was never
-> defined); the REST API cut (§7.9) waits for the owner's release decision and an app release; of the
-> Phase −1 defects (§9), C-03 is the owner's repository setting and the two items of §9.4 are open
-> investigations. Every step that only the owner can take is tracked in
+> defined); the REST API cut (§7.9) waits for the owner's release decision and an app release. The
+> Phase −1 defects are all closed: C-03 is done (§9.3) and both items of §9.4 are investigated and
+> closed (observed 2026-10-13, see §9.4). Every step that only the owner can take is tracked in
 > [`OWNER_STEPS_2026-10.md`](OWNER_STEPS_2026-10.md).
 > **Status:** every step of the plan that was in scope is done and ticked in the checklist of §7.6
 > (kept as the end state): Phase −1 (2026-10-01), Phase 0 (2026-10-03), the move of every domain class
@@ -3146,8 +3146,8 @@ before a decision.
   - `Q` The REST API cut (§7.9, waves on `claude/api-cut` and `claude/api-cut-w1` … `w6`, the
     forced app update, T0/T1 breaks) and with it "identity's REST surface sheds the six domains" (wave 2):
     these are path changes that need the owner's release decision and an app release.
-  - Phase −1 defects (§9): S-07 is done (#2299, verified in the code); C-03 is the owner's repository
-    setting; the two items of §9.4 are open investigations without a code change.
+  - Phase −1 defects (§9): S-07 is done (#2299, verified in the code); C-03 is done (§9.3); the two
+    items of §9.4 were investigated and closed on 2026-10-13, without a code change.
 
 ### 7.7 Phase 5 — Gradle modules for exchange and bank
 
@@ -3578,7 +3578,8 @@ configuration-cache entries (it never does today, because `setup-gradle` gets no
 
 ## 9 Defects found along the way — fixed first, in separate pull requests
 
-**Status:** fixed by PRs #2299–#2312, merged 2026-10-01 (§7.1); C-03 is left to the owner.
+**Status:** fixed by PRs #2299–#2312, merged 2026-10-01 (§7.1); C-03 is done too (§9.3, *corrected
+2026-10-13: this line still said it was left to the owner*).
 
 Every item below survived the adversarial round; the severity is the verified one, often lower
 than the first finding claimed. None allows another member's data to be read or changed; several
@@ -3622,12 +3623,40 @@ They are fixed before the refactor starts (D-07), independently of this plan.
 | C-03 | The repo-lint jobs `Self-tests` and `Container checks` (Prometheus rule unit tests, monitoring configuration checks, deploy-seam self-tests) are not required status checks | Low–medium | Add both to the ruleset — a repository-settings write by the owner; **done** (both required on `main`, checked 2026-10-04) |
 | C-04 | The only crash-loop alert has no absence guard for its Podman series | Low | An `absent()` rule or a conformance entry |
 
-### 9.4 To investigate
+### 9.4 To investigate — both closed 2026-10-13
 
-- The mass-change confirmation page echoes `stagedAt` and the change set from the browser without an
-  integrity check, so the expiry and revoked-since-staging checks trust a member-supplied time. Only
-  the member's own data under a capability the client holds is affected; a provenance question.
-- Whether the frontend session enforcement is really on in production (documented, not observed).
+- **The mass-change confirmation and its `stagedAt` — investigated from the code, no change.** The
+  premise (the page echoes `stagedAt` and the change set from the browser) does not hold. The
+  browser sends only a handoff id: `ConnectedAppsConfirmRelayController.HandoffRef` has the one
+  component `handoffId` (:239), and `load` (:87-115) takes the change set and `stagedAt` from the
+  gateway's staged entry, which `IngestHandoffService.consume` reads with an atomic `GETDEL` of
+  `ingest:handoff:<sub>:<id>` (:89), scoped to the session user's subject; the id is 160 bits of
+  `SecureRandom` (`HandoffStagingService.store`, :165-167), and the gateway sets `stagedAt` itself
+  from its own clock (`ExchangeController.staged`, :660). The consumed request then waits in the
+  member's server-side session (`keep`, :159-173) and `apply` (:126-136) takes it from there, so
+  the browser cannot alter the batch, its client or its time; every kept entry is re-checked
+  against the 30-minute lifetime on the way out (`live`, :199-209). The test
+  `ConnectedAppsConfirmControllerMvcTest.aBrowserSuppliedChangeSetOrStagingTimeIsNeverBelieved`
+  (:183) sends a hostile body with a changed client, resource, change set and a `stagedAt` an hour
+  ahead, and the backend still receives the staged values. The backend's DTO comment "as the member's
+  browser session hands it back" (`ConnectedAppMassChangeRequestDto`, :29-31) means the frontend
+  server, which is how the audit misread it. The backend trusts the request's `stagedAt` and
+  `clientId` (`ExchangeMassChangeService.admit`, :154-198), but only a bearer issued to the
+  configured web client reaches the endpoint (`ConnectedAppsGate.isMemberSession`, :46-54, on
+  `ConnectedAppsController`, :59); the member's browser never holds that token, and the member
+  whose data is written is read from the token, not from the request (`member`, :226-229). Were the
+  time forged by the one party that could (the frontend server), the gain would be a batch
+  confirmed past its 30 minutes or a suspension or client revocation older than the forged time not noticed (an
+  installation's disconnection is checked without `stagedAt`, :189-193), on that member's own data
+  and for a client capability they granted; the same changes are open to the member in the web
+  forms. Nothing is bound to an integrity tag because nothing crosses the browser. REQ-XCH-021
+  already states the property.
+- **Whether the frontend session enforcement is on in production — observed, closed.** On
+  2026-10-13 the production frontend container's environment was read read-only
+  (`podman inspect frontend`, filtered on the host to that one value): `APP_SESSION_TYPE_ALLOW_LIST`
+  is `enforce`; the code default in `RedisSessionConfig` (:90) and `application.yml` (:103) is
+  `enforce` too. Observed at the configuration level; the live gauge
+  `basetool_session_type_allow_list_mode` was not read (Prometheus needs credentials).
 
 ## 10 Frameworks and tools evaluated
 
