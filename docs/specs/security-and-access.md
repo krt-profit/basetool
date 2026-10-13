@@ -5780,10 +5780,14 @@ dry run by default, with a rollback file, never deleting.
   broken or misplaced block is repaired, not duplicated; `--rollback` binds the built-in flow again,
   restores the windows and unbinds the post login flow, and deletes no flow
   (`harden-keycloak-realm.py --selftest`, run in CI by `keycloak-provisioner.yml`).
+- [x] The identity-provider update (bind and rollback of the post login flow) and the Configure OTP
+  update are sent in merge mode (`kcadm -m`), because Keycloak rebuilds both objects from the body
+  and refuses a body without `providerId` or `alias`; the realm updates stay plain partial bodies.
+  The self-test models that refusal (`harden-keycloak-realm.py --selftest`).
 - [x] The provisioner's session windows are the file's `active` profile
   (`harden-keycloak-realm.py --selftest`).
 - [ ] A login that comes in through Discord is gated: **not testable in the repository** (the test
-  realm has no Discord provider); the owner checks it at the production run
+  realm has no real Discord provider, only a disabled stand-in the bind is exercised on); the owner checks it at the production run
   ([`OWNER_STEPS_2026-10.md`](../OWNER_STEPS_2026-10.md) § 7).
 
 **Enforced by:** `scripts/harden-keycloak-realm.py --selftest`,

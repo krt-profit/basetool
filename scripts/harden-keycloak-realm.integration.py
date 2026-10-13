@@ -11,8 +11,9 @@ Starts the sandbox Keycloak image (published throwaway secrets, `start-dev`), ru
 script against it through `docker exec ... kcadm.sh`, and then logs in over HTTP like a browser:
 
   * step 11: an admin is forced to set an OTP device up and is asked for the code on the next
-    login, a member never is, a wrong code is refused, and the rollback gives the admin back a
-    plain password login;
+    login, a member never is, a wrong code is refused, the post login flow is bound onto a disabled
+    stand-in identity provider named `discord` (kept as an `oidc` provider) and unbound again, and
+    the rollback gives the admin back a plain password login;
   * step 12: the SSO session windows of the chosen profile are on the realm;
   * step 2: "Forgot password" mails a reset link through the realm's SMTP sender to a sink inside
     the container (a single-file Java program on its loopback).
@@ -224,6 +225,11 @@ def run(stack: Stack, sink: SmtpSink, workdir: Path) -> None:
     stack.create_user("probe-admin", admin_pw, "Admin")
     stack.create_user("probe-admin-rollback", admin_pw, "Admin")
     stack.create_user("probe-forgetful", admin_pw, None)
+    stack.kcadm("create", "identity-provider/instances", "-r", REALM, "-s", "alias=discord",
+                "-s", "providerId=oidc", "-s", "enabled=false", "-s", "config.clientId=sandbox",
+                "-s", "config.clientSecret=sandbox-not-a-secret",
+                "-s", "config.authorizationUrl=https://idp.invalid/authorize",
+                "-s", "config.tokenUrl=https://idp.invalid/token")
     realm_before = stack.get_json(f"realms/{REALM}")
     backup = workdir / "hardening.before.json"
     flags = ["--windows", "proposal", "--reset-password", "on", "--smtp-host", sink.HOST,
@@ -277,6 +283,11 @@ def run(stack: Stack, sink: SmtpSink, workdir: Path) -> None:
     stack.check(member.login(*MEMBER) == Outcome.CODE, "a member signs in with the password alone")
     stack.check(stack.browser().login("probe-admin-rollback", admin_pw) == Outcome.OTP_SETUP,
                 "a second admin is forced too")
+    idp = stack.get_json("identity-provider/instances/discord")
+    stack.check(idp.get("postBrokerLoginFlowAlias") == "post-broker-admin-otp",
+                "the identity provider runs the post-broker flow")
+    stack.check(idp.get("providerId") == "oidc" and idp.get("alias") == "discord",
+                "the bind left the identity provider's id and alias alone")
 
     print("step 2: forgot password")
     before = len(sink.messages())
@@ -310,6 +321,9 @@ def run(stack: Stack, sink: SmtpSink, workdir: Path) -> None:
                 "the session maximum is back")
     stack.check(stack.browser().login("probe-admin-rollback", admin_pw) == Outcome.CODE,
                 "an admin signs in with the password alone again")
+    idp = stack.get_json("identity-provider/instances/discord")
+    stack.check(not idp.get("postBrokerLoginFlowAlias") and idp.get("providerId") == "oidc",
+                "the rollback unbinds the post-broker flow and leaves the provider's id alone")
     flows = {flow["alias"] for flow in stack.get_json("authentication/flows")}
     stack.check("browser-admin-otp" in flows, "the flow the run created is left in place, unbound")
 
