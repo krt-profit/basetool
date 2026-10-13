@@ -14,6 +14,8 @@
 
 ### Fixed
 
+- **Keycloak-Härtung: das Binden des Post-Login-Flows an Discord scheiterte.** `scripts/harden-keycloak-realm.py` schickte den Identity-Provider-Update ohne `providerId` (`Invalid identity provider id [null]`); Bindung, Rücknahme und „Configure OTP aktivieren" laufen jetzt im Merge-Modus, der Selbsttest bildet die Server-Regel nach (REQ-SEC-082).
+
 - **Dialoge schließen sich nicht mehr beim Markieren per Ziehen.** Wer in einem Feld Text markiert und die Maustaste außerhalb des Dialogs loslässt, behält den Dialog offen (gilt für alle Dialoge, z. B. das Verkaufen im Lager).
 
 - **Lager: der Verkaufsbetrag ist beim Öffnen leer.** Das Feld wurde mit dem Wert des vorherigen Verkaufs vorbefüllt; es wird bei jedem Öffnen des Ausbuchen-Dialogs geleert.

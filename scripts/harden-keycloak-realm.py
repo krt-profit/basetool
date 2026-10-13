@@ -74,16 +74,19 @@ KcadmError = mobile.KcadmError
 class HardenKcadm(mobile.Kcadm):
     """The shared kcadm wrapper plus the two write shapes the flow endpoints need."""
 
-    def write(self, verb: str, path: str, payload: dict | list, what: str) -> None:
+    def write(self, verb: str, path: str, payload: dict | list, what: str, merge: bool = False) -> None:
         """Create or update `path`; names what is written and never prints the payload.
 
         The shared wrapper prints payloads under --dry-run, which would show the SMTP password this
-        script can be handed through the environment.
+        script can be handed through the environment. `merge` makes kcadm read the stored
+        representation and lay the payload over it (`-m`): required for endpoints that rebuild the
+        object from the body, such as the identity-provider and required-action updates, because
+        `-f` alone sends the payload as the whole body.
         """
         if self.dry_run:
             print(f"  [dry-run] {verb} {path} - {what}")
             return
-        self._run([verb, path, "-r", self.realm, "-f", "-"],
+        self._run([verb, path, "-r", self.realm, *(["-m"] if merge else []), "-f", "-"],
                   stdin=json.dumps(payload, indent=2, sort_keys=True))
         print(f"  {verb} {path} - {what}")
 
@@ -369,7 +372,7 @@ def ensure_required_action(kc: HardenKcadm) -> None:
         action = required_action(kc, TOTP_ACTION)
     if action is not None and not action.get("enabled"):
         kc.write("update", f"authentication/required-actions/{TOTP_ACTION}", {"enabled": True},
-                 f"enable {TOTP_ACTION}")
+                 f"enable {TOTP_ACTION}", merge=True)
 
 
 def plan_forgot_password(kc: HardenKcadm, args: argparse.Namespace) -> Plan:
@@ -523,7 +526,7 @@ def plan_admin_otp(kc: HardenKcadm, args: argparse.Namespace) -> Plan:
                 f"{idp.get('postBrokerLoginFlowAlias') or '<none>'} -> {POST_BROKER_FLOW}",
                 lambda: kc.write("update", idp_path,
                                  {"postBrokerLoginFlowAlias": POST_BROKER_FLOW},
-                                 "bind the post-login flow")))
+                                 "bind the post-login flow", merge=True)))
     plan.notes.append("Keep a second admin session open in another browser while this runs; "
                       "after the bind an admin account cannot authenticate to kcadm any more")
     return plan
@@ -602,7 +605,7 @@ def plan_rollback(kc: HardenKcadm, backup: dict, args: argparse.Namespace) -> li
                 f"{idp_backup['postBrokerLoginFlowAlias'] or '<none>'}",
                 lambda: kc.write("update", f"identity-provider/instances/{quote(idp_backup['alias'], safe='')}",
                                  {"postBrokerLoginFlowAlias": idp_backup["postBrokerLoginFlowAlias"] or ""},
-                                 "restore the post-login flow")))
+                                 "restore the post-login flow", merge=True)))
     plan.notes.append(f"The flows '{BROWSER_FLOW}' and '{POST_BROKER_FLOW}' are left in the realm, "
                       f"unbound; delete them in the console when they are no longer wanted")
     plan.notes.append("The SMTP sender is not restored (its password is masked in the file)")
@@ -676,7 +679,8 @@ class FakeKeycloak:
         self.flows: dict[str, list[dict]] = {"browser": []}
         self.configs: dict[str, dict] = {}
         self.required_actions: dict[str, dict] = {}
-        self.idp = {"alias": "discord", "postBrokerLoginFlowAlias": ""}
+        self.idp = {"alias": "discord", "providerId": "oidc", "enabled": True,
+                    "postBrokerLoginFlowAlias": ""}
         self.clients = [{"clientId": "basetool-android",
                          "attributes": {"client.session.max.lifespan": "15552000"}}]
         self.counter = 0
@@ -729,7 +733,7 @@ class FakeKcadm(HardenKcadm):
             return dict(fake.idp)
         raise KcadmError(f"stub: unexpected get {path}")
 
-    def write(self, verb: str, path: str, payload, what: str) -> None:
+    def write(self, verb: str, path: str, payload, what: str, merge: bool = False) -> None:
         path = unquote(path)
         if self.dry_run:
             print(f"  [dry-run] {verb} {path} - {what}")
@@ -739,6 +743,8 @@ class FakeKcadm(HardenKcadm):
         if verb == "update" and path == "realms/iri":
             fake.realm.update(payload)
         elif verb == "update" and path.startswith("identity-provider/instances/"):
+            if not merge and not payload.get("providerId"):
+                raise KcadmError(f"exit 1: Invalid identity provider id [{payload.get('providerId')}]")
             fake.idp.update(payload)
         elif verb == "create" and path == "authentication/flows/browser/copy":
             alias = payload["newName"]
@@ -751,6 +757,9 @@ class FakeKcadm(HardenKcadm):
             fake.required_actions[payload["providerId"]] = {
                 "alias": payload["providerId"], "enabled": True}
         elif verb == "update" and path.startswith("authentication/required-actions/"):
+            if not merge and not payload.get("alias"):
+                raise KcadmError("the update body names no alias; the server rebuilds the required "
+                                 "action from it and would blank its name and alias")
             fake.required_actions[path.rsplit("/", 1)[1]].update(payload)
         elif verb == "create" and path.endswith("/lower-priority"):
             execution_id = path.split("/")[2]
@@ -882,6 +891,46 @@ def selftest() -> int:
         if path.startswith("identity-provider/") else _orig(path, query)
     code = run(kc, arguments("--apply", "--step", "11"))
     check(code == 0 and POST_BROKER_FLOW not in fake.flows, "no post-broker flow is created without the provider")
+
+    print("the identity provider and the required action are updated in merge mode")
+    sent: list[list[str]] = []
+    recorder = HardenKcadm(["kcadm"], "iri", dry_run=False)
+    recorder._run = lambda argv, stdin=None: sent.append(argv) or ""
+    recorder.write("update", "identity-provider/instances/discord", {"x": 1}, "idp", merge=True)
+    recorder.write("update", "realms/iri", {"x": 1}, "realm")
+    check(sent[0] == ["update", "identity-provider/instances/discord", "-r", "iri", "-m", "-f", "-"],
+          "an identity-provider update sends -m before -f")
+    check(sent[1] == ["update", "realms/iri", "-r", "iri", "-f", "-"],
+          "a realm update stays a plain -f body")
+    fake = FakeKeycloak()
+    refused = False
+    try:
+        FakeKcadm(fake, dry_run=False).write(
+            "update", "identity-provider/instances/discord", {"postBrokerLoginFlowAlias": "x"}, "unmerged")
+    except KcadmError as error:
+        refused = "Invalid identity provider id [None]" in str(error)
+    check(refused, "the fake refuses an unmerged identity-provider body without providerId")
+
+    print("a bound Discord provider keeps its identity and is restored to its earlier flow")
+    fake = FakeKeycloak()
+    fake.idp["postBrokerLoginFlowAlias"] = "earlier-flow"
+    fake.required_actions[TOTP_ACTION] = {"alias": TOTP_ACTION, "name": "Configure OTP", "enabled": False}
+    backup_path = Path(tempfile.mkdtemp()) / "earlier.json"
+    code = run(FakeKcadm(fake, dry_run=True), arguments("--apply", "--step", "11"))
+    check(code == 0 and fake.idp["postBrokerLoginFlowAlias"] == POST_BROKER_FLOW,
+          "the bind replaces a flow that was bound before")
+    check(fake.idp["providerId"] == "oidc" and fake.idp["alias"] == "discord",
+          "the bind leaves the provider's id and alias alone")
+    check(fake.required_actions[TOTP_ACTION]["enabled"] is True
+          and fake.required_actions[TOTP_ACTION]["name"] == "Configure OTP",
+          "a disabled Configure OTP is enabled without losing its name")
+    writes_before = len(fake.writes)
+    code = run(FakeKcadm(fake, dry_run=True), arguments("--step", "11"))
+    check(code == 0 and len(fake.writes) == writes_before, "with the provider already bound nothing is planned")
+    code = run(FakeKcadm(fake, dry_run=True), arguments("--apply", "--rollback", str(backup_path)))
+    check(code == 0 and fake.idp["postBrokerLoginFlowAlias"] == "earlier-flow"
+          and fake.idp["providerId"] == "oidc",
+          "the rollback restores the earlier flow and leaves the provider's id alone")
 
     print(f"\n{'selftest FAILED: ' + str(len(failures)) + ' check(s)' if failures else 'selftest passed'}")
     return 1 if failures else 0

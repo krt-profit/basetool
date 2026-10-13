@@ -1,6 +1,6 @@
 > **Doc type:** Operator runbook, one page — **the owner runs every step; nothing here was or may be
 > executed by an agent.** Written 2026-10-10 (domain modularisation plan, D-26). **Living document:**
-> a step is struck from the table below when it is done, with the date. Last reviewed: 2026-10-11.
+> a step is struck from the table below when it is done, with the date. Last reviewed: 2026-10-13.
 
 # Owner steps, October 2026
 
@@ -17,13 +17,13 @@ linked; this page is the order, the approvals and the words to type.
 
 | # | Step | Where | Approval | Depends on |
 |---|------|-------|----------|------------|
-| 1 | [`release` environment, its secret, and the repository secret's deletion](#1-the-release-environment-ci-sec-16) | GitHub | owner (repository settings) | — |
+| ~~1~~ | ~~[`release` environment, its secret, and the repository secret's deletion](#1-the-release-environment-ci-sec-16)~~ **done 2026-10-13**, proven by a dispatched `refresh-versions.yml` run that minted the App token | GitHub | owner (repository settings) | — |
 | ~~2~~ | ~~[Deploy sudoers rule](#2-the-deploy-sudoers-rule-ops-sec-08)~~ **production done 2026-10-11**; testing is the owner's call | testing, then production host | testing: owner's call; production: per command | — |
 | ~~3~~ | ~~[Restore drill after the S-09 rollout](#3-the-restore-drill-s-09)~~ **done 2026-10-11** | production host | per command | 2 (the drill runs as `deploy`) |
-| 4 | [Keycloak: the session for steps 5–7](#4-keycloak-one-session-for-the-three-realm-steps) | production host | per command | — |
-| 5 | [Keycloak step 2: forgot password and the sender](#5-keycloak-step-2-forgot-password-and-the-realms-sender) | production realm | per command | 4 |
+| ~~4~~ | ~~[Keycloak: the session for steps 5–7](#4-keycloak-one-session-for-the-three-realm-steps)~~ **done 2026-10-13** (the truststore and login commands work on the post-#2036 keystore) | production host | per command | — |
+| ~~5~~ | ~~[Keycloak step 2: forgot password and the sender](#5-keycloak-step-2-forgot-password-and-the-realms-sender)~~ **done 2026-10-13**: the link stays on, the sender works (console test), nothing to apply | production realm | per command | 4 |
 | ~~6~~ | ~~[Keycloak step 12: session windows](#6-keycloak-step-12-session-windows)~~ **decided 2026-10-11: unchanged, nothing to apply** | production realm | per command, after a decision | 4 |
-| 7 | [Keycloak step 11: OTP for admins](#7-keycloak-step-11-otp-for-admins--last) | production realm | per command | 4, 5, 6 |
+| ~~7~~ | ~~[Keycloak step 11: OTP for admins](#7-keycloak-step-11-otp-for-admins--last)~~ **done 2026-10-13**: applied, the Discord bind finished by hand (see the note in step 7), the owner confirmed the logins | production realm | per command | 4, 5, 6 |
 | 8 | [Trusted Types: enforce](#8-trusted-types-enforce) | production host | per command | a quiet week |
 | ~~9~~ | ~~[Promote v1.14.0](#9-promote-v1140)~~ **done: v1.14.0 on 2026-10-10, v1.15.0 on 2026-10-11** | GitHub, production | the `production` environment's approval | 2 done or consciously not |
 
@@ -200,7 +200,8 @@ dry run first, with a rollback file. It was proven against a throwaway Keycloak 
 sandbox realm (`scripts/harden-keycloak-realm.integration.py`: the admin forced to set up OTP and
 asked for the code afterwards, a member never asked, the session windows on the realm, the
 forgot-password mail through a test SMTP sink, the rollback). **Not tested there, and checked by you
-at step 7:** a login that comes in through Discord, because the test realm has no Discord provider.
+at step 7:** a login that comes in through Discord, because the test realm has no real Discord
+provider (since 2026-10-13 the run binds the flow onto a disabled stand-in provider named `discord`).
 
 **The identity** is the short-lived `basetool-provisioner` of the runbook's § 0.3. For this script it
 needs `manage-realm` (settings, flows, required actions), `manage-identity-providers` (binding the
@@ -384,6 +385,22 @@ changes*. **Verify with real accounts — both paths, three places:**
 2. The same admin through **Discord** → the code (or the set-up page) is demanded. *This is the one
    path the repository's test cannot reach.*
 3. A non-admin member, both ways → no OTP.
+
+> [!note] Corrected 2026-10-13 - the bind of the post login flow needed a fix
+> Run against production, the script failed at its last write with `Invalid identity provider id
+> [null]`: kcadm sends the body of `-f` as it is, and Keycloak refuses an identity-provider update
+> without `providerId`. The script now sends `-m` (merge with the stored representation) for that
+> write, for its rollback and for enabling Configure OTP, and its self-test models the rule. No real
+> Keycloak has run the fixed write yet: the integration run now binds onto a stand-in provider, but
+> it has not been run since the change.
+> An operator who hit the failure copies the fixed script to the host and re-runs `--step 11 --apply`
+> (the flows are built; only the bind is missing), or does that one write by hand, and undoes it the
+> same way (the empty value is JSON, because a bare `=` is not guaranteed to send an empty string):
+>
+> ```bash
+> kc update identity-provider/instances/discord -r iri -s postBrokerLoginFlowAlias=post-broker-admin-otp
+> kc update identity-provider/instances/discord -r iri -s 'postBrokerLoginFlowAlias=""'
+> ```
 
 **Rollback** — needs no admin login, only the provisioner session:
 

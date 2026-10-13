@@ -968,6 +968,13 @@ below the app's usage gap means a member reopening the app after that long must 
 > the procedure. The console recipe below stays as the manual fallback and the explanation; read
 > its 11a/11b together with the three points above.
 
+> [!bug] Corrected 2026-10-13 - binding the post login flow with `kcadm`
+> `kcadm update identity-provider/instances/discord -f -` sends the file as the whole body, and
+> Keycloak answers `Invalid identity provider id [null]` when the body has no `providerId`. Use
+> `-s postBrokerLoginFlowAlias=...` (merges by default) or `-m` together with `-f`; the script does
+> the latter. The same holds for `authentication/required-actions/<alias>`, which rebuilds the
+> action from the body. The realm endpoint takes partial bodies, so the realm writes are unaffected.
+
 Two halves, and the incomplete version looks finished: the browser flow alone is half the gate,
 because an admin who signs in **through Discord** never traverses it. The realm's `discord` provider
 currently has `postBrokerLoginFlowAlias: null`.
