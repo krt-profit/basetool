@@ -300,6 +300,20 @@ the Boot-managed version, because `lombok.config` is a single shared file at the
 - **A Javadoc sits directly above the declaration it documents, in every source set.** `main` gets the full `google_checks.xml`; `test` and `e2e` run `config/checkstyle/javadoc_position.xml`, which holds only `InvalidJavadocPosition` ([ADR-0222](docs/adr/0222-every-source-set-fails-on-a-misplaced-javadoc.md)). An orphaned block, meaning a Javadoc directly above another Javadoc, fails `check`. It happens when code is inserted between a Javadoc and its member: move the block back onto the member it describes, delete it if that member is gone, and never merge the two.
 - **Code comments and Javadoc length** follow the HARD RULE below.
 
+## Agent skills
+
+### Issue tracker
+
+Issues live in the GitHub Issues of `krt-profit/basetool` (`gh` CLI); all issue prose is English. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Standard five-role vocabulary, with `needs-triage` mapped to the existing `triage` label. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context, mapped onto the existing docs: glossary = arc42 §12, decisions = `docs/adr/`, requirements = `docs/specs/`; there is no `CONTEXT.md`. See `docs/agents/domain.md`.
+
 ## Code comments (HARD RULE — no comments besides Javadoc)
 
 **The code carries no comments besides proper Javadoc, the Javadoc is short and precise, and no
