@@ -447,4 +447,4 @@ shell/sc-links.html html <html lang="de">
 shell/sc-links.html head-fixed 08d6bee55c3b4da6
 shell/sc-links.html head-own <title>Star-Citizen-Links - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/shell/sc-links.css">
 shell/sc-links.html body <body>
-shell/sc-links.html parts chrome:1e932c1674d72a5e x-content
+shell/sc-links.html parts chrome:1e932c1674d72a5e x-content x-tail
