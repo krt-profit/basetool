@@ -200,7 +200,8 @@ dry run first, with a rollback file. It was proven against a throwaway Keycloak 
 sandbox realm (`scripts/harden-keycloak-realm.integration.py`: the admin forced to set up OTP and
 asked for the code afterwards, a member never asked, the session windows on the realm, the
 forgot-password mail through a test SMTP sink, the rollback). **Not tested there, and checked by you
-at step 7:** a login that comes in through Discord, because the test realm has no Discord provider.
+at step 7:** a login that comes in through Discord, because the test realm has no real Discord
+provider (since 2026-10-13 the run binds the flow onto a disabled stand-in provider named `discord`).
 
 **The identity** is the short-lived `basetool-provisioner` of the runbook's § 0.3. For this script it
 needs `manage-realm` (settings, flows, required actions), `manage-identity-providers` (binding the
@@ -384,6 +385,22 @@ changes*. **Verify with real accounts — both paths, three places:**
 2. The same admin through **Discord** → the code (or the set-up page) is demanded. *This is the one
    path the repository's test cannot reach.*
 3. A non-admin member, both ways → no OTP.
+
+> [!note] Corrected 2026-10-13 - the bind of the post login flow needed a fix
+> Run against production, the script failed at its last write with `Invalid identity provider id
+> [null]`: kcadm sends the body of `-f` as it is, and Keycloak refuses an identity-provider update
+> without `providerId`. The script now sends `-m` (merge with the stored representation) for that
+> write, for its rollback and for enabling Configure OTP, and its self-test models the rule. No real
+> Keycloak has run the fixed write yet: the integration run now binds onto a stand-in provider, but
+> it has not been run since the change.
+> An operator who hit the failure copies the fixed script to the host and re-runs `--step 11 --apply`
+> (the flows are built; only the bind is missing), or does that one write by hand, and undoes it the
+> same way (the empty value is JSON, because a bare `=` is not guaranteed to send an empty string):
+>
+> ```bash
+> kc update identity-provider/instances/discord -r iri -s postBrokerLoginFlowAlias=post-broker-admin-otp
+> kc update identity-provider/instances/discord -r iri -s 'postBrokerLoginFlowAlias=""'
+> ```
 
 **Rollback** — needs no admin login, only the provisioner session:
 
