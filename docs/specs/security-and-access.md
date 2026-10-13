@@ -4420,6 +4420,13 @@ print it. A PDF of several thousand warehouse movements and audit rows serves th
 worse than a short document that says exactly what exists and points at the machine-readable file
 (decision by @greluc, 2026-09-15).
 
+**Presentation of the download.** Both files are named `Datenexport <account name> <yy-MM-dd>`
+(`.pdf` / `.json`): the account name is the subject's effective name, characters a filesystem
+refuses are replaced by `_` and the name is capped at 80 characters, and the date is the day of
+generation in `Europe/Berlin`. The backend sets the `Content-Disposition`; the frontend proxy
+relays it unchanged. The JSON is indented (two spaces, one member per line) so that a person can
+read it as it stands; it is the same document as the compact serialisation.
+
 > [!warning] Corrected 2026-09-17 — the PDF printed raw column names to the member
 > The four sections the document prints in full render one row per column as a FELD/WERT pair,
 > and the FELD cell was the projection's own alias. A member exercising their right of access
