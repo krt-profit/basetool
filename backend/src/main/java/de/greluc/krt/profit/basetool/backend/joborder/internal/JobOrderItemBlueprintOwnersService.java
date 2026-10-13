@@ -52,7 +52,7 @@ import org.springframework.transaction.annotation.Transactional;
  * responsible org unit own a blueprint for the requested items (or a cosmetic variant of them), and
  * which one each holds.
  *
- * <p>Items are matched by {@link BlueprintVariantFamilyResolver} key, per the order's {@code
+ * <p>Items are matched by {@code BlueprintVariantFamilyResolver} key, per the order's {@code
  * countBlueprintsWithVariants} toggle (REQ-ORDERS-021): variant family when on, exact name when
  * off. Owners are exposed only by display name.
  */

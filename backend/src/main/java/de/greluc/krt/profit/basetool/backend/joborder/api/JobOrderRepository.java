@@ -137,7 +137,7 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   /**
    * Scoped, unpaged list of the orders in the given statuses with both kinds' material requirement
    * branches, for the cross-order material-demand overview (REQ-ORDERS-034). Scope is applied in
-   * SQL via {@link ScopeSpecifications#JOB_ORDER_SCOPE_PREDICATE}, including the SK-public escape.
+   * SQL via {@link JobOrderScope#PREDICATE}, including the SK-public escape.
    *
    * <p>Unpaged because the result is aggregated into sums (ADR-0104); callers bound it by passing
    * only non-terminal statuses.
