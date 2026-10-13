@@ -882,6 +882,13 @@ the backend image.
   commits **19 / 19**, so production answers 17 / 17 until it is promoted and every app below 19 meets
   the update wall afterwards. Publish app 19 first; the floor, the retired answers and the new paths
   arrive in one deploy, and a rollback takes all three back.
+- **Before promoting the release that raises the floor to 20** (REQ-API-020, D-17): the release
+  commits **20 / 20**, so every app below 20 meets the update wall afterwards. Build 19 is walled
+  because it echoes one version for the payout preference and the blueprint sharing, which have their
+  own counters since `V283`. App 20 (v0.6.1) is published; it needs this release's backend, because
+  against an older backend all but the last written settings row answer `409`. Read the floor
+  production serves first (`curl -s https://api.profit-base.online/api/v1/app/version-policy`), and
+  note that a rollback to a release with the old floor lets build 19 in again.
 
 ---
 

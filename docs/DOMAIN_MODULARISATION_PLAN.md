@@ -3023,7 +3023,7 @@ C) retire the target until a module extraction gives it a natural place. Not dec
 4. *Proof.* `V283MemberSettingsMigrationTest` runs the data-transfer statements read from the migration file over members the old columns describe: the runbook's counts agree, nobody else gets a row, a second run changes nothing, and the rollback
    statements restore the old columns from the new tables. `MemberPayoutSettingsTest` and `MemberBlueprintSharingsTest` pin the absent row, the own version, the lock and the audit event. The GDPR gates (`GdprParticipantCoverageTest`,
    `UserAccountMergeCoverageTest`, `PersonalDataExportCatalogueTest`, `PersonMentionCatalogueTest`, `DataExportEndStateTest`, `TableOwnershipTest`) hold with the two new tables; the committed export catalogue, the mention catalogue and the end-state document
-   changed for them. Whether the Android app needs a release is for the owner to settle with the app repository.
+   changed for them. Whether the Android app needs a release was settled with the owner on 2026-10-13: it does. Build 19 echoes one version for the payout preference and the blueprint sharing and is refused on both writes; app v0.6.1 (ersionCode 20) echoes one version per settings row and is published, and the backend raises the served floor and latest build from 19 to 20 (pplication.yml, REQ-API-020), so builds up to 19 meet the update wall.
 
 **Umbrella steps 1 and 15 — the mutation target and the struck P3-11 — done 2026-10-12**
 1. *Step 1 (option B, chosen by the owner 2026-10-12).* `backend/build-settings.properties` aims PIT at the module internals and the published services, `backend.*.internal.*` and `backend.*.api.*Service`, with the tests of the same packages

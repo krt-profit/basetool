@@ -1357,7 +1357,7 @@ under-stated), `s=` the app's own call sites, which the server ignores. No comme
   before through `frozen-contract-types.txt`, which records every property reachable from a frozen
   operation;
 - **the newest list is not emptied** — a floor on its call count (244 since the app's own list of build 19 replaced the
-  stand-in).
+  stand-in; build 20 makes the same 244 calls).
 
 **Refreshing it, at each app release** (the owner, or whoever cuts the app release):
 
@@ -1390,8 +1390,9 @@ under-stated), `s=` the app's own call sites, which the server ignores. No comme
   (244 operations, copied unchanged from the app's `claude/api-cut`); the backend's stand-in
   `unreleased.txt` is deleted. Every call exists in `openapi.json` at its new path and none is on
   the retired list (`CommittedAppCallListTest`, 2026-10-11).
-- [ ] A list per released app build — **open**: the first list of a *released* build arrives with
-  the app release 19 (versionCode 19).
+- [x] A list per released app build: `app-calls/20.txt` is the `core/contract/app-calls.txt` of the
+  released tag v0.6.1 (versionCode 20), byte-identical to the one of v0.6.0 (versionCode 19), which
+  the floor of 20 walls off, so `19.txt` is deleted (2026-10-13).
 
 **Enforced by:** `ExternalContractTest`, `AppCallListTest` (backend) · `AppCallListTest` (app) ·
 **Related:** REQ-API-009, REQ-API-010, REQ-API-017, REQ-SEC-037, ADR-0136
@@ -1415,7 +1416,7 @@ break:
   to (REQ-API-010);
 - no wildcard, no comment line, no repeated break; a malformed line fails the build.
 
-It was empty until the first hard-cut wave; wave 2 of the API cut (on the integration branch) added the ten lines of its T1 operations, absorbed by versionCode 19, and deleted `app-calls/18.txt` with them. Wave 3 (Einsätze) added the lines of its 29 T1 operations wave 4 (the org-unit bank prefix) the lines of its 24 and wave 6 (the small rest) the lines of its 9 the same way, with two field-level lines for the refinery request records (`POST /refinery-orders` and `PUT /refinery-orders/{id}`, `request[application/json]`) and one whole-operation line for the app's settings read `GET /settings/{key}`, which left the frozen set when the typed `GET /orders/settings` replaced it. The newest list, `app-calls/19.txt`, is the app's own list (244 operations, produced by its `AppCallListTest`); it replaced the backend's stand-in `unreleased.txt` (the old list rewritten to the new paths).
+It was empty until the first hard-cut wave; wave 2 of the API cut (on the integration branch) added the ten lines of its T1 operations, absorbed by versionCode 19, and deleted `app-calls/18.txt` with them. Wave 3 (Einsätze) added the lines of its 29 T1 operations wave 4 (the org-unit bank prefix) the lines of its 24 and wave 6 (the small rest) the lines of its 9 the same way, with two field-level lines for the refinery request records (`POST /refinery-orders` and `PUT /refinery-orders/{id}`, `request[application/json]`) and one whole-operation line for the app's settings read `GET /settings/{key}`, which left the frozen set when the typed `GET /orders/settings` replaced it. The newest list, `app-calls/20.txt`, is the app's own list of the released v0.6.1 (244 operations, produced by its `AppCallListTest`); it replaced `19.txt`, the same 244 lines of v0.6.0, when the floor rose to 20, and that one had replaced the backend's stand-in `unreleased.txt` (the old list rewritten to the new paths).
 
 **The comparison.** `theContractTypesMatchThePreviousRelease` compares the committed `openapi.json`
 with the previous release tag's, operation by operation, over the frozen set, every committed app
@@ -1476,11 +1477,14 @@ reviewed literals in `backend/src/main/resources/application.yml`, under
 and a rollback — the health gate's or a promotion of an older version — restores the previous
 release's values with its API, with no host step. **Raising the floor is a change to these literals
 in the wave's pull request**, reviewed like the API change it protects; no profile file may
-redeclare them. The committed values are **19 / 19** (app v0.6.0, `versionCode` 19), raised once, in the
-finalising pull request of the API cut, for the combined release (D-24); a member whose app is older
-than 19 meets the update wall after that promotion. The requirement was introduced with 17 / 17, the
-floor runbook step S8 of `EXCHANGE_GO_LIVE_RUNBOOK.md` set on 2026-09-28, and `latest` stood at 18
-for app v0.5.0 in between. Without the committed block the record's own
+redeclare them. The committed values are **20 / 20** (app v0.6.1, `versionCode` 20); a member whose app is older
+than 20 meets the update wall after that promotion. Build 19 (v0.6.0) is walled because it echoes one
+shared `version` for the payout preference and the blueprint sharing, which have their own
+optimistic-lock counters since `V283` (D-17) and answer it `409`; build 20 echoes the right one. The
+API cut raised the values from 17 / 18 to 19 / 19 for the combined release (D-24, finalising pull
+request, shipped in v1.15.0). The requirement was introduced with 17 / 17, the floor runbook step S8
+of `EXCHANGE_GO_LIVE_RUNBOOK.md` set on 2026-09-28, and `latest` stood at 18 for app v0.5.0 in
+between. Without the committed block the record's own
 defaults apply — floor `0` — which keeps REQ-API-010's "an unconfigured server walls nobody".
 
 **The emergency override.** `APP_ANDROID_MINIMUM_VERSION_CODE_OVERRIDE`,

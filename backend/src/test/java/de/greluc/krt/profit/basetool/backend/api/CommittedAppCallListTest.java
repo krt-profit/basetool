@@ -41,7 +41,7 @@ import tools.jackson.databind.JsonNode;
 class CommittedAppCallListTest {
 
   /** The build whose list is committed as the current one; the release floor equals it. */
-  private static final int CURRENT_BUILD = 19;
+  private static final int CURRENT_BUILD = 20;
 
   /** The calls of the current build when its list was committed. */
   private static final int CURRENT_CALLS = 244;
@@ -86,7 +86,7 @@ class CommittedAppCallListTest {
   /**
    * Loads the committed list of the current build.
    *
-   * @return the list named {@code 19}
+   * @return the list named {@code 20}
    * @throws IOException if the lists cannot be read
    */
   private static AppCallList.Release current() throws IOException {
