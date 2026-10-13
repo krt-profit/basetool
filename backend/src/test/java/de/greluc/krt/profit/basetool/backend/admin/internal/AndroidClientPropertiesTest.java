@@ -58,10 +58,10 @@ class AndroidClientPropertiesTest {
       "https://github.com/krt-profit/basetool-android/releases/latest";
 
   /** The floor committed with this release. */
-  private static final int COMMITTED_FLOOR = 19;
+  private static final int COMMITTED_FLOOR = 20;
 
   /** The newest published build committed with this release. */
-  private static final int COMMITTED_LATEST = 19;
+  private static final int COMMITTED_LATEST = 20;
 
   /** Enables the record under test. */
   @Configuration(proxyBeanMethods = false)
