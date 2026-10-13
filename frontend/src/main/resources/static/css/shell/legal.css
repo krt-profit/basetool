@@ -60,6 +60,10 @@
         padding-left: var(--space-6);
     }
 
+    .legal-toc__list {
+        list-style: none;
+    }
+
     .legal-toc__list > li + li {
         margin-top: var(--space-3);
     }
