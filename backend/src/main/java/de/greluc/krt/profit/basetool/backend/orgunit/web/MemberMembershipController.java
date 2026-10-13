@@ -177,8 +177,9 @@ public class MemberMembershipController {
    * version}, backing the admin member-edit form (ADMIN only).
    *
    * @param id user primary key.
-   * @return the user's memberships (Staffel + every SK) as full {@link OrgUnitMembershipDto}s,
-   *     wrapped in the same response shape the membership-delta PATCH returns.
+   * @return the user's memberships (Staffel + every SK) as full {@link
+   *     de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipDto}s, wrapped in the
+   *     same response shape the membership-delta PATCH returns.
    */
   @NotNull
   @GetMapping("/org-units/members/{id}/memberships/detail")

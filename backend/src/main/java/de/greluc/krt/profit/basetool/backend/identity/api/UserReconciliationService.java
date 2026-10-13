@@ -52,7 +52,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>{@link #syncUser(Jwt)} runs on every authentication via {@code
  * CustomJwtGrantedAuthoritiesConverter}; {@link #syncUser(KeycloakUserDto)} and {@link
- * #markMissingUsers} are driven by {@link UserSyncTask} from the Admin API. New registrations are
+ * #markMissingUsers} are driven by {@code UserSyncTask} from the Admin API. New registrations are
  * stamped PENDING through {@link UserRegistrationService#stampNewPendingRegistration}.
  */
 @Service
@@ -228,7 +228,7 @@ public class UserReconciliationService {
   /**
    * Reconciles the local user record from a Keycloak Admin API response (scheduled sync path).
    * Mirrors {@link #syncUser(Jwt)} but reads the data from a {@code KeycloakUserDto} instead of a
-   * decoded JWT. Used by {@link UserSyncTask}.
+   * decoded JWT. Used by {@code UserSyncTask}.
    *
    * @param dto Keycloak admin DTO
    */

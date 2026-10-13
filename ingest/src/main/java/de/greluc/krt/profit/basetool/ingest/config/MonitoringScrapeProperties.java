@@ -44,7 +44,8 @@ public class MonitoringScrapeProperties {
    * Password the Prometheus scraper presents via HTTP basic auth. Blank (the default) means "no
    * scraper in this environment" and keeps the endpoint in its fail-closed deny-all state. The
    * plaintext value from the environment is BCrypt-hashed at startup by {@link
-   * MonitoringScrapeSecurityConfig}; it is never stored or logged beyond this binding.
+   * de.greluc.krt.profit.basetool.ingest.assembly.MonitoringScrapeSecurityConfig}; it is never
+   * stored or logged beyond this binding.
    */
   private String password = "";
 

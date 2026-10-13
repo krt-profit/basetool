@@ -64,7 +64,8 @@ public record IngestProperties(
 
   /**
    * Normalises an absent public origin to empty, the documented "not configured" value, so {@link
-   * PublicUriDpopAuthenticationConverter} can test it with {@code isBlank()} alone.
+   * de.greluc.krt.profit.basetool.ingest.auth.PublicUriDpopAuthenticationConverter} can test it
+   * with {@code isBlank()} alone.
    */
   public IngestProperties {
     publicBaseUrl = publicBaseUrl == null ? "" : publicBaseUrl;
