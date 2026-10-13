@@ -9,6 +9,7 @@
     .ca-apps {
         --min: 30rem;
 
+        grid-template-columns: repeat(auto-fit, minmax(min(var(--min), 100%), 1fr));
         margin-bottom: var(--space-6);
     }
     .ca-apps > .card + .card {
