@@ -41,8 +41,8 @@ even though they are style rules on paper:
   the form; the substance is on the author. A misplaced or orphaned Javadoc fails the build in
   every source set, `test` and `e2e` included (ADR-0222).
 - **No comments besides Javadoc** (ADR-0214). Javadoc is short and carries no history; reasoning
-  goes into the commit message and the PR, durable facts into the spec, the ADR or the knowledge
-  base. Nothing gates this beyond review.
+  goes into the commit message and the PR, durable facts into the spec, the ADR or the runbook.
+  Nothing gates this beyond review.
 - **Google Java Style**, applied by Spotless and checked by Checkstyle; SpotBugs runs on `main`.
 - **Every user-visible string is translated**, and German umlauts are `\uXXXX`-escaped inside
   `.properties` and literal UTF-8 everywhere else.
@@ -51,8 +51,7 @@ even though they are style rules on paper:
 
 ## 2.4 The documentation constraint
 
-The **Basetool Knowledge** vault is a separate git repository that every part of the system orients
-by, and `CLAUDE.md` binds every change to update it in the same unit of work. Nothing in CI can
-enforce that — the vault is not a submodule of this repository, which is exactly why the rule is
-written into every place an agent or a contributor starts. It is a constraint on how work is done,
+`CLAUDE.md` binds every change to update the specs, the ADRs, the README, the role matrix and the
+German wiki in the same unit of work. Nothing in CI can enforce the wiki half — it is a separate
+git repository — which is why the rule is written into every place an agent or a contributor starts. It is a constraint on how work is done,
 not a suggestion about tidiness.

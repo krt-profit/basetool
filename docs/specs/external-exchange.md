@@ -1686,8 +1686,7 @@ tombstones and journal reports task metrics.
 - `basetool_ingest_gate_enforcing` is not extended to the exchange gates, since they cannot be
   switched off (owner decision 2026-09-27).
 
-**Status:** built — WP 3.3 (#2083), #2091 (the monitoring extras of 2026-09-27 included); the
-runbooks live in the knowledge base
+**Status:** built — WP 3.3 (#2083), #2091 (the monitoring extras of 2026-09-27 included).
 
 ### REQ-XCH-029 — Third parties get a local sandbox
 

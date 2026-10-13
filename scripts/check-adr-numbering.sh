@@ -36,7 +36,7 @@ declare -A number_to_file=()
 for f in "${files[@]}"; do
   n=$(adr_number "$f")
   if [[ -n "${number_to_file[$n]:-}" ]]; then
-    echo "::error title=Duplicate ADR number::ADR-${n} is claimed by both '${number_to_file[$n]}' and '${f}'. An ADR number is its identity -- renumber the less-referenced one to the next unused number and update every inbound reference (docs/adr/README.md, docs/specs/, Javadoc, CHANGELOG.md, the knowledge base)."
+    echo "::error title=Duplicate ADR number::ADR-${n} is claimed by both '${number_to_file[$n]}' and '${f}'. An ADR number is its identity -- renumber the less-referenced one to the next unused number and update every inbound reference (docs/adr/README.md, docs/specs/, Javadoc, CHANGELOG.md)."
     failed=1
   else
     number_to_file[$n]="$f"

@@ -14,13 +14,6 @@ Das Ergebnis ist **keine Datei zum Nachbearbeiten**, sondern eine fertige Seite,
 der der Nutzer per Knopfdruck in den CKEditor des Forums einfügt. Er bekommt nie
 Markdown und nie HTML-Quelltext zu Gesicht — siehe Schritt 5.
 
-> [!important] Vor der Arbeit: Knowledge Base lesen
-> Die `CLAUDE.md` des Repos bindet dich darauf, vor jeder Aufgabe die **Basetool
-> Knowledge Base** zu lesen. Für diesen Skill sind `20 Domains/Bank.md` (Hauptbuch,
-> Kontoarten, Gebühren, Split-Einzahlung) und `60 Runbooks/Production Access.md`
-> (Lesezugriff, psql-Rezept, **die Host-Adresse**) einschlägig. Findest du den Vault
-> nicht, **frag** — rate keinen Pfad.
-
 ## Der Rhythmus: ein Kalendermonat, fällig am Monatsanfang
 
 Ein Bericht deckt **immer einen vollen Kalendermonat** ab. Er wird **Anfang des
@@ -70,8 +63,7 @@ dieser Skill schreibt auf dem Host nichts und darf es auch nicht.
 > $env:BASETOOL_PROD_HOST = "<benutzer>@<adresse>"   # PowerShell
 > ```
 >
-> Wo die Adresse steht: Knowledge Base, `60 Runbooks/Production Access.md`. Ist die
-> Variable nicht gesetzt, sagt das Skript das und bricht ab — **frag dann den
+> Ist die Variable nicht gesetzt, sagt das Skript das und bricht ab — **frag dann den
 > Nutzer**, schreib die Adresse nirgends ins Repo.
 
 > [!note] Seit 2026-09-22 über Podman
@@ -105,7 +97,7 @@ mit Fehler.
   verteilt einen Anteil über alle aktiven Staffelkonten; die Buchungsbeine summieren
   sich aber **exakt** auf den Bruttobetrag, weil der Anteil des benannten Kontos per
   Subtraktion entsteht. 13 Einzahlungen mit 41 Buchungsbeinen sind deshalb **keine**
-  Doppelzählung. Näheres in `20 Domains/Bank.md`.
+  Doppelzählung. Näheres in [`docs/specs/bank.md`](../../../docs/specs/bank.md).
 - **Die Transfergebühr steckt in der Auszahlung drin**, sie kommt nicht obendrauf. Im
   Text also „darin X aUEC Transfergebühren", nie „zuzüglich".
 - Das **KRT-Konto** ist das Konto vom Typ `CARTEL`. Nie über die Kontonummer
@@ -279,7 +271,6 @@ nicht abgeschlossen und muss regulär noch einmal drankommen.
 
 ## Schnell-Checkliste vor dem Abschluss
 
-- [ ] Knowledge Base gelesen (`20 Domains/Bank.md`), bei Abweichung Code vor Notiz.
 - [ ] Voller Kalendermonat, Stichtag = Erster des Folgemonats.
 - [ ] Gegenprobe des Hilfsskripts steht auf `OK` — bei `FEHLER` nichts veröffentlicht.
 - [ ] Keine Namen, keine Handles, keine Alpha-Version im Text.

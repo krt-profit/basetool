@@ -14,7 +14,6 @@ and the reader cannot tell which one is current.
 | [`docs/adr/`](../adr/README.md) | Every architecturally significant decision, with its context and consequences |
 | [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md) | The role and permission matrix |
 | [`README.md`](../../README.md) | Product overview, tech stack, how to build and run |
-| `basetool-knowledge` (Obsidian vault) | Operational reality: hosts, incidents, runbooks, values, why something broke once |
 
 ## The sections
 

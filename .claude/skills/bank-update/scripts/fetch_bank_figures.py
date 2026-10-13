@@ -241,8 +241,7 @@ def main() -> None:
     if not args.host:
         sys.exit(
             "No production host. Pass --host or set BASETOOL_PROD_HOST. The address is "
-            "in the knowledge base, 60 Runbooks/Production Access.md — it is deliberately "
-            "not stored in this public repository."
+            "deliberately not stored in this public repository."
         )
 
     f = run_query(args.host, sql)
