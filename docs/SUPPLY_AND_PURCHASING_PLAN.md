@@ -1,12 +1,19 @@
-> **Doc type:** Proposal — written 2026-10-07 for the owner's review. The open decisions of §2 were
-> answered by the owner on 2026-10-07 (E-01 … E-12, F-1 … F-4); **nothing is built and nothing below
-> is binding** until @greluc approves the plan as a whole. On approval the draft requirements of §9
-> move into `docs/specs/supply.md` and `docs/specs/purchasing.md`, the amendments into their specs,
-> the decisions of §2 into ADRs, and this header becomes *living plan*.
+> **Doc type:** Proposal — written 2026-10-07 for the owner's review and brought up to the code of
+> `main` at `0da1df779` (v1.16.1) on 2026-10-13, after the domain modularisation, the notification
+> engine extension (#2414 Part A) and the first `StockCommands` shipped. The open decisions of §2 were
+> answered by the owner on 2026-10-07 (E-01 … E-12, F-1 … F-4) and still stand; only what they are
+> anchored to changed. **Nothing is built and nothing below is binding** until @greluc approves the
+> plan as a whole. On approval the draft requirements of §9 move into `docs/specs/supply.md` and
+> `docs/specs/purchasing.md`, the amendments into their specs, the decisions of §2 into ADRs, and
+> this header becomes *living plan*.
 > **Owner area:** BE · FE · BANK · INV · NOTIF · AUDIT · OBS · MOD
 > **Related ADRs:** ADR-0020, ADR-0028, ADR-0096, ADR-0109, ADR-0123, ADR-0229, ADR-0231 …
-> ADR-0236, ADR-0241 · **Related plans:** [domain modularisation](DOMAIN_MODULARISATION_PLAN.md) ·
-> **Related issues:** krt-profit/basetool#2409, #2413, #2414
+> ADR-0236, ADR-0240 … ADR-0242, ADR-0244, ADR-0245, ADR-0250 · **Related specs:**
+> [`module-boundaries.md`](specs/module-boundaries.md) (REQ-MOD-001 … 006) ·
+> **Related plans:** [domain modularisation](archive/DOMAIN_MODULARISATION_PLAN.md) (done and frozen
+> 2026-10-13; its rules live on in the spec above and in ADR-0231 … ADR-0239) ·
+> **Related issues:** krt-profit/basetool#2409, #2413, #2414 (all three built: REQ-INV-055, ADR-0244,
+> ADR-0245)
 > **Source concept:** „Konzept Handelsbeauftragte" (Bereich Profit, draft of 2026-10-05, Google Doc
 > outside the repository)
 
@@ -30,11 +37,13 @@ This plan turns that into two features and one architecture:
 | **Bedarf & Spenden** | ARGON publishes what it needs; any member pledges a material or item donation against it (or freely); ARGON confirms receipt, the stock moves into ARGON's pool, the donor is thanked and counted | `supply` (new, rank 10) |
 | **Ankauf** (trade deals) | An HB records an offer from an external org or person against an ARGON need, requests the money through the bank, records deliveries; ARGON accepts the quality and books the goods in; the HB settles and returns the rest | `purchasing` (new, rank 12) |
 
-Both are born as modules of the [modular monolith](DOMAIN_MODULARISATION_PLAN.md) (ADR-0231): own
-package, `api` / `internal` / `web`, declared with `@ApplicationModule`, no edge into the frozen
-baseline, interaction only through module APIs, observer SPIs and after-commit events (ADR-0232).
+Both are born as modules of the modular monolith ([`module-boundaries.md`](specs/module-boundaries.md),
+ADR-0231): own package, `api` / `internal` / `web`, declared with `@ApplicationModule` and in the
+domain map (REQ-MOD-001, REQ-MOD-006), no module-coupling violation (the baseline is empty, so the
+first one fails the build), interaction only through module APIs, observer SPIs and after-commit
+events (ADR-0232).
 
-### 1.1 Facts the design stands on (checked against `main` at `4dfdfc406`, 2026-10-07)
+### 1.1 Facts the design stands on (checked against `main` at `0da1df779`, 2026-10-13)
 
 - **ARGON** exists in no code, migration or document; it is an ordinary org unit of kind
   `SPECIAL_COMMAND` (only a frontend test fixture names it). The design therefore never hardcodes it:
@@ -42,13 +51,30 @@ baseline, interaction only through module APIs, observer SPIs and after-commit e
 - **The bank already has the money mechanics.** A `SPECIAL` account type (Sonderkonto) exists, the
   KRT account (`CARTEL`) has the approval ladder T1 / T2 (bank employee → Bankleitung → OL,
   REQ-BANK-047), debits from `CARTEL` / `SPECIAL` require a justification (REQ-BANK-045), accounts
-  carry a balance target, and any member may request a deposit into any active account. What it
-  lacks: **no structured purpose** on a booking request (only free-text note / justification /
-  staff note), and **no four-eyes check** — nobody compares the confirmer with the requester;
-  „nobody approves their own request" holds only structurally (ADR-0123).
+  carry a balance target, and any member may request a deposit into any active account. A member may
+  correct their own still-pending request (REQ-BANK-056). What it lacks, re-checked on 2026-10-13:
+  **no structured purpose** on a booking request (only free-text note / justification / staff note),
+  and **no four-eyes check** — `BankBookingRequestService#confirm` and `#applyOwnerApprovalWithinTransaction`
+  never compare the confirmer with `requestedBy`; „nobody approves their own request" holds only
+  structurally (ADR-0123). `bank.api` publishes amounts, the request type, the problem codes and
+  events only — no command and no observer.
 - **The Lager has no provenance.** `InventoryItem` has no source/donor field and no history table;
-  movements are traced only by audit events. `StockCommands` (the inventory command API of
-  ADR-0232) does not exist yet — `inventory.api` holds allocations, labels and problem codes only.
+  movements are traced only by audit events. The entity now lies in `inventory.internal` and other
+  modules see a row only as the read-only `inventory.api.StockRow`.
+- **`inventory.api.StockCommands` exists, but not for this.** It carries the lot-lock protocol
+  (`lockLots`, `lockLotRows`, ADR-0229), `bookIn` (a *personal* row without an org unit), `bookOutRow`,
+  `markStolen`, the job-order earmark release and take-from-earmark calls and the production and
+  refinery book-ins. It has **no book-in into an org-unit pool, no transfer into a pool and no
+  donation earmark**; those are what this work adds (E-11). A *pool* is not a table: it is a shared row
+  (`personal = false`) held by a member and stamped with `owning_org_unit_id`. An earmark is an
+  allocation row beside the row — `InventoryJobOrderAllocation` and `InventoryMissionAllocation`; the
+  Lager learns what it shows of their targets through the `inventory.api.EarmarkTargets` read SPIs,
+  which the target's module implements.
+- **A member-to-member transfer already tells the receiver** (#2409, REQ-INV-055):
+  `InventoryCheckoutService` publishes `InventoryTransferredToUserEvent` / `…FromUserEvent` after commit
+  on the single and bulk `TRANSFER` paths, and stock booked out by somebody else tells its owner
+  (`INVENTORY_BOOKED_OUT_BY_OTHER`, REQ-INV-056). A donation moves a donor's row at the hand of the
+  receiving unit, so it would trip both unless it is a command of its own (§4.2).
 - **Job orders are scoped by the responsible org unit** (`responsible_org_unit_id` drives
   visibility, ADR/REQ-ORDERS). HB are explicitly *not* an org unit („keine SK"), so a purchase cannot
   be a job order without breaking that scope rule. The wiki's „Warenauftrag" is the job order; the
@@ -58,15 +84,31 @@ baseline, interaction only through module APIs, observer SPIs and after-commit e
   concept's „Qualitätsklasse Masse" is the base tier `NONE`.
 - **UEX prices** are in the database: `Material.priceBuy/priceSell` (averages), `MaterialPrice`
   per terminal, `GameItemPrice` per item and terminal — the price reference the concept asks for.
-- **Notifications**: six selector kinds today; group recipients, time-based notices, per-recipient
-  supersede and muting are the *prerequisites* of #2414 Part A (A1–A4), not built yet.
+- **Notifications**: the engine extension this plan waited for is **built** (#2414 Part A, ADR-0244,
+  ADR-0245, REQ-NOTIF-018, -024 … -028). There are now ten selector kinds, among them
+  `EVENT_RECIPIENTS` (the set of users an event lists) and `OrgRelativeRole.UNIT_LEADERSHIP`; an
+  event can supersede a notice for named recipients only; a `TimedNoticeProducer` SPI lets a module
+  produce time-based notices from the notification module's single advisory-locked task; members
+  mute types (`notification_mute`, a type declares whether it is mutable); a render parameter ending in
+  `Code` renders a localized word (REQ-NOTIF-028).
 - **Existing „Spende"**: only the payout preference `DONATE` of an operation payout (aUEC donated
   from a mission share). Material donations are new; the UI calls them „Materialspende" to keep the
   two apart.
 - **Naming**: „Handel" is already the navigation group of prices and the trade-margin calculator.
   The new area is therefore „Beschaffung", the module names are `supply` and `purchasing`.
-- Highest ADR 0243, highest Flyway `V265`, no `REQ-SUP` / `REQ-PUR` prefix in use. All numbers in
-  this plan are provisional and are claimed at push time.
+- **The modularisation is finished** (frozen 2026-10-13): the backend has 26 domain-map modules
+  (the transitional `privacy` and the composition root `app` among them), every class lies in its module package, the module baseline is empty, every
+  domain owns an access policy and the table-ownership map is gated. Two things were *not* done and
+  matter here: bank and exchange stay in the `backend` Gradle project (no extraction, owner decision
+  2026-10-12), and the REST API cut waits for the owner's release decision, so the old roots stay and
+  the new modules simply use the target shape. The admin fence `/api/v1/*/admin/**` → `ADMIN` is
+  already in `SecurityConfig`.
+- **Numbers on `main`** (all provisional until claimed at push time by re-grepping `origin/main` and
+  the open PRs): highest ADR **0250**, highest Flyway **`V283`**, highest `REQ-BANK` **060** (057 …
+  060 are `bank-notifications.md`), `REQ-INV` **056** (055 is the transfer notice, 056 the notice to
+  an owner whose stock somebody else booked out), `REQ-NOTIF` 029, `REQ-AUDIT` 007, `REQ-OBS` 021, `REQ-SEC`
+  084, `REQ-DATA` 023, `REQ-API` 023, `REQ-FE` 035, `REQ-MOD` 006. No `REQ-SUP` / `REQ-PUR` prefix is
+  in use.
 
 ## 2 Decisions (owner, 2026-10-07)
 
@@ -78,7 +120,7 @@ the farm-time figure. The draft requirements of §9 are written for these answer
 | --- | --- | --- | --- |
 | E-01 | How is a Handelsbeauftragter represented? | **An in-app appointment** (`purchasing_delegate`): appointed and revoked by the Bereichsleitung of the governing Bereich (plus OL, admin), with an optional personal monthly limit and an end date; audited; the capability is derived from the active appointment, like the Logistician flag | A Keycloak role `TRADE_DELEGATE`: realm write per appointment (production write gate), no limit or end date, admins instead of the Bereichsleitung decide — contradicts „Benennung durch die Bereichsleitung Profit" |
 | E-02 | One module or two? | **Two**: `supply` (needs + donations, no money) and `purchasing` (deals, partners, delegates, bank link) | One `procurement` module: aborting the pilot (concept §11) would then mean switching off part of a module that donations also live in |
-| E-03 | Four-eyes rule | **For every bank booking request**, not only purchasing ones: the requester of a request may neither grant its owner approval nor confirm it; details F-1 … F-4 | Purchasing requests only (the recommendation): the owner chose the bank-wide rule — a behaviour change of the whole bank with its own requirement (REQ-BANK-058) and ADR |
+| E-03 | Four-eyes rule | **For every bank booking request**, not only purchasing ones: the requester of a request may neither grant its owner approval nor confirm it; details F-1 … F-4 | Purchasing requests only (the recommendation): the owner chose the bank-wide rule — a behaviour change of the whole bank with its own requirement (REQ-BANK-062) and ADR |
 | F-1 | May a requester reject their own request? | **Yes.** Rejecting moves no money and is in effect the cancel the requester may do anyway; four-eyes covers granting and confirming only | Forbid it: symmetry without a risk it removes |
 | F-2 | Direct bookings (no request) | **Unchanged.** A bank employee's direct deposit, withdrawal and transfer — including a payout to themselves — stay as today; four-eyes applies to requests only | Turn a self-payout into a request (the recommendation); turn every direct booking into a request (abolishes direct booking, which the design keeps for what nobody files a request for) |
 | F-3 | A responsible holder's own request | **The ADR-0123 exemption stays**: it needs no owner approval; the second person is the bank employee who confirms, and the holder may not confirm it themselves | A higher approver above the limit: a new approval chain |
@@ -90,7 +132,7 @@ the farm-time figure. The draft requirements of §9 are written for these answer
 | E-08 | Profit medals | **Out of scope**; the donation statistics (§4.5) are the data a later medal feature reads | Build medals now: the award rules are undecided |
 | E-09 | „Eingesparte Farmzeit" in the report | **Not recorded.** The tool keeps no farm-time estimate; the Bereichsleitung evaluates saved farm time outside the tool | An optional per-material estimate (the recommendation); a mandatory one |
 | E-10 | Android app | **Web only** for the new screens; the app ships only the rendering of every new notification type (mandatory: it fails its build on an unworded type) | App screens now: doubles the effort while the pilot may still be aborted |
-| E-11 | Stock writes | **Introduce the first `inventory.api.StockCommands` methods** (book-in into a pool, transfer to a pool, earmark) as part of this work, owned by inventory, `MANDATORY` | Foreign `new InventoryItem()` in `supply` / `purchasing`: the APPSEC-01 class of defect |
+| E-11 | Stock writes | **Extend the existing `inventory.api.StockCommands`** with book-in into a pool, transfer to a pool and a donation earmark as part of this work, owned by inventory, `MANDATORY` (the interface exists since the modularisation; these methods are new) | Foreign `new InventoryItem()` in `supply` / `purchasing`: the APPSEC-01 class of defect — and no longer even possible, the entity is `inventory.internal` |
 | E-12 | Governance before go-live | **A feature switch per module, off by default** (`supply.enabled`, `purchasing.enabled` as runtime system settings); `purchasing` is switched on only after the OL resolutions of concept §10 | Ship enabled: the KRT account's purpose is not yet extended by an OL resolution |
 
 ## 3 Roles and capabilities
@@ -152,9 +194,13 @@ Two ways in (E-07):
 1. **Pledge** — a member opens „Spenden" from a need or from a row of „Mein Lager" and pledges
    material/item, quality, amount, receiving unit (pre-filled from the need). If it came from a Lager
    row, the amount is **earmarked** on that row (no double pledge, no double sale) — a third
-   allocation kind beside the existing job-order and mission allocations of a Lager row. The receiving unit confirms receipt after the in-game handover:
+   allocation kind beside the existing job-order and mission allocations of a Lager row, owned by
+   inventory, pointing at the pledge by id, and read back through a new `EarmarkTargets.Donations`
+   SPI that supply implements (the pattern of `EarmarkTargets.Missions` / `JobOrders`). The
+   receiving unit confirms receipt after the in-game handover:
    - from a Lager row: `StockCommands.transferToPool` moves the amount into the receiving unit's
-     pool at the location the receiver names;
+     pool (a shared row held by the confirming member and stamped with the unit) at the location the
+     receiver names;
    - free pledge: `StockCommands.bookIntoPool` books it in at the receiver's location.
    The receiver may confirm a smaller amount (partial) or decline with a reason code.
 2. **Recorded** — a Logistician of the receiving unit records a donation already received, for a
@@ -166,9 +212,12 @@ The donor may choose **„anonym spenden"**: the receiving unit sees the donatio
 name is hidden from everyone except admin and the governing Bereichsleitung (for medal decisions);
 the donor's own statistics still count it.
 
-#2409 interplay: a donation transfer changes a row's owner. It must produce the **donation**
-notice only, not the generic „Umbuchung" notice of #2409 — the stock command carries a reason that
-the transfer notifier skips.
+Transfer-notice interplay (REQ-INV-055, REQ-INV-056): a donation transfer changes a row's owner. It
+must produce the **donation** notices only — not the generic „Umbuchung" notices
+(`InventoryTransferredTo/FromUserEvent`) and not „von jemand anderem ausgebucht"
+(`INVENTORY_BOOKED_OUT_BY_OTHER`). `transferToPool` is therefore its own command that publishes
+neither event, instead of a reason flag on the `TRANSFER` book-out path; the donor hears about it
+through N2 (§6). The audit rows still say what moved (§7.1).
 
 ### 4.3 Trade deal („Handelsvorgang")
 
@@ -217,7 +266,7 @@ unit's pool through `StockCommands.bookIntoPool` at a location they name. The HB
 
 **Settlement** is due within N days (setting, default 7) after `DELIVERED` or `FAILED`. Overdue
 settlement is surfaced on the deal list, on the governing Bereichsleitung's view and by a notice
-(§6, needs A2 of #2414).
+(§6, a `TimedNoticeProducer` of the extended engine, REQ-NOTIF-026).
 
 ### 4.4 Partners
 
@@ -261,18 +310,30 @@ rank 3   identity ──────────────┤ members, handles
 rank 4   orgunit ───────────────┤ units, Bereich leadership, membership flags
 rank 5   scope                  │
 rank 6   admin ─────────────────┤ SystemSettings (feature switches)
-rank 8   inventory ─────────────┤ StockCommands (new): bookIntoPool, transferToPool, earmark
-rank 10  supply  ◄──────────────┘ needs, donations          (new)
+rank 8   inventory ─────────────┤ StockCommands (extended): bookIntoPool, transferToPool, donation earmark
+rank 10  joborder ──────────────┤ read for the need's optional job-order link
+rank 11  supply  ◄──────────────┘ needs, donations          (new)
 rank 11  bank ───────────────── PurposeBoundRequests (new command), BookingRequestPurposeObserver (new SPI)
 rank 12  purchasing ──► supply.api, inventory.api, bank.api, catalogue, identity, orgunit, admin  (new)
 rank 1   audit, notification, livesync ◄── everyone (AuditRecorder, events, topics)
 ```
 
-Domain map additions: `module supply 10`, `module purchasing 12`, `package supply`,
-`package purchasing`; both declared in `package-info` with `allowedDependencies` listing exactly the
-`::api` interfaces above; no baseline entry (they are born clean, REQ-MOD). `bank` does **not**
-depend on `purchasing` (the SPI inverts it), so bank's later Gradle extraction (Phase 5) is
-unaffected.
+Domain map additions: `module supply 11`, `module purchasing 12`, `package supply`,
+`package purchasing` (REQ-MOD-001); both declared in `package-info` with `@ApplicationModule`, an
+`@NamedInterface("api")` on `api` and every package below it, and the `allowedDependencies` the map
+derives (REQ-MOD-006); both enter `ModularityTest.DECLARED_MODULES` and the lists of every module that
+may depend on them. No baseline entry — the baseline is empty (REQ-MOD-004).
+
+**Why `supply` is rank 11, not 10.** The rank rule lets a module depend only on lower ranks (REQ-MOD-003).
+The need's optional job-order link is validated against `joborder.api`, and `joborder` is rank 10, so
+a rank-10 `supply` would need an `allow supply joborder` row. Rank 11 needs none and costs nothing:
+`supply` does not depend on `bank`, and `purchasing` (12) sits above both. `inventory` (8) never
+names `supply` — it reaches the pledge through the `EarmarkTargets.Donations` SPI that `supply`
+implements.
+
+`bank` does **not** depend on `purchasing` (the SPI inverts it). Bank stays inside the `backend`
+Gradle project — the extraction was dropped on 2026-10-12 — so the SPI is a rank discipline now, not
+a precondition for a build split.
 
 ### 5.2 Inside the modules
 
@@ -281,8 +342,11 @@ backend.supply
 ├── api/       SupplyQueries (open needs, need progress, donation sums per unit/material/period),
 │              NeedRef, events/ (NeedRaised…, DonationPledged…, DonationReceived…)
 ├── internal/  Need, Donation, SupplyUnitSetting, repositories, NeedService, DonationService,
-│              SupplyAccessPolicy (bean supplyAccessPolicy), mappers
-└── web/       NeedController, DonationController, SupplyAdminController, REST DTOs
+│              SupplyAccessPolicy (bean supplyAccessPolicy) and the scope fragments beside the
+│              repositories, mappers and REST DTOs, the EarmarkTargets.Donations implementation,
+│              SupplyLiveSyncTopicAuthorizer, SupplyBusinessGauges, SupplyExportSections,
+│              SupplyUserErasure
+└── web/       NeedController, DonationController, SupplyAdminController
 
 backend.purchasing
 ├── api/       events/ (DealSubmitted…, DeliveryRecorded…, DeliveryAccepted…, SettlementOverdue…,
@@ -290,43 +354,65 @@ backend.purchasing
 ├── internal/  Deal, DealTranche, DealDelivery, Partner, Delegate, PurchasingSetting, RiskClass,
 │              DealService, TrancheService, DeliveryService, SettlementService, PartnerService,
 │              DelegateService, BankPurposeObserverImpl, PurchasingAccessPolicy
-│              (bean purchasingAccessPolicy), SettlementOverdueTask
+│              (bean purchasingAccessPolicy), SettlementOverdueNoticeProducer
+│              (a TimedNoticeProducer), PurchasingLiveSyncTopicAuthorizer,
+│              PurchasingBusinessGauges, PurchasingExportSections, PurchasingUserErasure, DTOs
 └── web/       DealController, PartnerController, DelegateController, PurchasingAdminController
 ```
 
-New in existing modules:
+The layering is the one `module-boundaries.md` (REQ-MOD-006) records: `web` depends on `internal`,
+never the reverse, and the REST DTOs live in `internal` beside the services until a module API
+returns its own records. The participants mirror what the existing modules implement
+(`BankExportSections`, `InventoryUserErasure`, `BankBusinessGauges`, `OrgUnitBankLiveSyncTopicAuthorizer`).
 
-- `inventory.api.StockCommands` — `bookIntoPool(material|item, quality, amount, location,
-  owningOrgUnit, reason)`, `transferToPool(sourceRowId, amount, targetOrgUnit, location, reason)`,
-  earmark / release for a pledge; `MANDATORY`, lot-lock protocol of ADR-0229, audits in the same
-  transaction, returns the row ids. `reason` is a closed enum (`DONATION`, `PURCHASE`) the #2409
-  notifier and the audit details use.
+Changes in existing modules:
+
+- `inventory.api.StockCommands` (exists; `InventoryStockCommands` implements it in `inventory.internal`)
+  — new methods `bookIntoPool(material|item, quality, amount, location, owningOrgUnit, holder,
+  reason)`, `transferToPool(sourceRowId, amount, targetOrgUnit, holder, location, reason)` and
+  `earmarkForDonation(rowId, donationId, amount)` / `releaseDonationEarmark(…)`; `MANDATORY`, under
+  the existing lot-lock protocol (`lockLots`, `lockLotRows`, ADR-0229), audits in the same
+  transaction, returns the row ids. `reason` is a new closed enum `StockBookingReason` (`DONATION`,
+  `PURCHASE`) that the audit details use; the existing `StockChangeReason` stays what it is, the
+  reason the offer ratchet records for a lowered row. `transferToPool` publishes neither
+  `InventoryTransferredTo/FromUserEvent` nor the booked-out-by-other notice (§4.2). `supply` (donations)
+  and `purchasing` (accepted deliveries) are its callers; neither writes a row of its own.
+- `inventory.api.EarmarkTargets.Donations` — a read SPI beside `Missions` and `JobOrders`, implemented
+  by `supply`, so the Lager can show a pledge on a row without naming `supply`.
 - `bank.api.PurposeBoundRequests` — `requestWithdrawal(accountId, amount, recipientUserId,
   purpose)`, `requestDeposit(…)`, `cancel(requestId)`; `MANDATORY`; validates through the existing
-  `BankBookingGuards`; writes the same bank audit events.
+  `BankBookingGuards`; writes the same bank audit events. `BankPurposeKind` (the closed enum, first
+  value `PURCHASING_DEAL`) sits in `bank.api` beside `BankBookingRequestType`.
 - `bank.api.BookingRequestPurposeObserver` — `onConfirmed / onRejected / onCancelled(requestId,
   purpose, transactionId)`; called by `BankBookingRequestService` inside its transaction for
   requests with a purpose; implementations are `MANDATORY`.
 - `bank` schema: `bank_booking_request.purpose_kind` (enum, nullable) + `purpose_ref` (uuid,
   nullable), both or neither (check constraint); the bank-wide four-eyes check (E-03,
-  REQ-BANK-058) lives in owner approval and confirm of every request, independent of the purpose.
+  REQ-BANK-062) lives in owner approval and confirm of every request, independent of the purpose.
 
 ### 5.3 Interaction mechanisms (ADR-0232)
 
 | Interaction | Mechanism | Why |
 | --- | --- | --- |
 | supply / purchasing → inventory (book-in, transfer, earmark) | command API, `MANDATORY` | stock and donation/acceptance must commit together |
+| inventory → supply (what a pledge earmark shows on a Lager row) | read SPI `EarmarkTargets.Donations`, owned by inventory, implemented by supply | inventory (rank 8) never names a higher module; one read per page |
+| supply → joborder (does the need's job order belong to the unit) | query on `joborder.api` | read only; why supply is rank 11 (§5.1) |
 | purchasing → bank (request money, return remainder) | command API, `MANDATORY` | the tranche row and the request commit together |
 | bank → purchasing (request confirmed/rejected/cancelled) | observer SPI owned by bank | deal state must equal request state at commit |
 | purchasing → supply (need open? progress) | query API | read only |
 | supply → purchasing | none | supply knows nothing of purchasing (E-02) |
 | everything → notification | after-commit event (REQ-NOTIF-002) | a notice may fail on its own |
-| everything → audit | direct `AuditRecorder` call, `MANDATORY` (REQ-AUDIT-001) | audit row in the business transaction |
-| everything → livesync | after-commit topic publish | as every domain |
+| purchasing → notification (settlement overdue) | `TimedNoticeProducer` SPI, run by the notification module's one advisory-locked task (ADR-0245) | the marker and the event commit together; at most one notice per deal |
+| everything → audit | direct `AuditRecorder` call, `MANDATORY` (REQ-AUDIT-001, REQ-AUDIT-007) | audit row in the business transaction |
+| everything → livesync | after-commit topic publish; room authorization by the module's `LiveSyncTopicAuthorizer` | as every domain |
 
 ### 5.4 Persistence
 
-Flyway, one migration per concern, in the global sequence (provisional V266 …):
+Flyway, one migration per concern, in the global sequence (provisional V284 …; one schema, one
+Flyway location, one `V<n>` sequence in `backend`). Foreign keys into the foundation modules (users,
+org units, catalogue) stay real keys; the links between business aggregates are plain id columns
+(`job_order_id`, `source_inventory_item_id`, `bank_request_id`, a deal's `need_id`), as the table
+below shows:
 
 | Table | Owner | Key columns |
 | --- | --- | --- |
@@ -342,27 +428,39 @@ Flyway, one migration per concern, in the global sequence (provisional V266 …)
 | `purchasing_deal_tranche` | purchasing | deal, kind, amount, `bank_request_id` (id reference), state, `version` |
 | `purchasing_deal_delivery` | purchasing | deal, amount, location, accepted amount, quality, rejected amount, reason, `accepted_by`, booked row ids, `version` |
 
+Inventory gains one table for the donation earmark, next to its job-order and mission allocations.
 Amounts in whole aUEC (`bigint`) as the bank; SCU with the catalogue's scale. Every table enters the
-table-ownership map (REQ-DATA, modularisation §5.6). Indexes for the scoped list queries; the list
-reads are statement-bounded (REQ-DATA-003, no N+1).
+table-ownership map (`backend/src/test/resources/architecture/table-ownership.txt`, REQ-DATA; the test
+fails on a table with no owner). Each access policy keeps its scope fragment beside its repository
+and carries a parity test against the per-row gate (REQ-DATA-010). Indexes for the scoped list
+queries; the list reads are statement-bounded (REQ-DATA-003, no N+1).
 
 ### 5.5 Authorization
 
-- Two access-policy beans owned by their modules (ADR-0236): `supplyAccessPolicy` (raising /
-  receiving unit membership, donor ownership, governing Bereich) and `purchasingAccessPolicy`
-  (active delegate, deal ownership, governing Bereich, raising unit of the deal's need, bank staff for
-  purpose-bound reads). Each owns its per-row gate **and** its list query fragment.
+- Two access-policy beans owned by their modules (ADR-0236), built on the scope kernel:
+  `supplyAccessPolicy` (raising / receiving unit membership, donor ownership, governing Bereich) and
+  `purchasingAccessPolicy` (active delegate, deal ownership, governing Bereich, raising unit of the
+  deal's need, bank staff for purpose-bound reads). Each owns its per-row gate **and** its list query
+  fragment, so the two widen together.
 - Controllers keep a coarse role gate on their own (`isAuthenticated()` with the member baseline;
-  admin endpoints `hasRole('ADMIN')` under `/api/v1/<root>/admin/**`, before every domain rule —
-  modularisation §5.4); scope and ownership in the module API so non-HTTP callers hit the same gates.
+  admin endpoints `hasRole('ADMIN')` under `/api/v1/<root>/admin/**`). The `/api/v1/*/admin/**` →
+  `ADMIN` matcher already stands in `SecurityConfig` before every domain rule, so the two admin roots
+  need no new rule — only a test that they are fenced. Scope and ownership live in the module API so
+  non-HTTP callers hit the same gates.
 - Redaction: a need's `maxUnitPrice` and purchase progress, a donation's donor when anonymous —
   stripped in the module's mapper for callers outside the floor, with redaction tests.
 - No exchange (`/exchange/v1`) surface; the edge allow-list for the app vhost is not widened (web
   only, E-10), and the edge deny probe asserts the new roots stay closed there.
 - Rate limits: the pledge and the deal create/submit endpoints get the write bucket of their
-  family; `no-store` for every new family (REQ-SEC-031, D-18 of the modularisation plan).
+  family; `no-store` for every new family — the two roots go into `NoStoreApiScopes`
+  (REQ-SEC-031, D-18 of the modularisation plan).
 
-### 5.6 REST API (cut per modularisation §5.10, tier T2 — web only)
+### 5.6 REST API (the target cut of [`rest-api-cut.md`](modularisation/rest-api-cut.md), tier T2 — web only)
+
+The REST cut of the old roots has not run (it waits for the owner's release decision and an app
+release), but the new modules are born in its shape: one root per domain, member-scoped resources under
+`<root>/me`, admin under `<root>/admin`, no shape suffixes, collections paged with `q`, `page`, `size`,
+`sort` and a `/lookup` for pickers (principles P1 … P5).
 
 | Root | Operations |
 | --- | --- |
@@ -379,61 +477,75 @@ reads are statement-bounded (REQ-DATA-003, no N+1).
 | `/api/v1/purchasing/admin/settings` | `GET`, `PUT`; `/admin/risk-classes` `GET`, `PUT` |
 
 Nested writes (`/deals/{id}/deliveries/{did}/accept`) are authorized on the child and a child of
-another deal answers 404 (modularisation §5.4, „nested paths keep the gate on the child"). One
+another deal answers 404 (the rule „nested paths keep the gate on the child"). One
 OpenAPI tag per module, unique schema names, every problem code in the module's `ProblemCode` enum
 and the documented list (ADR-0235).
 
 ### 5.7 Frontend
 
-- Packages per §5.9 of the modularisation plan: `supply.web` / `supply.client` / `supply.model`,
-  `purchasing.web` / `.client` / `.model`; typed clients `SupplyBackendClient`,
-  `PurchasingBackendClient` over `BackendApiClient` (URI templates only, `TypedBackendClientTest`).
-- Navigation: a new group **„Beschaffung"** with „Bedarf" (every member), „Meine Spenden" (every
-  member), „Eingehende Spenden" (receiving units), „Ankauf" (HB, governing Bereichsleitung, raising
-  unit, bank staff), „Bericht", and „Handelsbeauftragte" (governing Bereichsleitung, admin). Admin
-  settings get a „Beschaffung" section.
-- Page patterns of ADR-0242 (list, overview, form); the DAS KARTELL design system skill populated
-  before any UI work; deal detail as an overview page with tabs „Übersicht · Zahlungen ·
-  Lieferungen · Abrechnung · Verlauf"; the UEX reference price beside every price input; the risk
-  class and its rules shown, not hidden.
+- Packages named like the backend's (REQ-FE-034, `frontend/CLAUDE.md`): `supply.web` /
+  `supply.client` / `supply.model`, `purchasing.web` / `.client` / `.model`; typed clients
+  `SupplyBackendClient`, `PurchasingBackendClient` over `BackendApiClient` (URI templates only;
+  `TypedBackendClientTest` and `WebClientConfinementTest` hold them to it).
+- Assets live in the domain folder and nowhere else: `templates/supply/…`, `static/js/supply/…`,
+  `static/css/supply/…` (and the same for `purchasing`); `AssetLayoutTest` fails on a flat file. Scripts
+  are ES modules (ADR-0250): `<script type="module">`, static imports by absolute path from the own
+  domain and `/js/kernel/` only, registered under their domain in `typecheck-ratchet.json` and
+  type-checked by `:frontend:typecheckJs`.
+- Navigation (ADR-0240): the drawer is grouped, so the new group **„Beschaffung"** is a drawer group
+  with „Bedarf" (every member), „Meine Spenden" (every member), „Eingehende Spenden" (receiving
+  units), „Ankauf" (HB, governing Bereichsleitung, raising unit, bank staff), „Bericht", and
+  „Handelsbeauftragte" (governing Bereichsleitung, admin). The quick access indexes the drawer links
+  the server rendered, so visibility rules stay server-side and no endpoint is added. Admin settings
+  get a „Beschaffung" section in the admin mode.
+- Page patterns A to C of ADR-0242 (list, overview, form) and the colour and layer tokens of
+  ADR-0243; the DAS KARTELL design system skill populated before any UI work; deal detail as an
+  overview page with tabs „Übersicht · Zahlungen · Lieferungen · Abrechnung · Verlauf"; the UEX
+  reference price beside every price input; the risk class and its rules shown, not hidden.
 - Live update (REQ-FE-001…010): every write updates in place through `krtFetch`; peers receive
   live-sync topics `supply/needs`, `supply/donations/{unitId}`, `purchasing/deals` (room
-  authorization = the module's read gate); each section echoes its own version (deal header,
-  tranche row, delivery row, settlement).
+  authorization = the module's `LiveSyncTopicAuthorizer`, reusing its read gate); each section echoes
+  its own version (deal header, tranche row, delivery row, settlement).
 - i18n: every string DE/EN under `supply.*` and `purchasing.*`, umlauts as `\uXXXX`.
 
 ## 6 Notifications
 
-Built on the engine as #2414 extends it. Rows marked **(A1)**, **(A2)**, **(A3)** need that
-prerequisite of #2414 Part A; the others work with today's six selector kinds. Every type gets a
-seeded, editable rule, DE/EN labels, a rule-editor option (`AdminNotificationRuleOptionListsTest`),
-a link via `NotificationPageController.targetOf`, and Android rendering. All are after-commit,
-exclude the actor, carry no free text.
+Built on the engine as #2414 Part A left it (ADR-0244, ADR-0245; REQ-NOTIF-018, -024 … -028) — every
+prerequisite the first version of this plan waited for is shipped, so no notice below is gated on
+engine work. Every type gets a rule seeded by a Flyway migration (editable by the admin), DE/EN
+labels, a rule-editor option (`AdminNotificationRuleOptionListsTest`), a link via
+`NotificationPageController.targetOf`, and Android rendering. All are after-commit, exclude the actor,
+carry no free text. A word that differs by language („pausiert", „fortgesetzt") travels as a
+`…Code` render parameter (REQ-NOTIF-028), never as a stored string.
 
-| # | Notice | Trigger | Recipients | Cleared by | Mutable (A4) |
+| # | Notice | Trigger | Recipients | Cleared by | Mutable (REQ-NOTIF-027) |
 | --- | --- | --- | --- | --- | --- |
 | N1 | „Neue Spende angemeldet" | donation pledged | Lead / Logistician of the receiving unit (`ORG_RELATIVE_ROLE`, `RESPONSIBLE`) | receive / decline / withdraw (supersede, ADR-0096) | yes |
 | N2 | „Deine Spende ist angekommen" (with amount) | donation received / partially received | the donor (`EVENT_RECIPIENT`) | — | yes |
 | N3 | „Deine Spende wurde abgelehnt" | donation declined | the donor (`EVENT_RECIPIENT`) | — | yes |
-| N4 | „Neuer Bedarf zum Ankauf freigegeben" | need raised or set `purchasable` | every active HB **(A1, event-listed recipients)** | need fulfilled / withdrawn | yes |
+| N4 | „Neuer Bedarf zum Ankauf freigegeben" | need raised or set `purchasable` | every active HB (`EVENT_RECIPIENTS`: the event lists them) | need fulfilled / withdrawn | yes |
 | N5 | „Lieferung zur Abnahme" | delivery recorded | Lead / Logistician of the raising unit (`ORG_RELATIVE_ROLE`) | delivery accepted (supersede) | no |
 | N6 | „Lieferung abgenommen / abgelehnt" | acceptance | the deal's HB (`EVENT_RECIPIENT`) | — | no |
-| N7 | „Abrechnung überfällig" | settlement due date passed **(A2)** | the deal's HB; governing Bereichsleitung **(A1, unit leadership)**; `ROLE` bank management | settlement saved (per-entity supersede, as today) | no |
-| N8 | „Ankauf pausiert / fortgesetzt" | pause / resume | every active HB **(A1)**; raising unit leadership | resume supersedes pause | no |
+| N7 | „Abrechnung überfällig" | settlement due date passed, from `SettlementOverdueNoticeProducer` (`TimedNoticeProducer`, REQ-NOTIF-026) | the deal's HB (`EVENT_RECIPIENT`); the governing Bereichsleitung (`ORG_RELATIVE_ROLE` `UNIT_LEADERSHIP`); `ROLE` bank management | settlement saved (per-entity supersede) | no |
+| N8 | „Ankauf pausiert / fortgesetzt" | pause / resume | every active HB (`EVENT_RECIPIENTS`); raising unit leadership (`UNIT_LEADERSHIP`) | resume supersedes pause | no |
 | N9 | „Du bist Handelsbeauftragter / nicht mehr" | appointment / revocation | the member (`EVENT_RECIPIENT`) | revocation supersedes appointment | no |
-| N10 | money tranche notices | — | **reused**: `BANK_BOOKING_REQUEST_CREATED / CONFIRMED / REJECTED` already reach approvers, requester and responsible holder; #2413 item 3 (amended request) applies unchanged | — | as bank |
+| N10 | money tranche notices | — | **reused**: the bank's `BANK_BOOKING_REQUEST_CREATED / APPROVED / CONFIRMED / REJECTED` (REQ-BANK-057, `bank-notifications.md`) already reach approvers, requester and responsible holder; the correction of a pending request (REQ-BANK-056) applies unchanged | — | as bank |
 
-Until A1 ships, N4 and N8 reach nobody (their rules exist disabled); the deal list's „neu" filter
-covers the gap.
+The overdue marker is a column on the deal, written in the producer's transaction together with the
+event, so a deal produces N7 at most once; changing the due days or the delivery date resets it.
+Whether a type can be muted is the type's own declaration (ADR-0245): the donor notices can, the
+notices a purchasing duty hangs on cannot.
 
 ## 7 Audit, monitoring, data protection
 
 ### 7.1 Audit (REQ-AUDIT-001)
 
-Two new `AuditDomain` values, `SUPPLY` („Bedarf & Spenden") and `PURCHASING` („Ankauf"), registered
-everywhere a domain is (export and purge switches, person-search targets, `pdf.audit.title.*`, the
-frontend `AuditDomains`, the viewer's per-area filter, `admin.audit.*` labels, the
-AuditDomainSilenceAnomaly exclusion list — both are low-traffic). Event types:
+Two new `AuditDomain` values (the enum lives in `audit.api`, next to the twelve of today),
+`SUPPLY` („Bedarf & Spenden") and `PURCHASING` („Ankauf"), registered everywhere a domain is (export
+and purge switches, person-search targets, `pdf.audit.title.*`, the frontend `AuditDomains`, the
+viewer's per-area filter, `admin.audit.*` labels, the AuditDomainSilenceAnomaly exclusion list — both
+are low-traffic). Every call is a direct `AuditRecorder` call inside the business transaction
+(REQ-AUDIT-007); never an event. Event types:
 
 - `SUPPLY`: `NEED_RAISED`, `NEED_UPDATED`, `NEED_PAUSED`, `NEED_RESUMED`, `NEED_WITHDRAWN`,
   `NEED_FULFILLED`, `DONATION_PLEDGED`, `DONATION_RECEIVED`, `DONATION_DECLINED`,
@@ -455,22 +567,26 @@ AuditDomainSilenceAnomaly exclusion list — both are low-traffic). Event types:
 - Counters: `basetool_supply_donations_total{status}`, `basetool_supply_needs_total{event}`,
   `basetool_purchasing_deals_total{event}`, `basetool_purchasing_tranches_total{kind,outcome}`,
   audit-event counters for both domains (existing mechanism).
-- Gauges (registered by each module — modularisation §4.2, not in `BusinessMetricsCollector`):
+- Gauges, each registered by its own module in a `*BusinessGauges` class in `internal` (the pattern of
+  `BankBusinessGauges`; the composition-root `BusinessMetricsCollector` in `app` stays out of it):
   `basetool_supply_needs_open`, `basetool_supply_donations_pledged_open`,
   `basetool_purchasing_deals{status}`, `basetool_purchasing_settlements_overdue`,
   `basetool_purchasing_paused` (0/1).
-- Task metrics for `SettlementOverdueTask` (runs, duration, failures, notices produced).
+- No task metrics of its own: the overdue notice is produced by the notification module's single
+  timed-notice task, which already reports runs, duration, failures and notices produced through
+  `TaskMetrics` (ADR-0245). The producer's own failures are covered by that task's alert.
 - No user, partner, unit or material as a label (bounded labels only).
-- Alerts: `PurchasingSettlementOverdue` (warning, > 0 for 3 days), `PurchasingTaskFailing`;
-  Grafana: a „Beschaffung" row on the business dashboard (donations vs purchases per week, open
-  deals by state, overdue settlements).
+- Alerts: `PurchasingSettlementOverdue` (warning, > 0 for 3 days); Grafana: a „Beschaffung" row on the
+  business dashboard (donations vs purchases per week, open deals by state, overdue settlements).
 - Tracing: no new outbound call.
 
 ### 7.3 Data protection
 
-- Donor and HB are members: their donations and deals are part of the personal-data export
-  (`PersonalDataExportSection`) and of erasure (`UserErasureParticipant`: donor and HB anonymised,
-  donations and deals kept for the books).
+- Donor and HB are members: their donations and deals are part of the personal-data export (each module
+  contributes a `PersonalDataExportSection`, as `BankExportSections` does) and of erasure and handle
+  anonymisation (the `UserErasureParticipant`, `HandleAnonymisationParticipant` and
+  `UserReassignmentParticipant` SPIs of `platform.api`: donor and HB anonymised, donations and deals
+  kept for the books).
 - External individuals (partners): §4.4, E-05; listed in the data-protection notes as a new category
   of data subject.
 - No personal data in metrics, logs (`LogSafe`), notifications beyond display names, or audit
@@ -483,27 +599,31 @@ Each step is one pull request (or a short stack), shippable alone, behind the fe
 | Step | Content | Depends on |
 | --- | --- | --- |
 | S0 | Approval of this plan; ADRs (§10); specs `supply.md`, `purchasing.md` and the amendments (§9) | owner |
-| B1 | Bank-wide four-eyes rule (REQ-BANK-058, F-1 … F-4): independent of the rest, may ship first; bank wiki page and ROLES_AND_PERMISSIONS amended | S0 |
-| S1 | `inventory.api.StockCommands` first slice (book-in into pool, transfer to pool, earmark), with the audit contract, the lot-lock tests and the #2409 reason hook | S0 |
-| S2 | `supply` module: settings, needs, donations, web pages, N1–N3, audit `SUPPLY`, metrics, statistics; switch `supply.enabled` | S1 |
-| S3 | `purchasing` core without money: delegates, partners, deals, deliveries, acceptance with book-in, settlement record, pause; audit `PURCHASING`; N5, N6, N9 | S2 |
+| B1 | Bank-wide four-eyes rule (REQ-BANK-062, F-1 … F-4): independent of the rest, may ship first; bank wiki page and ROLES_AND_PERMISSIONS amended | S0 |
+| S1 | Extend `inventory.api.StockCommands` (book-in into pool, transfer to pool, donation earmark and its `EarmarkTargets.Donations` SPI), with the audit contract, the lot-lock tests and the proof that no transfer notice fires | S0 |
+| S2 | `supply` module (declared, in the domain map, in the table-ownership map): settings, needs, donations, web pages, N1–N3, audit `SUPPLY`, gauges, statistics; switch `supply.enabled` | S1 |
+| S3 | `purchasing` core without money: delegates, partners, deals, deliveries, acceptance with book-in, settlement record, pause; audit `PURCHASING`; N4–N6, N8, N9 | S2 |
 | S4 | Bank integration: purpose columns, `PurposeBoundRequests`, observer SPI, limits and budget cap, risk classes; bank-update skill split | S3 |
-| S5 | Notifications on #2414 Part A: N4, N7, N8; `SettlementOverdueTask` | #2414 A1, A2 |
+| S5 | Overdue settlement: `SettlementOverdueNoticeProducer` and N7 | S3 |
 | S6 | Report (CSV, forum text), dashboard, alerts | S4 |
 | Pilot | Admin switches `purchasing.enabled` after the OL resolutions; BL Profit appoints HB, sets cap; 4–6 weeks; evaluated with the S6 report | S4 (S5, S6 recommended) |
 
-The modularisation phases do not block this: the new modules depend only on `api` packages that
-exist or are created here (`StockCommands`, the bank purpose API). When inventory's and bank's
-classes move later (Phases 3 and 2), these APIs move with them unchanged.
+Nothing in the engine is left to wait for: the notification extension (#2414 Part A), the transfer
+notice (#2409) and the holder reconciliation (#2413) are on `main`, so S5 is an ordinary step and N4
+and N8 reach their recipients from the first day of S3. The modularisation does not block anything
+either: it is finished, the new modules depend only on `api` packages that exist (`StockCommands`,
+`SystemSettings`, the catalogue, identity and org-unit APIs) or are created here (the bank purpose
+API), and the module checks run on them from the first commit.
 
 Every step carries what the repository rules ask of a change: tests (unit, MockMvc gate matrix,
 `@SpringBootTest` with TestContainers for the money and stock paths, concurrency tests for pledge vs
 sale and for tranche confirm vs cancel, redaction tests, E2E for the pledge-receive flow and the
-deal flow), Checkstyle/SpotBugs/frontend lint gates, CHANGELOG, README, `ROLES_AND_PERMISSIONS.md`,
-arc42 §5 (two building blocks) and §8 if a cross-cutting rule changes, the German wiki (new pages
-„Bedarf und Spenden", „Ankauf"; „Kartellbank", „Lager", „Benachrichtigungen" amended), and the
-Basetool Knowledge vault (domain notes `Supply` / `Purchasing`, `Bank`, `Lager`, `Benachrichtigungen`,
-`Permissions`, `Audit`).
+deal flow, `ModularityTest` and the domain-map tests for the two modules, the table-ownership test,
+the scope-fragment parity test), Checkstyle/SpotBugs/NullAway and the frontend lint gates, CHANGELOG,
+README, `ROLES_AND_PERMISSIONS.md`, arc42 §5 (two building blocks), §8 if a cross-cutting rule changes
+and §11 for the new debt, and the German wiki (new pages „Bedarf und Spenden", „Ankauf"; „Kartellbank",
+„Lager", „Benachrichtigungen" amended). The Basetool Knowledge Base was retired on 2026-10-13; the
+specs, ADRs, arc42 chapters and runbooks of the repository are the only record to keep in step.
 
 ## 9 Draft requirements
 
@@ -561,7 +681,7 @@ approved.
   notifications, audit details, metrics or logs.
 - **REQ-SUP-015 Transfer notice.** A donation that changes a Lager row's owner MUST produce the
   donation notices (REQ-SUP-016) and MUST NOT additionally produce the owner-change transfer notices
-  of krt-profit/basetool#2409.
+  of REQ-INV-055 or the booked-out-by-other notice of REQ-INV-056.
 - **REQ-SUP-016 Notifications.** Pledged → receiving unit lead and Logisticians (N1, superseded on
   receive/decline/withdraw); received / partially received / declined → the donor (N2, N3). After
   commit, actor excluded.
@@ -629,7 +749,8 @@ approved.
   returned as a purpose-bound `DEPOSIT` request into the funding account. The deal MUST become
   `SETTLED` only when the remainder's deposit is confirmed (or the remainder is zero).
 - **REQ-PUR-018 Overdue settlement.** A deal not settled within the configured days MUST be marked
-  overdue on every deal list and in the report and MUST raise N7 (once per deal, REQ-NOTIF A2).
+  overdue on every deal list and in the report and MUST raise N7 (once per deal, through a
+  `TimedNoticeProducer`, REQ-NOTIF-026).
 - **REQ-PUR-019 Pause.** The raising unit's lead, the governing Bereichsleitung, OL members and admin
   MUST be able to pause and resume purchasing globally or per raising unit with a reason code. While
   paused, deal submit and tranche requests MUST be refused (`PURCHASING_PAUSED`); deliveries,
@@ -661,33 +782,37 @@ approved.
 
 | Spec | Requirement | Amendment |
 | --- | --- | --- |
-| `bank.md` | **new REQ-BANK-057** Purpose reference | A booking request MAY carry `purpose_kind` + `purpose_ref` (both or neither), set only through the bank's command API, never by the member or staff REST surface; shown read-only on request and transaction detail. |
-| `bank.md` | **new REQ-BANK-058** Four-eyes for every booking request | The requester of a booking request MUST NOT grant its owner approval and MUST NOT confirm it (`BANK_FOUR_EYES_REQUIRED`); `callerMayConfirm` and the owner-approval action MUST be absent for the requester. The requester MAY reject it (F-1). The rule binds bank employees and bank management; an **admin** MAY grant and confirm their own request (F-4). Direct bookings are not requests and stay unchanged (F-2). A responsible holder's own request stays exempt from owner approval (ADR-0123, F-3) and still needs a confirmer other than the holder. A request whose only eligible confirmer is the requester stays pending until another employee with the grant, bank management or an admin confirms it. |
-| `bank.md` | **new REQ-BANK-059** Purpose observer | On confirm, reject and cancel of a purpose-bound request the bank MUST call the registered observer for that purpose kind inside its transaction; an observer failure MUST roll the bank decision back. |
+| `bank.md` | **new REQ-BANK-061** Purpose reference | A booking request MAY carry `purpose_kind` + `purpose_ref` (both or neither), set only through the bank's command API, never by the member or staff REST surface; shown read-only on request and transaction detail. |
+| `bank.md` | **new REQ-BANK-062** Four-eyes for every booking request | The requester of a booking request MUST NOT grant its owner approval and MUST NOT confirm it (`BANK_FOUR_EYES_REQUIRED`); `callerMayConfirm` and the owner-approval action MUST be absent for the requester. The requester MAY reject it (F-1). The rule binds bank employees and bank management; an **admin** MAY grant and confirm their own request (F-4). Direct bookings are not requests and stay unchanged (F-2). A responsible holder's own request stays exempt from owner approval (ADR-0123, F-3) and still needs a confirmer other than the holder. A request whose only eligible confirmer is the requester stays pending until another employee with the grant, bank management or an admin confirms it. |
+| `bank.md` | **new REQ-BANK-063** Purpose observer | On confirm, reject and cancel of a purpose-bound request the bank MUST call the registered observer for that purpose kind inside its transaction; an observer failure MUST roll the bank decision back. |
 | `bank.md` | REQ-BANK-045 | unchanged; the generated justification satisfies it. |
-| `inventory-lager.md` | **new REQ-INV-055** `StockCommands` | The inventory module MUST offer `bookIntoPool`, `transferToPool`, `earmark` / `release` as its only write API for other modules, `MANDATORY`, under the lot-lock protocol (ADR-0229), each recording its `INVENTORY` audit event with a reason enum. |
-| `inventory-lager.md` | **new REQ-INV-056** Earmarked stock | An earmark for a pledge MUST reduce the row's available amount for every checkout, rebook, offer and allocation path. |
+| `inventory-lager.md` | **new REQ-INV-057** Pool and donation commands | `StockCommands` MUST offer `bookIntoPool`, `transferToPool` and the donation earmark / release alongside its existing calls, `MANDATORY`, under the lot-lock protocol (ADR-0229), each recording its `INVENTORY` audit event with a `StockBookingReason`. |
+| `inventory-lager.md` | **new REQ-INV-058** Earmarked stock | An earmark for a pledge MUST reduce the row's available amount for every checkout, rebook, offer and allocation path. |
+| `inventory-lager.md` | REQ-INV-055, REQ-INV-056 | a transfer into a pool for a donation publishes neither notice (REQ-SUP-015). |
 | `audit.md` | REQ-AUDIT-001 | coverage list gains `SUPPLY` and `PURCHASING` with the event types of plan §7.1. |
-| `notifications.md` | „Wired use cases" | gains N1–N9; N4, N7, N8 depend on #2414 A1/A2. |
+| `notifications.md` | „Wired use cases" | gains N1–N9 on the engine of REQ-NOTIF-024 … -028 (N10 reuses `bank-notifications.md`). |
 | `observability.md` | REQ-OBS-005…011 | the metrics and alerts of plan §7.2. |
-| `module-boundaries.md` | REQ-MOD | domain map gains `supply 10`, `purchasing 12`; both declared; no baseline edge. |
-| `data-persistence.md` | table-ownership map | the eleven tables of §5.4. |
-| `security-and-access.md` | REQ-SEC | the two access policies, the admin fence for `/api/v1/supply/admin/**` and `/api/v1/purchasing/admin/**`, `no-store` classification, the edge stays closed (web-only). |
+| `module-boundaries.md` | REQ-MOD-001, -006 | domain map gains `supply 11`, `purchasing 12`; both declared and in `ModularityTest.DECLARED_MODULES`; no baseline edge. |
+| `data-persistence.md` | table-ownership map (`table-ownership.txt`) | the eleven tables of §5.4 and inventory's donation-allocation table. |
+| `security-and-access.md` | REQ-SEC | the two access policies, the `/api/v1/*/admin/**` fence covering `/api/v1/supply/admin/**` and `/api/v1/purchasing/admin/**`, `no-store` classification (`NoStoreApiScopes`), the edge stays closed (web-only). |
 | `api-conventions.md` | REQ-API | the two roots, tier T2, problem codes registered. |
-| `data-protection` (vault / docs) | — | external individual partners as a new category of data subject. |
+| `docs/privacy/` (data-protection notes) | — | external individual partners as a new category of data subject. |
 
 ## 10 ADRs to write on approval
 
-1. **Material supply and purchasing are two modules** (`supply` rank 10, `purchasing` rank 12) —
+The next free number on `main` is ADR-0251 (2026-10-13); claim at push time.
+
+1. **Material supply and purchasing are two modules** (`supply` rank 11, `purchasing` rank 12) —
    E-02, the module placement of §5.1.
 2. **A bank booking request may carry an opaque purpose, and the bank notifies its owner through an
-   observer SPI** — REQ-BANK-057/059, keeps ADR-0020 (bank org-unit-blind) intact; amends ADR-0028
+   observer SPI** — REQ-BANK-061/063, keeps ADR-0020 (bank org-unit-blind) intact; amends ADR-0028
    only if the seam rules need the new API named.
-3. **Four-eyes for every bank booking request, admin excepted** — E-03, F-1 … F-4, REQ-BANK-058;
+3. **Four-eyes for every bank booking request, admin excepted** — E-03, F-1 … F-4, REQ-BANK-062;
    amends ADR-0123 (the exemption stays, the confirmer may no longer be the requester).
 4. **Handelsbeauftragte are an in-app appointment, not a Keycloak role** — E-01.
-5. **`StockCommands` is the inventory module's write API** — E-11; the first slice of what ADR-0232
-   foresaw.
+5. **`StockCommands` gains the pool and donation commands** — E-11; the first writes that put stock
+   into an org-unit pool and the donation earmark as a third allocation kind, with `transferToPool`
+   as a command of its own so that no transfer notice fires.
 
 ## 11 Risks
 
@@ -697,7 +822,8 @@ approved.
 | Members feel watched by the donation statistics | Own statistics private to the member, per-donor list only for the governing Bereichsleitung, anonymous donation option, no ranking page |
 | Earmark logic interferes with existing Lager paths (sale, rebook, Materialbörse ratchet) | Earmark as an allocation kind inside inventory (beside job-order and mission allocations), concurrency tests per path (REQ-SUP-008) |
 | A bank change regresses the money path | The bank change is additive (two nullable columns, an SPI) and the four-eyes check ships as its own step B1 with its own tests (requester refused, admin allowed, reject allowed, direct booking unchanged, holder exemption unchanged); the existing bank suites, `BankReadNoNPlusOneTest`, the ladder tests and E2E stay green unchanged |
-| Notification noise | Donor notices mutable (A4), N4/N8 via A1 only, one notice per action |
+| Notification noise | Donor notices mutable (REQ-NOTIF-027), N4/N8 only to the listed HB (`EVENT_RECIPIENTS`), one notice per action, N7 once per deal |
+| A donation transfer trips the Lager's transfer or booked-out notices | `transferToPool` is its own command that publishes neither event; a test asserts no `INVENTORY_TRANSFERRED_*` and no `INVENTORY_BOOKED_OUT_BY_OTHER` notice after a received donation |
 | Pilot aborted | Switch off `purchasing.enabled`; data stays readable for admin; `supply` unaffected (E-02) |
 | Personal data of non-members | E-05 minimal fields, erasure, restricted visibility |
 
