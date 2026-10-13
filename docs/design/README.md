@@ -13,7 +13,7 @@ This folder holds the **offline-capable design prototype** for the SC Extractor 
 
 **Authoritative sources**
 
-- Written UI/UX contract: [`../DESIGN_SC_EXTRACTOR.md`](../DESIGN_SC_EXTRACTOR.md)
+- Written UI/UX contract: [`../DESIGN_SC_EXTRACTOR.md`](../archive/DESIGN_SC_EXTRACTOR.md)
 - Online Claude Design prototype / handoff bundle:
   <https://api.anthropic.com/v1/design/h/mM6v29vZctN6kiBsF62_eA>
 - Living spec of the import it feeds: [`../specs/refinery-screenshot-import.md`](../specs/refinery-screenshot-import.md)

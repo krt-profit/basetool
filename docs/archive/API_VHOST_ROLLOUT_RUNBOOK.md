@@ -2574,7 +2574,7 @@ public.
    > `basetool-frontend` session token carries it, so on the gateway the check passes for exactly
    > the tokens the ingest interface exists to refuse — which is what ADR-0018 amendment 1
    > (`REQ-INGEST-011`) reversed on 2026-08-03, and what
-   > [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md) step 7a has forbidden in a boxed warning
+   > [`INGEST_KEYCLOAK_SETUP.md`](INGEST_KEYCLOAK_SETUP.md) step 7a has forbidden in a boxed warning
    > ever since. The realm has carried the correct `extractor-ingest-only` scope — stamping
    > `aud=basetool-ingest` on the extractor's tokens and on no one else's — since before this
    > rollout.

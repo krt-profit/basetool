@@ -1,6 +1,3550 @@
 # Changelog-Archiv
 
-Archivierte Changelog-Einträge für Versionen **vor v1.2.0** (v1.1.11 und älter). Die aktuellen Einträge stehen in [CHANGELOG.md](CHANGELOG.md).
+Archivierte Changelog-Einträge für Versionen **vor v1.13.1** (v1.13.0 und älter). Die aktuellen Einträge stehen in [CHANGELOG.md](CHANGELOG.md).
+
+## [v1.13.0](https://github.com/krt-profit/basetool/releases/tag/v1.13.0) - 2026-09-28
+
+### Added
+
+- **Datenaustausch: getrennte Verbindungen werden nach 90 Tagen gelöscht.** Ein nächtlicher Job
+  löscht getrennte Installationen (samt ihrer Bezeichnung) und die Trennung ganzer Anwendungen 90 Tage
+  nach der Trennung, statt sie bis zum Löschen des Kontos aufzubewahren; jeder Lauf mit Löschungen
+  steht mit den Anzahlen im Audit „Verbundene Anwendungen" (REQ-XCH-035).
+
+- **Verbundene Anwendungen: Link auf die Liste der zugelassenen Anwendungen.** Die Seite
+  *Persönlich → Verbundene Anwendungen* verlinkt die öffentliche Liste
+  (`docs/legal/approved-clients.md` auf GitHub), damit Mitglieder prüfen können, welche Anwendungen
+  zugelassen sind.
+
+- **Datenaustausch: Zurücknehmen für alle Mitglieder.** Unter *Administration → Verbundene
+  Anwendungen* nimmt ein Admin die Änderungen einer Anwendung seit einem Zeitpunkt bei allen
+  Mitgliedern zurück (optional nur eine Installation oder ein Bereich); die Anwendung wird vorher
+  gesperrt, betroffene Mitglieder werden benachrichtigt. Migrationen `V256`, `V257`.
+
+- **Datenaustausch: Monitoring je Anwendung.** Neues Grafana-Dashboard „Exchange“ mit Filter nach
+  verbundener Anwendung (Metriken und Gateway-Logs); Gateway-Logzeilen tragen Client und Route,
+  neue Metriken `basetool_exchange_clients` und `basetool_exchange_registry_mirror_age_seconds` samt
+  Alarm `ExchangeRegistryMirrorStaleAtGateway`.
+
+- **Monitoring: Alarm für die DPoP-Obergrenze.** `ExchangeDpopProofLimitSustained` (Warnung) meldet,
+  wenn Mitglieder 15 Minuten lang immer wieder an ihre Obergrenze lebender DPoP-Nachweise stoßen;
+  ein einzelner Ausreißer löst ihn nicht aus (REQ-XCH-006).
+
+- **Datenaustausch: Lasttest gegen die Sandbox.** `scripts/sandbox-load.py` misst Feed-, Snapshot-
+  und Änderungs-Routen des Gateways samt Redis-Byte-Budget an der lokalen Sandbox, nie an
+  Produktion; dafür hat die Sandbox 16 synthetische Mitglieder `sandbox-load-01` … `-16` (#2092).
+
+- **Datenaustausch: öffentliche Sandbox-Images.** Eine eigene Pipeline baut
+  `basetool-sandbox-{backend,frontend,ingest,keycloak}` mit reinen Testwerten; die Images verweigern
+  das Profil `prod` beim Start, und ein Secret-Scan läuft vor jeder Veröffentlichung. Eine Version
+  und `latest` erscheinen nur zu einem Release-Tag `vX.Y.Z` auf `main`. Die
+  Produktions-Images bleiben privat. Ein Smoke-Test (`scripts/sandbox-smoke.py`) zieht sie danach
+  ohne Anmeldung und prüft Geräte-Login, DPoP, alle Ressourcen und die Konformitäts-Beispiele.
+
+- **Datenaustausch: lokale Sandbox für Fremd-Anwendungen.** `scripts/sandbox.sh` bzw.
+  `scripts/sandbox.ps1` starten Gateway, Backend, Frontend und einen Keycloak-Realm mit Testclient
+  `sandbox-client`, synthetischen Mitgliedern und Beispieldaten nur auf `127.0.0.1` – ausschließlich
+  mit Wegwerf-Werten, ohne Produktionszugang (`docs/exchange/sandbox.md`, REQ-XCH-029).
+
+- **Datenaustausch: Anmeldung dokumentiert, DPoP-Referenz.** `docs/exchange/authentication.md`
+  beschreibt Geräte-Login, DPoP-Nachweise, Server-Nonce, Refresh und Trennen samt Fehlercodes;
+  `docs/exchange/dpop-reference/` ist eine MIT-lizenzierte Python-Referenz (Windows CNG, OpenSSL 3).
+
+- **Datenaustausch: Dokumentation für Fremd-Anwendungen online.** `docs/exchange/` erscheint mit einer
+  gerenderten OpenAPI-Referenz unter <https://krt-profit.github.io/basetool/>; das Service-Dokument
+  verweist dorthin. CI prüft Links und Markdown der Seiten.
+
+- **Blueprints: Herkunft.** Jeder Blueprint merkt sich, woher er kam (von Hand, Datei-Import,
+  Standard, Spiel-Log einer verbundenen Anwendung), und „Meine Blueprints“ zeigt das in der
+  Detailansicht. Migration `V255`; ältere Einträge bleiben ohne Herkunft.
+
+- **Datenaustausch: Entwürfe über das Gateway.** `POST /exchange/v1/me/drafts/blueprints` und
+  `…/drafts/refinery-orders` legen Blueprints bzw. Raffinerieaufträge wie der Extractor-Upload zur
+  Prüfung im Browser ab; nichts wird geschrieben, bevor das Mitglied bestätigt.
+
+- **Blueprint-Import liest das Austauschformat.** Der Datei-Import unter „Meine Blueprints“ nimmt
+  zusätzlich das `basetool.blueprints`-Format verbundener Anwendungen an; die bisherigen Formate
+  bleiben.
+
+- **Datenaustausch: Blueprints lesen.** Verbundene Anwendungen mit `exchange.blueprints.read` lesen
+  über `GET /exchange/v1/me/blueprints` die Blueprints des Mitglieds samt Quelle als Snapshot und
+  danach nur die Änderungen seit ihrem Cursor, Löschungen eingeschlossen; ein abgelaufener Cursor
+  antwortet `410 CURSOR_EXPIRED` (REQ-XCH-013, REQ-XCH-015).
+
+- **Datenaustausch: Bedarf lesen.** Verbundene Anwendungen mit `exchange.demand.read` lesen über
+  `GET /exchange/v1/me/org-demand` den offenen Material- und Item-Bedarf der Einheiten des
+  Mitglieds, anonym zusammengefasst – ohne Namen, Titel oder einzelne Aufträge (REQ-XCH-018).
+
+- **Datenaustausch: Schreibrouten im Gateway.**
+  `POST /exchange/v1/me/{blueprints,stock,ships}/changes` prüfen Änderungssätze (höchstens 500
+  Operationen, sonst `413 BATCH_TOO_LARGE`) und reichen sie ans Backend weiter. Eine von der
+  Massenänderungs-Sperre angehaltene Änderung wartet auf die Bestätigung im Browser, die Antwort
+  nennt die `confirmationUrl` (REQ-XCH-021, REQ-XCH-023).
+
+- **Datenaustausch: Lager und Hangar lesen.** Verbundene Anwendungen mit `exchange.stock.read` bzw.
+  `exchange.hangar.read` lesen über `GET /exchange/v1/me/stock` und `GET /exchange/v1/me/ships` den
+  persönlichen Bestand (über alle Einheiten-Pools summiert) und die eigenen Schiffe (ohne Kaufdaten)
+  des Mitglieds als Snapshot und danach die Änderungen (REQ-XCH-016, REQ-XCH-017).
+
+- **Datenaustausch: Account-Abgleich.** Eine verbundene Anwendung kann fragen, ob ein RSI-Handle aus
+  dem Spiel-Log zum angemeldeten Mitglied gehört, und vor einem Zweit-Account warnen; die Antwort ist
+  nur `match`, `mismatch` oder `unknown`, der gespeicherte Handle wird nie herausgegeben
+  (REQ-XCH-031).
+
+- **Datenaustausch: Limits und idempotente Schreibzugriffe.** Das Gateway begrenzt jede Anwendung
+  pro Mitglied (120/min, 500 Schreibzugriffe pro UTC-Tag) und insgesamt (1200/min) und verlangt bei
+  Schreibzugriffen einen `Idempotency-Key`; eine Wiederholung liefert die gespeicherte Antwort,
+  statt doppelt zu schreiben (REQ-XCH-020, REQ-XCH-023).
+
+- **Datenaustausch: Bewerbung für Fremd-Anwendungen.** `docs/exchange/onboarding.md` und
+  `docs/exchange/client-security.md` beschreiben Kriterien und Sicherheitsanforderungen, eine
+  Issue-Vorlage nimmt Bewerbungen auf, und `docs/legal/approved-clients.md` ist das öffentliche
+  Verzeichnis zugelassener Anwendungen (erster Eintrag: der SC Extractor; REQ-XCH-002,
+  REQ-XCH-027).
+
+- **Datenaustausch: Änderungsprotokoll.** Jede Änderung an persönlichen Blueprints, am persönlichen
+  Lager und an Schiffen – auch über Sammelaktionen und Standard-Blueprints – wird mit ihrer Quelle
+  (Web, App, Anwendung, System) protokolliert, 90 Tage aufbewahrt und in den Datenexport
+  aufgenommen; Grundlage für den Abgleich verbundener Anwendungen (Migration `V252`, ADR-0224,
+  REQ-XCH-013).
+
+- **Verbundene Anwendungen: letzte Änderungen und neue Verbindungen.** Jede Anwendung zeigt ihre zehn
+  letzten Änderungen an deinen Daten (zurückgenommene markiert); eine neue Installation bleibt mit
+  einem Warnhinweis als „Neu" hervorgehoben, bis du sie in ihrer Zeile mit „Gesehen" bestätigst
+  (REQ-XCH-032).
+
+- **Verbundene Anwendungen: große Änderungen bestätigen.** Will eine Anwendung auf einmal viele
+  Einträge entfernen, zeigt der Bestätigungslink, was passieren würde; erst „Bestätigen" wendet es an,
+  „Verwerfen" lässt alles, wie es ist (REQ-XCH-021).
+
+- **Verbundene Anwendungen: Änderungen zurücknehmen.** Auf der Seite setzt „Änderungen
+  zurücknehmen" alles zurück, was eine Anwendung im gewählten Zeitraum (bis 90 Tage) an Blueprints,
+  Lager und Hangar geändert hat; danach anders Geändertes bleibt und wird aufgelistet,
+  Materialbörse-Angebote kommen nicht zurück (REQ-XCH-022).
+
+- **Datenaustausch: Seiten aktualisieren sich live.** Schreibt eine verbundene Anwendung, laden
+  Hangar, „Meine Blueprints", Lager und Materialbörse ohne Neuladen nach; Hangar und Blueprints
+  haben dafür je einen persönlichen Live-Sync-Raum, den nur das Mitglied selbst abonnieren kann.
+
+- **Datenaustausch: Schiffe schreiben.** Verbundene Anwendungen verknüpfen ihre Schiffe zuerst mit
+  den vorhandenen – je Installation –, legen danach neue an, ändern und löschen mit der zuletzt
+  gesehenen Version (`/api/v1/exchange/me/ships/changes`); ein Fleetview-Import wird so nicht
+  verdoppelt, und eine Löschung meldet, aus wie vielen Missionseinheiten das Schiff genommen wurde
+  (REQ-XCH-017, Migration V254).
+
+- **Datenaustausch: Lager schreiben.** Verbundene Anwendungen setzen die Menge eines persönlichen
+  Postens gegen die zuletzt gesehene Menge (`/api/v1/exchange/me/stock/changes`); die Differenz wird
+  wie im Lager ein- oder ausgebucht, gekürzte oder entfernte Materialbörse-Angebote stehen im Audit
+  (`MARKET_OFFER_REDUCED`, `MARKET_OFFER_REMOVED`), und reservierte Mengen bleiben unangetastet
+  (REQ-XCH-016).
+
+- **Datenaustausch: Blueprints schreiben.** Verbundene Anwendungen können Blueprints hinzufügen
+  und entfernen (`/api/v1/exchange/me/blueprints/changes`); Standard-Blueprints bleiben, was ein
+  anderes Gerät oder das Web entfernt hat, kommt nur nach Rückfrage wieder, zu große Löschungen
+  warten auf die Bestätigung im Browser, und jede Änderung steht im Audit und im Schreibjournal
+  (REQ-XCH-014, REQ-XCH-015, REQ-XCH-021).
+
+- **Datenaustausch: Schreibjournal.** Änderungen verbundener Anwendungen an Blueprints, Lager und
+  Hangar werden mit dem Zustand davor und danach 90 Tage protokolliert und erscheinen im
+  Datenexport. Grundlage für das Zurücknehmen und die Massenänderungs-Sperre (Migration `V253`,
+  REQ-XCH-022).
+
+- **Datenaustausch: Vertrag öffentlich abrufbar.** Das Ingest-Gateway liefert das OpenAPI-Dokument
+  und die JSON-Schemas der Exchange-API anonym unter `/exchange/v1/openapi.json` und
+  `/exchange/v1/schemas/<name>.schema.json` aus (REQ-XCH-011). Die alten Extractor-Endpunkte lassen
+  sich zum Go-live mit `IRI_INGEST_LEGACY_ENDPOINTS_ENABLED=false` abschalten und antworten dann mit
+  `410` und einem Update-Hinweis (REQ-XCH-033).
+
+- **Benachrichtigung „Neue Anwendung verbunden".** Verbindet sich eine neue Installation einer
+  Anwendung mit deinem Konto, bekommst du eine Benachrichtigung mit dem Namen der Anwendung, damit
+  dir eine Verbindung auffällt, die du nicht selbst hergestellt hast (Migration `V251`, REQ-XCH-032).
+
+- **Administration → Verbundene Anwendungen.** Admins registrieren, bearbeiten, sperren und
+  begrenzen die zugelassenen Anwendungen samt Fähigkeiten und schalten den Datenaustausch global ein
+  oder aus; Sperren, Schalter und zusätzliche Berechtigungen fragen vorher nach. Je Anwendung stehen
+  verbundene Mitglieder, letzte Aktivität und ein Grafana-Link zur Fehlerrate
+  (`APP_GRAFANA_OPERATIONS_DASHBOARD_URL`). Jede Änderung steht im neuen Audit-Bereich „Verbundene
+  Anwendungen“ und wird für das Gateway nach Redis gespiegelt (`APP_EXCHANGE_MIRROR_ENABLED`, vorerst
+  aus; Migration `V248`, REQ-XCH-003).
+
+- **Verbundene Anwendungen: Trennen einer Installation oder einer ganzen Anwendung.** Mitglieder
+  sehen unter *Persönlich → Verbundene Anwendungen* ihre verbundenen Anwendungen mit Berechtigungen
+  und Installationen und trennen eine Installation oder die ganze Anwendung; gesperrte Schlüssel und
+  Widerrufe erreichen das Gateway sofort (Migration `V249`, REQ-XCH-008, REQ-XCH-032).
+
+- **Audit: Änderungen über eine zugelassene Anwendung nennen diese Anwendung.** Der Client-Filter im
+  Audit-Log bietet die registrierten Anwendungen unter ihrem Produktnamen an (REQ-XCH-010). Auch die
+  Metrik `basetool_api_client_requests_total` zählt weitergereichte Aufrufe unter der Client-ID der
+  Anwendung statt unter der des Gateways; ältere Audit-Zeilen bleiben „Ohne Client (System)“.
+
+- **Lager: Markierung „gestohlen“.** Bestand kann als gestohlen eingebucht oder nachträglich — auch
+  teilweise — markiert werden; gestohlene und reguläre Ware bilden getrennte Stapel, jede Umbuchung
+  behält die Markierung, Lager, Aufträge, Einsätze und Materialbörse zeigen sie an und filtern danach
+  (REQ-INV-053, Migration `V247`). Noch hinter dem Schalter `APP_INVENTORY_STOLEN_MARKING_ENABLED`
+  (aus), bis die App ihn kennt.
+
+- **Mein Lager: Einheit eines persönlichen Eintrags ändern.** Pro Eintrag und für eine Auswahl
+  lässt sich die Einheit eigener persönlicher Einträge nachträglich wechseln — auf eine eigene
+  Mitgliedschaft oder „Keine Einheit"; der Dialog sagt, wer den Eintrag dann sieht (REQ-INV-052).
+
+- **Profil: optionales RSI-Handle.** Mitglieder können ihr RSI-Handle im Profil hinterlegen; es ist
+  nur für sie selbst und Admins sichtbar, eindeutig über alle Konten und dient verbundenen Anwendungen
+  zum Account-Abgleich (REQ-SEC-072, REQ-XCH-031, Migration `V246`).
+
+- **Audit-Log: neuer Bereich „Blueprints".** Hinzufügen, Bearbeiten, Entfernen, Import, globale
+  Freigabe, Standard-Blueprints und deren Vergabe — auch aus der App und durch Admins — landen im
+  Audit-Log; Notizen werden nie mitgeschrieben (REQ-INV-051).
+
+- **Audit-Log: neuer Bereich „Hangar".** Jede Änderung an Schiffen — anlegen, bearbeiten,
+  löschen, Hangar leeren, Import, „Alle unfitted", Heimatstandort, auch aus der App und durch
+  Admins — landet im Audit-Log (neuer Tab); wird ein Schiff gelöscht, protokolliert die Mission das
+  Lösen aus ihren Einheiten (REQ-HANGAR-004).
+
+- **Keycloak: Vorlage für freigegebene Drittanwendungen (Exchange-API).** Der Realm-Provisioner legt
+  die zehn `exchange.*`-Scopes und jede Anwendung aus `scripts/keycloak/external-clients.json` nach
+  einer Vorlage an (Gerätelogin, Einwilligung, DPoP, 30/90 Tage Offline-Sitzung); das Login-Theme
+  bekommt eine eigene Einwilligungs- und Geräte-Seite mit Phishing-Warnung (REQ-XCH-005).
+
+- **Neue Seite „Star-Citizen-Links" (`/sc-links`) für alle Mitglieder.** 19 hilfreiche externe
+  Websites (u. a. UEX, Erkul, SCMDB, FleetYards, KRT OpSec) mit Logo und kurzer Beschreibung, nach
+  Themen gruppiert; erreichbar über die neue Navigationsgruppe „Ressourcen".
+
+- **App: „Mein Lager" ist über den API-vhost erreichbar.** Die drei Lesepfade
+  `GET /api/v1/inventory/my-inventory/{grouped,stack/entries,entry-ids}` stehen auf der Allowlist
+  und im eingefrorenen App-Vertrag (REQ-API-009), damit die Android-App den eigenen Bestand zeigen
+  kann (#2097).
+
+### Changed
+
+- **Datenschutzerklärung: Abschnitt „Verbundene Anwendungen“.** Er nennt, welche Daten eine verbundene
+  Anwendung erhält, was zu Verbindungen gespeichert wird und wie lange (getrennte Installationen und
+  Trennungen 90 Tage nach der Trennung, Änderungsprotokoll 90 Tage) und wie man trennt und zurücknimmt;
+  der Abschnitt zum SC Extractor nennt den direkten Blueprint-Abgleich.
+
+- **Nutzungsbedingungen: neue Fassung vom 28.09.2026.** Abschnitt 4 verweist auf die öffentliche Liste
+  zugelassener Anwendungen (erster Eintrag: der SC Extractor ab 2.10.0) und regelt, was eine verbundene
+  Anwendung darf; Einleitung und Abschnitt 12 verlangen eine Zustimmung statt „Zugriff“ oder
+  „fortgesetzter Nutzung“. Jedes Mitglied stimmt einmal neu zu; bis dahin pausieren SC Extractor und verbundene
+  Anwendungen.
+
+- **Sandbox: aktuelle Images für amd64 und arm64.** `edge` wird nach jeder Änderung auf `main`
+  neu gebaut, die den Inhalt der Images betrifft, für `linux/amd64` und `linux/arm64`; jedes Image
+  trägt seinen Commit (`org.opencontainers.image.revision`). In der Sandbox sind
+  `429 DPOP_PROOF_LIMIT` und `DEFAULT_NOT_REMOVABLE` jetzt auslösbar (REQ-XCH-029).
+
+- **Blueprints: Herkunft nennt die Anwendung beim Namen.** „Über …“ in der Detailansicht zeigt den
+  registrierten Namen der verbundenen Anwendung statt ihrer Client-ID; ist sie nicht mehr
+  registriert, bleibt die ID. Die Blueprint-Antworten (auch die Admin-Ansicht) tragen dafür
+  `sourceClientName` (REQ-INV-054, #2231).
+
+- **Datenaustausch: eigener Code für die DPoP-Obergrenze.** Hält ein Mitglied schon 600 lebende
+  DPoP-Nachweise, antwortet das Gateway mit `429 DPOP_PROOF_LIMIT` und `Retry-After` statt mit dem
+  `401 DPOP_INVALID` eines wiederholten Nachweises (REQ-XCH-006).
+
+- **Datenaustausch: volle Nachweis-Ablage antwortet 503.** Halten alle Mitglieder zusammen die
+  100 000 lebenden DPoP-Nachweise des Gateways, antwortet es mit `503 SERVICE_UNAVAILABLE` und
+  `Retry-After` statt mit `401 DPOP_INVALID` (REQ-XCH-006).
+
+- **Datenaustausch: feste Zahlen für Back-off und Sync-Takt.** Fremd-Anwendungen warten nach einem
+  Fehler ab 5 Sekunden, verdoppelt bis höchstens 5 Minuten, mit Jitter und nie kürzer als
+  `Retry-After`; zeitgesteuert synchronisieren sie höchstens alle 5 Minuten (REQ-XCH-027).
+
+- **Blueprint-Import: nur Formatversion 1.x.** Eine `basetool.blueprints`-Datei oder ein
+  Blueprint-Entwurf mit einer anderen Hauptversion als 1 (etwa `2.0`) wird abgelehnt statt als 1.0
+  gelesen (REQ-XCH-019, REQ-INV-014).
+
+- **Datenaustausch: Doku-Seite im KRT-Design.** Die öffentliche Entwickler-Doku
+  (`krt-profit.github.io/basetool`) nutzt statt des Standard-Themes das DAS-KARTELL-Design mit
+  Basetool-Logo, Seitennavigation, „Improve this page“-Link und einer eingefärbten API-Referenz;
+  dunkel, handytauglich, ohne externe Ressourcen.
+
+- **Datenaustausch: Entwickler-Doku komplett auf Englisch.** Deutsche Seitennamen und Begriffe
+  sind durch die englischen Namen der Web-App ersetzt; ein CI-Check verhindert neue Umlaute und
+  deutsche Anführungszeichen auf der Seite.
+
+- **Datenaustausch: zurückgehaltene Massenänderungen je Anwendung.** Jede verbundene Anwendung hat je
+  Mitglied einen eigenen Platz für eine zu bestätigende Massenänderung; eine andere Anwendung kann sie
+  nicht mehr verdrängen.
+
+- **Keycloak: die Zustimmungsseite eines Geräte-Logins zeigt Warnung und Code.** Ein neuer
+  Login-Formular-Provider im SPI-Jar (`krt-freemarker`) reicht den Code an die Seite weiter; wer
+  einem fremden Code-Link folgt, sieht vor „Erlauben" die Phishing-Warnung und den Code zum
+  Vergleich (ADR-0228, REQ-XCH-005).
+
+- **Datenaustausch: Geräte-Login ohne fertigen Code-Link.** Anwendungen zeigen den Code und die
+  schlichte Adresse `verification_uri`, in die das Mitglied den Code selbst eintippt; den Link mit
+  eingesetztem Code, der die Warnseite überspringt, öffnen sie nicht mehr (`docs/exchange/`,
+  REQ-XCH-027).
+
+- **Keycloak: der SC Extractor wird zum reinen Austausch-Client (Sicherheitsbefund H1).** Der
+  Provisioner verlangt für `basetool-sc-extractor` künftig eine Zustimmung im Browser, bindet
+  Zugriffs- und Auffrischungs-Token an DPoP und gibt nur noch die Austausch-Berechtigungen und
+  `offline_access` frei; `extractor-ingest` und `extractor-ingest-only` entfallen. Ein Extractor-Token gilt damit nicht
+  mehr für die Backend-API. Auf Produktion wird das erst nach dem Abschalten der alten
+  Extractor-Adressen angewendet, weil Versionen bis 2.9.1 sie noch brauchen.
+
+- **Datenaustausch: Backend prüft „Trennen“ selbst.** Hat ein Mitglied eine Anwendung getrennt,
+  lehnt jetzt auch das Backend deren Verbindungen von vor dem Trennen ab, mit derselben Zeit wie
+  das Gateway; ist der Sperrspiegel in Redis nicht lesbar, wird die Anfrage abgelehnt statt
+  durchgelassen.
+
+- **Datenaustausch: feste Fehlertexte.** Lehnt das Backend eine Anfrage einer verbundenen Anwendung
+  ab, erhält die Anwendung nur noch den Fehlercode mit einem festen englischen Text je Code, nie den
+  internen Text des Backends (REQ-XCH-025).
+
+- **Datenaustausch: Entwürfe in eigenen Plätzen.** Entwürfe einer verbundenen Anwendung liegen je
+  Anwendung und Mitglied in eigenen Plätzen (höchstens 10); sie verdrängen keine offenen Uploads des
+  SC Extractors und keine Entwürfe anderer Anwendungen mehr.
+
+- **Ingest: verbundene Anwendungen nicht auf den alten Endpunkten.** Die alten `/v1`-Endpunkte
+  lehnen jede Anwendung aus dem Austausch-Register ab, die nicht zusätzlich auf der
+  Client-Allowlist steht; der SC Extractor bleibt erreichbar.
+
+- **Ingest: Produktion startet nicht ohne Client-Allowlist.** Solange die alten `/v1`-Endpunkte
+  aktiv sind, verweigert das Gateway unter `prod` den Start, wenn `IRI_INGEST_ALLOWED_CLIENT_IDS`
+  leer ist oder `IRI_INGEST_CLIENT_AUDIT_ONLY` auf `true` steht – sonst erreichte das Token einer
+  verbundenen Anwendung die alten Entwurfs-Relays. Produktion setzt beides bereits passend.
+
+- **Keycloak: Offline-Sitzung des SC Extractors fest auf 30/90 Tage.** Der Provisioner setzt beim
+  Client `basetool-sc-extractor` dieselbe Offline-Sitzung wie bei verbundenen Anwendungen (30 Tage
+  ohne Nutzung, 90 Tage insgesamt), weil der Extractor ab 2.10.0 `offline_access` anfordert. Bisher
+  galten nur die Realm-Werte.
+
+- **Keycloak-Provisioner: keine fremden Mapper am SC Extractor und an Drittanwendungen.** Ein
+  Protocol-Mapper direkt an `basetool-sc-extractor` oder an einem Client aus
+  `external-clients.json` wird jetzt als geplante Änderung gelistet und beim `--apply` entfernt,
+  statt nur gemeldet. Ein von Hand ergänzter Audience-Mapper kann so kein Token für die Backend-API
+  mehr liefern; an allen anderen Clients bleibt es beim Melden.
+
+- **Keycloak: Zustimmungsseite verspricht nichts mehr, was sie nicht weiß.** Statt „Deinen Namen,
+  deine E-Mail-Adresse und deine Rollen erfährt sie nicht" steht dort jetzt „Die Anwendung erhält nur
+  die unten aufgeführten Rechte." Der alte Satz stimmte nicht für jede Anwendung, etwa für den SC
+  Extractor vor seiner Umstellung.
+
+- **Datenaustausch: Lager-Änderungen wie im Web.** Ein Umbuchen auf „gestohlen“ oder zurück markiert
+  die Zeilen wie im Lager (Teilmengen werden abgespalten) statt aus- und neu einzubuchen;
+  Stück-Einbuchungen werden mit der vorhandenen Zeile zusammengeführt. Als Verschiebung zählt ein
+  Abbau nur noch, wenn Zugänge desselben Materials ihn vollständig decken.
+
+- **Monitoring: ein Audit-Bereich alarmiert erst nach 30 statt 14 Tagen Stille; Hangar und Blueprints
+  sind wie Materialbörse und Rollen ausgenommen.** Auf Produktion gab es beim Hangar eine echte Pause
+  von gut 15 Tagen; beide Bereiche werden über die 30-/60-Tage-Tabellen im Betriebs-Dashboard
+  beobachtet (`AuditDomainSilenceAnomaly`, REQ-OBS-011).
+
+- **Redis: 768 MB Speichergrenze in einem 1024-MB-Container (vorher 384 / 512 MB).** Platz für den
+  begrenzten Speicherbereich der Exchange-Schnittstelle (höchstens 64 MB), ohne dass
+  Sitzungen enger werden (ADR-0221). Wirkt auf Produktion erst mit dem Release und seinen
+  Quadlet-Units.
+
+- **Blueprint-Import: Namen mit Klassen-Kürzeln eines Sprachpakets werden direkt zugeordnet.**
+  Sprachpakete wie StarStrings oder das deutsche Paket schreiben Klasse, Größe und Grad in den
+  Item-Namen („Sth/2/C Cirrus", „[STH-S2-C] Cirrus", „Cirrus (S2 C Stealth)"). Der Import entfernt
+  genau diese belegten Formen und versucht Name und Alias erneut, statt nur einen Vorschlag
+  anzubieten; gespeicherte Produkt-Schlüssel bleiben unverändert (REQ-INV-050).
+
+- **CI: ein Dependabot-Image-Bump in den Compose-Dateien bringt seine Quadlet-Units selbst mit.**
+  `dependabot-compose.yml` löst die Digests neu auf, erzeugt `quadlet/` neu und committet das Ergebnis
+  auf den Dependabot-Branch, sodass kein Bump mehr mit veralteten Units gemergt wird (ADR-0215).
+
+- **Deploy: ein Release mit neuem Keycloak-Provider-JAR kostet nur noch eine Downtime statt zwei.**
+  `deploy.sh` spielt das JAR zusammen mit den App-Images ein und startet jeden Dienst genau einmal
+  neu (auch Frontend und Ingest nicht mehr doppelt); scheitert das Health-Gate, gehen Images,
+  Konfiguration und JAR gemeinsam zurück (ADR-0213). Wirkt erst nach einem Lauf der Ansible-Rolle
+  (`--tags deploy,scripts`).
+
+- **Deploy: die Selbstheilung startet jeden betroffenen Dienst genau einmal und meldet erst Erfolg,
+  wenn alle wieder laufen.** Ein ungesunder Dienst wird mit allem, was ihn per `Requires=` braucht,
+  einmal gestoppt und in Reihenfolge wieder gestartet, statt einzeln neu gestartet (ungesundes
+  Frontend: nur Frontend). Wirkt erst nach einem Lauf der Ansible-Rolle (`--tags deploy,scripts`).
+
+- **Deploy: `deploy.sh --reapply` spielt das laufende Release erneut ein, ohne die Rollback-Anker zu
+  verschieben** — ersetzt das Löschen von `last-deployed.digests`. Ein gescheitertes Re-Apply wird
+  nach 5 Minuten (verdoppelnd bis 1 h) statt nach 10 Minuten (bis 6 h) wiederholt. Wirkt erst nach
+  einem Lauf der Ansible-Rolle (`--tags deploy,scripts`).
+
+### Fixed
+
+- **Datenaustausch: große Bestandsänderungen werden mit der Zeit nicht mehr langsamer.** Jede
+  Position einer Änderung las bisher die ganze Änderungshistorie des Mitglieds bzw. alle Zeilen des
+  Materials am Ort; ein neuer Index (Migration `V258`) und eine indexfähige Qualitätsabfrage halten
+  beide Zugriffe kurz (REQ-XCH-016).
+
+- **Datenaustausch: keine Deadlocks mehr bei gleichzeitigen Bestandsänderungen.** Sendeten zwei
+  Installationen eines Mitglieds gleichzeitig Änderungen an denselben Lots in anderer Reihenfolge,
+  brach PostgreSQL eine davon mit einem Deadlock ab; das Backend sperrt die Lots jetzt in fester
+  Reihenfolge (REQ-XCH-016).
+
+- **Datenaustausch: gleichzeitige Bestandsänderungen desselben Lots wirken nur einmal.** Schickten
+  zwei Installationen dieselbe Erhöhung gleichzeitig, wurden beide gebucht (aus 5 → 6 wurde 7), auch
+  bei leeren Lots; ein Zurücknehmen konnte eine gleichzeitige Änderung überschreiben. Jetzt sperrt das
+  Backend jedes Lot vorab, die zweite Änderung erhält `VERSION_CONFLICT` (ADR-0229, REQ-XCH-016).
+
+- **Datenaustausch: volles Speicherbudget ehrlich melden.** `503 EXCHANGE_BUDGET_EXHAUSTED` nennt im
+  `Retry-After` die Sekunden, bis genug Budget abläuft (höchstens eine Stunde), statt pauschal 60,
+  und zählt nicht mehr gegen das Tageskontingent von 500 Schreibzugriffen. Neue Metrik
+  `basetool_ingest_exchange_client_budget_used_ratio` mit Alarm `ExchangeClientBudgetHigh`, der das
+  volle Budget einer einzelnen Anwendung meldet (REQ-XCH-023).
+
+- **Monitoring: DPoP-Nonce-Abfrage ist keine Ablehnung mehr.** Der normale Nonce-Roundtrip zählt
+  nicht mehr als `dpop_invalid` in `basetool_ingest_exchange_refused_total` (REQ-XCH-028).
+
+- **Datenaustausch: große Änderungspakete legen den Extractor-Import nicht mehr lahm.** Das Gateway
+  leitet Datenaustausch-Anfragen über einen eigenen Circuit Breaker, eigene Verbindungen und 30 s
+  statt 15 s Timeout weiter und höchstens vier Pakete mit mehr als 100 Operationen gleichzeitig;
+  weitere erhalten `503 RELAY_BUSY` mit `Retry-After: 10`. Neuer Alarm `ExchangeLargeChangeSetsBusy`
+  (REQ-XCH-023).
+
+- **Redis: Ingest-Benutzer ohne ungenutzte Befehle.** Die ACL-Vorlage nimmt dem Benutzer
+  `basetool-ingest` `ZREMRANGEBYSCORE` und `UNLINK`, die das Gateway nie sendet; wirksam mit dem
+  nächsten Rendern der ACL.
+
+- **Ingest: Produktion startet nur mit eigenem Redis-Benutzer.** Unter `prod` verweigert das
+  Gateway den Start, wenn `REDIS_INGEST_USERNAME` leer oder `default` ist; so kann es nie als
+  `default` die Registry oder die Sperrlisten des Datenaustauschs verändern.
+
+- **Datenaustausch: abgewiesenes Zurücknehmen blockiert nichts mehr.** Ist die Warteschlange für
+  das Zurücknehmen bei allen Mitgliedern voll (zehn Läufe), wird der neue Lauf sofort als
+  fehlgeschlagen vermerkt und der Admin bekommt eine Meldung; bisher blieb er bis zum nächsten
+  Neustart „laufend“ und sperrte jeden weiteren Lauf der Anwendung. Die Anwendung bleibt gesperrt.
+
+- **Datenaustausch: abgeschaltete Registry-Spiegelung lässt keine Anwendung mehr durch.** Startet
+  das Backend mit `APP_EXCHANGE_MIRROR_ENABLED=false`, schaltet es ein zurückgebliebenes
+  Registry-Dokument in Redis ab, sodass das Gateway jede Austausch-Anfrage mit
+  `503 EXCHANGE_DISABLED` ablehnt. Die Backend-Prüfung erkennt das Trennen einer Anwendung jetzt
+  auch aus der Datenbank, nicht nur aus dem Redis-Spiegel.
+
+- **Datenaustausch: Anmeldungen ohne `offline_access` enden nach 90 Tagen.** Der Provisioner begrenzt
+  auch die Online-Sitzung jeder Exchange-Anwendung und des SC Extractors auf 30 Tage Leerlauf und
+  90 Tage insgesamt statt der 180 Tage des Realms; so überdauert die 90 Tage lange Sperrliste jede
+  Sitzung einer getrennten Installation (ADR-0217, REQ-XCH-008).
+
+- **Datenschutzerklärung: durchgehend „Sie“.** Die Sätze zu Datenkopie und Löschantrag sprachen als
+  einzige Stelle mit „du“ an.
+
+- **Sandbox: lokal gebaute Images verweigern `prod`.** `--build` baut die Images jetzt wie die
+  veröffentlichten mit der Sandbox-Markierung; `sandbox.ps1` bricht unter Windows PowerShell 5.1 bei
+  umgeleitetem Fehlerstrom nicht mehr mit `NativeCommandError` ab.
+
+- **Datenaustausch: Org-Bedarf nur mit Auftragsrecht.** `GET /exchange/v1/me/org-demand` liefert den
+  Bedarf nur noch Mitgliedern, die auch im Basetool Aufträge sehen dürfen (`canViewJobOrders`);
+  alle anderen erhalten leere Listen mit `reason: NOT_PERMITTED`. Verliert eine Einheit die
+  Profit-Berechtigung, verschwindet ihr Bedarf sofort (REQ-XCH-018).
+
+- **Blueprint-Import: der Grund steht in der Fehlermeldung.** Lehnt der Import eine Datei ab (leer,
+  zu groß, kein JSON, keine Blueprint-Liste, falsche Formatversion …), zeigt die Seite – auch die
+  Admin-Ansicht – den konkreten Grund in der eigenen Sprache statt „Import fehlgeschlagen."
+  (REQ-INV-014).
+
+- **Datenaustausch: Zurücknehmen robuster.** Das Zurücknehmen reicht so weit zurück wie die
+  eingestellte Aufbewahrung, lässt Einträge ohne Änderungsprotokoll unangetastet, stellt ein
+  entferntes Schiff auch für Mitglieder mehrerer Einheiten wieder her und hängt keine Verknüpfung
+  mehr an ein Schiff, das inzwischen einem anderen Mitglied gehört.
+
+- **Datenaustausch: Massenänderung nach dem Trennen nicht mehr bestätigbar.** Eine
+  zurückgehaltene Massenänderung gilt nur 30 Minuten ab dem Zurückhalten, auch in der Sitzung;
+  wurde die Anwendung oder Installation seitdem getrennt oder die Anwendung gesperrt, lehnt das
+  Backend die Bestätigung ab.
+
+- **Datenaustausch: fremde Schiffe werden nicht mehr gesperrt.** Nennt eine Anwendung das Schiff
+  eines anderen Mitglieds, sperrt das Backend dessen Zeile nicht mehr und blockiert so keine
+  Bearbeitung im Hangar.
+
+- **Datenaustausch: Doppelte Schreibvorgänge und Budget-Überlauf verhindert.** Eine Wiederholung mit
+  demselben `Idempotency-Key`, die das erste Ergebnis knapp verpasst, liefert es jetzt aus, statt
+  erneut zu schreiben; eine Sperre gibt nur ihr eigener Halter frei. Das Redis-Budget wird per
+  Lua-Skript atomar geprüft und gebucht und hält so auch bei parallelen Schreibvorgängen. Der
+  Redis-Nutzer `basetool-ingest` braucht dafür `EVAL`/`EVALSHA`, `ZREM` und `ZSCORE`.
+
+- **Datenaustausch: Trennen einer Anwendung wirkt auch ohne Einwilligung.** Das Trennen beendet
+  jetzt die Keycloak-Sitzungen, die nur dieser Anwendung gehören, und stempelt die Trennung erst
+  danach; der Gateway verweigert Tokens ohne `offline_access` nach ihrer Anmeldezeit (`auth_time`).
+  Ein nach der Trennung erneuerter Token kommt so nicht mehr durch (REQ-XCH-008).
+
+- **Leitung: eigener Rang korrekt angezeigt, Sichtbarkeit nach Leitung.** Ein Staffelleiter sah sich
+  in seiner Staffel als „Mitglied“; Ränge, die man nicht vergeben darf, erscheinen jetzt als
+  Markierung statt als Auswahl. Die Seite zeigt die geleiteten Einheiten und alles darunter (OL:
+  alles), und den eigenen Rang setzt, ändert oder entfernt nur noch ein Admin (REQ-ROLE-004).
+
+- **Datenaustausch: Austritt sperrt erst nach dem Abmelden.** Scheidet ein Mitglied aus, entzieht
+  das Backend zuerst Einwilligungen und Sitzungen in Keycloak und schreibt die Sperren danach – auch
+  wenn Keycloak scheitert –, damit kein zwischendurch erneuerter Token durchkommt (REQ-XCH-008).
+
+- **Datenaustausch: Trennen beendet die Anwendung auch in geteilten Sitzungen.** Eine neue
+  Admin-Erweiterung im Keycloak-SPI (`basetool-exchange`) meldet beim Trennen nur diese Anwendung
+  ab; die Web-Anmeldung des Mitglieds bleibt bestehen (REQ-XCH-008, ADR-0226).
+
+- **Datenaustausch: überlange unbekannte Feldnamen.** Ein Schreibvorgang mit einem unbekannten Feld,
+  dessen Pfad länger als 200 Zeichen wäre, wird vorab mit `400 SCHEMA_INVALID` abgelehnt, statt
+  geschrieben und mit `502` beantwortet zu werden.
+
+- **Datenaustausch: zu große Entwürfe.** Ein Entwurf oder zurückgehaltener Änderungssatz, der
+  verpackt über der Grenze liegt, wird mit `413` und dem Registry-Code abgelehnt statt mit
+  `400 BAD_REQUEST`, und diese Antwort wird nicht mehr zwischengespeichert.
+
+- **Datenaustausch: jede Ablehnung mit Registry-Code.** Ein Rumpf, der kein JSON ist, wird mit
+  `400 SCHEMA_INVALID` statt `400 BAD_REQUEST` abgelehnt und nicht mehr zwischengespeichert; ein
+  anderer Medientyp erhält den neuen Code `415 UNSUPPORTED_MEDIA_TYPE`, und vom Bot-Filter
+  gesperrte Methoden und Pfade unter `/exchange` antworten `404 NOT_FOUND` statt mit leerem `405`.
+
+- **Datenaustausch: Redis-Ausfälle.** Ein nicht erreichbarer Speicher auf einer Austausch-Route
+  antwortet mit `503 SERVICE_UNAVAILABLE` und `Retry-After: 60`, nie mit `500`; Registry und
+  Tageskontingent antworten weiter mit `Retry-After: 30`.
+
+- **Datenaustausch: Tageszähler ohne Ablauf.** Der Zähler des Schreibkontingents entsteht mit seinem
+  Ablaufdatum in einem Befehl und kann es nicht mehr verlieren; er zählt dabei genau einmal im
+  Redis-Budget.
+
+- **Verbundene Anwendungen: Registry-Felder begrenzt.** Der Anzeigename erlaubt nur lateinische
+  Buchstaben, Ziffern, Leerzeichen und einfache Satzzeichen und darf nicht „Basetool“ enthalten;
+  Limits höchstens 1200 Anfragen/Minute und 5000 Schreibzugriffe/Tag; Client-IDs des Basetools selbst
+  werden abgelehnt.
+
+- **Datenaustausch: Mengen und Ablehnungstext.** Das Backend begrenzt Lager-Mengen auf 0 bis 10⁹ wie
+  das Gateway-Schema, und eine nicht zuordenbare Austausch-Anfrage heißt nicht mehr „Import“.
+
+- **Gateway: DPoP-Härtung.** Der `jti`-Replay-Cache ist nach Pfadbereich getrennt und pro Mitglied
+  gedeckelt (600 aktive Nachweise), sodass ein Mitglied ihn nicht für alle füllen kann; ein nicht
+  lesbares Ziel verlangt die Nonce. Unter `prod` startet das Gateway nicht mehr ohne
+  `IRI_INGEST_PUBLIC_BASE_URL`, und der Registry-Cache darf höchstens 5 s dauern.
+
+- **Sandbox: Keycloak nur als `start-dev`.** Das Sandbox-Keycloak-Image verweigert jeden anderen
+  Befehl, weil sein Realm veröffentlichte Wegwerf-Secrets trägt.
+
+- **Gateway: Log-Zeilen bei 401/403 bereinigt.** Der Anfragepfad läuft durch `LogSafe`.
+
+- **Datenaustausch: Bedarf wie im Materialbedarf gerechnet.** Der Bedarf-Feed verrechnet überbuchten
+  Bestand innerhalb einer Einheit und rundet Stückware wie die Web-Seite; vorher konnte er mehr
+  offenen Bedarf melden als der Materialbedarf.
+
+- **Datenaustausch: Schiffe von Mitgliedern mehrerer Einheiten.** Legt eine verbundene Anwendung
+  für ein Mitglied mehrerer Einheiten ein Schiff an, entsteht es ohne Einheit, statt dass der ganze
+  Abgleich abbricht; bei genau einer Einheit bekommt es diese.
+
+- **Benachrichtigungen kommen nach einer Pause wieder sofort an.** Der Live-Stream der
+  Benachrichtigungen (`/notifications/stream`) holt sein Zugriffstoken jetzt über den
+  Single-Flight-Manager und erneuert es beim Öffnen, statt nach fünf Minuten Leerlauf ein abgelaufenes
+  mitzuschicken und bis zur nächsten Seitenanfrage stumm zu bleiben (REQ-NOTIF-010, REQ-SEC-012).
+
+- **Live-Aktualisierung im Einsatz fiel nach längerer Pause aus.** Verband sich ein Einsatz-Tab neu,
+  nachdem das Zugangs-Token abgelaufen war, lehnte der Server den Raum ab, und der Tab bekam keine
+  Änderungen anderer mehr. Der `/ws/sync`-Handshake erneuert das Token jetzt vorher (REQ-FE-015).
+
+- **Audit-Log der Materialbörse: Kürzungen und Entfernungen durch Lagerbewegungen fehlten.** Wenn
+  eine Ausbuchung, Übertragung, Umbuchung, Übergabe, Produktion, das Leeren des Lagers oder das
+  Löschen eines Kontos ein Angebot kürzte oder mitlöschte, stand das bisher nicht im Audit; jetzt
+  gibt es dafür `MARKET_OFFER_REDUCED` bzw. `MARKET_OFFER_REMOVED` mit dem Anlass (REQ-MARKET-013,
+  REQ-AUDIT-001).
+
+- **Lager: die Org-Einheiten-Auswahl in „Mein Lager“ ist nicht mehr leer.** Beim Sammel-Umbuchen
+  und beim Ändern der Org-Einheit fragte die Seite die eigenen Mitgliedschaften mit dem Benutzernamen
+  statt der Nutzer-ID ab und bot deshalb nur „Keine Einheit“ an; beide Dialoge nutzen jetzt die ID.
+
+- **Keycloak-Provisioner: ein frischer Realm ist nach dem ersten Lauf in Form.** Keycloak 26 übergeht
+  beim Anlegen eines Clients `backchannel.logout.session.required`; der Provisioner setzt das Attribut
+  jetzt direkt danach, statt erst beim zweiten Lauf (REQ-OPS-033).
+
+- **Audit-Log der Materialbörse: der PDF-Export scheiterte.** Der Titel des PDFs fehlte in allen
+  drei Backend-Sprachdateien, sodass der Export des Materialbörse-Tabs mit einem Fehler abbrach; ein
+  Test verlangt den Titel jetzt für jeden Audit-Bereich (REQ-AUDIT-003).
+
+- **Frontend: Meldungen und Formulardaten nach einer Weiterleitung gehen nicht mehr verloren.** Die
+  Session-Allow-List (`enforce`) verwarf die `CopyOnWriteArrayList`, in der Spring die Flash-Attribute
+  ablegt; die Klasse steht jetzt namentlich auf der Liste (REQ-SEC-067).
+
+- **Deploy: ein neues Keycloak-Provider-JAR meldet erst Erfolg, wenn die ganze App wieder läuft.**
+  Der Keycloak-Neustart startet über `Requires=` Backend, Frontend und Ingest mit neu; `deploy.sh`
+  wartet jetzt auf alle und stellt sonst das vorige JAR wieder her (`DeployFailed`), statt Erfolg zu
+  melden, während Frontend und Ingest noch ohne Container sind. Wirkt erst nach einem Lauf der
+  Ansible-Rolle (`--tags deploy,scripts`).
+
+- **Deploy: ein Drift-Re-Apply überschreibt den Rollback-Anker nicht mehr.** Stellt `deploy.sh`
+  dasselbe Release wieder her (z. B. „frontend: no container"), bleiben voriger Pin, `config-previous/`
+  und voriges JAR beim Vorgänger; scheitert es, wird nichts zurückgerollt und
+  `DeployHealthRestartFailing` statt eines falschen `DeployRolledBack` gemeldet. Wirkt erst nach einem
+  Lauf der Ansible-Rolle (`--tags deploy,scripts`).
+
+## [v1.12.0](https://github.com/krt-profit/basetool/releases/tag/v1.12.0) - 2026-09-25
+
+### Fixed
+
+- **Server: nach einem Neustart schlagen Deploy, Backup, Restore-Drill und Cleanup nicht mehr
+  fehl.** Die Timer starten ihren Job nicht mehr bei jedem Boot mit, die vier Jobs warten auf den
+  Service-User `iri` und seinen ersten Container, und eine Verweigerung nennt jetzt den
+  podman-Fehler. Wirkt erst nach einem Lauf der Ansible-Rolle (`--tags scripts`).
+
+- **Redis: das Frontend löst beim Start keine ACL-Verweigerung mehr aus.** Mit eigenem ACL-Benutzer
+  (`REDIS_FRONTEND_USERNAME`) prüft es den Session-Store per `PING` statt per `CONFIG GET`, das
+  dieser Benutzer nicht darf; jeder Neustart zählte bisher auf `RedisAclDenials`. Unter `default`
+  bleibt alles wie bisher, ein unerreichbares Redis bricht den Start weiterhin ab.
+
+- **Deploy: ein Fehler beim Einspielen der Host-Konfiguration bleibt nicht mehr stumm.** Scheitert
+  `deploy.sh` vor dem Health-Gate (Spiegeln, `env.d`, Units, Pull), schreibt es jetzt eine
+  `FATAL`-Zeile mit Schritt und Exit-Code, stellt Konfiguration und Digest-Pin wieder her, setzt den
+  Backoff und löst `DeployFailed` aus; ein nicht beschreibbares Verzeichnis wird vorab abgelehnt.
+  Wirkt erst nach einem Lauf der Ansible-Rolle (`--tags deploy,scripts`).
+
+- **Benachrichtigungen: ein Tab mit abgelaufener Sitzung fragt den Live-Stream nicht mehr alle paar
+  Sekunden an.** Er prüft die Sitzung, beendet den Stream bei einem 401 und schickt zur Anmeldung;
+  wiederholte Fehlversuche warten zunehmend länger. Ein Browser, der einen offenen Stream verlässt,
+  erzeugt im Log kein `ERROR` mehr.
+
+- **Logs: Zeilen aus einem asynchronen Dispatch (z. B. Ende oder Fehler eines Live-Streams) tragen
+  wieder `correlationId`, `userId` und `orgUnitId` der ursprünglichen Anfrage** statt
+  `userId=anonymous` ohne Korrelations-ID — in Frontend und Backend. Es wird dabei keine neue ID
+  erzeugt.
+
+- **Backend-Log: die Zugriffszeile eines Serverfehlers trägt wieder die Korrelations-ID.** Nach
+  einem 500 (oder 502 eines Fremddienstes) verlor sie die ID, weil der Fehler-Handler den MDC-Wert
+  entfernte; jetzt stimmen ERROR-Zeile, Zugriffszeile und Fehlerantwort überein (REQ-OBS-002).
+
+## [v1.11.0](https://github.com/krt-profit/basetool/releases/tag/v1.11.0) - 2026-09-25
+
+### Added
+
+- **Backend: der interne Schlüsselabruf bei Keycloak lässt sich jetzt einschalten.** Neue
+  optionale Variable `IRI_BACKEND_KEYCLOAK_JWK_SET_URI`; ohne sie bleibt alles wie bisher.
+
+- **Anmeldung: das Webtool kann sich als vertraulicher Client bei Keycloak ausweisen.** Mit
+  `KEYCLOAK_FRONTEND_CLIENT_SECRET` sendet es beim Einlösen des Anmelde-Codes zusätzlich zu PKCE
+  ein Geheimnis; ohne die Variable bleibt alles wie bisher. Die Umstellung meldet niemanden ab.
+
+- **Sicherheit: Sitzungsdaten dürfen nur noch bekannte Klassen enthalten.** Das Webtool liest einen
+  in Redis gespeicherten Sitzungswert nur, wenn dessen Typ auf einer festen Liste steht. Neue
+  Variable `APP_SESSION_TYPE_ALLOW_LIST` (`report` als Vorgabe: nichts ändert sich, Abweichungen
+  werden nur gezählt; `enforce` lehnt sie ab). Für Mitglieder unsichtbar.
+
+- **Einsätze: die Mitglieder-Suche bei Teilnehmer und Partyleiter sagt, wenn es mehr Treffer gibt.**
+  Beide Listen zeigen höchstens 50 Namen und darunter „Weiter tippen, um die Liste einzugrenzen…",
+  statt still alle Treffer zu laden.
+
+- **App: Einsatzleitung kann wieder Mitglieder zu einem Einsatz hinzufügen.** Dafür gibt es einen
+  eigenen, nur für Verwalter freigegebenen Weg, der ein Mitglied ausschließlich per ID einträgt
+  (`POST …/participants/by-id/slim`); die allgemeinen Anmelde-Wege bleiben für die App gesperrt.
+  Die App braucht dafür ein Update.
+
+- **Server: automatische Sicherheitsupdates.** Der Produktionshost spielt Security-Advisories jetzt
+  täglich um 07:00 selbst ein (dnf-automatic); die Container-Runtime ist ausgenommen, neu gestartet
+  wird nie automatisch. Neue Alarme melden fehlgeschlagene oder ausbleibende Läufe und einen
+  fälligen Neustart (REQ-OPS-032).
+
+- **Monitoring: Alarme für ausgefallene Datenbanken, Redis und ungesunde Container**
+  (`PostgresDown`, `RedisDown`, `ContainerUnhealthy`) sowie `DeployHeartbeatStale`, wenn der
+  Deploy-Timer eine Stunde lang nichts prüft.
+
+### Changed
+
+- **Build: Gradle 9.8.0.** Der Wrapper steht auf 9.8.0 (eingebettetes Kotlin 2.4.10, JaCoCo
+  0.8.15 als Standard). Rein intern, keine Auswirkung auf die Oberfläche.
+
+- **Dialoge verhalten sich überall gleich.** Jeder Dialog schließt jetzt mit Escape, setzt den
+  Fokus beim Öffnen in sein erstes Eingabefeld und gibt ihn beim Schließen an den auslösenden
+  Knopf zurück; die Seite dahinter ist gesperrt, solange er offen ist (native `<dialog>`-Elemente).
+
+- **Kleine Darstellungskorrekturen durch die CSS-Ebenen.** Die Unterzeile im Seitenkopf der Bank-
+  und Log-Seiten, von Spezialkommandos und Organigramm, die Checkbox-Beschriftungen in
+  Missionsdaten, Lager-Eingabe und Auftrag anlegen sowie die gesperrten Felder in „Raffinerieauftrag
+  anlegen“ erscheinen jetzt so, wie sie gestaltet waren.
+
+- **Alle Dialoge haben denselben Kopf.** Titel und Schließen-Kreuz (✕) sehen in jedem Dialog gleich
+  aus. Im Auftrag schließen Eintragung, Notiz, Übergabe, Item-Übergabe und Produktion jetzt auch
+  über das ✕ und mit Escape; beides tat dort bisher nichts.
+
+- **Webtool ↔ Backend: keine gzip-Kompression mehr auf der internen Verbindung.** Gemessen kostete
+  sie auf dem internen Weg mehr Zeit, als die kleineren Antworten sparten; das Webtool fragt sie
+  deshalb nicht mehr an. Für Aufrufer von außen ändert sich nichts (ADR-0161).
+
+- **App-Live-Sync: ein hängendes Handy bremst niemanden mehr aus.** Das Backend schreibt
+  Änderungsmeldungen an die App jetzt pro Verbindung im Hintergrund statt im Request dessen, der die
+  Änderung gemacht hat. Eine Verbindung, die nicht mehr liest, verliert höchstens eigene Meldungen
+  (gezählt und überwacht), statt Speicher zu belegen (ADR-0143).
+
+- **Edge: Stylesheets, Skripte und JSON-Antworten werden jetzt komprimiert ausgeliefert.** Bisher
+  hat der Edge-Proxy nur HTML gepackt; CSS, JavaScript und API-Antworten gingen unkomprimiert
+  raus. Seiten übertragen dadurch weniger Daten.
+
+- **Backend: weniger Datenbanklast pro Anfrage.** Die Berechtigungen eines Mitglieds werden pro
+  Anmeldesitzung zwischengespeichert statt pro Zugriffstoken, sodass die alle fünf Minuten
+  erneuerten Tokens sie nicht mehr jedes Mal neu laden. Eine in Keycloak entzogene Rolle wirkt
+  weiterhin beim nächsten Token (ADR-0174).
+
+- **Backend: Datenbankzugriffe laden nur noch, was sie brauchen.** Verknüpfte Datensätze (z. B.
+  Schiffstyp, Besitzer, Material-Kategorie) werden nicht mehr bei jedem Laden automatisch
+  mitgeholt, sondern gezielt dort, wo eine Ansicht sie anzeigt. Das entlastet vor allem die
+  UEX-Abgleiche und Listen; sichtbar ändert sich nichts.
+
+- **Intern: eine gemeinsame Log-Bereinigung für Backend, Webtool und Ingest.** Maskierung von
+  Tokens und E-Mail-Adressen sowie der Schutz gegen gefälschte Logzeilen liegen jetzt einmal im
+  neuen Modul `logging-support` statt dreifach kopiert (ADR-0205). Keine Funktionsänderung.
+
+- **Lager: Mehrfachfilter sind auf beiden Seiten gleich beschriftet.** Sind keine oder alle
+  Einträge angehakt, steht dort „Alle", sonst der Name oder „N ausgewählt". „Mein Lager" zeigte bei
+  allen angehakten Einträgen bisher „N ausgewählt".
+
+- **Oberfläche: fehlende Übersetzungen fallen auf.** Fehlt einer Seite ein Text, zeigt sie den
+  Schlüsselnamen statt eines fest eingebauten Ersatztexts und meldet die Lücke ans Monitoring.
+
+- **UEX-Abgleich: ein fehlerhafter Datensatz kostet nur noch sich selbst.** Preise, Rohstoffe,
+  Raffinerie-Ausbeuten und Universumsdaten werden nach dem Abruf in kleinen, getrennten Paketen
+  gespeichert; bisher verwarf ein einziger abgelehnter Datensatz den ganzen Abgleich, und während UEX
+  antwortete, blieb eine Datenbankverbindung belegt. Schreibzugriffe werden allgemein gebündelt
+  (REQ-DATA-005, REQ-DATA-003).
+
+- **Schnellere Einsatz-Details, Nutzerlisten und Personenauswahl.** Mitglieder in Teilnehmerlisten,
+  Bearbeiter-Listen und Nutzerseiten werden gesammelt statt einzeln geladen; ein 30-köpfiger Einsatz
+  braucht so viele Datenbankabfragen wie ein 5-köpfiger. Die Personenauswahl lädt pro Tastendruck nur
+  noch Name und Rang statt vollständiger Profile, Bearbeiter-Änderungen an Aufträgen laden keine
+  Mitgliederliste mehr (REQ-DATA-003, REQ-API-012).
+
+- **Datenbank: jeder Fremdschlüssel hat einen Index** (`V245`, 38 neue Indizes); ein neuer Test
+  verhindert, dass wieder einer ohne ausgeliefert wird (REQ-DATA-017).
+
+- **Anmeldung: Das Sitzungs-Cookie heißt jetzt `__Host-SESSION`.** Der Browser nimmt es damit nur
+  über HTTPS und nur für genau diese Adresse an, keine andere Seite kann es setzen oder überschreiben.
+  **Mit diesem Update werden alle einmal abgemeldet** und melden sich neu an; die
+  Datenschutzerklärung nennt den neuen Namen.
+
+- **Überwachung: Vom Browser blockierte Inhalte werden gemeldet.** Verstößt eine Seite gegen die
+  Content-Security-Policy, meldet der Fehler-Beacon das jetzt als `csp_violation` (nur Direktive und
+  Ursprung), sichtbar im Dashboard und im Alarm `ClientErrorSpike`.
+
+- **Einsätze: die Weboberfläche nutzt keine der 17 als veraltet markierten Einsatz-Schnittstellen
+  mehr**. Auszahlungsart, Ein-/Auschecken, Teilnehmer, Einheiten und Crew laufen
+  über die schlanken Nachfolger; ein Test verhindert künftig jeden Aufruf einer veralteten
+  Schnittstelle aus dem Frontend.
+
+- **Build: Release-Tags und Release-PRs legt jetzt die GitHub-App „basetool-release“ an.** Seit die
+  Tag-Regel nur noch sie und den Maintainer zulässt, scheiterte das persönliche Token beim Anlegen
+  des Tags, und v1.10.0 musste von Hand getaggt werden. Beide Release-Workflows holen sich jetzt ein
+  kurzlebiges, pro Schritt beschränktes App-Token; das alte Token wird nicht mehr gelesen.
+
+- **Server-Härtung.** Datenbank- und Redis-Netze haben in Produktion keinen Internetzugang mehr,
+  Keycloak bindet Theme und Provider nur lesend und `realm-export.json` gar nicht mehr ein, die
+  ungenutzte Prometheus-Lifecycle-API ist abgeschaltet, und das Host-Journal löscht Einträge nach
+  31 Tagen wie Loki (REQ-OBS-010). Die Netzänderung braucht einen einmaligen Neuaufbau der Netze.
+
+- **Monitoring: der Restore-Drill meldet einen ausgefallenen Wochenlauf nach 8 statt 35 Tagen**, und
+  der Container-Metrik-Kollektor alarmiert auch, wenn er nie geschrieben hat.
+
+- **Backend und Ingest-Gateway: ohne WebFlux.** Ausgehende Aufrufe (UEX, SC Wiki, Keycloak, das
+  Weiterleiten an das Backend) laufen blockierend über `RestClient` auf dem JDK-HTTP-Client; rund 20
+  Bibliotheken fallen aus jedem Image, die Keycloak-Admin-Aufrufe erscheinen jetzt in den
+  HTTP-Client-Metriken (ADR-0204). Für Nutzer ändert sich nichts.
+
+- **Betrieb: die Betriebsskripte kennen nur noch Podman.** Die Docker-Zweige in Deploy, Backup,
+  Restore-Drill und Cleanup sind entfernt, ebenso cAdvisor und der Docker-Socket-Proxy im Monitoring
+  (ADR-0203). Für Nutzer ändert sich nichts.
+
+- **Anmeldeseite: Passwortmanager funktionieren, „Angemeldet bleiben" ist nicht mehr
+  vorausgewählt.** Benutzername und Passwort werden jetzt von Passwortmanagern ausgefüllt und
+  gespeichert. Wer angemeldet bleiben will, setzt den Haken selbst (REQ-SEC-066).
+
+- **Ingest-Gateway: eigene, großzügigere Grenze pro IP-Adresse.** Mehrere Mitglieder hinter einem
+  gemeinsamen Anschluss (CGNAT, Büro) teilen sich nicht mehr 30 Sendungen pro Minute: pro IP gelten
+  jetzt 120, pro Mitglied weiter 30. Neu: `IRI_INGEST_RATE_LIMIT_IP_CAPACITY` /
+  `IRI_INGEST_RATE_LIMIT_IP_REFILL_TOKENS`.
+
+- **Betrieb: Das Ingest-Gateway meldet, welche Client-Sperren wirklich greifen.** Neue Metrik
+  `basetool_ingest_gate_enforcing{gate}`, eine Zeile im Startlog, ein Dashboard-Panel und der Alarm
+  `IngestAudienceGateOff`, solange die Audience-Prüfung aus ist.
+
+### Removed
+
+- **API: die 17 veralteten Einsatz-Schnittstellen sind vorzeitig entfernt.** Angekündigt war der
+  Sunset 2026-10-20; per Entscheidung vom 22.09.2026 fielen sie schon mit diesem Release weg. Ersatz
+  sind die `/slim`-Endpunkte und der versionierte Besitzerwechsel. App-Versionen älter als der
+  07.09.2026 müssen aktualisiert werden.
+
+### Fixed
+
+- **Besser lesbare Farben für farbige Texte.** Rote, blaue und graue Beschriftungen (etwa das
+  „Item“-Kennzeichen in der Auftragsliste, negative Preise in der Materialübersicht, rote
+  Löschen-Knöpfe, Fehlermeldungen und Hinweise) nutzen jetzt die helleren Farbtöne des Designsystems
+  und erreichen den WCAG-Mindestkontrast.
+
+- **Anmeldung: Discord-Login, der im falschen Browser endet, ist keine Sackgasse mehr.** Kehrt der
+  Discord-Login in einer anderen App oder einem anderen Browser zurück (Keycloak `cookie_not_found`),
+  erklärt die Fehlerseite jetzt die Ursache und bietet „Zurück zur Applikation“ an; der Link fehlte,
+  weil `basetool-frontend` keine `baseUrl` hatte (Realm-Provisioner, wirkt nach dem nächsten Apply).
+
+- **Mein Inventar: die Gruppen-Checkbox ist auf Handy und Tablet wieder groß genug.** Seit der
+  Umstellung auf CSS-Layer war das Kästchen „alle auswählen“ einer Gruppe dort nur 26 statt 32 Pixel
+  hoch; jetzt gilt wieder die Mindestgröße für Touch-Bedienung.
+
+- **Images: der Start-Cache (AOT) baut im Release-Workflow und startet auf jeder CPU.** Der
+  Release-Builder reichte OpenTelemetry-Variablen in das Cache-Training, an denen jeder Build
+  scheiterte; und der Cache enthielt CPU-spezifischen Maschinencode, mit dem das Backend auf Rechnern
+  mit anderer CPU beim Start abstürzte. Das Training entfernt die Variablen jetzt und speichert nur
+  noch Klassen und Profile.
+
+- **Admin: Eingabefehler im Formular „Persönliches Inventar“ gehen nicht mehr verloren.** Beim
+  Anlegen oder Bearbeiten für ein Mitglied blieb das Fenster nach einem Fehler geschlossen und
+  leer; jetzt öffnet es sich wieder mit den Eingaben und den Fehlermeldungen.
+
+- **Lieferkette: die Release-SBOMs werden immer frisch erzeugt und gegen den Laufzeit-Klassenpfad
+  geprüft.** Eine neue Projekt-Abhängigkeit wie `logging-support` ließ die CycloneDX-Aufgabe
+  unverändert bzw. aus dem Build-Cache kommen, sodass die Stückliste sie verschweigen konnte; jetzt
+  scheitert die Erzeugung (Release und jeder PR), wenn eine Komponente fehlt oder zu viel ist.
+
+- **Sicherheit: die Sitzungs-Typliste kennt jetzt alle Werte einer echten Anmeldung.** Im Modus
+  `enforce` hätte sie das ID-Token jedes Mitglieds abgelehnt (eine Adresse und Zahlen in den
+  Token-Angaben) und damit alle abgemeldet. Produktion läuft mit `report` und war nicht betroffen.
+
+- **Einsätze: „Leiter" in der Kopfzeile zeigt wieder den Einsatzleiter.** Das Backend schickte die
+  Einsatzleiter-Markierung der geplanten Rolle eines Teilnehmers nicht mit, deshalb stand dort immer
+  der Besitzer des Einsatzes, auch wenn ein Einsatzleiter eingetragen war.
+
+- **Netty auf 4.2.18.Final angehoben (Sicherheitsupdate).** Schließt CVE-2026-89044 (Request
+  Smuggling über einen fehlerhaften `Transfer-Encoding`-Header) in Backend, Webtool und Ingest.
+  Keine Funktionsänderung.
+
+- **Oberfläche: die letzten fest verdrahteten Texte kommen aus den Sprachdateien.** Die
+  Terminal-Auswahl beim Ausbuchen, die Lagereintrag-Zeile und der Dateiname des
+  Übergabeprotokolls im Auftrag, die Titel des Spezialkommando-Dialogs und der ADMIN-Hinweis
+  erschienen in der englischen Oberfläche bisher auf Deutsch.
+
+- **Monitoring: „In-flight Requests" statt „Tomcat Busy Threads".** Das Panel im
+  Spring-Apps-Dashboard stand unter virtuellen Threads immer bei -1; es zeigt jetzt die gerade
+  bearbeiteten Requests je Anwendung. Die wirkungslosen `server.tomcat.threads.*`-Einstellungen
+  sind entfernt.
+
+- **Monitoring: Container-Limits werden wieder gelesen.** Der cgroup-Collector las seit der
+  Podman-Umstellung die Unit statt des Containers und sah deshalb kein Speicher-, pids- oder
+  CPU-Limit: Die Alarme `ContainerMemoryHigh`, `ContainerPidsHigh` und `ContainerCpuThrottledHigh`
+  konnten nicht auslösen, und drei Panels im Container-Dashboard blieben leer. Podmans
+  Healthcheck-Units erscheinen dort außerdem nicht mehr als Hex-Container.
+
+- **Einsätze: Besitzerwechsel meldet jetzt einen Konflikt, wenn jemand anderes den Besitzer
+  inzwischen geändert hat.** Bisher gewann still der spätere von zwei gleichzeitigen Wechseln; jetzt
+  kommt der bekannte Konflikt-Dialog mit „Aktuelle Werte laden". Ein zweiter Wechsel auf derselben
+  Seite funktioniert ohne Neuladen.
+
+- **Einsätze und Operationen: Suche und Zeitraumfilter funktionieren mit Sonderzeichen.** Ein `&`,
+  `#` oder `+` im Suchbegriff veränderte bisher die Anfrage ans Backend, und der Datumsfilter der
+  Operationenliste griff nie. Beide Listen reichen die Filter jetzt unverändert weiter.
+
+- **Hangar-Import: Dateien über 8 MB werden sofort abgelehnt** – mit einer verständlichen Meldung
+  noch vor dem Hochladen, statt erst nach dem Upload mit einem Fehler.
+
+- **Fehlermeldungen: Downloads und Importe melden den echten Grund.** Lehnte das Backend einen
+  Kontoauszug, einen Export, einen Import oder eine Übergabe-PDF ab (z. B. keine Berechtigung,
+  nicht gefunden), kam bisher ein allgemeiner Serverfehler an; jetzt die passende Meldung.
+
+- **Organisationseinheit wechseln: Rücksprung nur noch innerhalb der Anwendung.** Nach dem Wechsel
+  führt die Weiterleitung nur noch auf eine Seite des Basetools, nie auf eine fremde Adresse.
+
+- **Protokolle enthalten keine Sitzungskennungen mehr**, nur noch einen nicht umkehrbaren
+  Fingerabdruck.
+
+- **Operationen: Die Markdown-Vorschau der Beschreibung funktioniert wieder.** Sie forderte die
+  falsche Antwortart an und blieb deshalb leer.
+
+- **Kein automatisches Neuladen mehr.** Ein neu angelegtes Material erscheint in der
+  Material-Verwaltung ohne Neuladen der Seite; bei einem Bearbeitungskonflikt (Lager-Zuordnung,
+  Lager-Notiz, Auftrags-Bearbeiter) wird nicht mehr nach zwei Sekunden neu geladen, sondern wie
+  überall nachgefragt.
+
+- **Sicherheit im Browser.** Alle Speichervorgänge laufen über denselben geschützten Weg
+  (CSRF-Wiederholung, Neuanmeldung, Doppelklick-Schutz), und jede eingefügte Anzeige wird
+  maskiert; der Lint-Lauf erzwingt beides jetzt.
+
+- **Betrieb: Container bekommen beim Stoppen wieder ihre Nachlaufzeit.** Podman beendete jeden
+  Container nach 10 s hart — Anwendungen, Datenbanken, Loki und Tempo mitten im geordneten
+  Herunterfahren. Die Units setzen jetzt `StopTimeout=` passend zur konfigurierten Frist.
+
+- **Backup: der wöchentliche Prometheus-Snapshot lief unter Podman nicht.** Der Hilfscontainer
+  wurde abgelehnt und trug das Passwort auf der Kommandozeile; der Snapshot wird jetzt im
+  Prometheus-Container angefordert und dort auch wieder gelöscht. Backup-Helfer und Restore-Drill
+  nutzen das per Digest gepinnte PostgreSQL-Image von db-backend.
+
+- **Extractor: Serverfehler wurden als „bitte anmelden" gemeldet.** Lehnte das Backend die eigene
+  Kennung des Ingest-Gateways ab, sah das Mitglied einen Anmeldefehler. Jetzt kommt ein 502 mit
+  Hinweis auf ein Serverproblem, und das Gateway holt beim nächsten Senden ein frisches Token.
+
+- **Ingest-Konfiguration nannte die falsche Audience.** Der Kommentar in `application.yml` empfahl
+  noch `basetool-backend`, was Browser-Sitzungstokens durchließe; richtig ist `basetool-ingest`. Ein
+  neuer Repo-Lint-Check verhindert, dass der Wert wieder auftaucht.
+
+### Security
+
+- **Edge: die Verbindung zu Grafana lässt sich jetzt prüfen.** Mit
+  `EDGE_GRAFANA_UPSTREAM_VERIFY=on` prüft der Edge Grafanas Zertifikat wie bei allen anderen
+  Diensten; ohne die Variable bleibt alles wie bisher.
+
+- **Redis: jeder Dienst bekommt einen eigenen ACL-Benutzer.** Backend, Webtool und Ingest können
+  Redis künftig mit eigenen, eng begrenzten Zugängen nutzen statt mit einem gemeinsamen
+  Vollzugriff. Neue Variablen `REDIS_<DIENST>_USERNAME`/`_PASSWORD` und `REDIS_DEFAULT_USER`;
+  ohne sie bleibt alles wie bisher. Die ACL-Datei enthält nur noch Hashwerte.
+
+- **Interne TLS-Verbindungen: jeder Dienst kann ein eigenes Zertifikat bekommen.** Backend, Webtool,
+  Ingest und Keycloak lassen sich auf eigene, von einer internen CA signierte Zertifikate umstellen,
+  und `INTERNAL_TLS_VERIFY_HOSTNAME` lässt Webtool und Ingest zusätzlich den Namen des Backends
+  prüfen. Ohne Umstellung bleibt alles wie bisher; für Mitglieder unsichtbar.
+
+## [v1.10.0](https://github.com/krt-profit/basetool/releases/tag/v1.10.0) - 2026-09-22
+
+### Added
+
+- **Spezialkommandos: SK-Leiter verwalten die Mitglieder ihres SK jetzt selbst.** „Leitung" →
+  „Mitglieder verwalten" öffnet die Mitgliederseite des eigenen SK: hinzufügen, entfernen,
+  Logistiker/Einsatz-Manager setzen. Das Recht bestand im Backend schon, nur lag die einzige Seite
+  dafür im Admin-Bereich. Den Lead-Rang setzen weiterhin Admin und Bereichsleitung.
+
+- **Neue Seite „Open-Source-Lizenzen“ in der Fußleiste, neben den Nutzungsbedingungen.** Sie
+  listet jede mitgelieferte Fremdkomponente mit Version und Lizenz, gruppiert nach Lizenz, und
+  wird bei jedem Build neu erzeugt. Öffentlich wie Impressum und Datenschutz.
+
+### Changed
+
+- **Exporte und Berichte: höchstens zehn pro Minute und Konto.** Kontoauszüge, Bank-3-Monats-Report,
+  Übergabeprotokolle, Audit- und Datenexporte (Art. 15) zählen gegen ein eigenes Kontingent; darüber
+  antwortet das Backend mit `429`. Einstellbar über `APP_RATE_LIMIT_SUBJECT_EXPORT_CAPACITY` /
+  `APP_RATE_LIMIT_SUBJECT_EXPORT_REFILL_PERIOD`.
+
+- **Betrieb: das Backend startet in Produktion nicht mehr ohne `IRI_BACKEND_EXPECTED_AUDIENCES`.**
+  Ein leerer Wert schaltete die JWT-Audience-Prüfung bisher still ab; jetzt bricht der Start mit
+  einer klaren Meldung ab, und die aktiven Audiences stehen beim Start im Log.
+
+- **Betrieb: Aufbewahrungsfristen haben Untergrenzen.** Ein Tippfehler wie `P0D` hätte beim nächsten
+  Lauf das ganze Audit-Protokoll bzw. alle Benachrichtigungen gelöscht. Jetzt verweigert das Backend
+  den Start unter 30 Tagen (Audit), 1 Tag (Benachrichtigungen, abgelehnte Registrierungen) oder
+  einem Intervall unter einer Minute.
+
+- **CI: schneller, und ein kaputter Check fällt wieder auf.** Repo-Lint läuft in vier statt 25 Jobs,
+  die E2E-Images werden einmal pro Lauf gebaut statt fünfzehnmal, und jede E2E-Zelle installiert nur
+  ihren Browser. Der Backend-PIT-Lauf liefert nach acht Wochen `PitHelpError` wieder Ergebnisse, der
+  wöchentliche OWASP-Scan meldet einen Fehlschlag als Issue, und die Konfigurationen von Prometheus,
+  Alertmanager, Alloy und Loki werden jetzt in CI geprüft.
+
+- **CI/Lieferkette: Signaturprüfung und Workflows gehärtet.** Die cosign-Signaturidentität in
+  `promote*.yml`, `release-images.yml` und `deploy.sh` ist jetzt verankert (`^…$`) – Refs wie
+  `main-x` oder `vfoo` gelten nicht mehr als vertrauenswürdig –, und signiert wird nur noch von
+  `main` oder einem Release-Tag auf `main`, von Jobs ohne eigenen Build. Dazu keine gespeicherten
+  Checkout-Credentials, Prüfsummen für CI-Werkzeuge, BuildKit per Digest, ein zizmor-Job und die
+  Gradle-Abhängigkeiten im Dependency Graph; der neue `deploy.sh` kommt über die Ansible-Rolle.
+
+- **Build: jedes ausgelieferte Modul prüft die Lizenzen seiner Abhängigkeiten gegen eine
+  GPL-3.0-kompatible Liste.** Eine unverträgliche Lizenz lässt den Build scheitern. Dabei fiel
+  AspectJ im Backend auf (EPL-2.0 ohne GPL-Zusatz); es wurde nicht genutzt und ist entfernt.
+  Zu jeder mitgelieferten Lato-Schrift liegt jetzt ihr Lizenztext (OFL).
+
+- **Admin: Standard-Blueprints aufnehmen und entfernen aktualisiert die Liste ohne Neuladen.** Die
+  Seite `/admin/default-blueprints` lud nach jeder Änderung komplett neu; jetzt wird nur die Liste
+  ersetzt (REQ-FE-001). Schlägt beim Aufnehmen ein Teil fehl, bleiben genau diese Einträge in der
+  Auswahl stehen und können erneut abgeschickt werden.
+
+- **Dokumentation: vollständig gegen den Code geprüft, umgesetzte Pläne archiviert.** Specs, ADRs,
+  arc42, Betriebs- und Rollen-Dokumente beschreiben jetzt den Stand nach dem Podman-Umzug;
+  `docs/deployment.md` ist dafür neu geschrieben. Erledigte Pläne und einmalige Runbooks liegen
+  gesammelt in `docs/archive/`. Rein dokumentarisch.
+
+### Fixed
+
+- **Aufträge: Herstellung bucht nur noch in Lager, die man verwalten darf.** Ein Logistiker konnte
+  hergestellte Items auf jedes Mitglied einbuchen, auch einer anderen Staffel und in dessen
+  persönlichen Bestand. Jetzt gilt dieselbe Prüfung wie beim Einbuchen (sonst `403`); „persönlich"
+  geht nur für einen selbst.
+
+- **Fehlermeldungen: ein interner Fehler erscheint nicht mehr als „ungültige Anfrage" mit
+  Originaltext.** Er wird als Serverfehler gemeldet und nur ins Log geschrieben. Die bekannten
+  Fälle (Lagereintrag gehört nicht zum Auftrag, Raffinerieauftrag schon eingelagert, Konto noch in
+  Keycloak) haben eigene, übersetzte Meldungen.
+
+- **Benachrichtigungsregeln: vorkonfigurierte Regeln lassen sich wieder bearbeiten.** Bank-,
+  Materialbörsen- und Kontolöschungs-Regeln scheiterten beim Speichern, selbst beim Deaktivieren,
+  und der Editor kannte nur 4 von 12 Ereignissen. Jetzt sind alle Ereignisse, Typen und
+  Empfänger-Arten (auch „Kontoverantwortliche") wählbar, mit Klartext statt Codes, und die Liste
+  aktualisiert sich ohne Neuladen.
+
+- **Texte: durchgängig „du", und keine fest verdrahteten Beschriftungen mehr.** Zwölf Hinweise und
+  Rückfragen siezten noch; „Nutzer zuordnen" und „Eigener Eintrag" beim Einbuchen sowie „Neuer
+  Auftrag" in der Auftragsliste waren nicht übersetzbar.
+
+- **Monitoring: der Alarm für Container in einer Neustart-Schleife konnte seit dem Podman-Umzug nicht
+  mehr auslösen.** Er las eine Metrik, die nur das entfernte cAdvisor lieferte; jetzt liest er die
+  Startzeit aus dem Podman-Exporter. Das Dashboard-Panel „NPM errors & warnings“ zeigt stattdessen
+  die Fehler- und Warnzeilen der Edge.
+
+- **Monitoring: Alloy und node_exporter haben wieder ein Speicherlimit und werden wieder überwacht.**
+  Als Host-Dienste liefen sie seit dem Umzug ohne Limit und außerhalb aller Speicher-Alarme; die
+  Ansible-Rolle setzt jetzt `MemoryMax` und `GOMEMLIMIT`, und der cgroup-Collector liest beide mit.
+  Neuer Alarm `HostServiceMetricsMissing`, falls diese Abdeckung wieder verschwindet.
+
+- **Betrieb: eine geänderte Monitoring- oder `acme`-Unit wird beim Deploy jetzt auch neu gestartet.**
+  Bisher wurde sie nur installiert und der alte Container lief weiter. `deploy.sh` läuft außerdem von
+  Hand gestartet aus `/` und prüft vor dem Deploy den Keystore-Pfad, den die Units tatsächlich
+  einbinden, statt den aus `.env`. Rein betriebsseitig.
+
+- **Aufgeräumt: die toten NPM-Snippets unter `docker/maintenance/nginx/` und zwei Security-Regeln für
+  längst entfernte Endpunkte.** Die Release-Prüfung verlangt jetzt auch `docker/edge` und `docker/acme`
+  im Konfigurationspaket. Kein sichtbarer Unterschied.
+
+- **Raffinerie: Ein Auftrag lässt sich nur noch mit einem Einsatz verknüpfen, an dem sein Besitzer
+  teilnimmt.** Bisher genügte die ID irgendeines Einsatzes, und der Auftrag floss in dessen
+  Auszahlungstopf ein — auch bei fremden Staffeln. Das gilt auch für Logistiker und Einsatzleiter;
+  bestehende Verknüpfungen bleiben erhalten, und das Formular nennt den Grund (REQ-SEC-042).
+
+- **Betrieb: Sicherung, Wiederherstellungsprobe und Aufräumen scheitern nicht mehr nach einem Neustart.**
+  Ihre Nachhol-Läufe starteten Sekunden nach dem Hochfahren, bevor die Container-Laufzeit bereitstand,
+  schlugen fehl und lösten einen kritischen Alarm aus — die nachzuholende Sicherung ging dabei verloren.
+  Sie warten jetzt, bis der Stack vollständig hochgefahren ist, bevor sie etwas anhalten oder aufräumen.
+  Rein betriebsseitig.
+
+- **Betrieb: die IPv6-Prüfung der Abnahme-Suite meldete Rot über die Bereitstellung, wenn der
+  Ausführende selbst kein IPv6 hat.** Der Zweig, der genau das unterscheiden sollte, war seit
+  jeher unerreichbar, weil die Fehlernummer unterwegs verloren ging. Sie bleibt jetzt erhalten,
+  und die Suite überspringt die Prüfung mit einer ehrlichen Begründung. Rein betriebsseitig.
+
+- **Betrieb: der monatliche Bankbericht liest die Zahlen wieder.** Das Abfrageskript rief auf dem
+  neuen Server noch `docker exec` auf und wäre beim nächsten Lauf gescheitert; es nutzt jetzt
+  Podman. Rein betriebsseitig.
+
+## [v1.9.2](https://github.com/krt-profit/basetool/releases/tag/v1.9.2) - 2026-09-22
+
+### Fixed
+
+- **Betrieb: die Host-Einrichtung hätte allen Containern die Namensauflösung genommen.** Die
+  Aliasliste wurde in eine einzige Zeile geschrieben statt in eine pro Adresse — ein erfolgreicher
+  Lauf hätte das Backend, die Grafana-Anmeldung und sämtliche externen Prüfungen stillgelegt.
+  Gefunden im Trockenlauf, nie angewendet. Eine Nachkontrolle liest die Datei jetzt zurück und
+  bricht ab, wenn das wieder passiert. Rein betriebsseitig.
+
+- **Betrieb: die IPv6-Prüfungen der öffentlichen Adressen laufen wieder.** Ein Container erreicht
+  auf dem neuen Server die eigene Maschine nicht über deren öffentliche Adresse; der Umweg, der
+  das löst, gab es bisher nur für IPv4. Die v6-Prüfungen scheiterten deshalb an sich selbst und
+  meldeten eine Störung, während IPv6 einwandfrei bediente. Es gibt den Umweg jetzt für beide
+  Protokolle — auf dem Testsystem gemessen, gleiche Antwort wie über IPv4. Rein betriebsseitig.
+
+- **Betrieb: die drei Host-Auslastungswarnungen können wieder auslösen.** Der Kernel dieses
+  Betriebssystems bringt die Auslastungsmessung mit, schaltet sie aber ab — seit dem Serverwechsel
+  fehlten damit alle Druckwerte, drei Warnungen waren tot und fünf Panels leer. Betroffen war
+  ausgerechnet das früheste Warnsignal vor einem Speicher-Engpass. Die Einrichtung setzt den
+  Kernel-Schalter jetzt selbst; wirksam wird er mit dem nächsten Neustart. Rein betriebsseitig.
+
+- **Betrieb: fünf leere Dashboard-Panels zeigen wieder Daten.** „Container Restarts", „Network
+  RX/TX", die dritte Reihe der Speicheraufschlüsselung und die beiden Redis-Speicherpanels fragten
+  Werte ab, die es nur unter der alten Container-Laufzeit gab — sie meldeten „No data" über
+  Container, die einwandfrei liefen. Die fehlenden Größen kommen jetzt aus den Quellen, die dieser
+  Host tatsächlich hat. Rein betriebsseitig.
+
+- **Der Edge sieht wieder die echte Client-Adresse.** Welches seiner eigenen Netze die Verbindung
+  trägt, entscheidet die Container-Laufzeit bei jedem Neuanlegen neu — gemessen wanderte sie über
+  drei verschiedene. Der Edge verwarf den PROXY-Header deshalb und protokollierte **jede** Anfrage
+  als dieselbe Bridge-Adresse, womit der Per-IP-Rate-Limiter und jede Adress-Allowlist auf einem
+  einzigen Topf für das gesamte Internet saßen. Jetzt sind alle sechs Netze gepinnt und alle sechs
+  Adressen benannt, und eine CI-Prüfung hält die drei Stellen, die sie aufzählen, deckungsgleich.
+
+- **Betrieb: die Container-Ausgaben landen wieder in Loki.** Auf dem Podman-Host schrieben die
+  Container in Podmans eigenen Speicher statt ins Journal, und das Journal selbst lag nur im
+  Arbeitsspeicher — der Sammler las also einen Pfad, den es nicht gab. Dadurch fehlten sämtliche
+  Container-Ströme, darunter das Zugriffsprotokoll des Edge; die Gesamt-Sammelrate blieb trotzdem
+  grün, weil die Dateiströme allein sie erzeugen. Beide Hälften sind jetzt festgelegt statt
+  geerbt. Rein betriebsseitig.
+
+- **Betrieb: die Konformanzprüfung liest Container-Logs jetzt über den tatsächlichen Treiber.**
+  Sie nahm einen an, und auf dem Produktionshost war es der andere — die Prüfung des
+  Client-Adressen-Durchgriffs meldete daraufhin „die Anfrage hat diesen Edge nie erreicht" über
+  einen Edge, der jede Anfrage der Maschine bediente. Rein betriebsseitig.
+
+- **Betrieb: die Container erreichen den eigenen öffentlichen Namen wieder.** Auf einem
+  Rootless-Host kommt ein Container über die öffentliche Adresse gar nicht an die eigene Maschine
+  heran. Die Rolle konnte dafür bisher genau einen Namen umbiegen und tat es für die Produktion
+  überhaupt nicht — unter Docker funktionierte der Umweg noch. Es ist jetzt eine Liste, und Grafana
+  sowie die externen Sonden stehen mit darin; ohne sie schlugen die Keycloak-Anmeldung in Grafana
+  und jede externe Prüfung fehl. Rein betriebsseitig.
+
+- **Die Zertifikatserneuerung fehlte im Auslieferungspaket.** Die ACME-Schleife ist am 16.09. aus
+  der Compose-Datei in eine eigene Skriptdatei gewandert, ohne dass das Paket sie mitnimmt: auf
+  einem frisch aufgesetzten Host startet der Dienst dadurch gar nicht und erneuert keine
+  Zertifikate. Bestehende Hosts merkten davon nichts, weil ihr Container das alte Kommando noch in
+  sich trug. Paket und Auslieferung tragen die Datei jetzt beide, und ein Test prüft künftig jeden
+  Teilbaum statt nur den, der zuerst gefehlt hat.
+
+- **Die wöchentliche Wiederherstellungsprobe läuft wieder durch.** Auf dem Podman-Host brach sie
+  beim zweiten Datenbank-Dump ab und meldete vier Artefakte als nicht wiederherstellbar, die sie
+  gar nicht erst geprüft hatte: `podman cp` gab einen Fehler zurück, obwohl die Datei vollständig
+  im Container angekommen war. Die Dumps wandern jetzt auf einem anderen Weg hinein, und die
+  übertragene Größe wird nachgezählt, statt dem Rückgabewert zu glauben.
+
+## [v1.9.1](https://github.com/krt-profit/basetool/releases/tag/v1.9.1) - 2026-09-22
+
+### Fixed
+
+- **Gelöschte Wiki-Gegenstände werden wieder als entfernt markiert.** Der Abgleich mit dem SC-Wiki
+  hat seine Aufräumstufe seit Wochen auf jedem Lauf übersprungen, weil ein einziger Teilabruf
+  (`/api/vehicle-items`) beim Anbieter dauerhaft unvollständig zurückkommt — dadurch blieb im
+  Gegenstandskatalog alles stehen, was es im Wiki längst nicht mehr gibt. Der vollständige
+  Gesamtabruf deckt diesen Teilabruf ab und bürgt jetzt für ihn; ist er selbst unvollständig,
+  bleibt die Aufräumstufe wie bisher aus (ADR-0195). Der erste Lauf nach dem Update markiert den
+  gesamten aufgelaufenen Rückstand auf einmal.
+
+## [v1.9.0](https://github.com/krt-profit/basetool/releases/tag/v1.9.0) - 2026-09-22
+
+### Added
+
+- **Entwicklung: die Architektur ist jetzt vollständig nach arc42 dokumentiert.** Zwölf Kapitel unter `docs/arc42/` — Kontext, Bausteine, Laufzeit, Verteilung, Querschnitt, Qualität, Risiken und Glossar — mit dem Stand **nach** dem Podman-Umzug. Sie verweisen auf Specs und ADRs, statt sie zu wiederholen. Rein entwicklungsseitig.
+
+### Changed
+
+- **Entwicklung: das Logging ist jetzt erzwungen einheitlich.** Produktionscode holt seinen Logger
+  ausschließlich über Lombok — `@Slf4j`, im Keycloak-Provider `@JBossLog`; jede andere
+  Logging-Annotation ist ein Compile-Fehler, und ein neuer CI-Check (`logging-facade`) weist
+  handgeschriebene Logger und Konsolenausgaben im Produktionscode zurück. Rein entwicklungsseitig
+  (ADR-0193).
+
+- **Entwicklung: Lombok und die JetBrains-Annotationen stehen jetzt in jedem Modul und jedem
+  Quellbereich zur Verfügung** — auch in Tests, im E2E-Bereich, im Keycloak-Provider und im
+  Test-Hilfsmodul, wo bisher schlicht keins von beiden eingebunden war. Lombok versieht zusätzlich
+  den von ihm erzeugten Code selbst mit Nullbarkeits-Angaben, und 1.063 Stellen haben eine aus dem
+  eigenen Code abgeleitete Nullbarkeits-Angabe bekommen. Rein entwicklungsseitig; das Verhalten der
+  Anwendung ändert sich nicht (ADR-0192).
+
+- **Entwicklung: die letzten handgeschriebenen Accessoren sind jetzt Lombok.** Der Sweep aus
+  ADR-0192 hatte nur den Produktionsbereich erfasst; acht Getter und Setter in den Metrik-Beans und
+  in einer Testklasse sind jetzt Annotationen. Was stehen bleibt, ist gezählt statt behauptet: 123
+  Accessoren, die Lombok nicht schreiben kann, plus vier Interface-Implementierungen, die von Hand
+  bleiben, damit sie „@Override“ tragen können. Rein entwicklungsseitig.
+
+- **Mehrere Betriebs-Abhängigkeiten wurden aktualisiert**: der Log-Speicher Loki (schließt mehrere
+  als hoch eingestufte Schwachstellen in der Netzwerkbibliothek), der Alarm-Verteiler Alertmanager,
+  die Container-Messung cAdvisor, der ACME-Client `lego`, der Edge-Proxy nginx sowie CI-Werkzeuge
+  und der Frontend-Formatierer Prettier. Betrifft nur den Betrieb, nicht die Nutzung.
+
+### Fixed
+
+- **Betrieb: die wöchentliche Aufräum-Aufgabe läuft wieder — und hätte beinahe Zertifikate
+  gelöscht.** Sie rief `docker` direkt auf; auf dem neuen Host gibt es kein `docker`, der Timer war
+  trotzdem aktiv und ihr Alarm feuerte dauerhaft. Sie erkennt die Laufzeit jetzt selbst. Zwei
+  Schritte entfallen auf Podman: `podman volume prune` kennt kein „nur anonyme" und hätte
+  `edge-certs` und `edge-acme-state` mitgenommen, und `builder prune` ist dort nur ein zweiter
+  Image-Prune. Der Grund für den Volume-Schritt wurde dafür an der Quelle beseitigt: die
+  Restore-Probe ließ bei jedem Lauf ein 156-MB-Volume zurück (ADR-0194).
+
+- **Eine kurz abreißende Verbindung zum Backend lässt Seiten nicht mehr grundlos leer wirken.** Riss
+  die Verbindung mitten in einer Antwort ab, meldete das Frontend intern einen Erfolg mit
+  unbekanntem Fehler und behandelte den Ausfall als Fehler des Aufrufers. Er wird jetzt als das
+  einsortiert, was er ist — eine Transportstörung — und landet in derselben Fehlerklasse und
+  Überwachung wie ein Verbindungsabbruch vor der Antwort (REQ-OBS-011).
+
+- **Das Frontend gibt Verbindungen zum Backend jetzt frei, bevor das Backend sie schließt.** Beide
+  Seiten warteten exakt 20 Sekunden, wodurch das Frontend gelegentlich eine bereits geschlossene
+  Verbindung weiterverwendete — unter HTTP/2 reißen dabei alle gleichzeitig darauf laufenden
+  Anfragen ab, nicht nur eine. Die Frontend-Seite wartet jetzt 10 Sekunden.
+
+- **Betrieb: die Maskierung im Log-Shipper schwärzt wieder genau das Richtige.** Sie überschrieb
+  auch den Feldnamen und schrieb `${1}***${1}***` statt `username=***`; zugleich endete sie beim
+  ersten Leerzeichen, sodass bei einem Anmeldeversuch mit Leerzeichen im Namen der Rest der Eingabe
+  unmaskiert im Log landete. Beides ist behoben; Token, Adressen und JWTs waren nie betroffen
+  (REQ-OBS-007).
+
+- **Ein Auftrag, den du gerade zugeordnet hast, stand weiter in der „+ Zuordnen“-Liste des Lagereintrags.** Wähltest du ihn dort erneut aus, brach das Speichern mit „Fehler beim Aktualisieren des Lagers.“ ab. Die Auswahl öffnet jetzt die vorhandene Zuordnung zum Bearbeiten, der Speichern-Knopf lässt sich während des Schreibens nicht mehr doppelt auslösen, und lehnt der Server eine Zuordnung doch ab — etwa weil ein anderes Mitglied denselben Auftrag Sekunden vorher zugeordnet hat — steht jetzt der tatsächliche Grund im Hinweis statt einer allgemeinen Fehlermeldung (REQ-INV-027, REQ-FE-001).
+
+- **Betrieb: die Maskierung im Log-Shipper kann nicht mehr unbemerkt kaputtgehen.** Die acht fehlerhaften Regeln waren gültige Konfiguration — nichts schlug fehl, nur der Ersatztext war falsch, und aufgefallen ist es erst beim Lesen eines Log-Exports. Ein neuer CI-Check (`alloy-log-masking`) prüft jetzt beide Regeln; zusätzlich maskiert `uname=` bei Grafana-Anmeldungen auch Werte mit Leerzeichen (REQ-OBS-007).
+
+- **Entwicklung: auf Windows-Arbeitsplätzen wurden mehrere Konfigurationsdateien mit CRLF
+  ausgecheckt.** Für `*.alloy` fehlte die Zeilenenden-Regel in `.gitattributes`, sodass der in
+  `monitoring/README.md` dokumentierte Befehl `alloy fmt --test` dort mit „is not formatted
+  correctly" scheiterte, obwohl die Datei fehlerfrei formatiert ist. Dieselbe Lücke ist jetzt auch
+  für `*.tmpl`, `*.toml`, `*.mjs`, `*.py`, `*.service`, `*.timer`, `*.logrotate` und
+  `docker/maintenance/**` geschlossen; die Dateiinhalte bleiben unverändert.
+
+## [v1.8.7](https://github.com/krt-profit/basetool/releases/tag/v1.8.7) - 2026-09-18
+
+### Added
+
+- **Du kannst deine Daten jetzt selbst exportieren.** Im Profil, unter „Meine Daten exportieren“: ein PDF als lesbare Zusammenfassung mit einem Verzeichnis aller Abschnitte, eine JSON-Datei als vollständige Auskunft. Namen anderer Mitglieder sind in beiden durch einen Platzhalter ersetzt – in jeder Schreibweise, unter der sie im Tool stehen (REQ-SEC-058).
+
+- **Du kannst die Löschung deines Kontos jetzt im Tool beantragen.** Im Profil unter „Konto löschen“ – mit dem Absenden wird nichts gelöscht, du kannst den Antrag bis zur Entscheidung zurückziehen, und wird er abgelehnt, erfährst du den Grund. Optional beantragst du zusätzlich, deinen Spielernamen dort zu anonymisieren, wo er eine Kontolöschung überdauert; darüber entscheidet ein Administrator gesondert (REQ-SEC-061, REQ-SEC-062).
+
+- **Administration: neue Seite „Löschanträge“.** Offene Löschanträge entscheiden – ältester zuerst, weil ein Antrag innerhalb eines Monats zu beantworten ist. Eine Ablehnung braucht eine Begründung, die dem Mitglied mitgeteilt wird. Das Ausführen entfernt Konto und Zugang in einem Schritt (REQ-SEC-061).
+
+- **Administration: neue Seite „Personensuche“.** Findet jede Stelle, an der ein Name vorkommt – auch in Freitextfeldern ohne Kontoverknüpfung, etwa bei externen Einsatzteilnehmern, Übergabe-Empfängern oder Organigramm-Platzhaltern. Gedacht für Auskunfts-, Berichtigungs- und Löschanfragen, bei denen eine Korrektur an einer von vier Stellen keine Korrektur ist (REQ-SEC-060).
+
+- **Benachrichtigung, wenn ein Mitglied die Löschung beantragt – und wenn ein Antrag abgelehnt wird.** Die Administration sieht den Antrag im Postfach mit dem Namen des Mitglieds, das Mitglied die Ablehnung mit dem Hinweis auf die Begründung im eigenen Profil (REQ-SEC-061).
+
+- **Administration: Datenauskunft für ein anderes Mitglied.** Auf der Mitglieder-Bearbeitungsseite, für eine Anfrage von jemandem, der sich nicht selbst anmelden kann. Inhalt und Anonymisierung sind identisch mit dem Selbstexport (REQ-SEC-058).
+
+- **Halbfertige Kontolöschungen fallen jetzt auf.** Wurde ein Keycloak-Zugang entfernt, die lokale Zeile aber nie gelöscht, blieben E-Mail-Adresse, Spielername, Discord-ID und Beschreibung unbegrenzt liegen, ohne dass es irgendwo auffiel. Die Überwachung meldet das jetzt nach sieben Tagen (REQ-SEC-059).
+
+- **Audit- und Bank-Protokolle werden nach 24 Monaten automatisch gelöscht.** Die Protokolle wuchsen bisher unbegrenzt und enthielten den Spielernamen dauerhaft — auch von Mitgliedern, deren Konto längst entfernt war. Einträge werden jetzt 24 Monate nach der protokollierten Aktivität entfernt; die manuelle Bereinigung und die in der Datenschutzerklärung genannte Frist bleiben davon unberührt (REQ-AUDIT-006).
+
+  > Beim ersten Lauf nach dem Deployment werden alle Einträge gelöscht, die älter als 24 Monate sind. Wer sie behalten will, setzt vorher `APP_AUDIT_RETENTION_ENABLED=false` oder exportiert sie.
+
+- **Abgelehnte Registrierungen werden nicht mehr dauerhaft gespeichert.** Wurde eine Anmeldung von
+  einem Administrator abgelehnt, blieben Konto, Anmeldedaten und die Ablehnungsbegründung bisher
+  unbegrenzt liegen — im Tool gab es keinen Weg, sie zu entfernen. Sie werden jetzt 90 Tage nach der
+  Ablehnung automatisch und vollständig gelöscht; bis dahin lässt sich eine irrtümliche Ablehnung
+  weiterhin zurücknehmen (REQ-SEC-057).
+
+- **Betrieb: die Ersatzseite für eine Android-Anmeldung, die im Browser landet, wird jetzt von außen
+  überwacht.** `/app/callback` muss auf `/app/link-help` weiterleiten — das ist es, was den
+  Anmeldecode aus Adresszeile und Verlauf nimmt — und `/app/link-help` muss ohne Anmeldung
+  antworten. Beides prüfen zwei neue Blackbox-Proben am Edge; die bisherigen Tests laufen nur im
+  Prozess und blieben grün, während eine Edge-Regel die Route bricht (REQ-SEC-038, REQ-OBS-012).
+
+- **Betrieb: die internen Zertifikate werden jetzt vollständig auf Ablauf überwacht.** Bisher
+  sah die Überwachung nur Zertifikate, die auch ausgeliefert werden — die interne CA, an der
+  jede interne TLS-Verbindung hängt, wurde von nichts geprüft und wäre unbemerkt abgelaufen.
+  Ein Sammler auf dem Host liest die Zertifikatsdateien jetzt täglich; selbstsignierte melden
+  sich 90 Tage vorher, alle anderen 14 (REQ-OBS-008, REQ-OBS-011).
+
+### Removed
+
+- **Der alte Nginx Proxy Manager ist aus dem Stack entfernt.** Er lag seit der Umstellung auf den
+  neuen Edge-Proxy nur noch als Rückweg im `rollback`-Profil und startete im Normalbetrieb nicht.
+  Der Edge hat sich bewährt, also fällt die Rückfallebene weg (ADR-0162). Für Betreiber ändert sich
+  nichts am laufenden Betrieb; die Daten unter `/var/iri/npm` bleiben auf dem Host liegen und werden
+  nicht automatisch gelöscht.
+
+### Changed
+
+- **Die Nutzungsbedingungen nennen jetzt ein Mindestalter von 18 Jahren.** Ein Zugang wird ohnehin
+  nur Mitgliedern der Organisation gewährt, für die dasselbe Mindestalter gilt — bisher stand das
+  aber nirgends. Weil sich der Text der Bedingungen ändert, müssen alle Mitglieder ihnen einmalig
+  erneut zustimmen; bis dahin ruht auch die Desktop-Anwendung (REQ-SEC-028).
+
+- **Die Datenschutzerklärung erklärt jetzt, wie lange Daten in Sicherungskopien verbleiben.** Nach
+  einer Löschung sind sie bis zu etwa sechs Monate in verschlüsselten Sicherungen weiterhin
+  vorhanden, bis diese auslaufen — das stand bisher nicht dort. Ergänzt wurde auch der Hinweis, dass
+  wissentlich keine Daten von Personen unter 18 Jahren verarbeitet werden.
+
+- **Ungelesene Benachrichtigungen werden jetzt ebenfalls gelöscht.** Die automatische Löschung
+  erfasste bisher nur gelesene; ein Postfach, das niemand öffnete, behielt seine Einträge dauerhaft.
+  Ungelesene werden jetzt 180 Tage nach ihrer Erstellung entfernt, gelesene unverändert 90 Tage nach
+  dem Lesen — beide Fristen stehen in der Datenschutzerklärung (REQ-NOTIF-009).
+
+- **Keycloak auf 26.7.4 angehoben (Sicherheitsupdate).** Das Patch-Release schließt sechs
+  Schwachstellen; zwei liegen auf Wegen, die hier wirklich benutzt werden — ein Überlastungsangriff
+  ohne Anmeldung über beliebige Sprachkennungen (CVE-2026-79651) und eine gezielte Aussperrung beim
+  Erstanmelden über Discord (CVE-2026-19607). Keine Funktions- oder Konfigurationsänderung:
+  Container-Image und die SPI-Artefakte des `keycloak-spi`-Moduls ziehen mit, weiterhin JDK 21.
+  **Deploy-Hinweis:** Anders als bisher dokumentiert ist das kein `deploy.sh --force`-Fall — der
+  Deploy wendet eine Digest-Auffrischung innerhalb desselben `26.7`-Tags seit 2026-09-12 selbst an;
+  der Keycloak-Container startet dabei neu.
+- **Betrieb: der Edge kann die echte Client-Adresse von einem vorgeschalteten Dienst übernehmen.**
+  Neue optionale Variable `EDGE_TRUSTED_PROXY`: ist sie leer, ändert sich nichts. Trägt sie die
+  Adresse eines Vorschalters, sprechen die öffentlichen Listener PROXY-Protocol und der Edge stellt
+  die Client-Adresse daraus wieder her — nötig für den Umzug auf rootless Podman, weil dessen
+  Port-Weiterleitung die Adresse sonst ersetzt (ADR-0187). Der Health-Check des Containers läuft
+  jetzt über einen eigenen Loopback-Listener auf Port 8081.
+
+- **Betrieb: die drei Java-Dienste brauchen weniger Arbeitsspeicher für dieselbe Arbeit.** Sie legen
+  Objekte jetzt mit kompakten Kopfdaten ab (64 statt 96 Bit pro Objekt) — ab Java 27 ist das die
+  Voreinstellung, hier wird es auf Java 25 vorgezogen. Die Speichergrenzen der Container bleiben
+  bewusst unverändert, bis der Gewinn auf Produktion nachgemessen ist (REQ-OPS-030).
+
+### Fixed
+
+- **Betrieb: auf der neuen Podman-Maschine wurde keine einzige Logzeile ausgeliefert.** Der Shipper
+  lief, wurde überwacht und meldete sich gesund — und schickte nichts: seine Pfade, Namen und Ports
+  stammen aus der Container-Welt und existieren für einen Host-Dienst nicht. Damit waren die
+  SSH- und auditd-Überwachung, die Anwendungs-Logs und das Zugriffsprotokoll des Edge blind. Behoben
+  und auf dem Testing-Host nachgewiesen (REQ-OBS-019).
+
+- **Betrieb: die Cockpit-Weboberfläche wird entfernt.** Rockys Server-Installation bringt sie mit,
+  und ihr Socket lauscht auf allen Netzwerkschnittstellen. Die Hosts werden über SSH verwaltet, also
+  ist das ein zweiter Verwaltungszugang, den niemand nutzt und den trotzdem jemand aktuell halten
+  müsste. Die Provisionierung entfernt ihn und prüft, dass der Port wirklich frei ist.
+
+- **Betrieb: die Prüfung, ob der Sitzungsspeicher ein Passwort verlangt, lief auf dem neuen Host gar nicht.** Sie sprach ihn über eine Adresse an, die es dort vom Host aus nicht gibt, und lief in eine Zeitüberschreitung — ausgerechnet die Prüfung, die unauthentifizierten Zugriff finden soll. Sie fragt jetzt von innen und bringt ihre eigene Absicherung mit, damit sie sich nicht versehentlich selbst anmeldet.
+
+- **Betrieb: die Konformitätsprüfung konnte die Überwachung des neuen Hosts nicht abfragen.** Sie
+  sprach den Metrik-Dienst über eine Adresse an, die es auf dem neuen Container-Unterbau vom Host
+  aus nicht gibt, und meldete daraufhin „kein Überwachungssystem vorhanden" — über eines, das lief.
+  Drei Prüfungen hängen daran, alle drei sind beim Umzug vorgesehen.
+
+- **Betrieb: die Konformitätsprüfung sah auf dem neuen Host keine Container.** Sie meldete neun
+  laufende Dienste als abwesend — aus dem Verzeichnis, in dem eine Root-Anmeldung startet, kann der
+  Dienstnutzer nicht lesen, und der Fehler wurde verschluckt. Genau diese Prüfung soll den Umzug
+  absichern; sie hätte im entscheidenden Moment eine gesunde Maschine als kaputt gemeldet.
+
+- **Betrieb: das Löschen des Token-Ablaufdatums wirkt jetzt auch.** Ein Zugangstoken ohne Ablauf soll keine Ablaufdatei haben — genau das hatte der Deploy bisher nicht umgesetzt: die alte Kennzahl blieb liegen und der kritische Alarm feuerte dauerhaft dafür, dass man seiner eigenen Anweisung gefolgt war. Die Kennzahl wird jetzt entfernt, auch bei leerer oder unlesbarer Datei.
+
+- **Betrieb: ein toter Trace-Pfad fällt jetzt auf.** Die einzige Regel, die ihn beobachtete,
+  benutzte „es kamen schon einmal Spans an" als Ersatz für „Tracing ist eingeschaltet" — und konnte
+  deshalb einen Pfad, der noch nie funktioniert hat, gar nicht melden. Die Anwendungen melden ihren
+  Tracing-Zustand jetzt selbst, und zwei Regeln unterscheiden, ob die Spans schon den Kollektor nicht
+  erreichen oder erst danach verloren gehen (REQ-OBS-019).
+
+- **Betrieb: auf der neuen Maschine wären sämtliche Traces verschwunden.** Die Anwendungen senden ihre
+  Spans an den Namen `alloy`, den auf einem Podman-Host nichts mehr auflöst; verworfen wurde im
+  Exporter der Anwendung, wo keine Warnung hinsieht. Die Container bekommen den Namen jetzt zugeteilt
+  (REQ-OBS-019).
+
+- **Betrieb: `/var/log/secure` und das auditd-Protokoll waren für den Shipper unlesbar.** Auf der
+  RHEL-Familie gehören beide `root:root`, die Gruppenmitgliedschaft allein reicht also nicht. Die
+  Provisionierung setzt die Rechte jetzt und prüft am Ende, ob die Dateien wirklich geöffnet werden
+  können — die bisherige Zusicherung prüfte nur die Gruppe und war auf einem blinden Host grün.
+
+- **Betrieb: die Sicherung erfasst jetzt die Zertifikate und die Redis-Zugriffskontrolle.** Beides
+  fehlte, und beides braucht eine Wiederherstellung: ohne die TLS-Dateien kann ein
+  wiederhergestellter Host kein HTTPS ausliefern und muss neu ausstellen, wogegen ein
+  Wochenlimit steht; ohne die ACL-Datei startet Redis gar nicht. Die Sicherung hielt stattdessen
+  weiter den Stand des längst entfernten alten Proxys. Der wöchentliche Wiederherstellungstest
+  prüft die drei Dateien jetzt mit und schlägt Alarm, wenn eine fehlt (REQ-OPS-010, REQ-OPS-011).
+
+- **Betrieb: das Redis-Passwort liegt nicht mehr in der Umgebung des laufenden Containers.** Es war
+  dort gelandet, um eine spätere Podman-Prüfung zu bedienen, wirkte aber sofort im heutigen
+  Docker-Betrieb — lesbar aus `/proc/1/environ` und `docker inspect`, für ein Deployment, das den
+  Wert gar nicht braucht.
+
+- **Betrieb: die Container-Kennzahlen haben jetzt Alarme und ein Dashboard.** Die Serien, die
+  cAdvisor bei der Podman-Umstellung ersetzen, wurden zwar erhoben, aber von nichts gelesen. Speicher,
+  OOM-Kills, CPU-Drosselung und Prozesszahl lösen jetzt dieselben Alarme wie bisher aus — unter
+  beiden Container-Laufzeiten, ohne Lücke während der Umstellung — und zwei neue Alarme melden,
+  wenn der Sammler selbst stehenbleibt oder nichts mehr findet (REQ-OBS-011, REQ-OBS-014).
+
+- **Betrieb: mehrere Prüfungen und Vorlagen der Podman-Umstellung waren fehlerhaft.** Die
+  Konformitätsprüfung stufte die häufigste Schreibweise einer Bridge-Adresse als öffentlich ein und
+  meldete grün für genau den Fehler, den sie finden soll; acht ihrer Prüfungen riefen ein
+  `docker`-Programm auf, das der neue Host nicht hat. Der Unit-Generator verlor Argumentgrenzen in
+  Health-Kommandos, setzte kein Startzeitlimit und reichte `%`-Platzhalter ungeschützt durch, wodurch
+  beide Datenbanken mit zerstörtem Log-Präfix liefen. Ein zurückgezogener Dienst ließ seine
+  gerenderte Secret-Datei unbegrenzt auf dem Host zurück.
+
+- **Betrieb: der Deploy hätte auf dem Podman-Host jedes Mal abgebrochen.** Vor dem Anwenden lädt
+  `deploy.sh` die drei Anwendungs-Images vor; unter Podman bekam der Befehl statt der Image-Adresse
+  den Dienstnamen und scheiterte, was den ganzen Lauf beendete. Der Test dafür akzeptierte jede
+  Eingabe und meldete grün — er verlangt jetzt eine echte Image-Adresse.
+
+- **Einsätze: Teilnehmer lassen sich auf dem Handy wieder in eine Einheit ziehen.** Bisher öffnete
+  langes Drücken das Kontextmenü des Browsers statt den Teilnehmer aufzunehmen — Ziehen war auf
+  Touch-Geräten schlicht wirkungslos. Jetzt nimmt ein kurzes Halten die Zeile auf und der Finger
+  zieht sie in die Einheit; ein Wischen scrollt weiterhin (REQ-MISSION-005).
+
+- **Einsätze: das Crew-Board sagt jetzt, dass man Teilnehmer auch antippen kann.** Die Hinweise in
+  den Einheiten forderten nur zum Ziehen auf. Der Weg über Antippen gab es schon, er stand nur
+  nirgends: Die Hinweise nennen ihn jetzt zuerst, und sobald ein Teilnehmer ausgewählt ist, zeigt
+  jede Einheit „Hier tippen, um zuzuweisen“ (REQ-MISSION-005).
+
+- **Betrieb: dokumentierte Schalter erreichten den Container nicht.** Die Umgebungsvariablen der
+  drei Aufräumläufe und dreier weiterer Einstellungen waren nirgends an das Backend durchgereicht
+  — der dokumentierte Not-Aus vor dem ersten, unwiderruflichen Lauf blieb wirkungslos. Alle sind
+  jetzt eingetragen, mit unveränderten Vorgabewerten (REQ-AUDIT-006, REQ-SEC-036, REQ-SEC-057,
+  REQ-NOTIF-009).
+
+- **Betrieb: die drei Dienst-Images konnten ohne ihr Log-Verzeichnis nicht starten.** Beim Bauen
+  legte der Trainingslauf die Logdateien als `root` an; sie blieben im Image liegen, und der
+  Anwendungsbenutzer durfte anschließend nicht mehr hineinschreiben. Sichtbar war das nur, wenn ein
+  Image ohne das eingehängte Log-Verzeichnis läuft — am laufenden Stack ändert sich nichts
+  (REQ-OPS-031).
+
+- **Ein beschädigter Sitzungseintrag sperrte einzelne Mitglieder komplett aus.** Verlor der
+  Sitzungsspeicher einen Eintrag, während gerade eine Anfrage lief, blieb ein halb geschriebener
+  Rest zurück — und jede weitere Seite antwortete für diesen Browser wochenlang mit einem Fehler,
+  bis das Cookie von Hand gelöscht wurde. Jetzt wird man in diesem Fall einfach abgemeldet und kann
+  sich neu anmelden (REQ-SEC-063).
+
+- **Betrieb: ein absichtlicher 404 schrieb trotzdem eine Warnung ins Log.** Der Aufruf von
+  `/favicon.ico` wird bewusst mit der 404-Seite beantwortet — Spring meldete ihn davor trotzdem als
+  Warnung, noch bevor die App überhaupt antworten konnte. Diese eine Logzeile ist jetzt
+  stummgeschaltet; an der Antwort selbst ändert sich nichts (REQ-OBS-001).
+
+- **Wer mehreren Org-Einheiten angehört, bekam beim Anlegen eine englische Fehlermeldung.** Ohne
+  Auswahl im Feld „Zuordnen zu“ und ohne gesetzte aktive Staffel wies der Server den Eintrag ab —
+  und die Meldung dazu kam als technischer englischer Text an. Sie ist jetzt deutsch und sagt, was
+  zu tun ist. Betrifft Lager, Hangar, Einsätze, Operationen und Raffinerieaufträge (REQ-ORG-023).
+
+- **Betrieb: der Backend-Dienst benannte seinen Garbage Collector nicht.** Die Regel, dass jeder
+  Dienst seinen Collector ausdrücklich setzt, war für Frontend und Ingest umgesetzt, für das Backend
+  aber vergessen worden — es lief auf der automatischen Auswahl und hätte bei einer kleineren
+  Speichergrenze unbemerkt auf den langsameren Collector umgeschaltet (REQ-OPS-028).
+
+- **Ein großer Datenexport lief nicht mehr in eine Zeitüberschreitung.** Der Download teilte sich
+  die 5-Sekunden-Grenze aller übrigen Aufrufe, obwohl er das gesamte Konto zusammenstellt — bei
+  langer Historie endete er mit einem Fehler. Er hat jetzt seine eigene Grenze
+  (`APP_HTTP_EXPORT_RESPONSE_TIMEOUT`, Vorgabe 120s).
+
+- **Im Auskunfts-PDF standen technische Spaltennamen statt Bezeichnungen.** In den vollständig
+  abgedruckten Abschnitten hieß die linke Spalte etwa ‚discord_guild_nickname‘ oder ‚join_date‘.
+  Alle Felder haben jetzt eine deutsche Bezeichnung (REQ-SEC-058).
+
+- **Eine halb ausgeführte Kontolöschung fällt jetzt auf.** Konnte nach dem Löschen der lokalen
+  Daten der Zugang selbst nicht entfernt werden, stand das nur im Log — das Konto konnte sich
+  weiter anmelden. Das wird jetzt im Protokoll vermerkt und gemeldet, damit es jemand in der
+  Zugangsverwaltung nachholt (REQ-SEC-061).
+
+- **Betrieb: einen Aufräumlauf wie dokumentiert abzuschalten löste einen dauerhaften Alarm aus.**
+  Die Überwachung konnte „noch nie erfolgreich gelaufen“ nicht von „absichtlich ausgeschaltet“
+  unterscheiden, weil ein abgeschalteter Lauf gar keinen Messwert veröffentlicht. Jeder Lauf meldet
+  jetzt, ob er überhaupt eingeschaltet ist (`basetool_scheduled_job_enabled`), und die Alarme fragen
+  das ab (REQ-OBS-011).
+
+## [v1.8.6](https://github.com/krt-profit/basetool/releases/tag/v1.8.6) - 2026-09-15
+
+
+### Fixed
+
+- **Im Organigramm standen Gleichrangige untereinander statt nebeneinander.** Die Bereichskoordinatoren und Bereichsoperatoren eines Bereichs hängten in einer einzigen senkrechten Kette — der dritte Operator sah aus, als unterstünde er dem zweiten. Jeder Rang bekommt jetzt seine eigene Reihe: Koordinatoren nebeneinander, Operatoren nebeneinander darunter (REQ-ORG-018).
+
+- **Die Live-Aktualisierung baute ihre Verbindung alle 90 Sekunden neu auf.** Auf einer ruhigen Seite
+  floss über die Live-Verbindung minutenlang nichts, und der Edge-Proxy trennte sie deshalb als
+  untätig — jeder geöffnete Tab verband sich danach neu und lud im Hintergrund alle Abschnitte
+  seiner Seite erneut. Der Server hält die Verbindung jetzt mit einem stillen Signal alle 30 Sekunden
+  offen (REQ-FE-015).
+
+## [v1.8.5](https://github.com/krt-profit/basetool/releases/tag/v1.8.5) - 2026-09-15
+
+### Changed
+
+- **Testing fällt nicht mehr hinter Produktion zurück.** Eine Promotion nach Produktion zieht das
+  Testing-System jetzt mit, sofern es sonst älter wäre — steht dort schon eine neuere Version, bleibt
+  sie stehen. Der Workflow „Promote to testing" wird damit nur noch gebraucht, um Testing bewusst
+  **vor** Produktion zu bringen (REQ-OPS-022).
+
+### Fixed
+
+- **Der Footer zeigte nach einem Release die vorherige Versionsnummer.** Statt „v1.8.4" stand dort
+  „v1.8.3-9-g…" — die Zeichenkette wurde eingebacken, bevor der Release-Tag überhaupt existierte, und
+  das Image wird beim Taggen bewusst wiederverwendet statt neu gebaut. Die Version wird jetzt aus dem
+  Changelog des Release-Commits gelesen, wo sie zu diesem Zeitpunkt schon feststeht (REQ-OPS-021).
+
+## [v1.8.4](https://github.com/krt-profit/basetool/releases/tag/v1.8.4) - 2026-09-15
+
+### Fixed
+
+- **Wenn die App-Anmeldung im Browser landete, kam eine 404-Seite mitten im Login.** Öffnet Android
+  den Anmelde-Rücksprung nicht in der App — etwa weil das Gerät die Verknüpfung vergessen hat, oder
+  weil man am Rechner sitzt — erklärt jetzt eine eigene Seite, was passiert ist, und führt Schritt
+  für Schritt zurück. Der Anmeldecode verschwindet dabei sofort aus der Adresszeile (REQ-SEC-038).
+
+- **Die Release-Notes nannten nur zwei der drei Container-Images.** Das Ingest-Image wird bei jedem
+  Release mitgebaut, geprüft, signiert und veröffentlicht, fehlte aber in der automatisch erzeugten
+  Liste — ebenso zwei der vier SBOM-Verzeichnisse. Beide Listen werden jetzt aus der Build-Matrix
+  abgeleitet, und eine CI-Prüfung schlägt an, sobald sie auseinanderlaufen (REQ-OPS-029).
+
+## [v1.8.3](https://github.com/krt-profit/basetool/releases/tag/v1.8.3) - 2026-09-14
+
+### Fixed
+
+- **Im Lager klebten die aufgeklappten Filter an der Tabelle.** Zwischen der letzten Filterzeile und
+  der Kopfzeile der Tabelle fehlte der Abstand. Er ist wieder da, auf allen Seiten mit
+  einklappbaren Filtern.
+
+- **Betrieb: ein Alarm meldete sich nach jedem Deploy, ohne dass etwas kaputt war.** Die Überwachung
+  der Keycloak-Anmeldeereignisse schlug an, sobald die Kennzahl fehlte — die entsteht aber erst mit
+  der ersten Anmeldung und wird von jedem Neustart zurückgesetzt. Sie meldet sich jetzt nur noch,
+  wenn tatsächlich Anmeldungen stattfinden und trotzdem nichts aufgezeichnet wird. Für Mitglieder
+  ändert sich nichts.
+
+- **Die Kopfzeile ist auf dem Handy wieder einzeilig.** Titel und Staffel rutschten unter das
+  Menüsymbol, wodurch die Kopfzeile fast doppelt so hoch wurde wie vorgesehen (110 statt 62 Pixel)
+  und entsprechend Platz vom Inhalt nahm. Sie steht jetzt wieder in einer Zeile neben Menü und
+  Glocke.
+
+## [v1.8.2](https://github.com/krt-profit/basetool/releases/tag/v1.8.2) - 2026-09-14
+
+### Changed
+
+- **Die Filter lassen sich auf allen großen Listenseiten zuklappen.** Bei Einsätzen, Operationen,
+  Aufträgen, Raffinerie-Aufträgen, Mitgliedern und der Materialübersicht füllten die Filter auf dem
+  Handy den halben Bildschirm, bevor die erste Zeile zu sehen war. Sie starten jetzt zugeklappt
+  hinter einem Schalter, der anzeigt, wie viele Filter gerade greifen — wer sie offen haben will,
+  klappt sie einmal auf, das merkt sich der Browser. Die Haupt-Schaltfläche der Seite
+  („Neuer Auftrag" und ähnliche) bleibt immer sichtbar. Seiten mit nur einem Suchfeld — Hangar,
+  Staffel-Hangar, Mein Inventar — bleiben bewusst wie sie sind.
+
+### Fixed
+
+- **Im Lager rutschten die aufgeklappten Einträge aus dem Bild, sobald man nach rechts scrollte.**
+  Auf dem Handy ist die Lager-Tabelle breiter als der Bildschirm und wird seitlich gescrollt — die
+  Eintragszeilen mit Auftrag, Einsatz, Lagerplatz und den Knöpfen liefen dabei aber nur über die
+  Bildschirmbreite und blieben links liegen, während rechts neben ihnen nichts stand. Sie füllen
+  jetzt dieselbe Breite wie die übrigen Zeilen, und ihre Knöpfe stehen unter „Aktion".
+
+## [v1.8.1](https://github.com/krt-profit/basetool/releases/tag/v1.8.1) - 2026-09-14
+
+
+### Fixed
+
+- **Nach der Umstellung der Anmeldeadresse zeigte die Seite einen Fehler statt der Anmeldung.** Wer
+  vor der Umstellung angemeldet war, bekam beim nächsten Aufruf einen Serverfehler und kam nur
+  weiter, indem er die Website-Daten im Browser löschte — von selbst wäre der Zustand 30 Tage
+  geblieben. Jetzt führt er zur normalen Anmeldung.
+
+## [v1.8.0](https://github.com/krt-profit/basetool/releases/tag/v1.8.0) - 2026-09-14
+
+### Added
+
+- **Das Basetool lässt sich als App auf dem Startbildschirm installieren.** Auf iPhone und iPad
+  über „Zum Home-Bildschirm“, auf Android und am Rechner über das Browsermenü; danach hat es ein
+  eigenes Symbol und startet ohne Adressleiste. Gedacht für iPhone- und iPad-Mitglieder, für die es
+  keine eigene App gibt — und ohne Netz funktioniert es nicht, damit keine Mitgliederdaten auf
+  dem Gerät liegen bleiben.
+
+- **Lager: Filter nach Standort.** „Mein Lager“ und das globale Lager lassen sich jetzt in
+  beiden Ansichten (Material und Items) auf einzelne Standorte einschränken. Zur Auswahl stehen
+  nur Standorte, an denen tatsächlich Bestand liegt. Die Auswahl bleibt wie die übrigen Filter
+  erhalten und zählt im Filter-Zähler mit; „Alle markieren“ erfasst genau den gefilterten
+  Bestand.
+
+### Changed
+
+- **Alle Dialoge passen jetzt auf den Bildschirm.** Rund die Hälfte der Dialoge konnte höher
+  werden als das Fenster, sodass die Schaltflächen unten nicht mehr erreichbar waren — auf kleinen
+  Bildschirmen und im Hochformat. Jeder Dialog ist jetzt auf 90 % der Fensterhöhe begrenzt,
+  scrollt seinen Inhalt und behält Titelzeile und Schaltflächen sichtbar. Bestätigungsdialoge
+  zeigen ihren Text dadurch linksbündig statt zentriert.
+
+- **Ein Dialog blockiert jetzt überall die automatische Aktualisierung.** Ändert jemand anderes
+  dieselbe Seite, während ein Dialog offen ist, wurde die Seite bisher bei den meisten Dialogen
+  darunter weggetauscht — das Speichern scheiterte danach mit einem Konflikthinweis. Das gilt
+  jetzt für alle Dialoge.
+
+- **Anmeldefehler sind im Betrieb erstmals unterscheidbar.** Die Kennzahl dafür kannte keinen Wert
+  für „gar keine Anmeldedaten mitgeschickt" — also für genau den Fall, der praktisch immer eintritt
+  — und warf deshalb sämtliche Fehlschläge in einen Topf „sonstige". Neuer Wert `no_credentials`
+  in Backend und Ingest.
+
+- **Die Datenbank wird bei vielen gleichzeitigen Mitgliedern nicht mehr ausgebremst.** Rollen und
+  Berechtigungen wurden je Mitglied alle 30 Sekunden vollständig neu aus der Datenbank gelesen; das
+  verursachte den Großteil der Datenbanklast und kurze, spürbare Verzögerungen. Der Zwischenspeicher
+  hält sie jetzt 5 Minuten — eine entzogene Rolle wirkt dadurch bis zu 5 Minuten später, sofern sich
+  das Mitglied nicht neu anmeldet.
+
+- **Mehr CPU für Datenbank, Backend und Keycloak, und eine passendere Datenbankkonfiguration.** Die
+  Grenzen waren so eng gesetzt, dass kurze Lastspitzen ausgebremst wurden, obwohl der Server fast
+  ungenutzt ist. Neue optionale Servervariable `IRI_AUTHORITIES_CACHE_TTL` (Standard `PT5M`,
+  zulässig bis `PT15M`) steuert den oben genannten Zwischenspeicher.
+
+### Fixed
+
+- **Robots-Datei, App-Links-Datei und Web-App-Manifest werden angemeldeten Mitgliedern nicht mehr
+  auf die Nutzungsbedingungen umgeleitet.** Wer die Bedingungen noch nicht bestätigt hatte, bekam
+  bei diesen drei Dateien die Zustimmungsseite statt der Datei, und jeder Abruf kostete eine
+  zusätzliche Abfrage beim Server. Das gilt auch für kodierte Schreibweisen derselben
+  Adresse.
+
+- **Drei Bedienelemente waren auf Touch-Geräten zu klein zum Treffen**: der Sprachumschalter
+  (17px hoch), der Schließen-Knopf der Seitenleiste (34px) und die Benachrichtigungsglocke (40px).
+  Alle drei erfüllen jetzt das 44px-Mindestmaß.
+
+- **Das 44px-Mindestmaß gilt jetzt für jedes Bedienelement, auch für die, an die niemand gedacht
+  hat.** Bisher galt es nur für eine Liste namentlich aufgeführter Elemente, und jede Prüfrunde fand
+  weitere, die darin fehlten — zuletzt die Sortierpfeile der Beförderungs-Themen mit 29x18px, die
+  nur erscheinen, wenn eine Kategorie mehr als ein Thema hat. Umgedreht: Knöpfe, Aufklapp-Titel,
+  Eingabefelder und Auswahllisten erfüllen das Maß von sich aus; dichte Tabellenzeilen behalten ihre
+  32px. Neue Bedienelemente sind damit von Anfang an groß genug, statt erst beim nächsten Fund
+  nachgetragen zu werden.
+
+- **Die „Details"-Schalter in den Übersichtstabellen waren zu klein.** In der Blueprint-Übersicht
+  und im Staffel-Hangar maßen sie 29px statt der geforderten 44px, ebenso zwei Schalter in der
+  Auftragsansicht. Ursache war eine alte Formatierungsanweisung, die das Mindestmaß gezielt
+  aufhob — auf Touch-Geräten sind sie jetzt normal groß.
+
+- **Knopfzeilen brechen auf dem Telefon zuverlässig um.** Auch das war eine Namensliste, und sie
+  konnte nie vollständig sein: ein Teil der Zeilen trägt automatisch erzeugte Klassennamen, die sich
+  bei jeder Änderung mitändern. Jetzt zählt der Aufbau der Zeile, nicht ihr Name.
+
+- **Auf schmalen Bildschirmen lief der Seitenkopf über.** Wo neben der Überschrift ein Knopf steht
+  („Neuer Auftrag“ und ähnliche), wurde er aus dem Bild geschoben und die ganze Seite musste
+  seitlich gescrollt werden — auf der Auftragsseite um 159px. Der Knopf rutscht jetzt in die
+  nächste Zeile.
+
+- **Das Schließkreuz in Dialogen sah aus wie ein fremder Knopf** — es hatte als einziges
+  Bedienelement gar keine Gestaltung und war auf Touch-Geräten zu klein. Es passt sich jetzt dem
+  übrigen Bild an; die Knopfzeile eines Dialogs bricht auf schmalen Bildschirmen um, statt den
+  letzten Knopf abzuschneiden.
+
+- **Die Navigationsschublade war auf dem Handy unten abgeschnitten.** Ihre Höhe richtete sich nach
+  dem Bildschirm ohne Browserleiste, sodass die letzten Einträge — darunter „Abmelden“ — hinter
+  der Leiste lagen und nicht erreichbar waren.
+
+- **Überschriften liefen auf dem Handy über den Rand.** Lange deutsche Komposita wie
+  „Nutzungsbedingungen“ passen nicht auf eine Handybreite und hatten keine Umbruchstelle; die
+  Rechtsseiten ragten dadurch bis zu 88px, die Audit-Seiten 151px hinaus. Sie werden jetzt mit
+  Trennstrich umbrochen.
+
+- **Knopfleisten brachen nicht um.** In dreizehn Fällen — am deutlichsten im Audit-Log mit vier
+  Knöpfen — wurde der letzte Knopf aus dem Bild geschoben. Sie setzen sich jetzt in die nächste
+  Zeile.
+
+- **Die Glocke überdeckte den Titel.** Sie schwebt über der Kopfzeile, die deshalb keinen Platz
+  für sie freihielt — der Titel endete unlesbar unter ihr. Jetzt ist ihr Platz reserviert.
+
+- **Auswahlfelder waren breiter als der Bildschirm.** Ein Auswahlfeld richtet sich nach seinem
+  längsten Eintrag; im Audit-Log und in der Preis-Übersicht wurde die Seite dadurch verkleinert
+  dargestellt, statt zu scrollen. Sie passen sich jetzt der verfügbaren Breite an.
+
+- **Die Antragsliste der Bank machte die Seite auf dem Handy mehr als doppelt so breit** — und die
+  drei Dialoge dieser Seite („Bestätigen“, „Ablehnen“, „Buchung“) saßen dadurch fast vollständig
+  außerhalb des Bildschirms. Die Tabelle scrollt jetzt für sich, die Seite bleibt stehen.
+
+- **Auftrags- und Raffinerie-Detailseiten ließen sich auf dem Handy nur seitlich verschoben lesen.**
+  Ihre Knopfleisten brachen nicht um und zogen die ganze Seite in die Breite. Sie setzen sich jetzt
+  in die nächste Zeile.
+
+- **Die Startseite ließ sich auf dem Tablet quer seitlich schieben.** Ein langer Einsatzname passte
+  nicht in seine Kachel und schob das ganze Raster über den Rand; jetzt bricht er um.
+
+- **Der Hinweis „Aktualisierungen verfügbar“ war auf den Bank-Seiten ungestaltet.** Er erschien dort
+  als nackter grauer Knopf mitten im Inhalt statt als Hinweisfeld unten rechts — auf den
+  Einsatzseiten sah er immer schon richtig aus.
+
+- **Wer auf seine Freigabe wartete, kam nicht an Impressum und Datenschutz.** Ein angemeldetes
+  Mitglied mit noch offener Registrierung wurde von beiden Seiten auf die Wartesseite geschickt und
+  musste sich abmelden, um sie zu lesen. Beide Seiten sind jetzt erreichbar, wie die
+  Nutzungsbedingungen es schon waren.
+
+- **Auf kurzen Seiten hing die Fußzeile auf dem Handy mitten im Bild** statt am Seitenende — etwa
+  auf einer leeren Benachrichtigungsliste. Sie sitzt jetzt wieder unten.
+
+- **Die Aktionsleiste der Einsatz-Verwaltung und der Balken des Organigramms überdeckten auf dem
+  Handy die Fußzeilen-Links**, seit die Fußzeile dort mitscrollt. Beide geben sie jetzt frei, wenn
+  man ans Seitenende kommt.
+
+- **Die Einheiten-Tabelle unter Administration → Organisationsstruktur passte auf dem Handy nicht
+  auf den Bildschirm.** Sobald Einheiten eingetragen waren, wurde sie breiter als das Gerät und
+  schob die ganze Seite samt Glocke seitlich weg. Jetzt scrollt sie für sich.
+
+- **Die Regel-Tabelle unter Administration → Benachrichtigungsregeln sprengte jeden Bildschirm.**
+  Sie ist 1303px breit und hatte keinen eigenen Scrollbereich, sodass die ganze Seite seitlich
+  verschoben werden musste — auch am Rechner. Jetzt scrollt die Tabelle für sich.
+
+- **Vier weitere Bedienelemente waren zum Antippen zu klein**: die Sortierknöpfe der
+  Materialbedarfsliste, die Auswahlkästchen im Lager, die Rechte-Schalter der Bank-Berechtigungen
+  und der Aufklapp-Pfeil einer Buchung — letzterer mit 15px deutlich unter jedem Mindestmaß.
+
+- **Auch die Sortierknöpfe unter Beförderung → Themen waren zu klein** — 29x18px, viermal auf der
+  Seite. Sie waren dem Test entgangen, weil sie erst ab zwei Themen überhaupt erscheinen.
+
+- **Eine unsinnige Sprachangabe in der Adresse führte auf die Fehlerseite.** Ein `?lang=`-Wert, den
+  der Server nicht lesen kann, beendete den Seitenaufruf mit einem Fehler, statt ihn einfach zu
+  übergehen. Betraf jede Seite, auch das Web-App-Manifest.
+
+- **Die Alarmierung bei Anmeldefehlern misst wieder Angreifer statt der eigenen Überwachung.** Der
+  Alarm „Möglicher JWT-Brute-Force" zählte jeden abgewiesenen Aufruf — und rund drei Viertel seiner
+  Schwelle waren von den eigenen Verfügbarkeitsprüfungen belegt, die absichtlich ein 401 erwarten. Er
+  achtet jetzt auf *zurückgewiesene Token*, was eine Prüfung nie auslösen kann; die reine Menge
+  überwacht ein eigener Alarm. Für Mitglieder ändert sich nichts.
+
+- **Die Keycloak-Verwaltungsoberfläche ist über den SSH-Tunnel wieder erreichbar.** Seit die
+  veröffentlichten Ports auf einer eigenen Netzwerkbrücke liegen, kam der Tunnel am Edge unter einer
+  Adresse an, die nicht auf der Freigabeliste von `/admin` stand — jede Anfrage endete mit 403. Die
+  Adresse ist jetzt eingetragen, IPv4 und IPv6; von außen bleibt die Konsole gesperrt. Für
+  Mitglieder ändert sich nichts.
+
+- **Der Speicherverbrauch der Weboberfläche steigt nicht mehr den ganzen Tag an.** Der Dienst lief
+  unbemerkt mit der einfachsten Speicherbereinigung der Java-Laufzeit, weil seine Speichergrenze
+  knapp unter der Schwelle lag, ab der automatisch die bessere gewählt wird — Seitenaufbauten wurden
+  dadurch regelmäßig kurz angehalten. Die Bereinigung wird jetzt ausdrücklich festgelegt, die Grenze
+  steigt von 1280 MB auf 1792 MB.
+
+- **Seiten werden schneller ausgeliefert.** Beim Aufbau jeder Seite sah der Server für jeden Link
+  in Menü und Fußzeile erst noch nach, ob dahinter vielleicht eine Datei liegt — und merkte sich
+  das Ergebnis nie, sodass er bei jedem Seitenaufruf von vorn suchte. Er sieht jetzt nur noch dort
+  nach, wo tatsächlich Dateien liegen. Am Aussehen und an der Bedienung ändert sich nichts.
+
+- **Die Anmeldung läuft jetzt unter derselben Adresse wie das Basetool selbst**, damit der Login
+  die installierte Web-App auf iPhone und iPad nicht mehr aus ihrem Fenster wirft. **Du musst dich
+  einmalig neu anmelden.** Die Android-App braucht die dazu passende neue Version — ältere
+  Installationen können sich nicht mehr anmelden.
+
+- **Betrieb: Eine Umgebung unter eigener Domain braucht nur noch eine Einstellung.**
+  `IRI_KEYCLOAK_HOSTNAME` und `IRI_KEYCLOAK_ISSUER_URI` waren zwei getrennte Werte, die von Hand
+  übereinstimmen mussten — taten sie es nicht, meldete sich Keycloak als gesund und die drei
+  Anwendungen scheiterten beim Start an „issuer does not match“, was wie ein Fehler der Anwendung
+  aussieht. Der zweite Wert wird jetzt aus dem ersten abgeleitet, und eine CI-Prüfung hält das so.
+  `IRI_KEYCLOAK_ISSUER_URI` bleibt als Ausnahme für abweichende Aufbauten und wird normalerweise
+  nicht gesetzt. **Dieselbe Einstellung verschiebt auch Grafanas Anmeldung mit** — deren drei
+  Keycloak-Adressen standen bisher einzeln im Monitoring-Stack. Nur die vier Prüf-Adressen in
+  `monitoring/prometheus/prometheus.yml` bleiben Handarbeit, weil diese Datei nicht ersetzt wird;
+  die CI-Prüfung meldet es, wenn sie zurückbleiben (ADR-0167).
+
+- **Auf dem Handy scrollt die Fußzeile jetzt mit, statt unten festzukleben.** Sie war dauerhaft
+  sichtbar und der Inhalt musste zusätzlich Platz für sie freihalten — zusammen rund ein Fünftel
+  des Bildschirms für drei Links. Jetzt siehst du sie erst beim Scrollen ans Ende; auf Tablet und
+  Rechner bleibt sie fixiert.
+
+- **Die Kopfzeile ist auf dem Handy schlanker.** Der Titel brach zweizeilig um und machte die
+  Kopfzeile 76px hoch; jetzt steht er einzeilig (bei Bedarf gekürzt) neben einem kleineren
+  Zeichen — rund 48px. Menü, Zeichen und Glocke bleiben beim Scrollen erreichbar.
+
+- **Betrieb: die Keycloak-Adresse entfällt, und eine bestehende Serverkonfiguration muss angepasst
+  werden.** Weil die Anmeldung unter die Basetool-Adresse gezogen ist, hat Keycloak keinen eigenen
+  Hostnamen mehr: `EDGE_HOST_KEYCLOAK` ist ersatzlos gestrichen (mit v1.7.18 noch als Pflichtvariable
+  eingeführt), `ACME_HOSTS` verliert denselben Eintrag, und `IRI_KEYCLOAK_HOSTNAME` enthält jetzt den
+  vollständigen Pfad mit `/auth`. Wer `IRI_KEYCLOAK_HOST_ALIAS` gesetzt hat, richtet ihn auf die
+  Web-Adresse. Die Reihenfolge steht in `docs/deployment.md`; wird sie übersprungen, startet die
+  Auslieferung nicht durch. Für Mitglieder ändert sich dadurch nichts.
+
+- **Bearbeitungen in der Weboberfläche lösen weniger Serverabfragen aus.** Jeder JSON-Aufruf — also
+  jedes Speichern, Umschalten und Nachladen ohne Seitenwechsel — hat bisher zusätzlich fünf
+  Abfragen ausgelöst, um die Seitenumgebung (Staffel-Auswahl, Berechtigungen,
+  Benachrichtigungszähler) aufzubauen, die ein JSON-Aufruf gar nicht verwenden kann. Diese Abfragen
+  entfallen.
+
+## [v1.7.19](https://github.com/krt-profit/basetool/releases/tag/v1.7.19) - 2026-09-13
+
+### Fixed
+
+- **Der Edge-Proxy kann jetzt so viele gleichzeitige Verbindungen bedienen, wie er soll.** Er war auf
+  4096 Verbindungen je Arbeitsprozess eingestellt, bekam vom Container aber nur 1024 Dateihandles —
+  und meldete das bei jedem Start. Für Mitglieder bisher folgenlos; unter Last hätte es Verbindungen
+  gekostet.
+
+## [v1.7.18](https://github.com/krt-profit/basetool/releases/tag/v1.7.18) - 2026-09-13
+
+### Changed
+
+- **Mehrere Betriebs-Abhängigkeiten wurden aktualisiert**: das Redis-Image, der
+  Redis-Exporter für Grafana, der ACME-Client `lego` (v4 → v5, inklusive angepasster
+  Kommandozeile) sowie Checkstyle, Node und die Frontend-Lint-Werkzeuge (ESLint,
+  Stylelint). Betrifft nur den Betrieb, nicht die Nutzung.
+- **Der Edge-Proxy ist nicht mehr auf die Produktionsadressen festgelegt.** Die Hostnamen kommen
+  jetzt aus der Konfiguration des jeweiligen Servers, statt fest in den Dateien zu stehen — damit
+  kann dieselbe Auslieferung auch die Testumgebung bedienen. Für Mitglieder ändert sich nichts.
+  Neue Pflichtvariablen auf dem Server: `EDGE_HOST_FRONTEND`, `EDGE_HOST_KEYCLOAK`,
+  `EDGE_HOST_INGEST`, `EDGE_HOST_GRAFANA`, `EDGE_HOST_API`; dazu `ACME_HOSTS`, das leer bleiben
+  darf, wo Zertifikate nicht selbst beschafft werden.
+
+### Fixed
+
+- **Sicherheitsaktualisierungen von Keycloak und PostgreSQL werden nicht mehr blockiert.** Die
+  Sperre, die einen echten Versionssprung dieser Dienste der Handsteuerung vorbehält, griff auch
+  bei einem lediglich neu gebauten Basis-Image — die Testumgebung stand deshalb sieben Tage still.
+  Für Mitglieder ändert sich nichts.
+
+### Security
+
+- **Der Edge-Proxy schließt eine TLS-Schwachstelle in nginx** (CVE-2026-1642, "NGINX
+  Rift" — ein Angreifer zwischen Proxy und Backend konnte TLS-Antworten manipulieren).
+  Das Basis-Image wurde auf die reparierte Version angehoben; für Mitglieder ändert
+  sich nichts.
+- **Eine Entwicklungs-Abhängigkeit mit einer ReDoS-Schwachstelle wurde angehoben** (`colord`,
+  GHSA-2wm5-q62r-hmrv). Sie läuft nur beim Prüfen des eigenen CSS und war nie Teil der
+  ausgelieferten Anwendung; für Mitglieder ändert sich nichts.
+
+## [v1.7.17](https://github.com/krt-profit/basetool/releases/tag/v1.7.17) - 2026-09-12
+
+### Added
+
+- **Eine scheiternde Zertifikatserneuerung meldet sich jetzt selbst.** Bisher wäre ein Fehlschlag
+  erst zwei Wochen vor Ablauf aufgefallen; jetzt gibt es nach zwei erfolglosen Anläufen eine
+  Warnung. Betrifft nur den Betrieb, nicht die Nutzung.
+
+## [v1.7.16](https://github.com/krt-profit/basetool/releases/tag/v1.7.16) - 2026-09-12
+
+## [v1.7.15](https://github.com/krt-profit/basetool/releases/tag/v1.7.15) - 2026-09-12
+
+### Fixed
+
+- **Die automatische Zertifikatserneuerung des Edge-Proxys funktioniert jetzt tatsächlich.** Der
+  ACME-Dienst konnte die erneuerten Zertifikate nicht ablegen und legte sie zudem nur für einen der
+  fünf Hostnamen an — die übrigen vier wären mit den bei der Umstellung übernommenen Zertifikaten
+  stehengeblieben und Anfang Dezember abgelaufen. Für Mitglieder ändert sich nichts; ohne die
+  Korrektur wären die Seiten nach Ablauf nicht mehr erreichbar gewesen.
+- **Ein erneuertes Zertifikat wird jetzt auch geladen.** Der Deploy prüfte zwar bei jedem Durchlauf,
+  ob sich die Zertifikate geändert haben, konnte die Prüfung aber nie durchführen und startete den
+  Proxy deshalb nie neu — ein neues Zertifikat wäre auf der Platte liegen geblieben.
+
+## [v1.7.14](https://github.com/krt-profit/basetool/releases/tag/v1.7.14) - 2026-09-12
+
+## [v1.7.13](https://github.com/krt-profit/basetool/releases/tag/v1.7.13) - 2026-09-12
+
+## [v1.7.12](https://github.com/krt-profit/basetool/releases/tag/v1.7.12) - 2026-09-12
+
+## [v1.7.11](https://github.com/krt-profit/basetool/releases/tag/v1.7.11) - 2026-09-12
+
+## [v1.7.10](https://github.com/krt-profit/basetool/releases/tag/v1.7.10) - 2026-09-12
+
+## [v1.7.9](https://github.com/krt-profit/basetool/releases/tag/v1.7.9) - 2026-09-12
+
+### Changed
+
+- **Der Edge-Proxy ist jetzt reines nginx statt Nginx Proxy Manager.** Für Mitglieder ändert sich
+  nichts an den Adressen oder am Verhalten; die gesamte Konfiguration liegt jetzt im Repository
+  statt in einer Datenbank auf dem Server, und die Zertifikatsverwaltung läuft in einem eigenen,
+  getrennten Dienst. Neue Pflichtvariable: `ACME_EMAIL` (Kontaktadresse für Let's Encrypt).
+
+## [v1.7.8](https://github.com/krt-profit/basetool/releases/tag/v1.7.8) - 2026-09-11
+
+### Changed
+
+- **Seiten mit vielen gleichzeitigen Abfragen laden schneller.** Anzeige und Backend sprechen jetzt
+  HTTP/2, teilen sich also wenige Verbindungen statt für jeden Aufruf eine eigene aufzumachen.
+  Umschaltbar über `APP_HTTP_BACKEND_PROTOCOL=HTTP11`, feinjustierbar über
+  `APP_HTTP_MAX_CONCURRENT_STREAMS`.
+
+- **Antworten zwischen Anzeige und Backend werden günstiger gelesen (CBOR).** Inhaltlich identisch,
+  nur weniger Rechenaufwand beim Auswerten. Umschaltbar über `APP_HTTP_CODEC=JSON`; Apps und
+  Extractor sind nicht betroffen.
+
+### Fixed
+
+- **Bank-, Mitglieder-, Lager- und Benachrichtigungsantworten werden nicht mehr unnötig komplett im
+  Speicher zwischengelagert.** Für diese Bereiche wurde eine Zwischenspeicherung berechnet, die
+  danach ohnehin verworfen wurde. Keine Antwort ändert sich, das Backend braucht dafür nur weniger
+  Speicher.
+
+## [v1.7.7](https://github.com/krt-profit/basetool/releases/tag/v1.7.7) - 2026-09-09
+
+### Fixed
+
+- **Eine Discord-Kennung kann nicht mehr an zwei Konten gleichzeitig hängen.** Beim Zusammenführen
+  wurde sie erst dem Zielkonto angehängt und dem alten erst am Ende weggenommen — dazwischen hielten
+  beide dieselbe Kennung, und Keycloak beantwortet jede Discord-Anmeldung in diesem Zustand mit einem
+  Serverfehler. Brach der Vorgang dazwischen ab, blieb es dabei. Die Kennung wird jetzt zuerst
+  gelöst und dann gesetzt.
+
+## [v1.7.6](https://github.com/krt-profit/basetool/releases/tag/v1.7.6) - 2026-09-09
+
+### Added
+
+- **Doppelte Konten lassen sich jetzt auch nach der Freigabe zusammenführen.** Hatte ein Mitglied
+  zwei Konten und war das zweite schon freigegeben, war die Aktion „Verknüpfen“ aus der
+  Freigabe-Warteschlange verschwunden und nur noch Handarbeit in Keycloak half. In der
+  Mitgliederverwaltung gibt es dazu jetzt **Zusammenführen**: Bestände, Einheiten und die
+  Discord-Anmeldung wandern auf das Konto, das bleibt, das doppelte wird entfernt. Wer was getan hat,
+  bleibt stehen.
+
+### Fixed
+
+- **„Verknüpfen“ in der Freigabe-Warteschlange funktionierte seit Ende Juli überhaupt nicht.** Eine
+  Absicherung des Löschens (kein Konto löschen, das es in Keycloak noch gibt) und der Ablauf des
+  Verknüpfens (das Wegwerf-Konto in Keycloak bewusst zuletzt entfernen) widersprachen sich, sodass
+  jeder Versuch abbrach. Beides bleibt erhalten; das Verknüpfen sagt der Absicherung jetzt
+  ausdrücklich, dass es das Keycloak-Konto selbst entfernt.
+
+- **Ein aktives Mitglied wurde als „nicht in Keycloak“ geführt, wenn sein Abgleich einmal
+  fehlschlug.** Der Abgleich verbuchte einen Fehler bei einem einzelnen Konto wie eine Löschung in
+  Keycloak — in der Mitgliederverwaltung erschien daraufhin der Löschknopf neben einem aktiven
+  Mitglied (gelöscht wurde nie etwas, die Sicherung dahinter hat gehalten). Der Abgleich merkt sich
+  jetzt, wen Keycloak gemeldet hat, statt wen er erfolgreich verarbeiten konnte; fehlgeschlagene
+  Konten werden gezählt und schlagen Alarm.
+
+- **Zwei Konten mit derselben Discord-Anmeldung legen den Abgleich nicht mehr lahm.** Hatte ein
+  Mitglied versehentlich zwei Konten, wollte der Abgleich dieselbe Discord-Kennung auf beide
+  schreiben und brach beim zweiten komplett ab. Die Verknüpfung wird jetzt übersprungen, gezählt und
+  gemeldet; sobald das doppelte Konto entfernt ist, trägt sie sich beim nächsten Abgleich von selbst
+  nach.
+
+## [v1.7.5](https://github.com/krt-profit/basetool/releases/tag/v1.7.5) - 2026-09-08
+
+### Changed
+
+- **Jedes ausgelieferte Modul liefert jetzt eine aktuelle Stückliste (SBOM) mit.** Bisher hingen
+  nur die von Backend und Frontend am Release. Die von `ingest` wurde seit dem 11.07. nicht mehr
+  erneuert — 126 der 180 Komponenten standen mit falscher Version darin — und `keycloak-spi` hatte
+  gar keine, obwohl sein Provider-JAR mit nach Produktion geht. Ein Release hat damit jetzt acht
+  statt vier Stücklisten, alle signiert.
+
+## [v1.7.4](https://github.com/krt-profit/basetool/releases/tag/v1.7.4) - 2026-09-08
+
+### Changed
+
+- **Der API-Zugang lässt jetzt die staffelweite Raffinerie-Liste durch.** Die Android-App zeigt seit 0.2.8 die Aufträge der ganzen Einheit statt nur der eigenen — den Weg dorthin (`GET /api/v1/refinery-orders/all`) wies der Zugang bisher ab, weshalb die Raffinerie in der App gar nicht mehr lud. **Keine neue Datenfreigabe:** das Webtool benutzt genau diesen Endpunkt seit jeher als Standardansicht, die Zeilen werden weiterhin serverseitig auf die eigene Einheit begrenzt, und anonym antwortet er wie zuvor mit 401. Eingespielt am 08.09.2026; der Pfad antwortet seitdem mit 401 statt 404 (Runbook-Phase Y).
+
+- **Die Überwachung achtet jetzt auch auf die primäre Sicherungsschicht von Redis.** Bisher gab es
+  nur einen Alarm für den Schnappschuss (RDB), nicht aber für das laufend geschriebene Journal
+  (AOF) — obwohl dieses die eigentliche Absicherung der Sitzungen ist. Neu schlagen zwei Alarme an,
+  wenn ein Schnappschuss fehlschlägt oder das Journal nicht mehr auf die Platte kommt.
+
+### Fixed
+
+- **Eine Operation mit einem gelöschten Mitglied ließ sich gar nicht mehr öffnen.** Die
+  Auszahlungsübersicht antwortete mit einem Serverfehler, und weil der Kopf der Operation aus
+  genau diesen Daten gebaut wird, blieb der ganze Bildschirm leer — im Webtool wie in der App.
+  Ursache war die Sortierung der Auszahlungszeilen: eine gelöschte Person hat bewusst keinen
+  Namen, und darauf war die Sortierung nicht vorbereitet. Gelöschte Zeilen stehen jetzt am Ende
+  der Liste.
+
+- **Nächtlicher Fehlalarm „Redis RDB snapshot older than 1h" behoben.** Redis schreibt einen
+  Schnappschuss nur, wenn sich etwas geändert hat — in ruhigen Nachtstunden also gar nicht, worauf
+  der Alarm die Untätigkeit als Ausfall meldete (zweimal in der Nacht zum 08.09., obwohl jeder
+  Speichervorgang erfolgreich war). Er verlangt jetzt zusätzlich, dass überhaupt ungesicherte
+  Änderungen anstehen. Keine Auswirkung auf die Oberfläche.
+
+## [v1.7.3](https://github.com/krt-profit/basetool/releases/tag/v1.7.3) - 2026-09-07
+
+## [v1.7.2](https://github.com/krt-profit/basetool/releases/tag/v1.7.2) - 2026-09-07
+
+## [v1.7.1](https://github.com/krt-profit/basetool/releases/tag/v1.7.1) - 2026-09-07
+
+### Changed
+
+- **Das Audit-Protokoll schreibt bei Teilnehmern jetzt „external" statt „guest".** Die Stufe heißt
+  seit der Umstellung auf Mitglieder-only „Extern"; das Protokoll war die letzte Stelle mit dem
+  alten Wort. Ältere Einträge behalten bewusst ihre ursprüngliche Schreibweise — wer im Protokoll
+  nach einer Stufe sucht, muss beide Begriffe kennen.
+
+- **„Gast" heißt jetzt „Extern".** Wer keinen Account hat, kann weiterhin an einem Einsatz teilnehmen — die Einsatzleitung trägt die Person ein und pflegt ihre Zeile. Die Selbstanmeldung ohne Konto entfällt.
+
+- **Bei Einsätzen heißt „öffentlich" jetzt „organisationsweit".** Gemeint war immer „jedes Mitglied der Organisation", nie „jeder".
+
+### Fixed
+
+- **Benachrichtigungsregeln, die eine Rolle in abweichender Schreibweise gespeichert hatten,
+  erreichten niemanden.** Die Empfängersuche vergleicht den Rollen-Code exakt, gespeichert wurde
+  aber die Schreibweise des Absenders — eine Regel mit `Admin` statt `ADMIN` benachrichtigte
+  stillschweigend keinen einzigen Empfänger. Die Migration zieht alle betroffenen Regeln auf die
+  Schreibweise des Rollenkatalogs nach; neue Regeln werden beim Speichern kanonisiert.
+
+### Security
+
+- **Das Basetool ist ab jetzt nur noch für Mitglieder.** Ohne Anmeldung siehst du die Startseite und die Rechtsseiten — sonst nichts. Einsätze, Operationen, die Auftragswarteschlange und die Spieldaten-Kataloge brauchen einen Login; jeder Link dorthin führt zur Anmeldung und danach zurück auf die gewünschte Seite.
+
+- **Jedes Konto hat mindestens Mitgliedsrechte.** Die Rolle „Gast" gibt es nicht mehr. Ein Konto, dem keine Rolle zugeordnet werden kann, wird abgewiesen und bekommt einen eigenen Hinweis, statt wie bisher stillschweigend die Gast-Ansicht zu erhalten.
+
+- **Drei Preis-Abfragen und die Startseite gaben ohne Anmeldung Daten heraus.** Die Handelspreise waren bereits vorher geschlossen (Runbook-Phase W); die Startseite zeigte bis jetzt die Einsätze der nächsten sieben Tage und legte für jeden Besuch zwei Sitzungen an. Beides ist behoben.
+
+- **Wer einen Einsatz verwalten darf, sieht die Verwaltungsdaten auch.** Bisher zeigte die Verwaltungs-Ansicht einem Einsatz-Manager den Besitzer als „-“ und keine Co-Manager, während die Knöpfe zum Hinzufügen und Entfernen aktiv waren. Zusätzlich geben die Schreib-Endpunkte eines Einsatzes ihre Antwort jetzt genauso gefiltert zurück wie das Lesen: unterhalb der Logistik ohne E-Mail, Rollen und Beitrittsdatum der anderen Teilnehmer.
+
+- **Die API-Dokumentation ist unter beiden Adressen der Administration vorbehalten.** Bisher war nur `/v3/api-docs` geschützt; die identische YAML-Variante war für jedes angemeldete Mitglied lesbar.
+
+- **Die Nutzungsbedingungen zeigen einen Hinweis statt eines Fehlers, wenn sie gerade nicht geladen werden können.** Zuvor endete die Seite in diesem Fall mit einem Serverfehler — auf genau der Seite, die man vor der Zustimmung lesen können muss.
+
+- **Ein abgemeldeter Tab legt keine Sitzungen mehr an.** Da jetzt jeder Pfad eine Anmeldung verlangt, hätte jede Hintergrundabfrage eines offenen Tabs eine Sitzung in Redis erzeugt. Gemerkt wird nur noch das Ziel echter Seitenaufrufe — Deep-Links führen nach der Anmeldung weiterhin genau dorthin.
+
+## [v1.6.22](https://github.com/krt-profit/basetool/releases/tag/v1.6.22) - 2026-09-06
+
+### Fixed
+
+- **Die letzten sieben Pfade der App waren am API-Zugang abgewiesen.** Die Blaupausen-Übersicht, das Anlegen mehrerer Blaupausen, der Blaupausen- und der Fleetview-Import, „Heimatort für alle Schiffe" und die beiden Schwellen, ab denen ein Auftrag gelb oder rot wird. Damit ist die Liste aus dem App-Audit abgearbeitet (Runbook-Phase X).
+
+- **Der Upload am API-Zugang war auf 256 KB begrenzt.** Die beiden Importe hätten dort abgebrochen, bevor sie das Backend erreichen. Die Grenze liegt jetzt bei 4 MB — gemessen am Fleetview-Export, der bei rund 500 KB für 100 Schiffe liegt.
+
+- **Handelspreise waren ohne Anmeldung abrufbar.** Die Preisübersicht und die Preise je Material antworteten anonym mit Daten, die Profitberechnung mit einem Fehler statt einer Abweisung — dieselben UEX-Handelsdaten, die REQ-SEC-032 über die Preismatrix bereits vom öffentlichen API-Zugang fernhält, nur durch drei andere Türen. Alle drei verlangen jetzt eine Anmeldung. Der Materialkatalog selbst (`/materials/{id}`) bleibt bewusst offen: er trägt keine Preise und veröffentlicht nichts, was die Suche nicht schon zeigt.
+
+- **Handel und Materialbörse waren in der App größtenteils tot.** Preisübersicht, Preismatrix, Profitberechnung, Materialdetails, der Standort-Filter und das Freigeben von Gegenständen an die Börse waren am API-Zugang abgewiesen (Runbook-Phase W).
+
+- **Einen Einsatz zu planen ging in der App fast nirgends.** Kern, Zeitplan und Flags, Party-Lead, Teilnehmer hinzufügen, Einheiten und ihre Besatzung, Frequenzen, Verwalter, Ablauf und Ziele — alle Schreibwege waren am API-Zugang abgewiesen. Freigegeben sind die schlanken Endpunkte, nicht die veralteten: deren Abschaltung ist für den 20.10.2026 angekündigt (Runbook-Phase V).
+
+- **Sammel-Ausbuchen, Sammel-Umbuchen und die Zuordnung im Lager waren tot.** Alle drei waren am API-Zugang nicht freigegeben; beim Umbuchen füllte sich der Standort-Picker sogar, nur das Absenden starb. Die Zuordnung war die schlimmste: die Speicherschleife ist versionsverkettet, die erste Zeile scheitert — und damit wurde nie etwas geschrieben, auch nichts halb (Runbook-Phase U).
+
+- **Die Auftrags-Familie war in der App größtenteils tot.** Materialbedarf, Zusagen-Tab, Verfügbarkeits-Chip und die Lagerzeilen im Übergabe-Sheet waren am API-Zugang nicht freigegeben — und mit ihnen die Schreibvorgänge, die daran hängen: Zusage geben und zurückziehen, Material- und Gegenstands-Übergabe, Herstellung erfassen, Gegenstände bearbeiten, Priorität ändern. Lesen und Schreiben mussten zusammen freigegeben werden: ohne Lagerzeile gibt es nichts abzusenden, und eine Zusagenliste ohne ihre beiden Knöpfe ist eine Liste mit toten Knöpfen (Runbook-Phase T).
+
+- **Vier Auswahllisten in der App waren leer, ohne dass etwas nach einem Fehler aussah.** Auftrags- und Einsatz-Picker im Buchungsblatt, der Operations-Picker im Einsatz und der Funktionen-Katalog werden bei einem Fehler bewusst stillschweigend geschluckt; am API-Zugang abgewiesen hieß das leere Liste, und eine leere Liste liest sich als Antwort. Der Funktionen-Katalog behauptete sogar, die Organisation habe keine CREW-Funktionen (Runbook-Phase S).
+
+- **Auftrag und Operation liessen sich in der App nicht bearbeiten.** Beide Pfade waren am API-Zugang längst freigegeben — nur das Verb wurde abgewiesen (405 statt 404). Die Ausnahme ist **methoden-genau** geschrieben: der Server bietet auf beiden Pfaden auch ein Löschen an, die App ruft es nie auf, und es bleibt weiterhin gesperrt (Runbook-Phase R).
+
+- **Drei me-bezogene Pfade der App waren am API-Zugang nicht freigegeben.** In den App-Einstellungen blieben „Auszahlungspräferenz" und „Blueprints mit Org teilen" dadurch auf jedem Konto ausgegraut, und „als gelesen" am Aushang sprang zurück. Lesen und Schreiben mussten zusammen freigegeben werden — die beiden Einstellungen teilen sich eine Optimistic-Lock-Version, ein Client der schreiben aber nicht lesen kann würde eine `0` zurücksenden. Freigegeben, eingefroren und geprobt (Runbook-Phase Q); erste Ausnahme, die die Read-only-Sperre unter `/users` je bekommen hat.
+
+## [v1.6.21](https://github.com/krt-profit/basetool/releases/tag/v1.6.21) - 2026-09-05
+
+### Fixed
+
+- **Ein per Tastatur gewähltes Material füllte die abhängigen Felder nicht.** Wer im Raffinerieauftrag „asl" tippte und den einzigen Treffer mit Enter übernahm, bekam das Eingangsmaterial gesetzt, aber kein Ausgangsmaterial — dort blieb „-" stehen. Beim Anklicken derselben Zeile funktionierte es. Die Auswahllisten führten die Zusatzangaben einer Option nur auf dem Mausweg mit; jetzt auf beiden. Betrifft ebenso die Mengeneinheit (SCU/Stück), die bei Tastaturauswahl auf dem Wert des vorherigen Materials stehen blieb (REQ-FE-016).
+
+- **Der Reiter „Materialbörse" im Prüfprotokoll konnte weder exportiert noch aufgeräumt werden.** PDF, JSON und die Aufbewahrungs-Bereinigung antworteten dort mit einem Fehler, während jeder andere Reiter funktionierte: der Weiterleitungs-Endpunkt führte eine eigene, veraltete Liste der Reiter. Beide Stellen lesen jetzt dieselbe Liste.
+
+- **Beim Löschen alter Synchronisationsberichte konnte die Auswahl des Katalogs verloren gehen.** Wurde der Reiter in Kleinschreibung übergeben, landete man zwar auf dem richtigen Reiter, gelöscht wurde aber in **beiden** Katalogen. Der Wert wird jetzt einmal vereinheitlicht und für Weiterleitung und Löschung gleich verwendet.
+
+### Security
+
+- **Die vom Webtool an das Backend weitergereichten Parameter sind jetzt an den Typ gebunden, den das Backend selbst verlangt.** Zeiträume als Zeitpunkt, Mitglieds-IDs als UUID, Filter nur aus der Liste, die die Seite selbst anbietet. Ein Wert mit URL-Sonderzeichen wird damit an der Weiterleitung abgewiesen statt eine Anfrage ans Backend umzuformen. Behebt sieben von acht kritischen CodeQL-Meldungen, darunter zwei echte Fehler: eine Bewertungs-Weiterleitung kodierte entgegen ihres eigenen Kommentars gar nicht, und die Berichts-Bereinigung setzte ihren Katalog-Parameter ungeprüft in eine löschende Anfrage (REQ-SEC-051, ADR-0158).
+
+- **Die Sternsystem-Filter der Gewinnberechnung können keine zusätzlichen Parameter mehr in die Backend-Anfrage einschleusen.** Der Weiterleitungs-Endpunkt setzte die gewählten Sternsysteme unkodiert in die Anfrage-URL — entgegen seines eigenen Kommentars, der das Gegenteil behauptete. Sie werden jetzt wie auf der Materialmatrix als URI-Variablen übergeben und dabei kodiert; behebt die achte und letzte kritische CodeQL-Meldung dieser Familie (REQ-SEC-051).
+
+## [v1.6.20](https://github.com/krt-profit/basetool/releases/tag/v1.6.20) - 2026-09-04
+
+### Security
+
+- **Die drei Container-Images tragen keine bekannten behebbaren HIGH-Schwachstellen mehr.** Das Basis-Image war fünf Wochen alt und brachte acht — in OpenSSL, expat und p11-kit, alle aus dem Betriebssystem des Images, keine davon aus dem Basetool selbst. Das Basis-Image ist jetzt aktuell **und** die Images ziehen beim Bauen die Sicherheitsupdates ihrer Alpine-Version nach; das Aktualisieren allein hätte nur fünf der acht behoben, weil das Upstream-Image den Alpine-Updates hinterherläuft. Für dich ändert sich nichts — außer dass die Produktions-Freigabe wieder durchläuft.
+
+## [v1.6.19](https://github.com/krt-profit/basetool/releases/tag/v1.6.19) - 2026-09-04
+
+### Changed
+
+- **Eine Produktions-Promotion bricht jetzt ab, wenn das Image eine behebbare HIGH/CRITICAL-Schwachstelle trägt.** Der Trivy-Scan lief bisher zwar bei jedem Build, blockierte aber an keiner Stelle — eine verwundbare Java-Bibliothek verhinderte den Merge, ein verwundbares OS-Paket dagegen gar nichts. `promote.yml` scannt den zu promotenden Digest jetzt vor der Freigabe; der Build-Scan bleibt bewusst nur hinweisend. Für den Notfall gibt es die Eingabe `allow_vulnerable`, die den Fund sichtbar lässt und die Umgehung in der Freigabe protokolliert (REQ-OPS-024, ADR-0155).
+
+### Fixed
+
+- **Unlesbare Sitzungswerte blieben liegen und wurden bei jeder weiteren Anfrage erneut verworfen.** Die Korrektur in v1.6.18 verhinderte nur, dass neue unlesbare Werte entstehen — bestehende reparierten sich entgegen der dortigen Angabe **nicht** von selbst, weil der dafür nötige Live-Sync-Handshake nur auf Seiten mit Live-Bereich zustande kommt. Ein unlesbarer Wert wird jetzt am Ende derselben Anfrage aus der Sitzung entfernt und damit genau einmal verworfen statt bis zu 30 Tage lang (REQ-SEC-050, ADR-0157).
+
+- **Die Freigabe-Limits der Bank waren in der App nicht speicherbar.** „Setzen" und „Entfernen" liefen ins Leere, weil der API-Zugang die vier Pfade nicht freigab — die aktuellen Werte wurden dagegen korrekt angezeigt, weil deren Leseweg längst frei war. Genau deshalb fiel es nicht auf. Die Pfade waren im Runbook überhaupt nicht erwähnt, weder freigegeben noch als bewusst ausgeschlossen. Jetzt freigegeben, eingefroren und auf beiden Verben geprobt (Runbook-Phase P). Nebenbei zwei Felder der Kontoeinstellungen nachgefroren, die die App immer schon liest.
+
+- **Die Direktbuchung der Bank war in der App gebaut und in Produktion nicht erreichbar.** Ein-, Aus- und Umbuchen ohne Antrag — der API-Zugang gab die vier Pfade nicht frei, mit der Begründung, kein Entwurf zeichne sie. Artboard 9 zeichnet sie, die App hat sie seit dem 30.08. Die Pfade sind jetzt freigegeben, eingefroren und werden auf `401` statt `404` geprobt; die Freischaltung wird mit dem Runbook (Phase O) eingespielt. Gleichzeitig zwei Fehler behoben, die erst dadurch sichtbar geworden wären: die App verlangte für den Einstieg Bank-Management, obwohl der Server nur Bankmitarbeiter plus Freigabe je Konto verlangt — und eine Buchung über dem Limit wurde als erledigt gemeldet, obwohl sie nur zur Freigabe eingereicht wurde (ADR-0156).
+
+- **Zwei App-Ansichten liefen ins Leere, weil der API-Zugang ihre Pfade nicht freigab.** Die Materialsammelübersicht eines Auftrags (Lieferstatus, Verknüpfung lösen, Material entfernen) und das Entfernen einer Person aus einer Einsatz-Einheit meldeten in der App nur „Konnte nicht gespeichert werden.". Die fünf Pfade sind jetzt freigegeben, in `ExternalContractTest` eingefroren und in `ApiVhostAnonymousSurfaceTest` festgenagelt; die Freischaltung wird mit dem Runbook (Phase N) eingespielt. Wer nur das Webtool nutzt, merkt nichts.
+
+## [v1.6.18](https://github.com/krt-profit/basetool/releases/tag/v1.6.18) - 2026-09-03
+
+### Fixed
+
+- **Jeder angemeldete Seitenaufruf hinterließ einen unlesbaren Wert in deiner Sitzung.** Tomcat 11.0.25 legt bei jedem WebSocket-Handshake — also bei jedem Seitenaufruf mit Live-Sync — einen Wert ab, den die Sitzungsablage nicht zurücklesen konnte: er wurde bei jeder folgenden Anfrage verworfen und beim nächsten Handshake neu geschrieben. Für dich war das unsichtbar, verdeckte in der Überwachung aber echte Sitzungsfehler. Bestehende Sitzungen reparieren sich beim nächsten Seitenaufruf von selbst.
+
+- **Die Anmeldung zu einem Einsatz schlug in der App immer fehl** — mit „Konnte nicht gespeichert werden.", während Abmelden und das Webtool funktionierten. Die App schickte die Anmeldung an einen Pfad, den der API-Zugang nach außen gar nicht freigibt; sie wurde abgewiesen, bevor sie das Backend erreichte. Die Selbstanmeldung `POST /missions/{id}/join` nimmt jetzt die beiden Antworten des Anmeldebogens entgegen — gewünschte Funktion und Auszahlungsart —, beide freiwillig; ohne Angabe gilt unverändert die Voreinstellung aus dem Profil. Die App-Seite folgt in der App (ADR-0170).
+
+## [v1.6.17](https://github.com/krt-profit/basetool/releases/tag/v1.6.17) - 2026-09-02
+
+### Changed
+
+- **Unlesbare Session-Werte werden jetzt benannt und gezählt.** Bisher stand pro Vorfall nur „ein Wert war unlesbar“ im Log — am 02.09. drei Stunden lang 496-mal dieselbe Zeile, ohne zu sagen, welcher Wert. Die Meldung nennt jetzt das betroffene Session-Attribut, die Ursache und den nicht auflösbaren Typ, wiederholt sich nicht mehr endlos und wird zusätzlich als Messwert erfasst. Für dich ändert sich nichts: ein unlesbarer Wert meldet dich weiterhin nur ab.
+
+- **Die Überwachung sieht drei bisher stille Fehler.** Neu sind Alarme dafür, dass Sitzungen dauerhaft unlesbar werden, dass ein Redis-Kanal dauerhaft nicht angemeldet ist, und dass die SC-Wiki-Aufräumroutine mehrere Läufe hintereinander aussetzt. Alle drei waren zuvor nur als Logzeile sichtbar.
+
+### Fixed
+
+- **Ein kurz nicht erreichbares Redis konnte das Backend beim Start abstürzen lassen.** Beide Redis-Kanäle (Live-Sync und Benachrichtigungen) melden sich beim Hochfahren an; scheiterte diese erste Anmeldung — etwa weil Redis gerade neu erstellt wurde —, brach der ganze Start ab und das Backend lief in eine Neustart-Schleife, obwohl Redis ausdrücklich optional ist. Das Backend startet jetzt auch ohne Redis und meldet sich im Hintergrund an, sobald es wieder da ist. Ursache des Ausfalls vom 02.09., 07:07 Uhr.
+
+- **Ein unvollständiger SC-Wiki-Abruf blockierte die nächsten Abrufe.** Der zwischengespeicherte ETag der ersten Seite wurde auch dann behalten, wenn der Durchlauf gar keine vollständige Bestandsaufnahme ergab — der nächste Lauf bekam daraufhin „unverändert“ zurück und holte die fehlenden Seiten nie nach. Damit blieb auch die Aufräumroutine für gelöschte Einträge auf unbestimmte Zeit stehen. Nach einem unvollständigen Durchlauf wird der ETag jetzt verworfen.
+
+## [v1.6.16](https://github.com/krt-profit/basetool/releases/tag/v1.6.16) - 2026-09-02
+
+### Fixed
+
+- **Ein fehlgeschlagener Anmeldeversuch konnte eine Sitzung dauerhaft unbrauchbar machen.** Spring Security legte die Fehlermeldung in der Sitzung ab; dieser Wert ließ sich schreiben, aber nicht mehr zurücklesen — und weil beim Lesen einer Sitzung alle Felder verarbeitet werden, riss dieses eine Feld die ganze Sitzung mit. Ergebnis: ab dem nächsten Klick überall ein Fehler, bis die Sitzung ablief. Die Meldung wird jetzt nicht mehr gespeichert; die Anmeldeseite zeigt den Fehler ohnehin über die Adresszeile an. Ursache des Ausfalls vom 02.09.
+
+## [v1.6.15](https://github.com/krt-profit/basetool/releases/tag/v1.6.15) - 2026-09-02
+
+### Fixed
+
+- **Eine unlesbare Session legte das gesamte angemeldete Basetool lahm.** Konnte ein Session-Wert in Redis nicht mehr gelesen werden, beantwortete **jede** Anfrage mit einem Session-Cookie einen HTTP 500 — und weil die Fehlerseite den CSRF-Token aus derselben Session liest, kam nicht einmal die Fehlerseite durch: der Browser zeigte eine weiße Fläche ohne Statuscode und ohne Korrelations-ID. Ein unlesbarer Session-Wert bedeutet jetzt „nicht gesetzt“: du wirst abgemeldet und landest auf dem Login statt vor einer leeren Seite. Schreibfehler bleiben bewusst laut.
+
+## [v1.6.14](https://github.com/krt-profit/basetool/releases/tag/v1.6.14) - 2026-09-02
+
+### Fixed
+
+- **Als Admin sahst du in der App nur deine eigenen Einheiten statt aller.** Der mobile Keycloak-Client trug die Rolle `Admin` bewusst nicht — damit warst du in der App faktisch ein Mitglied ohne Mitgliedschaften: keine Einheit zum Umschalten, und „Alle Org-Einheiten“ lieferte deine eigene (leere) Reichweite statt wirklich allem. Der Client trägt `Admin` jetzt. Dazu drei Folgefehler behoben: die App pinnte beim Kaltstart selbst die erste Einheit des Katalogs (und schloss dich damit von herrenlosen Zeilen aus), der Umschalter konnte nicht scrollen, sodass „Alle Org-Einheiten“ ab acht Einheiten unerreichbar war, und der Eintrag stand ganz unten statt oben. Die Admin-Seiten bleiben weiterhin nur im Webtool.
+
+- **„Alle Org-Einheiten“ versprach Mitgliedern mehr, als es lieferte.** Ohne Pin sieht ein Admin wirklich alles, jeder andere die Vereinigung seiner eigenen Einheiten — beschriftet war beides gleich. Heißt für Nicht-Admins jetzt „Alle meine Org-Einheiten“, in App und Webtool. Der Web-Umschalter hieß außerdem „Aktiver Bereich“, was mit der Einheiten-Art „Bereich“ kollidierte; er heißt jetzt „Aktive Org-Einheit“.
+
+- **Wer nur einem Bereich oder der Organisationsleitung angehörte, hatte einen leeren Org-Einheiten-Umschalter.** Die Auswahl bot nur Staffeln und Spezialkommandos an, obwohl ein Bereich und die OL selbst Daten besitzen können und der Server einen entsprechenden Kontext akzeptiert hätte. Umschalter und `GET /api/v1/me/org-units` bieten jetzt alle vier Arten an — für Mitglieder die eigenen Einheiten samt der über einen Leitungssitz erreichbaren, für Admins alle aktiven.
+
+- **Ein Admin durfte in der App nichts, was er im Webtool darf.** Lagereinträge zuordnen, fremde Zeilen umbuchen, Aufträge bearbeiten, Auszahlungen bestätigen — alles war ausgegraut, obwohl der Server es erlaubt hätte. Betraf ebenso Offiziere. Ursache: `isLogistician` und `isMissionManager` in `/users/me` sagen aus, ob eine **Staffel-Mitgliedschaft** dieses Häkchen trägt, und ein Admin hat per Design keine. Die API sagt einem Client seine Berechtigung jetzt selbst — über drei hierarchie-aufgelöste Flags in `/api/v1/me/capabilities` und ein `canEdit` pro Zeile auf Lager- und Auftragsdaten.
+
+### Security
+
+- **Eingebettetes Tomcat auf 11.0.25 angehoben.** Das Update schließt zehn Schwachstellen der bisher ausgelieferten 11.0.24, vier davon kritisch: eine Sicherheitsbeschränkung ließ sich umgehen, wenn eine Regel für einen längeren Pfad vor der strengeren Regel eines Unterpfads steht; eine DIGEST-Anmeldung war einmalig wiederholbar; eine FORM-Anmeldung hebelte eine auf POST beschränkte Regel aus; und eine Eingabeprüfung war zuvor nur unvollständig korrigiert worden. Betrifft Backend, Webtool und Ingest gleichermaßen — keine Funktions- oder Konfigurationsänderung.
+
+## [v1.6.13](https://github.com/krt-profit/basetool/releases/tag/v1.6.13) - 2026-09-02
+
+### Security
+
+- **Das Prüfprotokoll hält jetzt fest, über welchen Client eine Änderung kam** — Webtool oder Android-App —, in allen zehn Bereichen des Audit-Viewers samt Bank, als Spalte und als Filter. Der Wert stammt aus dem von Keycloak signierten Token und wird auf eine feste Werteliste abgebildet, nie als freier Text gespeichert. Ältere Einträge bleiben leer und werden nicht nachgetragen — im Bank-Protokoll heißt leer ausdrücklich „nicht erfasst“ und nicht „aus dem Webtool“, denn die Bank-Rollen liegen seit jeher auch beim App-Client (ADR-0152, ADR-0153).
+
+### Added
+
+- **`GET /api/v1/me/org-units`** beantwortet, welche Org-Einheiten ein Aufrufer als Kontext wählen darf: für Admins alle aktiven Einheiten, sonst die eigenen Mitgliedschaften plus die über einen Bereichs- oder OL-Sitz erreichbaren. Das Webtool hatte diese Fallunterscheidung selbst gebaut, die App nicht — jetzt steht sie einmal auf dem Server. Nebeneffekt: aus bis zu vier Abrufen pro Seitenaufbau wird einer.
+
+- **Die Auftragsauswahl beim Einbuchen und im „+ Zuordnen“-Menü zeigt, was jeder Auftrag noch braucht.** Die offene Restmenge steht direkt an der Option („#1042 · noch 250,000 SCU“), Fertigungsaufträge eingeschlossen, und aktualisiert sich live, wenn jemand anderes auf einen dieser Aufträge bucht. Liegt die eingegebene Qualität unter dem Mindestwert des Auftrags, steht das dabei — die Zuordnung ist erlaubt, senkt dessen Bedarf aber nicht.
+
+- **Auch beim Einbuchen fertiger Items steht die Restmenge am Auftrag.** Gezählt wird, was der Auftrag noch nicht erhalten hat und wofür ihm auch noch nichts zugeordnet ist — eine Übergabe bereits zugeordneter Stücke ändert die Zahl daher nicht. Eine Qualitätsangabe gibt es hier nicht, weil Item-Bestände keine Qualität tragen.
+
+### Changed
+
+- **Keycloak auf 26.7.3 angehoben (großes Sicherheitsupdate).** Das Patch-Release schließt 20 Schwachstellen im Anmeldedienst — darunter das Umbiegen eines Anmeldecodes auf eine fremde Client-Sitzung, eine unvollständig behobene Redirect-Injection, die bisher nur den Query-Teil und nicht den Fragment-Teil der Rücksprungadresse prüfte, und ein weiterhin mögliches Ausspionieren des Dateisystems über relative Pfade. Dazu kommen Korrekturen an einer CPU-Regression seit 26.7.1. Keine Funktions- oder Konfigurationsänderung: Das gepinnte Container-Image (`quay.io/keycloak/keycloak:26.7`-Digest, weiterhin JDK 21) und die SPI-Artefakte des `keycloak-spi`-Moduls ziehen mit; Anmeldung, Discord-Kontoverknüpfung und die App-Anmeldung laufen unverändert weiter. **Deploy-Hinweis:** Eine geänderte Keycloak-Image-Pinnung ist operator-gated — der Deploy wendet sie nicht selbständig an, sondern muss einmal mit `deploy.sh --force` durchgesetzt werden; der Keycloak-Container startet dabei neu.
+
+### Fixed
+
+- **Ein Admin durfte in der App nichts, was er im Webtool darf.** Lagereinträge zuordnen, fremde Zeilen umbuchen, Aufträge bearbeiten, Auszahlungen bestätigen — alles war ausgegraut, obwohl der Server es erlaubt hätte; und im Org-Einheiten-Umschalter stand nur „Alle Org-Einheiten". Betraf ebenso Offiziere. Ursache: `isLogistician` und `isMissionManager` in `/users/me` sagen aus, ob eine **Staffel-Mitgliedschaft** dieses Häkchen trägt, und ein Admin hat per Design keine. Die API sagt einem Client seine Berechtigung jetzt selbst — über drei hierarchie-aufgelöste Flags in `/api/v1/me/capabilities` und ein `canEdit` pro Zeile auf Lager- und Auftragsdaten.
+
+## [v1.6.12](https://github.com/krt-profit/basetool/releases/tag/v1.6.12) - 2026-08-30
+
+### Fixed
+
+- **Bearbeiter eines Auftrags werden nur noch mit Name und Rang ausgeliefert**, nicht mehr mit
+  Rollen, Berechtigungen, Beitrittsdatum und Discord-Status.
+
+- **Der Verkaufsort einer Ausbuchung wird als Länge statt im Wortlaut protokolliert.** Der
+  Prüfprotokoll-Eintrag enthält damit wieder keinen freien Nutzertext.
+
+- **Die 13 Abbilder des Monitoring-Stacks sind digest-gepinnt** (ADR-0072), wie es die Entscheidung
+  immer vorsah.
+
+### Security
+
+- **Bestand für ein anderes Mitglied anlegen prüft jetzt die Staffel, nicht nur die Rolle.** Wer
+  Logistiker war, konnte an vier Stellen Lager- und Raffineriebestand im Namen eines Mitglieds
+  einer *fremden* Staffel erzeugen — das flache Logistiker-Recht kennt keine Staffel. Betroffen
+  waren „Einbuchen", die Raffinerie-Auftragserstellung und das Einlagern von Raffinerie-Ausbeute.
+
+- **Der Lagerbestand eines Einsatzes ist nur noch für die eigene Staffel sichtbar.** Über die
+  öffentlichen Einsätze konnte jedes Mitglied die Lagereinträge einer fremden Staffel mitlesen —
+  samt Besitzer, Lagerort, Menge und Qualität.
+
+- **Ein Gast-Bearbeitungslink verliert seine Wirkung, sobald der Einsatz intern oder abgeschlossen
+  ist.** Bisher blieb er unbegrenzt gültig: eine nachträglich geänderte Anwesenheit verschob bei
+  bereits abgerechneten Operationen die Auszahlung aller anderen Teilnehmer.
+
+- **Gäste können sich nicht mehr selbst zum Einsatzleiter machen** und ihre Anmeldung nicht mehr auf
+  den exakten Namen eines registrierten Mitglieds umbenennen. Beides ging bisher über den
+  Bearbeitungslink; die Umbenennung konnte zusätzlich eine als „Bezahlt" markierte Auszahlung
+  zurücksetzen.
+
+- **Die Auszahlungstabelle einer Operation folgt nicht mehr der bloßen Teilnahme.** Wer sich in einen
+  öffentlichen Einsatz einer fremden Staffel einträgt, sieht dort jetzt nur noch die eigene Zeile;
+  die Finanzansichten der Operation bleiben der eigenen Staffel vorbehalten (ADR-0150).
+
+- **Das Seitengrößen-Limit für nicht angemeldete Aufrufe lässt sich nicht mehr umgehen.** Eine
+  hexadezimale oder mit Leerzeichen geschriebene Größe rutschte an der Prüfung vorbei und lieferte
+  bis zum Hundertfachen der erlaubten Zeilen.
+
+- **Import-Uploads haben jetzt eine Obergrenze für die Eintragszahl.** Ein einzelner Blueprint- oder
+  Schiffslisten-Upload konnte die Datenbankverbindungen für alle Nutzer belegen.
+
+- **Ein einzelner Absender kann den geteilten Zwischenspeicher nicht mehr füllen.** Die
+  Import-Übergaben des SC-Extractors haben jetzt ein Kontingent pro Konto; ohne das konnte ein
+  volles Redis die Anmeldung für alle blockieren.
+
+## [v1.6.11](https://github.com/krt-profit/basetool/releases/tag/v1.6.11) - 2026-08-29
+
+### Fixed
+
+- **Sechs Diagramme im Betriebs-Dashboard sagen jetzt, warum sie leer sind.** Ein Diagramm, das
+  planmäßig nichts anzeigt, sah bisher genauso aus wie eines, dessen Messwert kaputt ist — bei
+  den drei Resilience-Diagrammen war die Leere monatelang genau das. Außerdem prüft der Build die
+  13 Dashboards jetzt überhaupt erst: bis eben hätte eine kaputte Datei Grafana das Dashboard
+  stillschweigend weglassen lassen.
+
+## [v1.6.10](https://github.com/krt-profit/basetool/releases/tag/v1.6.10) - 2026-08-29
+
+### Added
+
+- **Ein Alarm für erschöpfte JVM-Threads ist jetzt scharf.** Er lag seit dem Vorfall im Juli
+  bewusst stillgelegt, weil niemand geprüft hatte, ob die Zeile, auf die er hört, überhaupt in der
+  Protokollsammlung ankommt — ein Alarm, der nie auslösen kann, sieht wie Absicherung aus und ist
+  keine. Die Zeile wurde jetzt auf demselben Java-Abbild nachgestellt, das in Produktion läuft,
+  und steht im Wortlaut neben der Regel.
+
+### Fixed
+
+- **Sechs Alarme für hängengebliebene Hintergrund-Jobs waren blind, wenn ein Job noch nie lief.**
+  Sie verglichen den Zeitpunkt des letzten Erfolgs mit der Uhr — den es aber erst gibt, sobald ein
+  Job einmal erfolgreich war. Ein Job, der seit dem letzten Neustart bei jedem Lauf scheiterte, sah
+  damit genauso aus wie ein gesunder. Die Regeln schlagen jetzt auch bei fehlender Rückmeldung an,
+  sobald der Server länger läuft als das jeweilige Zeitfenster.
+
+- **Raffinerie- und Operations-Aufträge gelten erst nach 90 statt nach 30 Tagen als liegengeblieben.**
+  Beim ersten Messen der Warteschlange stand der älteste offene Raffinerie-Auftrag bei 29,65 Tagen —
+  der Alarm war also Stunden davon entfernt, bei fünf laufenden Aufträgen anzuschlagen, die niemand
+  aufgegeben hatte. Eine Grenze, die der normale Betrieb erreicht, ist keine Grenze.
+
+## [v1.6.9](https://github.com/krt-profit/basetool/releases/tag/v1.6.9) - 2026-08-29
+
+### Added
+
+- **Admins können zwei Konten eines Mitglieds zusammenführen.** Wer mit einer neuen Kennung
+  ankommt, bekommt ein neues Konto — das alte behält bis dahin Lager, Hangar, Inventar,
+  Mitgliedschaften, Bankrechte und Benachrichtigungen. Die neue Aktion in der Freigabeliste
+  schiebt genau das herüber; was festhält, *wer etwas getan hat*, bleibt stehen — das ist
+  Historie und keine Habe. Halten beide Konten ein Bank-Konto, bricht die Aktion ab, statt zwei
+  Kassenbücher zu raten.
+
+### Fixed
+
+- **Vier Alarmregeln konnten nie auslösen.** Der Circuit-Breaker-, Bulkhead- und Retry-Alarm sowie
+  der Alarm für fehlgeschlagene systemd-Units standen zwar in der Konfiguration, ihre Metriken
+  wurden aber gar nicht erhoben — sie schwiegen also nicht, weil alles in Ordnung war, sondern
+  weil sie nichts sehen konnten. Ein fehlgeschlagener Deploy oder Backup meldete sich dadurch nur
+  über den zweiten Weg. Die Metriken werden jetzt wieder publiziert, und ein Test bricht den Build,
+  wenn eine Alarmregel künftig ins Leere zeigt.
+
+- **Die Daten eines gelöschten Kontos überleben es nicht mehr.** Fünf Spalten hielten eine
+  Mitglieds-ID ohne Fremdschlüssel: persönliches Inventar, persönliche Blueprints,
+  Benachrichtigungen, deren Empfänger-Regeln und die Beförderungs-Bewertungen — vergaß ein
+  Löschpfad eine davon, blieben die Zeilen unsichtbar liegen und wurden von einem zurückkehrenden
+  Keycloak-Konto wieder übernommen. Die Datenbank erzwingt das Aufräumen jetzt selbst
+  (Migration V235); am wichtigsten bei den Empfänger-Regeln, die sonst weiter Benachrichtigungen
+  für ein nicht mehr existierendes Mitglied erzeugen.
+
+- **Eine Anmeldung übernimmt kein fremdes Konto mehr, nur weil der Callsign passt.** Fand die
+  Anmeldung kein Konto zur Kennung des Tokens, band sie die Sitzung bisher an das Konto mit dem
+  gleichen Benutzernamen — und da Keycloak-Benutzernamen nach einer Löschung wiederverwendbar
+  sind, erbte ein neu angelegtes Konto so Lager, Bankrechte und Benachrichtigungen des früheren
+  Mitglieds. Es entsteht jetzt eine normale neue Registrierung; die Freigabeliste markiert sie mit
+  „Callsign doppelt“, damit die Admins entscheiden statt zu erben.
+
+## [v1.6.8](https://github.com/krt-profit/basetool/releases/tag/v1.6.8) - 2026-08-28
+
+## [v1.6.7](https://github.com/krt-profit/basetool/releases/tag/v1.6.7) - 2026-08-28
+
+### Removed
+
+- **Aufträge lassen sich nicht mehr ohne Login anlegen.** Das öffentliche Anfrageformular ist
+  entfallen: `/orders/create` verlangt jetzt eine Anmeldung, und damit auch die Einstellung
+  „Eingangs-Spezialkommando", die es nur gab, weil eine anonyme Anfrage keine Einheit mitbrachte.
+  Wer der Organisation einen Auftrag geben will, braucht ein Konto. Hintergrund: ADR-0149.
+
+### Fixed
+
+- **Ein einzelner Aussetzer beim UEX-Abgleich löscht keine Items mehr.** Schlug einer der rund 50
+  Kategorie-Aufrufe fehl, war das nicht von einer wirklich leeren Kategorie zu unterscheiden, und die
+  Aufräumrunde markierte deren sämtliche Items (bis zu ~500) bis zum nächsten Lauf als gelöscht. Kommt
+  jetzt auch nur eine Kategorie unvollständig zurück, bleibt die Aufräumrunde für den ganzen Lauf
+  stehen.
+
+- **Item-Maße, Crew-Stärke und Schiffsbeschreibungen kommen wieder an.** Mehrere Felder waren auf
+  Namen abgebildet, die es in den Schnittstellen gar nicht gibt — die Maße eines Items und acht
+  Schiffsangaben blieben deshalb dauerhaft leer, und zwei davon (Fahrzeug-Frachtraum, englische
+  Schiffsbeschreibung) leerte der UEX-Abgleich sogar jedes Mal wieder, nachdem der SC-Wiki-Abgleich
+  sie gefüllt hatte. Die Crew-Stärke wird jetzt aus dem Feld gelesen, das UEX wirklich liefert.
+
+- **Der Fahrzeug-Abgleich mit dem SC-Wiki läuft nicht mehr am Speicherlimit entlang.** Eine Seite mit
+  200 Fahrzeugen ist 10,4 MB groß, bei einer Obergrenze von 16 MB — ein Überschreiten hätte den
+  Abgleich stillschweigend abgebrochen. Fahrzeuge werden jetzt in kleineren Seiten geholt.
+
+- **Die Preis-Aufräumrunde läuft nicht mehr in eine Datenbankgrenze.** Sie übergab je einen Parameter
+  pro gemeldeter Preiszeile (23.770) und wäre bei etwa 38 % Wachstum an der Grenze von PostgreSQL
+  gescheitert. Sie arbeitet jetzt in festen Blöcken.
+
+- **Aus dem SC-Wiki entfernte Items werden wieder als gelöscht markiert.** Die
+  Vollständigkeitsprüfung des Item-Abgleichs verglich die geholten Zeilen mit der Gesamtzahl, die das
+  Wiki selbst meldet — und die liegt auf `/api/items` dauerhaft 48 Zeilen zu niedrig. Jeder
+  nächtliche Lauf galt deshalb als unvollständig, die Aufräumrunde wurde jedes Mal übersprungen und
+  die tägliche Warnung dazu war ein Fehlalarm. Gezählt werden jetzt eindeutige Item-Kennungen: eine
+  Überzahl ist kein Fehler mehr, eine doppelt gelieferte Zeile dagegen schon.
+
+## [v1.6.6](https://github.com/krt-profit/basetool/releases/tag/v1.6.6) - 2026-08-27
+
+## [v1.6.5](https://github.com/krt-profit/basetool/releases/tag/v1.6.5) - 2026-08-27
+
+### Fixed
+
+- **Scanner-Anfragen mit kaputter Adresse fluten das Protokoll nicht mehr.** Eine Anfrage wie
+  `/?=phpinfo()` konnte Tomcat nicht auswerten und landete als Serverfehler mit vollem Stacktrace im
+  Protokoll — pro Sonde gleich zweimal, weil die Fehlerseite dieselbe Adresse erneut las. Solche
+  Anfragen werden jetzt direkt mit „400 Ungültige Anfrage" beantwortet; unbeteiligte Nutzer merken
+  nichts.
+
+- **Stacktraces im Protokoll werden nicht mehr verstümmelt.** Die Maskierung von Zugangsdaten griff
+  auch mitten in Klassennamen, die „Token" oder „Authorization" enthalten, und schnitt den Rest der
+  Zeile ab. Sie verlangt jetzt ein Trennzeichen hinter dem Schlüsselwort — echte Zugangsdaten werden
+  unverändert entfernt.
+
+## [v1.6.4](https://github.com/krt-profit/basetool/releases/tag/v1.6.4) - 2026-08-26
+
+### Added
+
+- **Die Android-App kann jetzt die Bankverwaltung öffnen.** Die Endpunkte der
+  Bankmitarbeiter-Ansicht — Dashboard, Antrags-Queue mit Bestätigen und Ablehnen, Konten-Lifecycle,
+  Grants, Halter samt Umbuchung, Storno und die beiden Berichte — stehen jetzt auf der Allowlist des
+  API-vhosts. Der Admin-Bereich der Bank, die direkten Buchungsformulare und der KRT-Stufeneditor
+  bleiben ausdrücklich draußen. `GET /api/v1/me/capabilities` nennt dazu zwei neue Flags, damit die
+  App nicht aus Rollennamen raten muss, wer die Verwaltung sehen darf.
+
+- **Die Android-App darf jetzt Buchungsanträge stellen und freigeben.** Die dafür nötigen
+  Mitglieds-Endpunkte der Org-Einheits-Bank stehen jetzt auf der Allowlist des API-vhosts, ebenso
+  der Lesezugriff auf die Org-Einheiten eines Mitglieds, den der Umbuchen-Dialog der App braucht.
+  Bankmitarbeiter-Endpunkte bleiben unverändert draußen.
+
+- **Der vom Fankit-Agreement geforderte Hinweis steht jetzt auf der Seite** — der Satz zur
+  Nicht-Verbundenheit mit Cloud Imperium, der Copyright-Hinweis und „All rights reserved". Er
+  ergänzt die bisherige kurze Markenzeile, ersetzt sie nicht: die beiden Hinweise stammen aus
+  zwei verschiedenen CIG-Dokumenten, die beide gelten. Zu sehen auf der Startseite sowie auf
+  Datenschutz und Impressum.
+
+- **Veröffentlichte Artefakte tragen jetzt eine zweite, registry-unabhängige Herkunftsbestätigung.**
+  Die Images hatten ihre SLSA-Provenance und die Cosign-Signatur bisher nur in der Registry liegen,
+  wo ein Token mit Schreibrecht auf die Pakete beides mit austauschen könnte; die vier SBOM-Dateien
+  einer Veröffentlichung hatten überhaupt keinen Nachweis. Beides wird jetzt zusätzlich bei GitHub
+  hinterlegt und lässt sich mit einem Befehl prüfen (`gh attestation verify`, REQ-OPS-023) — am
+  Server ändert sich nichts.
+
+- **`.github/CODEOWNERS` bestimmt, wer bei einem Pull Request automatisch als Reviewer angefragt
+  wird.** Die Datei vergibt keine Rechte, sondern hält fest, welche Bereiche als besonders heikel
+  gelten — Release- und Deploy-Pfad, Build- und Abhängigkeitsdefinition, bindende Spezifikationen
+  und ADRs, Rollenmatrix sowie sicherheitskritischer Code.
+
+### Fixed
+
+- **Der eingefrorene API-Vertrag prüft die Query-Parameter jetzt bei jedem Endpunkt.** Die Parameter waren zwar eingefroren, aber in einer getrennten Liste — fünf Endpunkte der App standen deshalb ohne einen einzigen darin, unter anderem zwei geblätterte Listen und die Sperre gegen gleichzeitiges Bearbeiten beim Löschen einer Auftragsnotiz. Sie sind jetzt abgedeckt, und ein neuer Endpunkt ohne Angabe bricht den Build (REQ-API-009).
+
+- **Die Build-Prüfungen sind wieder grün.** Die Teilnehmerzahl aus v1.6.3 hat zwei Gates gerissen:
+  ein Javadoc rutschte an die falsche Stelle, und das Spiegel-DTO der Weboberfläche kannte das neue
+  Feld nicht. Beides betrifft nur Prüfungen — die Anwendung selbst war nie betroffen.
+
+## [v1.6.3](https://github.com/krt-profit/basetool/releases/tag/v1.6.3) - 2026-08-25
+
+### Added
+
+- **Die Einsatzliste der API nennt jetzt die Teilnehmerzahl.** Jede Listenzeile trägt
+  `registeredCount`, damit die Android-App auf der Übersicht „{n} angemeldet" zeigen kann — bisher
+  stand die Zahl nur im Einsatz-Detail. Die Zahl für eine ganze Seite wird in **einer** Abfrage
+  geholt, nicht je Zeile. Für die Weboberfläche ändert sich nichts.
+
+## [v1.6.2](https://github.com/krt-profit/basetool/releases/tag/v1.6.2) - 2026-08-25
+
+### Fixed
+
+- **Schreibende Aktionen in der Android-App funktionieren wieder.** Lagerbuchungen (Ausbuchen),
+  einen Auftrag übernehmen und seinen Status ändern sowie das Sollguthaben eines Bankkontos wurden
+  vom Server mit „Zugriff verweigert" abgelehnt. Ursache war eine CSRF-Prüfung, die für
+  Token-basierte Clients nichts schützen kann, aber alle Pfade außerhalb einer kurzen Ausnahmeliste
+  blockiert hat.
+
+- **Die Preisliste eines Materials über alle Terminals braucht jetzt eine Anmeldung.** Sie war über
+  die öffentliche API ohne Login abrufbar, obwohl sie nur die angemeldete Lager-Ansicht nutzt.
+
+- **Ein abgelehnter Aufruf ist im Log jetzt auffindbar.** Die Zeile nennt zusätzlich die Codestelle,
+  die abgelehnt hat — bisher stand dort nur, *dass* abgelehnt wurde.
+
+- **Live-Sync in der Android-App bleibt nicht mehr stumm, wenn viele Bildschirme offen sind.** Die
+  App hält eine Verbindung für alle Bildschirme zusammen; der Server hat ab 8 Räumen die ganze
+  Anfrage abgelehnt, womit Live-Sync in der gesamten App ausfiel, solange sie offen war. Das Limit
+  liegt jetzt bei 16 — dem Wert, den die Weboberfläche schon verwendet.
+
+- **Abgebrochene Live-Verbindungen landen nicht mehr als Fehler im Log.** Schließt jemand die App
+  oder wechselt die Seite, ist das der Normalfall und keine Störung. Bisher erzeugte jeder solche
+  Abbruch zwei Log-Zeilen inklusive Fehlerzähler — zuletzt 30 von 50 Meldungen in 16 Stunden.
+
+### Security
+
+- **Die öffentliche Einsatzansicht gibt keine Mitgliederdaten mehr preis.** Bei einem Einsatz mit
+  zugewiesenem Schiff lieferte sie ohne Anmeldung den vollständigen Datensatz der Schiffsbesitzerin
+  mit — Rollen und Berechtigungen, Profiltext, Staffelzugehörigkeit, Beitrittsdatum. Sichtbar bleibt
+  nur noch der öffentliche Rufzeichen-Eintrag (REQ-SEC-040).
+
+- **Raffinerie-Erträge lassen sich nicht mehr in fremde Bestände einlagern.** Beim Einlagern einer
+  eigenen Raffinerie-Order konnte pro Position ein beliebiges anderes Mitglied als Empfänger
+  eingetragen und diesem so jede Materialmenge ins Lager geschrieben werden. Das dürfen jetzt nur
+  Logistiker; alle anderen sehen im Dialog ihren eigenen Namen ohne Auswahl (REQ-SEC-039).
+
+- **Einsatz-Finanzen kann nur noch buchen, wer am Einsatz beteiligt ist.** Bisher genügte es, einen
+  öffentlichen Einsatz sehen zu dürfen, um Einnahmen und Ausgaben in dessen Kasse zu buchen — auch in
+  die einer fremden Staffel und auf den Namen eines fremden Teilnehmers. Es buchen jetzt die
+  Einsatzleitung für alle Beteiligten und jedes Mitglied für den eigenen Eintrag (REQ-SEC-042).
+
+- **Bank-, Finanz- und Bestandsantworten dürfen von Zwischenspeichern nicht mehr abgelegt werden.**
+  Sie trugen „revalidieren" statt „nicht speichern", womit ein Proxy zwischen App und Server
+  Kontoauszüge samt Handles hätte vorhalten dürfen. Betrifft die Mitglieder-Kontoansicht,
+  Einsatzfinanzen, Mein Inventar, Lager, Hangar, Raffinerie und Beförderung (REQ-SEC-031).
+
+- **Einsatzbeschreibungen sind für Gastkonten auch in der Suche ausgeblendet.** Die Detailansicht
+  hatte den Beschreibungstext vor ihnen verborgen, die Einsatzsuche gab ihn trotzdem heraus
+  (REQ-SEC-041).
+
+## [v1.6.1](https://github.com/krt-profit/basetool/releases/tag/v1.6.1) - 2026-08-25
+
+### Fixed
+
+- **Die Anmeldung in der Android-App funktioniert wieder.** Der Server veröffentlicht jetzt unter `/.well-known/assetlinks.json`, dass die App zu dieser Domain gehört. Ohne diese Datei hat Android den Rücksprung nach dem Login nicht der App zugeordnet, sondern im Browser geöffnet — und dort landete man auf der 404-Seite (REQ-SEC-038).
+
+## [v1.6.0](https://github.com/krt-profit/basetool/releases/tag/v1.6.0) - 2026-08-25
+
+### Added
+
+- **Die App darf Benachrichtigungen jetzt auch als gelesen markieren und löschen.** Die vier dafür nötigen Endpunkte sind im eingefrorenen App-Vertrag und auf der API-vhost-Allow-List ergänzt; der Posteingang der App war bis jetzt nur lesend (REQ-API-009).
+
+- **Raffinerie und Materialbörse sind für die App freigegeben und eingefroren.** Die eigenen Raffinerie-Orders samt Einlagern, dazu Angebote, Gesuche, „Ich kann liefern", Zurückziehen und die beiden Erstellen-Wege. Die Logistik-Sichten der Raffinerie und die Item-Anlage der Börse bleiben ausgeschlossen (REQ-API-009, REQ-SEC-037).
+
+- **Der Server kann jetzt sagen, welche App-Versionen er noch bedient.** Ein neuer Endpunkt nennt die älteste noch unterstützte App-Version; eine ältere App zeigt daraufhin selbst „Update erforderlich" statt an einer Schnittstelle zu scheitern, die es nicht mehr gibt. Voreingestellt ist keine Untergrenze — ein nicht konfigurierter Server sperrt niemanden aus. Der Endpunkt antwortet bewusst ohne Anmeldung, weil eine App, die sich nicht mehr anmelden kann, sonst nie erfährt, warum (REQ-API-010, REQ-SEC-037).
+
+- **Änderungen aus der App und aus dem Browser sehen sich jetzt gegenseitig.** Das Backend hat einen Live-Sync-Strom für die App bekommen und hängt am selben Redis-Kanal wie die Weboberfläche: eine Bearbeitung im Browser erscheint in der App ohne manuelles Neuladen, und eine Buchung in der App aktualisiert jede offene Browser-Ansicht. Vorher war beides blind füreinander. Bearbeiter-Punkte bleiben absichtlich der Weboberfläche vorbehalten (ADR-0143, REQ-FE-019).
+
+- **Die Schreibpfade der App sind am öffentlichen API-Endpunkt freigegeben.** Eine Änderung an der Edge-Konfiguration schaltet alle Phase-3-Pfade gemeinsam frei; die nächtliche Prüfung deckt sie ab diesem Zeitpunkt mit ab (REQ-SEC-037, REQ-OBS-012).
+
+- **Die Kontoeinstellungen der Kartellbank sind für die App freigegeben und eingefroren.** Zielsaldo setzen und die Sichtbarkeit eines Kontos regeln — nur für die verantwortliche Kontoinhaberin. Die Bankangestellten-Oberfläche (Ein- und Auszahlungen, Überweisungen) bleibt ausgeschlossen (REQ-API-009, REQ-SEC-037).
+
+- **Einsatz-Finanzen und die Auszahlungsbestätigung sind für die App freigegeben und eingefroren.** Einnahmen und Ausgaben zu einem Einsatz buchen, ändern und löschen, dazu die Bestätigung einer Auszahlung durch den Einsatzleiter (REQ-API-009, REQ-SEC-037).
+
+- **Die eigene Einsatz-Teilnahme ist für die App freigegeben und eingefroren.** Anmelden, abmelden, ein- und auschecken sowie die Auszahlungspräferenz — jeweils nur für den eigenen Eintrag. Die Einsatzplanung (Einheiten, Crews, Ablauf) bleibt ausgeschlossen (REQ-API-009, REQ-SEC-037).
+
+- **Auftrags-Zuweisung und Statuswechsel sind für die App freigegeben und eingefroren.** Sich selbst auf einen Auftrag setzen, wieder herunternehmen, die eigene Notiz dazu und — für Logistiker — der Statuswechsel. Die Übergaben, die Produktionsmeldungen und die übrige Bearbeitung bleiben ausgeschlossen (REQ-API-009, REQ-SEC-037).
+
+- **Der eingefrorene API-Vertrag deckt jetzt auch Query-Parameter und Pflicht-Enums in Anfragen ab.** Ein umbenannter Parameter oder eine umbenannte Enum-Konstante brach eine ausgelieferte App bisher, ohne den Build zu brechen (REQ-API-009).
+
+- **Die Lager-Buchungen der App sind freigegeben und eingefroren.** Einbuchen, Ausbuchen (verwerfen, übergeben, verkaufen), persönlich→geteilt umbuchen und die Notiz, dazu die vier Auswahllisten dahinter. Die Sammel-Endpunkte und die Alle-Mitglieder-Liste bleiben ausgeschlossen (REQ-API-009, REQ-SEC-037).
+
+- **Der Hangar der App darf schreiben.** Eigene Schiffe anlegen, ändern und löschen sind am API-vhost freigegeben und eingefroren, dazu die beiden Auswahllisten (Schiffstypen, Heimatorte). Die Importe und die Admin-Sicht auf fremde Hangars bleiben ausgeschlossen (REQ-API-009, REQ-SEC-037).
+
+- **Die Blueprints der App sind am API-vhost freigegeben und eingefroren.** Eigene Blueprints lesen, hinzufügen, Notiz ändern und löschen, dazu die Baubarkeits-Abfrage und die Produktsuche dahinter. Der Datei-Import bleibt Phase 4 (REQ-API-009).
+
+- **Die App darf jetzt schreiben — der erste Schritt.** „Mein Inventar" (eigener Bestand: anlegen, ändern, löschen) ist am API-vhost freigegeben und im eingefrorenen Client-Vertrag festgehalten. Freigeschaltet wird der Weg zur Produktion gesammelt am Ende von Phase 3 (Runbook, Phase I).
+
+- **Der Vertragstest prüft jetzt auch die Anfrageseite.** Ein Pflichtfeld, das eine Schreib-Schnittstelle neu verlangt, ist für jede bereits ausgelieferte App ein 400 — der Test lässt das nicht mehr durch (REQ-API-009, ADR-0136).
+
+### Changed
+
+- **Der Live-Push nennt jetzt, was angekommen ist** (Art, betroffener Datensatz, Textbausteine),
+  statt nur „es gibt Neues". Im Webtool ändert sich dadurch nichts; die Android-App kann Hinweise
+  damit nach Kategorie einsortieren und beim Antippen direkt den passenden Bildschirm öffnen.
+
+- **Die SpotBugs-Gradle-Plugin-Version wurde auf 6.5.11 angehoben.** Reiner Bugfix-Bump ohne bekannte Sicherheitslücke, im Rahmen des routinemäßigen Abhängigkeits-Audits.
+
+- **Der nächtliche Edge-Probe deckt jetzt die vollständige Phase-2-Allowlist ab**, inklusive der einen Stelle, an der nur das Verb zwei Oberflächen trennt: `POST /api/v1/orders` ist der öffentliche Antragsweg und muss auf dem API-vhost mit 405 abgewiesen werden. Dazu steht im Runbook jetzt eine Schritt-für-Schritt-Anleitung für den einen verbleibenden manuellen Schritt (Phase H).
+
+- **Die letzten Phase-2-Lesepfade sind eingefroren und für den API-vhost vorbereitet:** Lager-Baum, Auftragswarteschlange samt Detail und die Org-Bank (Salden, Kontodetail, Buchungen). Alles als exakte Pfade, und die schreibende Hälfte bleibt draußen — bei `/api/v1/orders` trennt nur das Verb den öffentlichen Antragsweg von der Warteschlangenansicht, weshalb der Read-Only-Schutz des vhosts diese Familie jetzt mit abdeckt.
+
+- **Die Hangar-Lesepfade sind eingefroren und für den API-vhost vorbereitet.** Die eigene Schiffsliste und die Aggregation über die aktive Org-Einheit stehen im REQ-API-009-Vertragssatz — als exakte Pfade, denn dieselbe Familie trägt die Schiffe *aller* Mitglieder, die Admin-Ansicht und die Schreibverben. Der Vertrags-Guard prüft jetzt auch verschachtelte Objekte, nicht nur Listen: bisher war bei einem Schiff nur `shipType` eingefroren, nicht dessen `name` — also genau das, was auf der Karte steht.
+
+- **Die Ankündigung ist für ausgelieferte Clients eingefroren und für den API-vhost vorbereitet.** `GET /api/v1/announcement` steht im REQ-API-009-Vertragssatz — einschließlich der 204-Antwort, wenn es nichts anzukündigen gibt: ein Client, der die leere Antwort als Fehler liest, zeigt eine Störung, wo „kein Banner" richtig wäre. Der Pfad ist exakt freigeschaltet, nicht als Präfix, weil darunter die Admin-Ansicht und der Schreibpfad derselben Zeile liegen.
+
+- **Die Benachrichtigungs-Lesepfade sind für ausgelieferte Clients eingefroren und für den API-vhost vorbereitet.** Posteingang, Ungelesen-Zähler und der SSE-Push stehen im REQ-API-009-Vertragssatz; die schreibende Hälfte der Familie bleibt draußen und wird zusätzlich per 405 abgewiesen. Der Stream setzt jetzt `X-Accel-Buffering: no`, damit ein nginx davor die Ereignisse nicht puffert — sonst kommen sie verspätet, gebündelt oder gar nicht an, und das sieht wie ein kaputter Push aus statt wie eine Proxy-Einstellung.
+
+- **Die Operationen-Lesepfade sind für ausgelieferte Clients eingefroren und für den API-vhost vorbereitet.** `GET /api/v1/operations/search`, `/{id}`, `/{id}/finance-summary` und `/{id}/payouts` stehen im REQ-API-009-Vertragssatz; der Vertrags-Guard prüft jetzt auch die Zeilen **eingebetteter** Listen, vorher war nur der Listenname eingefroren und ein umbenanntes `shareAmount` wäre unbemerkt durchgegangen. Die Operationen-Familie ist auf dem vhost ebenfalls schreibgeschützt (405). Braucht wieder einen manuellen Konfigurationsschritt (Runbook § D.3a).
+
+- **`GET /api/v1/users/me` ist für die App freigeschaltet — für genau ein Feld.** Die Auszahlungszeilen einer Operation sind auf die Backend-Benutzer-ID verschlüsselt, nicht auf den Keycloak-`sub` der App und nicht auf einen Anzeigenamen; ohne `id` kann die App einem Mitglied nicht sagen, welche der Zeilen seine ist. Nur `id` ist eingefroren, der Rest der Antwort bleibt frei.
+
+- **Der nächtliche Edge-Probe prüft jetzt die komplette Statustabelle des API-vhosts von außen.** Bisher konnte niemand feststellen, ob ein Pfad überhaupt freigeschaltet wurde — die Allowlist liegt in der NPM-Datenbank, und ein nie eingefügter Pfad antwortet mit 404 wie ein absichtlich gesperrter. Genau das hatte zuletzt einen leeren Einsatz-Detailbildschirm verursacht. Der Lauf schlägt in beide Richtungen an: 2xx, wo eine Abweisung stehen muss, und 404, wo ein Status stehen muss.
+
+- **Die Rollout-Prüfung des API-vhosts nannte für die beiden Finanz-Lesepfade den falschen Status.** Ohne Token antworten sie mit **403**, nicht mit 401: unterhalb von `/api/v1/missions/**` ist die Filterkette `permitAll`, die Abweisung entsteht erst an der Methode und wird dort als 403 gerendert. Beide Pfade sind unverändert dicht — nur die Zahl in der Prüftabelle war falsch, und ein neuer Test hält sie jetzt fest (REQ-SEC-037, Runbook § D.3a).
+
+- **Eine neue Enum-Konstante kann eine ausgelieferte App nicht mehr unbemerkt lahmlegen.** Jede *pflichtige* Enum-Eigenschaft, die von einer Vertragsoperation aus erreichbar ist, ist konstantenweise eingefroren; eine Erweiterung lässt jetzt den Backend-Build scheitern. Grund: ein streng parsender Client verliert bei einer unbekannten Konstante nicht das Feld, sondern die **ganze Antwort** — gemessen an der Android-App machte ein einzelner unbekannter `JobTypeDto.archetype` die komplette Einsatz-Detailantwort unlesbar, während die Liste weiterlief. Die Reihenfolge „App-Build zuerst, dann Konstante“ wird damit erzwungen statt gehofft (REQ-API-009).
+
+- **Einsatzdetail und Finanzen sind für ausgelieferte Clients eingefroren und auf dem API-vhost freigeschaltet.** `GET /api/v1/missions/{id}` sowie die beiden Finanz-Lesepfade stehen im REQ-API-009-Vertragssatz. Die vhost-Einträge sind UUID-förmig und **verankert**, weil unterhalb von `{id}` fast nur Schreibpfade liegen; zusätzlich weist der vhost jede Nicht-`GET`-Anfrage unterhalb von `/api/v1/missions` mit 405 ab, da eine pfadbasierte Allowlist die Methode nicht sieht und `/missions/{id}` auch `PUT` und `DELETE` beantwortet. Braucht wieder einen manuellen Konfigurationsschritt (Runbook § D.3a).
+
+- **Die anonyme Oberfläche des API-vhosts ist jetzt vollständig aufgezählt statt beiläufig.** Zwei Endpunkte antworten dort bewusst ohne Token — der Nutzungsbedingungstext und die Einsatzsuche, deren gastredigierte Zeilen die öffentliche Startseite ohnehin anzeigt. Beide stehen mit Begründung in REQ-SEC-037. Die Prüfanweisung im Rollout-Runbook nannte pauschal „401 ist bestanden“ und schlug deshalb bei genau diesen Pfaden falschen Alarm; sie liest den erwarteten Status jetzt aus einer Tabelle pro Pfad.
+
+## [v1.5.61](https://github.com/krt-profit/basetool/releases/tag/v1.5.61) - 2026-08-21
+
+### Changed
+
+- **Die Einsatzsuche der API gehört jetzt zum eingefrorenen Vertrag für ausgelieferte Clients.** `GET /api/v1/missions/search` steht im REQ-API-009-Vertragssatz und auf der Allowlist des API-vhosts, damit die Android-App sie erreicht — als exakter Pfad, nicht als Präfix, weil die Allowlist die HTTP-Methode nicht sieht. Der Vertrags-Guard prüft bei paginierten Antworten jetzt beide Ebenen; bisher hätte er nur den Umschlag eingefroren und ein entferntes Zeilenfeld wäre unbemerkt durchgegangen. Der vhost braucht dafür einen manuellen Konfigurationsschritt (Runbook § D.3a).
+
+## [v1.5.60](https://github.com/krt-profit/basetool/releases/tag/v1.5.60) - 2026-08-21
+
+## [v1.5.59](https://github.com/krt-profit/basetool/releases/tag/v1.5.59) - 2026-08-21
+
+### Changed
+
+- **Spring Boot auf 4.1.1 angehoben (Wartungs-Release).** Es bringt unter anderem Spring Framework 7.0.9, Spring Security 7.1.1, Hibernate 7.4.5, Tomcat 11.0.24, Netty 4.2.17.Final und den PostgreSQL-Treiber 42.7.13 mit; die drei temporären CVE-Overrides für Tomcat, Netty und den PostgreSQL-Treiber entfallen damit, weil Spring Boot genau diese Versionen jetzt selbst ausliefert. Rein intern, keine Auswirkung auf die Oberfläche.
+
+### Fixed
+
+- **Der Push-Kanal funktioniert wieder — er war unbemerkt tot.** Ein ETag-Filter puffert jede Antwort, um eine Prüfsumme zu bilden, und schrieb sie bei laufender Nebenläufigkeit nie zurück: Benachrichtigungs-Ströme nahmen Verbindungen an und lieferten dauerhaft kein einziges Byte. Sichtbar war das nirgends, weil die Metrik erzeugte Verbindungen zählt und nicht angekommene Daten (#1653).
+
+- **Eine Anmeldung über die Android-App entzog Administratoren ihre Admin-Rolle in der Datenbank.** Der Rollensatz wurde bei jeder Anmeldung aus dem Token überschrieben, und das App-Token führt `Admin` bewusst nicht mit — bis zur nächsten Web-Anfrage sahen Hintergrundjobs, Benachrichtigungsregeln und Mitgliederlisten den verkürzten Satz. Tokens von Clients mit absichtlich unvollständigem Rollen-Scope schreiben jetzt gar keine Rollen mehr; die Anfrage selbst wird weiterhin nur mit den Rollen aus dem Token autorisiert, die App bekommt also nach wie vor keine Administrationsrechte. Neue optionale Umgebungsvariable `APP_SECURITY_PARTIAL_ROLE_SCOPE_CLIENT_IDS` (REQ-SEC-036).
+
+- **Der Keycloak-Client der Android-App gab gar keine Rollen mit, wodurch jede Anmeldung über die App das Konto auf `Gast` zurücksetzte** — auch für die Weboberfläche, weil der Rollensatz bei jeder Anmeldung aus dem Token überschrieben wird. Das Provisionierungsskript vergibt jetzt die vier Mitgliedsrollen (KRT Member, Officer, Bank Employee, Bank Management) und nimmt alles andere wieder weg; `Admin` bleibt bewusst draußen, da die App keine Administrationsansichten hat (REQ-SEC-035). Das Produktionsrealm braucht dafür einen erneuten Skriptlauf, bevor die App ausgeliefert wird.
+
+## [v1.5.58](https://github.com/krt-profit/basetool/releases/tag/v1.5.58) - 2026-08-20
+
+### Added
+
+- **Testversionen lassen sich über eine eigene Aktion „Promote to testing" ausliefern.** Sie hängt — wie die Produktions-Promotion — ein zusätzliches Tag `:testing` an einen bereits gebauten, signierten Digest, ohne neu zu bauen; ein Testhost mit `deploy.sh --tag testing` zieht ihn beim nächsten Timer-Lauf. Signaturprüfung und der Gleichschritt aller fünf Artefakte sind identisch zur Produktion, nur die Reviewer-Freigabe entfällt (REQ-OPS-022).
+
+- **Zwei neue optionale Umgebungsvariablen `IRI_TRUSTSTORE_HOST_PATH` und `IRI_EXTRA_JAVA_OPTS`.** Steht vor dem Issuer ein selbstsigniertes Zertifikat, scheitert der Start von Backend, Frontend und Ingest an `PKIX path building failed` — die OIDC-Metadaten werden gegen den JVM-Standard-Truststore geprüft, den die SSL-Bundles des Projekts nicht abdecken. Die Variablen hängen einen eigenen Truststore ein; ungesetzt sind beide wirkungslos (REQ-OPS-022).
+
+- **Neue optionale Umgebungsvariable `IRI_KEYCLOAK_HOST_ALIAS`.** Hinter einem NAT ohne Hairpin zeigt der öffentliche Keycloak-Name auf die WAN-Adresse, die die eigenen Container nicht erreichen — Backend, Frontend und Ingest holen dort beim Start ihre OIDC-Metadaten und werden nie gesund, worauf das Health-Gate die Auslieferung zurückrollt. Die Variable trägt einen `extra_hosts`-Eintrag nach, der den Namen auf den lokalen Reverse Proxy zeigen lässt; ungesetzt ist sie wirkungslos (REQ-OPS-022).
+
+- **Zwei neue optionale Umgebungsvariablen für Umgebungen unter eigener Domain: `IRI_KEYCLOAK_HOSTNAME` und `IRI_KEYCLOAK_ISSUER_URI`.** Damit läuft dasselbe ausgelieferte Config-Bundle unter einem anderen Hostnamen, was bisher an zwei fest verdrahteten Werten scheiterte. Beide sind entweder zusammen zu setzen oder gar nicht; ungesetzt greifen unverändert die Produktionswerte (REQ-OPS-022).
+
+### Fixed
+
+- **Eine aus einem Windows-Klon kopierte `.env` ließ das Deployment mit einer irreführenden Meldung abbrechen.** `.env.example` hatte keine `eol=lf`-Regel, wurde also mit CRLF ausgecheckt; `deploy.sh` liest den Keystore-Pfad mit `grep`/`cut` daraus und bekam ihn mit angehängtem Wagenrücklauf — der Abbruch lautete dann `required file missing` für eine Datei, die vorhanden war. `.gitattributes` deckt jetzt `.env.example` und `*.ftl` mit ab.
+
+- **Das Deployment-Runbook verlangte für den GHCR-Pull-Token einen Fine-grained PAT — den GHCR gar nicht annimmt.** GitHub Packages unterstützt ausschließlich klassische Tokens; wer der Anleitung folgte, landete bei einem `denied` beim `docker login`, ohne dass am Token etwas falsch war. §5.4 nennt jetzt den Classic PAT mit `read:packages`, den nötigen SSO-Freigabeschritt und den Preis dieser Token-Art (kontoweiter Lesezugriff statt Repo-Beschränkung).
+
+## [v1.5.57](https://github.com/krt-profit/basetool/releases/tag/v1.5.57) - 2026-08-20
+
+### Added
+
+- **Beide Import-Seiten verlinken jetzt den Basetool SC Extractor.** Auf „Meine Blueprints“ neben „JSON importieren“ und auf „Neuer Raffinerieauftrag“ neben „Aus Screenshot-Extract importieren (JSON)“ führt ein Knopf direkt zum neuesten Release der Desktop-App, die genau diese Dateien erzeugt — wer sie noch nicht hat, musste sie bisher außerhalb des Tools suchen. Der Link öffnet sich in einem neuen Tab; die Blueprint-Liste bzw. ein bereits vorausgefülltes Auftragsformular bleibt stehen (REQ-INV-038, REQ-REFINERY-019).
+
+## [v1.5.56](https://github.com/krt-profit/basetool/releases/tag/v1.5.56) - 2026-08-20
+
+### Changed
+
+- **Die Freigabe-Limits stehen in der Kontoansicht der Bank jetzt sichtbar über der Konto-Info.** Sie steckten bisher in der standardmäßig zugeklappten Kachel „Konto-Info", die sich nach jeder Buchung wieder schließt — ein Bankmitarbeiter musste also erst aufklappen, um die Grenzen zu sehen, gegen die er bucht. Sind Limits eingerichtet, zeigt die Kontoansicht sie jetzt als eigene Kachel; die Anzeige bleibt für alle schreibgeschützt, eingerichtet werden Limits weiterhin nur in der Org-Einheits-Bank (REQ-BANK-041).
+
+- **Die Sichtbarkeits-Einstellung eines Kontos benennt die Zielgruppe genauer.** Bei Staffel- und Bereichskonten heißt die Zeile jetzt „Alle Mitglieder der Org-Einheit" statt „Alle Mitglieder" — passend zum gleichnamigen Freigabe-Limit, denn die Freigabe greift nur für Mitglieder der besitzenden Org-Einheit. Bei Sonderkonten bleibt es „Alle Mitglieder", weil dort tatsächlich alle KRT-Mitglieder gemeint sind (REQ-BANK-035).
+
+- **Die Spalte „Offen“ ist aus den *Aggregierten Materialien* eines Item-Auftrags verschwunden.** Sie zeigte den Eintragungs-Rest auf Basis des **vollen** Auftragsbedarfs, während „Gesamtmenge“ daneben nur den Bedarf der **noch nicht hergestellten** Einheiten meint — sobald Herstellung gebucht war, stand dort mehr „offen“ als überhaupt „gebraucht“ (bei Auftrag #75: 71,52 SCU offen gegen 56,2 SCU Gesamtmenge, ohne eine einzige Eintragung). Der „Eintragen“-Knopf sitzt jetzt in der Spalte „Eingetragen“; die maximal eintragbare Menge steht unverändert im Eintragen-Dialog. Bei Material-Aufträgen bleibt „Offen“ wie bisher (REQ-ORDERS-026).
+
+### Fixed
+
+- **Start- und Endzeit im Teilnehmer-Dialog eines Einsatzes liefen aus ihrer Spalte.** Datums- und Uhrzeitfeld haben eine feste Breite, die nebeneinander nicht in den 600 Pixel breiten Dialog passte: Die Uhrzeit ragte rund 13 Pixel über ihre Spalte hinaus, der Abstand zwischen „Startzeit“ und „Endzeit“ schrumpfte auf 3 Pixel und das Endzeit-Feld klebte am Dialogrand. Passt ein Paar nicht mehr neben das andere, rückt es jetzt in die nächste Zeile — mit dem gleichen Abstand wie alle übrigen Felder (REQ-UI-013).
+
+- **Der Dev- und E2E-Stack startete sein Backend nicht mehr.** Seit v1.5.55 setzte das Dev-Profil den JWKS-Schlüssel unter Springs eigenem Namensraum mit leerem Standardwert; Spring wertet leer nicht als „nicht gesetzt", sondern bricht den Start mit `jwkSetUri cannot be empty` ab. Der Backend-Container wurde nie gesund, damit kam der gesamte E2E-Stack nicht hoch und jeder Testlauf scheiterte an der Stack-Bereitstellung statt an seiner eigenen Prüfung. Der Schalter liegt jetzt wie in der Produktion auf `app.security.jwt.jwk-set-uri`, wo leer wieder „aus" bedeutet. Produktion war nie betroffen (REQ-SEC-024).
+
+## [v1.5.55](https://github.com/krt-profit/basetool/releases/tag/v1.5.55) - 2026-08-19
+
+### Added
+
+- **Eine irrtümlich abgelehnte Registrierung kann wieder geöffnet werden.** Unter `/admin/discord-registrations` listet eine zweite Tabelle die abgelehnten Registrierungen samt Zeitpunkt der Ablehnung; ein Admin holt eine davon per „Wiederöffnen“ zurück in die Warteschlange und gibt sie anschließend wie gewohnt frei. Bisher war eine Ablehnung endgültig — rückgängig machen ließ sie sich nur mit einem direkten Eingriff in die Datenbank oder durch Löschen des Kontos. Die Wiederöffnung wird protokolliert und ist für bereits freigegebene Konten gesperrt (REQ-SEC-034, ADR-0140).
+
+### Fixed
+
+- **Abgelehnte Registrierungen sahen weiter „Freigabe ausstehend".** Wartende und abgelehnte Konten landeten auf derselben Seite, und die zeigte unabhängig vom Status die Wartemeldung — abgelehnte Nutzer warteten deshalb auf eine Freigabe, die nie kommt, und meldeten das als hängende Freigabe. Die Seite unterscheidet jetzt: Abgelehnte sehen einen Ablehnungshinweis ohne automatische Freischaltung und den Verweis auf einen Administrator im Discord, Wartende die unveränderte Wartemeldung, und ein bereits freigegebenes Konto wird direkt ins Tool geleitet. Fällt die Ablehnung, während die Seite offen ist, wechselt der Text ohne Neuladen; danach wird nicht mehr auf eine Freigabe geprüft (REQ-SEC-017).
+
+## [v1.5.54](https://github.com/krt-profit/basetool/releases/tag/v1.5.54) - 2026-08-19
+
+### Changed
+
+- **Der Image-Bau eines Releases läuft nur noch einmal statt zweimal.** Release-Commit und `v*`-Tag zeigen auf denselben Commit, also übernimmt der Tag-Lauf jetzt die bereits gebauten, gescannten und signierten Images des main-Laufs und hängt nur die Versions-Tags daran — nach cosign-Prüfung, sonst wird regulär gebaut. Für den Betrieb heißt das: `:1.5.x` und `:sha-<kurz>` sind ab sofort derselbe Digest. Zusätzlich entfällt der Docker-Layer-Cache, der mehr Zeit kostete als er sparte. Ein Release dauert damit rund 5 statt 12:45 Minuten (REQ-OPS-021, ADR-0137).
+
+- **Keycloak auf 26.7.2 angehoben (Sicherheitsupdate).** Das Patch-Release schließt sieben Schwachstellen im Anmeldedienst — darunter eine Übernahme fremder Konten ohne Anmeldung über den Passwort-Zurücksetzen-Ablauf, eine Übernahme über einen vorhersagbaren Verknüpfungs-Hash beim Verbinden von Konten und die Preisgabe rotierter Client-Geheimnisse über die Verwaltungsschnittstelle. Keine Funktions- oder Konfigurationsänderung: Das gepinnte Container-Image (`quay.io/keycloak/keycloak:26.7`-Digest, weiterhin JDK 21) und die SPI-Artefakte des `keycloak-spi`-Moduls ziehen mit; die Discord-Anmeldung und -Kontoverknüpfung laufen unverändert weiter. **Deploy-Hinweis:** Eine geänderte Keycloak-Image-Pinnung ist operator-gated — der Deploy wendet sie nicht selbständig an, sondern muss einmal mit `deploy.sh --force` durchgesetzt werden; der Keycloak-Container startet dabei neu.
+
+- **Die Nutzungsbedingungen stehen jetzt an genau einer Stelle.** Der Text lag bisher im Sprachbundle der Weboberfläche; er liegt jetzt im Backend und wird über eine eigene Schnittstelle ausgeliefert, aus der sowohl die Webseite `/terms` als auch die Zustimmungsschranke rendern — und künftig die Android-App. Damit kann keine Fassung mehr von der abweichen, für die die Zustimmung gespeichert wird. Am Wortlaut ändert sich nichts, die gespeicherten Zustimmungen bleiben gültig, und die Seite sieht unverändert aus. Der Link zur Datenschutzerklärung steht jetzt unter dem Dokument statt mitten im Datenschutz-Absatz (ADR-0138, REQ-SEC-028).
+
+## [v1.5.53](https://github.com/krt-profit/basetool/releases/tag/v1.5.53) - 2026-08-19
+
+### Changed
+
+- **Die App trägt jetzt ihr eigenes Logo.** Kopfzeile, Browser-Tab, Startbildschirm-Symbol und die Anmeldeseite zeigen das neue Basetool-Zeichen statt der Kartell-Marke; das Kartell-Logo bleibt auf den erzeugten PDF-Dokumenten, wo die Organisation gemeint ist. Das Design-System ist dabei auf den aktuellen Stand gehoben worden (REQ-UI-019).
+
+## [v1.5.52](https://github.com/krt-profit/basetool/releases/tag/v1.5.52) - 2026-08-19
+
+### Changed
+
+- **Gastmodus der App gestrichen — die anonymen Schreibpfade bleiben dauerhaft zu.** Die öffentliche API-Allowlist hielt `POST /api/v1/orders/items`, die Gast-Teilnehmer-Mutationen und die redigierten Browsing-Zwillinge für den Gastmodus der Android-App in Reserve. Der Modus entfällt (jeder Nutzer meldet sich an), also werden diese Pfade auf dem `api`-vhost nie freigeschaltet. Für die Weboberfläche ändert sich nichts — sie erreicht das Backend intern.
+
+### Fixed
+
+- **Der nächtliche Fehlalarm zur DNS-Auflösung der App-Schnittstelle ist behoben.** Die beiden neuen Überwachungsprüfungen für `api.profit-base.online` schlugen ab der ersten Messung fehl, obwohl die Auflösung einwandfrei funktioniert — der Name ist ein Alias auf die Hauptdomain, und die Prüfregel ließ nur einen direkten Adresseintrag gelten. Sie verlangt jetzt, dass die Antwort überhaupt eine Adresse liefert; echte Ausfälle (unbekannter Name, fehlender Eintrag, ins Leere zeigender Alias) schlagen unverändert an. Keine Auswirkung auf die Oberfläche (REQ-OBS-012).
+
+## [v1.5.51](https://github.com/krt-profit/basetool/releases/tag/v1.5.51) - 2026-08-18
+
+## [v1.5.50](https://github.com/krt-profit/basetool/releases/tag/v1.5.50) - 2026-08-18
+
+### Fixed
+
+- **Die Zuordnung von Anfragen zur Client-Software hat nichts gezählt.** Der dafür zuständige Filter lief eine Position zu früh — vor der Authentifizierung, wo noch keine Anmeldung sichtbar ist — und lieferte deshalb seit seiner Einführung gar keine Messwerte. Er sitzt jetzt an der richtigen Stelle; ein Test hält beide Seiten des schmalen Fensters fest. Die Aufschlüsselung fehlgeschlagener Anmeldungen war davon nicht betroffen (REQ-OBS-018).
+
+## [v1.5.49](https://github.com/krt-profit/basetool/releases/tag/v1.5.49) - 2026-08-18
+
+### Changed
+
+- **Das Backend bekommt einen eigenen Netzwerkpfad zum Randserver, damit die geplante App-Schnittstelle erreichbar wird.** Bisher lag das Backend auf keinem Proxy-Netz — der neue Vhost `api.profit-base.online` konnte den Dienst deshalb gar nicht auflösen und beantwortete jeden Aufruf mit der Wartungsseite. Keine Auswirkung auf die Oberfläche (ADR-0135). **Deploy-Hinweis:** die Änderung erweitert die Netzwerk-Topologie, deshalb setzt der Deploy den gesamten Stack einmal neu auf — kurze Komplettunterbrechung, bitte in einem Wartungsfenster ausrollen.
+
+## [v1.5.48](https://github.com/krt-profit/basetool/releases/tag/v1.5.48) - 2026-08-18
+
+### Fixed
+
+- **Das Frontend wurde nach dem letzten Deploy nicht mehr gesund und der Rollout ist zurückgerollt.** Die Bereitschaftsprüfung des Frontends fragt das Backend ab — über genau den Port, dessen technische Statusdaten mit dem vorherigen Release auf einen internen Port umgezogen sind (ADR-0134). Sie zeigt jetzt auf den richtigen Port; ein Test hält beide Seiten zusammen, damit ein weiterer Portwechsel nicht wieder unbemerkt bleibt.
+
+## [v1.5.47](https://github.com/krt-profit/basetool/releases/tag/v1.5.47) - 2026-08-18
+
+### Added
+
+- **Vorbereitung für die Android-App: Der Betrieb sieht jetzt, welche Client-Software die Schnittstelle nutzt und warum eine Anmeldung scheitert.** Zwei neue Messwerte ordnen jede angemeldete Anfrage ihrem Programm zu — eine unbekannte Software löst eine Warnung aus — und schlüsseln abgelehnte Anmeldungen nach Ursache auf (abgelaufenes Token, fehlerhafter Kopfeintrag …). Die Überwachung der geplanten öffentlichen Schnittstelle ist vorbereitet, aber bewusst noch abgeschaltet, bis der Host existiert. Keine Auswirkung auf die Oberfläche (ADR-0135, REQ-OBS-018).
+
+- **Jedes Benutzerkonto hat jetzt ein eigenes Anfragekontingent für Änderungen.** Bisher wurde nur pro Netzwerkadresse begrenzt — was Mitglieder hinter einem gemeinsamen Anschluss gegenseitig ausbremst und einen Aufrufer mit wechselnden Adressen gar nicht erfasst. Das neue Kontingent (120 Änderungen pro Minute) hängt an der Anmeldung und liegt weit über dem, was normale Bedienung erzeugt (REQ-SEC-033).
+
+### Changed
+
+- **Bankdaten, Mitgliederdaten und Benachrichtigungen dürfen von Zwischenspeichern nicht mehr abgelegt werden.** Bisher durfte ein Proxy oder Browser-Cache diese Antworten aufbewahren, solange er vor der Wiederverwendung nachfragt; jetzt dürfen sie gar nicht erst gespeichert werden. Alle übrigen Abfragen bleiben unverändert (REQ-SEC-031).
+
+- **Die Preis-Matrix ist nur noch angemeldet abrufbar, und ohne Anmeldung sind höchstens 1000 Einträge pro Seite möglich.** Die Matrix ist die größte Einzelantwort der Schnittstelle und war bisher offen erreichbar; genutzt wird sie ohnehin nur auf einer Seite, die eine Anmeldung verlangt. Zu große Seitenanfragen werden jetzt mit einer klaren Fehlermeldung abgelehnt, statt stillschweigend gekürzt zu werden (REQ-SEC-032).
+
+- **Die technischen Statusdaten des Backends sind nicht mehr über den normalen Anwendungsport erreichbar.** Gesundheitsprüfung und Messwerte laufen jetzt über einen eigenen, ausschließlich intern erreichbaren Port — so wie es Frontend und Ingest schon länger tun. Damit liefert der Port, den die geplante öffentliche Schnittstelle weiterreicht, diese Daten gar nicht erst aus, statt sich allein auf eine Sperre am Randserver zu verlassen. Die Möglichkeit, während einer Störung kurzfristig die Protokolltiefe zu erhöhen, bleibt Administratoren erhalten. **Deploy-Hinweis:** Anwendungsabbild und Konfigurationspaket müssen gemeinsam ausgerollt werden — einzeln schlägt die Gesundheitsprüfung fehl und der Deploy rollt zurück (ADR-0134).
+
+### Fixed
+
+- **Die Rate-Limit-Zählung lässt sich nicht mehr durch einen gefälschten Absender aushebeln.** Das Backend ermittelt die echte Absenderadresse jetzt so, dass nur die eigenen vorgeschalteten Server dazu beitragen können. Im heutigen Betrieb ändert sich nichts — die Lücke wäre erst mit der geplanten öffentlichen Schnittstelle aufgegangen (REQ-SEC-011).
+
+## [v1.5.46](https://github.com/krt-profit/basetool/releases/tag/v1.5.46) - 2026-08-18
+
+### Added
+
+- **Auszahlungsanträge haben jetzt ein Feld "Empfänger".** Wer über die Org-Einheits-Bank eine Auszahlung beantragt, kann angeben, wer das Geld bekommt — vorbelegt mit dir selbst. Bisher wurde beim Buchen immer der Antragsteller als Empfänger eingetragen; ging die Auszahlung an jemand anderen, ließ sich das weder eintragen noch von der Bank korrigieren. Der Empfänger erscheint auch beim Aufklappen des Antrags.
+
+- **Eigene Anträge lassen sich aufklappen und bearbeiten.** Unter "Meine Anträge" zeigt ein Pfeil vor der Zeile Begründung, Notiz und Empfänger — wie in der Antragsliste der Bank und bei den fremden Anträgen. Solange der Antrag noch aussteht und noch nicht freigegeben wurde, lässt er sich über "Bearbeiten" korrigieren (Betrag, Begründung, Notiz, Empfänger, Zielkonto), statt ihn zurückziehen und neu stellen zu müssen. Erhöhst du den Betrag über dein Freigabe-Limit, wird die Freigabepflicht neu bewertet. Konto und Vorgang bleiben fest; dafür ziehst du den Antrag weiterhin zurück und stellst ihn neu. Ist die Freigabe bereits erteilt, ist der Antrag gesperrt — sie galt für den ursprünglichen Betrag. Die "Notiz Bankmitarbeiter" bleibt hier bewusst unsichtbar, sie ist bankintern.
+
+- **Das Freigabe-Limit "Alle Mitglieder" heißt jetzt "Alle Mitglieder der Org-Einheit".** Es galt schon immer nur für Mitglieder der Org-Einheit, zu der das Konto gehört; der alte Name legte etwas Weiteres nahe. Reine Umbenennung, keine Verhaltensänderung.
+
+- **Bankmitarbeiter können jetzt eine eigene Notiz zu einer Buchung erfassen.** Beim Bestätigen eines Antrags und bei jeder direkten Einzahlung, Auszahlung und jedem Transfer gibt es das Feld "Notiz Bankmitarbeiter" für interne Anmerkungen ("in zwei Tranchen übergeben"). Sie erscheint überall dort, wo auch Notiz und Begründung stehen — Kontohistorie, Antragsliste, Fremde Anträge, Kontoauszug und 3-Monats-Report. Für Mitglieder einer Org-Einheit ist sie bewusst nicht sichtbar; sie ist eine bankinterne Anmerkung.
+
+- **Fremde Anträge lassen sich jetzt aufklappen.** In der Freigabe-Liste der Org-Einheits-Bank zeigt ein Pfeil vor der Zeile Begründung und Notiz des Antrags — genau wie in der Antragsliste der Bank. Wer freigibt, entscheidet damit nicht mehr blind: beim KRT-Konto, dem Bankkonto und jedem Sonderkonto ist die Begründung Pflicht und war für den Freigebenden bisher nicht sichtbar.
+
+### Changed
+
+- **Die Nutzungsbedingungen benennen das Fan-Projekt jetzt ausdrücklich.** § 9 hält fest, dass das Basetool ein inoffizielles, nicht kommerzielles Fan-Projekt ohne Unterstützung von Cloud Imperium ist und Material aus dem offiziellen Star-Citizen-Fankit nur nach dessen Bedingungen nutzt. Da sich der Wortlaut ändert, wird die Zustimmung beim nächsten Login erneut abgefragt.
+
+## [v1.5.45](https://github.com/krt-profit/basetool/releases/tag/v1.5.45) - 2026-08-17
+
+### Added
+
+- **Vorbereitung für die Android-App: Anmelde-Verfahren festgelegt und als Skript hinterlegt.** Die künftige App bekommt einen Keycloak-Zugang, bei dem nur ihr Erneuerungs-Token an das jeweilige Gerät gebunden ist — ein gestohlenes Token ist damit außerhalb des Handys wertlos. Ein neues Betreiber-Skript legt diesen Zugang samt Richtlinie an und prüft das Ergebnis. Rein vorbereitend, keine Auswirkung auf die Oberfläche (ADR-0131, REQ-SEC-030).
+
+### Changed
+
+- **Kontakt-E-Mail-Adresse aktualisiert.** Die Betreiber-Adresse in Impressum und Datenschutzerklärung (alle drei Sprachvarianten) sowie in CLA, Code of Conduct und Beitragsleitfaden lautet jetzt lucas.greuloch@gmail.com (vorher lucas.greuloch@pm.me).
+
+### Fixed
+
+- **Auswahlfelder verlieren ihre Auswahl nicht mehr unsichtbar.** Wer in einem Auswahlfeld (Halter, Material, Ort, Nutzer …) erneut hineinklickte und tippte, ohne danach einen Eintrag aus der Liste zu wählen, verlor beim Wegklicken die Auswahl im Hintergrund — das Feld zeigte weiterhin den zuvor gewählten Namen an. Das Formular ließ sich abschicken und wurde dann abgewiesen, ohne dass erkennbar war, woran es lag. Betraf unter anderem die Auszahlung eines Bank-Antrags, deren Freigabe-Häkchen genau diesen Klick erzwingt.
+
+- **Meldungen zu ungültigen Eingaben benennen wieder das betroffene Feld.** Bei einem Prüffehler antwortete das Backend ohne Feldangabe, sodass die Oberfläche nur den Sammeltext „Einige Felder sind ungültig“ anzeigen konnte und im Server-Log gar kein Eintrag entstand — der Fehler war damit weder für Nutzer noch im Betrieb nachvollziehbar. Ursache war die Reihenfolge zweier Fehler-Handler (ADR-0132). Fehler werden jetzt wieder direkt am betroffenen Feld angezeigt und protokolliert.
+
+## [v1.5.43](https://github.com/krt-profit/basetool/releases/tag/v1.5.43) - 2026-08-17
+
+## [v1.5.42](https://github.com/krt-profit/basetool/releases/tag/v1.5.42) - 2026-08-17
+
+### Changed
+
+- **Redis läuft jetzt auf 8.10.0 (vorher 8.8.0).** Der Digest-Pin des `redis:8-alpine`-Images zeigte noch auf den Stand von Juni. Keine Konfigurationsänderung. **Deploy-Hinweis:** Der Redis-Container muss dafür neu gestartet werden.
+
+- **Monitoring-Images aktualisiert:** Loki 3.7.6, Alloy 1.18.1 und redis_exporter 1.89.0. Grafana bleibt bewusst auf 13.0.2 — die OSS-Variante hat bis heute keinen 13.1.x-Tag veröffentlicht.
+
+- **Die TypeScript-Typen der Backend-Schnittstelle erzeugt das Basetool jetzt selbst.** Statt des Pakets `openapi-typescript` läuft ein eigenes, abhängigkeitsfreies Skript; die erzeugte Datei schrumpft von 1,7 MB auf 96 KB und 22 npm-Pakete entfallen. Die Absicherung bleibt: Wird ein Feld im Backend umbenannt, bricht der Build, statt dass eine Auswahlliste stillschweigend leer bleibt. Rein intern, keine Auswirkung auf die Oberfläche (ADR-0130).
+
+- **Der Typprüfer der Browser-Skripte läuft auf TypeScript 7.** Das war zuvor durch `openapi-typescript` blockiert. Nichts wird kompiliert oder gebündelt — die Skripte bleiben unverändert.
+
+- **Fehlende Prüfungen auf nicht vorhandene Seitenelemente geschlossen.** Die Typprüfung deckte auf, dass mehrere Stellen in der Blaupausen-Ansicht und im Blaupausen-Import Elemente benutzten, ohne zu prüfen, ob sie überhaupt da sind. Fehlt eines — etwa weil ein Seitenteil nicht gerendert wurde —, brach dort bisher das Skript ab und die restliche Seite blieb tot; jetzt wird der betroffene Teil übersprungen und der Rest funktioniert weiter.
+
+- **Build- und Bibliotheks-Abhängigkeiten auf den aktuellen Stand gebracht.** Gradle 9.7.0, Flyway 13.2.0, ArchUnit 1.5.0, Playwright 1.62.0, Checkstyle 13.9.0, OWASP Dependency-Check 13.0.0 und die übrigen Werkzeuge; die PostgreSQL-, Tomcat- und Netty-Pins ziehen auf den jeweils neuesten Patch nach. Rein intern, keine Auswirkung auf die Oberfläche.
+
+- **Keycloak auf 26.7.1 angehoben (Sicherheitsupdate).** Das Patch-Release schließt fünf Schwachstellen im Anmeldedienst — unter anderem eine Umgehung der Signaturprüfung bei verschlüsselten OIDC-Request-Objects, eine Rechte-Eskalation über die Client-Verwaltung und drei Lücken in der feingranularen Rechteverwaltung. Keine Funktions- oder Konfigurationsänderung: Das gepinnte Container-Image (`quay.io/keycloak/keycloak:26.7`-Digest, weiterhin JDK 21) und die SPI-Artefakte des `keycloak-spi`-Moduls ziehen mit. **Deploy-Hinweis:** Der Keycloak-Container muss dafür neu gestartet werden.
+
+- **Build- und Testwerkzeuge auf den aktuellen Stand gebracht:** CycloneDX 3.4.1, Flyway 13.3.0, OkHttp 5.5.0, axe-core 4.13.0, Spotless 8.10.0 und JUnit 6.1.3. MapStruct bleibt bewusst auf 1.6.3 — für 1.7.0 gibt es bisher nur Beta-Builds. Rein intern, keine Auswirkung auf die Oberfläche.
+
+### Fixed
+
+- **Alarm-Mails wiederholen sich nicht mehr stündlich bzw. alle vier Stunden.** Alertmanager kennt kein „zur Kenntnis genommen" und schickte dieselbe Meldung erneut, solange der Alarm anlag — bei einem Alarm, der einen Zustand prüft, also endlos. Pro Ereignis kommt jetzt eine Mail und, sobald es vorbei ist, eine Entwarnung; das stündliche Nachfassen bei kritischen Alarmen läuft weiter über Discord. **Deploy-Hinweis:** Der Alertmanager-Container muss dafür neu erzeugt werden (neue Option `--data.retention=744h`).
+
+- **Fehlalarm „External sync stale" nach jedem Backend-Neustart behoben.** Der Zeitstempel des letzten erfolgreichen Laufs eines Hintergrundjobs wurde bereits beim *Start* eines Laufs mit dem Platzhalter `0` veröffentlicht; die Überwachung las das als „zuletzt erfolgreich am 01.01.1970" und schlug an, solange der erste Lauf nach einem Neustart dauerte — beim SC-Wiki-Abgleich 10 bis 15 Minuten. Der Zeitstempel entsteht jetzt erst mit dem ersten Erfolg, und die sechs betroffenen Alarmregeln ignorieren den Platzhalter zusätzlich selbst.
+
+- **Fehlalarm „Audit domain silent 14d (ROLE)" behoben.** Die Überwachung meldete jede Audit-Domäne als verdächtig still, die 14 Tage lang nichts aufgezeichnet hat — für den Bereich Rollen & Mitglieder ist das aber eine gewöhnliche ruhige Phase, und da der Alarm einen Zustand und kein Ereignis prüft, wiederholte er sich alle vier Stunden per Mail, bis jemand eine Rolle änderte. Rollen & Mitglieder ist jetzt von der Regel ausgenommen — wie Beförderung, Mein Inventar und Materialbörse, die dort naturgemäß wochenlang still sind. Das Betriebs-Dashboard zeigt das Audit-Volumen dieser Bereiche stattdessen in einer 60-Tage-Tabelle.
+
+- **Das „+ Zuordnen"-Popover im Lager bleibt immer vollständig im Bild.** Klappte es nach oben auf, obwohl darüber zu wenig Platz war, ragte sein oberer Teil — im Auswahlmodus die Auftragsliste — aus dem sichtbaren Bereich und war nicht erreichbar, weil sich ein fest positioniertes Element nicht heranscrollen lässt. Es klappt jetzt nur noch nach oben, wenn es dort auch hineinpasst, und wird andernfalls in den sichtbaren Bereich gerückt.
+
+- **Ein kurzer Aussetzer der Container-Registry löst keinen Sicherheitsalarm mehr aus.** Die Signaturprüfung vor dem Deploy wird jetzt bis zu dreimal wiederholt und schreibt die tatsächliche Fehlermeldung ins Log, statt sie zu verwerfen. Bisher war ein Netzwerk-Schluckauf nicht von einem manipulierten Image zu unterscheiden und brach den Deploy als kritischen Alarm ab. Neue Schalter: `IRI_COSIGN_VERIFY_ATTEMPTS` (Standard 3) und `IRI_COSIGN_VERIFY_DELAY` (Standard 5 s).
+
+### Security
+
+- **Die Signaturprüfung vor dem Deploy läuft künftig mit cosign 3.1.3.** Das Update schließt eine Schwachstelle (GHSA-fx35-mq7g-6g98), bei der cosign die Prüfung der Signatur-Identität stillschweigend übergehen konnte. Unsere Prüfung der Container-Images war davon nicht betroffen — die Lücke greift nur bei der Prüfung einzelner Dateien (`verify-blob`). Reine Runbook-Änderung, keine Code-Änderung; das Programm auf dem Server wird beim nächsten Wartungsfenster ausgetauscht.
+
+## [v1.5.41](https://github.com/krt-profit/basetool/releases/tag/v1.5.41) - 2026-08-05
+
+### Changed
+
+- **Der Footer ist auf jeder Seite eine Zeile flacher.** Das „Made By The Community"-Logo samt Markenhinweis von Cloud Imperium steht jetzt am Ende der Startseite statt im fest eingeblendeten Footer — beides sind laut Star-Citizen-Fankit zulässige Platzierungen. Das gibt vor allem auf Handy und Tablet spürbar Platz zurück.
+
+## [v1.5.40](https://github.com/krt-profit/basetool/releases/tag/v1.5.40) - 2026-08-05
+
+### Added
+
+- **Der Materialbedarf lässt sich jetzt filtern und sortieren.** Hinter einem **Filter**-Knopf (einklappbar wie im Lager) lässt sich nach Material — mit Suchfeld — und Qualitätsstufe eingrenzen, und bereits gedeckte Materialien lassen sich ausblenden. Die Spalten Material, Bedarf, Bestand, Eintragungen und Offen sind per Klick auf die Überschrift sortierbar. Die Zeile „Basis: N Aufträge" entfällt.
+
+## [v1.5.39](https://github.com/krt-profit/basetool/releases/tag/v1.5.39) - 2026-08-05
+
+### Added
+
+- **Neue Seite „Materialbedarf" in der Auftragsverwaltung.** Sie zeigt, wie viel von jedem Material über alle offenen und in Bearbeitung befindlichen Aufträge hinweg noch zu beschaffen ist — getrennt nach bearbeitender Einheit, mit Bedarf, bereits zugeordnetem Bestand, Eintragungen und der verbleibenden Lücke. Material- und Item-Aufträge zählen beide mit; jede Zeile lässt sich zu den Aufträgen aufklappen, aus denen sie sich zusammensetzt.
+
+### Changed
+
+- **Die Filterzeile im globalen Lager lässt sich jetzt einklappen — wie in „Mein Lager".** Sie steht hinter einem **Filter**-Knopf in der Aktionsleiste und schiebt die Tabelle nicht mehr nach unten. Ist etwas gefiltert, zeigt der Knopf die Anzahl der aktiven Filter, damit eine kurze Tabelle nie unerklärt bleibt. Die Einstellung merkt sich der Browser; ohne gespeicherte Wahl startet das Panel nur dann zugeklappt, wenn nichts gefiltert ist.
+
+- **Die Beschriftungen „Material" und „Qualität ≥" im globalen Lager sind jetzt übersetzt.** Sie standen fest auf Deutsch und blieben auch in der englischen Oberfläche stehen.
+
+## [v1.5.38](https://github.com/krt-profit/basetool/releases/tag/v1.5.38) - 2026-08-04
+
+## [v1.5.37](https://github.com/krt-profit/basetool/releases/tag/v1.5.37) - 2026-08-04
+
+### Fixed
+
+- **Das technische Konto des Gateways lässt sich jetzt aus der Mitgliederliste entfernen.** Der Eintrag stand dort als „Nicht in Keycloak", ließ sich aber nicht löschen: die Sicherheitsabfrage vor dem Löschen fand ihn in Keycloak sehr wohl. Für technische Konten gilt sie jetzt nicht mehr — für Mitglieder unverändert. Der erste Anlauf in v1.5.37 endete stattdessen in einem allgemeinen Fehler, weil die Prüfung eine Berechtigung brauchte, die das Basetool in Keycloak nicht hat; sie kommt jetzt ohne aus.
+
+- **Wenn ein Aufruf an Keycloak scheitert, sagt das Basetool das jetzt.** Solche Fehler kamen als „Ein unerwarteter Fehler ist aufgetreten" an — eine Meldung, die weder den betroffenen Dienst nennt noch von einem echten Programmfehler zu unterscheiden ist. Sie werden jetzt als Störung eines fremden Dienstes ausgewiesen.
+
+## [v1.5.36](https://github.com/krt-profit/basetool/releases/tag/v1.5.36) - 2026-08-04
+
+### Fixed
+
+- **Der Versand aus dem Extractor wird wieder dir zugerechnet — mit deinen Rechten und deiner Zustimmung.** Das Backend prüfte Freigabe, Zustimmung und Rechte am technischen Konto des Gateways statt an der sendenden Person. Für die Dauer eines solchen Aufrufs gilt jetzt wieder deine Identität; ein deaktiviertes Mitglied kann darüber nichts mehr senden.
+
+- **Ein in der Benutzerverwaltung deaktiviertes Mitglied kann über den Extractor nichts mehr senden.** Bisher wirkte eine Deaktivierung dort erst, wenn das Konto tatsächlich gelöscht wurde. Sie greift jetzt beim nächsten Abgleich, eine Reaktivierung entsprechend bei der nächsten Anmeldung.
+
+- **Eine fehlgeschlagene Zustimmung gilt nicht mehr als erteilt.** Die Zustimmung wurde vorgemerkt, bevor sie gespeichert war — schlug das Speichern fehl, galt sie bis zum nächsten Neustart trotzdem als erteilt. Jetzt zählt sie erst, wenn sie wirklich gespeichert ist.
+
+- **Das Gateway erscheint nicht mehr als neues Mitglied.** Sein technisches Konto löste bisher eine Registrierung samt Freigabeanfrage an die Administratoren aus, weil ein solches Konto von einer Person nicht zu unterscheiden war. Es wird jetzt als Maschine erkannt.
+
+## [v1.5.35](https://github.com/krt-profit/basetool/releases/tag/v1.5.35) - 2026-08-04
+
+### Fixed
+
+- **Der Versand aus dem Extractor funktioniert jetzt tatsächlich.** Die Korrektur in v1.5.34 griff noch nicht: das Gateway prüfte das Zertifikat des Anmeldeservers zwar nicht mehr gegen den Truststore des Backends, dafür aber gegen den eines intern erreichbaren Anmeldeservers — mit demselben Ergebnis. Es akzeptiert jetzt beide Herkünfte, sodass die Prüfung unabhängig davon aufgeht, welche Adresse konfiguriert ist.
+
+## [v1.5.34](https://github.com/krt-profit/basetool/releases/tag/v1.5.34) - 2026-08-04
+
+### Fixed
+
+- **Der Versand aus dem Extractor scheitert nicht mehr an einer falschen Vertrauensstellung.** Das Gateway prüfte das Zertifikat des Anmeldeservers gegen den Truststore des Backends und konnte deshalb gar keine Verbindung aufbauen — sichtbar nur als „An unexpected error occurred.". Es nutzt jetzt die passenden Wurzelzertifikate.
+
+- **Ein Gateway ohne nutzbare Anmeldung sagt das jetzt.** Statt eines nichtssagenden Serverfehlers kommt eine benannte Meldung mit dem Hinweis, dass es am Server liegt und nicht am eigenen Export.
+
+## [v1.5.33](https://github.com/krt-profit/basetool/releases/tag/v1.5.33) - 2026-08-04
+
+### Changed
+
+- **Der Alarm zur Zustimmungseinführung schlägt nur noch an, wenn tatsächlich mehrere Personen ausgesperrt sind.** Bisher zählte er abgelehnte Anfragen statt Personen — ein einzelnes wiederholt anfragendes Programm genügte, um ihn nachts auszulösen, obwohl niemand betroffen war. Er beobachtet jetzt, wie viele **verschiedene** Mitglieder abgelehnt werden, und lässt einer Person auch genug Zeit, die Bedingungen in Ruhe zu lesen.
+
+- **Der Desktop-Extractor sendet wieder und ist dabei besser geschützt als zuvor.** Seit dem 3. August schlug jeder Versand mit „A valid bearer token is required" fehl: das Zugangs-Token war an den Rechner gebunden, wurde aber in einer Form übergeben, die der Server aus Sicherheitsgründen ablehnt. Das Gateway prüft die Bindung jetzt selbst und spricht mit dem Backend unter eigener Kennung weiter — die Bindung wirkt damit genau dort, wo sie zählt, nämlich auf der Strecke aus dem Internet (ADR-0129).
+
+### Fixed
+
+- **Ein offener Tab läuft nach einer Änderung der Nutzungsbedingungen nicht mehr endlos ins Leere.** Die Benachrichtigungsverbindung eines Tabs, der beim Wirksamwerden neuer Bedingungen offen war, wurde auf die Zustimmungsseite umgeleitet, scheiterte daran und baute sich sofort neu auf — dauerhaft und unbemerkt. Sie wird jetzt einmal gezielt beendet, und der Tab wechselt auf die Zustimmungsseite (REQ-SEC-028).
+
+- **Die Glocke friert hinter der Zustimmungspflicht nicht mehr stumm ein.** Der Zähler für ungelesene Benachrichtigungen und die Einträge im Aufklappmenü verwarfen die Antwort des Zustimmungs-Gates kommentarlos und zeigten weiter den letzten Stand. Sie leiten jetzt wie jede andere Aktion auf die Zustimmungsseite weiter.
+
+- **P4K-Import (Admin): Die laufende Fortschrittsabfrage erkennt jetzt die Zustimmungsabfrage, statt sie als Erfolg zu lesen.** Wurde während eines Imports eine neue Fassung der Nutzungsbedingungen aktiv, holte die Seite alle 3 Sekunden endlos die Zustimmungsseite, ohne dass sichtbar etwas passierte. Sie wechselt jetzt zur Zustimmungsseite und beendet die Abfrage — wie jede andere Oberfläche (REQ-SEC-028).
+
+- **Deutlich weniger Serverlast, solange jemand noch nicht zugestimmt hat.** Das Zwischenergebnis „hat noch nicht zugestimmt" wurde gespeichert, aber nie wiederverwendet, sodass jede einzelne Anfrage einer nicht zugestimmten Sitzung eine zusätzliche Abfrage im Hintergrund auslöste. Es gilt jetzt wie das positive Gegenstück bis zu 60 Sekunden; eine Zustimmung wirkt weiterhin sofort.
+
+- **Live-Aktualisierung hängt sich nach einer Änderung der Nutzungsbedingungen nicht mehr in endlose Verbindungsversuche.** Ein Tab, dessen Nutzer den geltenden Bedingungen noch nicht zugestimmt hatte, wurde bei der Live-Sync-Verbindung auf die Zustimmungsseite umgeleitet — was eine WebSocket-Verbindung nicht auswerten kann, weshalb sie unbegrenzt alle 30 Sekunden neu aufgebaut wurde. Die Verbindung wird jetzt einmalig endgültig beendet und der Tab wechselt auf die Zustimmungsseite (REQ-SEC-028).
+
+- **Deployment: `IRI_MONITORING_ENABLED` wirkt jetzt auch, wenn es in der `.env` steht.** Der Deploy-Dienst liest diese Datei nicht ein, meldete deshalb bei jedem Lauf `IRI_MONITORING_ENABLED != 'true'` und spielte geänderte Monitoring-Konfiguration zwar auf die Platte, lud sie aber nie in das laufende Prometheus — korrigierte Alarmregeln feuerten dadurch weiter in ihrer alten Fassung. Ein explizit gesetzter Wert hat weiterhin Vorrang, und es wird ausschließlich dieser eine Schlüssel gelesen.
+
+## [v1.5.32](https://github.com/krt-profit/basetool/releases/tag/v1.5.32) - 2026-08-03
+
+## [v1.5.31](https://github.com/krt-profit/basetool/releases/tag/v1.5.31) - 2026-08-03
+
+### Added
+
+- **Raffinerieauftrag-Detailseite: Speichern und Einlagern bleiben jetzt auf der Seite, und zwei Personen sehen die Änderungen des anderen live.** Bisher sprang die Seite nach jeder Aktion zurück zur Liste, und ein zweiter Betrachter merkte von einer fremden Änderung nur den Versionskonflikt beim eigenen Speichern. Formular, Materialtabelle und der Einlagern-Dialog werden jetzt an Ort und Stelle aktualisiert; wird die Ausbeute einem Auftrag zugeordnet, frischt sich dessen offene Materialübersicht mit auf. Abbrechen führt weiterhin zur Liste, da der Auftrag die Arbeitsliste verlässt (REQ-FE-001/REQ-FE-015, #1238).
+
+- **Blueprint-Import: Munition aus einem deutschen Star-Citizen-Client wird jetzt direkt erkannt.** Ein deutscher Client schreibt „(30 Schuss)" statt „(30 cap)"; solche Namen mussten bisher beim ersten Import einmal von Hand zugeordnet werden — rund 13 Stück. Die Zuordnungen sind jetzt vorbelegt. Wer sie bereits selbst zugeordnet hat, behält seine Zuordnung (#1485).
+
+- **Live-Aktualisierung jetzt auch in Missionsliste, Raffinerie, Mitgliederverwaltung und Organisationsstruktur.** Ändert jemand anderes einen Eintrag, aktualisiert sich die offene Liste an Ort und Stelle statt still zu veralten — bisher half nur ein manuelles Neuladen. Das Organigramm und der Struktur-Editor teilen sich dabei einen Kanal: eine Zuordnungsänderung erreicht beide Ansichten (REQ-FE-015).
+
+- **Einlagern aus der Raffinerie aktualisiert jetzt auch ein offenes Lager.** Die eingelagerte Ausbeute erschien dort bisher erst nach einem Neuladen.
+
+- **Zwei neue Alarme für die Live-Aktualisierung.** Verwirft die Verteilung eine Änderung, sehen die anderen Betrachter unbemerkt einen veralteten Stand — ohne Fehlermeldung auf beiden Seiten. `LiveSyncRelayDropsSustained` schlägt bei anhaltenden Verlusten je Oberfläche an, `LiveSyncSectionKeySkew` beim Senden eines Bereichsschlüssels, den die Verteilung nicht kennt. Beide Schwellen stammen aus 21 Tagen gemessenem Produktivbetrieb (REQ-OBS-011).
+
+- **Neue Kennzahl `basetool_livesync_peer_rooms` samt Panel im Betriebs-Dashboard.** Sie zeigt je Oberfläche, in wie vielen Räumen mehrere Personen gleichzeitig sind. Ohne sie ist ein Ausbleiben von Aktualisierungen nicht davon zu unterscheiden, dass schlicht niemand gemeinsam bearbeitet hat.
+
+- **Nutzungsbedingungen müssen jetzt bestätigt werden — auch für den Extractor.** Ohne Zustimmung ist keine Nutzung möglich; bei Ablehnung wird man abgemeldet und kann sich jederzeit erneut anmelden und zustimmen. Ändert sich der Text, erscheint die Seite erneut, und wer wann welcher Fassung zugestimmt hat, ist nachvollziehbar gespeichert (REQ-SEC-028, ADR-0127).
+
+- **Neue Adminübersicht „Zustimmung zu den Nutzungsbedingungen“.** Zeigt, wer der geltenden Fassung zugestimmt hat und wer noch nicht, voreingestellt auf die offenen Fälle. Ohne sie wäre nach einer Textänderung nicht zu unterscheiden, ob sich schlicht noch niemand angemeldet hat oder ob die Zustimmung gar nicht funktioniert.
+
+- **Nutzungsbedingungen: Nur vom Betreiber freigegebene Client-Software darf die Schnittstellen nutzen.** Bisher stand diese Regel nur in der Entwicklerdokumentation und war damit nicht Vertragsbestandteil — ein Sperrgrund ließ sich nur über die Klausel „ohne Angabe von Gründen" stützen. Abschnitt 4 nennt sie jetzt ausdrücklich, für alle Schnittstellen und einschließlich Entwicklung und Bereitstellung fremder Clients (REQ-SEC-027, Stand 03.08.2026).
+
+### Changed
+
+- **Sicherheit: Die JWT-Audience-Prüfung des Backends läuft jetzt in jedem E2E-Durchlauf scharf.** Bisher war sie nirgends aktiv — die Produktion wäre der erste Ort gewesen, an dem der Prüfpfad überhaupt ausgeführt wird, und dort weist eine fehlende `aud` jede Anmeldung ab. Der E2E-Realm schreibt die Audience jetzt in seine Tokens, der E2E-Stack prüft sie, und ein Paritätstest verhindert, dass beides auseinanderläuft (Audit L-1, REQ-SEC-024). In Produktion bleibt die Prüfung unverändert aus.
+
+- **Ingest-Gateway: DPoP schützt jetzt den dauerhaft gespeicherten Refresh-Token statt des Access-Tokens.** Die ursprüngliche Variante konnte nicht funktionieren: das Gateway reicht das Token an das Backend weiter, und ein schlüsselgebundenes Token übersteht diesen zweiten Schritt nicht — es hätte den Schutz genau dort verloren, wo er greifen soll. Für Nutzer ändert sich nichts (REQ-INGEST-012).
+
+- **Die Bearbeitungs-Anzeige auf der Missionsseite gilt jetzt über alle Serverinstanzen hinweg.** Der Hinweis „wird gerade bearbeitet von“ erschien bisher nur, wenn beide Bearbeiter zufällig von derselben Instanz bedient wurden; bei mehreren Instanzen fehlte er, obwohl die Änderungen selbst korrekt ankamen. Die Anzeige wird jetzt zwischen den Instanzen abgeglichen — fällt Redis aus, verhält sie sich wie bisher instanzlokal (ADR-0126, neuer Kanal `basetool:livesync:presence`, einstellbar über `APP_LIVESYNC_REDIS_PRESENCE_CHANNEL`).
+
+- **Betriebsmittel des Servers nach einer Messwoche neu zugeschnitten.** Die Datenbanken waren für einen Datenbestand ausgelegt, den es nicht gibt: 2 GB Speicherlimit und ein 512 MB großer Puffer für eine 108 MB kleine Datenbank. Beide Datenbank-Container und ihre Postgres-Einstellungen sind jetzt an den gemessenen Bedarf angepasst — das gibt 768 MB frei, ohne dass irgendwo weniger zur Verfügung steht als benötigt (ADR-0085, #937).
+
+- **Vier Dienste dürfen jetzt kurzzeitig mehr Rechenleistung ziehen.** Die Weboberfläche stand pro Woche rund 25 Minuten still, weil ihre Obergrenze kurze Lastspitzen abschnitt — bei einem Server, der im Mittel zu 3 % ausgelastet ist. Betroffen waren Weboberfläche, Ingest-Gateway, Sitzungsspeicher und der vorgelagerte Webserver; spürbar wird das als geringere Wartezeit beim Seitenaufbau (#937).
+
+- **Organisationsstruktur: Die Seite lädt nach dem Anlegen oder Umhängen einer Einheit nicht mehr komplett neu.** Nur der betroffene Abschnitt wird neu gezeichnet; eine halb ausgefüllte Anlegen-Maske bleibt erhalten und wird erst auf Klick aktualisiert.
+
+### Fixed
+
+- **Sicherheit: Ein noch nicht freigeschaltetes Konto konnte die API über einen kodierten Pfad erreichen.** Die Sperre für Konten, die auf die Freischaltung warten, verglich den rohen Adresspfad, die Weiterleitung dagegen den dekodierten — eine Anfrage auf `/%61pi/...` kam so an der Sperre vorbei und wurde trotzdem an den Endpunkt zugestellt. Beide vergleichen jetzt denselben dekodierten Pfad (REQ-SEC-017).
+
+- **Sicherheit: Mehrere Schutzfilter ließen sich durch einen kodierten Pfad umgehen.** Die Filter prüften den rohen Adresspfad, die Weiterleitung dagegen den dekodierten — eine Anfrage auf `/%761/...` statt `/v1/...` kam so an ihnen vorbei und landete trotzdem beim Endpunkt. Betroffen waren am Ingest-Gateway die Client-Prüfung, die Größenbegrenzung, die Ratenbegrenzung und das Zugriffsprotokoll, im Backend die Größenbegrenzung für JSON-Importe und die Cache-Vorgaben der API-Antworten. Alle prüfen jetzt denselben dekodierten Pfad (REQ-SEC-029, REQ-INGEST-011).
+
+- **Die API-Dokumentation schrieb sich bei jedem Build selbst um.** `openapi.json` enthielt drei interne Prüfregeln des Lager-Formulars und zwei der Bank als vermeintliche Eingabefelder; deren Reihenfolge war zufällig, wodurch jeder Build die Datei veränderte, ohne dass sich an der Schnittstelle etwas geändert hatte. Die Pseudo-Felder sind entfernt, die Datei ist jetzt reproduzierbar, und ein Test hält das so (REQ-API-007).
+
+- **Fehlalarm „ExternalFetchErrors“ für den UEX-Katalog behoben.** Zwei dauerhaft leere UEX-Kategorien (Jumpsuits, Consumable) wurden bei jedem Abgleich als Abruffehler gezählt, weil UEX ein leeres Ergebnis als `data: null` ausliefert — zusammen mit Backend-Neustarts löste dieser Dauerzähler den Alarm aus, ohne dass eine Störung vorlag. Gezählt wird jetzt nur noch, was UEX selbst als Fehler meldet (REQ-OBS-011).
+
+- **Ingest-Gateway: Blueprint-Versand aus dem Extractor schlug fehl.** Der Extractor schreibt je Export-Pfad eine andere Herkunftsangabe; die Freigabeliste kannte nur eine davon, wodurch jeder Blueprint-Versand mit „nicht freigegeben" abgewiesen wurde. Beide Schreibweisen sind jetzt dokumentiert, und der Vergleich ignoriert Groß-/Kleinschreibung.
+
+- **Ingest-Gateway: Eine Ablehnung nennt jetzt die Ursache.** Alle vier Prüfungen antworteten mit demselben Satz, sodass aus der Meldung nicht hervorging, welche gegriffen hat. Zusätzlich wird jede abgelehnte Anmeldung nach Fehlerart gezählt — ein 401 war bisher im Betrieb nicht auswertbar.
+
+- **Die Formatierungsprüfung des Frontends schlug auf Windows-Arbeitsplätzen grundlos fehl.** Für TypeScript-Deklarationsdateien fehlte die Zeilenenden-Regel, sodass ein frischer Checkout unter Windows drei Dateien mit CRLF anlegte und Prettier sie beanstandete, obwohl niemand sie angefasst hatte — auf dem Linux-Server blieb der Fehler unsichtbar. `.gitattributes` deckt jetzt auch `*.ts` ab; die Dateiinhalte bleiben unverändert (ADR-0125).
+
+- **Auf jeder Einsatz-Detailseite stand dauerhaft eine rote Fehlermeldung.** Der Hinweis „Der Abschnitt konnte nicht aktualisiert werden" ist nur für eine fehlgeschlagene Teil-Aktualisierung gedacht, wurde aber unter den Reitern bei jedem normalen Seitenaufruf angezeigt — obwohl nichts fehlgeschlagen war. Er erscheint jetzt nur noch im Fehlerfall (REQ-FE-005).
+
+## [v1.5.30](https://github.com/krt-profit/basetool/releases/tag/v1.5.30) - 2026-08-03
+
+### Added
+
+- **Ingest-Gateway: Die Schnittstelle ist jetzt auf freigegebene Clients beschränkt.** Bisher wurde jedes gültige Token aus dem Realm akzeptiert — auch eines der Weboberfläche. Das Gateway prüft jetzt Client-Kennung, Berechtigungsumfang und die Herkunftsangabe der Nutzdaten gegen eine Freigabeliste und antwortet sonst mit `403 CLIENT_NOT_ALLOWED`. Wer den Extraktor nutzen darf, ändert sich nicht: jedes Mitglied darf Blueprints und Raffinerie-Aufträge hochladen (REQ-INGEST-011, ADR-0018).
+
+- **Ingest-Gateway: Unterstützung für schlüsselgebundene Token (DPoP, RFC 9449).** Ein abgeflossenes Token ist damit ohne den zugehörigen privaten Schlüssel wertlos — relevant, weil der Extraktor sein Token dauerhaft auf dem Rechner speichert. Vorerst im Parallelbetrieb: einfache Bearer-Token funktionieren unverändert weiter, bis der Extraktor nachzieht (REQ-INGEST-012).
+
+- **Neue Betriebskennzahlen für das Ingest-Gateway.** Gezählt werden jetzt die aufrufende Client-Software und jede Abweisung der Freigabeprüfung samt Grund. Der neue Alarm `IngestUnknownClient` unterscheidet dabei „ein fremdes Werkzeug ruft an" von „eine Keycloak-Zuordnung ist kaputt und sperrt den echten Extraktor aus".
+
+### Changed
+
+- **Ingest-Gateway: Zwei vom Client gelieferte Kopfzeilen wurden ungeprüft an das Backend weitergereicht.** `X-Correlation-Id` und `Accept-Language` wurden roh auf den internen Aufruf kopiert, obwohl das Gateway als einziger Dienst aus dem Internet erreichbar ist. Beide werden jetzt geprüft; die Korrelations-Kennung stammt aus der bereits validierten Quelle. Das behebt zugleich, dass ein Vorgang in Gateway- und Backend-Log unter verschiedenen Kennungen auftauchen konnte (REQ-OBS-002).
+
+- **Raffinerie-Import: Quellbilder und Materialzeilen sind jetzt Pflicht.** Ein Auftrag ohne Zeilen enthält nichts zu importieren, und eine echte Auswertung entsteht immer aus mindestens einem Screenshot. Gateway und Backend prüfen identisch, sodass der Datei-Upload im Browser dieselbe Regel anwendet; vom Extraktor erzeugte Dateien sind nicht betroffen (ADR-0008).
+
+- **Ingest-Gateway: Der Blueprint-Pfad protokolliert jetzt die Herkunft der Nutzdaten.** Bisher stand dort nur die Größe in Bytes, sodass ein strukturell auffälliger Export von einem normalen nicht zu unterscheiden war.
+
+## [v1.5.29](https://github.com/krt-profit/basetool/releases/tag/v1.5.29) - 2026-08-02
+
+### Added
+
+- **Ingest-Gateway: Der API-Vertrag der beiden Ingest-Endpunkte ist jetzt als OpenAPI-Dokument veröffentlicht.** `ingest/src/main/resources/api/openapi.json` beschreibt Schemata, Statuscodes und die Bearer-Authentifizierung, gegen die der Desktop-Extraktor entwickelt wird — bisher gab es dafür nur den Quelltext. Wie beim Backend wird das Dokument aus dem Test erzeugt und ist in der Produktion nicht abrufbar (REQ-INGEST-010, REQ-API-007).
+
+- **Fehler im Browser werden jetzt serverseitig erfasst.** Brach nach einer Teil-Aktualisierung ein Skript ab, sah der Nutzer nur ein totes Bedienfeld und im Server-Log stand nichts davon. Der Browser meldet solche Fehler jetzt an `POST /internal/client-error` (nur angemeldet, auf fünf Meldungen je Sitzung gedeckelt); übertragen werden ausschließlich Meldung, Quelle, Zeile, Spalte und Fehlerart — kein Stacktrace, keine Seiteninhalte, keine Formulareingaben.
+
+- **Die Protokolle der Wartungsjobs und der Keycloak-Konsole sind jetzt in der Log-Auswertung lesbar.** Ausrollen, Sicherung, Aufräumen und Wiederherstellungsprobe schrieben ihre Ausgabe nur in Dateien auf dem Server — nach einer nächtlichen Alarmmail führte der einzige Weg zur Ursache über SSH. Jede betroffene Alarmmeldung nennt jetzt die passende Abfrage, und ein Wächter meldet, wenn einer der zehn überwachten Log-Kanäle verstummt.
+
+- **Änderungen an Rollenberechtigungen stehen jetzt im Aktivitätsprotokoll.** Es war die letzte Mutation im Bereich „Rollen“, die keine Spur hinterließ. Der Eintrag nennt die hinzugefügten und entfernten Berechtigungen und ist im Protokoll-Reiter filterbar; ein unbekannter Wert wird dabei nur gezählt, nie benannt (REQ-AUDIT-001).
+
+- **Lager: Die Filterleiste in „Mein Lager“ lässt sich jetzt einklappen.** Die Filterzeile lief über mehrere Zeilen und drängte die Tabelle nach unten; sie sitzt jetzt in einem einklappbaren Bereich, und die Wahl bleibt je Browser erhalten. Damit ein zugeklappter Bereich keinen aktiven Filter verbergen kann, zeigt der Schalter deren Anzahl (REQ-INV-037).
+
+### Changed
+
+- **Protokollierung: Eine abgewiesene Anfrage ist jetzt zuordenbar, Routine-Rauschen verschwindet.** Abweisungen wegen fehlender Freigabe nannten den Betroffenen nicht, Zeilen des Frontends trugen die Organisationseinheit nicht, und jeder Tastendruck in einem Suchfeld erzeugte bei einer Störung eine Warnung. Warnungen sind jetzt wieder Warnungen, Routinefälle liegen auf DEBUG, Client-IPs verschwinden aus dem Log, und ein Speicherkonflikt nennt die betroffene Zeile samt beider Versionsstände.
+
+- **Eingaben aus Such- und Formularfeldern können keine Log-Zeilen mehr fälschen.** Ein eingefügter Zeilenumbruch mit gefälschtem Fehler-Präfix las sich bei der Auswertung wie eine echte Meldung. Solche Werte werden jetzt in allen drei Diensten bereinigt und gekürzt, bevor sie ins Log gelangen.
+
+- **Ein stillgelegter Log-Kanal fällt jetzt auf, und ein Neustart schneidet das Log-Ende nicht mehr ab.** Konnte ein Ausgabekanal seine Datei nicht öffnen, schrieb er stillschweigend ins Nichts, während die Fehlerzählung unauffällig blieb. Solche Störungen melden sich jetzt selbst; beim Herunterfahren bleiben fünf statt einer Sekunde, um den Puffer zu leeren (REQ-OBS-017).
+
+- **Benutzerabgleich meldet jetzt, was er getan hat.** Wie viele Konten neu als ausgeschieden markiert und wie viele Rollen mangels Entsprechung auf „Gast“ zurückgefallen sind, stand nirgends. Beides wird jetzt je Lauf zusammengefasst; auffällig viele Fälle erzeugen eine Warnung.
+
+- **Zusätzliche Betriebskennzahlen.** Gezählt werden jetzt verdrängte Sitzungen an der Zehn-Sitzungen-Grenze, abgebrochene Benachrichtigungskanäle samt Ursache, verweigerte Live-Abonnements samt Grund und die gemeldeten Browser-Fehler. Drei neue Alarme werten sie aus: auffällig viele Browser-Fehler, dauerhaft verdrängte Sitzungen und ein SC-Wiki-Abgleich, der an drei Tagen in Folge unvollständig blieb.
+
+- **Log-Level lassen sich jetzt im laufenden Betrieb umstellen.** Bisher kostete jede DEBUG-Diagnose eine Konfigurationsänderung samt Neustart — ausgerechnet die aussagekräftigsten Zeilen liegen aber bewusst auf DEBUG. Im Backend dürfen das nur Administratoren; Frontend und Ingest-Gateway geben ihre Stufen in der Produktion nur noch aus, weil ihr Wartungszugang keine Anmeldung kennt, und ein Neustart verwirft jede Änderung (REQ-OBS-016, ADR-0090).
+
+- **Geplante Aufgaben sind im Log als ein Lauf erkennbar.** Die acht nächtlichen Jobs schrieben ohne Kennung; bei überlappenden Zeitplänen ließen sich ihre Zeilen nicht mehr auseinanderhalten. Jeder Lauf bekommt jetzt eine eigene Kennung aus Job-Name und Zufallssuffix.
+
+- **Anmeldung über Discord: Eine Ablehnung nennt jetzt ihren Grund.** Zeitüberschreitung, DNS-Problem, Discord-Drosselung, Ausfall auf Discord-Seite oder unlesbare Antwort endeten alle in derselben nichtssagenden Meldung. Auch der stillschweigend übersprungene Dublettencheck beim Anlegen eines Kontos wird jetzt protokolliert.
+
+- **Ingest-Gateway: Jede Ablehnung ist jetzt im Log nachvollziehbar.** Bisher blieben eine Drosselung, ein abgelehntes Extrakt und ein abgelaufenes Token ohne jede Spur — im Log stand nur der Statuscode. Protokolliert werden jetzt der ausgelöste Limiter, die verletzte Feldregel, beide Größen beim Größen-Limit und die Form des Extrakts; Nutzdaten, Namen, Token und Client-IPs bleiben außen vor.
+
+- **Ingest-Gateway: 401 und 403 liefern jetzt eine auswertbare Fehlermeldung.** Beide antworteten bisher mit leerem Rumpf; der Extraktor konnte "Token erneuern" nicht von "nicht berechtigt" unterscheiden. Sie tragen jetzt dieselbe Fehlerstruktur wie alle übrigen Antworten des Gateways (REQ-API-004).
+
+- **Ingest-Gateway: Ist die Zwischenablage nicht erreichbar, kommt eine Wiederholen-Antwort statt eines Serverfehlers.** Fiel Redis aus, meldete das Gateway einen 500er und schrieb einen Fehler-Stacktrace ins Log, obwohl die Übergabe ans Backend bereits geglückt war. Jetzt gibt es einen 503 mit Wartezeit, eine Warnung statt eines Fehlers und einen eigenen Alarm, der auf Redis zeigt statt aufs Backend (REQ-INGEST-003).
+
+- **Ingest-Gateway: Protokollierung auf dem Stand von Backend und Frontend.** Jede Zeile trägt jetzt zusätzlich den Nutzer (Keycloak-`sub`, nie Name oder E-Mail), langsame Anfragen werden wie in den anderen Modulen als Warnung protokolliert, und jede Weiterleitung ans Backend hinterlässt eine Zeile mit Dauer. Neu einstellbar über `APP_LOGGING_*` (REQ-OBS-001/-002/-003).
+
+- **Die Browser-Skripte werden jetzt statisch typgeprüft.** Der TypeScript-Compiler läuft als reiner Prüfer (`tsc --noEmit`) über die Skripte unter `static/js` und hängt als `:frontend:typecheckJs` streng im `check`-Gate. Der Quellcode bleibt JavaScript — es wird nichts kompiliert, gebundelt oder umbenannt; Dateien nehmen einzeln per `// @ts-check` teil (derzeit 27 von 87, darunter das gesamte gemeinsame Fundament). Die Backend-DTO-Typen werden bei jedem Build aus `openapi.json` erzeugt, statt im Frontend von Hand nachgebaut zu werden, womit eine Feldumbenennung im Backend beim Bauen auffällt statt erst zur Laufzeit (REQ-FE-018, ADR-0125).
+
+### Fixed
+
+- **Katalogabgleich: Ein unvollständiger Abruf löscht keine Einträge mehr.** Brach der Seitendurchlauf des SC-Wiki mittendrin ab oder fehlte die Seitenangabe, wertete der Abgleich den Rest des Katalogs als gelöscht und markierte ihn entsprechend. Ein unvollständiger Lauf übernimmt jetzt seine Zeilen, verzichtet aber auf das Aufräumen und meldet den Grund. Beim UEX-Abgleich bleibt zudem eine leere oder fehlerhafte Antwort nicht mehr unbemerkt, und ein unveränderter Katalog ist als solcher erkennbar statt als Nulllauf.
+
+- **Live-Aktualisierung: Eine verweigerte Anmeldung an einem Raum bleibt nicht mehr unbemerkt.** Lehnte der Server das Abonnement ab, wirkte die Seite weiterhin aktuell, obwohl sie keine Peer-Änderungen mehr erhielt. Sie zeigt jetzt den Hinweis „Aktualisierungen verfügbar“, und war die Ablehnung nur eine vorübergehende Störung, versucht sie es genau einmal erneut.
+
+- **Sicherheit: Netty auf 4.2.16.Final angehoben (u. a. CVE-2026-56820, CVE-2026-56819, CVE-2026-55833).** Die von Spring Boot vorgegebene Version 4.2.15.Final war über eine fehlende Zertifikatsprüfung im OCSP-Client (Umgehung der Sperrprüfung durch Replay), ein Speicherleck im HTTP/2-Codec sowie eine SPDY-Header-Dekodierung mit CPU-erschöpfendem Denial-of-Service angreifbar; die gepatchte Version wird jetzt erzwungen. Betroffen sind reale Laufzeitpfade (WebClient im Frontend, Redis-Anbindung über Lettuce). Die parallel gemeldete gleiche CVE-Reihe auf der Netty-4.1.x-Linie betrifft ausschließlich eine Nur-Kompilierzeit-Abhängigkeit des Keycloak-SPI-Moduls (vom Keycloak-Container zur Laufzeit bereitgestellt) und wurde begründet unterdrückt.
+
+- **Monitoring: blackbox-Exporter-Speicherlimit auf 64 MB angehoben (`GOMEMLIMIT` 44 MiB).** Der Probe-Exporter lief seit dem 31.07. dauerhaft auf 97-100 % seines 32-MB-Limits und löste den `ContainerWorkingSetHigh`-Alarm aus, obwohl er nur 9,8 MiB Heap belegt. Ohne `GOMEMLIMIT` kannte die Go-Laufzeit das Container-Limit nicht und behielt den bei jeder Lastspitze angeforderten Speicher dauerhaft; das Limit selbst war seit dem Aufbau des Stacks unverändert, während die Zahl der Probe-Ziele auf 23 gewachsen ist. Greift beim nächsten Deploy.
+
+- **Monitoring: Alle Go-Dienste des Überwachungs-Stacks haben jetzt vorsorglich eine Speicher-Obergrenze (`GOMEMLIMIT`).** Bisher hatten nur Prometheus und Alloy eine; ohne sie kennt die Go-Laufzeit das Container-Limit nicht und kann angeforderten Speicher dauerhaft behalten. Grafana, Loki, Tempo, cAdvisor, Alertmanager, node-exporter, beide Postgres-Exporter und der Redis-Exporter sind jetzt auf 75 % ihres Limits begrenzt — ohne zusätzlichen Speicherbedarf. Greift beim nächsten Deploy.
+
+- **Monitoring: Der Speicheralarm bewertete rund die Hälfte der Meldungen falsch.** `ContainerWorkingSetHigh` misst auch die eingeblendete Programmdatei eines Dienstes mit — die ist aber jederzeit verdrängbar und kann keinen Speichermangel auslösen. Eine Nachmessung aller Container zeigte: bei Alertmanager, Alloy, node-exporter und den Exportern bestand bis zur Hälfte des gemeldeten Werts daraus; tatsächlich knapp war einzig der blackbox-Exporter. Alloys Anstieg vom 31.07. war kein Speicherleck, sondern eine Umbuchung nach dem Image-Wechsel auf Version 1.18.0. Der Alarm wertet jetzt nur noch den nicht verdrängbaren Anteil aus und heißt `ContainerMemoryHigh` (vorher `ContainerWorkingSetHigh`); Messanleitung, ADR-0085 und die Spec halten die Herleitung fest.
+
+## [v1.5.28](https://github.com/krt-profit/basetool/releases/tag/v1.5.28) - 2026-08-02
+
+### Added
+
+- **Lager: Markierte Einträge lassen sich jetzt auch gesammelt umbuchen.** Neben "Markierte ausbuchen" steht in "Mein Lager" ein "Markierte umbuchen" — dieselbe Auswahl wird verschoben statt ausgebucht: an einen anderen Ort bzw. Nutzer oder als persönlich bzw. ins gemeinsame Lager. Jeder markierte Eintrag wandert vollständig und nimmt seine Auftrags- und Einsatz-Marken mit. Einträge, die bereits am Ziel liegen, werden übersprungen und mitgezählt; die Meldung nennt beide Zahlen (REQ-INV-036, ADR-0124).
+
+### Changed
+
+- **Lager: Beim Um- und Ausbuchen entfällt die Herkunft-Eingabe, wenn es nichts zu entscheiden gibt.** Ist ein Eintrag genau einem Einsatz bzw. genau einem Auftrag zugeordnet und bleibt kein freier Rest, kann die Menge nur von dieser einen Marke kommen — das Feld wird jetzt mit der um- bzw. ausgebuchten Menge vorbefüllt, gesperrt und als automatisch gefüllt gekennzeichnet, statt das Absenden zu blockieren, bis der Wert von Hand nachgetragen wird. Es folgt jeder späteren Änderung der Menge. Gibt es mehrere Marken oder einen Rest, bleibt die Aufteilung wie bisher freie Wahl (REQ-INV-027).
+
+### Fixed
+
+- **Kompakte Schaltflächen in dichten Tabellen sind jetzt tatsächlich kompakt.** Die Varianten für Zeilen-Aktionen waren seit ihrer Einführung wirkungslos: eine später deklarierte Regel überschrieb sie, sodass jede "dichte" Schaltfläche in voller Größe erschien. Aktionsspalten in Lager, Kartellbank, Materialbörse, Einsätzen und Operationen werden dadurch spürbar schmaler — alle übrigen Schaltflächen behalten unverändert ihre 44px-Zielgröße (REQ-UI-009).
+
+- **Lager: Der Mengen-Dialog einer Auftrags- oder Einsatz-Zuordnung ist wieder bedienbar.** Beim Anklicken eines Zuordnungs-Chips schrumpfte das Mengenfeld auf wenige Pixel, und "Entfernen" ragte rechts aus dem Kästchen heraus. Das Mengenfeld nimmt jetzt eine eigene Zeile über voller Breite ein, die Schaltflächen teilen sich die darunter (REQ-UI-011).
+
+## [v1.5.27](https://github.com/krt-profit/basetool/releases/tag/v1.5.27) - 2026-07-31
+
+### Fixed
+
+- **Raffinerie: Ein ausgeblendeter Standort wird nicht mehr als Raffinerie angeboten.** Blendete ein Administrator einen Standort mit Raffinerie aus, verschwand er zwar aus dem Lagerort-Feld, blieb im selben Formular aber als Raffinerie wählbar — der Auftrag ließ sich anlegen, der Ertrag danach aber nirgends einbuchen. Bestehende Aufträge behalten ihren Standort und lassen sich weiterhin speichern (REQ-REFINERY-020).
+
+- **Release-Pipeline: Ein einzelner Runner ohne Verbindung zu Docker Hub bricht den Image-Bau nicht mehr ab.** Wiederholversuche allein halfen nicht, wenn die Verbindung über das gesamte Zeitfenster gestört blieb — genau daran scheiterte der Backend-Build von v1.5.26, während ein 22 Sekunden früher gestarteter Lauf alle Jobs bestand. Das BuildKit-Image wird jetzt ersatzweise über einen Spiegel-Server auf einem anderen Netzweg geladen. Ohne den Fehlversuch fehlten der Version alle Versionskennzeichen und Signaturen, sodass sie nicht auf den Server ausgerollt werden konnte.
+
+- **Release-Pipeline: Ein fehlgeschlagener Image-Bau meldet nicht mehr zusätzlich einen irreführenden zweiten Fehler.** Der Upload des Sicherheits-Scans lief auch dann noch an, wenn der Build gar nicht erst zustande kam, und beschwerte sich über die fehlende Ergebnisdatei — was die eigentliche Ursache überdeckte.
+
+- **Lager: Beim Einlagern stehen wieder alle Orte zur Auswahl.** Die Ort-Auswahl lud nur die ersten 25 Orte und zeigte keinen Hinweis, dass die Liste abgeschnitten war — 28 der 53 sichtbaren Orte waren dadurch nicht wählbar, darunter MIC-L5, Patch City, New Babbage und Orison. Der Ortskatalog wird jetzt vollständig geladen (REQ-FE-016).
+
+- **Such-Auswahlfelder melden jetzt, wenn es mehr Treffer gibt.** Material-, Item- und Kontoauswahl luden genau so viele Zeilen, wie sie anzeigen können, wodurch der Hinweis „Weiter tippen, um die Liste einzugrenzen" technisch nie erscheinen konnte. Ab dem 51. Treffer wird er wieder angezeigt (REQ-FE-016).
+
+## [v1.5.26](https://github.com/krt-profit/basetool/releases/tag/v1.5.26) - 2026-07-31
+
+### Changed
+
+- **Benutzerverwaltung: Beim Löschen eines Nutzers werden seine Daten jetzt wirklich gelöscht.** Lager, Hangar, "Mein Inventar", Baupläne, Benachrichtigungen und Bewertungen des Kontos werden entfernt statt auf einen Administrator umgebucht oder stillschweigend liegen gelassen; die Verknüpfungen der Lagereinträge zu Aufträgen und Einsätzen gehen mit. Einsätze, Operationen, Auftragshistorie und die Kartellbank bleiben erhalten — dort erscheint der Betroffene als "Gelöschter Nutzer" statt als leeres Feld. Raffinerieaufträge und von ihm angelegte Einsätze gehen weiterhin an einen Administrator über. Der Bestätigungsdialog beschreibt das jetzt zutreffend; bisher versprach er, alle Daten würden übertragen (REQ-DATA-008, REQ-AUDIT-001).
+
+- **Bereits verwaiste Daten früherer Löschungen werden einmalig entfernt.** Baupläne, "Mein Inventar", Benachrichtigungen, Benachrichtigungsregel-Ziele und Bewertungen ohne zugehöriges Konto verschwinden mit der Migration. Ein solches Regel-Ziel legte bis dahin bei jedem passenden Ereignis eine neue Benachrichtigung für ein nicht mehr existierendes Konto an.
+
+### Fixed
+
+- **Operationen: Eine bereits abgerechnete Operation ändert sich nicht mehr rückwirkend, wenn ein Mitglied gelöscht wird.** Der Gelöschte fiel aus der Aufteilung, seine Anwesenheit zählte nicht mehr zur Gesamtdauer, und von ihm verauslagte Ausgaben wurden auf die übrigen Teilnehmer umverteilt — bei Operationen, deren Auszahlung längst feststand. Er bleibt jetzt mit seinem Anteil in der Aufstellung (REQ-DATA-008).
+
+- **Benutzerverwaltung: Ein noch aktives Mitglied kann nicht mehr versehentlich gelöscht werden.** Ob ein Konto wirklich weg ist, wurde bisher nur am zuletzt gespeicherten Stand abgelesen — ein verschluckter Abgleichfehler genügte, um ein aktives Mitglied löschbar zu machen. Das wird jetzt direkt bei Keycloak nachgeprüft; ist Keycloak nicht erreichbar, wird das Löschen abgelehnt statt auf Verdacht ausgeführt (REQ-DATA-008).
+
+- **Einsätze: Ein gelöschtes Mitglied wird nicht mehr als "Gast" ausgewiesen.** Die Zeile blieb namenlos und trug fälschlich das Gast-Kennzeichen, wodurch jeder Betrachter sie bearbeiten und löschen konnte. Sie zeigt jetzt "Gelöschter Nutzer" und ist nur noch für Einsatzberechtigte änderbar.
+
+- **Benutzerverwaltung: Das Löschen eines Nutzers bricht nicht mehr mit einem Serverfehler ab.** Gehörte der Nutzer noch einer Staffel, einem Spezialkommando oder einem Bereich an — also praktisch immer —, endete das Löschen mit HTTP 500. Die Mitgliedschaftszeilen werden von der Datenbank mitgelöscht, hingen im selben Vorgang aber noch geladen im Speicher und zeigten dort auf den bereits entfernten Nutzer. Die Bank-Auswertung, die sie geladen hat, liest jetzt nur noch die IDs der betroffenen Einheiten (REQ-DATA-008, REQ-BANK-034).
+
+## [v1.5.25](https://github.com/krt-profit/basetool/releases/tag/v1.5.25) - 2026-07-30
+
+### Changed
+
+- **Kartellbank: Der Kontoverantwortliche unterliegt auf seinem eigenen Konto keinem Freigabe-Limit mehr.** Staffelleiter, SK-Leiter und Bereichsleiter mussten ihre eigenen Auszahlungs- und Überweisungsanträge selbst freigeben, weil die Limit-Prüfung nicht danach fragte, wer den Antrag stellt — bei Konten ohne hinterlegtes Limit traf das jeden Antrag. Solche Anträge tragen jetzt kein „Über Limit" mehr und brauchen keine zusätzliche Freigabe. Am KRT-Konto gilt das ebenso für die Organisationsleitung; für alle anderen Antragsteller bleibt die Betragsstaffel unverändert. Bestätigt und gebucht wird ein Antrag weiterhin durch die Bank (REQ-BANK-041, REQ-BANK-047, ADR-0123).
+
+## [v1.5.24](https://github.com/krt-profit/basetool/releases/tag/v1.5.24) - 2026-07-29
+
+## [v1.5.23](https://github.com/krt-profit/basetool/releases/tag/v1.5.23) - 2026-07-29
+
+### Fixed
+
+- **CI: Der Build schlägt nicht mehr sporadisch mit einem abgeschnittenen OpenAPI-Dokument fehl.** Der Backend-Test, der `openapi.json` erzeugt, schrieb die 1,8-MB-Datei direkt an Ort und Stelle, während parallel laufende Frontend-Tests sie lesen — wer ins Schreibfenster geriet, scheiterte an unvollständigem JSON. Die Datei wird jetzt fertig geschrieben und erst dann an ihren Platz verschoben (REQ-API-007).
+
+- **Discord-Registrierung: Nach der Freigabe geht es sofort weiter — ohne zweimaliges Ab- und Anmelden.** Die laufende Sitzung merkte sich das „noch nicht freigegeben" für ihre gesamte Laufzeit von 30 Tagen, sodass ein freigeschalteter Zugang weiter auf der Warteseite landete; die anschließend vergebenen Rollen und Einheiten waren aus demselben Grund erst nach einer weiteren Anmeldung sichtbar. Beides wird jetzt laufend aufgefrischt, und die Warteseite leitet nach der Freigabe von selbst ins Tool weiter (REQ-SEC-013, REQ-SEC-017, ADR-0122).
+
+- **Entzogene Rollen und Rechte verschwinden jetzt auch aus einer laufenden Sitzung.** Der Abgleich mit dem Backend hat Rechte bisher nur hinzugefügt, nie entfernt — wer eine Rolle verlor, sah die zugehörigen Schaltflächen bis zum nächsten Anmelden weiter, bekam beim Klick aber eine Fehlermeldung. Entzogene Rollen und Rechte fallen jetzt innerhalb von ein bis wenigen Minuten aus der Oberfläche (REQ-SEC-013, ADR-0122).
+
+- **Monitoring: Postgres-Fehlerzeilen lassen jetzt erkennen, welcher Client sie ausgelöst hat.** Mit dem Standardpräfix war eine abgewiesene Abfrage nicht zuordenbar — Anwendung, Exporter und eine manuelle `psql`-Sitzung sahen identisch aus, weil alle dieselbe Datenbankrolle verwenden. Beide Datenbanken schreiben jetzt Benutzer, Datenbank und `application_name` in jede Logzeile; Zeileninhalte werden weiterhin nicht geloggt (REQ-OBS-007).
+
+## [v1.5.22](https://github.com/krt-profit/basetool/releases/tag/v1.5.22) - 2026-07-29
+
+## [v1.5.21](https://github.com/krt-profit/basetool/releases/tag/v1.5.21) - 2026-07-29
+
+### Fixed
+
+- **Aufträge: Beim Bearbeiten eines Item-Auftrags gehen die bereits erfassten Herstellungen nicht mehr verloren.** Jedes Speichern löschte bisher alle Item-Zeilen und legte sie neu an, wodurch die Spalte „Hergestellt" jeder Zeile still auf 0 zurückfiel. Zeilen werden jetzt anhand ihrer ID an Ort und Stelle aktualisiert. Ist auf einer Zeile schon etwas hergestellt, lässt sie sich nicht mehr entfernen, das Item nicht mehr wechseln und die Anzahl nicht unter die hergestellte Menge senken; der Bauplan bleibt änderbar (REQ-ORDERS-032, ADR-0121).
+
+- **Aufträge: Item-Zeilen mit veraltetem Bauplan werden jetzt erkannt und markiert.** Ändert der SC-Wiki-Abgleich, welches Item ein Bauplan herstellt, blieb die Auftragszeile am alten Bauplan hängen und zeigte still die Materialien eines fremden Rezepts an — betroffen waren zwei Zeilen (u. a. „Cryo-Star SL" mit dem HeatSink-Rezept). Solche Zeilen tragen in der Auftragsdetailansicht jetzt den Hinweis „Rezept veraltet"; ein stündlicher Prüflauf meldet sie zusätzlich ans Monitoring. Einmal Bearbeiten und Speichern leitet die Zeile korrekt neu ab (REQ-ORDERS-033, ADR-0121).
+
+- **Raffinerie: Die Standortauswahl kann nicht mehr für einen ganzen Tag leer bleiben.** Seit der Umstellung auf die Terminal-basierte Ableitung wird die Liste aus Daten gebildet, die erst der UEX-Abgleich füllt. Schlug einer der Abgleichschritte davor fehl, wurden die Terminals gar nicht erst geholt — die Auswahl blieb leer und es ließ sich kein Raffinerieauftrag anlegen, bis der nächste Lauf 24 Stunden später griff. Die Terminals werden jetzt zuerst abgeglichen, und die Ableitung läuft auch dann, wenn ein späterer Schritt abbricht (REQ-REFINERY-020).
+
+## [v1.5.20](https://github.com/krt-profit/basetool/releases/tag/v1.5.20) - 2026-07-28
+
+### Fixed
+
+- **Raffinerie: MIC-L5, ARC-L4 und Patch City stehen jetzt als Raffinerie zur Auswahl.** Die Auswahlliste richtete sich nach dem Stations-/Stadt-Kennzeichen von UEX, das diesen drei Standorten keine Raffinerie zuschreibt, obwohl UEX dort jeweils ein Raffinerie-Terminal führt. Maßgeblich ist jetzt das Terminal selbst. Umgekehrt entfallen die vier „People's Service Station"-Stationen (Alpha, Delta, Lambda, Theta), die als Raffinerie angeboten wurden, ohne eine zu besitzen. Die Liste wird beim nächsten UEX-Abgleich aktualisiert (REQ-REFINERY-020). Die Regel erkannte auch die Einträge, mit denen auditd beim Neustart seine eigenen Regeln neu lädt — das nächtliche `libc6`-Update startet auditd neu und löste damit einen Fehlalarm aus, obwohl keine SSH-Datei angefasst wurde. Sie wertet jetzt nur noch echte Dateizugriffe (`type=SYSCALL`) aus (REQ-OBS-010).
+
+- **Monitoring: `FrontendLoginBroken` schlägt nicht mehr wegen Scanner-Verkehr in der Nacht an.** Besteht keine Keycloak-SSO-Sitzung, antwortet Keycloak auf die stille SSO-Erneuerung (`prompt=none`) mit `login_required` — der Normalfall bei jedem nicht angemeldeten Seitenaufruf, bisher aber als echter Anbieterfehler gezählt. Diese Antworten zählen jetzt als harmlos, sodass nur noch tatsächliche Fehler beim Token-Tausch alarmieren (REQ-OBS-011).
+
+## [v1.5.19](https://github.com/krt-profit/basetool/releases/tag/v1.5.19) - 2026-07-26
+
+### Fixed
+
+- **Monitoring: Grafana läuft nicht mehr nach wenigen Stunden in einen Zustand, in dem es keine Prozesse mehr starten kann.** Der HTTPS-Healthcheck erzeugte pro Prüfung einen unaufgeräumten `ssl_client`-Zombieprozess; nach rund vier Stunden war das Prozesslimit des Containers erschöpft (zuletzt 493 Zombies), der Container galt zwei Tage als „unhealthy". Alle Monitoring-Container starten jetzt wie die App-Container mit einem aufräumenden Init-Prozess, sodass auch eine künftige Umstellung auf HTTPS den Fehler nicht erneut auslösen kann (REQ-OPS-019).
+
+- **CI: Ein neuer Prüfschritt blockiert genau diesen Fehler künftig vor dem Merge.** Er prüft für jeden Container-Dienst, ob ein Healthcheck Prozesse abspaltet, ohne dass ein aufräumender Init-Prozess läuft — inklusive der Healthchecks, die aus den Images stammen. Ein Selbsttest stellt sicher, dass die Prüfung nicht unbemerkt wirkungslos wird (REQ-OPS-019).
+
+- **Monitoring: `ContainerPidsHigh` überwacht jetzt alle Container gegen ihr jeweils eigenes Prozesslimit.** Die Regel prüfte nur die vier JVM-Container gegen einen fest verdrahteten Schwellwert, der für Container mit kleinerem Limit unerreichbar war — die Grafana-Erschöpfung blieb deshalb vollständig unbemerkt und ohne Alarmmail (REQ-OBS-014).
+
+- **Monitoring: `SsePushChannelDead` alarmiert nicht mehr jede Nacht, in der niemand das Tool nutzt.** Die Bedingung „Nutzer sind online" stützte sich auf die Zahl der Sitzungen in Redis, die 30 Tage gültig bleiben und deshalb dauerhaft bei ~365 liegt — der Alert prüfte faktisch nur noch „keine SSE-Verbindung seit 30 Minuten" und meldete deshalb jede Nacht einen toten Benachrichtigungskanal. Er wertet jetzt echten Seitenverkehr aus (ohne Health-Probes, 404-Scanner und `/actuator*`) und schlägt nur noch an, wenn tatsächlich jemand die Anwendung benutzt (REQ-OBS-011).
+
+## [v1.5.18](https://github.com/krt-profit/basetool/releases/tag/v1.5.18) - 2026-07-25
+
+### Fixed
+
+- **Release-Pipeline: Ein Aussetzer von Docker Hub bricht den Image-Bau nicht mehr ab.** Das BuildKit-Image wird vor dem Start des Builders mit Wiederholversuchen geladen, und die rein manifestbezogenen Jobs (Zusammenführen, Promotion) starten gar keinen Builder mehr — sie brauchten nie einen. Zuvor scheiterte der `keycloak-spi`-Job von v1.5.17 an einer Zeitüberschreitung beim anonymen Docker-Hub-Abruf, nachdem sein Build bereits erfolgreich war.
+
+## [v1.5.17](https://github.com/krt-profit/basetool/releases/tag/v1.5.17) - 2026-07-25
+
+### Added
+
+- **Lager einbuchen: Bei genau einem zugeordneten Einsatz bzw. Auftrag muss die Menge nicht mehr eingetippt werden.** Bleibt das Mengenfeld der einzigen Zuordnung leer, wird die gesamte Menge des Eintrags dieser Zuordnung zugewiesen — pro Dimension unabhängig. Erst ab zwei Zuordnungen sind die Mengen wieder explizit anzugeben; eine eingetragene Menge hat immer Vorrang (REQ-INV-027).
+
+- **Raffinerie: Im Einlager-Dialog lässt sich jede Ausgabezeile direkt als persönlicher Eintrag einlagern.** Bisher landete Raffinerie-Ausbeute immer im geteilten Staffelbestand und musste anschließend über „Mein Lager" umgebucht werden. Persönliche Zeilen tragen keine Zuordnung: Die Kombination mit einem Auftrag wird abgelehnt (der Auftrags-Selektor wird bei gesetztem Haken gesperrt), und die Mission des Raffinerieauftrags wird für diese Zeile nicht vermerkt (REQ-INV-035).
+
+## [v1.5.16](https://github.com/krt-profit/basetool/releases/tag/v1.5.16) - 2026-07-25
+
+### Changed
+
+- **Bank-Anträge: Die letzte Spalte heißt jetzt „Entscheidung" statt „Aktionen", und der Über-Limit-Marker heißt „Über Limit" statt „Freigabe nötig".** Die Spalte zeigt nur bei offenen Anträgen Buttons, sonst die Person, die entschieden hat; der Marker wirkte auf bereits bestätigten Anträgen wie eine noch offene Aufgabe und ist dort jetzt zusätzlich grau statt gelb (REQ-BANK-041).
+
+- **Monitoring: Der `JobOrderStale`-Alert schlägt jetzt erst nach 180 Tagen an (vorher 30).** Lang laufende Aufträge sind bei der aktuellen Org-Kadenz normal; `RefineryOrderStale`/`OperationStale` bleiben bei 30 Tagen (REQ-OBS-005).
+
+- **Monitoring: `MailDroppedConfigDrift` alarmiert nicht mehr für den absichtlich abgeschalteten Mailversand.** Der Alert wertete den bewussten prod-Kill-Switch (`APP_MAIL_ENABLED=false`) als Konfigurationsfehler und mailte deshalb alle 4 Stunden; er greift jetzt nur noch bei aktiviertem, aber falsch konfiguriertem Versand (leerer SMTP-Host oder fehlende Sender-Bean) und bleibt bis zur Aktivierung des Mailversands still (REQ-OBS-011).
+
+### Fixed
+
+- **Stabilität: Das Frontend läuft nicht mehr am Rand seines Speicherlimits.** Der Container war mit 1024 MB tatsächlich zu klein — gemessen auf prod belegte er 935 MB (91 %) und selbst der nicht reduzierbare Anteil lag bei 87 %, sodass keine Heap-Einstellung das Limit hätte retten können. Das Limit steigt auf 1280 MB und der Heap ist auf 50 % (640 MB) begrenzt, weiterhin klar über den gemessenen 529 MB. Greift beim nächsten Deploy.
+
+- **Stabilität: Backend und Ingest-Gateway können ihr Speicherlimit nicht mehr überschreiten.** Beide durften bis zu 75 % des Limits als Heap belegen, was zusammen mit dem übrigen Speicherbedarf 96 % (Backend) bzw. 90 % (Ingest) ergeben hätte — bisher unbemerkt, weil der Heap nie so weit wuchs. Die Obergrenzen liegen jetzt bei 57 % bzw. 60 % und damit immer noch beim 1,2- bis 1,7-Fachen des gemessenen Bedarfs; die Container-Limits bleiben unverändert. Greift beim nächsten Deploy.
+
+- **Monitoring: Alloy-Speicherlimit auf 512 MB angehoben (`GOMEMLIMIT` 360 MiB).** Der Log-/Trace-Versender lief erneut auf über 90 % seines 384-MB-Limits und löste den `ContainerWorkingSetHigh`-Alarm aus, obwohl keine neue Last hinzukam; die Größen sind jetzt anhand des gemessenen konstanten Zusatzbedarfs (~47 MiB) als Budget statt als reiner Prozentwert bemessen. Greift beim nächsten Deploy.
+
+- **Log-Hygiene: Anmeldungen mit noch nicht freigeschaltetem Konto fluten das Log nicht mehr.** Die erwarteten `PENDING_APPROVAL`-403 (die Shell eines wartenden Nutzers pollt mehrere Endpunkte pro Seitenaufruf) werden in Backend und Frontend jetzt auf DEBUG statt WARN geloggt; die Metrik/der `PendingApprovalBlockSpike`-Alert bleiben unverändert (REQ-OBS-001).
+
+- **Log-Hygiene: Keycloak protokolliert Verbindungsabbrüche von Clients nicht mehr als ERROR.** `io.vertx.core.net.impl.ConnectionBase` (leere `<missing-log-message>`-ERROR-Zeilen bei abruptem TCP-Reset des Browsers/Scanners) ist per `KC_LOG_LEVEL` stummgeschaltet, damit diese wertlosen Zeilen keine ERROR-Spike-Alerts auslösen.
+
+## [v1.5.15](https://github.com/krt-profit/basetool/releases/tag/v1.5.15) - 2026-07-23
+
+### Changed
+
+- **Filter bleiben jetzt app-weit pro Browser erhalten.** Alle Auswahl-Filter (Checkboxen, Mehrfachauswahlen, Dropdowns, Umschalter) werden im localStorage gespeichert und beim nächsten Öffnen wiederhergestellt — u. a. Materialbörse, Mein/Globales Lager, Raffinerie-Aufträge, Profitberechnung, Missionen/Operationen („Vergangene anzeigen"), Beförderung, Bank-Freigaben, Bank-Chart-Zeitraum sowie die Admin-Filterseiten. Text-Suchfelder und Datumsbereiche starten bewusst weiterhin frisch (REQ-UI-017, ADR-0120).
+
+### Fixed
+
+- **Preis-Übersicht: Die gesetzten Filter (Material, System, Loading Dock, Auto Load) bleiben jetzt erhalten.** Bisher setzte jeder Reload — oder das Öffnen am nächsten Tag — alle Filter zurück; die Auswahl wird nun pro Browser im localStorage gespeichert und beim Laden der Seite vor dem ersten Datenabruf wiederhergestellt (REQ-UI-016).
+
+## [v1.5.14](https://github.com/krt-profit/basetool/releases/tag/v1.5.14) - 2026-07-23
+
+### Fixed
+
+- **Stabilität: Wiederkehrende Hibernate-Warnungen „Narrowing proxy to class Squadron/SpecialCommand" im Backend-Log beseitigt.** Mehrere Services luden eine Org-Einheit subklassen-typisiert nach, obwohl dieselbe Zeile in der Transaktion schon als Basis-Proxy vorlag (Missionsdetail, Eigentümer-Stempeln, Auftrags-Übergabe); sie laden jetzt polymorph über das OrgUnit-Repository — das entfernt die Warnung samt `==`-Identitätsbruch und spart zudem Abfragen (REQ-DATA-013, ADR-0119).
+
+- **Log-Hygiene: Bot-Anfragen wie `GET /missions/common-handlers.js` erzeugen keine WARN-Zeilen und keinen 400er mehr.** Crawler, die Skript-Dateinamen relativ zur Seiten-URL auflösen, trafen die `/{id}`-Routen und scheiterten an der UUID-Konvertierung; solche asset-förmigen Pfade liefern jetzt ehrlich die 404-Seite und loggen nur noch auf DEBUG — echte fehlerhafte IDs behalten 400 + WARN (REQ-OBS-001).
+
+## [v1.5.13](https://github.com/krt-profit/basetool/releases/tag/v1.5.13) - 2026-07-22
+
+### Changed
+
+- **Lager: Die Checkbox „Mit vorhandenem Bestand zusammenführen" sieht jetzt überall gleich aus.** Die Umbuchen-Dialoge (Mein Lager, Globales Lager) und das Einbuchen-Formular nutzen für die Zusammenführen- und Persönlich-Checkboxen jetzt dasselbe Layout wie die Profilseite: Checkbox links, Beschriftung mit Hilfetext rechts gestapelt (REQ-INV-026).
+
+### Fixed
+
+- **Hangar: Die „Fitted (Einsatzbereit)"-Checkbox im Schiff-Dialog wird wieder als sauberes KRT-Quadrat dargestellt.** Die seitenweite Formularfeld-CSS-Regel zog Innenabstand und Rahmen der Checkbox mit; der frühere Teil-Fix stellte nur die Breite wieder her. Checkboxen und Radios sind jetzt auf allen Seiten mit dieser seitenweiten Formularfeld-Regel ausgenommen — auch vorsorglich dort, wo heute noch keine Checkbox in einer Formulargruppe steht (REQ-UI-001).
+
+- **Admin-Bereich: Checkboxen in „Missionsdaten" und „Materialien verwalten" werden wieder als kompakte KRT-Kästchen dargestellt.** Eine seitenweite Formularfeld-Regel streckte die Checkboxen (Führungsposition/Einsatzleiter im Job-Dialog, die Flag-Schalter im Material-Anlegen-Dialog) auf volle Breite mit Innenabstand; die Regel klammert Checkboxen und Radios jetzt aus.
+
+- **Lager/Aufträge: Material-, Ort-, Item- und Konto-Auswahlfelder zeigen jetzt einen passenden Suchhinweis.** Bisher stand in vielen dieser Comboboxen (z. B. Material und Ort beim Einbuchen) irrtümlich der Nutzer-Platzhalter „Nutzer suchen oder wählen…"; jetzt nennt jedes Feld, was es durchsucht — auch die „Keine Treffer"-Meldung ist je Feldart korrekt (REQ-FE-011/016).
+
+- **Lager einbuchen / Auftrag erstellen: Die Material/Item-Auswahlknöpfe (Radio-Buttons) sind wieder normal groß.** Ein seitenweiter Eingabefeld-Stil hatte die Radio-Buttons zu übergroßen Ovalen aufgeblasen; sie erscheinen jetzt als reguläre KRT-Radio-Kreise neben ihrer Beschriftung (REQ-FE-016).
+
+- **Lager einbuchen: Die Optionen „Persönlicher Eintrag" und „Mit vorhandenem Bestand zusammenführen" haben jetzt dasselbe Format.** Beide Zeilen zeigen die Checkbox links und daneben Beschriftung mit Hilfetext untereinander; zuvor lief der lange Text der Zusammenführen-Option unschön um die Checkbox herum (REQ-INV-026).
+
+## [v1.5.12](https://github.com/krt-profit/basetool/releases/tag/v1.5.12) - 2026-07-22
+
+### Added
+
+- **Monitoring: Zwei neue Log-Alerts schließen die Lücke, durch die der 41-Minuten-Vorfall am 22.07.2026 ohne einen einzigen Alarm blieb.** `FrontendKeycloakBackchannelFailing` schlägt an, wenn Token-Aufrufe an Keycloak anhaltend mit Verbindungsabbrüchen scheitern; `HealthContributorHanging` meldet jeden Health-Contributor, der länger als 10 s braucht (Backend und Frontend) — beides Zustände, in denen Login/Session-Erneuerung bzw. der Container-Healthcheck bereits leiden, während alle bisherigen Alarme grün blieben (REQ-OBS-014).
+
+### Fixed
+
+- **Login/Session: Hängende Token-Aufrufe an Keycloak brechen jetzt nach Sekunden sauber ab statt minutenlang zu blockieren.** Beim Vorfall am 22.07.2026 blieben Token-Erneuerungen 41 Minuten lang mitten im Senden stecken (transiente Netzstörung auf dem Proxy-Pfad) — clientseitig griff kein Timeout, erst der Proxy kappte jede Verbindung nach ~60 s, und jeder Abbruch war eine verlorene Erneuerung. Der Token-Client hat jetzt Lese-/Schreib-Timeouts (3 s) wie der übrige Backend-Transport; ein hängender Aufruf mündet schnell in die stille Neuanmeldung (REQ-SEC-012, ADR-0117).
+
+- **Stabilität: Die Redis-Bereitschaftsprüfung kann nicht mehr minutenlang hängen.** Trotz des 2-Sekunden-Timeouts aus v1.5.10 stauten sich beim Vorfall am 22.07.2026 Health-Checks bis zu 14 Minuten hinter einer blockierten Lettuce-Verbindungsanforderung, die kein Kommando-Timeout erreicht. Die Redis-Prüfung ist jetzt zusätzlich auf Health-Ebene hart auf 3 s begrenzt und meldet danach ehrlich „nicht bereit" (ADR-0118).
+
+## [v1.5.11](https://github.com/krt-profit/basetool/releases/tag/v1.5.11) - 2026-07-21
+
+### Fixed
+
+- **Materialbörse: Beim Öffnen wurden kurzzeitig beide Boards (Angebote und Gesuche) übereinander angezeigt.** Auf der Standardansicht (Angebote) rendert der Server jetzt wieder nur das Angebots-Board; zuvor wurde das Gesuche-Board wegen einer Thymeleaf-Vorrangfalle (`th:replace` schlägt `th:if` auf demselben Element) bedingungslos zusätzlich eingefügt, bis ein Tab-Wechsel es wegräumte (REQ-MARKET-015).
+
+- **Materialbörse-Gesuche: Kosmetik im „Material/Item suchen"-Dialog.** Das Beschreibungsfeld nutzt jetzt die volle Dialogbreite (statt der schmalen Standardbreite eines Textfelds), und die leere „Gesucht —"-Zeile unter der Material-/Item-Auswahl erscheint nicht mehr beim Erstellen — diese Zeile ist nur beim Bearbeiten eines Gesuchs sinnvoll und war nur wegen eines CSS-Vorrangproblems im Erstellen-Dialog sichtbar (REQ-MARKET-015).
+
+## [v1.5.10](https://github.com/krt-profit/basetool/releases/tag/v1.5.10) - 2026-07-21
+
+### Added
+
+- **Materialbörse: Mitglieder können jetzt Gesuche einstellen, nicht nur Angebote.** Neben „Alle Angebote"/„Meine Angebote" gibt es jetzt die Tabs „Alle Gesuche"/„Meine Gesuche"; die Buttons wechseln je nach Ansicht zwischen „Material anbieten"/„Item anbieten" und „Material suchen"/„Item suchen". Ein Gesuch nennt ein Material oder craftbares Item, eine Markdown-Beschreibung, optional eine Mindestqualität und die gewünschte Menge (SCU oder Stück); andere Mitglieder signalisieren „Ich kann liefern" und der Suchende wird benachrichtigt — Standort und Lieferantennamen bleiben wie bei Angeboten privat bzw. nur für den Suchenden sichtbar (REQ-MARKET-015…020, ADR-0116).
+
+- **Aufträge: Neue Itemsammelübersicht zum Einsammeln der hergestellten Items.** Analog zur Materialsammelübersicht gibt es für Item-Aufträge jetzt eine eigene Sammelseite (erreichbar über die Item-Übergaben-Werkzeugleiste), auf der die dem Auftrag zugeordneten Items eingesammelt werden: Besitzer und Standort lassen sich umbuchen (die Auftragszuordnung bleibt dabei erhalten) und jede Einheit als geliefert markieren. Der bisher irrtümlich auf die Materialsammelübersicht zeigende Link bei Item-Aufträgen führt jetzt hierher (REQ-ORDERS-031).
+
+- **Auftragsdetails: Die aggregierte Materialliste zeigt jetzt eine Spalte „Vorhanden".** Zwischen „Gesamtmenge" und „Eingetragen" steht die dem Auftrag aus dem Lager zugeordnete Menge je Material. So ist auf einen Blick erkennbar, wie viel schon beschafft ist — die Lücke zur Gesamtmenge ist der noch zu beschaffende Rest, klar getrennt von der Spalte „Offen" (noch ausstehende Staffel-Eintragungen) (REQ-ORDERS-026).
+
+### Changed
+
+- **Auftragsdetails: Der einem Item zugeordnete Lagerbestand wird jetzt direkt beim Aufklappen der Item-Zeile angezeigt.** Im Tab „Bestellte Items" zeigt jede aufgeklappte Item-Zeile unter dem Bedarf je Stück, bei wem und wo die dem Auftrag zugeordneten Einheiten liegen — analog zur Materialliste. Der bisherige separate „Item-Bestand"-Block darunter entfällt; das Einsammeln (Umbuchen und Als-geliefert-Markieren) passiert auf der neuen Itemsammelübersicht (REQ-ORDERS-028).
+
+- **Auftragsdetails: Die Kennzahl „Offene Menge" trennt jetzt SCU- und Stück-Material.** Bisher wurden SCU- und Stück-Mengen zu einer einzigen, fälschlich als „SCU" beschrifteten Zahl addiert. Die Kachel zeigt die offene Menge jetzt je Einheit als eigene Zahl (SCU bzw. Stück); ein Auftrag mit nur einer Einheitenart zeigt weiterhin genau eine Zahl (REQ-ORDERS-026).
+
+- **Edge-Rate-Limiting: Verbindungslimit wieder eng pro Client (500/IP).** Nachdem das Frontend-Netz per ADR-0112 auf natives IPv6 umgestellt wurde und die echte Client-IP (v4 und v6) am Reverse-Proxy ankommt, wurde das gleichzeitige Verbindungslimit von der Sofortmaßnahme 10000 auf 500 pro Client gesenkt — großzügig für echte Nutzer (mehrere Tabs mit SSE/WebSocket), aber wieder eine wirksame Obergrenze gegen Fluten (REQ-SEC-023, ADR-0112).
+
+- **Edge-Rate-Limiting: IPv6-Clients werden pro `/64`-Netz gezählt statt pro Einzeladresse.** Das Verbindungs- und Anfragelimit am Reverse-Proxy fasst wechselnde IPv6-Adressen desselben Anschlusses (Privacy-Extension-Rotation im unteren 64-Bit-Teil) jetzt in einem gemeinsamen Zähler zusammen; IPv4 bleibt pro voller Adresse. Zudem in der Produktion verifiziert und klargestellt: keycloak/ingest/grafana brauchen kein eigenes IPv6-Netz — alle Vhosts teilen sich den einen `:443`-Eingang über `net-proxy-frontend`, sodass auch dort die echte Client-IP greift; die Bridge-Gateway-Adressen in deren Logs sind interner Hairpin-Verkehr (Blackbox-Proben und OIDC-Aufrufe), keine maskierten Nutzer (REQ-SEC-023, ADR-0112).
+
+### Fixed
+
+- **Raffinerie-Screenshot-Import: Die Raffiniermethode wird jetzt auch bei einer leicht verlesenen Schreibweise erkannt.** Der Import ordnete die Methode nur bei exakter Übereinstimmung zu, sodass die vom lokalen Bilderkenner „autokorrigierte" Schreibweise (`DINYX SOLVATION` statt des Spielbegriffs *Dinyx Solventation*) als „nicht zugeordnet" liegen blieb. Die Zuordnung nutzt jetzt — wie schon bei Materialien — eine mehrstufige Kette (exakt → kanonisch → unscharfer Nächster-Treffer) über die geschlossene Menge der neun Raffiniermethoden; unpassender Text bleibt weiterhin unzugeordnet (REQ-REFINERY-008).
+
+- **Benachrichtigungen: Der Live-Push (SSE) funktioniert wieder.** Der Echtzeit-Kanal für die Glocke lieferte serverseitig keine Antwort-Header mehr aus (jeder Stream lief in einen Proxy-Timeout), weil das Frontend-Relay seine Antwort erst beim ersten weitergeleiteten Backend-Event committete — und dieser Schreibzugriff kommt auf Spring Boot 4 / Tomcat 11 aus einem Nicht-Container-Thread, der die Antwort nicht abschließt. Das Relay committet jetzt sofort auf dem Request-Thread (ein unsichtbares initiales SSE-Kommentar); der 60-Sekunden-Poll war durchgehend der Fallback, sodass nur die Live-Aktualisierung betroffen war (REQ-NOTIF-010, ADR-0113).
+
+- **Stabilität: Ein langsames oder blockiertes Redis kann das Frontend nicht mehr in die Wartungsseite kippen.** Die Bereitschaftsprüfung (Readiness) bezieht den Redis-Zustand ein; dessen reaktiver PING lief ohne gesetztes Kommando-Timeout in Lettuces 60-Sekunden-Standard und konnte den Health-Endpunkt minutenlang blockieren, sodass der Docker-Healthcheck (5-Sekunden-Fenster) scheiterte und der Container als „unhealthy" in die Wartungsseite kippte. Das Redis-Kommando- und Verbindungs-Timeout ist jetzt auf 2 s begrenzt (per Umgebungsvariable änderbar) — ein hängendes Redis wird schnell und ehrlich als „nicht bereit" gemeldet statt zu blockieren, ein echter Redis-Ausfall lässt die Readiness weiterhin korrekt fehlschlagen (REQ-OPS-003, ADR-0114).
+
+- **Lager-Einbuchen: Die Auftrags-Auswahl beim Zuordnen zeigt jetzt zuverlässig die passenden Aufträge.** Im Einbuchen-Formular filterte die „Aufträge zuordnen"-Auswahl nach den Materialzeilen des Auftrags — die bei Fertigungsaufträgen (Item-Aufträge) leer sind. Dadurch fehlten je nach gewähltem Material mal alle, mal nur einige Aufträge, oder es erschienen vor der Materialauswahl alle. Der Filter nutzt jetzt die auftragsartunabhängige Menge der benötigten Materialien (`requiredMaterialIds`), sodass auch Fertigungsaufträge auftauchen, deren Bauplan das Material verbraucht (REQ-ORDERS-018).
+
+- **Login/Session: Gelegentliche „Fehler beim Laden" bzw. erzwungene Neuanmeldungen durch abgerissene Keycloak-Verbindungen behoben.** Die Token-Aufrufe des Frontends an Keycloak (Login und automatische Token-Erneuerung) laufen über den öffentlichen Reverse-Proxy und nutzten Spring Securitys Standard-Verbindungspool, der veraltete Keepalive-Verbindungen nicht aussortiert; griff eine Token-Erneuerung auf eine bereits vom Proxy geschlossene Verbindung zu, brach sie mit einem Verbindungsfehler ab. Beide Token-Wege bekommen jetzt einen eigenen Verbindungspool, der ungenutzte Verbindungen vor dem Keepalive-Timeout des Proxys wegräumt; reine Transportänderung ohne Auswirkung auf die Token-Erneuerungslogik (REQ-SEC-012, ADR-0115).
+
+## [v1.5.9](https://github.com/krt-profit/basetool/releases/tag/v1.5.9) - 2026-07-20
+
+### Fixed
+
+- **Missionen: Ein einmal eingetragener Verantwortlicher einer Einheit lässt sich im „Einheit bearbeiten"-Dialog wieder entfernen.** Bisher bot das Auswahlfeld keinen Weg zurück auf „automatisch: Schiffseigner": der Eintrag „— automatisch —" war nicht auswählbar und ein geleertes Feld sprang beim Verlassen auf den alten Namen zurück. Zurücksetzen geht jetzt auf zwei Wegen — über die anwählbare „— automatisch —"-Zeile im Dropdown oder durch schlichtes Löschen des Textes im Feld (das geleerte Feld bleibt leer). Gilt für alle optionalen Benutzer-Auswahlfelder (REQ-FE-011, ADR-0053).
+
+- **Mitgliederverwaltung: Der Button „Zweite Staffel hinzufügen" öffnet jetzt wieder den Eingabebereich für die zweite Staffel.** Bisher verschwand beim Klick nur der Button, ohne dass der zweite Staffel-Slot erschien: Dessen Sichtbarkeit wird über die CSS-Klasse `krtm-hidden` gesteuert, das Skript versuchte ihn aber über einen Inline-`display`-Stil einzublenden, der die Klasse nicht übersteuert. Der Slot wird jetzt ebenfalls per Klasse ein- und ausgeblendet (REQ-ORG-017, ADR-0093).
+
+- **Edge-Rate-Limiting: „Too many requests“ und Wartungsseite bei normaler Nutzung behoben.** Das Verbindungslimit am Reverse-Proxy (NPM) wirkte für IPv6-Clients faktisch global statt pro IP — weil `:443` auch auf IPv6 veröffentlicht ist, das Container-Netz aber nur IPv4 kann, leitet Docker jeden IPv6-Client über die Bridge-Gateway-Adresse weiter, und da Dual-Stack-Browser IPv6 bevorzugen, landete fast aller echte Verkehr in einem gemeinsamen Zähler. Schon wenige gleichzeitige Nutzer auf der Missionsseite überschritten so die 60er-Grenze, wodurch legitime Anfragen mit 429 abgewiesen wurden und Reconnect-Stürme das Frontend in die Wartungsseite trieben. Das Verbindungslimit wurde als Sofortmaßnahme auf 10000 angehoben; der eigentliche Fix (echte Client-IP wiederherstellen) ist als ADR-0112 geplant (REQ-SEC-023).
+
+- **Edge: Natives IPv6 auf dem Proxy-Netz stellt die echte Client-IP wieder her (ADR-0112).** IPv6-Clients kommen jetzt per Kernel-DNAT mit ihrer echten Adresse an — statt über die Bridge-Gateway-IP des userland-Relays — die Voraussetzung, um das Verbindungslimit am Edge wieder eng pro Client (~500/IP) statt global zu setzen. Das Ausrollen erfordert ein kurzes Wartungsfenster (Netz-Recreate); der Live-Wert bleibt vorerst 10000 (REQ-SEC-023).
+
+## [v1.5.8](https://github.com/krt-profit/basetool/releases/tag/v1.5.8) - 2026-07-20
+
+### Fixed
+
+- **Discord-Registrierungen: Ein bereits stecken gebliebener „Verknüpfen"-Antrag lässt sich jetzt durch erneutes Verknüpfen abschließen, statt mit „Ein unerwarteter Fehler ist aufgetreten" abzubrechen.** War der Wegwerf-Discord-Account durch einen früheren Fehlversuch schon aus Keycloak gelöscht, lieferte die Abfrage seiner Discord-Verknüpfung einen `404`, der ungefangen als Server-Fehler durchschlug und den in v1.5.7 ergänzten Rückgriff auf den lokal gespeicherten Discord-Bezug nie erreichte. Ein nicht mehr existierender Keycloak-Benutzer wird bei dieser Abfrage nun als „keine Verknüpfung" behandelt, sodass der lokale Rückgriff greift und der Antrag sauber verknüpft wird (REQ-SEC-026, ADR-0111).
+
+## [v1.5.7](https://github.com/krt-profit/basetool/releases/tag/v1.5.7) - 2026-07-20
+
+### Fixed
+
+- **Discord-Registrierungen: „Verknüpfen" schlägt nicht mehr mit einer Datenbankfehlermeldung fehl.** Das Verknüpfen eines Freigabeantrags mit einem bestehenden Account (v1.5.6) brach beim Schreiben des Audit-Eintrags immer mit einer Constraint-Verletzung ab, weil der neue Vorgangstyp `LINKED` in der Prüfbedingung der Freigabe-Historie fehlte (Migration V223 ergänzt ihn). Zusätzlich wird der Wegwerf-Discord-Account in Keycloak jetzt erst **nach** dem erfolgreichen Datenbank-Abgleich gelöscht und der Discord-Bezug notfalls aus dem lokalen Datensatz gelesen, sodass ein zuvor stecken gebliebener Antrag durch erneutes „Verknüpfen" sauber abgeschlossen werden kann (REQ-SEC-026, ADR-0111).
+
+## [v1.5.6](https://github.com/krt-profit/basetool/releases/tag/v1.5.6) - 2026-07-20
+
+### Added
+
+- **Discord-Registrierungen: „Verknüpfen" verbindet einen Freigabeantrag mit einem bestehenden Account.** Meldet sich ein Mitglied, das bereits einen Account hat, über Discord an und taucht als neuer Freigabeantrag auf (etwa weil sein Discord-Name vom Basetool-Namen abweicht), kann ein Admin den Antrag jetzt in der Freigabe-Liste per Account-Suche mit dem bestehenden Account verknüpfen, statt einen zweiten Account anzulegen — die Discord-Anmeldung wandert auf den Bestandsaccount und der doppelte Antrag wird entfernt (REQ-SEC-026). Setzt das Keycloak-Recht `manage-users` für das Sync-Service-Konto voraus.
+
+## [v1.5.5](https://github.com/krt-profit/basetool/releases/tag/v1.5.5) - 2026-07-20
+
+### Changed
+
+- **Datenschutz: Die Datenschutzerklärung wurde auf den aktuellen Stand des Basetools gebracht.** Ergänzt bzw. präzisiert wurden u.a. die Materialbörse (organisationsweite Sichtbarkeit von Angeboten), das persönliche Inventar, Beförderungs-/Bewertungsdaten, Angaben zu nicht registrierten Personen, die technische Ablaufverfolgung (Tracing, 14 Tage) und die Aufbewahrungsfristen (Anwendungsprotokolle 31 Tage, Metriken 180 Tage, Benachrichtigungen 90 Tage) sowie die korrekte Lösch- und Aufbewahrungslogik für Bankbuchungen. Der veraltete Cookie-Hinweis zu `orders_filter_status` entfällt.
+
+- **Aufträge: Der Statusfilter der Auftragsübersicht wird jetzt wie der Staffelfilter im Browser (localStorage) statt in einem Cookie gespeichert.** Das 30-Tage-Cookie `orders_filter_status` entfällt ersatzlos; die zuletzt gewählten Status werden clientseitig gemerkt und serverseitig angewandt (REQ-ORDERS-027).
+
+### Fixed
+
+- **Discord-Registrierungen: Der Server-Nickname wird jetzt auch angezeigt, wenn ein Mitglied keinen eigenen Server-Nickname gesetzt hat.** Bisher blieb die Spalte leer, sobald ein Mitglied im Server unter seinem globalen Anzeigenamen auftritt (ohne separaten Server-Nickname); erfasst wird nun der im Server angezeigte Name (Server-Nickname, sonst globaler Anzeigename), damit ein Admin den Antrag einer Person zuordnen kann (REQ-DATA-008).
+
+- **Sicherheit: Eingebetteter Tomcat auf 11.0.24 angehoben (CVE-2026-59083, CVE-2026-59084).** Der von Spring Boot vorgegebene Tomcat 11.0.23 war über die RewriteValve (Dekodierung von „+" zu einem Leerzeichen beim Umschreiben, wodurch in manchen Konfigurationen eine URL-basierte Sicherheitsregel umgangen werden konnte) sowie über die EncryptInterceptor-Härtung angreifbar; die von der NVD kritisch bewertete Version wird jetzt auf die gepatchte 11.0.24 erzwungen. Der OWASP-Abhängigkeits-Scan ist damit wieder grün — die parallel gemeldeten Vert.x-4.5.x-Funde (CVE-2026-15075/-15076) waren Fehlalarme, da diese Bibliotheken nur auf dem Compile-Klassenpfad des Keycloak-SPI-Moduls liegen, nie ausgeliefert werden und zur Laufzeit vom Keycloak-Container bereitgestellt werden; sie wurden begründet unterdrückt.
+
+## [v1.5.4](https://github.com/krt-profit/basetool/releases/tag/v1.5.4) - 2026-07-19
+
+### Fixed
+
+- **Extractor: Der „An Basetool senden"-Import-Link zeigt nicht mehr „Import-Link abgelaufen oder ungültig", wenn der Browser die Seite doppelt lädt.** Bei manchen Nutzern (beobachtet mit Firefox) öffnete der Browser die vorbefüllte Seite zweimal kurz hintereinander; der erste Aufruf verbrauchte den einmaligen Import-Link, der zweite zeigte den Ablauf-Hinweis — jeder Sendevorgang schlug fehl, während der manuelle JSON-Import weiter funktionierte. Der Seitenaufruf verbraucht den Link jetzt nicht mehr; das geschieht erst über eine gezielte Aktion der Seite, die ein vorausschauendes Vorladen des Browsers nicht auslöst. Betrifft Raffinerie- und Blueprint-Import gleichermaßen (REQ-INGEST-004, ADR-0110).
+
+- **Monitoring: Der Alarm `LokiWriteFailing` feuert nicht mehr dauerhaft, wenn ein nahezu stiller Container (z. B. `redis-exporter`) seine letzte Logzeile länger als Lokis Annahmefenster von 168 h unverändert stehen lässt.** Alloys Docker-Tailer liefert diese letzte Zeile bei jeder Wiederverbindung erneut; sobald sie 168 h überschritt, wies Loki jede Wiederholung mit „timestamp too old" (HTTP 400) ab, wodurch der Alarm ununterbrochen auslöste (die beiden `postgres`-Exporter und `alertmanager` wären wenige Tage später gefolgt). Ein `stage.drop older_than = "167h"` in der Container-Log-Pipeline verwirft solche veralteten Wiederholungen jetzt generisch an der Quelle, bevor sie Loki erreichen (REQ-OBS-007).
+
+## [v1.5.3](https://github.com/krt-profit/basetool/releases/tag/v1.5.3) - 2026-07-18
+
+### Changed
+
+- **Kartellbank: Die mittlere Freigabestufe des KRT-Kontos genehmigt jetzt die Bankleitung statt des Bereichsleiters Profit.** Auszahlungen/Transfers zwischen den beiden Schwellen `T1` und `T2` gehen zur Freigabe an die Bankleitung, darüber weiterhin an die Organisationsleitung; die Anzeige in „KRT-Freigaben" und auf der Kontodetailseite ist entsprechend angepasst (REQ-BANK-047, ADR-0109).
+
+- **Kartellbank: Bucht ein Bankmitarbeiter direkt über seiner Freigabegrenze aus dem KRT-Konto, wird die Buchung jetzt automatisch als Freigabeantrag angelegt statt abgewiesen.** Der Betrag wird nicht gebucht, sondern als band-gerouteter Antrag (Bankleitung bzw. Organisationsleitung) eingereicht; der Mitarbeiter erhält den Hinweis, dass der Antrag erst genehmigt werden muss und er der Bankleitung Bescheid geben soll (REQ-BANK-047, ADR-0109).
+
+### Fixed
+
+- **Kartellbank: Fachliche Buchungskonflikte zeigen wieder eine verständliche Meldung statt „Ein unerwarteter Fehler ist aufgetreten. Unser Team wurde informiert."** Mehrere Bank-Konfliktcodes (u. a. Begründung erforderlich, Freigabe erforderlich, Gebühr übersteigt Betrag, Antrag nicht mehr offen) waren im Frontend auf keine Meldung abgebildet und fielen auf den generischen Text zurück; sie erscheinen jetzt mit ihrer konkreten Ursache im Buchungsdialog (REQ-BANK-047).
+
+## [v1.5.2](https://github.com/krt-profit/basetool/releases/tag/v1.5.2) - 2026-07-18
+
+### Added
+
+- **Lager/Materialbörse: Items lassen sich jetzt direkt in „Mein Lager" (Ansicht „Items") für die Börse freigeben.** Jede Item-Bestandszeile trägt – wie schon die Material-Zeilen – die Checkbox „Für Börse freigeben"; das Anhaken öffnet den Freigabe-Dialog und stellt den Posten als bestandsgedecktes Item-Angebot ein, das Abhaken nimmt ihn wieder heraus. Bisher war das nur über „Material anbieten" auf der Börse selbst möglich (REQ-MARKET-002/014).
+
+- **Mein Lager: Ein Button „Alle markieren" vor „Markierte ausbuchen" wählt alle Einträge der aktuellen Ansicht aus.** In „Mein Lager" (`/inventory/my`, Material- und Items-Ansicht) markiert der Button jeden Eintrag der aktuellen Filteransicht — auch in eingeklappten Stapeln und über die Seitenblätterung hinweg —, sodass man vor „Markierte ausbuchen" nicht mehr jeden Eintrag einzeln anhaken muss; ein erneuter Klick hebt die Auswahl wieder auf (REQ-INV-034).
+
+### Changed
+
+- **Materialbörse: Der Dialog „Material anbieten" hat jetzt eine Material/Item-Auswahl (Radiobuttons) über dem Auswahlfeld.** Standard ist „Material"; „Item" zeigt nur die eigenen bestandsgedeckten Item-Lagerposten, „Material" nur Materialposten (vorher mischte die Liste beide). Gefiltert wird server-seitig, damit auch bei vielen Posten jeder Eintrag der gewählten Art auffindbar bleibt; ein Wechsel der Art setzt eine bereits getroffene Auswahl zurück (REQ-MARKET-002).
+
+### Fixed
+
+- **Extractor: Der „An Basetool senden"-Import-Link läuft nicht mehr vorzeitig ab.** Die Gültigkeit des einmaligen Handoffs wurde von 5 auf 30 Minuten angehoben (env-übersteuerbar via `APP_INGEST_HANDOFF_TTL`), weil das Öffnen der vorbefüllten Seite ein separater manueller Klick nach dem Senden ist — langsamere Nutzer sahen sonst durchgängig „Import-Link abgelaufen oder ungültig", während der manuelle JSON-Import funktionierte. Gateway und Frontend protokollieren den Handoff jetzt zusätzlich mit einem nicht umkehrbaren Subject-/ID-Hash (nie das Rohsubjekt oder die ID), damit ein künftiger Fehlschlag eindeutig als Ablauf oder Subject-Abweichung erkennbar ist (REQ-INGEST-003).
+
+- **Materialbörse: Im Dialog „Material anbieten" klappt die Material-/Item-Auswahlliste nicht mehr sofort beim Öffnen auf und verdeckt so die übrigen Eingabefelder.** Das Dropdown bleibt geschlossen und öffnet sich erst, wenn man in das Auswahlfeld klickt oder tippt; es schließt wieder bei Auswahl, Klick außerhalb oder Escape. Gilt ebenso für die Item-Auswahl im Dialog „Item anbieten" (REQ-MARKET-002).
+
+## [v1.5.1](https://github.com/krt-profit/basetool/releases/tag/v1.5.1) - 2026-07-17
+
+### Fixed
+
+- **Monitoring: Der Alarm `SyncZeroItems` (UEX-/SC-Wiki-Katalogsync) feuert nicht mehr fälschlich, wenn das Backend häufiger als der Tagesrhythmus des Syncs neu startet.** Der Item-Zähler wird lazy registriert und bei jedem Neustart zurückgesetzt, sodass `increase[48h]` trotz kerngesundem Sync (z. B. ~7499 importierte Zeilen pro Lauf) 0 las und der Alarm dauerhaft feuerte; die Regel prüft jetzt einen tatsächlich beobachteten erfolgreichen Lauf (`executions_total{outcome="success"}`) im Fenster statt „letzter Erfolg < 48h" — ein echter Leer-200-Ausfall löst weiterhin aus (REQ-OBS-014).
+
+- **Deploy: Änderungen an der Compose-Definition der Monitoring-Container (mem_limit/Env/Mounts in `docker-compose.monitoring.yml`) werden jetzt auf die laufenden Container angewandt.** Bisher wurde nur Drift in den Config-Unterverzeichnissen reconcilt, weshalb z. B. Alloy tagelang mit dem alten 256M-Limit lief, obwohl auf Platte 384M standen; `reconcile_monitoring_reloads` führt nun zusätzlich ein pro-Service idempotentes `docker compose … up -d` aus (REQ-OPS-013).
+
+- **Monitoring: cAdvisor überlebt jetzt einen containerd-Neustart, ohne Container-Serien zu verlieren (behebt wiederkehrende `CoreContainerMetricsMissing`-Alarme).** Der containerd-Socket wird als Verzeichnis statt als Einzeldatei gemountet, damit ein neuer Socket-Inode sichtbar bleibt und cAdvisor nicht auf den toten Inode festgenagelt wird (REQ-OBS-014, ADR-0072).
+
+- **Logging: Der langlebige Benachrichtigungs-Stream wird nicht mehr fälschlich als „Slow request" gemeldet.** Der SSE-Relay-Endpunkt (`/api/v1/notifications/stream` bzw. `/notifications/stream`) hält die Verbindung bauartbedingt bis zu 30 Minuten offen; bisher überschritt er dadurch bei jedem Verbindungsende die Slow-Request-Schwelle und flutete das Zugriffslog mit falschen WARN-Zeilen. Er wird jetzt wie schon bei den Latenzmetriken (REQ-OBS-009) von der WARN-Eskalation ausgenommen und behält seine eine INFO-Zeile (REQ-OBS-001).
+
+- **Logging: Die Hibernate-Validator-Deprecation-Warnungen zu `@Valid` auf Sammlungen entfallen.** Mehrere DTOs trugen `@Valid` am Listen-Container statt am Element-Typ, was beim Start je Feld ein `HV000271: Using @Valid on a container … is deprecated` auslöste; die Annotation steht jetzt am Element-Typ (`List<@Valid X>`), die Validierung bleibt unverändert.
+
+## [v1.5.0](https://github.com/krt-profit/basetool/releases/tag/v1.5.0) - 2026-07-17
+
+### Added
+
+- **Lager: Items (Gegenstände mit Blueprint) sind jetzt als eigener Bestand im Lager erfassbar (Backend/API).** Lagereinträge tragen entweder ein Material (mit Qualität) oder ein Item (ohne Qualität, ganze Stückzahlen); Item-Einträge lassen sich nur Item-Aufträgen zuordnen, die das Item anfordern, und nie Missionen (REQ-INV-029…031, Migration V220, ADR-0101). Die Lager-Ansichten im Frontend folgen in einer separaten PR.
+
+- **Lager: Die Lager-Seiten haben jetzt einen Material ↔ Items-Umschalter.** Übersicht, „Mein Lager" und „Globales Lager" zeigen wahlweise den Material- oder den neuen Item-Bestand (Item-Baum ohne Qualitäts-/Einsatzspalten, ganze Stückzahlen, Filter nur über tatsächlich eingelagerte Items und Aufträge); dazu kommt eine Item-Detailseite (`/inventory/game-item/{id}`), und Änderungen anderer Nutzer erscheinen in beiden Ansichten live (REQ-INV-030).
+
+- **Aufträge: Beim Erfassen einer Herstellung werden die produzierten Items direkt ins Lager eingebucht.** Der Herstellen-Dialog hat dafür einen neuen Abschnitt „Einlagerung": Lagerort (Pflicht), Eigentümer (vorbelegt mit dem Buchenden, inkl. Org-Einheiten-Auswahl) und die Optionen „persönlich" bzw. „dem Auftrag zuordnen" (Standard: zugeordnet); das Einlagern wird als eigenes Audit-Ereignis („Aus Herstellung eingelagert") protokolliert und erscheint bei anderen Nutzern live im Lager (REQ-INV-032, REQ-ORDERS-025).
+
+- **Aufträge: Die Auftragsdetailseite zeigt bei Item-Aufträgen jetzt ein „Item-Bestand"-Panel mit dem dem Auftrag zugeordneten Item-Bestand.** Das Panel auf dem Tab „Bestellte Items" gruppiert die zugeordneten Lagereinträge je Item (Besitzer, Ort, zugeordnete Stückzahl, Hergestellt-/Bestellt-Kontext) und bietet je Eintrag einen Geliefert-Schalter wie die Materialsammelübersicht; Änderungen (Herstellung, Lager-Zuordnung, Geliefert-Wechsel) erscheinen ohne Neuladen und auch bei anderen Betrachtern live (REQ-ORDERS-028).
+
+- **Lager: Das Einbuchen-Formular hat jetzt einen Material ↔ Item-Umschalter.** Im Item-Modus wird das Item über eine durchsuchbare Katalogsuche gewählt (nur Items mit Blueprint), die Menge in ganzen Stück erfasst (ohne Qualität und ohne Zusammenführen-Checkbox — Items werden automatisch zusammengeführt) und die Auftragszuordnung auf Item-Aufträge gefiltert, die das Item anfordern; Einsatz-Zuordnungen entfallen im Item-Modus (REQ-INV-029/031).
+
+- **Materialbörse: Items lassen sich jetzt direkt aus dem Item-Lagerbestand anbieten (bestandsgedecktes Item-Angebot).** Über „Material anbieten" erscheinen neben den Material- auch die eigenen Item-Lagerposten; ein daraus freigegebenes Angebot ist an den Lagerposten gebunden — die Stückzahl ist auf den Bestand begrenzt (bei Freigabe und Bearbeitung geprüft), sinkt bei Ausbuchungen/Umbuchungen automatisch mit und das Angebot verschwindet mit dem letzten Stück, genau wie bei Material-Angeboten. Frei angegebene Item-Angebote ohne Lagerbezug bleiben weiterhin möglich (in der Oberfläche mengenfest — anzupassen über Deaktivieren und neu Einstellen). Bestandsgedeckte Item-Angebote sind jetzt bearbeitbar (die Stückzahl, begrenzt auf den Lagerbestand); zuvor lief die Bearbeitung eines Item-Angebots ins Leere (REQ-MARKET-014, Migration V221, ADR-0108).
+
+- **Monitoring: Das Containers-Dashboard zeigt neben „CPU Throttled Seconds" jetzt „CPU Throttled Period Ratio %".** Das neue Panel bildet den Anteil der gedrosselten CFS-Perioden ab (die latenzrelevante Kennzahl statt der reinen Drossel-Sekunden) und markiert mit einer roten 25%-Linie die Schwelle des Alerts `ContainerCpuThrottledHigh`, sodass echtes CPU-Throttling auf einen Blick von harmlosen Burst-Spitzen unterscheidbar ist (REQ-OBS-014).
+
+### Changed
+
+- **Aufträge: Bei der Item-Übergabe wird jetzt der dem Auftrag zugeordnete Item-Bestand automatisch abgebucht.** Eine Lieferung verbraucht so viele Stück aus dem zugeordneten Lager-Bestand, wie geliefert wurden (höchstens den zugeordneten Bestand, älteste Zeilen zuerst), sodass der bei der Herstellung eingelagerte Bestand nach der Lieferung wieder verschwindet. Fehlt zugeordneter Bestand (etwa bei älteren, vor der Bestandsführung hergestellten Positionen), wird die Lieferung trotzdem gebucht — die Übergabe wird nie blockiert. Ist eine so abgebuchte Bestandszeile in der Materialbörse angeboten, wird die Anzeige automatisch auf den verbleibenden Bestand nachgezogen (bzw. mit einer geleerten Zeile entfernt). Die Abbuchung erscheint bei anderen Betrachtern live im „Item-Bestand"-Panel und im Lager (REQ-ORDERS-030).
+
+- **Aufträge: Bei öffentlichen SK-Aufträgen sehen Mitglieder der bestellenden Einheit Besitzer und Standort des zugeordneten Item-/Material-Bestands nicht mehr.** Auf dem Item-Bestand-Panel, der Materialsammlung und den Inventar-Detaillisten eines Auftrags werden Besitzer und Standort für Betrachter der Auftraggeber-Seite ausgeblendet („—"); Mengen, Liefer- und Herstellungsstand bleiben sichtbar. Mitglieder der bearbeitenden Einheit und Admins sehen weiterhin alles; bei staffel-eigenen Aufträgen ändert sich nichts (REQ-ORDERS-029, ADR-0107).
+
+- **Material- und Ortsauswahl laufen jetzt überall über eine durchsuchbare Combobox mit Server-Suche statt über ein einfaches Dropdown.** Betroffen sind das Einbuchen-Formular (Material + Ort), die Materialzeilen beim Anlegen und Bearbeiten von Aufträgen, die Eingangsmaterial-Auswahl beim Anlegen und Bearbeiten von Raffinerieaufträgen, der Ziel-Ort im Umbuchen-Dialog, die Materialnavigation der Lager-Detailseite und die Admin-Materialaliasse. Tippen sucht wie bei den Nutzer- und Item-Suchfeldern direkt auf dem Server — dadurch bleibt jeder Eintrag unabhängig von der Kataloggröße auffindbar und die Seiten müssen den Katalog nicht mehr komplett einbetten (REQ-FE-016, ADR-0100).
+
+- **Bank: Die Konto-Auswahlfelder (Zielkonto einer Buchung, Quellkonto der Direktbuchung, Konto einer Berechtigung sowie der Kontofilter) sind jetzt server-seitige Suchfelder, und die Kontenverwaltung ist echt paginiert.** Vorher wurde die Kontoliste bei 500 Konten stillschweigend abgeschnitten — ein Transfer-Ziel, ein Berechtigungskonto oder ein verwaltetes Konto darüber hinaus war ohne Suche, Seitenblätterung oder Hinweis nicht mehr erreichbar. Die Picker holen passende aktive Konten jetzt beim Tippen nach (Nummer oder Name), und die Verwaltungstabelle blättert seitenweise, sodass bei den für ~5000 Mitglieder geplanten Kontozahlen jedes Konto erreichbar bleibt (REQ-BANK-053, REQ-FE-017).
+
+- **Lager: Beim Umbuchen ist das „Buchen in OrgUnit"-Dropdown jetzt immer sichtbar, sobald der Ziel-Eigentümer mindestens einer Org-Einheit angehört, und auf die aktuelle Einheit der Zeile vorbelegt.** Es listet die Einheiten des ausgewählten Eigentümers über alle vier Ebenen (Staffel, Spezialkommando, Bereich, Organisationsleitung) — vorher erschienen nur Staffel/SK, und der Picker blieb bei genau einer Einheit ganz verborgen. Da nun immer eine konkrete Einheit vorausgewählt ist, behält ein Umbuchen ohne Änderung des Dropdowns die bisherige Einheit bei (REQ-INV-007, #1328).
+
+- **Material-Übersicht (Preis-Matrix): Die Filter (Material, System, Loading Dock, Auto Load) wirken jetzt serverseitig statt nur über die im Browser geladenen Zeilen.** Ein Filterwechsel fragt die passende Teilmenge direkt beim Backend an, statt die komplette Material×Terminal-Matrix in den Browser zu laden und dort zu filtern — ein gefiltertes Raster zeigt entsprechend nur noch Terminals und Materialien mit einem Preistreffer in der Auswahl (REQ-UI-014, ADR-0105).
+
+### Fixed
+
+- **Materialbörse: Die Item-Suche im „Material anbieten"-Dialog findet Item-Lagerposten mit mehrwortigen Namen wieder.** Das Frontend kodierte den Suchbegriff auf dem Weg zum Backend doppelt (ein Leerzeichen wurde zu `%2520` statt `%20`), sodass die getippte Suche nach einem Item-Bestand wie „E2E Boerse Item Stock Widget" nichts fand, während das Durchstöbern ohne Suchbegriff die Zeile zeigte. Der Freigabe- und der Item-Picker sowie die Angebotssuche übergeben den Suchbegriff jetzt einmalig kodiert als URI-Variable (REQ-MARKET-002/014).
+
+- **Combobox-Suchen finden mehrwortige und Umlaut-Begriffe wieder: Die Nutzer-, Bankkonto-, Mitglieder-, Item- und Hangar-Suche im Frontend-Proxy waren doppelt URL-kodiert.** Ein getippter Suchbegriff mit Leerzeichen oder Umlaut (z. B. „John Doe" in der Nutzer-Combobox) wurde auf dem Weg zum Backend zweimal kodiert und traf dort verstümmelt ein, sodass die Suche nichts fand; einwortige Begriffe waren nicht betroffen. Der Begriff wird jetzt genau einmal kodiert (REQ-FE-016/017).
+
+- **Suche: Mehrwortige und umlauthaltige Suchbegriffe finden jetzt wieder Treffer in Operationen, Blueprints und Standard-Blueprints, dem UEX-Ortstypeahead sowie dem persönlichen und dem Admin-Item-Inventar.** Die betroffenen Frontend-Proxys kodierten den Freitext doppelt (`URLEncoder` plus erneute WebClient-Kodierung), sodass etwa „Müller" beim Backend als `M%C3%BC…` ankam und die Suche leer lief; der Begriff wird jetzt als WebClient-URI-Template-Variable genau einmal kodiert (REQ-FE-016).
+
+- **Admin (Persönliche Blueprints): Der Filter über die Blueprints eines ausgewählten Nutzers findet mehrwortige und umlauthaltige Begriffe wieder.** Das Frontend kodierte den Suchbegriff auf dem Weg zum Backend doppelt (die `enc(...)`-Hilfsmethode plus erneute WebClient-Kodierung), sodass etwa „Größe Röhre" verstümmelt ankam und nichts fand; der Begriff wird jetzt genau einmal als WebClient-URI-Template-Variable kodiert (REQ-FE-016).
+
+- **Lager: Die Material- und die Item-Detailseite (`/inventory/material/{id}`, `/inventory/game-item/{id}`) blättern jetzt serverseitig durch alle Bestandszeilen statt bei 1000 Zeilen still abzuschneiden.** Bislang wurde nur eine feste Seite von 1000 Einträgen geladen und ohne Blättern angezeigt — bei mehr Zeilen waren die restlichen unsichtbar und unerreichbar. Beide Ansichten haben nun eine Seitensteuerung mit Seitengrößen 50/100/200, die die Ergebnisliste ohne Neuladen austauscht (REQ-INV-033, ADR-0104).
+
+- **Material-Detailseite: Die Preisliste zeigt jetzt garantiert alle Terminals, die das Material handeln.** Bisher wurde nur die erste Seite (max. 1000 Terminals) geladen und als vollständige Liste dargestellt, sodass alphabetisch spätere Terminals unbemerkt fehlten; die Liste wird nun seitenweise vollständig zusammengesetzt (REQ-UI-015, ADR-0105).
+
+- **Admin: Die Katalog-Seiten (Materialien, Orte, Missionsdaten, Spezialkommandos, Systemeinstellungen, UEX-Daten, Schiffsdaten) zeigen jetzt garantiert alle Einträge statt nur der ersten 1000 bzw. 10000.** Die Controller laden den Katalog seitenweise vollständig; die UEX-Zusammenfassungs-Chips zählen über die vom Backend gemeldete Gesamtzahl, und sollte das Sicherheitslimit beim Laden je erreicht werden, erscheint ein deutlicher Warnhinweis statt einer stillschweigend unvollständigen Liste (REQ-ADMIN-001/002, ADR-0102).
+
+- **Die gecachten Referenzkataloge des Frontends (Staffel-/SK-Umschalter in der Seitenleiste, Material-, Orts-, Schiffstyp- und Terminal-Auswahlen, Materialpreis-Matrix) laden jetzt ebenfalls garantiert alle Einträge statt einer einzelnen begrenzten Seite.** Der Cache holt solche Kataloge seitenweise vollständig, bevor er sie ablegt — ein über die bisherige Grenze hinaus gewachsener Katalog kann dadurch nicht mehr app-weit still abgeschnitten ausgeliefert werden (REQ-ADMIN-003, ADR-0103).
+
+- **Beförderung: Die Bewertungsmatrix in der Bewertungsverwaltung zeigt jetzt garantiert alle Mitglieder und alle Bewertungen.** Bewertungen wachsen multiplikativ (Mitglieder × Kategorien); bisher wurden Mitglieder und Bewertungen in je einer begrenzten Anfrage geladen, sodass jenseits der Grenze Zellen fehlten und wie „noch nicht bewertet" aussahen. Beide Achsen werden nun seitenweise vollständig geladen; sollte das Sicherheitslimit je greifen, erscheint ein deutlicher Warnhinweis statt einer stillschweigend lückenhaften Matrix (REQ-PROMO-001, ADR-0102).
+
+- **Benachrichtigungen: Die Benachrichtigungsseite deckelt die Liste nicht mehr stillschweigend bei den neuesten 50.** Bei mehr als 50 Benachrichtigungen zeigt die Seite jetzt einen Hinweis „neueste N von M" und eine „Mehr laden"-Schaltfläche, die die nächste Seite direkt nachlädt, statt die neuesten 50 als vollständigen Posteingang auszugeben (REQ-NOTIF-019).
+
+- **Mein Inventar: Die Standortsuche weist im Durchstöbern-Modus jetzt auf weitere Treffer hin.** Bei leerer Eingabe liefert die UEX-Standortsuche bis zu 2000 Orte; füllt eine Antwort diese Grenze, hängt die Liste nun den Hinweis „Weitere Treffer vorhanden – Suche verfeinern" an, statt die gekappte Liste als vollständig darzustellen (REQ-FE-016).
+
+- **Aufträge: Der scmdb.net-Import füllt die Mengenfelder wieder zuverlässig.** Der Import suchte die Mengenfelder noch als `input[type="number"]`, obwohl sie seit der SCU-Dezimal-Umstellung Textfelder sind — gefundene Materialien wurden dadurch ohne Menge eingetragen und der Import brach still ab.
+
+- **Lager: Der Umbuchen- und der Ausbuchen-Dialog werden wieder mittig im Fenster angezeigt statt am oberen Rand zu kleben.** Die Dialoge wurden per Inline-`display:block` geöffnet, was die zentrierende Flex-Ausrichtung von `.modal` überschrieb; sie öffnen jetzt mit `display:flex` (#1328).
+
+- **Lager: Das „Buchen in OrgUnit"-Dropdown im Umbuchen-Dialog wird jetzt wirklich angezeigt.** Die Einheiten-Abfrage lief gegen einen Backend-Pfad, den das Frontend nie beantwortet (404) — der Picker blieb dadurch immer verborgen, und ein Umbuchen auf einen Eigentümer mit mehreren Einheiten schlug fehl. Die Abfrage läuft jetzt wie beim Bank-Gegenpartei-Picker über den Frontend-Proxy (REQ-INV-007, #1328).
+
+## [v1.4.5](https://github.com/krt-profit/basetool/releases/tag/v1.4.5) - 2026-07-15
+
+### Fixed
+
+- **Lager: Das „+ Zuordnen"-Popover einer Lagerzeile am unteren Bildschirmrand klappt jetzt nach oben auf, statt unten aus dem Sichtbereich zu rutschen.** Seit der Umstellung auf feste Positionierung (v1.4.3) konnten Mengenfeld und „Speichern"-Button unter den Bildschirmrand fallen und waren dort nicht erreichbar (ein festes Element lässt sich nicht in den Sichtbereich scrollen); das Popover flippt nun wie die Suchfeld-Dropdowns über den Auslöser (REQ-UI-011, REQ-INV-027).
+
+## [v1.4.3](https://github.com/krt-profit/basetool/releases/tag/v1.4.3) - 2026-07-15
+
+### Added
+
+- **Aufträge: Beim Erfassen einer Herstellung lässt sich je Material festlegen, dass es nicht ausgebucht werden soll.** Der Herstellen-Dialog hat jetzt pro Material eine Checkbox „Nicht ausbuchen": Ist sie gesetzt, wird dieses Material von der Lagerentnahme ausgenommen — die Herstellung wird gebucht, der verknüpfte Lagerbestand des Materials bleibt aber unverändert (REQ-ORDERS-025).
+
+### Changed
+
+- **Aufträge: Die aggregierten Materialien eines Item-Auftrags zeigen jetzt nur noch den offenen Bedarf für die noch nicht hergestellten Einheiten.** Jede Herstellungsbuchung verringert den aggregierten Bedarf (und die Kennzahl „Offene Menge") anteilig — unabhängig davon, ob das Material ausgebucht oder als „Nicht ausbuchen" markiert wurde; eine vollständig hergestellte Position trägt 0 bei. Die Eintragungen-Zielmenge (Material-Claims) bleibt bewusst auf dem vollen Auftragsbedarf (REQ-ORDERS-025).
+
+### Fixed
+
+- **Aufträge: Die Detailseite eines Item-Auftrags erzeugt keine unnötigen Zugriffe mehr auf die mitgliederinterne Blaupausen-Abdeckung.** Die Abdeckungs-Ansicht wurde bei jedem Abschnitts-Nachladen (Kopf, Positionen, Kennzahlen, …) erneut vom Backend geholt, obwohl sie nur auf der Vollseite bzw. beim eigenen Nachladen des Blaupausen-Abschnitts angezeigt wird. Für Nicht-Mitglieder der bearbeitenden Staffel/SK antwortete der mitgliederinterne Endpunkt jedes Mal mit 403 und flutete das Backend-Log mit `ACCESS_DENIED`-Warnungen; der Abruf ist jetzt auf die beiden Renderings beschränkt, die die Daten tatsächlich anzeigen (REQ-ORDERS-016).
+
+- **Lager: Das „Auftrag"- und „Einsatz"-Dropdown der Zuordnung wird nicht mehr abgeschnitten, wenn es unten aus der Tabelle herausragt.** Das „+ Zuordnen"-Popover wurde vom horizontal scrollenden Tabellencontainer am unteren Rand beschnitten (in Firefox wie Chrome sichtbar als Unterbrechung); es wird jetzt wie die Suchfeld-Dropdowns fest am Auslöser verankert und überlagert den Rand vollständig (REQ-UI-011, REQ-INV-027).
+
+## [v1.4.2](https://github.com/krt-profit/basetool/releases/tag/v1.4.2) - 2026-07-15
+
+### Changed
+
+- **Aufträge: Die Herstellung ist in den Reiter „Bestellte Items" integriert; der eigene Herstellung-Reiter entfällt.** Der Button „Herstellung erfassen" steht jetzt als letzte Spalte je Position im Reiter „Bestellte Items", die Bauplan-Spalte entfällt. Der Materialbedarf je Stück steht dort in einer per Pfeil ausklappbaren Unterzeile (standardmäßig eingeklappt, analog zu Notiz/Begründung in der Bank-Antragstabelle). Zusätzlich haben „Hergestellt" und „Geliefert" nun jeweils einen Fortschrittsbalken (REQ-ORDERS-025, REQ-ORDERS-026).
+
+- **Aufträge: Der Reiter „Item-Übergaben" zeigt „Alle Items wurden vollständig übergeben" nur noch, wenn der Auftrag wirklich vollständig ausgeliefert ist.** Ist noch nichts zur Übergabe hergestellt (oder es fehlt noch Herstellung), weist der Reiter jetzt darauf hin, dass zuerst die Herstellung zu erfassen ist — statt der irreführenden Vollständig-Meldung (REQ-ORDERS-025).
+
+### Fixed
+
+- **Lager: Die Checkbox „Mit vorhandenem Bestand zusammenführen" im Einbuchen-Dialog ist wieder normal groß.** Eine seitenweite Formatregel streckte die Checkbox auf volle Breite mit großem Innenabstand; sie nimmt jetzt wie die übrigen Kontrollkästchen die Standardgröße an (betrifft auch die Checkbox „Als persönlicher Eintrag markieren").
+
+## [v1.4.1](https://github.com/krt-profit/basetool/releases/tag/v1.4.1) - 2026-07-15
+
+### Added
+
+- **Aufträge: Neue Herstellung-Funktion für Item-Aufträge.** Für einen Item-Auftrag lassen sich jetzt die bereits hergestellten Einheiten erfassen; die Buchung verbraucht dabei den verknüpften Lagerbestand (die für die Menge benötigten Materialien werden aus den zugeordneten Lagereinträgen abgezogen). Die Auslieferung eines Item-Auftrags setzt nun eine vorherige Herstellung voraus — es kann höchstens so viel ausgeliefert werden, wie hergestellt wurde (REQ-ORDERS-025).
+
+### Changed
+
+- **Aufträge: Die Auftragsdetailseite ist neu gestaltet — gegliedert in Reiter und ein Kennzahlen-Band.** Die zuvor untereinander gestapelten Abschnitte sind jetzt auf Reiter verteilt, und die wichtigsten Auftragskennzahlen (u. a. Fortschritt aus hergestellter/ausgelieferter Menge) stehen kompakt in einem Kennzahlen-Band am Seitenkopf (REQ-ORDERS-026).
+
+- **Aufträge-Übersicht: Die Materialliste je Auftrag ist jetzt ein- und ausklappbar** (standardmäßig eingeklappt); der Zustand wird pro Nutzer lokal im Browser gespeichert und bleibt über Filterwechsel und Neuladen erhalten (REQ-ORDERS-027).
+
+- **Aufträge-Übersicht: Der Staffel-Filter ist jetzt eine Mehrfachauswahl.** Statt nur „Eigene Staffel / Alle Staffeln" lassen sich per Auswahl-Dropdown gezielt die anzuzeigenden Staffeln ankreuzen (alle aktiven Staffeln, standardmäßig alle ausgewählt). Der Filterzustand wird lokal beim Nutzer gespeichert (REQ-ORDERS-027).
+
+### Fixed
+
+- **Lager: Bei Materialien mit Mengentyp „Stück" werden Mengen jetzt überall als ganze Zahlen ohne Nachkommastellen angezeigt.** In den Auftrags- und Einsatz-Chips, den Rest-Chips, den Herkunft-Pickern beim Aus- und Umbuchen sowie im Übergabe-Dialog stand bisher z. B. „5,000" statt „5". Die drei Nachkommastellen bleiben SCU-Materialien vorbehalten (REQ-INV-027).
+
+- **Monitoring: Der kritische Alarm `ContainerRestartLoop` schlägt nicht mehr fälschlich bei einem einzelnen Container-Neustart (etwa einem regulären Deploy von backend/frontend/ingest) an.** Er zählte Neustarts mit `increase()` auf der Metrik `container_start_time_seconds` — einer Gauge mit dem Unix-Startzeitpunkt, deren Differenz bei jedem Neustart die Sekunden/Tage zwischen altem und neuem Start ergab und so schon ab dem ersten Neustart über den Schwellwert 3 sprang. Er nutzt jetzt `changes()` (echte Neustart-Zählung, wie das Grafana-Panel) und meldet erst ab mehr als drei Neustarts in 15 Minuten; abgesichert durch einen promtool-Test (REQ-OBS-014).
+
+- **Monitoring: Der Alarm `FrontendLoginBroken` schlägt nicht mehr fälschlich bei Scanner-/Bot-Zugriffen auf den OAuth-Callback an.** Ein leerer oder unvollständiger Aufruf von `/login/oauth2/code/*` wirft in Spring Security `invalid_request` (noch vor jedem Token-Austausch); dieser Code floss bisher in den `provider_error`-Zähler und konnte den Alarm in verkehrsarmen Zeiten ohne echten Ausfall auslösen. `invalid_request` wird jetzt wie die State-Fehler dem harmlosen `invalid_state`-Bereich zugeordnet, sodass `provider_error` nur noch echte Token-/IdP-Brüche zählt (REQ-OBS-011).
+
+- **Monitoring: Der kritische Alarm `PostgresFatalOrPanic` schlägt nicht mehr bei harmlosen FATAL-Zeilen eines Datenbank-Neustarts an.** `PANIC` löst weiterhin bedingungslos aus; bei `FATAL` werden die bekannten harmlosen Lebenszyklus-Meldungen (Datenbank startet gerade / fährt herunter / im Wiederherstellungsmodus / Verbindung durch Admin-Befehl beendet) ausgenommen, während sicherheitsrelevante FATALs (fehlgeschlagene Authentifizierung, unbekannte Rolle/Datenbank, zu viele Clients) weiterhin melden.
+
+- **Monitoring: Zusammenhängende Ausfälle erzeugen jetzt deutlich weniger Alarm-Mails.** Alertmanager unterdrückt die Ressourcen-Warnungen (`ContainerWorkingSetHigh` u. a.) eines neustartenden Containers unter dessen `ContainerRestartLoop` und die von einem ausgefallenen Scrape-Ziel abgeleiteten Warnungen unter dessen `TargetDown`; zudem werden Benachrichtigungen nur noch nach `alertname` gruppiert, sodass ein mehrere Ziele betreffender `TargetDown` in einer Mail zusammengefasst wird (REQ-OBS-014).
+
+- **Monitoring: Alloy-Speicherlimit von 256M auf 384M angehoben und `GOMEMLIMIT` von 230MiB auf 300MiB gesenkt, um die wiederkehrenden `ContainerWorkingSetHigh`-Warnungen für Alloy zu beheben.** `GOMEMLIMIT` lag bei ~90 % des Limits — genau auf der Alarmschwelle — und ADR-0095 (zusätzlicher App-stdout-Versand) hatte den Arbeitsspeicher erhöht, ohne das Limit anzupassen. Der neue `GOMEMLIMIT` (~78 %) liegt bewusst unter der Schwelle. Greift beim nächsten Monitoring-Deploy (Alloy wird neu erstellt).
+
+## [v1.4.0](https://github.com/krt-profit/basetool/releases/tag/v1.4.0) - 2026-07-14
+
+### Changed
+
+- **Lager: Ein Lagereintrag kann jetzt mehreren Aufträgen und Einsätzen mit eigener Menge zugeordnet werden.** Statt genau einem Auftrag und einem Einsatz lässt sich der Bestand eines Eintrags getrennt je Dimension aufteilen und wird als Mengen-Chips direkt am Eintrag angezeigt (z. B. 60 SCU für Auftrag A, 40 SCU für Auftrag B); ein unverteilter Rest erscheint als eigener Chip. Auch beim Einbuchen kann die Menge gleich auf mehrere Aufträge/Einsätze verteilt werden. Ein Eintrag stapelt sich dadurch nur noch über seine physische Identität (Material, Besitzer, Lagerort, Qualität, Org-Einheit) — die Zuordnungen wandern an den einzelnen Eintrag (REQ-INV-027).
+
+- **Lager: „Geliefert" ist jetzt je Auftrag statt je Eintrag.** Ein Eintrag, der mehrere Aufträge bedient, kann für den einen als geliefert und für den anderen als offen markiert sein. Die Materialsammlung eines Auftrags zeigt zudem die tatsächlich diesem Auftrag zugeordnete Menge statt des gesamten Bestands des Eintrags (REQ-INV-027).
+
+- **Lager: Beim Verkauf von einem Einsatz zugeordnetem Bestand wählt der Verkäufer, welchen Einsätzen wie viel des Erlöses gutgeschrieben wird.** Bisher wurde der gesamte Erlös automatisch einem Einsatz zugeschrieben; jetzt verteilt der Verkäufer den Erlös auf die Einsätze, an denen er teilnimmt, und ein nicht zugeordneter Rest bleibt persönlich (REQ-INV-027).
+
+- **Lager: Beim Ausbuchen und Umbuchen wählt man jetzt direkt im Dialog, von welchen Auftrags- und Einsatz-Marken die Menge abgezogen wird.** Je zugeordneter Marke gibt es ein Mengenfeld; nicht zugewiesene Mengen kommen vom noch nicht zugewiesenen Rest (Voreinstellung), und reicht der Rest nicht, blockiert der Dialog das Absenden und nennt die mindestens auf Marken zu verteilende Menge. Beim Umbuchen nimmt die verschobene Menge ihre Marken mit; beim Verkauf zeigt der Dialog den je Einsatz gekoppelten Erlös (REQ-INV-027).
+
+- **Lager: Inventaränderungen erscheinen jetzt live in allen Lager-Ansichten anderer Betrachter.** Fügt jemand eine Zuordnung hinzu/ändert/entfernt sie, bucht aus, bucht um oder leert das Lager, aktualisieren sich die geteilte Übersicht (`/inventory/all`), die Materialübersicht (`/inventory`), die Material-Detailansicht und „Mein Lager" bei den anderen Betrachtern ohne manuelles Neuladen — die eigene Filter- und Baum-Ansicht bleibt erhalten. Zusätzlich spiegeln die Auftrags-Materialsammlung (die zugeordnete Menge) und die Materialbörse (Angebote, die bei sinkendem Bestand automatisch schrumpfen) solche Inventaränderungen jetzt live. Bisher sahen die Betrachter veraltete Daten bis zum nächsten Reload (REQ-FE-010).
+
+- **Lager: Die aggregierte Materialübersicht zeigt jetzt auch die maximale verfügbare Qualität.** In der Ansicht `/inventory` steht zwischen „Ø Qualität" und „Gesamtmenge" eine neue Spalte „Max. Qualität" mit der höchsten für das jeweilige Material vorhandenen Qualität (REQ-INV-027).
+
+- **Einsatz-Detailseite: Die Lagerbestände zeigen jetzt alle zugeordneten Aufträge als Mengen-Chips.** In der Auftrag-Spalte der Lagereinträge-Tabelle stand bisher nur der erste zugeordnete Auftrag; bei einem auf mehrere Aufträge aufgeteilten Eintrag werden nun alle Aufträge mit ihrer jeweiligen Menge angezeigt (REQ-INV-027).
+
+- **Oberfläche: Das dezente Wabenmuster (Honeycomb) im Seitenhintergrund entfällt.** Der Hintergrund der App sowie der Keycloak-Anmelde- und -Kontoseiten ist jetzt durchgehend flaches Schwarz; der dezente orange Schimmer oben auf der Anmeldeseite bleibt erhalten. Das Hintergrundbild `honeycomb-bg.svg` wurde aus allen Ressourcen entfernt (REQ-UI-003).
+
+- **Lager: Neuer Filter „Nur nicht-persönliche Einträge" in „Mein Lager".** Neben „Nur persönliche Einträge" lässt sich die Ansicht jetzt auch umgekehrt auf die geteilten (nicht-persönlichen) Bestände einschränken. Beide Filter schließen sich gegenseitig aus (das Aktivieren des einen hebt den anderen auf) und werden wie die übrigen Filter in der Seiten-URL mitgeführt (REQ-INV-006).
+
+- **Lager: Stückzahl-Materialien werden wieder zu einem Lagereintrag zusammengeführt.** Gleichartige Bestände desselben Stückzahl-Materials (gleiche Qualität, Lagerort und Org-Einheit) landen beim Einbuchen, Ändern und Umbuchen automatisch in einem einzigen Eintrag, wobei vorhandene Notizen zusammengeführt und die Auftrags-/Einsatz-Zuordnungen der Einträge vereint werden; bei SCU-Materialien lässt sich das Zusammenführen pro Aktion optional über eine Checkbox im Dialog aktivieren. Angebote in der Materialbörse bleiben dabei unverändert (die angebotene Menge steigt nicht), und bereits vorhandene passende Einträge werden beim Ausrollen der Änderung einmalig zusammengeführt.
+
+- **Materialbörse: Angebote werden automatisch verringert, wenn der zugehörige Lagerbestand kleiner wird.** Wird ein Lagereintrag ausgebucht, umgebucht, übergeben oder verringert und die angebotene Menge ist nicht mehr gedeckt, sinkt die angebotene Menge des Angebots dauerhaft auf den verbleibenden Bestand. Erhöht sich der Bestand später wieder, bleibt das Angebot unverändert — mehr anzubieten ist eine bewusste Entscheidung des Anbieters.
+
+- **Organigramm: Kopf-Kasten und Bereichsleiter optisch geschärft.** Der Kasten der Organisationsleitung ist nicht mehr auf die Rasterbreite fixiert, wächst auf seine Beschriftung und hat mehr Innenabstand, sodass „ORGANISATIONSLEITUNG" nicht mehr am Rand klebt; der Rahmen der Bereichsleiter ist einen Pixel kräftiger.
+
+- **Organigramm: Ansicht entrümpelt.** Die Markierung „Leitung" an kontogebundenen Sitzen entfällt (der schreibgeschützte Zustand zeigt sich im Bearbeitungsmodus bereits an den fehlenden Schaltflächen), und der Pflegehinweis „Kein Account" erscheint nur noch im Bearbeitungsmodus (REQ-ORG-010, REQ-ORG-013, REQ-ORG-020).
+
+- **Organigramm: Die Mitglieder der Organisationsleitung stehen jetzt nebeneinander.** Statt als senkrechte Kette unter dem OL-Kasten fächern sie nun waagerecht auf — dieselbe Anordnung wie die Staffeln/Spezialkommandos unter einem Staffelleiter (REQ-ORG-013).
+
+- **Organigramm: Der horizontale Scrollbalken bleibt bei einem breiten Diagramm immer sichtbar.** Bisher saß er am unteren Rand des (bei vielen Einheiten sehr hohen) Diagramms — oft unterhalb der Fußzeile, sodass man erst die ganze Seite herunterscrollen musste, um seitlich zu scrollen. Ein mitlaufender Scrollbalken ist jetzt knapp über der Fußzeile fixiert und immer erreichbar.
+
+- **Organigramm/Leitung: Beim Besetzen eines Postens mit einem Account wird ein bestehender gleichnamiger Freitext-Eintrag automatisch übernommen.** Bisher blieb ein zuvor eingetragener Freitext-Name (z. B. ein Platzhalter für ein Mitglied ohne Account) nach der Ernennung des Accounts als Dublette stehen und musste von Hand gelöscht werden. Wird jetzt in „Leitung" ein Account auf einen Posten (OL-Mitglied, SK-Leiter, Bereichskoordinator/-operator, Ensign) ernannt und existiert dort ein Freitext-Eintrag mit demselben Namen, wird dieser automatisch in den Account umgewandelt statt zusätzlich stehen zu bleiben. Die Einzelposten (Staffelleiter, Bereichsleiter, Kommandoleiter, Stv., Grand Admiral) taten dies bereits.
+
+- **Neuer Posten „Grand Admiral" in der Organisationsleitung.** Ein einzelnes OL-Mitglied kann zum Grand Admiral ernannt werden; im Organigramm steht es dann direkt unter der Kachel „Organisationsleitung", über den übrigen OL-Mitgliedern. Der Grand Admiral hat exakt die Rechte eines OL-Mitglieds (kein neues Rechtemodell). Ernannt wird er unter „Organisation → Leitung" (Admin): wer noch kein OL-Mitglied ist, wird dabei automatisch eines; beim Entfernen bleibt die Person normales OL-Mitglied. Alternativ lässt sich – wie bei den anderen Feldern im Organigramm – ein Freitext-Name für einen Grand Admiral ohne Account direkt im Organigramm-Editor eintragen (verleiht keine Rechte). Es gibt immer höchstens einen Grand Admiral (REQ-ORG-021).
+
+- **Die Seite „Organisation → Leitung" ist jetzt nur noch für Admins und Officer zugänglich.** Bisher öffnete das Gate zusätzlich für reine Logistiker/Missionsmanager, die dort aber ohnehin keine Ernennungsrechte und damit eine leere Seite hatten. Zugang (Seite und Aktionen) ist jetzt auf `ADMIN`/`OFFICER` eingegrenzt; alle funktionalen Leiter (OL-, Bereichs-, SK- und Staffelleitung samt Kommandorängen) tragen die operative `OFFICER`-Rolle und behalten den Zugang unverändert (REQ-ROLE-004).
+
+### Fixed
+
+- **Aufträge: Die Teil-Übergabe eines Lagereintrags, der gleichzeitig einem Auftrag und einem Einsatz zugeordnet ist, schlägt nicht mehr fehl.** Die übergebene Menge verlässt beide Markierungen; die Einsatz-Markierung wird automatisch auf den verbleibenden Bestand gekappt (Rest zuerst, dann anteilig). Ist die Aufteilung mehrdeutig (mehrere Einsätze und der Rest deckt die Menge nicht), lässt der Übergabe-Dialog dich direkt wählen, wie viel von welchem Einsatz abgezogen wird. Außerdem behoben: schnelle aufeinanderfolgende Chip-Änderungen am selben Eintrag lösten fälschlich einen Konflikt-Neuladen aus, und ein N+1-Ladeproblem der Zuordnungs-Referenzen (REQ-INV-027, REQ-DATA-003, REQ-FE-003).
+
+- **Aufträge: Eine Auftrags-Übergabe kann jetzt höchstens die dem Auftrag zugeordnete Menge eines Lagereintrags hergeben.** Bei einem Eintrag, dessen Bestand auf mehrere Aufträge aufgeteilt ist, ließ sich bisher mehr für einen Auftrag übergeben, als ihm zugeordnet war — der Überschuss ging still zulasten der anderen Aufträge bzw. des freien Rests und verletzte deren Deckung. Das Mengenfeld ist jetzt auf die dem Auftrag zugeordnete Menge begrenzt, und das Backend lehnt eine zu große Menge mit HTTP 400 ab (REQ-INV-027).
+
+- **Lager: Bei Materialien mit Mengentyp „Stück" werden Mengen jetzt überall als ganze Zahlen ohne Nachkommastellen angezeigt.** In den Auftrags- und Einsatz-Chips, den Rest-Chips, den Herkunft-Pickern beim Aus- und Umbuchen sowie im Übergabe-Dialog stand bisher z. B. „5,000" statt „5". Die drei Nachkommastellen bleiben SCU-Materialien vorbehalten (REQ-INV-027).
+
+- **Aufträge: Die „Geliefert"-Umschaltung auf der Material-Sammlungs-Seite erscheint jetzt live bei anderen Betrachtern.** Setzt jemand auf `/orders/{id}/material-collection` einen Lagereintrag auf geliefert oder verschiebt ihn (Besitzer/Standort), aktualisiert sich die Tabelle bei anderen Betrachtern derselben Seite sowie die Materialsammlung auf der Auftrag-Detailseite jetzt ohne manuelles Neuladen; bisher blieben sie bis zum Reload veraltet (REQ-FE-010).
+
+- **Barrierefreiheit: Gedämpfter grauer Text erfüllt auf dem flachen schwarzen Hintergrund wieder den WCAG-AA-Kontrast.** Mit dem Wegfall des Wabenmusters lag gedämpfter Text in Grau 2 (`#646464`) nur noch bei rund 3,5:1 und unterschritt damit die AA-Schwelle für kleinen Text (sichtbar u. a. auf der Hangar-Seite). Muted-Text, Platzhalter und die leise Löschen-Schaltfläche nutzen jetzt den helleren Ton `--color-gray-2-text` (`#8A8A8A`, rund 6,1:1); Rahmen, Bildlaufleisten und dekorative Symbole behalten das bisherige Grau 2 (REQ-UI-003, REQ-UI-006).
+
+- **Keycloak-Nutzerabgleich: Der nächtliche Abgleich lief ins Leere, wenn dem Dienstkonto die Berechtigung `view-realm` fehlte.** Seit der rollenindizierten Auflösung (5000-Konten-Härtung) liest der Abgleich die Realm-Rollen und deren Mitglieder, was zusätzlich zu `view-users` die `realm-management`-Rolle `view-realm` erfordert. Fehlt sie, brach jeder Lauf mit `403` ab — der Abgleich wird übersprungen (kein Datenverlust), aber ausgetretene Mitglieder behielten ihre Rollen und Rollenänderungen wurden nur beim interaktiven Login übernommen. Der Fehler wird jetzt mit klarem Hinweis auf die fehlende Rolle protokolliert; die nötige Berechtigung ist in `docs/keycloak/README.md` dokumentiert (REQ-SEC-043).
+
+- **Logging: Unauthentifizierte Backend-Anfragen (HTTP 401) werden nicht mehr als WARN protokolliert.** Der interne TLS-Health-Probe fragt alle 30 Sekunden die Wurzel `/` jedes Dienstes ab und erzeugte so rund 2 WARN-Zeilen pro Minute reines Rauschen. Ein 401 ist der erwartete Normalfall für jeden anonymen Aufrufer und läuft jetzt auf DEBUG; 403 und alle anderen 4xx bleiben WARN, und die Metrik `basetool_http_error_total{code}` ist unverändert (REQ-OBS-001).
+
+- **Monitoring: Ein laufender Monitoring-Stack mit nicht gesetztem `IRI_MONITORING_ENABLED` schlägt jetzt Alarm, statt still zu driften.** Bei nicht gesetztem Flag lud `deploy.sh` zwar weiter die Konfigdateien auf die Platte, erzeugte die laufenden Container aber nie neu — Regel- und Scrape-Änderungen erreichten das laufende Prometheus nie, und der dafür gedachte Alarm `PrometheusConfigStale` konnte nicht anschlagen, weil seine Metrik nur im (in diesem Fall deaktivierten) Reconcile-Codepfad geschrieben wird. `deploy.sh` meldet den Zustand jetzt pro Durchlauf als WARN und über die eigenständige Metrik `basetool_monitoring_reconcile_disabled`; der neue Alarm `MonitoringReconcileDisabled` schlägt nach 30 Minuten an (REQ-OBS-014, REQ-OPS-013).
+
+- **Monitoring: Der Alarm `EdgeIpv6Unreachable` schlug fälschlich an, weil der blackbox-Prober kein IPv6 konnte.** Die Monitoring-Netze des Exporters sind rein IPv4, sodass er keine IPv6-Route hatte und die v6-Probes stets scheiterten, obwohl das öffentliche Edge über IPv6 erreichbar ist. Der Exporter bekommt jetzt ein eigenes v6-Egress-Netz (`net-blackbox-v6`), womit die Probes die echte Edge-Strecke testen und der Alarm ein wahres Signal wird (REQ-OBS-008/-012).
+
+- **Monitoring: cAdvisor schreibt keine Dateisystem-Fehlerzeilen mehr ins Log.** Auf dem containerd-`overlayfs`-Speichertreiber von Docker 29 konnte cAdvisor die Layer der einzelnen Container nicht lesen und schrieb pro Housekeeping-Durchlauf eine Fehlerzeile je Container (`could not stat … no such file`), ohne verwertbare Pro-Container-Dateisystemmetriken zu liefern. Die `disk`-Metrikgruppe ist jetzt deaktiviert — sie wird von keinem Alarm oder Dashboard genutzt (die Host-Dateisystembelegung liefert der node-exporter), sodass das Log-Rauschen ohne Funktionsverlust entfällt (REQ-OBS-014).
+
+## [v1.3.6](https://github.com/krt-profit/basetool/releases/tag/v1.3.6) - 2026-07-12
+
+### Changed
+
+- **Kartellbank: Die Benachrichtigung über einen neuen Buchungsantrag verschwindet jetzt, sobald der Antrag bearbeitet ist.** Bank-Mitarbeiter und -Verantwortliche behielten bisher die „Neuer Buchungsantrag"-Benachrichtigung im Postfach, auch nachdem der Antrag längst freigegeben, abgelehnt oder vom Antragsteller zurückgezogen war. Wird ein Antrag entschieden oder zurückgezogen, werden diese nun veralteten Benachrichtigungen jetzt automatisch aus allen betroffenen Postfächern entfernt; Glocke und Liste aktualisieren sich live.
+
+- **Materialbörse: Die Angebotsliste reicht jetzt bis kurz vor die Fußzeile.** Bisher endete die Liste an einer festen Höhe und ließ darunter eine große leere Fläche bis zur Fußzeile. Sie füllt jetzt die verfügbare Höhe bis knapp über die Fußzeile (mit kleinem Abstand zur optischen Trennung) und scrollt bei vielen Angeboten intern.
+
+- **Materialbörse: Die Sortier-Option „Material A–Z" heißt jetzt „Name A–Z".** Die Börse enthält auch Items (nicht nur Materialien); die alphabetische Sortierung greift auf den angezeigten Namen zu, daher der treffendere Name.
+
+### Fixed
+
+- **Kartellbank: Ein zweiter Buchungsantrag lässt sich direkt nach dem ersten wieder bestätigen oder ablehnen.** Nach dem Bestätigen bzw. Ablehnen eines Antrags blieb der „Bestätigen"-/„Ablehnen"-Knopf des nächsten Antrags ohne Wirkung — der Dialog öffnete sich nicht mehr, bis die Seite neu geladen wurde. Der Dialog wurde nach dem Absenden über einen Inline-Stil geschlossen, der das inzwischen klassenbasierte Wieder-Öffnen (CSP-Umstellung, ADR-0093) überstimmte; er schließt jetzt über dieselbe CSS-Klasse und öffnet dadurch zuverlässig erneut (REQ-UI-013, REQ-FE-005).
+
+- **Dieselbe Dialog-Störung an weiteren Stellen behoben.** Die gemeinsamen Öffnen-/Schließen-Handler räumen jetzt einen alten Inline-Anzeigestil beim Öffnen und Schließen weg, sodass jeder Dialog unabhängig davon, wie die Gegenseite ihn ein-/ausblendet, zuverlässig auf- und zugeht. Betraf u. a.: „Operation erstellen" ließ sich nach dem Anlegen einer Operation erst nach Neuladen erneut öffnen, und im Lösch-Bestätigungsdialog einer Operation schloss der „Abbrechen"-Knopf das Fenster nicht (REQ-UI-013).
+
+- **Operationen: Die Fehlermeldung eines nicht ladbaren Abschnitts wird wieder rot dargestellt.** Der Hinweis „Abschnitt konnte nicht geladen werden" trug seit der CSP-Härtung (`style-src-attr 'none'`, ADR-0093) noch einen wirkungslosen Inline-Stil für die Warnfarbe; die Farbe läuft jetzt über eine CSS-Klasse (REQ-UI-013).
+
+- **Monitoring: Die kritischen Alarme `TargetDown` für `blackbox-internal-tls` und `blackbox-http-ipv6` schlagen nicht mehr fälschlich an.** Bei einem Blackbox-`/probe`-Job heißt `up==0` nicht, dass das Ziel unten ist, sondern dass der Prometheus-zu-Exporter-Scrape selbst das Zeitlimit riss — das Blackbox-Modul-Timeout (10 s) war identisch mit dem globalen `scrape_timeout` (10 s), sodass ein bis zur Frist laufender Probe (IPv6 ohne v4-Fallback, langsamer interner TLS-Handshake unter dem gewollten Speicherdruck des Hosts) den Scrape über die Grenze kippte. Jeder `/probe`-Job trägt jetzt ein eigenes `scrape_timeout: 15s`, und `TargetDown` ist auf die Nicht-Probe-Jobs eingegrenzt (der `blackbox-exporter`-Selbst-Scrape und alle App-/Infra-Scrapes bleiben in Reichweite). Ein echter Probe-Ausfall meldet weiterhin sofort über die dedizierten `probe_success`-Alarme (`BlackboxProbeFailed` / `EdgeIpv6Unreachable` / `DnsResolutionFailed` / `CertificateExpiringSoon`) (REQ-OBS-008/-012).
+
+## [v1.3.5](https://github.com/krt-profit/basetool/releases/tag/v1.3.5) - 2026-07-12
+
+### Changed
+
+- **Monitoring: Live-Sync-Abo-Metriken der Auftragsräume klarer benannt.** Im Grafana-Panel „Live-sync subscriptions (live) by topic class" tauchten die Auftrags-Detailseite und die Auftrags-Warteschlange als `order` und `orders` auf — nur durch das Plural-s unterscheidbar und dadurch wie ein versehentliches Duplikat lesbar. Das `topic_class`-Label heißt jetzt `order_detail` bzw. `orders_queue` (analog zu `bank_account`/`bank_staff`). Reine Label-Umbenennung; der Wire-Topic (`order:{id}` / `orders`) bleibt unverändert (REQ-OBS-011).
+
+- **Monitoring: Der Alarm `BankAuditSilenceAnomaly` schlägt erst nach 60 Tagen ohne Bank-Audit-Ereignis an (vorher 5 Tage).** Das Bank-Audit-Volumen ist naturgemäß niedrig, sodass eine mehrtägige Stille normal ist und den Warnalarm bislang fälschlich auslöste. Das breitere 60-Tage-Fenster meldet nur noch eine echte, langanhaltende Bank-Audit-Stille (mögliche REQ-AUDIT-001-Regression).
+
+- **Monitoring: Der Alarm `FrontendLoginBroken` meldet nur noch einen echten Login-Ausfall statt harmloser Fehlversuche.** Bisher schlug er an, sobald es im 15-Minuten-Fenster Login-Fehlversuche, aber keinen erfolgreichen Login gab — bei überwiegend dauerhaft angemeldeten Mitgliedern (30-Tage-Sitzung) sind frische Logins jedoch oft null, während ein einzelner harmloser Fehlversuch (etwa ein Bot am OAuth-Callback, Abbruch oder abgelaufener State → `invalid_state`) genügte, um den Warnalarm auszulösen. Der Alarm wertet jetzt nur wiederholte `provider_error`-Fehler (fehlgeschlagener Code-to-Token-/JWKS-/IdP-Schritt — genau die Bruchstelle, die `KeycloakLoginErrorSpike` nicht sieht) bei gleichzeitig null Erfolgen aus (REQ-OBS-011).
+
+### Fixed
+
+- **Monitoring: Grafana lässt sich wieder neu erzeugen/deployen.** Der Image-Pin zeigte auf `grafana/grafana-oss:13.1.0` — diesen Tag gibt es im OSS-Repository nicht (nur das Enterprise-Repo `grafana/grafana` hat 13.1.0), sodass jeder `--force-recreate` von Grafana mit „not found" abbrach. Zurück auf den neuesten tatsächlich veröffentlichten OSS-Tag `13.0.2` gepinnt.
+
+- **Monitoring: `TempoGeneratorRemoteWriteFailing` nennt jetzt die zweite reale Ursache.** Der Alarm verwies bisher nur auf „Credential-Drift". Tatsächlich kann der Remote-Write auch bei überall korrektem Passwort mit 401 scheitern, wenn `prometheus-web.yml` host-seitig neu provisioniert, der Prometheus-Container aber nicht neu erzeugt wurde (er validiert weiter den alten Hash) — der bekannte Single-File-Bind-Mount-Effekt. Die Alarmbeschreibung führt jetzt Triage-Schritte samt curl-Probe auf und der Fix ist ein `--force-recreate` von Prometheus **und** Tempo (REQ-OBS-014).
+
+- **Monitoring: Der Alarm `SyncZeroItems` schlägt für `uex_sync` nicht mehr fälschlich bei einem unveränderten Katalog an.** Der UEX-Client nutzt bedingte GETs (ETag): Ist der Item-Katalog seit dem letzten Lauf unverändert, liefert jede Kategorie `304 Not Modified`, der Lauf schreibt nichts — für die Metrik bislang nicht von einem echten Leer-Ausfall (leere 200er) unterscheidbar. Der Item-Sync meldet in diesem Fall jetzt die aktuelle Größe des Katalogs statt `0`, sodass der Alarm nur noch bei einem echten leeren UEX-Feed auslöst (REQ-OBS-011, #1041).
+
+- **Monitoring: Loki und Tempo verlieren bei einem Neustart keine frisch empfangenen Log-/Trace-Daten mehr.** Beide dskit-Dienste leeren beim Beenden ihren Write-Ahead-Log (Standard-Drain 30 s), liefen im Monitoring-Compose aber ohne `stop_grace_period` auf Dockers 10-Sekunden-Standard — ein `deploy.sh --force-recreate` (der übliche Weg, eine Config-Änderung zu übernehmen) beendete sie dadurch nach rund 20 s per SIGKILL mitten im Leeren und erzwang eine WAL-Wiederherstellung. Beide erhalten jetzt `stop_grace_period: 45 s`; Prometheus bleibt bewusst beim Standard (absturzsichere WAL-Wiederherstellung), ADR-0072.
+
+- **Monitoring: Der Alarm `SyncZeroItems` schlägt beim SC-Wiki-Sync nicht mehr fälschlich an, wenn der Katalog stabil ist.** Die SC-Wiki-Clients nutzen bedingte GETs (ETag/`304 Not Modified`); ein unveränderter Katalog liefert für jeden Endpunkt eine 304-Antwort und schreibt nichts — bisher als 0 Items gezählt und damit nach 48 h nicht von einem echten Ausfall (leere 200er) unterscheidbar. Jeder SC-Wiki-Schritt (Commodity, Vehicle, Blueprint, Manufacturer, Item) meldet bei einem reinen 304-Lauf jetzt seinen Live-Zeilenbestand statt 0, sodass nur noch ein echter Leerlauf den Alarm auslöst (analog zur `uex_sync`-Korrektur; REQ-OBS-011, #1182).
+
+## [v1.3.3](https://github.com/krt-profit/basetool/releases/tag/v1.3.3) - 2026-07-12
+
+### Added
+
+- **Monitoring: Neuer Alarm `ContainerPidsHigh` warnt, bevor ein Container sein Task-Limit (cgroup-`pids`) erschöpft.** Beim Ingest-Vorfall am 12.07.2026 füllte sich das 2048er-`pids`-Limit durch nicht abgeräumte Healthcheck-Zombie-Prozesse, während die JVM-Thread-Metrik flach blieb — daher schlug `JvmThreadsHigh` nicht an und nur der Absturz danach meldete sich. Ergänzend zur Ursachenbehebung (`init: true`, REQ-OPS-019) überwacht der neue Alarm die cAdvisor-Metrik `container_threads` (>80 % = 1638 der 2048er-Grenze) für die vier JVM-Container backend/frontend/ingest/keycloak und fängt so jede künftige `pids`-Erschöpfung ab; dafür wird die cAdvisor-`process`-Metrikgruppe aktiviert (REQ-OBS-014).
+
+- **Monitoring: JVM-Absturzursachen landen jetzt in Loki.** Native Fehler wie `pthread_create failed` / `unable to create native thread`, die die JVM direkt auf die Container-Ausgabe schreibt (außerhalb von Logback) und die deshalb bisher nie in Loki ankamen, werden jetzt zusätzlich als eigener, shipper-seitig maskierter Stream (`app="<dienst>-stdout"`) versendet — so ist die Ursache eines native-Thread-Absturzes auch nachträglich in Grafana sichtbar. Die zugehörige Regel `JvmNativeThreadExhaustion` ist vorbereitet, bleibt aber bis zur Verifikation auf der Teststrecke deaktiviert (REQ-OBS-007/-014, ADR-0095).
+
+### Fixed
+
+- **Ingest-Gateway (Ein-Klick-Import) stürzt nicht mehr nach ~17 h Laufzeit ab.** Der HTTPS-Healthcheck der JVM-Dienste erzeugte über BusyBox-`wget` alle 30 s einen nicht abgeräumten `ssl_client`-Zombie-Prozess; da die JVM als PID 1 lief und Waisen nicht abräumt, füllte sich der `pids`-Cgroup-Grenzwert (2048) nach rund 17 h und die JVM konnte keine Threads mehr anlegen — Absturz, Neustart-Schleife und Alarm-Mails. Backend, Frontend und Ingest laufen jetzt mit `init: true` (tini als PID 1 räumt die Zombies ab; REQ-OPS-019).
+
+- **Preis-Übersicht wird wieder angezeigt.** Nach der CSP-Härtung (`style-src-attr 'none'`, ADR-0093) blieb die Handelsmatrix unter „Preis-Übersicht" unsichtbar: Die Tabelle wurde per CSS-Klasse ausgeblendet, das Skript blendete sie aber noch über das inzwischen wirkungslose `style.display` ein, und die dynamischen Abstandszeilen des virtuellen Scrollens trugen ein vom Browser blockiertes `style="height:…"`. Sichtbarkeit läuft jetzt über das Umschalten der Klasse, die Zeilenhöhe über das CSSOM — die Seite funktioniert wieder.
+
+- **Monitoring: Prometheus übernimmt geänderte Scrape-/Alert-Konfiguration jetzt zuverlässig.** Weil die Config-Dateien Single-File-Bind-Mounts sind, las der laufende Prometheus nach einem Datei-Update (neuer Inode) weiter die alte Fassung, bis der Container neu erzeugt wurde — ein Reload half nicht, und nach der Portumstellung des Ingest-Actuators (11262→11272) blieb das Ingest-Ziel unüberwacht (kritischer `TargetDown`). `deploy.sh` gleicht die Config jetzt bei jedem Durchlauf gegen die Datei ab und erzeugt den betroffenen Dienst bei Abweichung selbstheilend neu; der neue Alarm `PrometheusConfigStale` meldet eine nie übernommene Konfiguration (REQ-OBS-014, REQ-OPS-013).
+
+- **Weitere per JavaScript aufgebaute Oberflächen funktionieren wieder unter der verschärften CSP.** Nach derselben CSP-Härtung blieben weitere client-seitig erzeugte Elemente unsichtbar oder verloren ihr Layout — u. a. die Statuszeilen der Gewinn-Übersicht, die dynamisch hinzugefügten Auftragspositionen, diverse SCU-Hinweise (Auftrag, Lager, Umbuchen, Ausbuchen), der „Zurückziehen"-Knopf im Anspruchs-Dialog, die Missions-Frequenzanzeige, die Operations-Vorschau und die „Keine Terminals gefunden"-Zeile. Sie steuern Layout und Sichtbarkeit jetzt über CSS-Klassen statt über vom Browser blockierte Inline-Stile.
+
+## [v1.3.2](https://github.com/krt-profit/basetool/releases/tag/v1.3.2) - 2026-07-11
+
+### Fixed
+
+- **Materialbörse: Beim Freigeben eines Materials wird kein zweites Mengenfeld mehr angezeigt.** Der Freigabe-Dialog (aus „Mein Lager" heraus wie über „Material anbieten") blendete unter dem korrekten Feld „Menge anbieten" fälschlich noch das Item-Mengenfeld „Menge (Stück)" ein, das eigentlich nur beim Anbieten craftbarer Items gilt. Ursache war eine CSS-Regel, die das per `hidden` versteckte Feld überstimmte (REQ-MARKET-002/012).
+
+## [v1.3.1](https://github.com/krt-profit/basetool/releases/tag/v1.3.1) - 2026-07-11
+
+### Fixed
+
+- **Betrieb: Deploy-blockierende Subnetz-Kollision im Compose-Stack behoben.** Das mit v1.3.0 neu hinzugekommene Netzwerk `net-redis-backend` (Redis-Fan-out für die Live-Benachrichtigungen) war auf dasselbe Subnetz `172.28.11.0/24` gepinnt wie das bestehende `net-proxy-grafana`. Da Grafana dieses Netz aktiv hält, brach der v1.3.0-Deploy beim Anlegen mit „Pool overlaps with other one on this address space" ab und löste einen Rollback aus. `net-redis-backend` liegt jetzt auf dem freien `172.28.12.0/24`.
+
+## [v1.3.0](https://github.com/krt-profit/basetool/releases/tag/v1.3.0) - 2026-07-11
+
+### Added
+
+- **Die Auftrags-Warteschlange aktualisiert sich jetzt live für alle Betrachter.** Legt jemand einen Auftrag an oder ändert die Priorität per Drag-and-drop, sehen andere Betrachter der Warteschlange die Änderung ohne Neuladen — jeder in seiner eigenen Filter- und Seitenansicht. Auch von Gästen angelegte Aufträge erscheinen sofort (serverseitig ausgelöst, da Gäste keine Live-Verbindung haben). Wer gerade eine Zeile per Drag-and-drop verschiebt, wird dabei nicht gestört (REQ-FE-015, ADR-0094, #1102).
+
+- **Die Auftrags-Detailseite aktualisiert sich jetzt live für alle Betrachter.** Ändert jemand Status, Bearbeiter, Materialien, Übergaben oder eine Eintragung eines Auftrags, sehen andere Betrachter desselben Auftrags die Änderung ohne Neuladen; Statusänderungen, Bearbeitungen und Löschungen aktualisieren zusätzlich die Auftrags-Warteschlange aller Betrachter. Ist gerade ein Dialog offen, erscheint stattdessen eine „Aktualisierungen verfügbar"-Schaltfläche (REQ-FE-015, ADR-0094, #1102).
+
+- **Operationen aktualisieren sich jetzt live für andere Betrachter.** Speichert jemand die Kern-Daten einer Operation (Name, Status, Beschreibung) oder markiert er eine Auszahlung als bezahlt, sehen andere Betrachter derselben Operation die Änderung ohne Neuladen — analog zur Missions-Detailseite. Ändert jemand auf der Missions-Detailseite den Namen, den Status oder die Finanzen einer zur Operation gehörenden Mission, aktualisieren sich auch die eingebettete Einsatz-Tabelle und die Finanzübersicht der Operation live mit. Ist gerade ein Dialog offen, erscheint stattdessen eine „Aktualisierungen verfügbar"-Schaltfläche (REQ-FE-015, ADR-0094, #1115, #1241).
+
+- **Die Kartellbank aktualisiert sich jetzt live für alle Betrachter.** Bucht, bestätigt oder storniert jemand eine Kontobewegung, bearbeitet eine Freigabe, einen Antrag, ein Konto oder die Kontoeinstellungen, sehen andere Betrachter derselben Bank-Ansicht (Konto-Detail, Übersicht, Antrags-Warteschlange, Verwaltung, KRT-Freigaben, Org-Einheits-Bank) die Änderung ohne Neuladen — jeder in seiner eigenen Filter- und Seitenansicht. Ist gerade ein Dialog offen, erscheint stattdessen eine „Aktualisierungen verfügbar"-Schaltfläche (REQ-FE-015, ADR-0094, #1102).
+
+- **„Meine Blueprints": Filter „Nur craftbare anzeigen".** Neben „Raffinerie-Ertrag einrechnen" gibt es jetzt einen Umschalter, der die Blueprint-Liste auf die aktuell craftbaren Blueprints eingrenzt. Der Filter berücksichtigt den Raffinerie-Umschalter (ist er an, zählen auch nur dank Raffinerie craftbare Blueprints als craftbar) und lässt sich mit der Suche kombinieren (REQ-INV-019).
+
+- **Auftraggeber können ihre eigenen Aufträge jetzt einsehen und eingeschränkt bearbeiten.** Mitglieder rein nicht-profit-berechtigter Einheiten, die bisher Aufträge nur anlegen konnten, sehen nun unter „Meine Aufträge" die von ihrer Einheit angeforderten Aufträge und dürfen sie – solange noch nichts geliefert wurde – bearbeiten: Mengen ändern, noch nicht gelieferte Materialien hinzufügen oder entfernen (samt Lösen der zugeordneten Lagerbestände), die Mindestqualität anpassen und den Kommentar bearbeiten. Bearbeiter und Materialübersicht bleiben für sie ausgeblendet. Ändert der Auftraggeber einen Auftrag, werden Offiziere und Leads der bearbeitenden Einheit benachrichtigt (#1186).
+
+- **Monitoring: Abonnements der Live-Aktualisierung auf unbekannte Themen werden jetzt gezählt.** Abonniert ein Client über `/ws/sync` ein Thema, das dieser Server nicht (mehr) kennt — das Anzeichen einer Versions-Diskrepanz zwischen Client und Server —, wird das jetzt über die neue Metrik `basetool_livesync_invalid_topic_total` sichtbar und im Grafana-Board „07" (Panel „Presence relay drops/hour") dargestellt; bisher blieb dieser Fall metrisch unsichtbar (REQ-OBS-011, REQ-FE-015, ADR-0094, #1239).
+
+- **Ingest-Gateway gegen Bot-Angriffe und Scans abgesichert.** Das öffentlich erreichbare Ingest-Gateway wehrt bekannte Scanner-Anfragen (WordPress-, PHP-, Actuator-, WebDAV- und Konfig-Pfade) jetzt vor der Sicherheitsprüfung ab: bekannte Bot-Pfade und nie ausgelieferte Dateiendungen erhalten 404, nicht genutzte HTTP-Methoden (u. a. PUT/DELETE/PATCH/TRACE) 405. Die echten Schnittstellen (`/v1/…`, Health-, Metrics- und OpenAPI-Endpunkte) bleiben unberührt; jede Abweisung wird über `basetool_bot_blocked_total{rule}` sichtbar (REQ-INGEST-009) (#1202).
+
+- **Items auf der Materialbörse anbieten.** Neben „Material anbieten" gibt es jetzt „Item anbieten": craftbare Items (also solche, für die ein Blueprint existiert) lassen sich mit selbst angegebener Menge auf der Börse anbieten. Item-Angebote haben keine Qualität und keinen Standort; ein Mitglied kann dasselbe Item auch mehrfach anbieten (#1185).
+
+- **Materialbörse: Teilmengen anbieten.** Beim Freigeben eines Lager-Postens lässt sich jetzt wählen, wie viel davon angeboten wird — die ganze Menge (Schaltfläche „Alles") oder nur ein Teil. Die angebotene Menge kann später über „Angebot bearbeiten" angepasst werden und darf den aktuellen Lagerbestand nie überschreiten: Wird ein Teil des Postens ausgebucht, sinkt die angezeigte Angebotsmenge automatisch mit; wird der Posten vollständig ausgebucht, wird er gelöscht und das Angebot damit automatisch von der Börse entfernt. Filter und Sortierung „Menge" beziehen sich auf diese effektive Menge (#1183).
+
+### Changed
+
+- **Fehler behoben: Änderungen am Partyleiter und an der Frequenzübersicht einer Mission erscheinen jetzt live bei anderen Betrachtern.** Das Verwaltungs-Panel „Organisation" (Partyleiter + Frequenzübersicht) lag bisher außerhalb der live aktualisierten Bereiche, sodass ein zweiter Betrachter eine Änderung erst nach manuellem Neuladen sah — und seine nächste Bearbeitung unnötig an einem veralteten Stand scheiterte (Konflikt/409). Der Bereich wird nun wie die übrigen Missions-Abschnitte ohne Neuladen mitaktualisiert (REQ-FE-015, ADR-0094, #1120).
+
+- **Suche: Freitext-Suchbegriffe behandeln `%` und `_` jetzt als normale Zeichen.** Bisher wirkten in den Suchfeldern (Materialbörse, Nutzer-, Missions-, Operations-, Schiff-, Blueprint-, Material- und Lager-Suche) eingegebene `%`/`_` als SQL-Platzhalter (`%` = „beliebig viele Zeichen", `_` = „ein beliebiges Zeichen") und verfälschten die Treffer bzw. konnten einen langsamen Scan auslösen. Die Zeichen werden jetzt zentral maskiert und literal gesucht; die Ergebnisse bleiben wie bisher auf den Berechtigungs-Scope begrenzt.
+
+- **Sicherheit: Backend begrenzt jetzt die Größe von JSON-Import-Anfragen (Raffinerie-Screenshot-Import).** Ein übergroßer Nicht-Multipart-JSON-Body auf dem Import-Endpunkt wird nun mit 413 abgewiesen, bevor er in den Speicher geladen wird — bisher band Jackson erst die gesamten Arrays, ehe die `@Size`-Prüfung griff (Speicher-DoS). Der Schutz greift auch bei fehlender `Content-Length` (chunked). Neue Metrik `basetool_request_body_rejected_total` samt Alarm `RequestBodyRejectedSpike`.
+
+- **Sicherheit: JWT-Audience-Prüfung für Backend und Ingest-Gateway aktivierbar gemacht (standardmäßig aus).** Beide Dienste lassen sich jetzt so konfigurieren, dass sie nur noch Tokens mit `aud=basetool-backend` akzeptieren statt jedes gültig signierte Realm-Token; dem Backend fehlte dafür bisher die Verdrahtung. Gesteuert über die Umgebungsvariablen `IRI_BACKEND_EXPECTED_AUDIENCES` bzw. `IRI_INGEST_EXPECTED_AUDIENCES`, standardmäßig leer (aus), damit Entwicklungs- und E2E-Realms unberührt bleiben. In Produktion beide auf `basetool-backend` setzen — erst nachdem geprüft wurde, dass der Realm diesen `aud` in die Tokens schreibt, sonst werden alle Anmeldungen abgewiesen (Audit L-1).
+
+- **Sicherheit: Alle Inline-`style`-Attribute aus den Templates entfernt; die CSP sperrt Inline-Styles jetzt vollständig (`style-src-attr 'none'`).** Bisher erlaubte die Content-Security-Policy Inline-`style=""`-Attribute (`'unsafe-inline'`) — der letzte verbliebene CSP-Kompromiss. Alle rund 640 statischen Inline-Styles wurden in generierte CSS-Klassen (`inline-migration.css`) überführt, bedingte Werte (Modal-Sichtbarkeit, Deckkraft, Farbe) in Klassen-Umschalter, und dynamische Fortschrittsbalken-Breiten in ein per JavaScript gesetztes Attribut; die Modal-/Anzeige-Umschalter laufen nun über `classList` statt über Inline-Styles. Ein eingeschleustes Inline-`style`-Attribut wird damit vom Browser blockiert (ADR-0093).
+
+- **Sicherheit: Präsenz-WebSocket der Missionsdetails gegen Überlastung durch einen einzelnen Nutzer gehärtet.** Der „Wer bearbeitet gerade?"-Kanal einer Mission verarbeitete Fokus-/Heartbeat-Nachrichten bisher ohne Begrenzung — ein einzelner angemeldeter Client konnte mit beliebig vielen frei erfundenen Abschnitts-Schlüsseln den Speicher und die Broadcast-Last für alle Betrachter einer Mission unbegrenzt aufblähen. Fokus-/Heartbeat-Nachrichten werden jetzt wie der bereits abgesicherte „geändert"-Kanal pro Sitzung ratenbegrenzt, überlange Abschnitts-Schlüssel verworfen und die Zahl der je Mission geführten Abschnitte gedeckelt (REQ-FE-010).
+
+- **Sicherheit: Anonymes Anlegen von Item-Aufträgen unterliegt jetzt demselben engen Ratenlimit wie das Anlegen von Material-Aufträgen.** Die Ratenlimit-Regel deckte bisher nur `POST /api/v1/orders` ab; das aufwendigere Item-Auftrags-Anlegen unter `POST /api/v1/orders/items` fiel nur unter das lockere Gesamtlimit. Beide Pfade teilen sich nun das enge Anlege-Limit (REQ-SEC-011).
+
+- **Sicherheit: Das gemeinsame Geheimnis der Discord-Konto-Prüfung muss jetzt mindestens 32 Zeichen lang sein.** Der interne Endpunkt zur Kollisionsprüfung bei der Discord-Erstanmeldung ist absichtlich vom Ratenbegrenzer ausgenommen; sein gemeinsames Geheimnis ist damit die einzige Absicherung. Ein zu kurzes, erratbares Geheimnis lässt den Dienst jetzt beim Start abbrechen, ein leeres deaktiviert den Endpunkt weiterhin (REQ-SEC-022).
+
+- **Sicherheit/Lieferkette: Signierte SBOMs bilden nur noch die ausgelieferte Laufzeit ab; die Gradle-Distribution ist per Prüfsumme fixiert.** Die CycloneDX-SBOMs (Backend, Frontend, Ingest) enthielten bisher auch Build-/Test-Abhängigkeiten und wiesen eine bereits gepatchte PostgreSQL-Version (42.7.11 statt 42.7.12) aus, was Downstream-CVE-Scanner mit Fehlalarmen gegen nie ausgelieferte Bibliotheken versorgte; sie sind jetzt auf den Laufzeit-Klassenpfad eingegrenzt und neu erzeugt. Zusätzlich ist die Gradle-Distribution über `distributionSha256Sum` an die offizielle Prüfsumme gebunden, sodass ein manipuliertes Wrapper-Distributionsarchiv den Build abbricht.
+
+- **Härtung: Live-Aktualisierung gegen Signal-Fluten einzelner Nutzer abgesichert.** Die Zahl gleichzeitig offener Live-Verbindungen (`/ws/sync`) pro Nutzer ist jetzt gedeckelt, und die Rate der Live-Signale je Ansicht (z. B. Auftrags-Warteschlange, Kartellbank) ist insgesamt begrenzt — unabhängig davon, wie viele Verbindungen oder Tabs beteiligt sind. So kann ein fehlerhafter oder böswilliger Client die Live-Aktualisierung anderer nicht mehr durch eine Signal-Flut ausbremsen; normale Mehrfach-Tab-Nutzung bleibt unberührt (REQ-FE-015, ADR-0094, #1243).
+
+- **Fehler behoben: Der vollständige Docker-Entwicklungs-Stack (`docker compose --profile dev up`) startet den Backend-Dienst wieder sauber.** Die Redis-Verbindung für die Live-Benachrichtigungs-Fan-out (ADR-0094) wird jetzt in allen Profilen aus `REDIS_HOST` aufgelöst (der Compose-Anchor setzt sie auf den `redis`-Dienst), statt im Dev-Profil auf `localhost` zu zeigen, und `backend-dev` wartet vor dem Start auf einen gesunden `redis-dev`. Produktion bleibt unverändert (REQ-FE-015, ADR-0094, #1246).
+
+- **Sicherheit: PostgreSQL-JDBC-Treiber auf 42.7.12 angehoben (CVE-2026-54291).** Der von Spring Boot vorgegebene Treiber 42.7.11 konnte einen mit `channelBinding=require` angeforderten SCRAM-Handshake stillschweigend auf die Variante ohne Kanalbindung herabstufen und so den Schutz vor Man-in-the-Middle-Angriffen verlieren; die gepatchte Version 42.7.12 wird jetzt erzwungen. Der wöchentliche OWASP-Abhängigkeits-Scan ist damit wieder grün — die parallel gemeldeten httpcore-4.4.x-Funde (CVE-2026-54399/-54428) waren Fehlalarme, da die CVEs nur die nicht ausgelieferte HttpCore-5.x-Reihe betreffen, und wurden begründet unterdrückt.
+
+- **Navigation: „Blueprint-Verfügbarkeit" liegt jetzt unter „Flotte & Logistik".** Der Menüpunkt wanderte aus der Gruppe „Handel" in die Gruppe „Flotte & Logistik" und steht dort direkt unter „Auftragsverwaltung".
+
+- **Härtung: Metrik- und Health-Endpunkte der öffentlichen Dienste laufen jetzt auf einem eigenen, nur intern erreichbaren Port.** Frontend und Ingest-Gateway liefern `/actuator/**` (Health und Prometheus-Metriken) in Produktion nicht mehr über den öffentlichen App-Port aus, sondern über einen dedizierten Management-Port (Frontend 18091, Ingest 11272), der weder auf dem Host noch über den Reverse-Proxy veröffentlicht wird — erreichbar nur vom Monitoring-Netz (Prometheus) und vom containerinternen Health-Check. Der öffentliche Port beantwortet `/actuator/**` damit auf Anwendungsebene mit 404, unabhängig von der Edge-Sperre — analog zum bereits so betriebenen Keycloak-Management-Port. Backend bleibt unverändert (ohnehin nicht aus dem Internet erreichbar). Nur Produktion betroffen; Entwicklungs-/Test-/E2E-Umgebungen bleiben unverändert (ADR-0090, REQ-OBS-005).
+
+- **Härtung: Auch der Health-Endpunkt der öffentlichen Dienste wird laufend als „von außen gesperrt" überwacht.** Bisher prüfte die Edge-Überwachung nur, dass `/actuator/prometheus` von außen mit 404 abgewiesen wird; die Health-Endpunkte (`/actuator/health`) blieben ungeprüft. Die internen Blackbox-Sonden und der tägliche externe Prüf-Workflow bestätigen jetzt für Frontend und Ingest-Gateway, dass sowohl Metriken als auch Health von außen 404 liefern — driftet die Sperre (etwa nach einem NPM-Umbau), schlägt `EdgeActuatorDenyBroken` an. Metriken erreichen Prometheus weiterhin über das interne Monitoring-Netz, der Health-Check läuft containerintern (REQ-OBS-005/-012). Anonyme Seitenaufrufe (etwa durch Uptime- oder Suchmaschinen-Bots) legten bisher jeweils eine 30 Tage gültige Sitzung in Redis an; so liefen über 16.000 verwaiste Sitzungen auf, die den Speicher langfristig gefüllt und irgendwann Anmeldungen blockiert hätten. Nicht angemeldete Sitzungen laufen jetzt nach kurzer Zeit ab, während das 30-Tage-Fenster „Angemeldet bleiben" erst nach erfolgreicher Anmeldung greift und für Mitglieder unverändert bleibt. Ein neuer Alarm (`ActiveSessionsRunaway`) warnt, falls sich so etwas wiederholt (REQ-SEC-025, ADR-0088).
+
+- **Fehler behoben: Ein als Transfer gekennzeichnetes Ausbuchen ohne Ziel vernichtete stillschweigend Lagerbestand.** Wurde ein Ausbuchvorgang ausdrücklich als Transfer, aber ohne Zielperson und ohne Zielort abgeschickt (nur über einen fehlerhaften Client erreichbar, nicht über die Oberfläche), entfernte das System den Quellbestand und protokollierte ihn fälschlich als „verbraucht", statt die Anfrage abzuweisen. Solche zielosen Transfers werden jetzt mit einer klaren Fehlermeldung (400) zurückgewiesen; es geht kein Bestand verloren und es entsteht kein irreführender Protokolleintrag (REQ-INV-025).
+
+- **Fehler behoben: Nach einem Dialog im Lager (z. B. Umbuchen oder Ausbuchen) klappte die Ansicht wieder komplett zu.** Nach einer Aktion über ein Dialogfenster wurde die Lagertabelle an Ort und Stelle neu aufgebaut und alle zuvor aufgeklappten Material-Gruppen und Standort-Stapel waren wieder eingeklappt. Der Aufklapp-Zustand bleibt jetzt erhalten: aufgeklappte Gruppen und Stapel bleiben offen (und ein wiederhergestellter Stapel lädt seine aktualisierten Einträge neu) — auch nach einem Filterwechsel. Betrifft „Mein Lager" und „Globales Lager" (REQ-INV-002).
+
+- **Fehler behoben: Kein Serverfehler mehr, wenn zwei Logistiker derselben Squadron gleichzeitig die erste Eintragung auf denselben Materialposten eines Spezialkommando-Auftrags vornehmen.** Bisher konnte der Verlierer dieses seltenen Wettlaufs einen internen Serverfehler (500) statt einer gespeicherten Eintragung erhalten. Die Eintragung wird jetzt automatisch in einer frischen Transaktion erneut versucht (der zuletzt Speichernde gewinnt); nur ein tatsächlich anhaltender Konflikt meldet weiterhin sauber „Konflikt" (409) statt eines Serverfehlers.
+
+- **Fehler behoben: Ein Materialposten eines Spezialkommando-Auftrags kann nicht mehr überbucht werden, wenn zwei verschiedene Squadrons gleichzeitig ihre erste Eintragung vornehmen.** Bisher sahen sich zwei Squadrons, die im selben Moment erstmals denselben Posten eintrugen, gegenseitig nicht und trugen beide ihre Menge ein, sodass die Summe die benötigte Menge überschreiten konnte. Die Eintragungen eines Auftrags werden jetzt kurz serialisiert (Sperre auf dem Auftrag), sodass die zweite Squadron den bereits eingetragenen Anteil sieht und bei Überbuchung sauber mit einer Fehlermeldung abgewiesen wird (REQ-ORDERS-024, ADR-0092).
+
+- **Fehler behoben: Materialbörse zeigt jetzt bei jedem Anbieter dessen Einheiten-Abzeichen an.** Bisher blieb das Abzeichen leer, wenn der angebotene Posten keiner Einheit zugeordnet war (etwa persönlicher oder Alt-Bestand) — obwohl der Anbieter Mitglied einer Staffel ist. Das Abzeichen richtet sich jetzt nach den Mitgliedschaften des Anbieters selbst: Alle Staffeln, Spezialkommandos und Bereiche, denen er angehört, erscheinen hinter dem Namen (Staffeln zuerst, dann Spezialkommandos, dann Bereiche, je Gruppe alphabetisch) — ein „primäres" wird nicht mehr ausgewählt (REQ-MARKET-001).
+
+- **Verbesserung: Nutzer-Auswahlfelder suchen jetzt serverseitig statt die ganze Mitgliederliste vorzuladen.** Die Auswahlfelder, die bisher alle Mitglieder komplett vorluden (u. a. in Lager, Raffinerie, Aufträgen, Missionen, Rollen-/Leitungsverwaltung und der Kartellbank), durchsuchen die Mitglieder jetzt erst bei der Eingabe über den Server — schneller und skalierbar für tausende Konten. Gäste-Felder und die Halter-Auswahl bleiben unverändert (#1193).
+
+- **Verbesserung: Auch die Einzahler-/Empfänger-Auswahl im Kontobewegungs-Dialog sucht jetzt serverseitig.** Das Gegenpartei-Auswahlfeld der Ein-/Auszahlung lud als letztes Bank-Auswahlfeld noch die gesamte Nutzerliste vor; es durchsucht die Mitglieder jetzt erst bei der Eingabe über den Server. Der „Kein Tool-Account"-Umschalter und die abhängige Einheiten-Auswahl funktionieren unverändert (Folgeänderung zu #1193).
+
+- **Fehler behoben: Serverseitige Nutzer-Auswahlfelder zeigten beim bloßen Aufklappen „Keine passenden Nutzer".** Wurde ein solches Feld ohne Eingabe geöffnet, blieb die Liste leer, weil die leere Suchanfrage am Server als Fehler (HTTP 500) abgewiesen wurde. Ein leeres Suchfeld liefert jetzt die (nach Berechtigung eingegrenzte) Mitgliederliste, sodass sich ein Nutzer wieder direkt auswählen lässt, ohne erst zu tippen (Folgeänderung zu #1193).
+
+- **Weniger Log-Rauschen, wenn das Backend kurz nicht erreichbar ist (z. B. bei einem Neustart/Deploy).** Ein durch den offenen Circuit-Breaker kurzgeschlossener Aufruf wurde bisher dreifach als `WARN` protokolliert und flutete bei jedem Backend-Neustart das Log, sodass ein erwarteter, sich selbst behebender Aussetzer kaum von einem echten Vorfall zu unterscheiden war. Solche kurzgeschlossenen Aufrufe werden jetzt auf `DEBUG` gestuft; das einmalige Öffnen des Breakers, die Metrik und der Alert bleiben als Signal erhalten (#1203).
+
+- **Fehler behoben: Ein langsamer, aber erfolgreicher Backend-Aufruf wird nicht mehr als WARN protokolliert.** Erfolgreiche Aufrufe (z. B. `POST /api/v1/users/sync` mit Status 200), die nur die Langsam-Schwelle überschritten, erschienen im Log fälschlich als WARN. Sie werden jetzt als INFO mit dem Marker „Slow backend call" geführt; WARN bleibt echten Serverfehlern (5xx) und Netzwerkfehlern vorbehalten. Die Latenzüberwachung erfolgt weiterhin über das `http.client.requests`-p95-Histogramm (#1204).
+
+- **Fehler behoben: Hibernate-Warnungen aus dem Backend-Log entfernt.** Die überflüssige explizite `hibernate.dialect`-Angabe (PostgreSQL wird automatisch erkannt) wurde entfernt und die veralteten `@Valid`-Container-Annotationen auf die Typargument-Form (`List<@Valid X>`) umgestellt. Die Validierung bleibt unverändert; das Backend-Log startet nun ohne diese Warnungen (#1206).
+
+- **Fehler behoben: Keine wiederkehrenden Warnungen mehr im Log nach der UEX-Synchronisation.** UEX vergibt mehreren Item-IDs (Basis-Item und seine Skins) dieselbe Spiel-UUID; da `external_uuid` eindeutig ist, kann nur eine Zeile die UUID führen. Das ist erwartetes, dauerhaftes Verhalten, wurde aber bisher bei jedem Lauf pro betroffener Zeile als Warnung geloggt. Diese Fälle werden jetzt auf DEBUG geloggt; die Laufzusammenfassung nennt stattdessen die Gesamtzahl (`sharedUuidDeclined`) (#1205).
+
+- **Fehler behoben: Keine `aurora_version()`-Fehlermeldungen mehr im Keycloak-Datenbanklog.** Die in Keycloak 26.7 neu standardmäßig aktive „Asynchronous-Commit"-Optimierung führte beim Start `SELECT aurora_version()` zur AWS-Aurora-Erkennung aus; auf unserer normalen PostgreSQL-Datenbank existiert diese Funktion nicht, sodass bei jedem Keycloak-Start ein (harmloser, von Keycloak abgefangener) `ERROR: function aurora_version() does not exist` das db-keycloak-Log verschmutzte. Die Optimierung ist nun per `KC_SPI_CONNECTIONS_JPA_QUARKUS_ASYNC_COMMIT=false` abgeschaltet — Verhalten wie vor dem 26.7-Update, die Probe wird an der Quelle vermieden (#1207).
+
+- **Fehler behoben: Wiederkehrende WARN-Meldung im Frontend-Log entfernt.** Spring Data warnte bei jedem Seitenaufruf, ein `@ModelAttribute`-Parameter des Staffel-Kontexts sei „nicht mit @ProjectedPayload annotiert" — ein Fehlalarm, da es sich um normale Listen und nicht um Projektionen handelt. Die im Frontend ohnehin ungenutzte Spring-Data-Web-Unterstützung wird jetzt nicht mehr geladen, wodurch die Fehlmeldung an der Wurzel entfällt (statt nur den Logger stummzuschalten) (#1202).
+
+- **Fehler behoben: Die RED-Panels im Tracing-Dashboard zeigten „No data" mit Fehlerhinweis.** Die drei Panels (Request-Rate, p95-Latenz, Fehlerrate) liefen als TraceQL-Metrics-Abfragen gegen Tempo, was den nicht aktivierten `local-blocks`-Prozessor voraussetzt. Sie beziehen ihre Werte jetzt — nach Route gruppiert — aus den vorhandenen `http_server_requests`-Histogrammen (Prometheus), denselben Serien wie die Latenz-/5xx-Alarme. Kein zusätzlicher Speicher-, Tempo-Neustart- oder Reihen-Aufwand; die Trace-Tabellen „Slow traces"/„Error traces" bleiben unverändert an Tempo (ADR-0076).
+
+- **Weniger fälschliche ERROR-Logs im Frontend bei Backend-Aussetzern.** Zahlreiche Seiten- und Schreib-Handler protokollierten einen bereits an der Backend-Grenze einmalig geloggten Fehler (erwartete 4xx wie Validierung/Konflikt oder einen kurzgeschlossenen Circuit-Breaker) ein zweites Mal als ERROR und konnten so bei einem Backend-Neustart schon beim Öffnen der Startseite oder einer Admin-Seite den `LogbackErrorSpike`-Alarm fälschlich auslösen; solche Fälle werden jetzt einheitlich als DEBUG (Grenze hat bereits geloggt) bzw. WARN geführt, während unerwartete Fehler weiter als ERROR sichtbar bleiben und genuine 500er in AJAX-Handlern nun korrekt als ERROR statt DEBUG erscheinen. Zusätzlich wird der Keycloak-Callsign-Handle nicht mehr ins Log geschrieben und ein abgebrochener Benachrichtigungs-Stream erzeugt keine überflüssige ERROR-Zeile mehr (REQ-OBS-001/-004) (#1227).
+
+- **Weniger Log-Rauschen und bessere Diagnose im Backend.** Abgefangene Fehlschläge der externen Kataloge (UEX, SC-Wiki) werden von ERROR auf WARN gestuft — ein Ausfall dieser instabilen Community-APIs löste über die Endpunkt-/UUID-Fächerung sonst fälschlich den `LogbackErrorSpike`-Alarm aus, obwohl der `external_fetch_errors`-Zähler das eigentliche Signal ist; leere UEX-Antworten werden nun einheitlich als WARN sichtbar statt still verworfen, der 429-Ratenbegrenzer und doppelte WARN-Zeilen für erwartete 400er fluten das Log nicht mehr, fehlgeschlagene P4K-Importe behalten ihren Stacktrace, und Änderungen am öffentlichen Ankündigungs-Banner werden protokolliert. Zudem gelangen ein Gäste-Name und der rohe abgelehnte Feldwert eines JSON-Parsefehlers nicht mehr ins Log (REQ-OBS-001/-004/-013) (#1228).
+
+- **Neue Frühwarn-Metriken für schwer erkennbare Ausfälle.** Drei bisher nur im Log (oder gar nicht) sichtbare Fehlerzustände liefern jetzt ein beschränkt gelabeltes `basetool_*`-Signal mit passendem Alarm: ein fehlgeschlagener Keycloak-Roster-Abruf (`basetool_keycloak_sync_fetch_failures_total` → `KeycloakSyncFetchFailing`), der sonst als erfolgreicher Sync mit 0 Nutzern erschien und lokale Rollen driften ließ; ein dauerhaft fehlschlagender einzelner SC-Wiki-Sync-Schritt (`basetool_scheduled_job_step_failures_total{step}` → `ScWikiStepFailing`), den der Gesamtjob als Erfolg verbuchte; und die REQ-SEC-017-Sperre wartender Konten, die als 403 auf Filter-Ebene an der Fehler-Metrik vorbeilief (`basetool_http_error_total{code=PENDING_APPROVAL}` → `PendingApprovalBlockSpike`). Zusätzlich meldet der Prometheus-Scrape-Endpunkt beim Start, ob er per Basic-Auth abgesichert ist oder mangels Zugangsdaten auf Deny-All steht (REQ-OBS-011) (#1230).
+
+- **Ingest-Gateway: bessere Nachvollziehbarkeit und ein bisher blinder DoS-Schutz.** Das Gateway schreibt jetzt pro `/v1`-Anfrage eine Zugriffs-Logzeile (Methode, Pfad, Status, Dauer) — bisher blieb ein erfolgreicher, abgewiesener (413/429) oder fehlgeschlagener Handoff ohne korrelierte Logspur. Ein durch den offenen Circuit-Breaker kurzgeschlossener Backend-Aufruf wird nun als DEBUG statt WARN geführt (bei einem Backend-Neustart floss sonst pro Aufruf eine WARN-Zeile), während der einmalige Breaker-Zustandswechsel als WARN protokolliert wird. Zudem liefert die 413-Abweisung zu großer Payloads jetzt eine Metrik (`basetool_ingest_payload_rejected_total`) samt Alarm (`IngestPayloadRejectedSpike`), sodass ein Flut- oder Scan-Angriff auf die einzige öffentlich erreichbare Fläche erkennbar wird (REQ-OBS-001/-011) (#1232).
+
+- **Fehler behoben: Ein vorübergehender Keycloak-Fehler während der täglichen Nutzer-Synchronisation stuft keine Konten mehr falsch ein.** Schlug beim rollenindizierten Sync das Auslesen der Mitglieder einer Rolle vorübergehend fehl (Timeout/5xx), wurde diese Rolle bisher stillschweigend allen Inhabern entzogen — ein neu angelegtes Admin-Konto konnte so als „ausstehend" in der Freigabe-Warteschlange landen und bestehende Admins wurden kurzzeitig herabgestuft. Ein solcher Fehler überspringt jetzt den ganzen Lauf (kein degradiertes Schreiben), und die Rollenzuordnung ist gegen Groß-/Kleinschreibungs-Unterschiede zwischen lokalem Katalog und Keycloak abgesichert (REQ-SEC-043).
+
+## [v1.2.6](https://github.com/krt-profit/basetool/releases/tag/v1.2.6) - 2026-07-09
+
+### Added
+
+- **Benachrichtigung, wenn jemand Interesse an einem Materialbörse-Angebot anmeldet.** Anbieter erhalten jetzt eine In-App-Benachrichtigung, sobald ein Mitglied Interesse an einem ihrer Angebote anmeldet, und müssen die Börse dafür nicht mehr selbst im Blick behalten (#1187).
+
+### Changed
+
+- **Fehler behoben: Weiße Rahmen und helle Überlagerung in der Materialbörse-Liste entfernt.** Die Angebotsliste rendert ihre Einträge als Schaltflächen; ohne zurückgesetzte Browser-Standardoptik zeigten nicht ausgewählte Einträge eine helle Überlagerung und weiße Rahmen. Die Liste folgt jetzt wieder dem KRT-Designsystem (#1184).
+
+- **Fehler behoben: Die Materialbörse zeigt jetzt die richtige Mengeneinheit.** Angebote stückbasierter Materialien (Einheit „Stück") wurden auf der Börse, im Detailbereich und im Freigabe-Dialog fälschlich immer als „SCU" angezeigt. Die Menge folgt jetzt der Einheit des Materials (SCU oder Stück) – wie im Lager (#1182).
+
+## [v1.2.5](https://github.com/krt-profit/basetool/releases/tag/v1.2.5) - 2026-07-09
+
+### Changed
+
+- **Keycloak auf 26.7.0 angehoben (Sicherheits- und Wartungsupdate).** Der Anmeldedienst (Keycloak) wird von 26.6.4 auf das Minor-Release 26.7.0 aktualisiert — mit mehreren Sicherheitskorrekturen (u. a. HTTP-Parameter-Pollution im OIDC-Endpunkt, Umgehung der CIBA-Brute-Force-Sperre, TOCTOU beim Umbenennen von Admin-Rollen und eine Rechte-Eskalation in der alten feingranularen Rechteverwaltung). Keine Funktions- oder Konfigurationsänderung: Anmeldung, Realm-Import und der `keycloak-spi`-Provider (Discord-Föderation + Mitgliedschafts-Gate) laufen unverändert weiter. Das gepinnte Container-Image (`quay.io/keycloak/keycloak:26.7`-Digest, weiterhin JDK 21) und die SPI-Artefakte des `keycloak-spi`-Moduls ziehen mit. **Deploy-Hinweis:** Beim nächsten Deploy lädt Compose das neue Image-Digest; der Keycloak-Container muss dafür neu gestartet werden.
+
+- **Verbesserung: Die periodische Keycloak-Synchronisation läuft jetzt einmal täglich um 05:00 (statt stündlich) und belastet Keycloak deutlich weniger.** Sie fragt Rollen jetzt rollen-indiziert statt einzeln pro Nutzer ab und liest Discord-Verknüpfungen nur noch für Konten ohne bestehende Verknüpfung — bei 5000 Konten sinkt die Zahl der Keycloak-Aufrufe pro Lauf von rund 10.000 auf wenige Dutzend. Für eine sofortige Aktualisierung dient der „Jetzt synchronisieren"-Knopf; einstellbar über `APP_KEYCLOAK_SYNC_CRON` / `APP_KEYCLOAK_SYNC_ZONE` (Standard `0 0 5 * * *` / `Europe/Berlin`, ersetzt `APP_KEYCLOAK_SYNC_INTERVAL`).
+
+- **Kapazität: Das Tool ist jetzt auf 5000 Nutzerkonten und 200 gleichzeitige Nutzer ausgelegt.** Keycloak, seine Datenbank, die Backend-Datenbank und Redis wurden auf dem 16-GB-Host entsprechend hochdimensioniert; das 30-tägige Anmeldefenster bleibt erhalten (ADR-0085).
+
+## [v1.2.4](https://github.com/krt-profit/basetool/releases/tag/v1.2.4) - 2026-07-09
+
+### Added
+
+- **Neuer Knopf „Jetzt synchronisieren" in der Mitgliederverwaltung.** Administratoren können die Keycloak-Synchronisation manuell anstoßen, statt bis zu eine Stunde auf den nächsten automatischen Lauf zu warten; nach Abschluss erscheint eine Bestätigung und die Mitgliederliste wird direkt mit den aktualisierten Daten neu geladen.
+
+### Changed
+
+- **Verbesserung: Deutlich seltener „Sitzung abgelaufen (gleichzeitige Anmeldungen)".** Die Obergrenze gleichzeitiger Anmeldungen pro Nutzer wurde von 2 auf 10 angehoben. In Kombination mit dem 30-tägigen Sitzungsfenster verdrängte die niedrige Grenze bisher echte Sitzungen von Nutzern, die sich von mehreren Geräten/Browsern anmelden, und zeigte ihnen die Meldung „This session has been expired". Die neueste Anmeldung gewinnt weiterhin, und niemand wird ausgesperrt.
+
+- **Verbesserung: Ein vorübergehender Laufzeitfehler eines Dienstes löst keinen stundenlangen Neustart-/Rollback-Sturm mehr aus.** In der Nacht zum 2026-07-09 erschöpfte das Backend seine Thread-Obergrenze, wodurch sein Health-Check kippte und die automatische Bereitstellung das unveränderte Release wiederholt (fälschlich) „zurückrollte". Der Deploy-Automatismus unterscheidet jetzt einen echten Fehl-Release von einem reinen Laufzeitproblem am bereits laufenden Release und startet in letzterem Fall nur den betroffenen Dienst gezielt neu, statt die Version zurückzurollen. Ein kurzer Keycloak-Ausfall nimmt zudem die App-Container nicht mehr aus dem Health-Zustand (ADR-0083/0084).
+
+- **Verbesserung: Die periodische Keycloak-Synchronisation läuft jetzt stündlich statt jede Minute** und belastet Keycloak dadurch deutlich weniger. Die Frequenz ist über die Umgebungsvariable `APP_KEYCLOAK_SYNC_INTERVAL` (Standard `PT1H`) einstellbar.
+
+- **Monitoring: Frühwarnung bei Thread-Erschöpfung.** Ein neuer Alert (`JvmThreadsHigh`) warnt, sobald ein Dienst sich seiner Thread-Obergrenze nähert — die Ursache des Vorfalls vom 2026-07-09; ein nicht behebbarer Laufzeitfehler am laufenden Release meldet sich jetzt eindeutig (`DeployHealthRestartFailing`) statt als irreführendes Deploy-Rollback.
+
+- **Verbesserung: Die bearbeitende Einheit wird jetzt in der Auftragsübersicht angezeigt.** In der Auftragsverwaltung erscheint die aktuell zuständige Einheit (Staffel oder Spezialkommando) direkt unter der Auftrags-ID und -art — bisher war sie nur in der Auftragsdetailansicht sichtbar (#1188).
+
+## [v1.2.3](https://github.com/krt-profit/basetool/releases/tag/v1.2.3) - 2026-07-08
+
+## [v1.2.2](https://github.com/krt-profit/basetool/releases/tag/v1.2.2) - 2026-07-08
+
+### Changed
+
+- **Fehler behoben: In der Materialbörse ließen sich nicht alle Materialien anbieten.** Die Auswahlliste im Dialog „Material anbieten" zeigte nur die ersten 50 Lager-Posten (alphabetisch) und filterte danach im Browser, sodass Materialien weiter hinten im Alphabet (etwa Savrilium) nicht gefunden und nicht angeboten werden konnten — ohne Fehlermeldung. Die Materialsuche im Dialog läuft jetzt serverseitig, sodass jeder eigene Lager-Posten über die Suche gefunden und angeboten werden kann (REQ-MARKET-002).
+
+## [v1.2.1](https://github.com/krt-profit/basetool/releases/tag/v1.2.1) - 2026-07-08
+
+### Changed
+
+- **Fehler behoben: Der Freigabe-Dialog der Materialbörse öffnete sich unsichtbar.** Sowohl der Knopf „Material anbieten" als auch die Lager-Checkbox „Für Börse freigeben" öffneten den Dialog, der jedoch unsichtbar blieb — es ließ sich kein Material einstellen, und ein späteres Abwählen der Checkbox schlug mit „Kein aktives Angebot" fehl. Der Dialog wird jetzt korrekt angezeigt (#1174).
+
+## [v1.2.0](https://github.com/krt-profit/basetool/releases/tag/v1.2.0) - 2026-07-07
+
+### Added
+
+- **Neue Materialbörse (Flotte & Logistik).** Ein zentraler, für alle Mitglieder sichtbarer Marktplatz: Spieler geben Überschüsse aus ihrem Lager frei (Checkbox „Für Börse freigeben" mit Markdown-Bemerkung, max. 20.000 Zeichen) und andere melden Interesse an. Angezeigt wird nur, wer welches Material in welcher Qualität und Menge anbietet — Standort und Übergabeort bleiben privat, und Interessenten-Namen sieht ausschließlich der Anbieter. Verhandlung und Übergabe laufen direkt zwischen den Spielern (REQ-MARKET-001…010, ADR-0082).
+
+- **Materialbörse im Audit-Log.** Freigabe, Deaktivierung, Bemerkungs-Bearbeitung sowie An- und Abmelden von Interesse werden protokolliert; das Admin-Audit-Log erhält einen eigenen „Materialbörse"-Tab.
+
+### Changed
+
+- **Verbesserung: Die Operationsseite lädt schneller und belastet Datenbank und Verbindungspool unter hoher Gleichzeitigkeit deutlich weniger.** Die Finanzübersicht einer Operation ermittelt ihre Summen jetzt über schlanke Datenbank-Aggregate, statt sämtliche Finanz- und Raffinerieeinträge aller Einsätze zu laden; die Aufschlüsselung je Einsatz wird erst beim Aufklappen nachgeladen, die vier Detail-Abfragen laufen parallel, und der „Bezahlt"-Schalter aktualisiert nur noch die betroffene Zeile, statt die gesamte Auszahlung neu zu berechnen. Die Operationsauswahl auf der Einsatzseite wird zudem nur noch beim vollständigen Seitenaufbau geladen und auf aktuelle Operationen begrenzt (#1109).
+
+- **Verbesserung: Live-Aktualisierungen auf der Missionsseite bleiben stabil, auch wenn einzelne Betrachter eine hängende Verbindung haben.** Ein „eingefrorener" Betrachter (etwa ein zugeklapptes Notebook mit noch offener Verbindung) blockiert nicht mehr die Echtzeit-Aktualisierungen aller übrigen Betrachter; zudem werden gleichzeitig verbindende und trennende Betrachter jetzt zuverlässig erfasst, sodass niemand mehr still eine veraltete Ansicht behält (#1109).
+
+- **Fehler behoben: Der Benachrichtigungs-Zähler konnte unmittelbar nach einer Aktion kurz einen veralteten Stand anzeigen.** Die Echtzeit-Benachrichtigung wird jetzt erst nach dem endgültigen Speichern ausgelöst, sodass die anschließende Aktualisierung den korrekten ungelesenen Stand liest (#1109).
+
+- **Fehler behoben: Beim Bearbeiten einer Operation ohne JavaScript zeigte ein Bearbeitungskonflikt eine irreführende allgemeine Fehlermeldung.** Ein Konflikt (gleichzeitige Bearbeitung durch jemand anderen) meldet jetzt korrekt, dass neu geladen werden muss, statt einen unklaren Fehler anzuzeigen (#1109).
+
+- **Verbesserung: Die Oberfläche ist unter hoher Last stabiler.** Sehr große Katalog-Abfragen (etwa die Materialübersicht) werden bei gleichzeitigem Zugriff nur noch einmal geladen statt mehrfach parallel, und die Zahl gleichzeitiger Echtzeit-Verbindungen pro Nutzer (viele offene Tabs) wird begrenzt (#1109). Gleichzeitige Live-Aktualisierungen und Teilansichten belasten den Server zudem etwas weniger, und die Auftrags-Detailseite lädt die Nutzerliste nur noch beim vollständigen Seitenaufbau (#1109).
 
 ## [v1.1.11](https://github.com/krt-profit/basetool/releases/tag/v1.1.11) - 2026-07-07
 

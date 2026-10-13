@@ -4,7 +4,7 @@
   hierarchy and the per-module enums in Phase 1, P1-12, 2026-10-04)
 - **Date:** 2026-10-01
 - **Deciders:** @greluc (owner decision D-09)
-- **Related:** [domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md) §5.5, §8.1 ·
+- **Related:** [domain modularisation plan](../archive/DOMAIN_MODULARISATION_PLAN.md) §5.5, §8.1 ·
   [REST API cut](../modularisation/rest-api-cut.md) (*Contract machinery*, error-code registry) ·
   spec REQ-API-004, REQ-API-007 ·
   [ADR-0231](0231-the-backend-becomes-a-modular-monolith-one-package-per-domain.md) ·

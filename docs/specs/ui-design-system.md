@@ -1773,7 +1773,7 @@ whole app.
 The brand assets themselves — their artwork, variants and rasters — are authored and versioned in
 the design skill `assets/`; this spec governs only *where the app applies them* (REQ-UI-019). The
 desktop SC Extractor's GUI design lives in
-[`docs/DESIGN_SC_EXTRACTOR.md`](../DESIGN_SC_EXTRACTOR.md).
+[`docs/archive/DESIGN_SC_EXTRACTOR.md`](../archive/DESIGN_SC_EXTRACTOR.md).
 
 **Material-amount input fields** (SCU/PIECE precision, positivity, the `.`/`,` separator) are
 cross-cutting (inventory, orders, refinery), so their rules live in their own spec —

@@ -223,7 +223,7 @@ not happened.
   production switch is two owner steps with no login window —
   [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md).
 - **Three of the twelve Keycloak hardening steps are open** —
-  [`KEYCLOAK_HARDENING_RUNBOOK.md`](../KEYCLOAK_HARDENING_RUNBOOK.md): step 2 (decide *Forgot
+  [`KEYCLOAK_HARDENING_RUNBOOK.md`](../archive/KEYCLOAK_HARDENING_RUNBOOK.md): step 2 (decide *Forgot
   password* on Keycloak's own SMTP; `resetPasswordAllowed` was still on at the last recorded
   export), step 11 (OTP for `Admin`, in the browser flow **and** the Discord post-login flow) and
   step 12 (the session windows). Every step is an owner-only write against the production realm;
@@ -361,7 +361,7 @@ build. The backend ArchUnit rules no longer are (re-keyed by role and class lite
 floors, 2026-10-02, REQ-SEC-073); SpEL bean names, path lists and the other name-keyed controls are
 the plan's remaining guards.
 
-**Closing it** is the [domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md): package per
+**Closing it** is the [domain modularisation plan](../archive/DOMAIN_MODULARISATION_PLAN.md): package per
 domain with a published API, Spring Modulith and a frozen ArchUnit baseline in test scope, guards
 that make every name-keyed gate fail loudly before anything moves, and later Gradle modules for the
 exchange and the bank. Its decisions are recorded as ADR-0231 (the module cut), ADR-0232 (how modules

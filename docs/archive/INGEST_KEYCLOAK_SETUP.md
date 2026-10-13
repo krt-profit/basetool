@@ -1,10 +1,14 @@
+> **Archived 2026-10-13.** Doc type: Historical record — frozen, kept as a record and no longer updated. Commands and states below describe the host and the code as they were.
+>
+> **Current truth:** [`keycloak/README.md`](../keycloak/README.md), [`desktop-ingest.md`](../specs/desktop-ingest.md), ADR-0202 and `scripts/provision-keycloak-realm.py`. Index of the archive: [`README.md`](README.md).
+
 # Desktop ingest — Keycloak setup runbook
 
-> **Doc type:** Living runbook for [ADR-0018](adr/0018-desktop-ingest-gateway-device-grant.md),
-> [ADR-0129](adr/0129-ingest-gateway-is-a-trusted-subsystem-not-a-token-relay.md) and
-> [`docs/specs/desktop-ingest.md`](specs/desktop-ingest.md) (`REQ-INGEST-002`, `-007`, `-008`,
+> **Doc type:** Living runbook for [ADR-0018](../adr/0018-desktop-ingest-gateway-device-grant.md),
+> [ADR-0129](../adr/0129-ingest-gateway-is-a-trusted-subsystem-not-a-token-relay.md) and
+> [`docs/specs/desktop-ingest.md`](../specs/desktop-ingest.md) (`REQ-INGEST-002`, `-007`, `-008`,
 > `-011`, `-012`). The *decision* and the *requirements* live there; this document is the operator's
-> *how*. Registered in [`docs/specs/INDEX.md`](specs/INDEX.md). Last reviewed: 2026-09-28.
+> *how*. Registered in [`docs/specs/INDEX.md`](../specs/INDEX.md). Last reviewed: 2026-09-28.
 
 **Status: implemented.** The setup this runbook describes is live: epic #639 and its issues #641
 (Keycloak client + audience scope) and #642 (the gateway) closed on 2026-06-17, and #1247 (backend
@@ -23,8 +27,8 @@ what it is. They are corrected to what is deployed, not to what was first writte
 months behind production without anybody deciding it should.
 
 The **prod realm dump (with secrets) is not in this repository**: only a **sanitized reference**
-lives at [`docs/keycloak/realm-config.reference.json`](keycloak/realm-config.reference.json)
-(secrets, SMTP and real URLs redacted — see [`docs/keycloak/README.md`](keycloak/README.md)), and
+lives at [`docs/keycloak/realm-config.reference.json`](../keycloak/realm-config.reference.json)
+(secrets, SMTP and real URLs redacted — see [`docs/keycloak/README.md`](../keycloak/README.md)), and
 the throwaway `frontend/src/e2e/resources/realm-export.e2e.json` test artifact — do **not** copy its
 `directAccessGrantsEnabled: true`.
 
@@ -44,7 +48,7 @@ the throwaway `frontend/src/e2e/resources/realm-export.e2e.json` test artifact �
 > *Amended 2026-09-28 (#2092 step 9):* the legacy `/v1` routes and their client allowlist
 > (`IRI_INGEST_ALLOWED_CLIENT_IDS`, `IRI_INGEST_CLIENT_AUDIT_ONLY`, `IRI_INGEST_REQUIRED_SCOPE`,
 > `IRI_INGEST_ALLOWED_TOOLS`) are removed. Suspending a client in the registry is now the immediate
-> revocation ([`external-exchange.md`](specs/external-exchange.md), REQ-XCH-008).
+> revocation ([`external-exchange.md`](../specs/external-exchange.md), REQ-XCH-008).
 
 ## Configured state
 
@@ -97,7 +101,7 @@ The renderer refuses, naming every missing variable, rather than writing a half-
 
 ## New or out-of-date realm: run the provisioner
 
-`scripts/provision-keycloak-realm.py` ([ADR-0202](adr/0202-a-realm-is-brought-to-the-production-shape-by-a-provisioner-that-never-deletes.md),
+`scripts/provision-keycloak-realm.py` ([ADR-0202](../adr/0202-a-realm-is-brought-to-the-production-shape-by-a-provisioner-that-never-deletes.md),
 `REQ-OPS-033`) brings a realm to the **production shape** of everything the Basetool owns: the five
 clients (`basetool-frontend`, `backend-service`, `basetool-ingest-gateway`, `basetool-sc-extractor`,
 `basetool-android`; `grafana` with `--grafana-origin`) and the approved third-party clients of
@@ -126,7 +130,7 @@ What to know before running it:
   `--frontend-client confidential` switches `basetool-frontend` to confidential and sets Keycloak's
   secret from `$KEYCLOAK_FRONTEND_CLIENT_SECRET` in the same update (refused without it);
   `--frontend-client public` is the rollback. Without the flag a run never changes the type, in
-  either direction ([`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md)).
+  either direction ([`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md)).
   **Since 2026-09-25 production's frontend client is confidential**, so every run below passes
   `--frontend-client confidential` with the secret from `.env`; on an already-confidential client
   that plans nothing for the type and never rewrites the secret. On a host whose frontend does
@@ -141,7 +145,7 @@ What to know before running it:
   variable(s) that need it — for `basetool-ingest-gateway` all five values of
   [step 9b](#9b--five-values-in-the-prod-env).
 - **The identity** is the short-lived `basetool-provisioner` of
-  [`docs/keycloak/README.md`](keycloak/README.md#why-a-service-account-and-not-the-admin-user)
+  [`docs/keycloak/README.md`](../keycloak/README.md#why-a-service-account-and-not-the-admin-user)
   (`manage-clients` + `manage-realm`). Reading and granting service-account roles needs
   `manage-users`, which that identity deliberately lacks: every run then prints the roles under
   `[manual]` („service-account roles could not be read") and exits `3` instead of `0` — the apply
@@ -175,7 +179,7 @@ What to know before running it:
   bullet above). OTP for admins, the forgot-password switch and the session windows are
   `scripts/harden-keycloak-realm.py` (REQ-SEC-082); the two SSO windows are the file
   `keycloak/session-windows.json`, which this script reads and the provisioner must find beside it, the Discord identity provider
-  ([`DISCORD_KEYCLOAK_SETUP.md`](keycloak/DISCORD_KEYCLOAK_SETUP.md)), or the realm's default client
+  ([`DISCORD_KEYCLOAK_SETUP.md`](../keycloak/DISCORD_KEYCLOAK_SETUP.md)), or the realm's default client
   scopes; an ingest scope that is a realm default is reported, because every client created later
   would inherit its audience.
 
@@ -223,7 +227,7 @@ Then, in this order:
 2. **Verify the tokens**, not only the config: [step 5b](#step-5--verify-both-token-sets-carry-the-audience-gate-for-step-6)
    on a fresh frontend login.
 3. **Verify the shape**: run `scripts/keycloak-config-snapshot.sql` on this host and on production
-   (the recipe is in [`docs/keycloak/README.md`](keycloak/README.md)) and `diff` the two. What may still differ is listed there —
+   (the recipe is in [`docs/keycloak/README.md`](../keycloak/README.md)) and `diff` the two. What may still differ is listed there —
    the origins, Keycloak-version artefacts on built-ins, and what the provisioner reported as *only
    on this realm*. Any other line is drift.
 
@@ -293,13 +297,13 @@ explicit yes to that command.
 ## Onboarding a new approved client
 
 Only for client software the owner has explicitly approved. A third-party client talks to the
-**exchange API** (`/exchange/v1/**`, [`external-exchange.md`](specs/external-exchange.md)) and
+**exchange API** (`/exchange/v1/**`, [`external-exchange.md`](../specs/external-exchange.md)) and
 nothing else; it never gets an ingest scope, and the legacy `/v1/*` routes are removed since
 2026-09-28 (`REQ-XCH-033`). Every such client follows one template (`REQ-XCH-005`,
-[ADR-0217](adr/0217-third-party-clients-are-public-device-grant-clients-in-a-db-registry.md)), and
+[ADR-0217](../adr/0217-third-party-clients-are-public-device-grant-clients-in-a-db-registry.md)), and
 the provisioner creates it — never the Admin Console.
 
-1. **List it** in [`scripts/keycloak/external-clients.json`](../scripts/keycloak/external-clients.json):
+1. **List it** in [`scripts/keycloak/external-clients.json`](../../scripts/keycloak/external-clients.json):
    a `clientId` of lower-case letters, digits and hyphens, the `name` the consent page shows, and a
    `description`. A reserved or duplicate id, or a missing name, stops the run before it reads the
    realm.
@@ -331,7 +335,7 @@ the provisioner creates it — never the Admin Console.
    exchange scopes (and `offline_access`), `cnf.jkt` is present, and there is no `email`, `name`,
    `preferred_username` or Discord claim.
 5. **Record it**: the client in this document's *Configured state* and the realm reference on its
-   next regeneration ([`docs/keycloak/README.md`](keycloak/README.md)).
+   next regeneration ([`docs/keycloak/README.md`](../keycloak/README.md)).
 
 **The SC Extractor** is no template client — it keeps its own `ClientSpec` — but from its migration
 release (2.10.0) it requests `offline_access` like one, and the provisioner pins the same offline
@@ -357,7 +361,7 @@ never deletes and reports it as *only on this realm* from then on.
 **A member's disconnect** of a client needs no realm setting: the backend removes the consent,
 deletes the sessions only that client holds, and ends the client inside shared sessions through the
 `basetool-exchange` admin extension of the `keycloak-spi` jar
-([`docs/keycloak/README.md`](keycloak/README.md), REQ-XCH-008). The extension ships with the SPI jar
+([`docs/keycloak/README.md`](../keycloak/README.md), REQ-XCH-008). The extension ships with the SPI jar
 of the same release; a Keycloak still on an older jar answers `404`, which the backend logs and
 passes over.
 
@@ -555,7 +559,7 @@ Do **not** proceed to step 6 until both checks pass.
 `extractor-ingest` as a **Default** scope, and *Client scopes → extractor-ingest → Mappers* must
 contain an `oidc-audience-mapper` with `Included Custom Audience = basetool-backend` and *Add to
 access token* ON. Both clients showing that is the condition step 6 depends on. The committed
-[`realm-config.reference.json`](keycloak/realm-config.reference.json) records this shape, but it
+[`realm-config.reference.json`](../keycloak/realm-config.reference.json) records this shape, but it
 is a sanitized snapshot (2026-09-09), **not** live state — read it from the running realm.
 
 **5b — Token check (confirmation).** Obtain an access token per client (device flow for the
@@ -640,7 +644,7 @@ extractor ever gets, and put the ingest-specific mapper there:
 > **⚠️ `Include in token scope` must be On — the shared scope has it Off.** Spring Security derives
 > the `SCOPE_…` authority from the token's `scope` claim, and the deployed `extractor-ingest` scope
 > carries `include.in.token.scope: "false"` (see
-> [`realm-config.reference.json`](keycloak/realm-config.reference.json)), so its name never reaches
+> [`realm-config.reference.json`](../keycloak/realm-config.reference.json)), so its name never reaches
 > the claim. With that setting the gateway's `required-scope` check would reject **every** caller,
 > the real extractor included — not merely fail to discriminate. Verify the flag on the new scope
 > before enabling the check.
@@ -653,7 +657,7 @@ afterwards inherits it; hardening step 9 removed both extractor scopes from the 
 exactly that reason.
 
 Equivalent realm-export fragment (already reflected in
-[`realm-config.reference.json`](keycloak/realm-config.reference.json)):
+[`realm-config.reference.json`](../keycloak/realm-config.reference.json)):
 
 ```json
 {

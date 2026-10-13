@@ -629,9 +629,9 @@ protection for a host that has not got the check yet, and it is how the first in
 > [!note] A release whose PRs need more than this path gets its own runbook
 > When a release carries host steps, ordering constraints or switches beyond the promotion below,
 > they are collected per release from an audit of its PRs: **1.11.0** →
-> [`RELEASE_1.11.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.11.0_PRODUCTION_RUNBOOK.md); the **External
+> [`RELEASE_1.11.0_PRODUCTION_RUNBOOK.md`](archive/RELEASE_1.11.0_PRODUCTION_RUNBOOK.md); the **External
 > Client Exchange go-live** (#2092, the first release after 1.12.0) →
-> [`EXCHANGE_GO_LIVE_RUNBOOK.md`](EXCHANGE_GO_LIVE_RUNBOOK.md).
+> [`EXCHANGE_GO_LIVE_RUNBOOK.md`](archive/EXCHANGE_GO_LIVE_RUNBOOK.md).
 
 ```bash
 gh workflow run promote.yml -f version=1.9.3
@@ -875,7 +875,7 @@ the backend image.
 - **Before promoting the first release with REQ-API-020** (one-off, read-only): read the floor
   production serves, `curl -s https://api.profit-base.online/api/v1/app/version-policy`. The release
   commits **17 / 17**, the value S8 of
-  [`EXCHANGE_GO_LIVE_RUNBOOK.md`](EXCHANGE_GO_LIVE_RUNBOOK.md) set on 2026-09-28. If production
+  [`EXCHANGE_GO_LIVE_RUNBOOK.md`](archive/EXCHANGE_GO_LIVE_RUNBOOK.md) set on 2026-09-28. If production
   answers anything else, the promotion would change the floor: correct the literal in a pull request
   first, or accept the change deliberately.
 - **Before promoting the release that carries the API cut** (REQ-API-020, D-24): the release
@@ -1441,7 +1441,7 @@ dry run by default, `--apply` to write, origins from `--public-origin`, nothing 
 the target has. Run it on a **new** host's realm, and on the **testing** host whenever
 `scripts/keycloak-config-snapshot.sql` diffs against production outside the environment-specific
 lines. The procedure, and the `.env` values a newly created confidential client needs, are in
-[`INGEST_KEYCLOAK_SETUP.md` → *New or out-of-date realm*](INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner).
+[`INGEST_KEYCLOAK_SETUP.md` → *New or out-of-date realm*](archive/INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner).
 On production an `--apply` is a gated write like any other.
 
 **The frontend's client type** (public or confidential, ADR-0001) is changed only by

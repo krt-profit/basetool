@@ -5,7 +5,7 @@
   owner-approved switch of production to `enforce`
 - **Date:** 2026-10-01
 - **Deciders:** @greluc (owner decision D-16)
-- **Related:** [domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md) §8.2 · spec
+- **Related:** [domain modularisation plan](../archive/DOMAIN_MODULARISATION_PLAN.md) §8.2 · spec
   REQ-FE-018 ([`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md)) ·
   [ADR-0125](0125-typed-javascript-via-checkjs-not-typescript.md),
   [ADR-0130](0130-own-openapi-dts-emitter-and-typescript-7.md) (the type check) ·

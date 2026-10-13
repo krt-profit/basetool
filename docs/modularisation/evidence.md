@@ -1,4 +1,4 @@
-> **Doc type:** Appendix of the frozen plan [Domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md) — measured on `origin/main` `95e945326` on 2026-09-29; counts are exact for that commit, line numbers drift.
+> **Doc type:** Appendix of the frozen plan [Domain modularisation plan](../archive/DOMAIN_MODULARISATION_PLAN.md) — measured on `origin/main` `95e945326` on 2026-09-29; counts are exact for that commit, line numbers drift.
 
 # Evidence and data
 

@@ -3,7 +3,7 @@
 - **Status:** Accepted — enforcement in place (Phase 0: re-keyed ArchUnit rules with selection floors, the domain map and the frozen module baseline, Spring Modulith 2.1.1 in test scope); module declarations in place for every module package since 2026-10-04 (plan P1-13, amendment 1), and the verified module set grows as domains move
 - **Date:** 2026-09-29
 - **Deciders:** @greluc (owner decision D-02)
-- **Related:** [domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md) §5.7, §6, §10 ·
+- **Related:** [domain modularisation plan](../archive/DOMAIN_MODULARISATION_PLAN.md) §5.7, §6, §10 ·
   [ADR-0231](0231-the-backend-becomes-a-modular-monolith-one-package-per-domain.md) ·
   [ADR-0232](0232-modules-interact-through-commands-observers-and-after-commit-events.md) ·
   [ADR-0047](0047-backend-package-acyclic-dependencies.md) (amended) ·

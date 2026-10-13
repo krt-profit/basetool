@@ -5,7 +5,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-only
 
-"""Steps 2, 11 and 12 of docs/KEYCLOAK_HARDENING_RUNBOOK.md as an idempotent, dry-run-first script.
+"""Steps 2, 11 and 12 of docs/archive/KEYCLOAK_HARDENING_RUNBOOK.md as an idempotent, dry-run-first script.
 
 Step 2: report the realm's own SMTP sender and switch "Forgot password" on or off (the sender's
 test stays a console action: Keycloak mails the admin who runs it).

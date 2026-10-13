@@ -755,7 +755,7 @@ groups:
           severity: warning
         annotations:
           summary: "Ingest gateway runs without its JWT audience check"
-          description: "basetool_ingest_gate_enforcing{gate=\"audience\"} is 0: the ingest gateway accepts any valid realm token at the decoder, including frontend session tokens. Set IRI_INGEST_EXPECTED_AUDIENCES=basetool-ingest (never the backend's audience), the audience the exchange.* client scopes stamp — docs/INGEST_KEYCLOAK_SETUP.md step 7a — then re-render env.d and restart ingest."
+          description: "basetool_ingest_gate_enforcing{gate=\"audience\"} is 0: the ingest gateway accepts any valid realm token at the decoder, including frontend session tokens. Set IRI_INGEST_EXPECTED_AUDIENCES=basetool-ingest (never the backend's audience), the audience the exchange.* client scopes stamp — docs/archive/INGEST_KEYCLOAK_SETUP.md step 7a — then re-render env.d and restart ingest."
 
       - alert: AndroidVersionPolicyOverrideActive
         expr: max by (application, field) (basetool_android_version_policy_override{application="basetool-backend"}) == 1

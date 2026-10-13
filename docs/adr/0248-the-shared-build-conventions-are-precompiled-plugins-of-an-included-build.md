@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-10-11
 - **Deciders:** @greluc
-- **Related:** spec REQ-OPS-046 · REQ-OPS-034 · REQ-OPS-037 · ADR-0192 · ADR-0208 · plan `docs/DOMAIN_MODULARISATION_PLAN.md` §5.8, §7.7, §8.4 (P5-a)
+- **Related:** spec REQ-OPS-046 · REQ-OPS-034 · REQ-OPS-037 · ADR-0192 · ADR-0208 · plan `docs/archive/DOMAIN_MODULARISATION_PLAN.md` §5.8, §7.7, §8.4 (P5-a)
 
 ## Context
 

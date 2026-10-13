@@ -3622,7 +3622,7 @@ REQ-OBS-011, REQ-OBS-012, REQ-OBS-014, REQ-SEC-029, REQ-INGEST-011
 A `@PreAuthorize` expression that Spring Security cannot evaluate — a renamed or missing security
 bean, a method that no longer exists with that arity, an expression that yields no decision — is
 refused **fail-closed** with `400 ILLEGAL_ARGUMENT` (owner decision D-19, plan
-[`DOMAIN_MODULARISATION_PLAN.md`](../DOMAIN_MODULARISATION_PLAN.md) §2). The response contract is
+[`DOMAIN_MODULARISATION_PLAN.md`](../archive/DOMAIN_MODULARISATION_PLAN.md) §2). The response contract is
 unchanged; what was missing is that the refusal reached only the users, never the monitoring: every
 call of the gated operation answered 400 and the only trace was a WARN line among ordinary bad
 requests.

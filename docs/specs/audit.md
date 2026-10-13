@@ -660,7 +660,7 @@ amending [ADR-0038](../adr/0038-admin-retention-purge-of-audit-logs.md) ·
 
 REQ-AUDIT-001 holds only while the audit row is written **inside the transaction of the mutation it
 records**: an audit-insert failure must roll the mutation back. Three rules keep a well-meant
-"event" from breaking that ([plan §5.3](../DOMAIN_MODULARISATION_PLAN.md)):
+"event" from breaking that ([plan §5.3](../archive/DOMAIN_MODULARISATION_PLAN.md)):
 
 1. **No after-commit or asynchronous method records an audit row.** A method annotated
    `@TransactionalEventListener` or `@Async` (or on an `@Async` class) never calls

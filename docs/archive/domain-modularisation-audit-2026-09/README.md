@@ -1,14 +1,14 @@
 > **Archived 2026-10-01.** Doc type: Historical analysis — the raw evidence of the domain
 > modularisation audit of 2026-09-29, frozen and no longer updated.
 >
-> **Current truth:** [the domain modularisation plan](../../DOMAIN_MODULARISATION_PLAN.md) and its
+> **Current truth:** [the domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md) and its
 > appendices in [`docs/modularisation/`](../../modularisation/). Index of the archive:
 > [`README.md`](../README.md).
 
 # Domain modularisation audit — raw evidence (2026-09-29)
 
 The per-analysis reports, the finding data and the scripts behind the
-[domain modularisation plan](../../DOMAIN_MODULARISATION_PLAN.md), kept by the owner's decision
+[domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md), kept by the owner's decision
 D-22 so every figure in the plan can be traced to the analysis that produced it. Code state:
 `origin/main` at `95e945326`.
 

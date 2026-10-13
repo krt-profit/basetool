@@ -17,8 +17,8 @@ without `--import-realm` — the Keycloak database, not `realm-export.json`, is 
 | `basetool-frontend`       | public, authorization code, PKCE `S256` required — **confidential** (client secret + PKCE) once the owner's rollout is done | the web app's login (Spring OAuth2 client)                  | [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md) (ADR-0001: code shipped 2026-09-23, rollout pending) |
 | `backend-service`         | confidential, service account   | the backend's user sync and Discord linking (Admin API)                      | [below](#backend-service-service-account-roles-admin-api)                          |
 | `basetool-android`        | public, PKCE `S256`, DPoP-bound refresh token | the Android app                                                 | [below](#runbook--provisioning-the-mobile-client-basetool-android)                 |
-| `basetool-sc-extractor`   | public, device grant            | the desktop SC Extractor (ingest)                                            | [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md)                          |
-| `basetool-ingest-gateway` | confidential, service account   | the ingest gateway's own identity towards the backend (ADR-0129)             | [`INGEST_KEYCLOAK_SETUP.md` step 9](../INGEST_KEYCLOAK_SETUP.md)                   |
+| `basetool-sc-extractor`   | public, device grant            | the desktop SC Extractor (ingest)                                            | [`INGEST_KEYCLOAK_SETUP.md`](../archive/INGEST_KEYCLOAK_SETUP.md)                          |
+| `basetool-ingest-gateway` | confidential, service account   | the ingest gateway's own identity towards the backend (ADR-0129)             | [`INGEST_KEYCLOAK_SETUP.md` step 9](../archive/INGEST_KEYCLOAK_SETUP.md)                   |
 | `grafana`                 | confidential, authorization code | Grafana's OAuth login                                                        | set up once by the archived [`MONITORING_ROLLOUT_RUNBOOK.md`](../archive/MONITORING_ROLLOUT_RUNBOOK.md) |
 
 The `discord` identity provider and the membership gate come from the `keycloak-spi` module
@@ -31,7 +31,7 @@ Keycloak logs `KC-SERVICES0047` for it at start, as for every provider of the JA
 upgrade, re-check the classes it extends and render one device consent page (the sandbox smoke test
 does). The login and account theme is
 `krt-theme` from `keycloak-theme/`. Realm hardening and its per-step status:
-[`KEYCLOAK_HARDENING_RUNBOOK.md`](../KEYCLOAK_HARDENING_RUNBOOK.md).
+[`KEYCLOAK_HARDENING_RUNBOOK.md`](../archive/KEYCLOAK_HARDENING_RUNBOOK.md).
 
 Three scripts read a realm without changing it: `scripts/keycloak-realm-fingerprint.sh` prints a
 secret-free identity list of the realm's database (clients, roles, flows, mappers) to `diff` two
@@ -71,7 +71,7 @@ clients' offline sessions (ADR-0202 amendment 5; without the composite their dev
 refused `400 not_allowed`), and it offers the scope to no other client: `offline_access` is
 withheld from `basetool-frontend`, `backend-service`, `basetool-ingest-gateway`, `grafana` and
 `basetool-android`, and it is no realm default client scope. Procedure:
-[`INGEST_KEYCLOAK_SETUP.md` → *New or out-of-date realm*](../INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner).
+[`INGEST_KEYCLOAK_SETUP.md` → *New or out-of-date realm*](../archive/INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner).
 The mobile provisioner stays the focused tool for that one client.
 
 ## Files
@@ -89,7 +89,7 @@ The mobile provisioner stays the focused tool for that one client.
   > `scope` claim. That separation is exactly what lets the gateway tell an extractor token from a
   > browser session token (`REQ-INGEST-011`) — putting the `basetool-ingest` audience on the shared
   > scope, or assigning the exclusive scope to the frontend, silently disables the gate. See
-  > [`INGEST_KEYCLOAK_SETUP.md` step 7a](../INGEST_KEYCLOAK_SETUP.md).
+  > [`INGEST_KEYCLOAK_SETUP.md` step 7a](../archive/INGEST_KEYCLOAK_SETUP.md).
 
 The throwaway **test** realm used by the Playwright e2e suite lives elsewhere, at
 [`frontend/src/e2e/resources/realm-export.e2e.json`](../../frontend/src/e2e/resources/realm-export.e2e.json).
@@ -235,7 +235,7 @@ longevity and the refresh flow. Unchanged from 2026-06-18 through the 2026-09-09
 
 These values mean **no session/idle timeout fires anywhere near 30–60 minutes** — relevant when
 diagnosing forced re-logins (see [ADR-0019](../adr/0019-frontend-reauth-on-client-authorization-required.md)
-and [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md) step 4).
+and [`INGEST_KEYCLOAK_SETUP.md`](../archive/INGEST_KEYCLOAK_SETUP.md) step 4).
 
 **Refresh-token rotation is off, and that is deliberate.** `revokeRefreshToken` was turned off
 realm-wide on 2026-06-18 (REQ-SEC-012 / [ADR-0019](../adr/0019-frontend-reauth-on-client-authorization-required.md)
@@ -244,7 +244,7 @@ browser, so rotation plus reuse detection bought little there while being the di
 session revocations under the BFF's unavoidable concurrent-refresh race. `refreshTokenMaxReuse`
 is therefore inert — it only has meaning while rotation is on. Two consequences worth knowing:
 the persisted desktop-extractor refresh token is no longer protected by reuse detection (a
-recorded, reversible operator lever — see [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md)),
+recorded, reversible operator lever — see [`INGEST_KEYCLOAK_SETUP.md`](../archive/INGEST_KEYCLOAK_SETUP.md)),
 and any future **public** client (native/mobile) must be sender-constrained via DPoP instead,
 since RFC 9700 requires public-client refresh tokens to be either rotated or bound.
 
@@ -313,7 +313,7 @@ and runs with a **read-only root filesystem**, so kcadm cannot write its default
 carries `--config` pointing at the unit's writable tmpfs. That was derived from the generated unit
 and first exercised on the production host on 2026-09-25 (the owner's session for the confidential
 frontend client, steps 1–2 below typed interactively); the helper and its reasoning are in
-[`KEYCLOAK_HARDENING_RUNBOOK.md` § 0.4](../KEYCLOAK_HARDENING_RUNBOOK.md#04-open-a-session). The
+[`KEYCLOAK_HARDENING_RUNBOOK.md` § 0.4](../archive/KEYCLOAK_HARDENING_RUNBOOK.md#04-open-a-session). The
 provisioning script is not deployed to the host (copy it over), and its default prefix is
 `docker exec`, so pass `--kcadm-command` as below. Run everything as root, from `/`.
 
@@ -384,7 +384,7 @@ Docker Compose stack the root filesystem is writable: plain `docker exec keycloa
 > *(2026-09-25, evening)* #2036's release is **v1.12.0, on production since 17:44 UTC**, and step 4
 > has made the CA the only anchor there — so production is now in the untested shape above. Step 1
 > as written has **not** been run against it yet; the next kcadm session is the first test. The same step appears in
-> [`KEYCLOAK_HARDENING_RUNBOOK.md` § 0.4](../KEYCLOAK_HARDENING_RUNBOOK.md#04-open-a-session).
+> [`KEYCLOAK_HARDENING_RUNBOOK.md` § 0.4](../archive/KEYCLOAK_HARDENING_RUNBOOK.md#04-open-a-session).
 
 ### Why a service account and not the admin user
 
@@ -521,7 +521,7 @@ having its refresh token bound.
   it goes when WP-K2 finishes, and the snapshot is regenerated then.
 
 The remaining open hardening steps (2, 11, 12) are tracked in the
-[hardening runbook's status table](../KEYCLOAK_HARDENING_RUNBOOK.md#status).
+[hardening runbook's status table](../archive/KEYCLOAK_HARDENING_RUNBOOK.md#status).
 
 ## Resolved
 

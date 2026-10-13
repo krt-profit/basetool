@@ -1,4 +1,4 @@
-> **Archived 2026-09-22.** Doc type: Historical plan — frozen, kept as a record and no longer updated. Every track shipped: the app's API surface went live on its own vhost on 2026-08-21 and app v0.3.0 was released on 2026-09-14. Track D1 (realm hardening) continues in the living [`KEYCLOAK_HARDENING_RUNBOOK.md`](../KEYCLOAK_HARDENING_RUNBOOK.md).
+> **Archived 2026-09-22.** Doc type: Historical plan — frozen, kept as a record and no longer updated. Every track shipped: the app's API surface went live on its own vhost on 2026-08-21 and app v0.3.0 was released on 2026-09-14. Track D1 (realm hardening) continues in the living [`KEYCLOAK_HARDENING_RUNBOOK.md`](KEYCLOAK_HARDENING_RUNBOOK.md).
 >
 > **Current truth:** [ADR-0131](../adr/0131-mobile-auth-refresh-only-dpop-binding.md), [ADR-0134](../adr/0134-backend-joins-the-management-port-isolation.md), [ADR-0135](../adr/0135-public-api-vhost-not-a-gateway.md), [ADR-0136](../adr/0136-external-contract-set-for-shipped-clients.md), [`security-and-access.md`](../specs/security-and-access.md), [`api-conventions.md`](../specs/api-conventions.md) (REQ-API-009). Index of the archive: [`README.md`](README.md).
 

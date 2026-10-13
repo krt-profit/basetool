@@ -1,4 +1,4 @@
-> **Doc type:** Appendix of the frozen plan [Domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md)
+> **Doc type:** Appendix of the frozen plan [Domain modularisation plan](../archive/DOMAIN_MODULARISATION_PLAN.md)
 > — the target cut decided on 2026-09-29 (full cut, hard cut with forced update); a snapshot
 > against `origin/main` `95e945326`.
 
@@ -694,7 +694,7 @@ first calls race the wall, which is harmless for showing it.
   not in the promoted configuration bundle.
 - `AndroidClientProperties` is a `@ConfigurationProperties` record read at start, so a new floor
   needs a backend restart, which through `Requires=` restarts frontend and ingest too — about one
-  minute of web and app outage (`docs/EXCHANGE_GO_LIVE_RUNBOOK.md`, step S8).
+  minute of web and app outage (`docs/archive/EXCHANGE_GO_LIVE_RUNBOOK.md`, step S8).
 - `scripts/deploy.sh` renders `env.d` from the host `.env` only inside `install_quadlet_units`
   (`:268-278`), which runs when the configuration bundle's digest changed, on `--reapply` or on a
   host without units (`:962-985`, `:1238-1303`), and on a rollback (`:352`); an unchanged tick exits
@@ -704,7 +704,7 @@ first calls race the wall, which is harmless for showing it.
   promotion is therefore probably, not certainly, applied by the release's recreate — and a
   health-gate rollback re-renders `env.d` from the same `.env`, so the old backend would come back
   with the raised floor and no app version would work.
-- Raising the floor is runbook step S8 (`docs/EXCHANGE_GO_LIVE_RUNBOOK.md:533-559`): set both codes
+- Raising the floor is runbook step S8 (`docs/archive/EXCHANGE_GO_LIVE_RUNBOOK.md:533-559`): set both codes
   in `.env`, run `render-env-d.py`, restart `backend.service`, start `ingest` and `frontend` again
   (both `Requires=backend.service`). It is a production write and needs the owner's per-action
   approval (root `CLAUDE.md`).

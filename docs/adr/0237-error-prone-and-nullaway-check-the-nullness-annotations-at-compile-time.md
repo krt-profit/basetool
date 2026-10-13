@@ -3,7 +3,7 @@
 - **Status:** Accepted — implemented 2026-10-10 for the backend's module `api` packages
 - **Date:** 2026-10-01
 - **Deciders:** @greluc (owner decision D-13)
-- **Related:** [domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md) §8.1 (*Nullness*),
+- **Related:** [domain modularisation plan](../archive/DOMAIN_MODULARISATION_PLAN.md) §8.1 (*Nullness*),
   §6.3, §10 ·
   [ADR-0192](0192-lombok-and-the-jetbrains-annotations-apply-to-every-source-set.md) (the JetBrains
   annotations) · [ADR-0208](0208-gradle-verifies-every-dependency-against-a-committed-sha-256.md) ·

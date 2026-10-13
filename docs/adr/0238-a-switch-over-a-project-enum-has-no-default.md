@@ -3,7 +3,7 @@
 - **Status:** Accepted — implemented 2026-10-10 for every existing switch (plan §8.1)
 - **Date:** 2026-10-01
 - **Deciders:** @greluc (owner decision D-15)
-- **Related:** [domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md) §8.1 ·
+- **Related:** [domain modularisation plan](../archive/DOMAIN_MODULARISATION_PLAN.md) §8.1 ·
   [ADR-0223](0223-only-final-java-features-and-no-preview-flags.md) (final features only) ·
   [ADR-0235](0235-errors-are-a-sealed-kernel-of-kinds-and-per-module-problem-codes.md) ·
   `config/checkstyle/google_checks.xml` (`MissingSwitchDefault`) · `CLAUDE.md` → *Java conventions*

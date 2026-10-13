@@ -2334,7 +2334,7 @@ there.
 (`.github/workflows/keycloak-provisioner.yml`) · `scripts/keycloak-config-snapshot.sql` ·
 **Decision:**
 [ADR-0202](../adr/0202-a-realm-is-brought-to-the-production-shape-by-a-provisioner-that-never-deletes.md) ·
-**Runbook:** [`INGEST_KEYCLOAK_SETUP.md` → *New or out-of-date realm*](../INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner)
+**Runbook:** [`INGEST_KEYCLOAK_SETUP.md` → *New or out-of-date realm*](../archive/INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner)
 
 ### REQ-OPS-034 — Every artifact the build resolves matches a committed checksum
 

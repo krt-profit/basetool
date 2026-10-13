@@ -1,22 +1,26 @@
+> **Archived 2026-10-13.** Doc type: Historical record — frozen, kept as a record and no longer updated. Commands and states below describe the host and the code as they were.
+>
+> **Current truth:** [`deployment.md`](../deployment.md). Index of the archive: [`README.md`](README.md).
+
 # Release 1.11.0 — production rollout runbook
 
 > [!note] **Executed 2026-09-25 — now a historical record.** Production runs v1.11.0 since the
 > 12:40 UTC deploy tick; see [§9 Execution record](#9-execution-record-2026-09-25) for what was run,
 > what went wrong on the way and what it taught. The living procedure is
-> [`deployment.md`](deployment.md).
+> [`deployment.md`](../deployment.md).
 
 > **Doc type:** Operator runbook for **one** release — the move of production (and, through
 > `promote.yml`'s `sync-testing`, the testing host) from **v1.10.0 to v1.11.0**. Written 2026-09-25
 > from a per-PR audit of all 66 PRs between `v1.10.0` and `6076888cd` (the commit release PR #2056
 > was cut from), plus #2057 merged after the cut, against the code and the docs on `main`, plus
 > read-only reads of both hosts the same day. **Historical once 1.11.0 is live**: freeze it then and let
-> [`deployment.md`](deployment.md) stay the living truth.
+> [`deployment.md`](../deployment.md) stay the living truth.
 >
 > **Every step that writes to a host is a production write**: it waits for @greluc's explicit yes,
 > in chat, to that exact command (CLAUDE.md → *Production host access*). Nothing here is approval.
 
 Shell conventions (`cd /`, `${UCTL}`, `${UPOD}`) are the ones in
-[`deployment.md` → Shell conventions](deployment.md#shell-conventions-used-below).
+[`deployment.md` → Shell conventions](../deployment.md#shell-conventions-used-below).
 
 ---
 
@@ -49,7 +53,7 @@ stop and re-check the step that depends on it.
   changed every `quadlet/systemd/*.container` (stop grace, `RunInit`), #2023 changed `redis`'s
   command line. No `Image=` of a stateful service changed, so the stateful-infra gate does not
   fire. Redis keeps its data (AOF). Watch the tick rather than leaving it to the timer
-  ([`deployment.md` → Host-config and unit changes](deployment.md#host-config-and-unit-changes)).
+  ([`deployment.md` → Host-config and unit changes](../deployment.md#host-config-and-unit-changes)).
 - **Keycloak restarts** (unit change + new provider JAR from #1990), which also loads the #2053
   theme text.
 - **The edge is recreated** (#2021 gzip, #2039 unit mount, #1996/#1999 API allow-list).
@@ -125,8 +129,8 @@ against a baseline, not against zero.
 and `mint-internal-tls.sh` (#2034) are not installed. The release itself would still deploy with the
 installed `deploy.sh` (every mount source the new units name exists), but the new pre-flights, the
 new backup coverage and the later rollouts need them, and the docs order it before the promotion.
-Per [`deployment.md` → Updating the operational scripts and units](deployment.md#updating-the-operational-scripts-and-units)
-and the controller caveats in [`ansible/README.md`](../ansible/README.md) — mirror `ansible/`,
+Per [`deployment.md` → Updating the operational scripts and units](../deployment.md#updating-the-operational-scripts-and-units)
+and the controller caveats in [`ansible/README.md`](../../ansible/README.md) — mirror `ansible/`,
 `scripts/` **and** `monitoring/` from the same `origin/main` into the WSL filesystem, then:
 
 ```bash
@@ -154,7 +158,7 @@ same for testing (`--limit testing`) whichever option §2.3 took.
 2. `release-publish.yml` creates the tag **with the `basetool-release` App token** — the first
    publish since the App key was replaced on 2026-09-25 (the token itself is proven by
    refresh-versions run 36127942075 and Release · Prepare run 36128198185). If the tag step fails:
-   the manual fallback in [`deployment.md` → Cutting a release](deployment.md#cutting-a-release).
+   the manual fallback in [`deployment.md` → Cutting a release](../deployment.md#cutting-a-release).
 3. The tag run of `release-images.yml` re-tags `:sha-<release>` of all three app images plus
    `config` and `keycloak-spi` as `:1.11.0`. Confirm all five exist before promoting (the promote's
    own first step also refuses otherwise).
@@ -230,7 +234,7 @@ the confidential frontend client (#2028 → `--frontend-client public --apply` f
 > `/var/iri/code/.env.backup-20260925-175805-step4`). For 1.10.0 or older the two switches above
 > come on top: `REDIS_DEFAULT_USER` on, and `--frontend-client public --apply` through a new
 > provisioner session. Procedure:
-> [`deployment.md` → Step 4](deployment.md#step-4--drop-the-old-certificate).
+> [`deployment.md` → Step 4](../deployment.md#step-4--drop-the-old-certificate).
 
 ---
 
@@ -242,15 +246,15 @@ production write with its own yes; do them one at a time, never inside the deplo
 | When | What | Where it is written down |
 |---|---|---|
 | after §5 is green | **Release the Android app (basetool-android #182)** — it calls `…/participants/by-id/slim`, which exists only from 1.11.0; bump `versionCode` to 16 first | vault *Android App*; #1999 |
-| any time | **Host reboot** for the pending kernel (`HostRebootRequired`) | [`deployment.md` → Updating the operational scripts and units](deployment.md#updating-the-operational-scripts-and-units) (host patching) |
+| any time | **Host reboot** for the pending kernel (`HostRebootRequired`) | [`deployment.md` → Updating the operational scripts and units](../deployment.md#updating-the-operational-scripts-and-units) (host patching) |
 | any time after 1.11.0 | **#2053: `baseUrl` on `basetool-frontend`** — provisioner dry run with `--public-origin https://profit-base.online` and **no** `--frontend-client`; it must plan only the `baseUrl` line; then `--apply`, a second empty dry run, delete the session and the rollback basis | [`INGEST_KEYCLOAK_SETUP.md`](INGEST_KEYCLOAK_SETUP.md) (provisioner); needs a freshly created `basetool-provisioner` (the 2026-09-23 one is deleted) |
-| ≥ 7 days after go-live, both report queries empty | **APPSEC-05: allow-list `enforce`** | [`deployment.md` → Session type allow-list](deployment.md#session-type-allow-list-report-then-enforce) |
-| after 1.11.0 | **#2038: internal JWKS for the backend** | [`deployment.md` → Internal JWKS](deployment.md#internal-jwks-for-the-backend) |
-| after 1.11.0 | **#2039: edge verifies Grafana** — precondition (SAN `DNS:grafana`) already confirmed | [`deployment.md` → The edge verifies Grafana](deployment.md#the-edge-verifies-grafana) |
-| after 1.11.0 | **APPSEC-07: confidential frontend client** — frontend secret first, Keycloak second; blocks a plain release rollback (§6) | [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md) |
-| after 1.11.0 | **APPSEC-04: one Redis ACL user per service** — steps 2–4 in one sitting with `iri-deploy.timer` stopped; render via `.new` + `cat`; step 5 blocks a plain release rollback (§6) | [`deployment.md` → The Redis ACL](deployment.md#the-redis-acl) (corrected 2026-09-25) |
-| after 1.11.0 | **ING-SEC-04: per-service internal TLS**, steps 1–2, then #2036 (step 3) only after step 2's files exist, then step 4 (step 0 is §2.5) | [`deployment.md` → Internal TLS](deployment.md#internal-tls-per-service-certificates-from-a-private-ca) |
-| any time, testing first | **#1992: `Internal=true` on the five internal networks** — a stop, `network rm`, restart window | [`deployment.md` → Network changes are installed, not applied](deployment.md#network-changes-are-installed-not-applied) |
+| ≥ 7 days after go-live, both report queries empty | **APPSEC-05: allow-list `enforce`** | [`deployment.md` → Session type allow-list](../deployment.md#session-type-allow-list-report-then-enforce) |
+| after 1.11.0 | **#2038: internal JWKS for the backend** | [`deployment.md` → Internal JWKS](../deployment.md#internal-jwks-for-the-backend) |
+| after 1.11.0 | **#2039: edge verifies Grafana** — precondition (SAN `DNS:grafana`) already confirmed | [`deployment.md` → The edge verifies Grafana](../deployment.md#the-edge-verifies-grafana) |
+| after 1.11.0 | **APPSEC-07: confidential frontend client** — frontend secret first, Keycloak second; blocks a plain release rollback (§6) | [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md) |
+| after 1.11.0 | **APPSEC-04: one Redis ACL user per service** — steps 2–4 in one sitting with `iri-deploy.timer` stopped; render via `.new` + `cat`; step 5 blocks a plain release rollback (§6) | [`deployment.md` → The Redis ACL](../deployment.md#the-redis-acl) (corrected 2026-09-25) |
+| after 1.11.0 | **ING-SEC-04: per-service internal TLS**, steps 1–2, then #2036 (step 3) only after step 2's files exist, then step 4 (step 0 is §2.5) | [`deployment.md` → Internal TLS](../deployment.md#internal-tls-per-service-certificates-from-a-private-ca) |
+| any time, testing first | **#1992: `Internal=true` on the five internal networks** — a stop, `network rm`, restart window | [`deployment.md` → Network changes are installed, not applied](../deployment.md#network-changes-are-installed-not-applied) |
 
 Optional tidy-ups found on the way, no urgency: the duplicate `IRI_BACKEND_EXPECTED_AUDIENCES` line in
 production's `.env`; the leftover `/var/iri/code/scripts/lib/container-runtime.sh.bak-2026-09-22`.
@@ -276,8 +280,8 @@ production's `.env`; the leftover `/var/iri/code/scripts/lib/container-runtime.s
 >   production** (≥ 7 days of `Failed to load the backend truststore` warnings). Fixed ~15:52 UTC:
 >   `/var/iri/secrets/backend-truststore.p12` built with aliases `backend` and `internal-ca`, mounted
 >   by the drop-in `keycloak.container.d/50-backend-truststore.conf`; no warning since.
->   [`DISCORD_KEYCLOAK_SETUP.md` §7.3](keycloak/DISCORD_KEYCLOAK_SETUP.md#73-truststore-for-the-backend-certificate)
->   and [`deployment.md` → Step 2f](deployment.md#step-2f--the-keycloak-spi-prechecks-truststore)
+>   [`DISCORD_KEYCLOAK_SETUP.md` §7.3](../keycloak/DISCORD_KEYCLOAK_SETUP.md#73-truststore-for-the-backend-certificate)
+>   and [`deployment.md` → Step 2f](../deployment.md#step-2f--the-keycloak-spi-prechecks-truststore)
 >   are corrected.
 > - **The keycloak restart for 2f was a ~2-minute full outage** (15:52:40–15:54:50 UTC, 175
 >   maintenance-page 502/503/504 at the edge): backend, frontend and ingest `Requires=` it and
@@ -311,7 +315,7 @@ production's `.env`; the leftover `/var/iri/code/scripts/lib/container-runtime.s
 >
 > **Later the same evening:** #1992 was applied on **production** directly (owner's choice, testing
 > skipped): the five data networks are `internal=true` since 16:24 UTC after a ~2.5-minute
-> maintenance ([`deployment.md` → Network changes](deployment.md#network-changes-are-installed-not-applied));
+> maintenance ([`deployment.md` → Network changes](../deployment.md#network-changes-are-installed-not-applied));
 > the testing host still has the old networks. The frontend's refused `CONFIG GET` noted above
 > disappears with the release that carries #2067 (verified gone on production after the v1.12.0 deploy, 2026-09-25). The Android release v0.3.1 (versionCode 16) was
 > tagged; the served-version floor moves to 16 only once it is published.
@@ -335,7 +339,7 @@ production's `.env`; the leftover `/var/iri/code/scripts/lib/container-runtime.s
 >
 > **Still open after that:** the host's `realm-export.json` seed for the confidential client, the
 > Android release (basetool-android #182), and the kcadm truststore question after step 3
-> ([`keycloak/README.md`](keycloak/README.md#runbook--provisioning-the-mobile-client-basetool-android),
+> ([`keycloak/README.md`](../keycloak/README.md#runbook--provisioning-the-mobile-client-basetool-android),
 > untested).
 
 ---
@@ -405,7 +409,7 @@ failure.
   > `previous-digest-pin.yml` and snapshotted the half-mirrored tree as `config-previous/`, so both
   > rollback anchors were gone until the 12:40 tick succeeded. #2063 records such a failure, restores
   > the previous tree, refuses up front on a non-`deploy`-owned directory, and writes the pin after
-  > the config delivery ([`deployment.md`](deployment.md), REQ-OPS-003). It reaches a host only
+  > the config delivery ([`deployment.md`](../deployment.md), REQ-OPS-003). It reaches a host only
   > through the role run `--tags deploy,scripts`.
 - **`/var/iri/secrets` was `root:root`**, the role's target is `iri:iri 0755`
   (`basetool_host_service_user_dirs`). The keystore rotation in `deployment.md` relies on it: step 2
