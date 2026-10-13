@@ -61,8 +61,7 @@ public class PersonalInventoryItemService {
 
   /**
    * Whitelist of sort properties accepted on list endpoints. Restricting this prevents unstable
-   * sorting and information disclosure via arbitrary sort keys (see AGENTS.md "Pagination &
-   * Sorting").
+   * sorting and information disclosure via arbitrary sort keys.
    */
   public static final Set<String> SORTABLE_FIELDS =
       Set.of("id", "name", "quantity", "locationNameSnapshot", "createdAt", "updatedAt");
