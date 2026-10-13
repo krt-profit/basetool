@@ -1,6 +1,6 @@
 > **Doc type:** Operator runbook, one page — **the owner runs every step; nothing here was or may be
 > executed by an agent.** Written 2026-10-10 (domain modularisation plan, D-26). **Living document:**
-> a step is struck from the table below when it is done, with the date. Last reviewed: 2026-10-11.
+> a step is struck from the table below when it is done, with the date. Last reviewed: 2026-10-13.
 
 # Owner steps, October 2026
 
@@ -17,13 +17,13 @@ linked; this page is the order, the approvals and the words to type.
 
 | # | Step | Where | Approval | Depends on |
 |---|------|-------|----------|------------|
-| 1 | [`release` environment, its secret, and the repository secret's deletion](#1-the-release-environment-ci-sec-16) | GitHub | owner (repository settings) | — |
+| ~~1~~ | ~~[`release` environment, its secret, and the repository secret's deletion](#1-the-release-environment-ci-sec-16)~~ **done 2026-10-13**, proven by a dispatched `refresh-versions.yml` run that minted the App token | GitHub | owner (repository settings) | — |
 | ~~2~~ | ~~[Deploy sudoers rule](#2-the-deploy-sudoers-rule-ops-sec-08)~~ **production done 2026-10-11**; testing is the owner's call | testing, then production host | testing: owner's call; production: per command | — |
 | ~~3~~ | ~~[Restore drill after the S-09 rollout](#3-the-restore-drill-s-09)~~ **done 2026-10-11** | production host | per command | 2 (the drill runs as `deploy`) |
-| 4 | [Keycloak: the session for steps 5–7](#4-keycloak-one-session-for-the-three-realm-steps) | production host | per command | — |
-| 5 | [Keycloak step 2: forgot password and the sender](#5-keycloak-step-2-forgot-password-and-the-realms-sender) | production realm | per command | 4 |
+| ~~4~~ | ~~[Keycloak: the session for steps 5–7](#4-keycloak-one-session-for-the-three-realm-steps)~~ **done 2026-10-13** (the truststore and login commands work on the post-#2036 keystore) | production host | per command | — |
+| ~~5~~ | ~~[Keycloak step 2: forgot password and the sender](#5-keycloak-step-2-forgot-password-and-the-realms-sender)~~ **done 2026-10-13**: the link stays on, the sender works (console test), nothing to apply | production realm | per command | 4 |
 | ~~6~~ | ~~[Keycloak step 12: session windows](#6-keycloak-step-12-session-windows)~~ **decided 2026-10-11: unchanged, nothing to apply** | production realm | per command, after a decision | 4 |
-| 7 | [Keycloak step 11: OTP for admins](#7-keycloak-step-11-otp-for-admins--last) | production realm | per command | 4, 5, 6 |
+| ~~7~~ | ~~[Keycloak step 11: OTP for admins](#7-keycloak-step-11-otp-for-admins--last)~~ **done 2026-10-13**: applied, the Discord bind finished by hand (see the note in step 7), the owner confirmed the logins | production realm | per command | 4, 5, 6 |
 | 8 | [Trusted Types: enforce](#8-trusted-types-enforce) | production host | per command | a quiet week |
 | ~~9~~ | ~~[Promote v1.14.0](#9-promote-v1140)~~ **done: v1.14.0 on 2026-10-10, v1.15.0 on 2026-10-11** | GitHub, production | the `production` environment's approval | 2 done or consciously not |
 
