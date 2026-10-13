@@ -1,8 +1,8 @@
 import de.greluc.krt.profit.basetool.conventions.BasetoolExtension
 import de.greluc.krt.profit.basetool.conventions.catalog
+import de.greluc.krt.profit.basetool.conventions.lombokNotation
 import de.greluc.krt.profit.basetool.conventions.moduleBuildSettings
 import de.greluc.krt.profit.basetool.conventions.requiredLibrary
-import de.greluc.krt.profit.basetool.conventions.requiredVersion
 import java.util.zip.ZipFile
 
 plugins { java }
@@ -12,13 +12,8 @@ val catalog = project.catalog()
 
 java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
 
-val lombok = provider {
-  if (pluginManager.hasPlugin("io.spring.dependency-management")) "org.projectlombok:lombok"
-  else "org.projectlombok:lombok:${catalog.requiredVersion("lombok")}"
-}
-
 listOf("compileOnly", "annotationProcessor", "testCompileOnly", "testAnnotationProcessor").forEach {
-  dependencies.addProvider(it, lombok)
+  dependencies.addProvider(it, lombokNotation())
 }
 
 listOf("compileOnly", "testCompileOnly").forEach {

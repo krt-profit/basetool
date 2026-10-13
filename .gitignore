@@ -1,6 +1,8 @@
 HELP.md
 .gradle
 build/
+/backend/docs/javadoc/
+/ingest/docs/javadoc/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/

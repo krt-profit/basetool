@@ -16,6 +16,15 @@ fun VersionCatalog.requiredVersion(alias: String): String =
     .orElseThrow { IllegalStateException("The version catalog has no version '$alias'.") }
     .requiredVersion
 
+/**
+ * The notation of the Lombok dependency: without a version where the dependency-management plugin
+ * applies the Boot-managed one, else with the catalog's version.
+ */
+fun Project.lombokNotation(): Provider<String> = provider {
+  if (pluginManager.hasPlugin("io.spring.dependency-management")) "org.projectlombok:lombok"
+  else "org.projectlombok:lombok:${catalog().requiredVersion("lombok")}"
+}
+
 /** The catalog library [alias] as a dependency provider, failing when the entry does not exist. */
 fun VersionCatalog.requiredLibrary(alias: String): Provider<MinimalExternalModuleDependency> =
   findLibrary(alias).orElseThrow {
