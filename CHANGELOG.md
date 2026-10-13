@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.16.1](https://github.com/krt-profit/basetool/releases/tag/v1.16.1) - 2026-10-13
+
 ### Changed
 
 - **Datenauskunft: sprechende Dateinamen und lesbares JSON.** PDF und JSON heißen jetzt „Datenexport <Kontoname> <JJ-MM-TT>“ (auch beim Export durch einen Admin), und die JSON-Datei ist eingerückt statt einzeilig (REQ-SEC-058).
