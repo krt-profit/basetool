@@ -42,7 +42,7 @@ OpenSSH client, which reaches the agent that holds the key (Git Bash's `ssh` fai
 `Permission denied (publickey)`): `ssh root@46.225.24.180`. The commands below are typed in that
 interactive root shell. A one-shot read can also be passed in single quotes,
 `ssh root@46.225.24.180 'cd / && …'`; a multi-line script is piped in with its carriage returns
-stripped (vault *Production Access*).
+stripped.
 
 **Shell prelude**, once per session, as root, from `/` — the conventions of
 [`deployment.md` → Shell conventions](../deployment.md#shell-conventions-used-below):
@@ -56,8 +56,8 @@ ENVF=/var/iri/code/.env
 ```
 
 `IRI_UID` is 994 on production. The containers are reached through `sudo -u iri`, never
-`runuser -u iri`: `runuser` fails `podman exec` with a crun cgroup „Permission denied" on this host
-(vault *Production Access*, *Keycloak*), and `sudo -u` keeps the working directory, which is why
+`runuser -u iri`: `runuser` fails `podman exec` with a crun cgroup „Permission denied" on this host,
+and `sudo -u` keeps the working directory, which is why
 every command starts at `/`.
 
 **Editing `.env`.** Every `.env` change below goes through this helper, which keeps a dated backup,
@@ -209,7 +209,7 @@ on it.
 | R7 | Host RAM headroom | `free -m`; Grafana → Explore: `min_over_time(node_memory_MemAvailable_bytes[30d])`, `node_memory_MemTotal_bytes`; `grep -h '^Memory=' /etc/containers/systemd/users/${IRI_UID}/*.container` | the 30-day minimum of available memory well above the 512 MiB the Redis limit grows by · *Read 2026-09-28:* 15 345 MiB total, 10 587 MiB available, no swap; unit `Memory=` sum 13 456 MiB today, **13 968 MiB** with Redis at 1024M. |
 | R8 | Exchange and ingest switches in `.env` | `grep -cE '^APP_EXCHANGE_MIRROR_ENABLED=' $ENVF; grep -cE '^IRI_INGEST_LEGACY_ENDPOINTS_ENABLED=' $ENVF; grep -c '^IRI_INGEST_ALLOWED_CLIENT_IDS=basetool-sc-extractor$' $ENVF; grep -cE '^IRI_INGEST_CLIENT_AUDIT_ONLY=(true\|"true")$' $ENVF; grep -cE '^IRI_INGEST_PUBLIC_BASE_URL=https://ingest\.profit-base\.online$' $ENVF; grep -cE '^APP_INVENTORY_STOLEN_MARKING_ENABLED=' $ENVF; grep -c '^REDIS_INGEST_USERNAME=basetool-ingest$' $ENVF` | `0`, `0`, `1`, `0`, `1`, `0`, `1` · *Read 2026-09-28:* the first six exactly as expected — `PublicBaseUrlGuard` and `LegacyClientGateGuard` pass; the seventh (for `RedisUsernameGuard`) is read on the day, R11 already showed all three service usernames set. |
 | R9 | The same, as the running ingest sees it | `for v in APP_INGEST_CLIENT_IDENTITY_ALLOWED_CLIENT_IDS APP_INGEST_CLIENT_IDENTITY_AUDIT_ONLY APP_INGEST_PUBLIC_BASE_URL; do printf '%s=' $v; ${UPOD} exec ingest printenv $v; done` | `basetool-sc-extractor`, `false`, `https://ingest.profit-base.online` · **TO BE READ on the day** (exec-based, gated). |
-| R10 | Android floor | `grep -E '^APP_ANDROID_(MINIMUM\|LATEST)_VERSION_CODE=[0-9]+$' $ENVF`; off the host: `curl -s https://api.profit-base.online/api/v1/app/version-policy` | `16` / `16` (vault *Android App*, 2026-09-25) · *Read 2026-09-28:* 16 / 16. |
+| R10 | Android floor | `grep -E '^APP_ANDROID_(MINIMUM\|LATEST)_VERSION_CODE=[0-9]+$' $ENVF`; off the host: `curl -s https://api.profit-base.online/api/v1/app/version-policy` | `16` / `16` (2026-09-25) · *Read 2026-09-28:* 16 / 16. |
 | R11 | Redis users in `.env` | `grep -cE '^REDIS_(BACKEND\|INGEST\|FRONTEND)_USERNAME=' $ENVF; grep -c '^REDIS_DEFAULT_USER=off$' $ENVF` | `3`; `1` (APPSEC-04 done 2026-09-25) · *Read 2026-09-28:* `3`; `1`. |
 | R12 | Keycloak realm shape (extractor, exchange scopes, provisioner client) | the snapshot read below the table | extractor `consent=f`, `dpop.bound.access.tokens=false`, default scopes incl. `extractor-ingest` and `extractor-ingest-only`; **no** `exchange.*` scope; no `versekit`, no `basetool-provisioner`; no `mapper|basetool-sc-extractor|` row (optional cross-check of G5-L4) · *Read 2026-09-28 in part (owner-approved exec):* realm login theme `krt-theme`, 0 `exchange.*` client scopes, 0 `versekit` clients. The full snapshot (the extractor's consent, DPoP and scope rows) **TO BE READ on the day**. |
 | R13 | Last backup | `systemctl show iri-backup.service -p Result -p ExecMainExitTimestamp` | `success`, today 04:15 · *Read 2026-09-28:* `success`, 2026-09-28 04:17:40 UTC — re-read on the day. |
@@ -527,12 +527,12 @@ yes).
 ### S7 — Publish the Android app
 
 GitHub (basetool-android), no host change. The app release with #190–#196: merge the release PR
-that bumps `versionCode` to **17**, tag it, let `release.yml` publish the APK and SBOM
-(vault *Android App*). Its new actions appear only where `/api/v1/me/capabilities` advertises them,
+that bumps `versionCode` to **17**, tag it, let `release.yml` publish the APK and SBOM.
+Its new actions appear only where `/api/v1/me/capabilities` advertises them,
 so marking stays hidden until S9. **Precondition:** S6 verified (the app's new routes and
 allowlist entries exist only on the new server). **Verify:** `gh release view --repo
-krt-profit/basetool-android --json tagName,isLatest,assets`; install it on the Pixel AVD in German
-(vault *Verifying the app on a device*), sign in, open „Mein Lager".
+krt-profit/basetool-android --json tagName,isLatest,assets`; install it on the Pixel AVD in German,
+sign in, open „Mein Lager".
 
 ### S8 — Raise the app's minimum version
 
@@ -651,8 +651,7 @@ files under `/root/kc-realm/`, and a kcadm session file on the Keycloak tmpfs.
   then `config truststore --trustpass - /opt/keycloak/data/tmp/truststore.p12`. Both prompts want a
   value from the host (the keystore password `KC_HTTPS_KEY_STORE_PASSWORD`, the provisioner's secret
   from the Admin Console) — type them, never paste them into a transcript. Never retry a failing
-  login blindly: the realm locks after five failures (vault *Keycloak* → *Administering the realm
-  with kcadm*).
+  login blindly: the realm locks after five failures.
 - **Rollback basis** (holds client secrets — stays on the host, `0700`, deleted at S16's end):
 
   ```bash
@@ -754,7 +753,7 @@ files under `/root/kc-realm/`, and a kcadm session file on the Keycloak tmpfs.
 
 GitHub (basetool-sc-extractor), no host change — **the start of the one sitting S13–S15**. Tag the
 decided commit `v2.10.0` and push the tag; the tag run builds the MSI, attests it and publishes a
-non-prerelease GitHub release (vault *SC Extractor Release Pipeline*).
+non-prerelease GitHub release.
 
 - **The tag push is the publication.** The workflow has no draft stage: it builds, scans, attests
   and publishes in one run, as `releases/latest`, with `.github/release-notes/v2.10.0.md` in front
@@ -929,10 +928,8 @@ the command itself still needs its yes). Right after S15, in the same provisione
   were removed and `basetool-provisioner` was deleted.
 - **Verify:** the row „Freigegeben"; the VerseKit author's first connection shows under
   *Installations created/day*; a member's new-connection notification arrives.
-- **Watch:** as S15, per client `versekit`; plus `ExchangeRemoveSpike`, `ExchangeGuardStorm`
-  (vault runbook *Suspending an exchange client*).
-- **Rollback:** „Sperren"; for a bad release, the minimum version (vault *Blocking a bad exchange
-  client release*).
+- **Watch:** as S15, per client `versekit`; plus `ExchangeRemoveSpike`, `ExchangeGuardStorm`.
+- **Rollback:** „Sperren"; for a bad release, the minimum version.
 
 ### S18 — Widen VerseKit, one capability group at a time
 
@@ -1044,7 +1041,7 @@ Fastest first; each is its own production write with its own yes.
    stop spreading.
 5. **Data** — a member undoes one client's changes from the journal on „Verbundene Anwendungen";
    an admin undoes a client for every member since a point in time with the bulk undo on the admin
-   page (REQ-XCH-034, which suspends the client first; vault *Suspending an exchange client*).
+   page (REQ-XCH-034, which suspends the client first).
    Materialbörse offers a sync removed are not restored.
 6. **Marking and the app floor** — S9's and S8's rollbacks; marked rows stay marked. *Since
    2026-10-03 (REQ-API-020):* a release that carries the release-bound floor takes its floor back
@@ -1056,7 +1053,7 @@ Fastest first; each is its own production write with its own yes.
 
 ## 9. Members
 
-In German, in the forum (vault *Announcing a release*), in three posts:
+In German, in the forum, in three posts:
 
 1. **Before S6 (2026-09-28)** — the outage window; **once**, every member confirms the changed terms
    of use at the next sign-in; until a member has, their SC Extractor pauses; the Android app

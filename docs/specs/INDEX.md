@@ -159,8 +159,7 @@ proves it, and every issue/PR that touched it.
 
 Each id below had come to name two different requirements in two specs. On 2026-09-22 they were
 renumbered once, on the owner's decision: the side with more references kept the number, the other
-got the next free id of its area, and every reference in code, tests, specs, ADRs and the knowledge
-vault was rewritten. `CHANGELOG.md`, `docs/archive/` and the Flyway migrations are historical and
+got the next free id of its area, and every reference in code, tests, specs, and ADRs was rewritten. `CHANGELOG.md`, `docs/archive/` and the Flyway migrations are historical and
 keep the old ids — read them with this table.
 
 | Old id | Kept by | New id | For |

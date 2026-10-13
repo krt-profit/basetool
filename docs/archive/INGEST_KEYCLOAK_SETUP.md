@@ -334,8 +334,8 @@ the provisioner creates it — never the Admin Console.
    requested capabilities; `aud` contains `basetool-ingest`, `azp` is the new id, `scope` holds only
    exchange scopes (and `offline_access`), `cnf.jkt` is present, and there is no `email`, `name`,
    `preferred_username` or Discord claim.
-5. **Record it**: the client in this document's *Configured state*, the realm reference on its next
-   regeneration ([`docs/keycloak/README.md`](../keycloak/README.md)), and the vault.
+5. **Record it**: the client in this document's *Configured state* and the realm reference on its
+   next regeneration ([`docs/keycloak/README.md`](../keycloak/README.md)).
 
 **The SC Extractor** is no template client — it keeps its own `ClientSpec` — but from its migration
 release (2.10.0) it requests `offline_access` like one, and the provisioner pins the same offline

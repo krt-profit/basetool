@@ -763,7 +763,7 @@ runs on the testing host or a local stack, not on production. `dev` and `test` k
 the inert default, and once the legacy endpoints are off (REQ-XCH-033) the allowlist is no longer
 needed, because both routes answer `410` before the security chain. Production already sets the value
 (`basetool-sc-extractor`, read-only check on 2026-09-27) and has run with `audit-only` false since
-2026-08-30 (as `INGEST_KEYCLOAK_SETUP.md` and the knowledge base record it), so the next deploy starts
+2026-08-30 (as `INGEST_KEYCLOAK_SETUP.md` records it), so the next deploy starts
 as before. The
 compose files and the Quadlet `env.d` template keep their empty default on purpose: the value is host
 configuration, and a host that lacks it now fails loudly instead of running open.

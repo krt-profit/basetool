@@ -60,8 +60,7 @@ because a quality goal nobody measures is a preference, and a gate that cannot f
 
 ## 10.4 The quality goal with no automated gate
 
-**Auditability of the documentation itself.** Specs, ADRs, the README, the role matrix, the wiki and
-the knowledge base are all required to move with the change — and nothing in CI can enforce the
-vault half, because it is a separate repository. That is a known, accepted gap, mitigated only by
-writing the rule into every place a contributor or an agent starts. §11 lists it as debt rather than
-pretending it is covered.
+**Auditability of the documentation itself.** Specs, ADRs, the README, the role matrix and the wiki
+are all required to move with the change — and nothing in CI can enforce the wiki half, because it
+is a separate repository. That is a known, accepted gap, mitigated only by writing the rule into
+every place a contributor or an agent starts.

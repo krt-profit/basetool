@@ -6,7 +6,7 @@ Every architecturally significant decision is an **ADR** in [`docs/adr/`](../adr
 before or with the change that implements it. There are **246** of them (ADR-0001 to ADR-0246,
 as of 2026-10-10). They are numbered
 sequentially, carry a status, and are amended in place with a dated `## Amendment N` section rather
-than silently rewritten — a vault or a decision log that edits its own history teaches its readers
+than silently rewritten — a decision log that edits its own history teaches its readers
 not to trust it.
 
 Two rules make the collection usable rather than merely large:
@@ -17,8 +17,7 @@ Two rules make the collection usable rather than merely large:
 - **Claiming a number is done at push time**, against `origin/main` *and* open PRs. A number
   reserved only in prose does not exist as far as the numbering gate is concerned.
 
-The ADRs are the *why*. The [`docs/specs/`](../specs/INDEX.md) registry is the *what must hold*, and
-the knowledge-base vault is the *what is actually true on the running system right now*.
+The ADRs are the *why*. The [`docs/specs/`](../specs/INDEX.md) registry is the *what must hold*.
 
 ## 9.2 The decisions that shape the whole system
 
@@ -50,8 +49,8 @@ other decision in context.
 
 - **Feature behaviour** is a spec (`REQ-<AREA>-NNN`), not an ADR. "Which role may clear a payout" is
   a requirement; "authorisation is centralised on `@PreAuthorize`" is a decision.
-- **Operational values** — a host, a port, a retention window, a threshold — belong in the knowledge
-  base, where they can be corrected the day they change without rewriting a decision record.
+- **Operational values** — a host, a port, a retention window, a threshold — belong in a runbook or the
+  configuration, where they can be corrected the day they change without rewriting a decision record.
 - **Plan documents** (`docs/*_PLAN.md`, `docs/DESIGN_*.md`) carry a `Doc type:` header marking
   them *living spec* or *historical plan*. Once a plan ships — or a one-time runbook has been
   executed — it is frozen and moved to [`docs/archive/`](../archive/README.md), pointing at the

@@ -38,8 +38,7 @@ The connections run over **eighteen** container networks, each named for what it
 `net-monitoring-core`, `net-monitoring-scrape`, `net-blackbox-v6`). Apart from the two monitoring
 networks each joins a small named set — usually one pair, plus a data store's exporter — and a
 container reaches exactly the containers it shares a network with. The units are in
-[`quadlet/systemd/`](../../quadlet/systemd/); the segment-by-segment reasoning is the knowledge
-base's Topology note.
+[`quadlet/systemd/`](../../quadlet/systemd/).
 
 | Building block | Responsibility | Deliberately does **not** |
 | --- | --- | --- |

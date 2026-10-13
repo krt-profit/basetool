@@ -554,7 +554,7 @@ intercepted authorization code is redeemable without it.
 > `client-authentication-method: none`, and the realm has `publicClient: true` with no secret.
 > ADR-0001 (**Accepted — implementation pending**, 2026-05-20) decided to give it a client secret
 > and has not been carried out; reading the ADR as the state of the system is how an earlier version
-> of the knowledge base's client table came to call this client *confidential*.
+> of the documentation once came to call this client *confidential*.
 >
 > Spring Security sends PKCE automatically for a public client, so the login flow is already
 > PKCE-protected in practice — what this step adds is that the **realm requires** it, which closes

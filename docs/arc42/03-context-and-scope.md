@@ -41,8 +41,7 @@
 | **Nextcloud (WebDAV)** | out | The nightly encrypted restic backup | Off-site storage, deliberately not on the same host or provider account |
 
 > [!note] WoltLab is not a neighbour yet
-> The organisation's forum is intended to become the roster's source of truth (the knowledge base's
-> WoltLab note carries the decision). Nothing in the code talks to it or anticipates it today.
+> The organisation's forum is intended to become the roster's source of truth. Nothing in the code talks to it or anticipates it today.
 
 ## 3.2 Technical context — what is reachable from the internet
 
