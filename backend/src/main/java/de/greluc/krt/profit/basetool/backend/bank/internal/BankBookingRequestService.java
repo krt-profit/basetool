@@ -437,7 +437,8 @@ public class BankBookingRequestService {
   /**
    * Lists every request on the given accounts, newest first (REQ-BANK-041) — backs the responsible
    * holder's "Fremde Anträge" tab. Org-unit-blind: the caller ({@link OrgUnitBankAccessService})
-   * supplies the set of accounts the holder is responsible for.
+   * supplies the set of accounts the holder is responsible for. The caller's own requests are left
+   * out unless they are an admin, because they may not approve them (REQ-BANK-062).
    *
    * @param accountIds the accounts to list requests for
    * @return the requests on those accounts, newest first; empty when the set is empty
@@ -447,7 +448,10 @@ public class BankBookingRequestService {
     if (accountIds.isEmpty()) {
       return List.of();
     }
+    UUID callerId = authHelperService.currentUserId().orElse(null);
+    boolean admin = authHelperService.isAdmin();
     return requestRepository.findByAccountIdInOrderByCreatedAtDesc(accountIds).stream()
+        .filter(request -> !isBoundByFourEyes(request, callerId, admin))
         .map(this::toDto)
         .toList();
   }
@@ -513,8 +517,45 @@ public class BankBookingRequestService {
     }
     BiPredicate<BankBookingRequestType, UUID> confirmCheck =
         bankSecurityService.confirmCheck(authentication);
+    UUID callerId = authHelperService.currentUserId().orElse(null);
+    boolean admin = authHelperService.isAdmin();
     return pageQueue(statuses, pageable)
-        .map(request -> toDto(request, callerMayConfirm(request, confirmCheck)));
+        .map(
+            request ->
+                toDto(
+                    request,
+                    callerMayConfirm(request, confirmCheck)
+                        && !isBoundByFourEyes(request, callerId, admin)));
+  }
+
+  /**
+   * Whether the four-eyes rule bars the caller from approving or confirming the request: the caller
+   * raised it and is not an admin (REQ-BANK-062).
+   *
+   * @param request the request to judge
+   * @param callerId the caller's user id, or {@code null} when unknown
+   * @param admin whether the caller is an admin, who may decide their own request
+   * @return {@code true} iff the caller must leave the decision to a second person
+   */
+  private static boolean isBoundByFourEyes(
+      @NotNull BankBookingRequest request, @Nullable UUID callerId, boolean admin) {
+    return !admin && callerId != null && callerId.equals(request.getRequestedBy());
+  }
+
+  /**
+   * Fails the decision when the four-eyes rule bars the current caller from granting or confirming
+   * the request (REQ-BANK-062).
+   *
+   * @param request the request being decided
+   * @throws BankConflictException with {@code BANK_FOUR_EYES_REQUIRED} when the caller raised it
+   */
+  private void requireSecondPerson(@NotNull BankBookingRequest request) {
+    if (isBoundByFourEyes(
+        request, authHelperService.currentUserId().orElse(null), authHelperService.isAdmin())) {
+      throw new BankConflictException(
+          BankConflictException.CODE_BANK_FOUR_EYES_REQUIRED,
+          "The requester of a booking request cannot approve or confirm it");
+    }
   }
 
   /**
@@ -580,9 +621,10 @@ public class BankBookingRequestService {
    * @throws NotFoundException when the request does not exist
    * @throws AccessDeniedException when the employee lacks the matching per-account capability
    * @throws BankConflictException with {@code BANK_REQUEST_NOT_PENDING}, {@code
-   *     BANK_OWNER_APPROVAL_REQUIRED}, or a ledger conflict ({@code BANK_ACCOUNT_CLOSED}, {@code
-   *     BANK_OVERDRAFT}, {@code BANK_SELF_TRANSFER}); the holder may go negative (REQ-BANK-006,
-   *     ADR-0039)
+   *     BANK_FOUR_EYES_REQUIRED} (the caller raised the request and is no admin, REQ-BANK-062),
+   *     {@code BANK_OWNER_APPROVAL_REQUIRED}, or a ledger conflict ({@code BANK_ACCOUNT_CLOSED},
+   *     {@code BANK_OVERDRAFT}, {@code BANK_SELF_TRANSFER}); the holder may go negative
+   *     (REQ-BANK-006, ADR-0039)
    * @throws ObjectOptimisticLockingFailureException on a version mismatch (409)
    */
   @NotNull
@@ -598,6 +640,7 @@ public class BankBookingRequestService {
     BankBookingRequest request = lockRequest(requestId);
     requireVersion(request, version);
     requirePending(request);
+    requireSecondPerson(request);
     if (request.isRequiresOwnerApproval() && !ownerApprovalConfirmed) {
       throw new BankConflictException(
           BankConflictException.CODE_BANK_OWNER_APPROVAL_REQUIRED,
@@ -765,13 +808,17 @@ public class BankBookingRequestService {
    * @param granted whether to grant ({@code true}) or revoke ({@code false}) the approval
    * @return the updated request
    * @throws BadRequestException when granting approval to a request that needs none
-   * @throws BankConflictException with {@code BANK_REQUEST_NOT_PENDING} when no longer pending
+   * @throws BankConflictException with {@code BANK_REQUEST_NOT_PENDING} when no longer pending, or
+   *     {@code BANK_FOUR_EYES_REQUIRED} when a non-admin grants their own request (REQ-BANK-062)
    */
   @NotNull
   @Transactional(propagation = Propagation.MANDATORY)
   public BankBookingRequestDto applyOwnerApprovalWithinTransaction(
       @NotNull BankBookingRequest request, boolean granted) {
     requirePending(request);
+    if (granted) {
+      requireSecondPerson(request);
+    }
     if (granted && !request.isRequiresOwnerApproval()) {
       throw new BadRequestException(
           "This request does not require the responsible holder's approval");

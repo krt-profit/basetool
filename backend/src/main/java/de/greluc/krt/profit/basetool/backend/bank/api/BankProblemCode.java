@@ -72,6 +72,9 @@ public enum BankProblemCode implements ProblemCode {
   /** The booking needs the owner's approval first. */
   BANK_OWNER_APPROVAL_REQUIRED(HttpStatus.CONFLICT),
 
+  /** The requester of a booking request may neither approve nor confirm it (REQ-BANK-062). */
+  BANK_FOUR_EYES_REQUIRED(HttpStatus.CONFLICT),
+
   /** Reserved, not emitted: the cartel approval answers {@code 202} instead (ADR-0109). */
   BANK_CARTEL_APPROVAL_REQUIRED(HttpStatus.CONFLICT),
 

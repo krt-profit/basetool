@@ -2872,6 +2872,42 @@ frontend `OrgUnitBankPageControllerMvcTest` (modal renders after the table, with
 `audit/web/AdminAuditLogPageController` (audit filter), `templates/bank/org-unit-bank.html` ·
 **ADR:** [ADR-0133](../adr/0133-editable-pending-booking-requests.md)
 
+### REQ-BANK-062 — Four-eyes for every booking request
+
+The member who raised a booking request **MUST NOT grant its owner approval and MUST NOT confirm it**
+(`BANK_FOUR_EYES_REQUIRED`, 409). A second person decides. The check runs in
+`BankBookingRequestService` under the row lock, after the pending and version guards, for `confirm`
+and for the grant of the owner approval; revoking an approval is not a grant and stays open.
+
+- **Reject stays open to the requester.** A rejection moves no money and is in effect the cancel the
+  requester may do anyway.
+- **Direct bookings are not requests.** A bank employee's direct deposit, withdrawal and transfer,
+  a payout to themselves included, are unchanged.
+- **The holder exemption stays** (ADR-0123): a responsible holder's own request needs no owner
+  approval, the second person is the bank employee who confirms it, and the holder may not confirm
+  it themselves.
+- **Admin is not bound.** An admin MAY grant and confirm their own request (emergency path). Bank
+  management and bank employees are bound.
+- **The surfaces follow the rule.** `callerMayConfirm` on the staff queue is `false` for the
+  requester; the "Fremde Anträge" approval list omits the caller's own requests unless the caller is
+  an admin.
+- A request whose only eligible confirmer is its requester stays `PENDING` until another employee
+  with the grant, a member of the bank management or an admin confirms it.
+
+**Acceptance**
+
+- [x] Confirming or granting the owner approval of one's own request is a 409
+  `BANK_FOUR_EYES_REQUIRED` and changes nothing.
+- [x] An admin confirms and approves their own request.
+- [x] The requester rejects their own request.
+- [x] The queue marks the caller's own request as not confirmable; the approval list omits it for a
+  non-admin.
+
+**Enforced by:** `BankBookingRequestServiceTest` (requester refused, admin allowed, reject allowed,
+queue flag, approval list) · **Code:** `bank/internal/BankBookingRequestService`,
+`bank/api/BankProblemCode`, `bank/api/BankConflictException` · **ADR:**
+[ADR-0251](../adr/0251-four-eyes-for-every-bank-booking-request-admin-excepted.md)
+
 ## Out of scope
 
 - **Accounts for individual players** — an explicit owner decision: players appear only

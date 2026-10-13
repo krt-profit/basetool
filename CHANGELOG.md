@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Bank: Vier-Augen-Prinzip für jeden Buchungsantrag.** Wer einen Antrag gestellt hat, kann ihn weder freigeben noch bestätigen (409 `BANK_FOUR_EYES_REQUIRED`); eine zweite Person entscheidet. Ablehnen bleibt möglich, direkte Buchungen bleiben unverändert, Admins sind ausgenommen (REQ-BANK-062, ADR-0251).
+
 ## [v1.16.1](https://github.com/krt-profit/basetool/releases/tag/v1.16.1) - 2026-10-13
 
 ### Changed
