@@ -63,6 +63,7 @@ class PurchasingDealFlowE2eTest {
   private static Browser browser;
   private static String needId;
   private static String partnerName;
+  private static String materialName;
 
   /**
    * Launches the browser and prepares the supply and purchasing surfaces: the unit may raise needs,
@@ -78,6 +79,7 @@ class PurchasingDealFlowE2eTest {
     }
     String suffix = UUID.randomUUID().toString().substring(0, 8);
     partnerName = "Ankauf E2E Partner " + suffix;
+    materialName = "Ankauf E2E Ore " + suffix;
     needId = seeder.preparePurchasing(USERNAME, PASSWORD, suffix);
   }
 
@@ -144,7 +146,9 @@ class PurchasingDealFlowE2eTest {
         page.locator("[data-testid='purchasing-deal-submit']").click();
 
         assertSuccessToast(page);
-        assertThat(page.locator("[data-testid='purchasing-deal-row']"))
+        assertThat(
+                page.locator("[data-testid='purchasing-deal-row']")
+                    .filter(new Locator.FilterOptions().setHasText(materialName)))
             .hasCount(1, new LocatorAssertions.HasCountOptions().setTimeout(10_000));
         assertEquals(
             Boolean.TRUE,
