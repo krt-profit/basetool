@@ -167,6 +167,13 @@ class DialogA11yE2eTest {
       String accountId =
           seeder.createBankAccount(USERNAME, PASSWORD, "E2E Dialog Account", "SPECIAL");
       SEEDED_DETAILS.add("/bank/accounts/" + accountId);
+      String purchasingSuffix = UUID.randomUUID().toString().substring(0, 8);
+      String purchasingNeed =
+          seeder.preparePurchasing(USERNAME, PASSWORD, "dialog" + purchasingSuffix);
+      String dealId =
+          seeder.createPurchasingDeal(
+              USERNAME, PASSWORD, purchasingNeed, "E2E Dialog Partner " + purchasingSuffix);
+      SEEDED_DETAILS.add("/purchasing/deals/" + dealId);
     }
   }
 

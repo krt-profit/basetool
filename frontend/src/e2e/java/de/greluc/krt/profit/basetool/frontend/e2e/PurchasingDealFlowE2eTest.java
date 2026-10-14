@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.frontend.e2e;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -79,71 +78,7 @@ class PurchasingDealFlowE2eTest {
     }
     String suffix = UUID.randomUUID().toString().substring(0, 8);
     partnerName = "Ankauf E2E Partner " + suffix;
-    String materialId =
-        seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, "Ankauf E2E Ore " + suffix);
-    int supply =
-        seeder.putForStatus(
-            USERNAME,
-            PASSWORD,
-            "/api/v1/supply/admin/settings",
-            "{\"enabled\":true,\"governingAreaIds\":[]}");
-    assertTrue(supply >= 200 && supply < 300, "the supply switch must be settable: " + supply);
-    int unit =
-        seeder.putForStatus(
-            USERNAME,
-            PASSWORD,
-            "/api/v1/supply/admin/units/" + IRIDIUM_ID,
-            "{\"mayRaiseNeeds\":true,\"acceptsDonations\":true,\"version\":null}");
-    assertTrue(unit == 200 || unit == 409, "the unit flags must be settable: " + unit);
-
-    String account =
-        seeder.createBankAccount(USERNAME, PASSWORD, "Ankauf E2E " + suffix, "SPECIAL");
-    JsonObject settings =
-        JsonParser.parseString(
-                seeder.getBody(USERNAME, PASSWORD, "/api/v1/purchasing/admin/settings"))
-            .getAsJsonObject();
-    JsonArray tiers = settings.getAsJsonArray("allowedQualityTierIds");
-    int saved =
-        seeder.putForStatus(
-            USERNAME,
-            PASSWORD,
-            "/api/v1/purchasing/admin/settings",
-            "{\"enabled\":true,\"governingAreaIds\":[],\"fundingAccountId\":\""
-                + account
-                + "\",\"defaultMonthlyLimit\":100000000,\"budgetCap\":null,\"budgetPeriod\":\"MONTH\","
-                + "\"settlementDueDays\":7,\"allowedQualityTierIds\":"
-                + tiers
-                + ",\"version\":"
-                + settings.get("version").getAsLong()
-                + "}");
-    assertTrue(saved >= 200 && saved < 300, "the purchasing settings must be settable: " + saved);
-
-    String userId = seeder.getUserId(USERNAME, PASSWORD);
-    seeder.registerBankHolder(USERNAME, PASSWORD, userId);
-    int appointed =
-        seeder.postForStatus(
-            USERNAME,
-            PASSWORD,
-            "/api/v1/purchasing/delegates",
-            "{\"userId\":\"" + userId + "\",\"validUntil\":null,\"monthlyLimit\":null}");
-    assertTrue(
-        appointed == 201 || appointed == 409, "the test user must become a delegate: " + appointed);
-
-    needId =
-        JsonParser.parseString(
-                seeder.postBody(
-                    USERNAME,
-                    PASSWORD,
-                    "/api/v1/supply/needs",
-                    "{\"orgUnitId\":\""
-                        + IRIDIUM_ID
-                        + "\",\"materialId\":\""
-                        + materialId
-                        + "\",\"amount\":20,\"priority\":\"NORMAL\",\"purchasable\":true,"
-                        + "\"purchaseReason\":\"RARE_SOURCE\",\"maxUnitPrice\":200}"))
-            .getAsJsonObject()
-            .get("id")
-            .getAsString();
+    needId = seeder.preparePurchasing(USERNAME, PASSWORD, suffix);
   }
 
   /** Releases the browser and the Playwright driver process. */

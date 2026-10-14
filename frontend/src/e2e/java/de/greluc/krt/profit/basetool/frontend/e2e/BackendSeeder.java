@@ -2561,4 +2561,122 @@ public final class BackendSeeder {
         "docker/test-tls/basetool-test-truststore.p12 not found walking up from "
             + Paths.get("").toAbsolutePath());
   }
+
+  /**
+   * Prepares the supply and purchasing surfaces for a deal: IRIDIUM may raise needs, a funding
+   * account and the purchasing settings exist, the user holds a bank account role and is appointed
+   * a delegate, and a purchasable need exists. Safe to repeat; an existing appointment is kept.
+   *
+   * @param username Keycloak username of the (admin) test user
+   * @param password Keycloak password
+   * @param suffix a unique suffix for the names the call creates
+   * @return the id of the purchasable need
+   */
+  public String preparePurchasing(String username, String password, String suffix) {
+    String materialId = ensureJobOrderMaterial(username, password, "Ankauf E2E Ore " + suffix);
+    int supply =
+        putForStatus(
+            username,
+            password,
+            "/api/v1/supply/admin/settings",
+            "{\"enabled\":true,\"governingAreaIds\":[]}");
+    if (supply < 200 || supply >= 300) {
+      throw new IllegalStateException("The supply switch must be settable: " + supply);
+    }
+    int unit =
+        putForStatus(
+            username,
+            password,
+            "/api/v1/supply/admin/units/" + IRIDIUM_SQUADRON_ID,
+            "{\"mayRaiseNeeds\":true,\"acceptsDonations\":true,\"version\":null}");
+    if (unit != 200 && unit != 409) {
+      throw new IllegalStateException("The unit flags must be settable: " + unit);
+    }
+    String account = createBankAccount(username, password, "Ankauf E2E " + suffix, "SPECIAL");
+    JsonObject settings =
+        JsonParser.parseString(getBody(username, password, "/api/v1/purchasing/admin/settings"))
+            .getAsJsonObject();
+    int saved =
+        putForStatus(
+            username,
+            password,
+            "/api/v1/purchasing/admin/settings",
+            "{\"enabled\":true,\"governingAreaIds\":[],\"fundingAccountId\":\""
+                + account
+                + "\",\"defaultMonthlyLimit\":100000000,\"budgetCap\":null,"
+                + "\"budgetPeriod\":\"MONTH\",\"settlementDueDays\":7,\"allowedQualityTierIds\":"
+                + settings.getAsJsonArray("allowedQualityTierIds")
+                + ",\"version\":"
+                + settings.get("version").getAsLong()
+                + "}");
+    if (saved < 200 || saved >= 300) {
+      throw new IllegalStateException("The purchasing settings must be settable: " + saved);
+    }
+    String userId = getUserId(username, password);
+    registerBankHolder(username, password, userId);
+    int appointed =
+        postForStatus(
+            username,
+            password,
+            "/api/v1/purchasing/delegates",
+            "{\"userId\":\"" + userId + "\",\"validUntil\":null,\"monthlyLimit\":null}");
+    if (appointed != 201 && appointed != 409) {
+      throw new IllegalStateException("The test user must become a delegate: " + appointed);
+    }
+    return JsonParser.parseString(
+            postBody(
+                username,
+                password,
+                "/api/v1/supply/needs",
+                "{\"orgUnitId\":\""
+                    + IRIDIUM_SQUADRON_ID
+                    + "\",\"materialId\":\""
+                    + materialId
+                    + "\",\"amount\":20,\"priority\":\"NORMAL\",\"purchasable\":true,"
+                    + "\"purchaseReason\":\"RARE_SOURCE\",\"maxUnitPrice\":200}"))
+        .getAsJsonObject()
+        .get("id")
+        .getAsString();
+  }
+
+  /**
+   * Creates an organisation partner and a draft deal for a need, as the appointed test user.
+   *
+   * @param username Keycloak username of the delegate
+   * @param password Keycloak password
+   * @param needId the purchasable need from {@link #preparePurchasing}
+   * @param partnerName the partner's name
+   * @return the id of the deal
+   */
+  public String createPurchasingDeal(
+      String username, String password, String needId, String partnerName) {
+    String partnerId =
+        JsonParser.parseString(
+                postBody(
+                    username,
+                    password,
+                    "/api/v1/purchasing/partners",
+                    "{\"kind\":\"ORG\",\"name\":\""
+                        + partnerName
+                        + "\",\"orgTag\":null,\"channel\":\"OTHER\","
+                        + "\"conditionsNote\":null,\"reputationNote\":null,"
+                        + "\"contactVia\":\"OTHER\"}"))
+            .getAsJsonObject()
+            .get("id")
+            .getAsString();
+    return JsonParser.parseString(
+            postBody(
+                username,
+                password,
+                "/api/v1/purchasing/deals",
+                "{\"needId\":\""
+                    + needId
+                    + "\",\"partnerId\":\""
+                    + partnerId
+                    + "\",\"amount\":5,\"unitPrice\":100,\"paymentModel\":\"ON_DELIVERY\","
+                    + "\"riskClass\":null,\"escortWish\":false,\"missionId\":null}"))
+        .getAsJsonObject()
+        .get("id")
+        .getAsString();
+  }
 }

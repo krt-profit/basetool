@@ -75,4 +75,17 @@ public record NeedDto(
     UUID jobOrderId,
     boolean canManage,
     Long version,
-    Instant createdAt) {}
+    Instant createdAt) {
+
+  /**
+   * The share of the amount that is covered, as a whole percent between 0 and 100.
+   *
+   * @return the percent, 0 for a need without an amount
+   */
+  public int fulfilledPercent() {
+    if (amount == null || amount <= 0 || fulfilledAmount == null) {
+      return 0;
+    }
+    return (int) Math.min(100, Math.round(fulfilledAmount * 100 / amount));
+  }
+}

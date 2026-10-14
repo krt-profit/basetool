@@ -73,7 +73,7 @@
                             </td>
                             <td th:attr="data-label=#{supply.need.progress}">
                                 <div class="meter supply-meter" aria-hidden="true">
-                                    <i class="meter__fill--warning" th:attr="data-krtm-width=${n.amount() > 0 ? (n.fulfilledAmount() * 100 >= n.amount() * 100 ? 100 : T(java.lang.Math).round(n.fulfilledAmount() * 100 / n.amount())) : 0}"></i>
+                                    <i class="meter__fill--warning" th:attr="data-krtm-width=${n.fulfilledPercent()}"></i>
                                 </div>
                                 <span class="cell-sub" th:text="#{supply.need.amountOf(${n.fulfilledAmount()}, ${n.amount()}, #{'supply.unit.' + ${n.quantityType()}})}">3 von 10 SCU</span>
                             </td>
