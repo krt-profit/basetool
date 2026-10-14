@@ -135,7 +135,7 @@ class ScWikiItemSyncServiceBackfillTest {
 
     service.syncItems();
 
-    verify(scWikiClient, never()).fetchOne(any(), any(), any());
+    verify(scWikiClient, never()).fetchOne(any(), any(), any(), any());
     verify(scWikiClient).fetchAllPagesResult(eq(WEAPONS), any(), any(), any(), any());
   }
 
@@ -146,11 +146,11 @@ class ScWikiItemSyncServiceBackfillTest {
     UUID uuid = UUID.randomUUID();
     when(gameItemRepository.findAllExternalUuids()).thenReturn(List.of(uuid));
     when(blueprintRepository.findReferencedItemUuids()).thenReturn(List.of());
-    when(scWikiClient.fetchOne(any(), eq(ScWikiItemDto.class), any())).thenReturn(null);
+    when(scWikiClient.fetchOne(any(), any(), eq(ScWikiItemDto.class), any())).thenReturn(null);
 
     service.syncItems();
 
-    verify(scWikiClient).fetchOne(eq(ITEMS + "/" + uuid), eq(ScWikiItemDto.class), any());
+    verify(scWikiClient).fetchOne(eq(ITEMS), eq(uuid), eq(ScWikiItemDto.class), any());
     verify(scWikiClient, never()).fetchAllPagesResult(any(), any(), any(), any(), any());
   }
 
@@ -162,7 +162,7 @@ class ScWikiItemSyncServiceBackfillTest {
     service.syncItems();
 
     verify(scWikiClient, never()).fetchAllPagesResult(any(), any(), any(), any(), any());
-    verify(scWikiClient, never()).fetchOne(any(), any(), any());
+    verify(scWikiClient, never()).fetchOne(any(), any(), any(), any());
   }
 
   @Test

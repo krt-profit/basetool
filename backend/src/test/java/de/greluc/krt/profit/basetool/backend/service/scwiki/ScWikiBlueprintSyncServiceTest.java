@@ -258,7 +258,7 @@ class ScWikiBlueprintSyncServiceTest {
     GameItem output = gameItem(outputUuid);
     when(scWikiClient.fetchAllPagesResult(any(), any(), eq("blueprints")))
         .thenReturn(ScWikiClient.FetchResult.of(List.of(listDto)));
-    when(scWikiClient.fetchOne(anyString(), eq(ScWikiBlueprintDto.class), eq("blueprint")))
+    when(scWikiClient.fetchOne(anyString(), any(), eq(ScWikiBlueprintDto.class), eq("blueprint")))
         .thenReturn(detail);
     when(blueprintRepository.findByScwikiUuid(bpUuid)).thenReturn(Optional.empty());
     when(gameItemRepository.findByExternalUuid(outputUuid)).thenReturn(Optional.of(output));
@@ -404,7 +404,7 @@ class ScWikiBlueprintSyncServiceTest {
     int written = service.syncBlueprints();
 
     assertEquals(1559, written, "a 304 (unchanged) list must report the live blueprint count");
-    verify(scWikiClient, never()).fetchOne(any(), any(), any());
+    verify(scWikiClient, never()).fetchOne(any(), any(), any(), any());
     verify(blueprintRepository, never()).save(any());
     verify(blueprintRepository, never()).markScwikiDeleted(any(), any());
   }
@@ -572,7 +572,7 @@ class ScWikiBlueprintSyncServiceTest {
     Material agricium = material("Agricium");
     when(scWikiClient.fetchAllPagesResult(any(), any(), eq("blueprints")))
         .thenReturn(ScWikiClient.FetchResult.of(List.of(listDto)));
-    when(scWikiClient.fetchOne(anyString(), eq(ScWikiBlueprintDto.class), eq("blueprint")))
+    when(scWikiClient.fetchOne(anyString(), any(), eq(ScWikiBlueprintDto.class), eq("blueprint")))
         .thenReturn(null);
     when(blueprintRepository.findByScwikiUuid(bpUuid)).thenReturn(Optional.of(existing));
     when(materialRepository.findByScwikiUuid(resourceUuid)).thenReturn(Optional.of(agricium));

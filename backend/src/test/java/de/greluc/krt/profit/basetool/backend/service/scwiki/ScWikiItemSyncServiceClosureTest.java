@@ -126,12 +126,12 @@ class ScWikiItemSyncServiceClosureTest {
     UUID b = UUID.randomUUID();
     when(gameItemRepository.findAllExternalUuids()).thenReturn(List.of(a));
     when(blueprintRepository.findReferencedItemUuids()).thenReturn(List.of(b));
-    when(scWikiClient.fetchOne(any(), eq(ScWikiItemDto.class), any())).thenReturn(null);
+    when(scWikiClient.fetchOne(any(), any(), eq(ScWikiItemDto.class), any())).thenReturn(null);
 
     service.syncItems();
 
-    verify(scWikiClient).fetchOne(eq("/api/items/" + a), eq(ScWikiItemDto.class), any());
-    verify(scWikiClient).fetchOne(eq("/api/items/" + b), eq(ScWikiItemDto.class), any());
+    verify(scWikiClient).fetchOne(eq("/api/items"), eq(a), eq(ScWikiItemDto.class), any());
+    verify(scWikiClient).fetchOne(eq("/api/items"), eq(b), eq(ScWikiItemDto.class), any());
     verify(scWikiClient, never()).fetchAllPagesResult(any(), any(), any());
   }
 
@@ -170,7 +170,7 @@ class ScWikiItemSyncServiceClosureTest {
 
     when(gameItemRepository.findAllExternalUuids()).thenReturn(List.of(uuid));
     when(blueprintRepository.findReferencedItemUuids()).thenReturn(List.of());
-    when(scWikiClient.fetchOne(eq("/api/items/" + uuid), eq(ScWikiItemDto.class), any()))
+    when(scWikiClient.fetchOne(eq("/api/items"), eq(uuid), eq(ScWikiItemDto.class), any()))
         .thenReturn(dto);
     when(gameItemRepository.findByExternalUuid(uuid)).thenReturn(Optional.of(existing));
     when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -222,7 +222,7 @@ class ScWikiItemSyncServiceClosureTest {
             "4.8");
     when(gameItemRepository.findAllExternalUuids()).thenReturn(List.of());
     when(blueprintRepository.findReferencedItemUuids()).thenReturn(List.of(uuid));
-    when(scWikiClient.fetchOne(eq("/api/items/" + uuid), eq(ScWikiItemDto.class), any()))
+    when(scWikiClient.fetchOne(eq("/api/items"), eq(uuid), eq(ScWikiItemDto.class), any()))
         .thenReturn(dto);
     when(gameItemRepository.findByExternalUuid(uuid)).thenReturn(Optional.empty());
     when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -243,7 +243,7 @@ class ScWikiItemSyncServiceClosureTest {
     UUID uuid = UUID.randomUUID();
     when(gameItemRepository.findAllExternalUuids()).thenReturn(List.of(uuid));
     when(blueprintRepository.findReferencedItemUuids()).thenReturn(List.of());
-    when(scWikiClient.fetchOne(any(), eq(ScWikiItemDto.class), any())).thenReturn(null);
+    when(scWikiClient.fetchOne(any(), any(), eq(ScWikiItemDto.class), any())).thenReturn(null);
 
     service.syncItems();
 
@@ -260,7 +260,7 @@ class ScWikiItemSyncServiceClosureTest {
 
     service.syncItems();
 
-    verify(scWikiClient, never()).fetchOne(any(), any(), any());
+    verify(scWikiClient, never()).fetchOne(any(), any(), any(), any());
   }
 
   @Test
@@ -271,12 +271,8 @@ class ScWikiItemSyncServiceClosureTest {
     when(gameItemRepository.findAllExternalUuids())
         .thenReturn(List.of(deadlocked, firstGood, secondGood));
     when(blueprintRepository.findReferencedItemUuids()).thenReturn(List.of());
-    when(scWikiClient.fetchOne(any(), eq(ScWikiItemDto.class), any()))
-        .thenAnswer(
-            inv -> {
-              String uri = inv.getArgument(0);
-              return itemDto(UUID.fromString(uri.substring(uri.lastIndexOf('/') + 1)));
-            });
+    when(scWikiClient.fetchOne(any(), any(), eq(ScWikiItemDto.class), any()))
+        .thenAnswer(inv -> itemDto(inv.getArgument(1)));
     when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
     when(gameItemRepository.save(any(GameItem.class)))
         .thenAnswer(
@@ -304,12 +300,8 @@ class ScWikiItemSyncServiceClosureTest {
     when(gameItemRepository.findAllExternalUuids())
         .thenReturn(List.of(collided, firstGood, secondGood));
     when(blueprintRepository.findReferencedItemUuids()).thenReturn(List.of());
-    when(scWikiClient.fetchOne(any(), eq(ScWikiItemDto.class), any()))
-        .thenAnswer(
-            inv -> {
-              String uri = inv.getArgument(0);
-              return itemDto(UUID.fromString(uri.substring(uri.lastIndexOf('/') + 1)));
-            });
+    when(scWikiClient.fetchOne(any(), any(), eq(ScWikiItemDto.class), any()))
+        .thenAnswer(inv -> itemDto(inv.getArgument(1)));
     when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
     when(gameItemRepository.save(any(GameItem.class)))
         .thenAnswer(
@@ -333,14 +325,17 @@ class ScWikiItemSyncServiceClosureTest {
     UUID uuid = UUID.randomUUID();
     when(gameItemRepository.findAllExternalUuids()).thenReturn(List.of(uuid));
     when(blueprintRepository.findReferencedItemUuids()).thenReturn(List.of());
-    when(scWikiClient.fetchOne(any(), eq(ScWikiItemDto.class), any())).thenReturn(itemDto(uuid));
+    when(scWikiClient.fetchOne(any(), any(), eq(ScWikiItemDto.class), any()))
+        .thenReturn(itemDto(uuid));
     when(gameItemRepository.findByExternalUuid(uuid)).thenReturn(Optional.empty());
     when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
 
     service.syncItems();
 
     InOrder ordered = inOrder(scWikiClient, gameItemRepository);
-    ordered.verify(scWikiClient).fetchOne(eq("/api/items/" + uuid), eq(ScWikiItemDto.class), any());
+    ordered
+        .verify(scWikiClient)
+        .fetchOne(eq("/api/items"), eq(uuid), eq(ScWikiItemDto.class), any());
     ordered.verify(gameItemRepository).save(any(GameItem.class));
   }
 

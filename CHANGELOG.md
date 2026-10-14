@@ -12,6 +12,10 @@
 
 - **Bank: Vier-Augen-Prinzip für jeden Buchungsantrag.** Wer einen Antrag gestellt hat, kann ihn weder freigeben noch bestätigen (409 `BANK_FOUR_EYES_REQUIRED`); eine zweite Person entscheidet. Ablehnen bleibt möglich, direkte Buchungen bleiben unverändert, Admins sind ausgenommen (REQ-BANK-062, ADR-0251).
 
+### Fixed
+
+- **Monitoring: SC-Wiki-Abrufe erzeugen keine `uri`-Tag-Flut mehr.** Der Einzelabruf von Items und Blueprints trug die UUID im Pfad, sodass `http.client.requests` des Backends pro Ressource einen neuen `uri`-Wert anlegte und das Limit von 100 mit einer Warnung riss; der Pfad ist jetzt eine URI-Vorlage (`/api/items/{id}`).
+
 ## [v1.16.1](https://github.com/krt-profit/basetool/releases/tag/v1.16.1) - 2026-10-13
 
 ### Changed

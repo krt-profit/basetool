@@ -711,6 +711,10 @@ first hit after that was missing from `Http5xxRateHigh`, `HttpLatencyP95High` an
   they plus 50 fixed tags (`UNKNOWN`, `NOT_FOUND`, `REDIRECTION`, …) reach the bound cap; the
   frontend test also holds the client cap at 1000 or more, because the frontend relays to every
   backend route.
+- An outbound call never concatenates a resource id into the path: it passes a URI template and the
+  value as a URI variable (`ScWikiClient.fetchOne`: `/api/items/{id}`), so the client-side `uri` tag
+  is the template. The backend keeps the default client cap of 100, which its few external
+  templates stay far below; a raw id in the path blows through it within one sync run.
 - `HttpUriTagCapNear` (`apps.yml`, warning) fires when an application reports 900 distinct `uri`
   values on either meter for 15 minutes — the drift a test cannot see, such as a raw path leaking
   into the tag.

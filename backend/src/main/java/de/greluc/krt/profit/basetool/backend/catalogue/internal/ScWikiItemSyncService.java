@@ -133,8 +133,7 @@ public class ScWikiItemSyncService {
       scWikiClient.paceForRateLimit();
       try {
         ScWikiItemDto dto =
-            scWikiClient.fetchOne(
-                properties.itemsEndpoint() + "/" + uuid, ScWikiItemDto.class, "item");
+            scWikiClient.fetchOne(properties.itemsEndpoint(), uuid, ScWikiItemDto.class, "item");
         ClosureOutcome outcome =
             self.getObject().fillClosureItemWithinTransaction(runId, uuid, dto, now);
         if (outcome == ClosureOutcome.FILLED) {
