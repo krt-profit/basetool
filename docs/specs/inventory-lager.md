@@ -1535,12 +1535,17 @@ that lowers or moves the row:
   write that would leave a pledge uncovered (422);
 - a row that still carries a donation slice is neither depleted nor moved in full;
 - the exchange counts the donation slice in its free-stock calculation;
-- a stock merge unions the slices of the folded row into the survivor.
+- a stock merge unions the slices of the folded row into the survivor;
+- the row's DTO lists the slices as `donationAllocations` (the donation, the receiving unit's name,
+  the earmarked amount), which the Lager reads through the `EarmarkTargets.Donations` SPI that the
+  supply module implements, so inventory never names it. The personal Lager shows a pledged slice as
+  a chip and offers „Spenden" on the row while the supply surface is on.
 
 Concurrent pledge and sale of the same row cannot both succeed: both take the row's lot lock first and
 the row's `@Version` guards the write.
 
-**Enforced by:** `InventoryPoolCommandsTest` · **Code:** `inventory/internal/InventoryAllocations`,
+**Enforced by:** `InventoryPoolCommandsTest`, `InventoryItemMapperTest`, `SupplyDonationEarmarksTest`,
+`InventorySupplyRenderTest` · **Code:** `inventory/internal/InventoryAllocations`,
 `inventory/internal/InventoryCheckoutService`, `inventory/internal/InventoryDonationAllocation`,
 `exchange/internal/ExchangeStockWriteService`
 

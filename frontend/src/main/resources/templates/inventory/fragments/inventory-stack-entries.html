@@ -14,6 +14,9 @@
                        data-trigger="inv-my-update-bulk-state">
                 <span th:if="${entry.stolen}" class="chip chip--danger" data-testid="stolen-chip"
                       th:title="#{inventory.stolen.chip.title}" th:text="#{inventory.stolen.chip}">Gestohlen</span>
+                <span th:if="${!#lists.isEmpty(entry.donationAllocations)}" class="chip chip--primary" data-testid="donation-chip"
+                      th:title="#{supply.lager.pledged.title(${#strings.listJoin(entry.donationAllocations.![receivingUnitName], ', ')})}"
+                      th:text="#{supply.lager.pledged(${#numbers.formatDecimal(#aggregates.sum(entry.donationAllocations.![amount]), 1, 'NONE', 3, 'DEFAULT')})}">Zugesagt</span>
                 <div class="tree-fieldset">
                     <div class="tree-field">
                         <span class="tree-field-cap" th:text="#{inventory.order}">Auftrag</span>
@@ -208,6 +211,19 @@
                         th:aria-label="${entry.stolen == true} ? #{inventory.stolen.unmark.action} : #{inventory.stolen.mark.action}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-warning"/></svg>
                 </button>
+                <button type="button" class="btn btn-ghost btn-xs btn-icon"
+                        th:if="${supplyEnabled == true and entry.stolen != true}"
+                        th:data-id="${entry.id}"
+                        th:data-amount="${entry.amount}"
+                        th:data-reserved="${entry.donationAllocations != null and !#lists.isEmpty(entry.donationAllocations) ? #aggregates.sum(entry.donationAllocations.![amount]) : 0}"
+                        th:data-quantity-type="${entry.material != null ? entry.material.quantityType : 'ITEM'}"
+                        th:data-label="${entry.material != null ? entry.material.name : entry.gameItem.name}"
+                        th:data-quality="${entry.quality}"
+                        data-trigger="supply-lager-donate"
+                        data-testid="supply-lager-donate"
+                        th:title="#{supply.lager.donate}" th:aria-label="#{supply.lager.donate}">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-upload"/></svg>
+                </button>
                 <button type="button" class="btn btn-xs btn-icon inventory-note-btn"
                         th:classappend="${entry.note != null and !#strings.isEmpty(entry.note)} ? 'btn-outline has-note' : 'btn-ghost'"
                         th:data-id="${entry.id}"
@@ -237,6 +253,9 @@
                        data-trigger="inv-my-update-bulk-state">
                 <span th:if="${entry.stolen}" class="chip chip--danger" data-testid="stolen-chip"
                       th:title="#{inventory.stolen.chip.title}" th:text="#{inventory.stolen.chip}">Gestohlen</span>
+                <span th:if="${!#lists.isEmpty(entry.donationAllocations)}" class="chip chip--primary" data-testid="donation-chip"
+                      th:title="#{supply.lager.pledged.title(${#strings.listJoin(entry.donationAllocations.![receivingUnitName], ', ')})}"
+                      th:text="#{supply.lager.pledged(${#numbers.formatDecimal(#aggregates.sum(entry.donationAllocations.![amount]), 1, 'NONE', 3, 'DEFAULT')})}">Zugesagt</span>
                 <div class="tree-fieldset">
                     <div class="tree-field">
                         <span class="tree-field-cap" th:text="#{inventory.order}">Auftrag</span>
@@ -369,6 +388,19 @@
                         th:title="${entry.stolen == true} ? #{inventory.stolen.unmark.action} : #{inventory.stolen.mark.action}"
                         th:aria-label="${entry.stolen == true} ? #{inventory.stolen.unmark.action} : #{inventory.stolen.mark.action}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-warning"/></svg>
+                </button>
+                <button type="button" class="btn btn-ghost btn-xs btn-icon"
+                        th:if="${supplyEnabled == true and entry.stolen != true}"
+                        th:data-id="${entry.id}"
+                        th:data-amount="${entry.amount}"
+                        th:data-reserved="${entry.donationAllocations != null and !#lists.isEmpty(entry.donationAllocations) ? #aggregates.sum(entry.donationAllocations.![amount]) : 0}"
+                        th:data-quantity-type="${entry.material != null ? entry.material.quantityType : 'ITEM'}"
+                        th:data-label="${entry.material != null ? entry.material.name : entry.gameItem.name}"
+                        th:data-quality="${entry.quality}"
+                        data-trigger="supply-lager-donate"
+                        data-testid="supply-lager-donate"
+                        th:title="#{supply.lager.donate}" th:aria-label="#{supply.lager.donate}">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-upload"/></svg>
                 </button>
                 <button type="button" class="btn btn-xs btn-icon inventory-note-btn"
                         th:classappend="${entry.note != null and !#strings.isEmpty(entry.note)} ? 'btn-outline has-note' : 'btn-ghost'"

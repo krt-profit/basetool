@@ -23,6 +23,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
+import de.greluc.krt.profit.basetool.backend.inventory.api.DonationAllocationDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.DonationEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderAllocationDto;
@@ -127,6 +129,29 @@ public abstract class InventoryItemMapper {
         allocation.getMissionId(),
         mission == null ? null : mission.name(),
         mission == null ? null : mission.plannedStartTime(),
+        allocation.getAmount());
+  }
+
+  /**
+   * Maps one donation slice to its outbound chip DTO, flattening the pledge to its id and the name
+   * of the unit it is made to.
+   *
+   * @param allocation the donation slice; {@code null} returns {@code null}.
+   * @return the populated slice DTO.
+   */
+  @Nullable
+  public DonationAllocationDto donationAllocationToDto(
+      @Nullable InventoryDonationAllocation allocation) {
+    if (allocation == null) {
+      return null;
+    }
+    DonationEarmark donation =
+        allocation.getDonationId() == null
+            ? null
+            : earmarkTargets.donation(allocation.getDonationId());
+    return new DonationAllocationDto(
+        allocation.getDonationId(),
+        donation == null ? null : donation.receivingUnitName(),
         allocation.getAmount());
   }
 

@@ -92,10 +92,13 @@ from the need and must satisfy its tier.
 
 A pledge from a Lager row earmarks the pledged amount on the row in the same transaction
 (REQ-INV-057, REQ-INV-058). The earmarked amount cannot be sold, discarded, transferred or pledged again
-until the pledge is received, declined or withdrawn. The pledge takes the row's lot lock first.
+until the pledge is received, declined or withdrawn. The pledge takes the row's lot lock first. The
+personal Lager row offers „Spenden" (a dialog for the receiving unit, the amount up to the free
+remainder and the anonymous choice) and shows the pledged slice as a chip (REQ-INV-058).
 
-**Enforced by:** `SupplyDonationServiceTest`, `InventoryPoolCommandsTest` · **Code:**
-`supply/internal/SupplyDonationService`, `inventory/api/StockCommands`
+**Enforced by:** `SupplyDonationServiceTest`, `InventoryPoolCommandsTest`, `InventorySupplyRenderTest`,
+`SupplyPledgeReceiveE2eTest` · **Code:** `supply/internal/SupplyDonationService`,
+`supply/internal/SupplyDonationEarmarks`, `inventory/api/StockCommands`, `static/js/supply/supply-lager.js`
 
 ### REQ-SUP-009 — Receive
 
@@ -117,10 +120,10 @@ earmark.
 ### REQ-SUP-011 — Recorded donation
 
 The lead or a Logistician of a receiving unit records a donation already received, for a named member or
-without a donor, and books it into the pool in the same transaction. The page records it without a
-donor; the endpoint accepts one.
+without a donor, and books it into the pool in the same transaction. The page picks the donor from the
+member search or leaves it empty, and offers the anonymous choice.
 
-**Enforced by:** `SupplyDonationServiceTest` · **Code:** `supply/internal/SupplyDonationService#record`
+**Enforced by:** `SupplyDonationServiceTest`, `SupplyPledgeReceiveE2eTest` · **Code:** `supply/internal/SupplyDonationService#record`
 
 ### REQ-SUP-012 — Anonymous donation
 
@@ -204,7 +207,7 @@ surviving account.
 ## Out of scope
 
 Money, deals and partners ([`purchasing.md`](purchasing.md)); profit medals; Android screens beyond the
-rendering of the notices; any `/exchange/v1` surface; a donor picker on the page for a recorded donation.
+rendering of the notices; any `/exchange/v1` surface.
 
 ## Open questions
 

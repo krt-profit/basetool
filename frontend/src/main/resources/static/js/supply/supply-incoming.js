@@ -148,8 +148,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             ? null
                             : numberOrNull(field('supply-record-quality').value),
                     amount: numberOrNull(field('supply-record-amount').value),
-                    donorUserId: null,
-                    anonymous: false,
+                    donorUserId: textOrNull(select('supply-record-donor').value),
+                    anonymous: field('supply-record-anonymous').checked,
                     locationId: textOrNull(select('supply-record-location').value),
                 },
                 successMessage: supplyI18n.recorded,

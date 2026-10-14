@@ -424,6 +424,9 @@ DELETE /api/v1/bank/org-units/accounts/{id}/approval-limit/user/{userId} respons
 DELETE /api/v1/bank/org-units/accounts/{id}/visibility/role/{roleCode} response[200][*/*]=$OrgUnitBankAccountSettingsDto
 DELETE /api/v1/bank/org-units/requests/{id}/owner-approval response[200][*/*]=$BankBookingRequestDto
 DELETE /api/v1/personal-blueprints response[200][*/*]=$PersonalBlueprintBulkDeleteResult
+DonationAllocationDto.amount=number/double
+DonationAllocationDto.donationId=string/uuid
+DonationAllocationDto.receivingUnitName=string
 FrequencyTypeDto.active=boolean
 FrequencyTypeDto.description=string
 FrequencyTypeDto.id=string/uuid
@@ -581,6 +584,7 @@ InventoryItemCreateDto.userId=string/uuid
 InventoryItemDto.amount=number/double
 InventoryItemDto.canEdit=boolean
 InventoryItemDto.createdAt=string/date-time
+InventoryItemDto.donationAllocations=array<$DonationAllocationDto>
 InventoryItemDto.gameItem=$InventoryGameItemReferenceDto
 InventoryItemDto.id=string/uuid
 InventoryItemDto.jobOrderAllocations=array<$JobOrderAllocationDto>

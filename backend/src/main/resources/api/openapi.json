@@ -76530,6 +76530,22 @@
           }
         }
       },
+      "DonationAllocationDto" : {
+        "type" : "object",
+        "properties" : {
+          "amount" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "donationId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "receivingUnitName" : {
+            "type" : "string"
+          }
+        }
+      },
       "DonationDto" : {
         "type" : "object",
         "properties" : {
@@ -77431,6 +77447,12 @@
           "createdAt" : {
             "type" : "string",
             "format" : "date-time"
+          },
+          "donationAllocations" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/DonationAllocationDto"
+            }
           },
           "gameItem" : {
             "$ref" : "#/components/schemas/InventoryGameItemReferenceDto"

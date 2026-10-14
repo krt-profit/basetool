@@ -618,9 +618,8 @@ Each step is one pull request (or a short stack), shippable alone, behind the fe
   `supply` owns and `purchasing` implements (S3); without an implementation nobody is a delegate.
 - A need's covered and purchased amounts are credited by bulk `UPDATE` statements that leave the
   need's version alone (REQ-SUP-019).
-- Not yet built: the pledge shown on a Lager row (`EarmarkTargets.Donations`), a donor picker for a
-  recorded donation, the pledge button on a Lager row, the Android rendering of the three notices
-  (repository `basetool-android`), and the live-sync topics for the app (they are web-only).
+- Not built in this repository: the Android rendering of the three notices (repository
+  `basetool-android`); the supply live-sync topics are web-only.
 
 Nothing in the engine is left to wait for: the notification extension (#2414 Part A), the transfer
 notice (#2409) and the holder reconciliation (#2413) are on `main`, so S5 is an ordinary step and N4

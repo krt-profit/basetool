@@ -226,6 +226,7 @@
 /api/proxy/supply/needs/{id}/pause POST -> SupplyProxyController#pauseNeed gate=class:isAuthenticated() layout=no
 /api/proxy/supply/needs/{id}/resume POST -> SupplyProxyController#resumeNeed gate=class:isAuthenticated() layout=no
 /api/proxy/supply/needs/{id}/withdraw POST -> SupplyProxyController#withdrawNeed gate=class:isAuthenticated() layout=no
+/api/proxy/supply/units GET -> SupplyProxyController#units gate=class:isAuthenticated() layout=no
 /api/v1/orders/{jobOrderId}/handovers/report/preview POST -> JobOrderHandoverReportProxyController#previewHandoverReport gate=method:isAuthenticated() layout=no
 /api/v1/orders/{jobOrderId}/handovers/{handoverId}/report GET -> JobOrderHandoverReportProxyController#downloadHandoverReport gate=method:isAuthenticated() layout=no
 /api/v1/orders/{jobOrderId}/item-handovers/{handoverId}/report GET -> JobOrderHandoverReportProxyController#downloadItemHandoverReport gate=method:isAuthenticated() layout=no

@@ -681,6 +681,8 @@ interface DocumentEventMap {
     'krt:mission-changed': CustomEvent<{ section?: string }>;
     /** Fired when the mission page must drop its local state and re-fetch. */
     'krt:mission-resync': CustomEvent<null>;
+    /** Fired when stock changed locally outside the Lager scripts, so the personal Lager re-renders. */
+    'krt:inventory-changed': CustomEvent<null>;
 }
 
 /** Fetches combobox options on demand for a query. */

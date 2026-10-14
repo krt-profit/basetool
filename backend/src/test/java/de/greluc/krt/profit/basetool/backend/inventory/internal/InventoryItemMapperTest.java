@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.inventory.api.DonationEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
@@ -109,6 +110,14 @@ class InventoryItemMapperTest {
     item.setVersion(7L);
     InventoryAllocations.addJobOrder(item, jobOrder.getId(), item.getAmount(), true);
     InventoryAllocations.addMission(item, mission.getId(), item.getAmount());
+    UUID donationId = UUID.randomUUID();
+    item.getDonationAllocations()
+        .add(
+            InventoryDonationAllocation.builder()
+                .inventoryItem(item)
+                .donationId(donationId)
+                .amount(4.0)
+                .build());
     InventoryEarmarkLookup targets =
         new InventoryEarmarkLookup() {
           @Override
@@ -116,6 +125,14 @@ class InventoryItemMapperTest {
             return id.equals(missionId)
                 ? new MissionEarmark(missionId, mission.getName(), mission.getPlannedStartTime())
                 : null;
+          }
+
+          @Override
+          public DonationEarmark donation(UUID id) {
+            if (id.equals(donationId)) {
+              return new DonationEarmark(donationId, "Bereich Profit");
+            }
+            return null;
           }
 
           @Override
@@ -141,6 +158,10 @@ class InventoryItemMapperTest {
     assertEquals(1, dto.missionAllocations().size());
     assertEquals(missionId, dto.missionAllocations().get(0).missionId());
     assertEquals("Op Sunfire", dto.missionAllocations().get(0).missionName());
+    assertEquals(1, dto.donationAllocations().size());
+    assertEquals(donationId, dto.donationAllocations().get(0).donationId());
+    assertEquals("Bereich Profit", dto.donationAllocations().get(0).receivingUnitName());
+    assertEquals(4.0, dto.donationAllocations().get(0).amount());
 
     assertNotNull(dto.user());
     assertEquals(userId, dto.user().id());

@@ -188,6 +188,16 @@
                         </div>
                     </div>
                     <div class="form-group">
+                        <label for="supply-record-donor" th:text="#{supply.record.donor}">Spender (optional)</label>
+                        <select id="supply-record-donor" data-krt-combobox="remote-users" data-testid="supply-record-donor">
+                            <option value=""></option>
+                        </select>
+                    </div>
+                    <div class="form-group flex-gap-sm">
+                        <input type="checkbox" id="supply-record-anonymous">
+                        <label for="supply-record-anonymous" th:text="#{supply.pledge.anonymous}">Anonym spenden</label>
+                    </div>
+                    <div class="form-group">
                         <label for="supply-record-amount" th:text="#{supply.receive.amount}">Erhaltene Menge</label>
                         <input type="number" id="supply-record-amount" min="0.001" step="any" inputmode="decimal" required>
                     </div>

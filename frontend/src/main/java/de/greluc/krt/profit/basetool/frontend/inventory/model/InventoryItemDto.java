@@ -55,8 +55,73 @@ public record InventoryItemDto(
     Double jobOrderRest,
     List<MissionAllocationDto> missionAllocations,
     Double missionRest,
+    List<DonationAllocationDto> donationAllocations,
     String note,
     SquadronReferenceDto owningSquadron,
     Long version,
     Boolean canEdit,
-    Instant createdAt) {}
+    Instant createdAt) {
+
+  /**
+   * Creates a row that carries no donation pledge.
+   *
+   * @param id the row id
+   * @param user the holder
+   * @param material the material, or {@code null} for a game item
+   * @param gameItem the game item, or {@code null} for a material
+   * @param location the location
+   * @param quality the quality of a material
+   * @param amount the amount held
+   * @param personal whether the row is personal
+   * @param stolen whether the row is marked stolen
+   * @param jobOrderAllocations the job-order slices
+   * @param jobOrderRest the unallocated job-order remainder
+   * @param missionAllocations the mission slices
+   * @param missionRest the unallocated mission remainder
+   * @param note the row note
+   * @param owningSquadron the owning org unit
+   * @param version the optimistic-locking version
+   * @param canEdit whether the caller may write the row
+   * @param createdAt the creation time
+   */
+  public InventoryItemDto(
+      UUID id,
+      UserReferenceDto user,
+      MaterialReferenceDto material,
+      InventoryGameItemReferenceDto gameItem,
+      LocationReferenceDto location,
+      Integer quality,
+      Double amount,
+      Boolean personal,
+      Boolean stolen,
+      List<JobOrderAllocationDto> jobOrderAllocations,
+      Double jobOrderRest,
+      List<MissionAllocationDto> missionAllocations,
+      Double missionRest,
+      String note,
+      SquadronReferenceDto owningSquadron,
+      Long version,
+      Boolean canEdit,
+      Instant createdAt) {
+    this(
+        id,
+        user,
+        material,
+        gameItem,
+        location,
+        quality,
+        amount,
+        personal,
+        stolen,
+        jobOrderAllocations,
+        jobOrderRest,
+        missionAllocations,
+        missionRest,
+        List.of(),
+        note,
+        owningSquadron,
+        version,
+        canEdit,
+        createdAt);
+  }
+}

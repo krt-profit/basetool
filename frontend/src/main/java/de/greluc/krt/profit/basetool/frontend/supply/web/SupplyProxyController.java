@@ -35,11 +35,13 @@ import de.greluc.krt.profit.basetool.frontend.supply.model.UpdateSupplySettingsR
 import de.greluc.krt.profit.basetool.frontend.supply.model.UpdateSupplyUnitRequest;
 import de.greluc.krt.profit.basetool.frontend.supply.model.VersionRequest;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -61,6 +63,17 @@ public class SupplyProxyController {
 
   /** The supply domain's backend calls. */
   private final SupplyBackendClient supplyClient;
+
+  /**
+   * Reads the units that take part in the supply module, for the donation dialog of the Lager.
+   *
+   * @return the configured units with their flags
+   */
+  @GetMapping("/units")
+  public List<SupplyUnitDto> units() {
+    List<SupplyUnitDto> units = supplyClient.units();
+    return units == null ? List.of() : units;
+  }
 
   /**
    * Forwards a new need.
