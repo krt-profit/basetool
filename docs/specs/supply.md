@@ -8,7 +8,7 @@
 
 The Bereich Profit's concept „Handelsbeauftragte" asks the tool to record what a unit needs and what
 members donate, so the pilot's abort criterion — falling willingness to donate — can be measured. This
-spec governs the first half of [`SUPPLY_AND_PURCHASING_PLAN.md`](../SUPPLY_AND_PURCHASING_PLAN.md): the
+spec governs the first half of [`SUPPLY_AND_PURCHASING_PLAN.md`](../archive/SUPPLY_AND_PURCHASING_PLAN.md): the
 module `supply` (rank 11 of the domain map) with the needs of the raising units and the material
 donations of the members. It handles no money; the second half, `purchasing`, builds on it and lives in
 [`purchasing.md`](purchasing.md). Tracked in krt-profit/basetool#2573.

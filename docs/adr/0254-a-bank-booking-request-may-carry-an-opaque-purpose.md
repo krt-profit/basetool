@@ -7,7 +7,7 @@
   [ADR-0020](0020-bank-org-unit-aware-access-seam.md) ·
   [ADR-0232](0232-modules-interact-through-commands-observers-and-after-commit-events.md) ·
   [ADR-0251](0251-four-eyes-for-every-bank-booking-request-admin-excepted.md) ·
-  [`SUPPLY_AND_PURCHASING_PLAN.md`](../SUPPLY_AND_PURCHASING_PLAN.md) (§4.3, §5.2)
+  [`SUPPLY_AND_PURCHASING_PLAN.md`](../archive/SUPPLY_AND_PURCHASING_PLAN.md) (§4.3, §5.2)
 
 ## Context
 

@@ -6,7 +6,7 @@
 - **Related:** spec [`inventory-lager.md`](../specs/inventory-lager.md) (REQ-INV-057, REQ-INV-058,
   REQ-INV-055) · [ADR-0229](0229-exchange-stock-writes-take-an-advisory-lock-per-lot.md) ·
   [ADR-0232](0232-modules-interact-through-commands-observers-and-after-commit-events.md) ·
-  [`SUPPLY_AND_PURCHASING_PLAN.md`](../SUPPLY_AND_PURCHASING_PLAN.md) (E-11)
+  [`SUPPLY_AND_PURCHASING_PLAN.md`](../archive/SUPPLY_AND_PURCHASING_PLAN.md) (E-11)
 
 ## Context
 

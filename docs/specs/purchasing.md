@@ -7,7 +7,7 @@
 
 ## Context & goal
 
-The second half of [`SUPPLY_AND_PURCHASING_PLAN.md`](../SUPPLY_AND_PURCHASING_PLAN.md): the module
+The second half of [`SUPPLY_AND_PURCHASING_PLAN.md`](../archive/SUPPLY_AND_PURCHASING_PLAN.md): the module
 `purchasing` (rank 12 of the domain map) lets appointed members — the Handelsbeauftragten (HB) — buy
 material from external partners for a need that a raising unit released for purchase. The money is the
 Kartellbank's: every tranche is an ordinary bank withdrawal request to the HB, and the remainder returns

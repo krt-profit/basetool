@@ -7,7 +7,7 @@
   [ADR-0231](0231-the-backend-becomes-a-modular-monolith-one-package-per-domain.md) ·
   [ADR-0232](0232-modules-interact-through-commands-observers-and-after-commit-events.md) ·
   [ADR-0252](0252-stockcommands-gains-the-pool-and-donation-commands.md) ·
-  [`SUPPLY_AND_PURCHASING_PLAN.md`](../SUPPLY_AND_PURCHASING_PLAN.md) (E-02, §5.1)
+  [`SUPPLY_AND_PURCHASING_PLAN.md`](../archive/SUPPLY_AND_PURCHASING_PLAN.md) (E-02, §5.1)
 
 ## Context
 

@@ -7,7 +7,7 @@
   REQ-BANK-047) · [ADR-0123](0123-responsible-holder-exempt-from-approval-limits.md) ·
   [ADR-0066](0066-krt-account-amount-tiered-approval-ladder.md) ·
   [ADR-0109](0109-krt-middle-band-bankleitung-and-over-ceiling-auto-request.md) ·
-  [`SUPPLY_AND_PURCHASING_PLAN.md`](../SUPPLY_AND_PURCHASING_PLAN.md) (E-03, F-1 … F-4)
+  [`SUPPLY_AND_PURCHASING_PLAN.md`](../archive/SUPPLY_AND_PURCHASING_PLAN.md) (E-03, F-1 … F-4)
 
 ## Context
 

@@ -1,15 +1,25 @@
-> **Doc type:** Living plan — written 2026-10-07 for the owner's review and brought up to the code of
-> `main` at `0da1df779` (v1.16.1) on 2026-10-13. The open decisions of §2 were answered by the owner
-> on 2026-10-07 (E-01 … E-12, F-1 … F-4) and still stand. **Status 2026-10-14:** all six steps are
-> built: B1 (four-eyes, ADR-0251), S1 (`StockCommands`, ADR-0252), S2 (`supply`, ADR-0253,
-> [`supply.md`](specs/supply.md)), S3 … S6 (`purchasing`, ADR-0254, ADR-0255,
-> [`purchasing.md`](specs/purchasing.md)). The requirements of §9.1 and §9.2 live in the two specs and
-> bind. §8.1 records where S2 deviates from this text, §8.2 where S3 … S6 do.
+> **Archived 2026-10-14.** Doc type: Historical record — the plan is **completed** and frozen, kept as
+> the record of why the material supply and the purchasing were built the way they were. All six steps
+> are built and merged in krt-profit/basetool#2573: B1 (four-eyes, ADR-0251), S1 (`StockCommands`,
+> ADR-0252), S2 (`supply`, ADR-0253), S3 … S6 (`purchasing`, ADR-0254, ADR-0255). §8.1 and §8.2 record
+> where the build deviates from the text below; the later decisions are recorded there as well (no
+> anonymous donation, the governing Bereiche are a configurable set of which only the Bereichsleiter
+> and the Bereichskoordinatoren govern).
+>
+> **Current truth:** [`supply.md`](../specs/supply.md) and [`purchasing.md`](../specs/purchasing.md)
+> (REQ-SUP-001 … 020, REQ-PUR-001 … 028), the ADRs 0251 … 0255, arc42
+> [§5](../arc42/05-building-block-view.md) and [§11](../arc42/11-risks-and-technical-debt.md), the role
+> matrix [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md) and the German wiki pages „Bedarf
+> und Spenden" and „Ankauf". Index of the archive: [`README.md`](README.md).
+
+> **Doc type:** Historical plan — written 2026-10-07 for the owner's review and brought up to the code
+> of `main` at `0da1df779` (v1.16.1) on 2026-10-13. The open decisions of §2 were answered by the
+> owner on 2026-10-07 (E-01 … E-12, F-1 … F-4) and still stand.
 > **Owner area:** BE · FE · BANK · INV · NOTIF · AUDIT · OBS · MOD
 > **Related ADRs:** ADR-0020, ADR-0028, ADR-0096, ADR-0109, ADR-0123, ADR-0229, ADR-0231 …
 > ADR-0236, ADR-0240 … ADR-0242, ADR-0244, ADR-0245, ADR-0250 · **Related specs:**
-> [`module-boundaries.md`](specs/module-boundaries.md) (REQ-MOD-001 … 006) ·
-> **Related plans:** [domain modularisation](archive/DOMAIN_MODULARISATION_PLAN.md) (done and frozen
+> [`module-boundaries.md`](../specs/module-boundaries.md) (REQ-MOD-001 … 006) ·
+> **Related plans:** [domain modularisation](DOMAIN_MODULARISATION_PLAN.md) (done and frozen
 > 2026-10-13; its rules live on in the spec above and in ADR-0231 … ADR-0239) ·
 > **Related issues:** krt-profit/basetool#2409, #2413, #2414 (all three built: REQ-INV-055, ADR-0244,
 > ADR-0245)
@@ -36,7 +46,7 @@ This plan turns that into two features and one architecture:
 | **Bedarf & Spenden** | ARGON publishes what it needs; any member pledges a material or item donation against it (or freely); ARGON confirms receipt, the stock moves into ARGON's pool, the donor is thanked and counted | `supply` (new, rank 10) |
 | **Ankauf** (trade deals) | An HB records an offer from an external org or person against an ARGON need, requests the money through the bank, records deliveries; ARGON accepts the quality and books the goods in; the HB settles and returns the rest | `purchasing` (new, rank 12) |
 
-Both are born as modules of the modular monolith ([`module-boundaries.md`](specs/module-boundaries.md),
+Both are born as modules of the modular monolith ([`module-boundaries.md`](../specs/module-boundaries.md),
 ADR-0231): own package, `api` / `internal` / `web`, declared with `@ApplicationModule` and in the
 domain map (REQ-MOD-001, REQ-MOD-006), no module-coupling violation (the baseline is empty, so the
 first one fails the build), interaction only through module APIs, observer SPIs and after-commit
@@ -452,7 +462,7 @@ queries; the list reads are statement-bounded (REQ-DATA-003, no N+1).
   family; `no-store` for every new family — the two roots go into `NoStoreApiScopes`
   (REQ-SEC-031, D-18 of the modularisation plan).
 
-### 5.6 REST API (the target cut of [`rest-api-cut.md`](modularisation/rest-api-cut.md), tier T2 — web only)
+### 5.6 REST API (the target cut of [`rest-api-cut.md`](../modularisation/rest-api-cut.md), tier T2 — web only)
 
 The REST cut of the old roots has not run (it waits for the owner's release decision and an app
 release), but the new modules are born in its shape: one root per domain, member-scoped resources under

@@ -6,7 +6,7 @@
 - **Related:** spec [`purchasing.md`](../specs/purchasing.md) (REQ-PUR-003) ·
   [ADR-0253](0253-material-supply-and-purchasing-are-two-modules.md) ·
   [ADR-0254](0254-a-bank-booking-request-may-carry-an-opaque-purpose.md) ·
-  [`SUPPLY_AND_PURCHASING_PLAN.md`](../SUPPLY_AND_PURCHASING_PLAN.md) (E-01)
+  [`SUPPLY_AND_PURCHASING_PLAN.md`](../archive/SUPPLY_AND_PURCHASING_PLAN.md) (E-01)
 
 ## Context
 
