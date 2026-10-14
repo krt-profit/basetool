@@ -31,7 +31,7 @@ produced. The state answers with the caller's capabilities only while the switch
 
 ### REQ-PUR-002 — Settings
 
-An admin sets the governing Bereiche (any number; the Bereich with the department Profit until changed), the funding account (an active `CARTEL` or `SPECIAL` bank account),
+An admin sets the governing Bereiche (any number; the Bereich with the department Profit, when one exists as the migration runs, until an admin changes the choice), the funding account (an active `CARTEL` or `SPECIAL` bank account),
 the default monthly limit per HB, the budget cap and its period (`MONTH`, `QUARTER`, `YEAR`), the
 settlement due days (1 … 90) and the quality tiers purchasing may buy (none until set). The settings row
 carries its own version; every change is audited (`PURCHASING_SETTINGS_CHANGED`).
