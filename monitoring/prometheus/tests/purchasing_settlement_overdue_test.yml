@@ -1,0 +1,35 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1h
+
+tests:
+  - name: overdue settlement for three days fires
+    interval: 1h
+    input_series:
+      - series: 'basetool_purchasing_settlements_overdue{job="basetool-backend", instance="backend:11261"}'
+        values: "0x10 1x120"
+    alert_rule_test:
+      - eval_time: 90h
+        alertname: PurchasingSettlementOverdue
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: basetool-backend
+              instance: "backend:11261"
+            exp_annotations:
+              summary: "Purchasing settlements overdue (1)"
+              description: "At least one purchasing deal has been past its settlement date for 3 days (1 now). The delegate, the governing leadership and the bank management were told once; check the deal list for the overdue marker (REQ-PUR-018)."
+
+  - name: overdue settlement shorter than three days stays quiet
+    interval: 1h
+    input_series:
+      - series: 'basetool_purchasing_settlements_overdue{job="basetool-backend", instance="backend:11261"}'
+        values: "0x10 1x40 0x40"
+    alert_rule_test:
+      - eval_time: 50h
+        alertname: PurchasingSettlementOverdue
+        exp_alerts: []
+      - eval_time: 90h
+        alertname: PurchasingSettlementOverdue
+        exp_alerts: []

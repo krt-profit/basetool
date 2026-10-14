@@ -6,6 +6,8 @@
 
 - **Bedarf & Spenden (Beschaffung).** Einheiten, die Bedarf melden dürfen, veröffentlichen, was ihnen fehlt; Mitglieder sagen Materialspenden zu (auch direkt aus der eigenen Lagerzeile, anonym möglich), die empfangende Einheit bestätigt sie ins Einheitenlager. Dazu Statistik pro Monat, drei Benachrichtigungen (Zusage, Erhalt, Ablehnung), Prüfprotokoll-Bereich „Bedarf & Spenden" und Verwaltungsseite `/admin/supply`; per Schalter `supply.enabled` standardmäßig aus (REQ-SUP-001…020, ADR-0252, ADR-0253, Migrationen V284–V286).
 
+- **Ankauf (Handelsbeauftragte).** Bestellte Handelsbeauftragte kaufen für freigegebene Bedarfe bei externen Partnern ein: Geschäft mit Risikoklasse, Mittel als Bankanträge (Vier-Augen-Prinzip, Monatslimit, Budgetdeckel), Lieferungen, die die Einheit annimmt und ins Einheitenlager bucht, Abrechnung mit Rückfluss des Restbetrags, Pause-Schalter, Monatsbericht mit CSV und Forumtext, acht Benachrichtigungen, Prüfprotokoll-Bereich „Ankauf" und Verwaltungsseite `/admin/purchasing`; per Schalter `purchasing.enabled` standardmäßig aus (REQ-PUR-001…028, ADR-0255, Migrationen V287–V289).
+
 ### Changed
 
 - **Bank: Vier-Augen-Prinzip für jeden Buchungsantrag.** Wer einen Antrag gestellt hat, kann ihn weder freigeben noch bestätigen (409 `BANK_FOUR_EYES_REQUIRED`); eine zweite Person entscheidet. Ablehnen bleibt möglich, direkte Buchungen bleiben unverändert, Admins sind ausgenommen (REQ-BANK-062, ADR-0251).

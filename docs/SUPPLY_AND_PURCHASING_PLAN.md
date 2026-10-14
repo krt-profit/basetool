@@ -1,10 +1,10 @@
 > **Doc type:** Living plan — written 2026-10-07 for the owner's review and brought up to the code of
 > `main` at `0da1df779` (v1.16.1) on 2026-10-13. The open decisions of §2 were answered by the owner
-> on 2026-10-07 (E-01 … E-12, F-1 … F-4) and still stand. **Status 2026-10-13:** B1 (four-eyes,
-> ADR-0251), S1 (`StockCommands`, ADR-0252) and S2 (`supply`, ADR-0253,
-> [`supply.md`](specs/supply.md)) are built; S3 … S6 are not. The requirements of §9.1 live in
-> [`supply.md`](specs/supply.md) and bind; §9.2 stays a draft until S3. §8.1 records where S2 deviates
-> from this text.
+> on 2026-10-07 (E-01 … E-12, F-1 … F-4) and still stand. **Status 2026-10-14:** all six steps are
+> built: B1 (four-eyes, ADR-0251), S1 (`StockCommands`, ADR-0252), S2 (`supply`, ADR-0253,
+> [`supply.md`](specs/supply.md)), S3 … S6 (`purchasing`, ADR-0254, ADR-0255,
+> [`purchasing.md`](specs/purchasing.md)). The requirements of §9.1 and §9.2 live in the two specs and
+> bind. §8.1 records where S2 deviates from this text, §8.2 where S3 … S6 do.
 > **Owner area:** BE · FE · BANK · INV · NOTIF · AUDIT · OBS · MOD
 > **Related ADRs:** ADR-0020, ADR-0028, ADR-0096, ADR-0109, ADR-0123, ADR-0229, ADR-0231 …
 > ADR-0236, ADR-0240 … ADR-0242, ADR-0244, ADR-0245, ADR-0250 · **Related specs:**
@@ -620,6 +620,25 @@ Each step is one pull request (or a short stack), shippable alone, behind the fe
   need's version alone (REQ-SUP-019).
 - Not built in this repository: the Android rendering of the three notices (repository
   `basetool-android`); the supply live-sync topics are web-only.
+
+### 8.2 Where S3 … S6 deviate from this text
+
+- The governing Bereich of purchasing is a column of `purchasing_setting` and the switch
+  `purchasing.enabled` a system setting; supply keeps its own pair. The delegate's capability is the
+  appointment row itself (ADR-0255).
+- The settlement is its own table with its own version, not a `deal.settlement_version` column; the
+  deal header takes a pessimistic row lock for every state change and tranche, delivery, close and
+  settlement do not echo the header's version (REQ-PUR-026).
+- `purchasing` implements three SPIs of lower modules: `BookingRequestPurposeObserver` (bank),
+  `NeedLifecycleObserver` and `NeedPriceAudience` (supply). The bank transaction is not tagged with the
+  purpose; a deal reaches its money through the request's id (REQ-BANK-061).
+- The risk class is the smallest class whose maximum total covers the deal; the partner history enters
+  through the class's „known partner" rule and not as a second computed step (REQ-PUR-011).
+- The report is computed in memory over the deals of the period; the CSV has one line per deal and the
+  forum text is plain text (REQ-PUR-023). The `bank-update` skill reports the confirmed purchasing
+  withdrawals and the returned remainders as „davon Materialeinkauf" from the purpose columns.
+- Not built in this repository: the Android rendering of the eight purchasing notices (repository
+  `basetool-android`); the purchasing live-sync topic is web-only.
 
 Nothing in the engine is left to wait for: the notification extension (#2414 Part A), the transfer
 notice (#2409) and the holder reconciliation (#2413) are on `main`, so S5 is an ordinary step and N4

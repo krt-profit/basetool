@@ -1021,6 +1021,37 @@ trade delegate.
 governing Bereich (`supply.governing_area_id`), the Organisationsleitung and an admin. Every supply
 mutation is audited under `AuditDomain.SUPPLY`.
 
+### 3.14 Ankauf (purchasing, REQ-PUR-\*)
+
+The purchasing surface (`/purchasing/...`, group „Beschaffung") is off until an admin sets
+`purchasing.enabled` on `/admin/purchasing`; while it is off every endpoint except the state read and the
+admin endpoints answers `404`. Every controller is class-gated on `hasRole('KRT_MEMBER')`; the admin
+controller on `hasRole('ADMIN')`. Within that gate `PurchasingAccessPolicy` decides (ADR-0255): the
+**Handelsbeauftragter (HB)** is not a Keycloak role but an in-app appointment — active while not revoked
+and not past its end date — made by the governing leadership. Deals are not tenant scoped; a deal is read
+by its own HB (also after the appointment ended), the governing leadership, bank staff, and the lead and
+Logisticians of the raising unit. Partner notes are returned to HBs and the governing leadership only.
+
+| Action                                                               | Member | HB (active) | Former HB | Log. / Lead of raising unit | Governing leadership | Bank staff | Admin |
+|:---------------------------------------------------------------------|:-------|:------------|:----------|:----------------------------|:---------------------|:-----------|:------|
+| Create / edit a deal, request money, record a delivery               | —      | ✅ (own)     | —         | —                           | —                    | —          | —     |
+| Close the delivery, record the settlement                            | —      | ✅ (own)     | ✅ (own)   | —                           | —                    | —          | —     |
+| Cancel a deal before any money was confirmed                         | —      | ✅ (own)     | ✅ (own)   | —                           | ✅                    | —          | ✅     |
+| Accept / reject a delivery (never one's own)                         | —      | —           | —         | ✅ (own unit)                | ✅                    | —          | ✅     |
+| Read a deal                                                          | —      | ✅ (own)     | ✅ (own)   | ✅ (own unit)                | ✅                    | ✅          | ✅     |
+| Read the partner notes of a deal                                     | —      | ✅           | ✅ (own)   | —                           | ✅                    | —          | ✅     |
+| Create / edit / block / unblock a partner                            | —      | ✅           | —         | —                           | ✅                    | —          | ✅     |
+| Erase an individual partner                                          | —      | —           | —         | —                           | ✅                    | —          | ✅     |
+| Appoint / revoke an HB, set a personal limit                         | —      | —           | —         | —                           | ✅                    | —          | ✅     |
+| Pause / resume purchasing                                            | —      | —           | —         | ✅ (own unit)                | ✅ (also global)      | —          | ✅     |
+| Read the report, CSV and forum text                                  | —      | ✅           | —         | ✅ (own unit)                | ✅                    | ✅          | ✅     |
+| Switch the surface on, set the funding account, limits, risk classes | —      | —           | —         | —                           | —                    | —          | ✅     |
+
+„Governing leadership" is the Bereichsleiter of the governing Bereich (`purchasing_setting.governing_area_id`),
+the Organisationsleitung and an admin. Every purchasing mutation is audited under `AuditDomain.PURCHASING`;
+the money itself moves only through bank requests, which obey the four-eyes rule (REQ-BANK-062): the HB is the
+requester and can neither grant nor confirm a tranche.
+
 ---
 
 ## 4. Multi-OrgUnit visibility (scoping)

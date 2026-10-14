@@ -150,6 +150,15 @@ UNION ALL SELECT 'req_krt_wdr_ok_sum', COALESCE(SUM(r.amount), 0)::text
   FROM bank_booking_request r JOIN krt k ON k.id = r.account_id, b
   WHERE r.type = 'WITHDRAWAL' AND r.status = 'CONFIRMED'
     AND r.created_at >= b.f AND r.created_at < b.t
+UNION ALL SELECT 'req_buy_wdr_n', COUNT(*)::text FROM bank_booking_request r, b
+  WHERE r.type = 'WITHDRAWAL' AND r.status = 'CONFIRMED' AND r.purpose_kind = 'PURCHASING_DEAL'
+    AND r.created_at >= b.f AND r.created_at < b.t
+UNION ALL SELECT 'req_buy_wdr_sum', COALESCE(SUM(r.amount), 0)::text FROM bank_booking_request r, b
+  WHERE r.type = 'WITHDRAWAL' AND r.status = 'CONFIRMED' AND r.purpose_kind = 'PURCHASING_DEAL'
+    AND r.created_at >= b.f AND r.created_at < b.t
+UNION ALL SELECT 'req_buy_dep_sum', COALESCE(SUM(r.amount), 0)::text FROM bank_booking_request r, b
+  WHERE r.type = 'DEPOSIT' AND r.status = 'CONFIRMED' AND r.purpose_kind = 'PURCHASING_DEAL'
+    AND r.created_at >= b.f AND r.created_at < b.t
 UNION ALL SELECT 'req_krt_rej_n', COUNT(*)::text
   FROM bank_booking_request r JOIN krt k ON k.id = r.account_id, b
   WHERE r.status = 'REJECTED' AND r.created_at >= b.f AND r.created_at < b.t
@@ -287,6 +296,8 @@ def main() -> None:
     print(f"  Einzahlungsantraege bestaetigt   {f['req_dep_ok_n']:.0f}")
     print(f"  Auszahlungsantraege bestaetigt   {f['req_wdr_ok_n']:.0f}  ueber {de(f['req_wdr_ok_sum'])} aUEC")
     print(f"  davon KRT-Konto                  {f['req_krt_wdr_ok_n']:.0f}  ueber {de(f['req_krt_wdr_ok_sum'])} aUEC")
+    print(f"  davon Materialeinkauf            {f['req_buy_wdr_n']:.0f}  ueber {de(f['req_buy_wdr_sum'])} aUEC")
+    print(f"  Rueckfluesse Materialeinkauf     {de(f['req_buy_dep_sum'])} aUEC")
     print(f"  abgelehnt gesamt                 {f['req_rejected_n']:.0f}")
     print(f"  davon KRT-Konto                  {f['req_krt_rej_n']:.0f}  ueber {de(f['req_krt_rej_sum'])} aUEC")
     print()

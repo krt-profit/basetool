@@ -286,6 +286,16 @@ web, naming its client (REQ-AUDIT-005):
   switch and the governing Bereich). The details carry ids, enums, amounts and tier codes, never a
   name; an anonymous donation records no target user. The stock movement of a receipt additionally
   audits in the Lager area through `StockCommands`.
+- **Ankauf** (`PurchasingDeal`, `PurchasingPartner`, `PurchasingDelegate`, `PurchasingSetting`,
+  `AuditDomain.PURCHASING`, REQ-PUR-025) — `DEAL_CREATED`, `DEAL_UPDATED`, `DEAL_CANCELLED`,
+  `DEAL_TRANCHE_REQUESTED`, `DEAL_TRANCHE_FUNDED`, `DEAL_TRANCHE_REFUSED`, `DEAL_DELIVERY_RECORDED`,
+  `DEAL_DELIVERY_ACCEPTED`, `DEAL_DELIVERY_REJECTED`, `DEAL_DELIVERY_CLOSED`,
+  `DEAL_SETTLEMENT_RECORDED`, `DEAL_SETTLED`, `DEAL_FAILED`, `PARTNER_CREATED`, `PARTNER_UPDATED`,
+  `PARTNER_BLOCKED`, `PARTNER_UNBLOCKED`, `PARTNER_ERASED`, `DELEGATE_APPOINTED`, `DELEGATE_REVOKED`,
+  `DELEGATE_LIMIT_CHANGED`, `PURCHASING_PAUSED`, `PURCHASING_RESUMED`, `PURCHASING_SETTINGS_CHANGED` and
+  `RISK_CLASSES_CHANGED`. The details carry ids, enums, amounts and quality, never a partner name, handle or
+  note. The money of a tranche audits in the bank's own trail; the stock movement of an accepted delivery
+  audits in the Lager area through `StockCommands` (reason `PURCHASE`).
 
 The audit table is **business data, not logging** — the [`observability.md`](observability.md) rule
 (never write names, emails or tokens to the **log stream**) is unaffected and still applies. User

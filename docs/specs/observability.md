@@ -1911,6 +1911,16 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   `basetool_supply_donations_pledged_open` sampled by `SupplyBusinessGauges`
   (REQ-SUP-017, REQ-OBS-011). Counts only; no unit, material or member label. The `SUPPLY` audit
   domain is excluded from `AuditDomainSilenceAnomaly`.
+- `basetool_purchasing_deals_total{event}` counter (`event` = created, updated, cancelled, settled,
+  delivery_recorded, delivery_accepted, delivery_rejected, delivery_closed, delivery_failed),
+  `basetool_purchasing_tranches_total{kind,outcome}` counter (`outcome` = requested, confirmed,
+  refused, cancelled) and the gauges `basetool_purchasing_deals_by_status{status}`,
+  `basetool_purchasing_settlements_overdue`, `basetool_purchasing_paused` and
+  `basetool_purchasing_delegates_active`, sampled by `PurchasingBusinessGauges`
+  (REQ-PUR-018, REQ-OBS-011). Counts only; no partner, member, amount or deal label. The alert
+  `PurchasingSettlementOverdue` fires when a settlement has been overdue for 3 days (covered by a
+  promtool test); the `PURCHASING` audit domain is excluded from `AuditDomainSilenceAnomaly` like
+  `SUPPLY`, and the operations dashboard gains the purchasing panels.
 - `basetool_bank_audit_events_total{event_type}` counter at the single `BankAuditService.record`
   choke point (`event_type` = the bounded `BankAuditEventType` enum). The bank keeps a physically
   separate `bank_audit_event` table excluded from `AuditDomain`, so before #1041 item 10 the most
