@@ -34,6 +34,9 @@
     .purchasing-totals {
         margin-bottom: var(--space-4);
     }
+    .kv-list dt {
+        overflow-wrap: anywhere;
+    }
     @media (width <= 768px) {
         .cell-actions .purchasing-actions {
             justify-content: flex-start;
