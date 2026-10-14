@@ -478,15 +478,20 @@ public class ScWikiClient {
    * Fetches a single Wiki resource and binds it to {@code type}, unwrapping a top-level {@code
    * data} envelope when present. No ETag caching.
    *
+   * <p>The id is expanded into a {@code /{id}} template variable, so the {@code uri} tag of {@code
+   * http.client.requests} stays the endpoint template instead of one value per resource.
+   *
    * @param <T> the target DTO type
-   * @param uri the relative request URI (e.g. {@code "/api/items/" + uuid})
+   * @param endpoint the Wiki endpoint path (e.g. {@code "/api/items"})
+   * @param id the resource id appended as the last path segment
    * @param type the DTO class to bind the payload to
    * @param resourceLabel label for log lines
    * @return the parsed DTO, or {@code null} on 404 / error / unparseable body
    */
   @Nullable
   @SuppressWarnings("NullAway")
-  public <T> T fetchOne(String uri, Class<T> type, String resourceLabel) {
+  public <T> T fetchOne(String endpoint, Object id, Class<T> type, String resourceLabel) {
+    String uri = endpoint + "/" + id;
     log.debug("Fetching one {} from SC Wiki API: {}", resourceLabel, uri);
     FetchErrorLatch errorLatch = new FetchErrorLatch();
     String rawBody;
@@ -494,7 +499,7 @@ public class ScWikiClient {
       rawBody =
           client
               .get()
-              .uri(uri)
+              .uri(endpoint + "/{id}", id)
               .exchange(
                   (_, response) -> {
                     int status = response.getStatusCode().value();

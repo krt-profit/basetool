@@ -154,7 +154,8 @@ public class ScWikiBlueprintSyncService {
         scWikiClient.paceForRateLimit();
         ScWikiBlueprintDto detail =
             scWikiClient.fetchOne(
-                properties.blueprintsEndpoint() + "/" + listDto.uuid(),
+                properties.blueprintsEndpoint(),
+                listDto.uuid(),
                 ScWikiBlueprintDto.class,
                 "blueprint");
         if (detail == null) {

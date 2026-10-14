@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Monitoring: SC-Wiki-Abrufe erzeugen keine `uri`-Tag-Flut mehr.** Der Einzelabruf von Items und Blueprints trug die UUID im Pfad, sodass `http.client.requests` des Backends pro Ressource einen neuen `uri`-Wert anlegte und das Limit von 100 mit einer Warnung riss; der Pfad ist jetzt eine URI-Vorlage (`/api/items/{id}`).
+
 ## [v1.16.1](https://github.com/krt-profit/basetool/releases/tag/v1.16.1) - 2026-10-13
 
 ### Changed
