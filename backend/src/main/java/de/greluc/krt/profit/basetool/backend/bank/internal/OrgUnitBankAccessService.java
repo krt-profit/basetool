@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankAmounts;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankPurpose;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
@@ -60,6 +61,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -704,6 +706,68 @@ public class OrgUnitBankAccessService {
         null,
         request.counterpartyUserId(),
         request.counterpartyOrgUnitId());
+  }
+
+  /**
+   * Raises a booking request for another module's purpose (REQ-BANK-061) on a funding account: a
+   * {@code WITHDRAWAL} from a {@code CARTEL} account is routed through the KRT ladder like any
+   * request, a withdrawal from a {@code SPECIAL} account and every deposit need no owner approval,
+   * and the bank's confirmation (with four-eyes, REQ-BANK-062) always follows. The caller is the
+   * requester.
+   *
+   * @param accountId the active {@code CARTEL} or {@code SPECIAL} account
+   * @param type {@code DEPOSIT} or {@code WITHDRAWAL}
+   * @param amount the whole-aUEC amount
+   * @param justification the Begr&uuml;ndung of a withdrawal
+   * @param counterpartyUserId the Empf&auml;nger of a withdrawal, or {@code null}
+   * @param purpose what the request is for
+   * @return the pending request
+   * @throws NotFoundException when the account does not exist
+   * @throws BadRequestException when the account is closed or not a funding account type, or the
+   *     type is neither deposit nor withdrawal
+   */
+  @NotNull
+  @Transactional(propagation = Propagation.MANDATORY)
+  public BankBookingRequestDto raisePurposeBoundRequest(
+      @NotNull UUID accountId,
+      @NotNull BankBookingRequestType type,
+      @NotNull BigDecimal amount,
+      @Nullable String justification,
+      @Nullable UUID counterpartyUserId,
+      @NotNull BankPurpose purpose) {
+    BankAccount account =
+        Entities.require(bankAccountRepository.findById(accountId), "Bank account not found");
+    if (account.getStatus() != BankAccountStatus.ACTIVE
+        || (account.getType() != BankAccountType.CARTEL
+            && account.getType() != BankAccountType.SPECIAL)) {
+      throw new BadRequestException(
+          "A purpose-bound request needs an active KRT or special account");
+    }
+    ApprovalRouting routing =
+        switch (type) {
+          case WITHDRAWAL ->
+              account.getType() == BankAccountType.CARTEL
+                  ? resolveCartelApprovalRouting(account, amount)
+                  : new ApprovalRouting(false, null, null);
+          case DEPOSIT -> new ApprovalRouting(false, null, null);
+          case TRANSFER ->
+              throw new BadRequestException("A purpose-bound request is a deposit or a withdrawal");
+        };
+    return bankBookingRequestService.create(
+        accountId,
+        type,
+        amount,
+        null,
+        justification,
+        null,
+        routing.requiresOwnerApproval(),
+        routing.applicableLimit(),
+        routing.requiredApprover(),
+        false,
+        null,
+        counterpartyUserId,
+        null,
+        purpose);
   }
 
   /**

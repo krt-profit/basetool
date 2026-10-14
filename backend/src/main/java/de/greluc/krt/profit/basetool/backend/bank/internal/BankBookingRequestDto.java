@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankPurposeKind;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -72,6 +73,10 @@ import org.jetbrains.annotations.Nullable;
  *     no Empf&auml;nger is named
  * @param counterpartyOrgUnitId the named Empf&auml;nger's chosen org unit, or {@code null}
  * @param counterpartyOrgUnitName name snapshot of that org unit, or {@code null}
+ * @param purposeKind what another module raised the request for through the bank command API
+ *     (REQ-BANK-061), or {@code null} for a request a member or employee filed
+ * @param purposeRef that module's opaque reference, or {@code null} exactly when there is no
+ *     purpose
  * @param version the optimistic-locking version echoed on cancel/confirm/reject
  * @param callerMayConfirm on the bank-staff queue, whether the caller may confirm this request now
  *     (pending, and the capability the confirm endpoint requires); {@code null} on every other read
@@ -112,6 +117,8 @@ public record BankBookingRequestDto(
     @Nullable String counterpartyHandle,
     @Nullable UUID counterpartyOrgUnitId,
     @Nullable String counterpartyOrgUnitName,
+    @Nullable BankPurposeKind purposeKind,
+    @Nullable UUID purposeRef,
     Long version,
     @Nullable Boolean callerMayConfirm) {
 
@@ -161,6 +168,8 @@ public record BankBookingRequestDto(
         counterpartyHandle,
         counterpartyOrgUnitId,
         counterpartyOrgUnitName,
+        purposeKind,
+        purposeRef,
         version,
         callerMayConfirm);
   }

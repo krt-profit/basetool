@@ -113,6 +113,8 @@ class BankRequestQueuePageControllerMvcTest {
             null,
             null,
             null,
+            null,
+            null,
             0L,
             true);
     PageResponse<BankBookingRequestDto> page =

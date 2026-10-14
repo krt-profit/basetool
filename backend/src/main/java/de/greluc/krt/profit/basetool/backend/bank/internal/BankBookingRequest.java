@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankPurposeKind;
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -300,4 +301,22 @@ public class BankBookingRequest extends AbstractEntity<UUID> {
   @Nullable
   @Column(name = "owner_approval_granted_at")
   private Instant ownerApprovalGrantedAt;
+
+  /**
+   * What the request is for when another module raised it through the bank's command API
+   * (REQ-BANK-061); {@code null} for every request a member or employee filed. Immutable; set
+   * together with {@link #purposeRef}.
+   */
+  @Nullable
+  @Enumerated(EnumType.STRING)
+  @Column(name = "purpose_kind", length = 32, updatable = false)
+  private BankPurposeKind purposeKind;
+
+  /**
+   * The owner's opaque id for the thing the request pays for; the bank never reads it, it only
+   * hands it back to the observer of {@link #purposeKind}. Immutable.
+   */
+  @Nullable
+  @Column(name = "purpose_ref", updatable = false)
+  private UUID purposeRef;
 }

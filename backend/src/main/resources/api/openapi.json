@@ -74334,6 +74334,14 @@
           "ownerApprovalGrantedByHandle" : {
             "type" : "string"
           },
+          "purposeKind" : {
+            "type" : "string",
+            "enum" : [ "PURCHASING_DEAL" ]
+          },
+          "purposeRef" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
           "rejectReason" : {
             "type" : "string"
           },
