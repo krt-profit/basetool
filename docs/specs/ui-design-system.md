@@ -1594,8 +1594,11 @@ krt-profit/design-system#6), and every work page follows one of three patterns.
 | `fragments/components :: listFoot(pageResponse, baseUrl)` | „1–7 von 24" and the pagination below a table; its `data-list-total` keeps the page head's count chip (`countFor`) current after every live swap (`krt-list-count.js`) |
 
 Two global scripts drive them: `krt-overflow-menu.js` opens and closes the menus (toggle, Escape,
-outside click, Tab, focus back to the toggle, arrow keys, Home/End) and closes a menu when one of its
-entries is clicked; `krt-filter-chips.js` renders a chip per active control of the bound form
+outside click, Tab, focus back to the toggle, arrow keys, Home/End), closes a menu when one of its
+entries is clicked, and opens a panel upwards (`.overflow-menu__panel--up`) when it does not fit below
+its toggle — inside the viewport under the sticky header, the body of an enclosing table and every
+clipping ancestor — and there is more room above; `common-handlers.js` publishes the sticky header's
+height as `--krt-header-height` for sticky content below it; `krt-filter-chips.js` renders a chip per active control of the bound form
 (skipping search fields, segmented controls and `data-filter-chip-ignore`), and removing a chip
 clears that control and fires its `input` and `change` events, so the page's own live filter runs.
 Pages that swap their filter form call `window.krtFilterChips.refresh()`.

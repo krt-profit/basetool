@@ -6688,6 +6688,10 @@
         border: var(--border-accent);
         box-shadow: var(--shadow-dropdown);
     }
+    .overflow-menu__panel--up {
+        top: auto;
+        bottom: calc(100% + 4px);
+    }
     .overflow-menu__item {
         display: flex;
         align-items: center;

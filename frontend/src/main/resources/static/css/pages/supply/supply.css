@@ -11,6 +11,24 @@
         justify-content: flex-end;
         gap: var(--space-2);
     }
+    .supply-row-actions:has(.overflow-menu__panel:not([hidden])) {
+        z-index: 3;
+    }
+    .table-responsive:has(> .supply-table) {
+        overflow: visible;
+    }
+    @media (width > 768px) {
+        .supply-row-actions {
+            flex-wrap: nowrap;
+        }
+        .supply-table thead th {
+            position: sticky;
+            top: var(--krt-header-height, 0);
+            z-index: 2;
+            border-bottom: 0;
+            box-shadow: inset 0 -2px 0 var(--color-primary);
+        }
+    }
     .supply-meter {
         width: 100%;
         min-width: 6rem;
