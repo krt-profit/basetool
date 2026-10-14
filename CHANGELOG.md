@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.16.2](https://github.com/krt-profit/basetool/releases/tag/v1.16.2) - 2026-10-14
+
 ### Added
 
 - **Bedarf & Spenden (Beschaffung).** Einheiten, die Bedarf melden dürfen, veröffentlichen, was ihnen fehlt; Mitglieder sagen Materialspenden zu (auch direkt aus der eigenen Lagerzeile), die empfangende Einheit bestätigt sie ins Einheitenlager. Dazu Statistik pro Monat, drei Benachrichtigungen (Zusage, Erhalt, Ablehnung), Prüfprotokoll-Bereich „Bedarf & Spenden" und Verwaltungsseite `/admin/supply`; per Schalter `supply.enabled` standardmäßig aus (REQ-SUP-001…020, ADR-0252, ADR-0253, Migrationen V284–V286).
