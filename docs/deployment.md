@@ -1620,18 +1620,24 @@ edge. It covers every vhost, including `/auth`: during a restart there is nothin
 
 ### Edge rate limiting
 
-`include/limits.conf` applies, on every vhost, **20 r/s with burst 80** (`nodelay`) and at most
+`include/limits.conf` applies, on every vhost, **50 r/s with burst 150** (`nodelay`) and at most
 **500 concurrent connections** per client, keyed by `$krt_limit_key` from `conf.d/00-maps.conf` —
-the full IPv4 address or the IPv6 `/64` (REQ-SEC-023). The token endpoint has a tighter
-`burst=10`. Rejections are **429**, never 503, or the maintenance intercept would answer a flood.
-Rejections land in the edge log at `warn`; a sustained flood raises `EdgeRateLimitSpike`.
+the full IPv4 address or the IPv6 `/64` (REQ-SEC-023). Two locations of the frontend vhost count in
+a zone of their own instead (ADR-0256): the static asset trees `/js/`, `/css/`, `/fonts/`,
+`/images/` and `/logos/` (**200 r/s, burst 600**) and the token endpoint (**20 r/s, burst 10**).
+Rejections are **429**, never 503, or the maintenance intercept would answer a flood. Rejections
+land in the edge log at `warn`; a sustained flood raises `EdgeRateLimitSpike`.
+
+A 429 on a hashed static asset in a member's browser console almost always means the browser cache
+is off (DevTools *Disable cache*): with it on, an `immutable` asset is requested once per release.
+The edge log shows it as the same hashed URL answered `200` again and again by one client.
 
 The limiter is only as good as the client address: it keys on what the PROXY header asserts, so an
 `EDGE_TRUSTED_PROXY` mismatch collapses it onto one bucket. `check-conformance.py`'s
 `client-address-visible` is the check. To exercise the limit (a load test — decide deliberately):
 
 ```bash
-for i in $(seq 1 120); do curl -s -o /dev/null -w '%{http_code}\n' https://profit-base.online/ & done | sort | uniq -c
+for i in $(seq 1 300); do curl -s -o /dev/null -w '%{http_code}\n' https://profit-base.online/ & done | sort | uniq -c
 # expect 200s and 429s, no 503
 ```
 
