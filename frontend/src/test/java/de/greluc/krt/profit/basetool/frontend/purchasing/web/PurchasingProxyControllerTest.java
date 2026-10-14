@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.frontend.purchasing.model.DelegateDto;
 import de.greluc.krt.profit.basetool.frontend.purchasing.model.PartnerDto;
 import de.greluc.krt.profit.basetool.frontend.purchasing.model.PausePurchasingRequest;
 import de.greluc.krt.profit.basetool.frontend.purchasing.model.PauseStateDto;
+import de.greluc.krt.profit.basetool.frontend.purchasing.model.PurchasingRefDto;
 import de.greluc.krt.profit.basetool.frontend.purchasing.model.PurchasingSettingsDto;
 import de.greluc.krt.profit.basetool.frontend.purchasing.model.PurchasingVersionRequest;
 import de.greluc.krt.profit.basetool.frontend.purchasing.model.RecordDeliveryRequest;
@@ -217,14 +218,25 @@ class PurchasingProxyControllerTest {
   void theAdminSettingsAndRiskClassesAreForwardedToTheClient() {
     UpdatePurchasingSettingsRequest settings =
         new UpdatePurchasingSettingsRequest(
-            true, ID, OTHER, 50_000L, null, "MONTH", 14, List.of(), 4L);
+            true, List.of(ID), OTHER, 50_000L, null, "MONTH", 14, List.of(), 4L);
     UpdateRiskClassesRequest classes =
         new UpdateRiskClassesRequest(
             List.of(new UpdateRiskClassEntry("A", 100_000L, 50, false, false, 1L)));
     PurchasingSettingsDto stored =
         new PurchasingSettingsDto(
-            true, ID, "Profit", OTHER, "100", "Fund", 50_000L, null, "MONTH", 14, List.of(), false,
-            null, 5L);
+            true,
+            List.of(new PurchasingRefDto(ID, "Profit")),
+            OTHER,
+            "100",
+            "Fund",
+            50_000L,
+            null,
+            "MONTH",
+            14,
+            List.of(),
+            false,
+            null,
+            5L);
     List<RiskClassDto> table = List.of(new RiskClassDto("A", 100_000L, 50, false, false, 2L));
     when(purchasingClient.updateSettings(settings)).thenReturn(stored);
     when(purchasingClient.updateRiskClasses(classes)).thenReturn(table);

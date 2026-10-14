@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingProblemCode;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingProblemException;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -104,14 +105,14 @@ public class PurchasingSettingsService {
   }
 
   /**
-   * Returns the id of the governing Bereich, when one is set.
+   * Returns the ids of the governing Bereiche.
    *
-   * @return the Bereich's id, or empty
+   * @return the Bereiche, sorted by id; empty while none is set
    */
   @NotNull
   @Transactional(readOnly = true)
-  public Optional<UUID> governingAreaId() {
-    return Optional.ofNullable(current().getGoverningAreaId());
+  public List<UUID> governingAreaIds() {
+    return current().getGoverningAreaIds().stream().sorted().toList();
   }
 
   /**
@@ -130,7 +131,7 @@ public class PurchasingSettingsService {
    *
    * @param request the new values with the echoed version
    * @return the stored settings
-   * @throws BadRequestException when the governing unit is no Bereich or a tier is unknown
+   * @throws BadRequestException when a governing unit is no Bereich or a tier is unknown
    * @throws PurchasingProblemException with {@code PURCHASING_FUNDING_ACCOUNT_MISSING} when the
    *     account is not an active {@code CARTEL} or {@code SPECIAL} account
    */
@@ -140,12 +141,11 @@ public class PurchasingSettingsService {
     PurchasingSetting setting = current();
     OptimisticLock.checkRequired(
         setting.getVersion(), request.version(), PurchasingSetting.class, setting.getId());
-    if (request.governingAreaId() != null) {
-      OrgUnit area =
-          Entities.require(
-              orgUnitRepository.findById(request.governingAreaId()), "Org unit not found");
+    Set<UUID> areas = request.governingAreaIds() == null ? Set.of() : request.governingAreaIds();
+    for (UUID areaId : areas) {
+      OrgUnit area = Entities.require(orgUnitRepository.findById(areaId), "Org unit not found");
       if (area.getKind() != OrgUnitKind.BEREICH) {
-        throw new BadRequestException("The governing unit must be a Bereich");
+        throw new BadRequestException("A governing unit must be a Bereich");
       }
     }
     if (request.fundingAccountId() != null
@@ -160,7 +160,8 @@ public class PurchasingSettingsService {
       throw new BadRequestException("A quality tier is unknown");
     }
     final boolean wasEnabled = isEnabled();
-    setting.setGoverningAreaId(request.governingAreaId());
+    setting.getGoverningAreaIds().clear();
+    setting.getGoverningAreaIds().addAll(areas);
     setting.setFundingAccountId(request.fundingAccountId());
     setting.setDefaultMonthlyLimit(request.defaultMonthlyLimit());
     setting.setBudgetCap(request.budgetCap());
@@ -177,7 +178,7 @@ public class PurchasingSettingsService {
         null,
         AuditDetails.of("enabled", request.enabled())
             .with("wasEnabled", wasEnabled)
-            .with("governingArea", saved.getGoverningAreaId())
+            .with("governingAreas", areas.size())
             .with("fundingAccount", saved.getFundingAccountId())
             .with("defaultMonthlyLimit", saved.getDefaultMonthlyLimit())
             .with("budgetCap", saved.getBudgetCap())
@@ -255,21 +256,18 @@ public class PurchasingSettingsService {
   }
 
   private @NotNull PurchasingSettingsDto toDto(@NotNull PurchasingSetting setting) {
-    String areaName =
-        setting.getGoverningAreaId() == null
-            ? null
-            : orgUnitRepository
-                .findById(setting.getGoverningAreaId())
-                .map(OrgUnit::getName)
-                .orElse(null);
+    List<PurchasingRefDto> areas =
+        orgUnitRepository.findAllById(setting.getGoverningAreaIds()).stream()
+            .map(area -> new PurchasingRefDto(area.getId(), area.getName()))
+            .sorted(Comparator.comparing(PurchasingRefDto::name))
+            .toList();
     Optional<FundingAccountRef> account =
         setting.getFundingAccountId() == null
             ? Optional.empty()
             : fundingAccounts.findActive(setting.getFundingAccountId());
     return new PurchasingSettingsDto(
         isEnabled(),
-        setting.getGoverningAreaId(),
-        areaName,
+        areas,
         setting.getFundingAccountId(),
         account.map(FundingAccountRef::accountNo).orElse(null),
         account.map(FundingAccountRef::name).orElse(null),

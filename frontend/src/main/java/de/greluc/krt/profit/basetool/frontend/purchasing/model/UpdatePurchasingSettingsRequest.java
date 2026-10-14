@@ -33,7 +33,7 @@ import java.util.UUID;
  * field.
  *
  * @param enabled whether the surface is on
- * @param governingAreaId the governing Bereich
+ * @param governingAreaIds the governing Bereiche
  * @param fundingAccountId the funding account
  * @param defaultMonthlyLimit the default monthly limit
  * @param budgetCap the budget cap, or {@code null}
@@ -45,7 +45,7 @@ import java.util.UUID;
 @DtoMirror
 public record UpdatePurchasingSettingsRequest(
     boolean enabled,
-    UUID governingAreaId,
+    List<UUID> governingAreaIds,
     UUID fundingAccountId,
     @NotNull @PositiveOrZero Long defaultMonthlyLimit,
     @PositiveOrZero Long budgetCap,

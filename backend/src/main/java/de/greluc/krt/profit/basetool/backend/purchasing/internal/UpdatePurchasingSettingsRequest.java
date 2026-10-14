@@ -32,7 +32,8 @@ import org.jetbrains.annotations.Nullable;
  * Stores the purchasing settings (REQ-PUR-002). PUT semantics: an omitted optional field clears it.
  *
  * @param enabled whether the purchasing surface is on
- * @param governingAreaId the governing Bereich, or {@code null}
+ * @param governingAreaIds the governing Bereiche; empty leaves only admins and the
+ *     Organisationsleitung governing
  * @param fundingAccountId an active {@code CARTEL} or {@code SPECIAL} account, or {@code null}
  * @param defaultMonthlyLimit the monthly limit of a delegate without a personal one
  * @param budgetCap the most that may be requested per period, or {@code null} for no cap
@@ -43,7 +44,7 @@ import org.jetbrains.annotations.Nullable;
  */
 public record UpdatePurchasingSettingsRequest(
     boolean enabled,
-    @Nullable UUID governingAreaId,
+    @Nullable Set<UUID> governingAreaIds,
     @Nullable UUID fundingAccountId,
     @NotNull @PositiveOrZero Long defaultMonthlyLimit,
     @Nullable @PositiveOrZero Long budgetCap,

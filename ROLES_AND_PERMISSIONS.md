@@ -1047,8 +1047,9 @@ Logisticians of the raising unit. Partner notes are returned to HBs and the gove
 | Read the report, CSV and forum text                                  | —      | ✅           | —         | ✅ (own unit)                | ✅                    | ✅          | ✅     |
 | Switch the surface on, set the funding account, limits, risk classes | —      | —           | —         | —                           | —                    | —          | ✅     |
 
-„Governing leadership" is the Bereichsleiter of the governing Bereich (`purchasing_setting.governing_area_id`),
-the Organisationsleitung and an admin. Every purchasing mutation is audited under `AuditDomain.PURCHASING`;
+„Governing leadership" is a Bereichsleiter or Bereichskoordinator of a governing Bereich (the set in
+`purchasing_setting_governing_area`, the Bereich Profit by default; a Bereichsoperator does not govern), the
+Organisationsleitung and an admin. Every purchasing mutation is audited under `AuditDomain.PURCHASING`;
 the money itself moves only through bank requests, which obey the four-eyes rule (REQ-BANK-062): the HB is the
 requester and can neither grant nor confirm a tranche.
 

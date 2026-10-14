@@ -1123,7 +1123,7 @@ added to both. `deletion_request` sits with identity, as do the GDPR classes onc
 | `operation` | 2 | `operation`, `operation_payout_status` |
 | `bank` | 10 | `bank_account`, `bank_account_approval_limit`, `bank_account_grant`, `bank_account_view_grant`, `bank_audit_event`, `bank_booking_request`, `bank_holder`, `bank_holder_posting`, `bank_posting`, `bank_transaction` |
 | `supply` | 3 | `supply_donation`, `supply_need`, `supply_unit_setting` |
-| `purchasing` | 10 | `purchasing_deal`, `purchasing_deal_delivery`, `purchasing_deal_settlement`, `purchasing_deal_tranche`, `purchasing_delegate`, `purchasing_partner`, `purchasing_risk_class`, `purchasing_setting`, `purchasing_setting_allowed_tier`, `purchasing_unit_pause` |
+| `purchasing` | 11 | `purchasing_deal`, `purchasing_deal_delivery`, `purchasing_deal_settlement`, `purchasing_deal_tranche`, `purchasing_delegate`, `purchasing_partner`, `purchasing_risk_class`, `purchasing_setting`, `purchasing_setting_allowed_tier`, `purchasing_setting_governing_area`, `purchasing_unit_pause` |
 | `exchange` | 11 | `exchange_bulk_undo_run`, `exchange_bulk_undo_skip`, `exchange_change`, `exchange_client`, `exchange_client_capability`, `exchange_client_revocation`, `exchange_feed_horizon`, `exchange_installation`, `exchange_journal`, `exchange_settings`, `exchange_ship_link` |
 
 The listed crossings:

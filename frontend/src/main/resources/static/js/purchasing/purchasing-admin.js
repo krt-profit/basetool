@@ -39,12 +39,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 .map((input) => /** @type {HTMLInputElement} */ (input))
                 .filter((input) => input.checked)
                 .map((input) => input.value);
+            const areas = Array.from(form.querySelectorAll('input.purchasing-area'))
+                .map((input) => /** @type {HTMLInputElement} */ (input))
+                .filter((input) => input.checked)
+                .map((input) => input.value);
             sendWrite({
                 method: 'PUT',
                 url: '/api/proxy/purchasing/admin/settings',
                 payload: {
                     enabled: field('purchasing-settings-enabled').checked,
-                    governingAreaId: textOrNull(select('purchasing-settings-area').value),
+                    governingAreaIds: areas,
                     fundingAccountId: textOrNull(select('purchasing-settings-account').value),
                     defaultMonthlyLimit: numberOrNull(field('purchasing-settings-limit').value),
                     budgetCap: numberOrNull(field('purchasing-settings-cap').value),

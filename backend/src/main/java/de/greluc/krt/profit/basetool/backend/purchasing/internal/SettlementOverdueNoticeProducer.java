@@ -56,7 +56,7 @@ public class SettlementOverdueNoticeProducer implements TimedNoticeProducer {
     if (!settingsService.isEnabled()) {
       return 0;
     }
-    UUID governingArea = settingsService.governingAreaId().orElse(null);
+    UUID governingArea = settingsService.governingAreaIds().stream().findFirst().orElse(null);
     int raised = 0;
     for (UUID id : dealRepository.findOverdueNotYetAnnouncedIds(now, Limit.of(limit))) {
       if (dealRepository.markOverdueNotified(id, now) != 1) {

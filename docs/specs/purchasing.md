@@ -31,7 +31,7 @@ produced. The state answers with the caller's capabilities only while the switch
 
 ### REQ-PUR-002 — Settings
 
-An admin sets the governing Bereich, the funding account (an active `CARTEL` or `SPECIAL` bank account),
+An admin sets the governing Bereiche (any number; the Bereich with the department Profit until changed), the funding account (an active `CARTEL` or `SPECIAL` bank account),
 the default monthly limit per HB, the budget cap and its period (`MONTH`, `QUARTER`, `YEAR`), the
 settlement due days (1 … 90) and the quality tiers purchasing may buy (none until set). The settings row
 carries its own version; every change is audited (`PURCHASING_SETTINGS_CHANGED`).
@@ -41,8 +41,8 @@ carries its own version; every change is audited (`PURCHASING_SETTINGS_CHANGED`)
 
 ### REQ-PUR-003 — Appointment
 
-The Bereichsleiter of the governing Bereich, the members of the Organisationsleitung and an admin appoint
-a member as HB with an optional end date and an optional personal monthly limit, and revoke the
+The Bereichsleiter and the Bereichskoordinatoren of a governing Bereich (never a Bereichsoperator), the
+members of the Organisationsleitung and an admin appoint a member as HB with an optional end date and an optional personal monthly limit, and revoke the
 appointment. Only an active — not revoked, not expired — appointment confers the HB capability. A former
 HB keeps read access to and the settlement duty for their running deals and may not create deals or
 request money. The appointment and its revocation are audited and noticed to the member (N8, N9).

@@ -29,8 +29,8 @@ import org.jetbrains.annotations.Nullable;
  * The purchasing settings as the admin page and the state read show them (REQ-PUR-002).
  *
  * @param enabled whether the purchasing surface is switched on
- * @param governingAreaId the governing Bereich, or {@code null}
- * @param governingAreaName its name, or {@code null}
+ * @param governingAreas the Bereiche whose Bereichsleiter and Bereichskoordinatoren govern
+ *     purchasing, by name
  * @param fundingAccountId the funding account, or {@code null}
  * @param fundingAccountNo its number, or {@code null}
  * @param fundingAccountName its name, or {@code null}
@@ -45,8 +45,7 @@ import org.jetbrains.annotations.Nullable;
  */
 public record PurchasingSettingsDto(
     boolean enabled,
-    @Nullable UUID governingAreaId,
-    @Nullable String governingAreaName,
+    List<PurchasingRefDto> governingAreas,
     @Nullable UUID fundingAccountId,
     @Nullable String fundingAccountNo,
     @Nullable String fundingAccountName,

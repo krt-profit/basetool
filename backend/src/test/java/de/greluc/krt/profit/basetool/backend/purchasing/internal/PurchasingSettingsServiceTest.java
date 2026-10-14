@@ -106,9 +106,9 @@ class PurchasingSettingsServiceTest {
   }
 
   private static UpdatePurchasingSettingsRequest request(
-      boolean enabled, UUID area, UUID account, Set<UUID> tiers, long version) {
+      boolean enabled, Set<UUID> areas, UUID account, Set<UUID> tiers, long version) {
     return new UpdatePurchasingSettingsRequest(
-        enabled, area, account, 5_000L, 20_000L, BudgetPeriod.QUARTER, 14, tiers, version);
+        enabled, areas, account, 5_000L, 20_000L, BudgetPeriod.QUARTER, 14, tiers, version);
   }
 
   @Test
@@ -143,15 +143,16 @@ class PurchasingSettingsServiceTest {
   }
 
   @Test
-  void theGoverningAreaIdIsEmptyUntilOneIsSet() {
+  void theGoverningAreaIdsAreEmptyUntilOneIsSetAndSortedAfterwards() {
     PurchasingSetting setting = setting(0L);
     when(settingRepository.findById(PurchasingSetting.SINGLETON_ID))
         .thenReturn(Optional.of(setting));
-    assertThat(service.governingAreaId()).isEmpty();
+    assertThat(service.governingAreaIds()).isEmpty();
 
-    UUID area = UUID.randomUUID();
-    setting.setGoverningAreaId(area);
-    assertThat(service.governingAreaId()).contains(area);
+    UUID low = new UUID(0L, 1L);
+    UUID high = new UUID(0L, 2L);
+    setting.getGoverningAreaIds().addAll(Set.of(high, low));
+    assertThat(service.governingAreaIds()).containsExactly(low, high);
   }
 
   @Test
@@ -161,7 +162,7 @@ class PurchasingSettingsServiceTest {
     area.setName("Bereich Profit");
     UUID accountId = UUID.randomUUID();
     PurchasingSetting setting = setting(4L);
-    setting.setGoverningAreaId(area.getId());
+    setting.getGoverningAreaIds().add(area.getId());
     setting.setFundingAccountId(accountId);
     setting.setBudgetCap(9_000L);
     setting.setPaused(true);
@@ -172,14 +173,15 @@ class PurchasingSettingsServiceTest {
     when(settingRepository.findById(PurchasingSetting.SINGLETON_ID))
         .thenReturn(Optional.of(setting));
     when(systemSettings.getSettingValue(ENABLED_KEY)).thenReturn(Optional.of("true"));
-    when(orgUnitRepository.findById(area.getId())).thenReturn(Optional.of(area));
+    when(orgUnitRepository.findAllById(Set.of(area.getId()))).thenReturn(List.of(area));
     when(fundingAccounts.findActive(accountId))
         .thenReturn(Optional.of(new FundingAccountRef(accountId, "KRT-1", "KRT", "CARTEL")));
 
     PurchasingSettingsDto dto = service.read();
 
     assertThat(dto.enabled()).isTrue();
-    assertThat(dto.governingAreaName()).isEqualTo("Bereich Profit");
+    assertThat(dto.governingAreas())
+        .containsExactly(new PurchasingRefDto(area.getId(), "Bereich Profit"));
     assertThat(dto.fundingAccountNo()).isEqualTo("KRT-1");
     assertThat(dto.fundingAccountName()).isEqualTo("KRT");
     assertThat(dto.budgetCap()).isEqualTo(9_000L);
@@ -202,7 +204,7 @@ class PurchasingSettingsServiceTest {
     PurchasingSettingsDto dto = service.read();
 
     assertThat(dto.enabled()).isFalse();
-    assertThat(dto.governingAreaName()).isNull();
+    assertThat(dto.governingAreas()).isEmpty();
     assertThat(dto.fundingAccountId()).isEqualTo(setting.getFundingAccountId());
     assertThat(dto.fundingAccountNo()).isNull();
     assertThat(dto.fundingAccountName()).isNull();
@@ -220,6 +222,7 @@ class PurchasingSettingsServiceTest {
     when(settingRepository.findById(PurchasingSetting.SINGLETON_ID))
         .thenReturn(Optional.of(setting));
     when(orgUnitRepository.findById(area.getId())).thenReturn(Optional.of(area));
+    when(orgUnitRepository.findAllById(Set.of(area.getId()))).thenReturn(List.of(area));
     when(fundingAccounts.findActive(accountId))
         .thenReturn(Optional.of(new FundingAccountRef(accountId, "KRT-1", "KRT", "CARTEL")));
     when(qualityTierRepository.findAllById(tiers))
@@ -227,16 +230,18 @@ class PurchasingSettingsServiceTest {
     when(systemSettings.getSettingValue(ENABLED_KEY)).thenReturn(Optional.of("false"));
     when(settingRepository.saveAndFlush(setting)).thenReturn(setting);
 
-    PurchasingSettingsDto dto = service.update(request(true, area.getId(), accountId, tiers, 3L));
+    PurchasingSettingsDto dto =
+        service.update(request(true, Set.of(area.getId()), accountId, tiers, 3L));
 
-    assertThat(setting.getGoverningAreaId()).isEqualTo(area.getId());
+    assertThat(setting.getGoverningAreaIds()).containsExactly(area.getId());
     assertThat(setting.getFundingAccountId()).isEqualTo(accountId);
     assertThat(setting.getDefaultMonthlyLimit()).isEqualTo(5_000L);
     assertThat(setting.getBudgetCap()).isEqualTo(20_000L);
     assertThat(setting.getBudgetPeriod()).isEqualTo(BudgetPeriod.QUARTER);
     assertThat(setting.getSettlementDueDays()).isEqualTo(14);
     assertThat(setting.getAllowedQualityTierIds()).containsExactlyInAnyOrderElementsOf(tiers);
-    assertThat(dto.governingAreaName()).isEqualTo("Bereich Profit");
+    assertThat(dto.governingAreas())
+        .containsExactly(new PurchasingRefDto(area.getId(), "Bereich Profit"));
     verify(systemSettings).putSettingValue(ENABLED_KEY, "true");
     ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
     verify(auditRecorder)
@@ -253,7 +258,7 @@ class PurchasingSettingsServiceTest {
   @Test
   void anUpdateWithoutOptionalValuesClearsThemAndLooksNothingUp() {
     PurchasingSetting setting = setting(0L);
-    setting.setGoverningAreaId(UUID.randomUUID());
+    setting.getGoverningAreaIds().add(UUID.randomUUID());
     setting.setFundingAccountId(UUID.randomUUID());
     setting.getAllowedQualityTierIds().add(UUID.randomUUID());
     when(settingRepository.findById(PurchasingSetting.SINGLETON_ID))
@@ -263,7 +268,7 @@ class PurchasingSettingsServiceTest {
 
     PurchasingSettingsDto dto = service.update(request(false, null, null, null, 0L));
 
-    assertThat(setting.getGoverningAreaId()).isNull();
+    assertThat(setting.getGoverningAreaIds()).isEmpty();
     assertThat(setting.getFundingAccountId()).isNull();
     assertThat(setting.getAllowedQualityTierIds()).isEmpty();
     assertThat(dto.allowedQualityTierIds()).isEmpty();
@@ -294,7 +299,8 @@ class PurchasingSettingsServiceTest {
         .thenReturn(Optional.of(setting(0L)));
     when(orgUnitRepository.findById(squadron.getId())).thenReturn(Optional.of(squadron));
 
-    assertThatThrownBy(() -> service.update(request(true, squadron.getId(), null, null, 0L)))
+    assertThatThrownBy(
+            () -> service.update(request(true, Set.of(squadron.getId()), null, null, 0L)))
         .isInstanceOf(BadRequestException.class);
 
     verify(settingRepository, never()).saveAndFlush(any());

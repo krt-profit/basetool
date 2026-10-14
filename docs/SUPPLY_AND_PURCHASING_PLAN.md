@@ -624,8 +624,10 @@ Each step is one pull request (or a short stack), shippable alone, behind the fe
 - A donation has no anonymous mode (decided after the review): the receiving unit must know from whom
   the goods arrive in the game (REQ-SUP-012).
 
-- The governing Bereich of purchasing is a column of `purchasing_setting` and the switch
-  `purchasing.enabled` a system setting; supply keeps its own pair. The delegate's capability is the
+- The governing Bereiche of purchasing are a set (table `purchasing_setting_governing_area`, the Bereich
+  Profit by default) and the switch `purchasing.enabled` a system setting; supply keeps its own pair. Only
+  their Bereichsleiter and Bereichskoordinatoren govern, never a Bereichsoperator. The overdue notice names
+  the first governing Bereich as its context. The delegate's capability is the
   appointment row itself (ADR-0255).
 - The settlement is its own table with its own version, not a `deal.settlement_version` column; the
   deal header takes a pessimistic row lock for every state change and tranche, delivery, close and

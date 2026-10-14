@@ -88956,12 +88956,11 @@
           "fundingAccountNo" : {
             "type" : "string"
           },
-          "governingAreaId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "governingAreaName" : {
-            "type" : "string"
+          "governingAreas" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/PurchasingRefDto"
+            }
           },
           "pauseReason" : {
             "type" : "string",
@@ -91700,9 +91699,13 @@
             "type" : "string",
             "format" : "uuid"
           },
-          "governingAreaId" : {
-            "type" : "string",
-            "format" : "uuid"
+          "governingAreaIds" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "format" : "uuid"
+            },
+            "uniqueItems" : true
           },
           "settlementDueDays" : {
             "type" : "integer",

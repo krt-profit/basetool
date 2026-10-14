@@ -3,7 +3,6 @@ CREATE TABLE purchasing_setting (
     version               BIGINT                   NOT NULL DEFAULT 0,
     created_at            TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     updated_at            TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-    governing_area_id     UUID,
     funding_account_id    UUID,
     default_monthly_limit BIGINT                   NOT NULL DEFAULT 0,
     budget_cap            BIGINT,
@@ -13,17 +12,30 @@ CREATE TABLE purchasing_setting (
     pause_reason          VARCHAR(32),
     paused_by             UUID,
     paused_at             TIMESTAMP WITH TIME ZONE,
-    CONSTRAINT fk_purchasing_setting_area FOREIGN KEY (governing_area_id) REFERENCES org_unit (id) ON DELETE SET NULL,
     CONSTRAINT fk_purchasing_setting_paused_by FOREIGN KEY (paused_by) REFERENCES app_user (id) ON DELETE SET NULL,
     CONSTRAINT chk_purchasing_setting_limit CHECK (default_monthly_limit >= 0),
     CONSTRAINT chk_purchasing_setting_cap CHECK (budget_cap IS NULL OR budget_cap >= 0),
     CONSTRAINT chk_purchasing_setting_due CHECK (settlement_due_days BETWEEN 1 AND 90)
 );
 
-CREATE INDEX idx_purchasing_setting_area ON purchasing_setting (governing_area_id);
 CREATE INDEX idx_purchasing_setting_paused_by ON purchasing_setting (paused_by);
 
 INSERT INTO purchasing_setting (id) VALUES ('00000000-0000-0000-0000-0000000a0001');
+
+CREATE TABLE purchasing_setting_governing_area (
+    setting_id UUID NOT NULL,
+    area_id    UUID NOT NULL,
+    PRIMARY KEY (setting_id, area_id),
+    CONSTRAINT fk_purchasing_governing_area_setting FOREIGN KEY (setting_id) REFERENCES purchasing_setting (id) ON DELETE CASCADE,
+    CONSTRAINT fk_purchasing_governing_area_unit FOREIGN KEY (area_id) REFERENCES org_unit (id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_purchasing_governing_area_unit ON purchasing_setting_governing_area (area_id);
+
+INSERT INTO purchasing_setting_governing_area (setting_id, area_id)
+SELECT '00000000-0000-0000-0000-0000000a0001', id
+FROM org_unit
+WHERE kind = 'BEREICH' AND department = 'PROFIT';
 
 CREATE TABLE purchasing_setting_allowed_tier (
     setting_id      UUID NOT NULL,

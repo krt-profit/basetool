@@ -111,6 +111,7 @@ purchasing_partner purchasing
 purchasing_risk_class purchasing
 purchasing_setting purchasing
 purchasing_setting_allowed_tier purchasing
+purchasing_setting_governing_area purchasing
 purchasing_unit_pause purchasing
 quality_tier catalogue
 rank_requirement promotion

@@ -532,7 +532,7 @@ class PurchasingPageControllerTest {
   void adminSettingsOffersOnlyBereicheAndActiveTiersAndEvictsTheFeatureState() {
     PurchasingSettingsDto settings =
         new PurchasingSettingsDto(
-            true, null, null, null, null, null, 0L, null, "MONTH", 14, List.of(), false, null, 1L);
+            true, List.of(), null, null, null, 0L, null, "MONTH", 14, List.of(), false, null, 1L);
     QualityTierDto active =
         new QualityTierDto(UUID.randomUUID(), "HIGH", 700, "Hoch", "High", 1, true, 1L);
     QualityTierDto retired =

@@ -20,6 +20,10 @@
 package de.greluc.krt.profit.basetool.backend.purchasing.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -79,7 +83,7 @@ class PurchasingAccessPolicyTest {
   private void noLeadership() {
     when(authHelperService.isAdmin()).thenReturn(false);
     when(ownerScopeService.currentUserIsOlMember()).thenReturn(false);
-    when(settingsService.governingAreaId()).thenReturn(Optional.empty());
+    when(settingsService.governingAreaIds()).thenReturn(List.of());
   }
 
   private void noBankRole() {
@@ -111,14 +115,45 @@ class PurchasingAccessPolicyTest {
   }
 
   @Test
-  void theLeaderOfTheGoverningBereichGovernsAndAnyoneElseDoesNot() {
+  void theLeaderOfAGoverningBereichGoverns() {
     when(authHelperService.isAdmin()).thenReturn(false);
     when(ownerScopeService.currentUserIsOlMember()).thenReturn(false);
-    when(settingsService.governingAreaId()).thenReturn(Optional.of(AREA));
+    when(settingsService.governingAreaIds()).thenReturn(List.of(AREA));
     when(ownerScopeService.currentUserHoldsRoleOnOrgUnit(AREA, MembershipRole.BEREICHSLEITER))
         .thenReturn(true);
 
     assertThat(policy.isGoverningLeadership()).isTrue();
+  }
+
+  @Test
+  void aCoordinatorOfAnyGoverningBereichGoverns() {
+    UUID other = UUID.randomUUID();
+    when(authHelperService.isAdmin()).thenReturn(false);
+    when(ownerScopeService.currentUserIsOlMember()).thenReturn(false);
+    when(settingsService.governingAreaIds()).thenReturn(List.of(AREA, other));
+    when(ownerScopeService.currentUserHoldsRoleOnOrgUnit(any(), eq(MembershipRole.BEREICHSLEITER)))
+        .thenReturn(false);
+    when(ownerScopeService.currentUserHoldsRoleOnOrgUnit(AREA, MembershipRole.BEREICHSKOORDINATOR))
+        .thenReturn(false);
+    when(ownerScopeService.currentUserHoldsRoleOnOrgUnit(other, MembershipRole.BEREICHSKOORDINATOR))
+        .thenReturn(true);
+
+    assertThat(policy.isGoverningLeadership()).isTrue();
+  }
+
+  @Test
+  void anOperatorOfAGoverningBereichDoesNotGovern() {
+    when(authHelperService.isAdmin()).thenReturn(false);
+    when(ownerScopeService.currentUserIsOlMember()).thenReturn(false);
+    when(settingsService.governingAreaIds()).thenReturn(List.of(AREA));
+    when(ownerScopeService.currentUserHoldsRoleOnOrgUnit(AREA, MembershipRole.BEREICHSLEITER))
+        .thenReturn(false);
+    when(ownerScopeService.currentUserHoldsRoleOnOrgUnit(AREA, MembershipRole.BEREICHSKOORDINATOR))
+        .thenReturn(false);
+
+    assertThat(policy.isGoverningLeadership()).isFalse();
+    verify(ownerScopeService, never())
+        .currentUserHoldsRoleOnOrgUnit(AREA, MembershipRole.BEREICHSOPERATOR);
   }
 
   @Test
@@ -132,8 +167,10 @@ class PurchasingAccessPolicyTest {
   void aCallerWhoLeadsOtherUnitsOnlyDoesNotGovern() {
     when(authHelperService.isAdmin()).thenReturn(false);
     when(ownerScopeService.currentUserIsOlMember()).thenReturn(false);
-    when(settingsService.governingAreaId()).thenReturn(Optional.of(AREA));
+    when(settingsService.governingAreaIds()).thenReturn(List.of(AREA));
     when(ownerScopeService.currentUserHoldsRoleOnOrgUnit(AREA, MembershipRole.BEREICHSLEITER))
+        .thenReturn(false);
+    when(ownerScopeService.currentUserHoldsRoleOnOrgUnit(AREA, MembershipRole.BEREICHSKOORDINATOR))
         .thenReturn(false);
 
     assertThat(policy.isGoverningLeadership()).isFalse();

@@ -86,7 +86,7 @@ class PurchasingDealFlowE2eTest {
             USERNAME,
             PASSWORD,
             "/api/v1/supply/admin/settings",
-            "{\"enabled\":true,\"governingAreaId\":null}");
+            "{\"enabled\":true,\"governingAreaIds\":[]}");
     assertTrue(supply >= 200 && supply < 300, "the supply switch must be settable: " + supply);
     int unit =
         seeder.putForStatus(
@@ -108,7 +108,7 @@ class PurchasingDealFlowE2eTest {
             USERNAME,
             PASSWORD,
             "/api/v1/purchasing/admin/settings",
-            "{\"enabled\":true,\"governingAreaId\":null,\"fundingAccountId\":\""
+            "{\"enabled\":true,\"governingAreaIds\":[],\"fundingAccountId\":\""
                 + account
                 + "\",\"defaultMonthlyLimit\":100000000,\"budgetCap\":null,\"budgetPeriod\":\"MONTH\","
                 + "\"settlementDueDays\":7,\"allowedQualityTierIds\":"

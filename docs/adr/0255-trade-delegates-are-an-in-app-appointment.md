@@ -20,7 +20,8 @@ with which limit.
 
 The HB capability is an **in-app appointment**, a row in `purchasing_delegate`, not a Keycloak role:
 
-- The Bereichsleiter of the governing Bereich, the members of the Organisationsleitung and an admin
+- The Bereichsleiter and the Bereichskoordinatoren of the governing Bereiche, the members of the
+  Organisationsleitung and an admin
   appoint and revoke it in the tool, with an optional end date and an optional personal monthly limit.
 - The capability is the row itself: not revoked and not past its end date. The check runs on every
   request, so a revocation or an expiry takes effect at once, with no re-login.

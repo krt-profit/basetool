@@ -86,7 +86,7 @@ class SettlementOverdueNoticeProducerTest {
     PurchasingDeal lost = deal(8L);
     PurchasingDeal third = deal(9L);
     when(settingsService.isEnabled()).thenReturn(true);
-    when(settingsService.governingAreaId()).thenReturn(Optional.of(AREA));
+    when(settingsService.governingAreaIds()).thenReturn(List.of(AREA));
     when(dealRepository.findOverdueNotYetAnnouncedIds(eq(NOW), any(Limit.class)))
         .thenReturn(List.of(first.getId(), lost.getId(), third.getId()));
     when(dealRepository.markOverdueNotified(first.getId(), NOW)).thenReturn(1);
@@ -120,7 +120,7 @@ class SettlementOverdueNoticeProducerTest {
   void aDealThatVanishedAfterTheMarkerIsNotCounted() {
     UUID id = UUID.randomUUID();
     when(settingsService.isEnabled()).thenReturn(true);
-    when(settingsService.governingAreaId()).thenReturn(Optional.empty());
+    when(settingsService.governingAreaIds()).thenReturn(List.of());
     when(dealRepository.findOverdueNotYetAnnouncedIds(eq(NOW), any(Limit.class)))
         .thenReturn(List.of(id));
     when(dealRepository.markOverdueNotified(id, NOW)).thenReturn(1);
@@ -135,7 +135,7 @@ class SettlementOverdueNoticeProducerTest {
   void withoutAGoverningAreaTheNoticeCarriesNoOrgUnitContext() {
     PurchasingDeal deal = deal(3L);
     when(settingsService.isEnabled()).thenReturn(true);
-    when(settingsService.governingAreaId()).thenReturn(Optional.empty());
+    when(settingsService.governingAreaIds()).thenReturn(List.of());
     when(dealRepository.findOverdueNotYetAnnouncedIds(eq(NOW), any(Limit.class)))
         .thenReturn(List.of(deal.getId()));
     when(dealRepository.markOverdueNotified(deal.getId(), NOW)).thenReturn(1);

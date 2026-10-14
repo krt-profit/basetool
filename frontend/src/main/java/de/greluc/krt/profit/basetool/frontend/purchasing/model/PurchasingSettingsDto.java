@@ -28,8 +28,7 @@ import java.util.UUID;
  * Frontend mirror of the backend {@code PurchasingSettingsDto}; must match it field for field.
  *
  * @param enabled whether the surface is on
- * @param governingAreaId the governing Bereich
- * @param governingAreaName its name
+ * @param governingAreas the governing Bereiche
  * @param fundingAccountId the funding account
  * @param fundingAccountNo its number
  * @param fundingAccountName its name
@@ -45,8 +44,7 @@ import java.util.UUID;
 @DtoMirror
 public record PurchasingSettingsDto(
     boolean enabled,
-    UUID governingAreaId,
-    String governingAreaName,
+    List<PurchasingRefDto> governingAreas,
     UUID fundingAccountId,
     String fundingAccountNo,
     String fundingAccountName,
@@ -57,4 +55,16 @@ public record PurchasingSettingsDto(
     List<UUID> allowedQualityTierIds,
     boolean paused,
     @BackendEnumAsString String pauseReason,
-    Long version) {}
+    Long version) {
+
+  /**
+   * Whether a Bereich is one of the governing Bereiche.
+   *
+   * @param areaId the Bereich
+   * @return {@code true} when its leadership governs purchasing
+   */
+  public boolean governs(UUID areaId) {
+    return governingAreas != null
+        && governingAreas.stream().anyMatch(area -> area.id().equals(areaId));
+  }
+}

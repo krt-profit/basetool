@@ -79,8 +79,9 @@ public class PurchasingAccessPolicy {
   }
 
   /**
-   * Whether the caller leads the governing Bereich, belongs to the Organisationsleitung or is an
-   * admin: the circle that governs purchasing.
+   * Whether the caller is a Bereichsleiter or Bereichskoordinator of a governing Bereich, belongs
+   * to the Organisationsleitung or is an admin: the circle that governs purchasing. A
+   * Bereichsoperator does not govern.
    *
    * @return {@code true} for the governing leadership
    */
@@ -88,13 +89,14 @@ public class PurchasingAccessPolicy {
     if (authHelperService.isAdmin() || ownerScopeService.currentUserIsOlMember()) {
       return true;
     }
-    return settingsService
-        .governingAreaId()
-        .map(
-            area ->
-                ownerScopeService.currentUserHoldsRoleOnOrgUnit(
-                    area, MembershipRole.BEREICHSLEITER))
-        .orElse(false);
+    for (UUID area : settingsService.governingAreaIds()) {
+      if (ownerScopeService.currentUserHoldsRoleOnOrgUnit(area, MembershipRole.BEREICHSLEITER)
+          || ownerScopeService.currentUserHoldsRoleOnOrgUnit(
+              area, MembershipRole.BEREICHSKOORDINATOR)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**

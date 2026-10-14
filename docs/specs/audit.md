@@ -283,7 +283,7 @@ web, naming its client (REQ-AUDIT-005):
   `NEED_FULFILLED` (written in the statement that covers the need), `DONATION_PLEDGED`,
   `DONATION_RECEIVED`, `DONATION_DECLINED`, `DONATION_WITHDRAWN`, `DONATION_RECORDED`,
   `SUPPLY_UNIT_SETTING_CHANGED` (the flags before and after) and `SUPPLY_SETTINGS_CHANGED` (the
-  switch and the governing Bereich). The details carry ids, enums, amounts and tier codes, never a
+  switch and the number of governing Bereiche). The details carry ids, enums, amounts and tier codes, never a
   name; the donor of a donation is its target user. The stock movement of a receipt additionally
   audits in the Lager area through `StockCommands`.
 - **Ankauf** (`PurchasingDeal`, `PurchasingPartner`, `PurchasingDelegate`, `PurchasingSetting`,

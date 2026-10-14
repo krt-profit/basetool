@@ -44,7 +44,7 @@ import org.hibernate.annotations.OptimisticLock;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The single row of purchasing settings (REQ-PUR-002): the governing Bereich, the funding account,
+ * The single row of purchasing settings (REQ-PUR-002): the governing Bereiche, the funding account,
  * the delegates' default limit, the budget cap and its period, the settlement due days, the global
  * pause and the quality tiers purchasing may buy.
  */
@@ -63,10 +63,16 @@ public class PurchasingSetting extends AbstractEntity<UUID> {
   @Id
   private UUID id;
 
-  /** The Bereich whose leadership governs purchasing, or {@code null} until an admin sets it. */
-  @Nullable
-  @Column(name = "governing_area_id")
-  private UUID governingAreaId;
+  /**
+   * The Bereiche whose Bereichsleiter and Bereichskoordinatoren govern purchasing; the Bereich
+   * Profit until an admin changes it.
+   */
+  @ElementCollection(fetch = FetchType.EAGER)
+  @CollectionTable(
+      name = "purchasing_setting_governing_area",
+      joinColumns = @JoinColumn(name = "setting_id"))
+  @Column(name = "area_id")
+  private Set<UUID> governingAreaIds = new HashSet<>();
 
   /** The bank account tranches are paid from, a plain id into the bank module. */
   @Nullable
