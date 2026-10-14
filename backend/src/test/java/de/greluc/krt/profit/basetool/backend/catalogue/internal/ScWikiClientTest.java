@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiRes
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.RestClientConfig;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
+import io.micrometer.core.instrument.observation.DefaultMeterObservationHandler;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import java.util.ArrayList;
@@ -634,7 +635,8 @@ class ScWikiClientTest {
 
     ScWikiBlueprintDto detail =
         client.fetchOne(
-            "/api/blueprints/00000000-0000-0000-0000-0000000000bb",
+            "/api/blueprints",
+            "00000000-0000-0000-0000-0000000000bb",
             ScWikiBlueprintDto.class,
             "blueprint");
 
@@ -653,7 +655,8 @@ class ScWikiClientTest {
 
     ScWikiBlueprintDto detail =
         client.fetchOne(
-            "/api/blueprints/00000000-0000-0000-0000-0000000000cc",
+            "/api/blueprints",
+            "00000000-0000-0000-0000-0000000000cc",
             ScWikiBlueprintDto.class,
             "blueprint");
 
@@ -662,11 +665,40 @@ class ScWikiClientTest {
   }
 
   @Test
+  void fetchOne_tagsTheHttpClientRequestsWithTheEndpointTemplateNotTheResourceId()
+      throws Exception {
+    SimpleMeterRegistry observed = new SimpleMeterRegistry();
+    ObservationRegistry observationRegistry = ObservationRegistry.create();
+    observationRegistry
+        .observationConfig()
+        .observationHandler(new DefaultMeterObservationHandler(observed));
+    ScWikiClient observedClient =
+        new ScWikiClient(
+            new RestClientConfig().restClientBuilder(observationRegistry),
+            properties,
+            meterRegistry);
+    observedClient.initClient();
+    server.enqueue(jsonOk("{\"uuid\":\"a\"}"));
+    server.enqueue(jsonOk("{\"uuid\":\"b\"}"));
+
+    observedClient.fetchOne("/api/items", "uuid-a", ScWikiBlueprintDto.class, "item");
+    observedClient.fetchOne("/api/items", "uuid-b", ScWikiBlueprintDto.class, "item");
+
+    assertEquals(
+        List.of("/api/items/{id}"),
+        observed.find("http.client.requests").timers().stream()
+            .map(timer -> timer.getId().getTag("uri"))
+            .distinct()
+            .toList(),
+        "one uri tag per endpoint template, never one per resource id");
+  }
+
+  @Test
   void fetchOne_notFound_returnsNull() {
     server.enqueue(new MockResponse().setResponseCode(404));
 
     ScWikiBlueprintDto detail =
-        client.fetchOne("/api/blueprints/missing", ScWikiBlueprintDto.class, "blueprint");
+        client.fetchOne("/api/blueprints", "missing", ScWikiBlueprintDto.class, "blueprint");
 
     assertNull(detail, "404 must resolve to null (Wiki doesn't know this one), not throw");
   }
