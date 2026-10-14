@@ -28,7 +28,6 @@ import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyProblemCode;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyProblemException;
 import java.util.Optional;
@@ -58,7 +57,6 @@ public class SupplySettingsService {
   private final SystemSettings systemSettings;
   private final OrgUnitRepository orgUnitRepository;
   private final AuditRecorder auditRecorder;
-  private final AuthHelperService authHelperService;
 
   /**
    * Whether the supply surface is switched on.

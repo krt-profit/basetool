@@ -34,7 +34,6 @@ import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
-import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyProblemCode;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyProblemException;
 import java.util.Optional;
@@ -52,15 +51,12 @@ class SupplySettingsServiceTest {
   @Mock private SystemSettings systemSettings;
   @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private AuditRecorder auditRecorder;
-  @Mock private AuthHelperService authHelperService;
 
   private SupplySettingsService service;
 
   @BeforeEach
   void setUp() {
-    service =
-        new SupplySettingsService(
-            systemSettings, orgUnitRepository, auditRecorder, authHelperService);
+    service = new SupplySettingsService(systemSettings, orgUnitRepository, auditRecorder);
   }
 
   @Test

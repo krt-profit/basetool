@@ -499,7 +499,7 @@ public class InventoryStockCommands implements StockCommands {
         donationAllocationRepository.findByDonationId(donationId)) {
       InventoryItem row = slice.getInventoryItem();
       double released = slice.getAmount() == null ? 0.0 : slice.getAmount();
-      row.getDonationAllocations().remove(slice);
+      row.removeDonationAllocation(slice);
       inventoryRepository.saveAndFlush(row);
       auditRecorder.record(
           AuditEventType.INVENTORY_ALLOCATION_REMOVED,

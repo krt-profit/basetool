@@ -170,7 +170,7 @@ public final class InventoryAllocations {
     slice.setInventoryItem(item);
     slice.setDonationId(donationId);
     slice.setAmount(amount);
-    item.getDonationAllocations().add(slice);
+    item.addDonationAllocation(slice);
     return slice;
   }
 

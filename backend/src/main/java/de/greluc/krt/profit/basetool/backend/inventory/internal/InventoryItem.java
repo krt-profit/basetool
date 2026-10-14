@@ -44,8 +44,10 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.validation.constraints.Min;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -54,6 +56,7 @@ import lombok.ToString;
 import org.hibernate.annotations.BatchSize;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.UnmodifiableView;
 
 /**
  * One warehouse stock row, either a material row ({@link #material} and {@link #quality}) or a game
@@ -164,7 +167,38 @@ public class InventoryItem extends AbstractEntity<UUID> implements StockRow {
   @BatchSize(size = 100)
   @OrderBy("createdAt ASC, id ASC")
   @ToString.Exclude
+  @Getter(AccessLevel.NONE)
   private List<InventoryDonationAllocation> donationAllocations = new ArrayList<>();
+
+  /**
+   * Returns the donation slices as a read-only view; a slice is added or removed only through
+   * {@link #addDonationAllocation} and {@link #removeDonationAllocation}.
+   *
+   * @return the unmodifiable view of the slices, oldest first
+   */
+  @UnmodifiableView
+  public List<InventoryDonationAllocation> getDonationAllocations() {
+    return Collections.unmodifiableList(donationAllocations);
+  }
+
+  /**
+   * Adds a donation slice to this entry.
+   *
+   * @param slice the slice, already pointing at this entry
+   */
+  public void addDonationAllocation(InventoryDonationAllocation slice) {
+    donationAllocations.add(slice);
+  }
+
+  /**
+   * Removes a donation slice from this entry; the orphan removal deletes its row.
+   *
+   * @param slice the slice
+   * @return {@code true} when the entry held the slice
+   */
+  public boolean removeDonationAllocation(InventoryDonationAllocation slice) {
+    return donationAllocations.remove(slice);
+  }
 
   @Column(name = "note", length = 1000)
   @Nullable

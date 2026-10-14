@@ -111,13 +111,12 @@ class InventoryItemMapperTest {
     InventoryAllocations.addJobOrder(item, jobOrder.getId(), item.getAmount(), true);
     InventoryAllocations.addMission(item, mission.getId(), item.getAmount());
     UUID donationId = UUID.randomUUID();
-    item.getDonationAllocations()
-        .add(
-            InventoryDonationAllocation.builder()
-                .inventoryItem(item)
-                .donationId(donationId)
-                .amount(4.0)
-                .build());
+    item.addDonationAllocation(
+        InventoryDonationAllocation.builder()
+            .inventoryItem(item)
+            .donationId(donationId)
+            .amount(4.0)
+            .build());
     InventoryEarmarkLookup targets =
         new InventoryEarmarkLookup() {
           @Override
