@@ -49,7 +49,8 @@ public final class AuditDomains {
           "HANGAR",
           "BLUEPRINT",
           "CONNECTED_APPS",
-          "SUPPLY");
+          "SUPPLY",
+          "PURCHASING");
 
   /** Non-instantiable holder of the shared tab list. */
   private AuditDomains() {}

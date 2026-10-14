@@ -223,7 +223,7 @@ public class PurchasingSettingsService {
       byCode.put(riskClass.getCode().name(), riskClass);
     }
     AuditDetails details = AuditDetails.of("classes", request.classes().size());
-    for (UpdateRiskClassesRequest.Entry entry : request.classes()) {
+    for (UpdateRiskClassesRequest.UpdateRiskClassEntry entry : request.classes()) {
       PurchasingRiskClass riskClass = byCode.get(entry.code().name());
       if (riskClass == null) {
         throw new BadRequestException("Unknown risk class");

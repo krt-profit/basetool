@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<nav th:fragment="tabs(active)" class="tab-nav purchasing-tabs" th:aria-label="#{purchasing.title}" data-testid="purchasing-tabs">
+    <a th:href="@{/purchasing/deals}" class="tab" th:classappend="${active == 'deals'} ? 'active'"
+       th:attr="aria-current=${active == 'deals'} ? 'page' : null" data-testid="purchasing-tab-deals"
+       th:text="#{purchasing.tab.deals}">Gesch&auml;fte</a>
+    <a th:if="${purchasingTabs.partners()}" th:href="@{/purchasing/partners}" class="tab"
+       th:classappend="${active == 'partners'} ? 'active'"
+       th:attr="aria-current=${active == 'partners'} ? 'page' : null" data-testid="purchasing-tab-partners"
+       th:text="#{purchasing.tab.partners}">Partner</a>
+    <a th:if="${purchasingTabs.delegates()}" th:href="@{/purchasing/delegates}" class="tab"
+       th:classappend="${active == 'delegates'} ? 'active'"
+       th:attr="aria-current=${active == 'delegates'} ? 'page' : null" data-testid="purchasing-tab-delegates"
+       th:text="#{purchasing.tab.delegates}">Handelsbeauftragte</a>
+    <a th:if="${purchasingTabs.report()}" th:href="@{/purchasing/report}" class="tab"
+       th:classappend="${active == 'report'} ? 'active'"
+       th:attr="aria-current=${active == 'report'} ? 'page' : null" data-testid="purchasing-tab-report"
+       th:text="#{purchasing.tab.report}">Bericht</a>
+</nav>
+</body>
+</html>

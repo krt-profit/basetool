@@ -114,6 +114,7 @@
 /admin/personal-inventory/{userSub}/add POST -> AdminPersonalInventoryPageController#add gate=class:hasRole('ADMIN') layout=yes
 /admin/personal-inventory/{userSub}/{id}/delete POST -> AdminPersonalInventoryPageController#delete gate=class:hasRole('ADMIN') layout=yes
 /admin/personal-inventory/{userSub}/{id}/update POST -> AdminPersonalInventoryPageController#update gate=class:hasRole('ADMIN') layout=yes
+/admin/purchasing GET -> PurchasingPageController#adminSettings gate=method:hasRole('ADMIN') layout=yes
 /admin/quality-tiers GET -> AdminQualityTiersPageController#list gate=class:hasRole('ADMIN') layout=yes
 /admin/quality-tiers POST headers=[X-Requested-With=XMLHttpRequest] -> AdminQualityTiersRelayController#create gate=class:hasRole('ADMIN') layout=no
 /admin/quality-tiers/{id} POST headers=[X-Requested-With=XMLHttpRequest] -> AdminQualityTiersRelayController#update gate=class:hasRole('ADMIN') layout=no
@@ -211,6 +212,28 @@
 /api/proxy/promotion/topics POST -> PromotionProxyController#createTopic gate=method:hasAnyRole('ADMIN','OFFICER') layout=no
 /api/proxy/promotion/topics/{id} DELETE -> PromotionProxyController#deleteTopic gate=method:hasAnyRole('ADMIN','OFFICER') layout=no
 /api/proxy/promotion/topics/{id} PUT -> PromotionProxyController#updateTopic gate=method:hasAnyRole('ADMIN','OFFICER') layout=no
+/api/proxy/purchasing/admin/risk-classes PUT -> PurchasingProxyController#updateRiskClasses gate=method:hasRole('ADMIN') layout=no
+/api/proxy/purchasing/admin/settings PUT -> PurchasingProxyController#updateSettings gate=method:hasRole('ADMIN') layout=no
+/api/proxy/purchasing/deals POST -> PurchasingProxyController#createDeal gate=class:isAuthenticated() layout=no
+/api/proxy/purchasing/deals/{id} PUT -> PurchasingProxyController#updateDeal gate=class:isAuthenticated() layout=no
+/api/proxy/purchasing/deals/{id}/cancel POST -> PurchasingProxyController#cancelDeal gate=class:isAuthenticated() layout=no
+/api/proxy/purchasing/deals/{id}/close-delivery POST -> PurchasingProxyController#closeDelivery gate=class:isAuthenticated() layout=no
+/api/proxy/purchasing/deals/{id}/deliveries POST -> PurchasingProxyController#recordDelivery gate=class:isAuthenticated() layout=no
+/api/proxy/purchasing/deals/{id}/deliveries/{deliveryId}/accept POST -> PurchasingProxyController#acceptDelivery gate=class:isAuthenticated() layout=no
+/api/proxy/purchasing/deals/{id}/settlement PUT -> PurchasingProxyController#settle gate=class:isAuthenticated() layout=no
+/api/proxy/purchasing/deals/{id}/tranches POST -> PurchasingProxyController#requestTranche gate=class:isAuthenticated() layout=no
+/api/proxy/purchasing/delegates POST -> PurchasingProxyController#appoint gate=class:isAuthenticated() layout=no
+/api/proxy/purchasing/delegates/{id}/limit PUT -> PurchasingProxyController#setLimit gate=class:isAuthenticated() layout=no
+/api/proxy/purchasing/delegates/{id}/revoke POST -> PurchasingProxyController#revoke gate=class:isAuthenticated() layout=no
+/api/proxy/purchasing/partners POST -> PurchasingProxyController#createPartner gate=class:isAuthenticated() layout=no
+/api/proxy/purchasing/partners/{id} PUT -> PurchasingProxyController#updatePartner gate=class:isAuthenticated() layout=no
+/api/proxy/purchasing/partners/{id}/block POST -> PurchasingProxyController#blockPartner gate=class:isAuthenticated() layout=no
+/api/proxy/purchasing/partners/{id}/erase POST -> PurchasingProxyController#erasePartner gate=class:isAuthenticated() layout=no
+/api/proxy/purchasing/partners/{id}/unblock POST -> PurchasingProxyController#unblockPartner gate=class:isAuthenticated() layout=no
+/api/proxy/purchasing/pause POST -> PurchasingProxyController#pause gate=class:isAuthenticated() layout=no
+/api/proxy/purchasing/pause/resume POST -> PurchasingProxyController#resume gate=class:isAuthenticated() layout=no
+/api/proxy/purchasing/report/export GET -> PurchasingProxyController#exportReport gate=class:isAuthenticated() layout=no
+/api/proxy/purchasing/report/forum-text GET -> PurchasingProxyController#forumText gate=class:isAuthenticated() layout=no
 /api/proxy/special-commands/{id}/profit-eligible PATCH -> SpecialCommandAdminProxyController#setProfitEligible gate=method:hasRole('ADMIN') layout=no
 /api/proxy/squadrons/{id}/profit-eligible PATCH -> SquadronAdminProxyController#setProfitEligible gate=method:hasRole('ADMIN') layout=no
 /api/proxy/squadrons/{id}/promotion-enabled PATCH -> SquadronAdminProxyController#setPromotionEnabled gate=method:hasRole('ADMIN') layout=no
@@ -525,6 +548,11 @@
 /promotion/manage GET -> PromotionPageController#manage gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
 /promotion/my-evaluations GET -> PromotionPageController#myEvaluations gate=class:isAuthenticated() layout=yes
 /promotion/overview GET -> PromotionPageController#overview gate=class:isAuthenticated() layout=yes
+/purchasing/deals GET -> PurchasingPageController#deals gate=class:isAuthenticated() layout=yes
+/purchasing/deals/{id} GET -> PurchasingPageController#deal gate=class:isAuthenticated() layout=yes
+/purchasing/delegates GET -> PurchasingPageController#delegates gate=class:isAuthenticated() layout=yes
+/purchasing/partners GET -> PurchasingPageController#partners gate=class:isAuthenticated() layout=yes
+/purchasing/report GET -> PurchasingPageController#report gate=class:isAuthenticated() layout=yes
 /refinery-orders GET -> RefineryOrderPageController#viewOrders gate=method:isAuthenticated() layout=yes
 /refinery-orders/create GET -> RefineryOrderPageController#viewCreateForm gate=method:isAuthenticated() layout=yes
 /refinery-orders/create POST -> RefineryOrderWriteController#createOrder gate=method:isAuthenticated() layout=yes

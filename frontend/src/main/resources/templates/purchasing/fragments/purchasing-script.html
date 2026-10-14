@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="purchasingBootstrap">
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    var purchasingI18n = {
+        dealSaved:        /*[[#{purchasing.deal.saved}]]*/ 'Geschäft gespeichert.',
+        dealCancelled:    /*[[#{purchasing.deal.cancelled}]]*/ 'Geschäft storniert.',
+        dealError:        /*[[#{purchasing.deal.error}]]*/ 'Das Geschäft konnte nicht gespeichert werden.',
+        trancheRequested: /*[[#{purchasing.tranche.requested}]]*/ 'Mittel angefordert.',
+        trancheError:     /*[[#{purchasing.tranche.error}]]*/ 'Die Mittel konnten nicht angefordert werden.',
+        deliveryRecorded: /*[[#{purchasing.delivery.recorded}]]*/ 'Lieferung erfasst.',
+        deliveryDecided:  /*[[#{purchasing.delivery.decided}]]*/ 'Lieferung entschieden.',
+        deliveryClosed:   /*[[#{purchasing.delivery.closed}]]*/ 'Lieferung abgeschlossen.',
+        deliveryError:    /*[[#{purchasing.delivery.error}]]*/ 'Die Aktion konnte nicht ausgeführt werden.',
+        settled:          /*[[#{purchasing.settlement.saved}]]*/ 'Abrechnung gespeichert.',
+        settleError:      /*[[#{purchasing.settlement.error}]]*/ 'Die Abrechnung konnte nicht gespeichert werden.',
+        partnerSaved:     /*[[#{purchasing.partner.saved}]]*/ 'Partner gespeichert.',
+        partnerChanged:   /*[[#{purchasing.partner.changed}]]*/ 'Partner aktualisiert.',
+        partnerError:     /*[[#{purchasing.partner.error}]]*/ 'Der Partner konnte nicht gespeichert werden.',
+        delegateSaved:    /*[[#{purchasing.delegate.saved}]]*/ 'Handelsbeauftragte gespeichert.',
+        delegateError:    /*[[#{purchasing.delegate.error}]]*/ 'Die Aktion konnte nicht ausgeführt werden.',
+        paused:           /*[[#{purchasing.pause.paused}]]*/ 'Ankauf pausiert.',
+        resumed:          /*[[#{purchasing.pause.resumed}]]*/ 'Ankauf fortgesetzt.',
+        pauseError:       /*[[#{purchasing.pause.error}]]*/ 'Die Aktion konnte nicht ausgeführt werden.',
+        settingsSaved:    /*[[#{purchasing.admin.saved}]]*/ 'Gespeichert.',
+        settingsError:    /*[[#{purchasing.admin.error}]]*/ 'Speichern fehlgeschlagen.',
+        forumCopied:      /*[[#{purchasing.report.forum.copied}]]*/ 'Forumtext kopiert.',
+        forumError:       /*[[#{purchasing.report.forum.error}]]*/ 'Der Forumtext konnte nicht geladen werden.',
+        eraseTitle:       /*[[#{purchasing.partner.erase.title}]]*/ 'Partner löschen',
+        eraseConfirm:     /*[[#{purchasing.partner.erase.confirm}]]*/ 'Handle und Notizen unwiderruflich löschen? Die Geschäfte bleiben erhalten.',
+        eraseAction:      /*[[#{purchasing.partner.erase}]]*/ 'Löschen',
+        needHint:         /*[[#{purchasing.deal.needHint}]]*/ '{0}: offen {1}, Höchstpreis {2} aUEC'
+    };
+    var purchasingConflict = {
+        title:                /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt',
+        reloadDetailFallback: /*[[#{frontend.ajax.conflict.detail}]]*/ 'Bitte neu laden.',
+        reloadLabel:          /*[[#{frontend.ajax.conflict.reload}]]*/ 'Aktuelle Werte laden',
+        dismissLabel:         /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schliessen',
+        reloadQuestion:       /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
+    };
+</script>
+</th:block>
+</body>
+</html>

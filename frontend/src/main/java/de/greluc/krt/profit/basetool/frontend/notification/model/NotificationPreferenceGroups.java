@@ -61,6 +61,7 @@ public final class NotificationPreferenceGroups {
     prefixes.put("MATERIAL_", "market");
     prefixes.put("INVENTORY_", "inventory");
     prefixes.put("SUPPLY_", "supply");
+    prefixes.put("PURCHASING_", "purchasing");
     prefixes.put("EXCHANGE_", "connectedApps");
     prefixes.put("DISCORD_", "account");
     prefixes.put("ACCOUNT_DELETION_", "account");

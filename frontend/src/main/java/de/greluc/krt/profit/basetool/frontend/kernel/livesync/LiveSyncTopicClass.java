@@ -267,7 +267,15 @@ public enum LiveSyncTopicClass {
       false,
       "supply_donations",
       "/api/v1/supply/donations?orgUnitId={id}&size=1",
-      null);
+      null),
+
+  /**
+   * Global purchasing room for {@code /purchasing/deals}, the deal page, the partners and the
+   * delegates with the section {@code deals}, authorized by the socket's authentication alone; each
+   * refresh reads through the backend's own gates.
+   */
+  PURCHASING_DEALS(
+      "purchasing-deals", false, Set.of("deals"), false, "purchasing_deals", null, null);
 
   /** The wire prefix identifying the class. */
   private final @NotNull String prefix;

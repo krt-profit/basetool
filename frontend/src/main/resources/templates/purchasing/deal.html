@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<head>
+    <title th:text="#{purchasing.deal.pageTitle} + ' - ' + ${appTitle}">Gesch&auml;ft - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+<th:block th:replace="~{purchasing/fragments/purchasing-links :: purchasingLinks}"></th:block>
+    </th:block>
+</head>
+<body>
+<th:block th:fragment="pageContent">
+<main>
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='purchasing.deals.title', eyebrowHref=@{/purchasing/deals}, titleText=#{purchasing.deal.title(${deal.dealNo()})}, count=null, actions=null)}"></th:block>
+
+    <div id="purchasing-deal-detail" th:data-live-sync-topic="${purchasingLiveSyncTopic}">
+    <th:block th:fragment="dealDetail">
+        <section class="card purchasing-overview" th:data-deal-id="${deal.id()}" data-testid="purchasing-deal-overview">
+            <div class="purchasing-overview__head">
+                <span class="chip" th:classappend="${deal.status() == 'SETTLED'} ? 'chip--primary' : 'chip--muted'"
+                      data-testid="purchasing-deal-status" th:data-status="${deal.status()}" th:text="#{'purchasing.deal.status.' + ${deal.status()}}">Entwurf</span>
+                <span class="chip chip--danger" th:if="${deal.overdue()}" th:text="#{purchasing.deal.overdue}">&uuml;berf&auml;llig</span>
+                <span class="chip chip--muted" th:text="#{'purchasing.deal.riskClass.' + ${deal.riskClass()}}">A</span>
+                <span class="chip chip--muted" th:if="${deal.escortWish()}" th:text="#{purchasing.deal.escort.chip}">Begleitschutz</span>
+            </div>
+            <dl class="purchasing-facts">
+                <div><dt th:text="#{purchasing.deal.unit}">Einheit</dt><dd th:text="${deal.raisingOrgUnit().name()}">ARGON</dd></div>
+                <div><dt th:text="#{purchasing.deal.entry}">Material / Item</dt>
+                    <dd>
+                        <span th:text="${deal.material() != null ? deal.material().name() : deal.gameItem().name()}">Quantanium</span>
+                        <span class="cell-sub" th:if="${deal.qualityTier() != null}"
+                              th:text="${#locale.language == 'en' ? deal.qualityTier().labelEn() : deal.qualityTier().labelDe()}">Keine</span>
+                    </dd></div>
+                <div><dt th:text="#{purchasing.deal.amount}">Menge</dt>
+                    <dd th:text="#{purchasing.deal.amountOf(${deal.acceptedAmount()}, ${deal.amount()}, #{'purchasing.unit.' + ${deal.quantityType()}})}">3 von 10 SCU</dd></div>
+                <div th:if="${deal.pendingAmount() > 0}"><dt th:text="#{purchasing.deal.pending}">Ungepr&uuml;ft</dt><dd th:text="${deal.pendingAmount()}">2</dd></div>
+                <div><dt th:text="#{purchasing.deal.unitPrice}">Einzelpreis</dt>
+                    <dd>
+                        <span th:text="#{purchasing.money(${#numbers.formatInteger(deal.unitPrice(), 1, 'POINT')})}">100 aUEC</span>
+                        <span class="cell-sub" th:if="${deal.uexReferencePrice() != null}"
+                              th:text="#{purchasing.deal.uexReference(${#numbers.formatDecimal(deal.uexReferencePrice(), 1, 'POINT', 0, 'COMMA')})}">UEX: 90 aUEC</span>
+                    </dd></div>
+                <div><dt th:text="#{purchasing.deal.total}">Summe</dt><dd th:text="#{purchasing.money(${#numbers.formatInteger(deal.total(), 1, 'POINT')})}">10.000 aUEC</dd></div>
+                <div><dt th:text="#{purchasing.deal.paymentModel}">Zahlungsmodell</dt><dd th:text="#{'purchasing.deal.paymentModel.' + ${deal.paymentModel()}}">Vorkasse</dd></div>
+                <div><dt th:text="#{purchasing.deal.funded}">Bewilligt</dt>
+                    <dd th:text="#{purchasing.deal.fundedOf(${#numbers.formatInteger(deal.fundedAmount(), 1, 'POINT')}, ${#numbers.formatInteger(deal.requestedAmount(), 1, 'POINT')})}">0 von 0 aUEC</dd></div>
+                <div><dt th:text="#{purchasing.deal.delegate}">Handelsbeauftragter</dt><dd th:text="${deal.delegateName() != null ? deal.delegateName() : '&ndash;'}">Name</dd></div>
+                <div><dt th:text="#{purchasing.deal.partner}">Partner</dt>
+                    <dd>
+                        <span th:text="${deal.partner().name()}">Partner</span>
+                        <span class="cell-sub" th:if="${deal.partner().orgTag() != null}" th:text="${deal.partner().orgTag()}">TAG</span>
+                    </dd></div>
+                <div th:if="${deal.partner().conditionsNote() != null}"><dt th:text="#{purchasing.partner.conditions}">Konditionen</dt><dd th:text="${deal.partner().conditionsNote()}">Notiz</dd></div>
+                <div th:if="${deal.partner().reputationNote() != null}"><dt th:text="#{purchasing.partner.reputation}">Ruf</dt><dd th:text="${deal.partner().reputationNote()}">Notiz</dd></div>
+                <div th:if="${deal.settlementDueAt() != null}"><dt th:text="#{purchasing.deal.settlementDue}">Abrechnung f&auml;llig</dt>
+                    <dd th:text="${#temporals.format(deal.settlementDueAt(), 'dd.MM.yyyy')}">01.01.2026</dd></div>
+            </dl>
+            <div class="purchasing-actions">
+                <button type="button" class="btn btn-ghost" data-trigger="purchasing-edit-deal" data-testid="purchasing-edit-deal"
+                        th:if="${deal.canEdit()}"
+                        th:data-deal-id="${deal.id()}" th:data-version="${deal.version()}"
+                        th:data-partner-id="${deal.partner().id()}" th:data-amount="${deal.amount()}"
+                        th:data-unit-price="${deal.unitPrice()}" th:data-model="${deal.paymentModel()}"
+                        th:data-risk-class="${deal.riskClass()}" th:data-escort="${deal.escortWish()}"
+                        th:text="#{purchasing.deal.edit}">Bearbeiten</button>
+                <button type="button" class="btn btn--cta" data-trigger="purchasing-request-tranche" data-testid="purchasing-request-tranche"
+                        th:if="${deal.canRequestTranche()}"
+                        th:data-deal-id="${deal.id()}" th:data-model="${deal.paymentModel()}"
+                        th:data-open="${deal.total() - deal.requestedAmount()}"
+                        th:text="#{purchasing.tranche.request}">Mittel anfordern</button>
+                <button type="button" class="btn btn-ghost" data-trigger="purchasing-record-delivery" data-testid="purchasing-record-delivery"
+                        th:if="${deal.canRecordDelivery()}"
+                        th:data-deal-id="${deal.id()}" th:data-open="${deal.amount() - deal.acceptedAmount() - deal.pendingAmount()}"
+                        th:text="#{purchasing.delivery.record}">Lieferung erfassen</button>
+                <button type="button" class="btn btn-ghost" data-trigger="purchasing-close-delivery" data-testid="purchasing-close-delivery"
+                        th:if="${deal.canCloseDelivery()}" th:data-deal-id="${deal.id()}"
+                        th:text="#{purchasing.delivery.close}">Lieferung abschlie&szlig;en</button>
+                <button type="button" class="btn btn--cta" data-trigger="purchasing-settle" data-testid="purchasing-settle"
+                        th:if="${deal.canSettle()}"
+                        th:data-deal-id="${deal.id()}" th:data-received="${deal.fundedAmount()}"
+                        th:data-failed="${deal.status() == 'FAILED'}"
+                        th:data-version="${deal.settlement() != null ? deal.settlement().version() : ''}"
+                        th:data-paid="${deal.settlement() != null ? deal.settlement().moneyPaid() : ''}"
+                        th:data-loss="${deal.settlement() != null ? deal.settlement().lossAmount() : ''}"
+                        th:text="#{purchasing.settlement.record}">Abrechnen</button>
+                <button type="button" class="btn btn-quiet-danger" data-trigger="purchasing-cancel-deal" data-testid="purchasing-cancel-deal"
+                        th:if="${deal.canCancel()}"
+                        th:data-deal-id="${deal.id()}" th:data-version="${deal.version()}"
+                        th:text="#{purchasing.deal.cancel}">Stornieren</button>
+            </div>
+        </section>
+
+        <section class="card card--flush">
+            <h2 class="purchasing-section-title" th:text="#{purchasing.tranche.title}">Zahlungen</h2>
+            <div class="table-responsive" th:if="${!#lists.isEmpty(deal.tranches())}">
+                <table class="data-table data-table--stack purchasing-table" data-testid="purchasing-tranches">
+                    <thead>
+                        <tr>
+                            <th th:text="#{purchasing.tranche.kind}">Art</th>
+                            <th th:text="#{purchasing.tranche.amount}">Betrag</th>
+                            <th class="cell-status" th:text="#{purchasing.tranche.state}">Stand</th>
+                            <th th:text="#{purchasing.tranche.requestedAt}">Angefordert</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="t : ${deal.tranches()}" data-testid="purchasing-tranche-row">
+                            <td th:text="#{'purchasing.tranche.kind.' + ${t.kind()}}">Vorkasse</td>
+                            <td th:text="#{purchasing.money(${#numbers.formatInteger(t.amount(), 1, 'POINT')})}">1.000 aUEC</td>
+                            <td class="cell-status"><span class="chip" th:classappend="${t.state() == 'CONFIRMED'} ? 'chip--primary' : 'chip--muted'"
+                                                          th:text="#{'purchasing.tranche.state.' + ${t.state()}}">Angefordert</span></td>
+                            <td th:text="${#temporals.format(t.createdAt(), 'dd.MM.yyyy HH:mm')}">01.01.2026</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="purchasing-empty" th:if="${#lists.isEmpty(deal.tranches())}" th:text="#{purchasing.tranche.empty}">Noch keine Mittel angefordert.</p>
+        </section>
+
+        <section class="card card--flush">
+            <h2 class="purchasing-section-title" th:text="#{purchasing.delivery.title}">Lieferungen</h2>
+            <div class="table-responsive" th:if="${!#lists.isEmpty(deal.deliveries())}">
+                <table class="data-table data-table--stack purchasing-table" data-testid="purchasing-deliveries">
+                    <thead>
+                        <tr>
+                            <th th:text="#{purchasing.delivery.amount}">Menge</th>
+                            <th th:text="#{purchasing.delivery.location}">Ort</th>
+                            <th th:text="#{purchasing.delivery.accepted}">Angenommen</th>
+                            <th class="cell-status" th:text="#{purchasing.delivery.status}">Stand</th>
+                            <th class="cell-actions"><span class="visually-hidden" th:text="#{purchasing.actions}">Aktionen</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="dv : ${deal.deliveries()}" data-testid="purchasing-delivery-row" th:data-delivery-id="${dv.id()}">
+                            <td th:text="${dv.amount()}">5</td>
+                            <td th:text="${dv.location() != null ? dv.location().name() : '&ndash;'}">Lorville</td>
+                            <td>
+                                <span th:if="${dv.acceptedAmount() != null}"
+                                      th:text="#{purchasing.delivery.acceptedOf(${dv.acceptedAmount()}, ${dv.rejectedAmount()})}">4 angenommen, 1 abgelehnt</span>
+                                <span class="cell-sub" th:if="${dv.measuredQuality() != null}" th:text="#{purchasing.delivery.quality(${dv.measuredQuality()})}">Qualit&auml;t 700</span>
+                                <span class="cell-sub" th:if="${dv.rejectReason() != null}" th:text="#{'purchasing.delivery.rejectReason.' + ${dv.rejectReason()}}">Falscher Gegenstand</span>
+                            </td>
+                            <td class="cell-status"><span class="chip" th:classappend="${dv.status() == 'ACCEPTED'} ? 'chip--primary' : 'chip--muted'"
+                                                          th:text="#{'purchasing.delivery.status.' + ${dv.status()}}">Erfasst</span></td>
+                            <td class="cell-actions">
+                                <button type="button" class="btn btn--cta" data-trigger="purchasing-accept-delivery" data-testid="purchasing-accept-delivery"
+                                        th:if="${dv.canAccept()}"
+                                        th:data-deal-id="${deal.id()}" th:data-delivery-id="${dv.id()}" th:data-version="${dv.version()}"
+                                        th:data-amount="${dv.amount()}" th:data-material="${deal.material() != null}"
+                                        th:data-min-quality="${deal.qualityTier() != null ? deal.qualityTier().minQuality() : 0}"
+                                        th:data-location-id="${dv.location() != null ? dv.location().id() : ''}"
+                                        th:text="#{purchasing.delivery.decide}">Entscheiden</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="purchasing-empty" th:if="${#lists.isEmpty(deal.deliveries())}" th:text="#{purchasing.delivery.empty}">Noch keine Lieferung.</p>
+        </section>
+
+        <section class="card" th:if="${deal.settlement() != null}" data-testid="purchasing-settlement">
+            <h2 class="purchasing-section-title" th:text="#{purchasing.settlement.title}">Abrechnung</h2>
+            <dl class="purchasing-facts">
+                <div><dt th:text="#{purchasing.settlement.received}">Erhalten</dt><dd th:text="#{purchasing.money(${#numbers.formatInteger(deal.settlement().moneyReceived(), 1, 'POINT')})}">0 aUEC</dd></div>
+                <div><dt th:text="#{purchasing.settlement.paid}">An Gegenpartei gezahlt</dt><dd th:text="#{purchasing.money(${#numbers.formatInteger(deal.settlement().moneyPaid(), 1, 'POINT')})}">0 aUEC</dd></div>
+                <div><dt th:text="#{purchasing.settlement.remainder}">R&uuml;ckfluss</dt><dd th:text="#{purchasing.money(${#numbers.formatInteger(deal.settlement().remainder(), 1, 'POINT')})}">0 aUEC</dd></div>
+                <div><dt th:text="#{purchasing.settlement.loss}">Verlust</dt>
+                    <dd>
+                        <span th:text="#{purchasing.money(${#numbers.formatInteger(deal.settlement().lossAmount(), 1, 'POINT')})}">0 aUEC</span>
+                        <span class="cell-sub" th:if="${deal.settlement().lossReason() != null}" th:text="#{'purchasing.settlement.lossReason.' + ${deal.settlement().lossReason()}}">Betrug</span>
+                    </dd></div>
+                <div th:if="${deal.settlement().settledAt() == null and deal.settlement().remainderRequestId() != null}">
+                    <dt th:text="#{purchasing.settlement.state}">Stand</dt><dd th:text="#{purchasing.settlement.waitingForBank}">Warte auf die Bank</dd></div>
+            </dl>
+        </section>
+    </th:block>
+    </div>
+
+    <th:block th:if="${deal.isMine()}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='purchasing-edit-modal', titleKey='purchasing.deal.edit', titleId='purchasing-edit-title', variant='krt-modal--wide', body=~{::purchasing-edit-modal-body})}">
+        <th:block th:ref="purchasing-edit-modal-body">
+            <form id="purchasing-edit-form" class="no-track" novalidate>
+                <div class="krt-modal-body">
+                    <input type="hidden" id="purchasing-edit-id">
+                    <input type="hidden" id="purchasing-edit-version">
+                    <div class="form-group">
+                        <label for="purchasing-edit-partner" th:text="#{purchasing.deal.partner}">Partner</label>
+                        <select id="purchasing-edit-partner" required>
+                            <option th:each="p : ${partners}" th:value="${p.id()}" th:text="${p.name()}">Partner</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="purchasing-edit-amount" th:text="#{purchasing.deal.amount}">Menge</label>
+                        <input type="number" id="purchasing-edit-amount" min="0.001" step="any" inputmode="decimal" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="purchasing-edit-price" th:text="#{purchasing.deal.unitPrice}">Einzelpreis (aUEC)</label>
+                        <input type="number" id="purchasing-edit-price" min="1" step="1" inputmode="numeric" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="purchasing-edit-model" th:text="#{purchasing.deal.paymentModel}">Zahlungsmodell</label>
+                        <select id="purchasing-edit-model">
+                            <option th:each="m : ${ {'ADVANCE','ON_DELIVERY','PARTIAL'} }" th:value="${m}"
+                                    th:text="#{'purchasing.deal.paymentModel.' + ${m}}">Vorkasse</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="purchasing-edit-class" th:text="#{purchasing.deal.riskClass.raise}">Risikoklasse erh&ouml;hen (optional)</label>
+                        <select id="purchasing-edit-class">
+                            <option value="" th:text="#{purchasing.deal.riskClass.computed}">Berechnete Klasse</option>
+                            <option th:each="c : ${ {'A','B','C'} }" th:value="${c}" th:text="#{'purchasing.deal.riskClass.' + ${c}}">A</option>
+                        </select>
+                    </div>
+                    <div class="form-group flex-gap-sm">
+                        <input type="checkbox" id="purchasing-edit-escort">
+                        <label for="purchasing-edit-escort" th:text="#{purchasing.deal.escort}">Begleitschutz gew&uuml;nscht</label>
+                    </div>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="purchasing-edit-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta" data-testid="purchasing-edit-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{general.save}">Speichern</span></button>
+                </div>
+            </form>
+        </th:block>
+    </th:block>
+
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='purchasing-tranche-modal', titleKey='purchasing.tranche.request', titleId='purchasing-tranche-title', body=~{::purchasing-tranche-modal-body})}">
+        <th:block th:ref="purchasing-tranche-modal-body">
+            <form id="purchasing-tranche-form" class="no-track" novalidate>
+                <div class="krt-modal-body">
+                    <input type="hidden" id="purchasing-tranche-deal">
+                    <div class="form-group">
+                        <label for="purchasing-tranche-kind" th:text="#{purchasing.tranche.kind}">Art</label>
+                        <select id="purchasing-tranche-kind" data-testid="purchasing-tranche-kind">
+                            <option th:each="k : ${ {'ADVANCE','ON_DELIVERY','FINAL'} }" th:value="${k}"
+                                    th:text="#{'purchasing.tranche.kind.' + ${k}}">Vorkasse</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="purchasing-tranche-amount" th:text="#{purchasing.tranche.amount}">Betrag (aUEC)</label>
+                        <input type="number" id="purchasing-tranche-amount" min="1" step="1" inputmode="numeric" required data-testid="purchasing-tranche-amount">
+                        <p id="purchasing-tranche-hint" class="cell-sub m-0"></p>
+                    </div>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="purchasing-tranche-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta" data-testid="purchasing-tranche-submit" th:text="#{purchasing.tranche.submit}">Anfordern</button>
+                </div>
+            </form>
+        </th:block>
+    </th:block>
+
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='purchasing-delivery-modal', titleKey='purchasing.delivery.record', titleId='purchasing-delivery-title', body=~{::purchasing-delivery-modal-body})}">
+        <th:block th:ref="purchasing-delivery-modal-body">
+            <form id="purchasing-delivery-form" class="no-track" novalidate>
+                <div class="krt-modal-body">
+                    <input type="hidden" id="purchasing-delivery-deal">
+                    <div class="form-group">
+                        <label for="purchasing-delivery-amount" th:text="#{purchasing.delivery.amount}">Menge</label>
+                        <input type="number" id="purchasing-delivery-amount" min="0.001" step="any" inputmode="decimal" required data-testid="purchasing-delivery-amount">
+                        <p id="purchasing-delivery-hint" class="cell-sub m-0"></p>
+                    </div>
+                    <div class="form-group">
+                        <label for="purchasing-delivery-location" th:text="#{purchasing.delivery.location}">Ort</label>
+                        <select id="purchasing-delivery-location">
+                            <option value="" th:text="#{purchasing.delivery.location.none}">Kein Ort</option>
+                            <option th:each="l : ${locations}" th:value="${l.id()}" th:text="${l.name()}">Lorville</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="purchasing-delivery-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta" data-testid="purchasing-delivery-submit" th:text="#{purchasing.delivery.submit}">Erfassen</button>
+                </div>
+            </form>
+        </th:block>
+    </th:block>
+
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='purchasing-settle-modal', titleKey='purchasing.settlement.record', titleId='purchasing-settle-title', body=~{::purchasing-settle-modal-body})}">
+        <th:block th:ref="purchasing-settle-modal-body">
+            <form id="purchasing-settle-form" class="no-track" novalidate>
+                <div class="krt-modal-body">
+                    <input type="hidden" id="purchasing-settle-deal">
+                    <input type="hidden" id="purchasing-settle-version">
+                    <p id="purchasing-settle-received" class="m-0"></p>
+                    <div class="form-group">
+                        <label for="purchasing-settle-paid" th:text="#{purchasing.settlement.paid}">An Gegenpartei gezahlt (aUEC)</label>
+                        <input type="number" id="purchasing-settle-paid" min="0" step="1" inputmode="numeric" required data-testid="purchasing-settle-paid">
+                    </div>
+                    <div class="form-group">
+                        <label for="purchasing-settle-loss" th:text="#{purchasing.settlement.loss}">Verlust (aUEC)</label>
+                        <input type="number" id="purchasing-settle-loss" min="0" step="1" inputmode="numeric" value="0" data-testid="purchasing-settle-loss">
+                    </div>
+                    <div class="form-group" id="purchasing-settle-reason-row" hidden>
+                        <label for="purchasing-settle-reason" th:text="#{purchasing.settlement.lossReason}">Verlustgrund</label>
+                        <select id="purchasing-settle-reason">
+                            <option th:each="r : ${ {'FRAUD','NON_DELIVERY','QUALITY','OTHER'} }" th:value="${r}"
+                                    th:text="#{'purchasing.settlement.lossReason.' + ${r}}">Betrug</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="purchasing-settle-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta" data-testid="purchasing-settle-submit" th:text="#{purchasing.settlement.submit}">Abrechnen</button>
+                </div>
+            </form>
+        </th:block>
+    </th:block>
+    </th:block>
+
+    <th:block th:if="${deal.isMine() or purchasingState.governing()}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='purchasing-cancel-modal', titleKey='purchasing.deal.cancel', titleId='purchasing-cancel-title', variant='krt-modal--danger', body=~{::purchasing-cancel-modal-body})}">
+        <th:block th:ref="purchasing-cancel-modal-body">
+            <form id="purchasing-cancel-form" class="no-track" novalidate>
+                <div class="krt-modal-body">
+                    <input type="hidden" id="purchasing-cancel-deal">
+                    <input type="hidden" id="purchasing-cancel-version">
+                    <p class="m-0" th:text="#{purchasing.deal.cancel.confirm}">Das Gesch&auml;ft wirklich stornieren? Offene Mittelanforderungen werden zur&uuml;ckgezogen.</p>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="purchasing-cancel-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn-danger" data-testid="purchasing-cancel-submit" th:text="#{purchasing.deal.cancel}">Stornieren</button>
+                </div>
+            </form>
+        </th:block>
+    </th:block>
+    </th:block>
+
+    <th:block th:if="${purchasingState.managesUnit() or purchasingState.governing()}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='purchasing-accept-modal', titleKey='purchasing.delivery.decide', titleId='purchasing-accept-title', variant='krt-modal--wide', body=~{::purchasing-accept-modal-body})}">
+        <th:block th:ref="purchasing-accept-modal-body">
+            <form id="purchasing-accept-form" class="no-track" novalidate>
+                <div class="krt-modal-body">
+                    <input type="hidden" id="purchasing-accept-deal">
+                    <input type="hidden" id="purchasing-accept-delivery">
+                    <input type="hidden" id="purchasing-accept-version">
+                    <p id="purchasing-accept-total" class="m-0"></p>
+                    <div class="form-group">
+                        <label for="purchasing-accept-accepted" th:text="#{purchasing.delivery.acceptedAmount}">Angenommen</label>
+                        <input type="number" id="purchasing-accept-accepted" min="0" step="any" inputmode="decimal" required data-testid="purchasing-accept-accepted">
+                    </div>
+                    <div class="form-group">
+                        <label for="purchasing-accept-rejected" th:text="#{purchasing.delivery.rejectedAmount}">Abgelehnt</label>
+                        <input type="number" id="purchasing-accept-rejected" min="0" step="any" inputmode="decimal" value="0" data-testid="purchasing-accept-rejected">
+                    </div>
+                    <div class="form-group" id="purchasing-accept-reason-row" hidden>
+                        <label for="purchasing-accept-reason" th:text="#{purchasing.delivery.rejectReasonLabel}">Ablehnungsgrund</label>
+                        <select id="purchasing-accept-reason">
+                            <option th:each="r : ${ {'WRONG_ITEM','QUALITY_TOO_LOW','DAMAGED','OTHER'} }" th:value="${r}"
+                                    th:text="#{'purchasing.delivery.rejectReason.' + ${r}}">Falscher Gegenstand</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="purchasing-accept-quality-row">
+                        <label for="purchasing-accept-quality" th:text="#{purchasing.delivery.measuredQuality}">Gemessene Qualit&auml;t (0&ndash;1000)</label>
+                        <input type="number" id="purchasing-accept-quality" min="0" max="1000" step="1" inputmode="numeric" data-testid="purchasing-accept-quality">
+                        <p id="purchasing-accept-quality-hint" class="cell-sub m-0"></p>
+                    </div>
+                    <div class="form-group" id="purchasing-accept-location-row">
+                        <label for="purchasing-accept-location" th:text="#{purchasing.delivery.stockLocation}">Lagerort</label>
+                        <select id="purchasing-accept-location" data-testid="purchasing-accept-location">
+                            <option th:each="l : ${locations}" th:value="${l.id()}" th:text="${l.name()}">Lorville</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="purchasing-accept-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta" data-testid="purchasing-accept-submit" th:text="#{purchasing.delivery.decideSubmit}">Entscheiden</button>
+                </div>
+            </form>
+        </th:block>
+    </th:block>
+    </th:block>
+</main>
+</th:block>
+
+<th:block th:fragment="pageTail">
+<th:block th:replace="~{purchasing/fragments/purchasing-script :: purchasingBootstrap}"></th:block>
+<script type="module" th:src="@{/js/purchasing/purchasing-deal.js}" th:attr="nonce=${cspNonce}"></script>
+</th:block>
+</body>
+</html>

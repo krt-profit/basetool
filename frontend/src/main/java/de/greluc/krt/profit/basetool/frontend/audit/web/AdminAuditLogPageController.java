@@ -392,7 +392,37 @@ public class AdminAuditLogPageController {
                   "SUPPLY_UNIT_SETTING_CHANGED",
                   "SUPPLY_SETTINGS_CHANGED",
                   "SUPPLY_AUDIT_EXPORTED",
-                  "SUPPLY_AUDIT_PURGED")));
+                  "SUPPLY_AUDIT_PURGED")),
+          Map.entry(
+              "PURCHASING",
+              List.of(
+                  "DEAL_CREATED",
+                  "DEAL_UPDATED",
+                  "DEAL_CANCELLED",
+                  "DEAL_TRANCHE_REQUESTED",
+                  "DEAL_TRANCHE_FUNDED",
+                  "DEAL_TRANCHE_REFUSED",
+                  "DEAL_DELIVERY_RECORDED",
+                  "DEAL_DELIVERY_ACCEPTED",
+                  "DEAL_DELIVERY_REJECTED",
+                  "DEAL_DELIVERY_CLOSED",
+                  "DEAL_SETTLEMENT_RECORDED",
+                  "DEAL_SETTLED",
+                  "DEAL_FAILED",
+                  "PARTNER_CREATED",
+                  "PARTNER_UPDATED",
+                  "PARTNER_BLOCKED",
+                  "PARTNER_UNBLOCKED",
+                  "PARTNER_ERASED",
+                  "DELEGATE_APPOINTED",
+                  "DELEGATE_REVOKED",
+                  "DELEGATE_LIMIT_CHANGED",
+                  "PURCHASING_PAUSED",
+                  "PURCHASING_RESUMED",
+                  "PURCHASING_SETTINGS_CHANGED",
+                  "RISK_CLASSES_CHANGED",
+                  "PURCHASING_AUDIT_EXPORTED",
+                  "PURCHASING_AUDIT_PURGED")));
 
   /** Reads the audit trails and the exchange registry. */
   private final AuditBackendClient auditClient;

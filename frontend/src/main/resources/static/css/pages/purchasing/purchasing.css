@@ -1,0 +1,70 @@
+@layer base, components, page, utilities;
+
+@layer page {
+    .purchasing-tabs {
+        margin-bottom: var(--space-4);
+    }
+    .purchasing-table .cell-actions {
+        white-space: nowrap;
+    }
+    .purchasing-table .cell-actions .btn {
+        margin-inline-start: var(--space-2);
+    }
+    .purchasing-section-title {
+        margin: 0 0 var(--space-3);
+        padding: var(--space-4) var(--space-4) 0;
+        font-size: var(--fs-h3);
+    }
+    .purchasing-empty {
+        margin: 0;
+        padding: var(--space-4);
+        color: var(--color-gray-1);
+    }
+    .purchasing-banner {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-3);
+        padding: var(--space-3) var(--space-4);
+        border-inline-start: 4px solid var(--color-warning);
+        background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+    }
+    .purchasing-banner__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
+        margin-inline-start: auto;
+    }
+    .purchasing-overview {
+        margin-bottom: var(--space-4);
+    }
+    .purchasing-overview__head {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
+        margin-bottom: var(--space-3);
+    }
+    .purchasing-facts {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+        gap: var(--space-3) var(--space-4);
+        margin: 0 0 var(--space-4);
+    }
+    .purchasing-facts dt {
+        color: var(--color-gray-1);
+        font-size: var(--fs-sm);
+    }
+    .purchasing-facts dd {
+        margin: 0;
+    }
+    .purchasing-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
+    }
+    .purchasing-totals,
+    .purchasing-overview,
+    .card.purchasing-totals {
+        margin-bottom: var(--space-4);
+    }
+}

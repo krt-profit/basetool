@@ -110,7 +110,9 @@ public class NotificationPageController {
           "BANK_ACCOUNT_GRANT",
           "/bank/accounts/",
           "BANK_HOLDER",
-          "/bank/holders/");
+          "/bank/holders/",
+          "PURCHASING_DEAL",
+          "/purchasing/deals/");
 
   /** The types whose record is gone, so the row has nothing to link to. */
   private static final Set<String> UNLINKED_TYPES = Set.of("MISSION_DELETED", "BANK_GRANT_REVOKED");
@@ -136,6 +138,11 @@ public class NotificationPageController {
           Map.entry("SUPPLY_DONATION_PLEDGED", "/supply/donations/incoming"),
           Map.entry("SUPPLY_DONATION_RECEIVED", "/supply/donations/mine"),
           Map.entry("SUPPLY_DONATION_DECLINED", "/supply/donations/mine"),
+          Map.entry("PURCHASING_NEED_RELEASED", "/purchasing/deals"),
+          Map.entry("PURCHASING_PAUSED", "/purchasing/deals"),
+          Map.entry("PURCHASING_RESUMED", "/purchasing/deals"),
+          Map.entry("PURCHASING_DELEGATE_APPOINTED", "/purchasing/deals"),
+          Map.entry("PURCHASING_DELEGATE_REVOKED", "/purchasing/deals"),
           Map.entry("HANGAR_SHIP_ASSIGNED", "/hangar"),
           Map.entry("HANGAR_FITTED_RESET", "/hangar"),
           Map.entry("HANGAR_CHANGED_BY_ADMIN", "/hangar"),

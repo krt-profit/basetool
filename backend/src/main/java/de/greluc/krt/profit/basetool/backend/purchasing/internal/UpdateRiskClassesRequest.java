@@ -34,7 +34,7 @@ import java.util.List;
  *
  * @param classes the classes with their new values and the echoed versions
  */
-public record UpdateRiskClassesRequest(@NotEmpty @Valid List<Entry> classes) {
+public record UpdateRiskClassesRequest(@NotEmpty @Valid List<UpdateRiskClassEntry> classes) {
 
   /**
    * One class to change.
@@ -47,7 +47,7 @@ public record UpdateRiskClassesRequest(@NotEmpty @Valid List<Entry> classes) {
    * @param version the echoed optimistic-locking version
    */
   @Schema(name = "UpdateRiskClassEntry")
-  public record Entry(
+  public record UpdateRiskClassEntry(
       @NotNull RiskClassCode code,
       @NotNull @Positive Long maxTotal,
       @NotNull @Min(0) @Max(100) Integer maxAdvancePercent,

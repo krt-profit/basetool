@@ -83,6 +83,10 @@ declare const DISCORD_MSG: KrtI18nDict;
 declare const supplyConflict: KrtI18nDict;
 /** Injected by the page bootstrap (declared in the supply fragment supply-script.html). */
 declare const supplyI18n: KrtI18nDict;
+/** Injected by the page bootstrap (declared in the purchasing fragment purchasing-script.html). */
+declare const purchasingConflict: KrtI18nDict;
+/** Injected by the page bootstrap (declared in the purchasing fragment purchasing-script.html). */
+declare const purchasingI18n: KrtI18nDict;
 /** Injected by the page bootstrap (declared in hangar.html). */
 declare const hangarConflict: KrtI18nDict;
 /** Injected by the page bootstrap (declared in hangar.html). */

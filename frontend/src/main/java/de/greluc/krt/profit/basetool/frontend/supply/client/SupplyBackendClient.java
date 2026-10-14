@@ -122,6 +122,18 @@ public class SupplyBackendClient {
   }
 
   /**
+   * Reads the open needs a trade delegate may buy for, for the purchasing deal form.
+   *
+   * @return the first page of open purchasable needs, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public PageResponse<NeedDto> purchasableNeeds() {
+    return backendApiClient.get(
+        "/api/v1/supply/needs?status=OPEN&purchasable=true&size=200&sort=createdAt,desc",
+        NEED_PAGE);
+  }
+
+  /**
    * Reads the open needs of one unit, for the pledge form.
    *
    * @param orgUnitId the raising unit

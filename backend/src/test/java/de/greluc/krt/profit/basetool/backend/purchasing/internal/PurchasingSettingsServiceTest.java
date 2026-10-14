@@ -360,8 +360,10 @@ class PurchasingSettingsServiceTest {
     UpdateRiskClassesRequest request =
         new UpdateRiskClassesRequest(
             List.of(
-                new UpdateRiskClassesRequest.Entry(RiskClassCode.A, 500L, 25, false, false, 1L),
-                new UpdateRiskClassesRequest.Entry(RiskClassCode.B, 900L, 50, true, true, 2L)));
+                new UpdateRiskClassesRequest.UpdateRiskClassEntry(
+                    RiskClassCode.A, 500L, 25, false, false, 1L),
+                new UpdateRiskClassesRequest.UpdateRiskClassEntry(
+                    RiskClassCode.B, 900L, 50, true, true, 2L)));
 
     List<RiskClassDto> result = service.updateRiskClasses(request);
 
@@ -392,7 +394,8 @@ class PurchasingSettingsServiceTest {
     UpdateRiskClassesRequest request =
         new UpdateRiskClassesRequest(
             List.of(
-                new UpdateRiskClassesRequest.Entry(RiskClassCode.A, 500L, 25, false, false, 4L)));
+                new UpdateRiskClassesRequest.UpdateRiskClassEntry(
+                    RiskClassCode.A, 500L, 25, false, false, 4L)));
 
     assertThatThrownBy(() -> service.updateRiskClasses(request))
         .isInstanceOf(ObjectOptimisticLockingFailureException.class);
@@ -407,7 +410,8 @@ class PurchasingSettingsServiceTest {
     UpdateRiskClassesRequest request =
         new UpdateRiskClassesRequest(
             List.of(
-                new UpdateRiskClassesRequest.Entry(RiskClassCode.C, 500L, 25, false, false, 1L)));
+                new UpdateRiskClassesRequest.UpdateRiskClassEntry(
+                    RiskClassCode.C, 500L, 25, false, false, 1L)));
 
     assertThatThrownBy(() -> service.updateRiskClasses(request))
         .isInstanceOf(BadRequestException.class);
