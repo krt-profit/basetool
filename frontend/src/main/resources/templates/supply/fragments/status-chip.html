@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<span th:fragment="chip(kind, status)" class="chip"
+      th:classappend="${status == 'FULFILLED' or status == 'RECEIVED'} ? 'chip--success'
+          : (${status == 'DECLINED'} ? 'chip--danger'
+          : (${status == 'PAUSED' or status == 'PARTIALLY_RECEIVED'} ? 'chip--warning'
+          : (${status == 'WITHDRAWN'} ? 'chip--muted' : 'chip--info')))"
+      th:text="#{'supply.' + ${kind} + '.status.' + ${status}}">Offen</span>
+</body>
+</html>

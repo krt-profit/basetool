@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="lagerPledgeModal">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='supply-lager-modal', titleKey='supply.lager.modal.title', variant='krt-modal--wide', body=~{::supply-lager-modal-body})}">
+        <th:block th:ref="supply-lager-modal-body">
+            <form id="supply-lager-form" class="no-track" novalidate>
+                <div class="krt-modal-body">
+                    <input type="hidden" id="supply-lager-source-id">
+                    <p class="supply-pledge-need" id="supply-lager-label"></p>
+                    <div class="form-group">
+                        <label for="supply-lager-unit" th:text="#{supply.pledge.unit}">Annehmende Einheit</label>
+                        <select id="supply-lager-unit" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="supply-lager-amount" th:text="#{supply.need.amount}">Menge</label>
+                        <input type="number" id="supply-lager-amount" min="0.001" step="any" inputmode="decimal" required>
+                        <small id="supply-lager-free" class="form-hint"></small>
+                    </div>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="supply-lager-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta" data-testid="supply-lager-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{supply.pledge.submit}">Spende anmelden</span></button>
+                </div>
+            </form>
+        </th:block>
+    </th:block>
+</th:block>
+</body>
+</html>

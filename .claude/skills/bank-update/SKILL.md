@@ -230,6 +230,8 @@ Vorhaben, ersetzt es den Satz; sonst bleibt er stehen.
   den Summen oben **nicht** enthalten sind, im Kontostand aber sehr wohl.
 - **Abrufe:** Anzahl bestätigter Auszahlungsanträge, davon die auf dem KRT-Konto mit
   Betrag; abgelehnte gesondert. Gab es keine: „Anfragen bezüglich Abrufe gab es keine."
+  Gab es Materialeinkäufe (Zeile „davon Materialeinkauf"), nenn sie in einem Satz mit
+  Betrag und Rückfluss; keine Partner, keine Namen.
 
 ## Schritt 5 — Seite bauen und ausliefern
 

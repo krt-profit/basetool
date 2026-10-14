@@ -467,5 +467,80 @@ public enum NotificationEventType {
    * An admin switched the exchange on again (REQ-XCH-041). Creates no notification; clears the
    * switched-off notices.
    */
-  EXCHANGE_SWITCHED_ON
+  EXCHANGE_SWITCHED_ON,
+
+  /**
+   * A member pledged a material donation (REQ-SUP-016). The default rule notifies the lead and the
+   * Logisticians of the receiving unit.
+   */
+  SUPPLY_DONATION_PLEDGED,
+
+  /**
+   * A receiving unit confirmed a donation (REQ-SUP-016). The default rule notifies the donor; the
+   * event clears the pledge notices.
+   */
+  SUPPLY_DONATION_RECEIVED,
+
+  /**
+   * A receiving unit declined a pledge (REQ-SUP-016). The default rule notifies the donor; the
+   * event clears the pledge notices.
+   */
+  SUPPLY_DONATION_DECLINED,
+
+  /**
+   * A donor withdrew a pledge (REQ-SUP-016). Creates no notification; clears the pledge notices.
+   */
+  SUPPLY_DONATION_WITHDRAWN,
+
+  /**
+   * A need was released for purchase (REQ-PUR-024). The default rule notifies every active
+   * delegate.
+   */
+  PURCHASING_NEED_RELEASED,
+
+  /**
+   * A purchasable need was fulfilled or withdrawn (REQ-PUR-024). Creates no notification; clears
+   * the release notices.
+   */
+  PURCHASING_NEED_CLOSED,
+
+  /**
+   * A delegate recorded a delivery (REQ-PUR-024). The default rule notifies the lead and the
+   * Logisticians of the raising unit.
+   */
+  PURCHASING_DELIVERY_RECORDED,
+
+  /**
+   * A raising unit accepted or rejected a delivery (REQ-PUR-024). The default rule notifies the
+   * deal's delegate; the event clears the delivery notice.
+   */
+  PURCHASING_DELIVERY_DECIDED,
+
+  /**
+   * A deal's settlement is past its due date (REQ-PUR-018). Produced once per deal by the
+   * timed-notice task.
+   */
+  PURCHASING_SETTLEMENT_OVERDUE,
+
+  /**
+   * Purchasing was paused (REQ-PUR-024). The default rule notifies the delegates and, for a unit
+   * pause, the unit's leadership.
+   */
+  PURCHASING_PAUSED,
+
+  /**
+   * Purchasing was resumed (REQ-PUR-024). Clears the pause notices and notifies the same people.
+   */
+  PURCHASING_RESUMED,
+
+  /**
+   * A member was appointed Handelsbeauftragter (REQ-PUR-024). The default rule notifies the member.
+   */
+  PURCHASING_DELEGATE_APPOINTED,
+
+  /**
+   * An appointment was revoked (REQ-PUR-024). The default rule notifies the member and clears the
+   * appointment notice.
+   */
+  PURCHASING_DELEGATE_REVOKED
 }

@@ -302,6 +302,12 @@ since the go-live of 2026-09-28, so these risks hold now.
   let a proof replayed to the other instance pass and reject the other's nonces. Scaling the gateway
   out means moving them to Redis first ([`external-exchange.md`](../specs/external-exchange.md),
   REQ-XCH-023).
+- **Purchasing trusts the in-game handover, and the tool only records it** (opened 2026-10-14). A tranche
+  puts bank money into a delegate's hands; what happens in the game between the delegate and the partner
+  is reported by the delegate, and the raising unit can check only the goods it receives. The controls
+  are the limits and the budget cap, the four-eyes rule on every tranche, the risk classes, the overdue
+  settlement notice and the pause switch ([`purchasing.md`](../specs/purchasing.md), ADR-0255); a delegate
+  who reports a false payment is found by the settlement and the bank's own trail, not prevented.
 - **A fifth certificate directory** (`keycloak.<domain>`) is carried and served by nothing, left
   from before identity moved onto the app origin (ADR-0166). It is documented so the count does not
   read as a missing certificate; pruning it is a deliberate edge change, not a clean-up to do in

@@ -1,0 +1,45 @@
+@layer base, components, page, utilities;
+
+@layer page {
+    .purchasing-tabs {
+        margin-bottom: var(--space-4);
+    }
+    .krt-modal-body .form-group > label {
+        display: block;
+        margin-bottom: var(--space-2);
+        font-weight: var(--fw-bold);
+        font-size: var(--fs-sm);
+    }
+    .krt-modal-body
+        .form-group
+        > :is(input:not([type='checkbox'], [type='radio']), select, textarea) {
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .purchasing-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-2);
+    }
+    .cell-actions .purchasing-actions {
+        justify-content: flex-end;
+    }
+    .alert > .purchasing-actions {
+        margin-top: var(--space-3);
+    }
+    .purchasing-actions .overflow-menu:has(.overflow-menu__panel:not([hidden])) {
+        z-index: var(--z-popover-raised);
+    }
+    .purchasing-totals {
+        margin-bottom: var(--space-4);
+    }
+    .kv-list dt {
+        overflow-wrap: anywhere;
+    }
+    @media (width <= 768px) {
+        .cell-actions .purchasing-actions {
+            justify-content: flex-start;
+        }
+    }
+}

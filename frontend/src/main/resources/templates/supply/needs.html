@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<head>
+    <title th:text="#{supply.needs.title} + ' - ' + ${appTitle}">Bedarf - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+<th:block th:replace="~{supply/fragments/supply-links :: supplyLinks}"></th:block>
+    </th:block>
+</head>
+<body>
+<th:block th:fragment="pageContent">
+<main>
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.supply', titleText=#{supply.needs.title},
+        count=${needsPage != null ? needsPage.totalElements() : null}, countId='supply-needs-count', countFor='supply-needs-results', actions=~{::needs-actions})}">
+        <th:block th:ref="needs-actions">
+            <button type="button" class="btn btn-ghost" data-trigger="supply-open-pledge" data-testid="supply-free-pledge"
+                    th:if="${!#lists.isEmpty(receivingUnits)}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-upload"/></svg> <span th:text="#{supply.pledge.free}">Spende anmelden</span></button>
+            <button type="button" class="btn btn--cta" data-trigger="supply-open-need" data-testid="supply-raise-need"
+                    th:if="${!#lists.isEmpty(raisingUnits)}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{supply.need.raise}">Bedarf anlegen</span></button>
+        </th:block>
+    </th:block>
+
+    <th:block th:replace="~{supply/fragments/supply-tabs :: tabs(active='needs')}"></th:block>
+
+    <section class="list-panel">
+        <form id="supply-needs-filter" class="no-track" role="search" method="get" th:action="@{/supply/needs}">
+            <div class="toolbar">
+                <label class="visually-hidden" for="supply-filter-unit" th:text="#{supply.filter.unit}">Einheit</label>
+                <select id="supply-filter-unit" name="orgUnitId" data-testid="supply-filter-unit" data-filter-chip-ignore>
+                    <option value="" th:text="#{supply.filter.unit.all}">Alle Einheiten</option>
+                    <option th:each="u : ${units}" th:if="${u.mayRaiseNeeds()}" th:value="${u.orgUnitId()}"
+                            th:selected="${u.orgUnitId() == selectedUnit}" th:text="${u.name()}">ARGON</option>
+                </select>
+                <label class="visually-hidden" for="supply-filter-status" th:text="#{supply.filter.status}">Status</label>
+                <select id="supply-filter-status" name="status" data-testid="supply-filter-status" data-filter-chip-ignore>
+                    <option value="" th:text="#{supply.filter.status.visible}">Sichtbare</option>
+                    <option th:each="s : ${ {'OPEN','PAUSED','FULFILLED','WITHDRAWN'} }" th:value="${s}"
+                            th:selected="${s == selectedStatus}" th:text="#{'supply.need.status.' + ${s}}">Offen</option>
+                </select>
+            </div>
+            <input type="hidden" name="size" th:value="${pageSize}">
+        </form>
+
+        <div id="supply-needs-results" class="card card--flush" th:data-live-sync-topic="${supplyLiveSyncTopic}">
+        <th:block th:fragment="needsResults">
+            <div class="table-responsive" th:if="${!#lists.isEmpty(needs)}">
+                <table class="data-table data-table--stack supply-table">
+                    <thead>
+                        <tr>
+                            <th th:text="#{supply.need.unit}">Einheit</th>
+                            <th th:text="#{supply.need.entry}">Material / Item</th>
+                            <th th:text="#{supply.need.progress}">Fortschritt</th>
+                            <th th:text="#{supply.need.priority}">Priorit&auml;t</th>
+                            <th class="cell-status" th:text="#{supply.need.status}">Status</th>
+                            <th class="cell-actions"><span class="visually-hidden" th:text="#{supply.actions}">Aktionen</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="n : ${needs}" data-testid="supply-need-row" th:data-need-id="${n.id()}">
+                            <td>
+                                <span class="cell-title" th:text="${n.orgUnitShorthand() != null ? n.orgUnitShorthand() : n.orgUnitName()}">ARGON</span>
+                                <span class="cell-sub" th:text="${n.orgUnitName()}">Spezialkommando ARGON</span>
+                            </td>
+                            <td th:attr="data-label=#{supply.need.entry}">
+                                <span class="cell-title" th:text="${n.material() != null ? n.material().name() : n.gameItem().name()}">Quantanium</span>
+                                <span class="cell-sub">
+                                    <span th:if="${n.qualityTier() != null}"
+                                          th:text="${#locale.language == 'en' ? n.qualityTier().labelEn() : n.qualityTier().labelDe()}">Keine</span>
+                                    <span th:if="${n.purchasable()}" class="chip chip--primary" data-testid="supply-need-purchasable"
+                                          th:text="#{supply.need.purchasable}">Zukauf m&ouml;glich</span>
+                                    <span th:if="${n.maxUnitPrice() != null}" class="chip chip--muted"
+                                          th:text="#{supply.need.maxPrice(${#numbers.formatInteger(n.maxUnitPrice(), 1, 'POINT')})}">max. 1.000 aUEC</span>
+                                </span>
+                            </td>
+                            <td th:attr="data-label=#{supply.need.progress}">
+                                <div class="meter supply-meter" aria-hidden="true">
+                                    <i class="meter__fill--warning" th:attr="data-krtm-width=${n.fulfilledPercent()}"></i>
+                                </div>
+                                <span class="cell-sub" th:text="#{supply.need.amountOf(${n.fulfilledAmount()}, ${n.amount()}, #{'supply.unit.' + ${n.quantityType()}})}">3 von 10 SCU</span>
+                            </td>
+                            <td th:attr="data-label=#{supply.need.priority}" th:text="#{'supply.need.priority.' + ${n.priority()}}">Normal</td>
+                            <td class="cell-status">
+                                <th:block th:replace="~{supply/fragments/status-chip :: chip(kind='need', status=${n.status()})}"></th:block>
+                            </td>
+                            <td class="cell-actions">
+                                <div class="supply-row-actions">
+                                    <button type="button" class="btn btn-outline btn-xs" data-trigger="supply-open-pledge-for-need"
+                                            data-testid="supply-pledge"
+                                            th:if="${n.status() == 'OPEN'}"
+                                            th:data-need-id="${n.id()}" th:data-unit-id="${n.orgUnitId()}"
+                                            th:data-entry="${n.material() != null ? n.material().name() : n.gameItem().name()}"
+                                            th:data-quantity-type="${n.quantityType()}"
+                                            th:text="#{supply.pledge.action}">Spenden</button>
+                                    <th:block th:if="${n.canManage() and (n.status() == 'OPEN' or n.status() == 'PAUSED')}">
+                                        <button type="button" class="btn btn-ghost btn-icon" data-trigger="supply-edit-need"
+                                                data-testid="supply-edit-need"
+                                                th:data-need-id="${n.id()}" th:data-version="${n.version()}"
+                                                th:data-amount="${n.amount()}" th:data-priority="${n.priority()}"
+                                                th:data-purchasable="${n.purchasable()}"
+                                                th:data-reason="${n.purchaseReason()}"
+                                                th:data-max-price="${n.maxUnitPrice()}"
+                                                th:data-quantity-type="${n.quantityType()}"
+                                                th:data-entry="${n.material() != null ? n.material().name() : n.gameItem().name()}"
+                                                th:attr="title=#{supply.need.edit},aria-label=#{supply.need.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                                        <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id=${'supply-need-more-' + n.id()}, items=~{::supply-need-more-items})}">
+                                            <th:block th:ref="supply-need-more-items">
+                                                <button type="button" class="overflow-menu__item" role="menuitem" data-trigger="supply-need-pause"
+                                                        th:if="${n.status() == 'OPEN'}" th:data-need-id="${n.id()}" th:data-version="${n.version()}"
+                                                        th:text="#{supply.need.pause}">Pausieren</button>
+                                                <button type="button" class="overflow-menu__item" role="menuitem" data-trigger="supply-need-resume"
+                                                        th:if="${n.status() == 'PAUSED'}" th:data-need-id="${n.id()}" th:data-version="${n.version()}"
+                                                        th:text="#{supply.need.resume}">Fortsetzen</button>
+                                                <button type="button" class="overflow-menu__item overflow-menu__item--danger" role="menuitem" data-trigger="supply-need-withdraw"
+                                                        data-testid="supply-need-withdraw"
+                                                        th:data-need-id="${n.id()}" th:data-version="${n.version()}"
+                                                        th:text="#{supply.need.withdraw}">Zur&uuml;ckziehen</button>
+                                            </th:block>
+                                        </th:block>
+                                    </th:block>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <th:block th:if="${#lists.isEmpty(needs)}">
+                <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='supply.needs.empty.title', textKey='supply.needs.empty.text')}"></th:block>
+            </th:block>
+            <th:block th:replace="~{kernel/fragments/components :: listFoot(pageResponse=${needsPage}, baseUrl=${paginationBaseUrl})}"></th:block>
+            <nav th:replace="~{kernel/fragments/pagination :: pageSizePicker(pageResponse=${needsPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
+        </th:block>
+        </div>
+    </section>
+
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='supply-need-modal', titleKey='supply.need.modal.title', titleId='supply-need-title', variant='krt-modal--wide', body=~{::supply-need-modal-body})}">
+        <th:block th:ref="supply-need-modal-body">
+            <form id="supply-need-form" class="no-track" novalidate>
+                <div class="krt-modal-body">
+                    <input type="hidden" id="supply-need-id">
+                    <input type="hidden" id="supply-need-version">
+                    <div class="form-group" id="supply-need-unit-row">
+                        <label for="supply-need-unit" th:text="#{supply.need.unit}">Einheit</label>
+                        <select id="supply-need-unit" required>
+                            <option th:each="u : ${raisingUnits}" th:value="${u.orgUnitId()}" th:text="${u.name()}">ARGON</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="supply-need-kind-row">
+                        <label for="supply-need-kind" th:text="#{supply.need.kind}">Art</label>
+                        <select id="supply-need-kind">
+                            <option value="material" th:text="#{supply.kind.material}">Material</option>
+                            <option value="item" th:text="#{supply.kind.item}">Item</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="supply-need-material-row">
+                        <label for="supply-need-material" th:text="#{supply.need.material}">Material</label>
+                        <select id="supply-need-material">
+                            <option th:each="m : ${materials}" th:value="${m.id()}" th:data-quantity-type="${m.quantityType()}" th:text="${m.name()}">Quantanium</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="supply-need-item-row" hidden>
+                        <label for="supply-need-item" th:text="#{supply.need.item}">Item</label>
+                        <select id="supply-need-item">
+                            <option th:each="i : ${items}" th:value="${i.id()}" th:text="${i.name()}">Item</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="supply-need-tier-row">
+                        <label for="supply-need-tier" th:text="#{supply.need.tier}">Qualit&auml;tsstufe</label>
+                        <select id="supply-need-tier">
+                            <option th:each="t : ${tiers}" th:value="${t.id()}"
+                                    th:text="${t.label(#locale)}">Keine</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="supply-need-amount" th:text="#{supply.need.amount}">Menge</label>
+                        <input type="number" id="supply-need-amount" min="0.001" step="any" inputmode="decimal" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="supply-need-priority" th:text="#{supply.need.priority}">Priorit&auml;t</label>
+                        <select id="supply-need-priority">
+                            <option value="LOW" th:text="#{supply.need.priority.LOW}">Niedrig</option>
+                            <option value="NORMAL" selected th:text="#{supply.need.priority.NORMAL}">Normal</option>
+                            <option value="HIGH" th:text="#{supply.need.priority.HIGH}">Hoch</option>
+                        </select>
+                    </div>
+                    <div class="form-group check-row">
+                        <input type="checkbox" id="supply-need-purchasable">
+                        <label for="supply-need-purchasable" th:text="#{supply.need.purchasable.label}">Zukauf erlauben</label>
+                    </div>
+                    <div id="supply-need-purchase-fields" hidden>
+                        <div class="form-group">
+                            <label for="supply-need-reason" th:text="#{supply.need.reason}">Grund</label>
+                            <select id="supply-need-reason">
+                                <option th:each="r : ${ {'HIGH_FARM_EFFORT','RARE_SOURCE','TIME_CRITICAL','OTHER'} }" th:value="${r}"
+                                        th:text="#{'supply.need.reason.' + ${r}}">Hoher Farmaufwand</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="supply-need-max-price" th:text="#{supply.need.maxPriceLabel}">H&ouml;chstpreis je Einheit (aUEC)</label>
+                            <input type="number" id="supply-need-max-price" min="1" step="1" inputmode="numeric">
+                        </div>
+                    </div>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="supply-need-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta" data-testid="supply-need-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{supply.need.save}">Speichern</span></button>
+                </div>
+            </form>
+        </th:block>
+    </th:block>
+
+    <th:block th:replace="~{supply/fragments/pledge-modal :: pledgeModal}"></th:block>
+</main>
+</th:block>
+
+<th:block th:fragment="pageTail">
+<th:block th:replace="~{supply/fragments/supply-script :: supplyBootstrap}"></th:block>
+<script type="module" th:src="@{/js/supply/supply-needs.js}" th:attr="nonce=${cspNonce}"></script>
+</th:block>
+</body>
+</html>

@@ -1,0 +1,53 @@
+@layer base, components, page, utilities;
+
+@layer page {
+    .supply-tabs {
+        margin-bottom: var(--space-4);
+    }
+    .supply-row-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+        gap: var(--space-2);
+    }
+    .supply-meter {
+        width: 100%;
+        min-width: 6rem;
+        margin-bottom: var(--space-2);
+    }
+    @media (width <= 768px) {
+        .supply-table .supply-meter {
+            display: none;
+        }
+    }
+    .supply-stats-donors,
+    .supply-admin-units {
+        margin-top: var(--space-6);
+    }
+    .supply-pledge-need {
+        margin: 0 0 var(--space-3);
+        color: var(--color-gray-1);
+    }
+    .supply-pledge-need[hidden] {
+        display: none;
+    }
+    .krt-modal-body .form-group:not(.check-row) > label {
+        display: block;
+        margin-bottom: var(--space-2);
+        font-weight: var(--fw-bold);
+        font-size: var(--fs-sm);
+    }
+    .krt-modal-body
+        .form-group
+        > :is(input:not([type='checkbox'], [type='radio']), select, textarea) {
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .form-section > .form-group {
+        margin: 0;
+    }
+    .form-layout.card > .form-actions--sticky {
+        justify-content: flex-end;
+    }
+}

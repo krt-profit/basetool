@@ -587,7 +587,9 @@ public class ExchangeStockWriteService {
       BigDecimal rowAmount = round(BigDecimal.valueOf(row.getAmount()), change.lot().unit());
       BigDecimal take = rowAmount.min(left);
       if (take.compareTo(rowAmount) < 0) {
-        BigDecimal earmarked = BigDecimal.valueOf(row.jobOrderReserved() + row.missionReserved());
+        BigDecimal earmarked =
+            BigDecimal.valueOf(
+                row.jobOrderReserved() + row.missionReserved() + row.donationReserved());
         take = take.min(round(rowAmount.subtract(earmarked), change.lot().unit()));
       }
       if (take.signum() <= 0) {
@@ -768,7 +770,8 @@ public class ExchangeStockWriteService {
   private static @NotNull BigDecimal free(@NotNull List<StockRow> rows) {
     BigDecimal free = BigDecimal.ZERO;
     for (StockRow row : rows) {
-      double reserved = Math.max(row.jobOrderReserved(), row.missionReserved());
+      double reserved =
+          Math.max(Math.max(row.jobOrderReserved(), row.missionReserved()), row.donationReserved());
       free = free.add(BigDecimal.valueOf(Math.max(0.0, row.getAmount() - reserved)));
     }
     return free;

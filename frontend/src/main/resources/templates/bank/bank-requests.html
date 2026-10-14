@@ -70,6 +70,8 @@
                             <span class="bank-req-justification" data-testid="bank-request-justification"
                                   th:text="'&#8222;' + ${r.justification()} + '&#8220;'">&#8222;Missionsfreigabe&#8220;</span>
                         </th:block>
+                        <span th:if="${r.purposeKind() != null}" class="chip chip--muted" data-testid="bank-request-purpose"
+                              th:text="#{'bank.purpose.' + ${r.purposeKind()}}">Ankauf</span>
                     </span>
                 </td>
                 <td>

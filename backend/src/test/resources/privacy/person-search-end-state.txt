@@ -76,4 +76,8 @@ PROMOTION|promotion_level_content|description|null|Vor ZzzMentionZzz nach
 PROMOTION|promotion_topic|description|null|Vor ZzzMentionZzz nach
 PROMOTION|promotion_topic|name|null|Vor ZzzMentionZzz nach
 PROMOTION|rank_requirement|description|null|Vor ZzzMentionZzz nach
+PURCHASING|purchasing_partner|conditions_note|null|Vor ZzzMentionZzz nach
+PURCHASING|purchasing_partner|name|null|Vor ZzzMentionZzz nach
+PURCHASING|purchasing_partner|org_tag|null|ZzzMentionZzz
+PURCHASING|purchasing_partner|reputation_note|null|Vor ZzzMentionZzz nach
 REGISTRATION|user_approval_event|reason|null|Vor ZzzMentionZzz nach

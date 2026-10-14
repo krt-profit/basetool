@@ -264,6 +264,7 @@ public class InventoryCheckoutService {
     AllocationReductions.applyPlan(item, missionReductions, false);
 
     if (remainingAmount <= QUANTITY_EPSILON) {
+      InventoryDonationGuards.requireNoDonation(item);
       final int removed = stockChangeObserver.beforeDelete(List.of(sourceId), reason);
       inventoryItemRepository.delete(item);
       recordBookOutTail(
@@ -374,6 +375,7 @@ public class InventoryCheckoutService {
     AllocationReductions.applyPlan(item, missionReductions, false);
     final StockChangeEffects offers;
     if (remainingAmount <= QUANTITY_EPSILON) {
+      InventoryDonationGuards.requireNoDonation(item);
       offers =
           new StockChangeEffects(
               0, stockChangeObserver.beforeDelete(List.of(sourceId), offerReason));
@@ -656,6 +658,7 @@ public class InventoryCheckoutService {
     InventoryItem savedNew = inventoryItemRepository.save(newItem);
 
     if (depleted) {
+      InventoryDonationGuards.requireNoDonation(item);
       stockChangeObserver.beforeDelete(List.of(sourceId), StockChangeReason.REBOOK);
       inventoryItemRepository.delete(item);
     } else {
@@ -1267,6 +1270,7 @@ public class InventoryCheckoutService {
       @Nullable OrgUnit targetOwningOrgUnit,
       boolean targetPersonal,
       boolean mergeStock) {
+    InventoryDonationGuards.requireNoDonation(source);
     final double amount = source.getAmount() != null ? source.getAmount() : 0.0;
 
     InventoryItem newItem = new InventoryItem();

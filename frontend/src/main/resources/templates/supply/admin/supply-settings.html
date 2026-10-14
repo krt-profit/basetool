@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<head>
+    <title th:text="#{supply.admin.title} + ' - ' + ${appTitle}">Bedarf &amp; Spenden - Administration</title>
+    <th:block th:fragment="extraLinks">
+<th:block th:replace="~{supply/fragments/supply-links :: supplyLinks}"></th:block>
+    </th:block>
+</head>
+<body>
+<th:block th:fragment="pageContent">
+<main>
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{supply.admin.title}, count=null, actions=null)}"></th:block>
+
+    <form id="supply-settings-form" class="form-layout card no-track" novalidate>
+        <fieldset class="form-section">
+            <legend class="form-section__head" th:text="#{supply.admin.section.general}">Allgemein</legend>
+            <label class="check-row">
+                <input type="checkbox" id="supply-settings-enabled" th:checked="${settings != null and settings.enabled()}">
+                <span th:text="#{supply.admin.enabled}">Bedarf &amp; Spenden einschalten</span>
+            </label>
+            <div class="form-group">
+                <label for="supply-settings-area" class="form-label" th:text="#{supply.admin.area}">Federf&uuml;hrender Bereich</label>
+                <select id="supply-settings-area" data-testid="supply-settings-area">
+                    <option value="" th:text="#{supply.admin.area.none}">Keiner</option>
+                    <option th:each="u : ${adminUnits}" th:if="${u.kind() == 'BEREICH'}" th:value="${u.orgUnitId()}"
+                            th:selected="${settings != null and u.orgUnitId() == settings.governingAreaId()}"
+                            th:text="${u.name()}">Profit</option>
+                </select>
+            </div>
+        </fieldset>
+
+        <div class="form-actions--sticky">
+            <button type="submit" class="btn btn--cta" data-testid="supply-settings-save"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{supply.need.save}">Speichern</span></button>
+        </div>
+    </form>
+
+    <section class="supply-admin-units">
+        <div class="card-head">
+            <h2 class="card-title" th:text="#{supply.admin.units}">Teilnehmende Einheiten</h2>
+        </div>
+        <div class="card card--flush">
+            <div class="table-responsive">
+                <table class="data-table data-table--stack supply-table" data-testid="supply-units-table">
+                    <thead>
+                        <tr>
+                            <th th:text="#{supply.donation.unit}">Einheit</th>
+                            <th th:text="#{supply.admin.mayRaise}">Stellt Bedarf</th>
+                            <th th:text="#{supply.admin.accepts}">Nimmt Spenden an</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="u : ${adminUnits}" th:data-unit-id="${u.orgUnitId()}" th:data-version="${u.version()}"
+                            data-testid="supply-unit-row">
+                            <td th:text="${u.name()}">ARGON</td>
+                            <td th:attr="data-label=#{supply.admin.mayRaise}"><input type="checkbox" class="supply-unit-raise" th:checked="${u.mayRaiseNeeds()}"
+                                       data-trigger="supply-unit-change" th:attr="aria-label=#{supply.admin.mayRaise}"></td>
+                            <td th:attr="data-label=#{supply.admin.accepts}"><input type="checkbox" class="supply-unit-accept" th:checked="${u.acceptsDonations()}"
+                                       data-trigger="supply-unit-change" th:attr="aria-label=#{supply.admin.accepts}"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+</main>
+</th:block>
+
+<th:block th:fragment="pageTail">
+<th:block th:replace="~{supply/fragments/supply-script :: supplyBootstrap}"></th:block>
+<script type="module" th:src="@{/js/supply/supply-admin.js}" th:attr="nonce=${cspNonce}"></script>
+</th:block>
+</body>
+</html>

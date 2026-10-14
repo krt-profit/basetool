@@ -109,6 +109,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserDtoRedaction;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.identity.web.DiscordAccountExistenceController;
 import de.greluc.krt.profit.basetool.backend.identity.web.TermsDocumentController;
+import de.greluc.krt.profit.basetool.backend.inventory.api.DonationAllocationDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
@@ -362,6 +363,7 @@ class ArchitectureTest {
           ClientAttribution.class,
           ClientDirectory.class,
           ConnectedAppsProperties.class,
+          DonationAllocationDto.class,
           ExchangeChangeRetentionProperties.class,
           ExchangeClientDirectory.class,
           ExchangeConnectionRetentionProperties.class,
@@ -1164,7 +1166,7 @@ class ArchitectureTest {
 
   @Test
   void leafHelpersMustStayDependencyLeaves() {
-    assertClassFloor("leafHelpersMustStayDependencyLeaves", LEAF_HELPERS, 69);
+    assertClassFloor("leafHelpersMustStayDependencyLeaves", LEAF_HELPERS, 70);
     leafHelpersMustStayDependencyLeavesRule(
             LEAF_HELPERS, LEAF_HELPERS.or(MODEL_CODE).or(REPOSITORY_CODE), ROOT_PACKAGE)
         .check(CLASSES);

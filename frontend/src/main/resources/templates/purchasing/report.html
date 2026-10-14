@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<head>
+    <title th:text="#{purchasing.report.title} + ' - ' + ${appTitle}">Ankaufbericht - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+<th:block th:replace="~{purchasing/fragments/purchasing-links :: purchasingLinks}"></th:block>
+    </th:block>
+</head>
+<body>
+<th:block th:fragment="pageContent">
+<main>
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.supply', titleText=#{purchasing.report.title}, count=null, actions=~{::report-actions})}">
+        <th:block th:ref="report-actions">
+            <a class="btn btn-ghost" id="purchasing-report-csv" data-testid="purchasing-report-csv"
+               th:href="@{/api/proxy/purchasing/report/export(from=${from},to=${to})}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-download"/></svg> <span th:text="#{purchasing.report.csv}">CSV</span></a>
+            <button type="button" class="btn btn-ghost" data-trigger="purchasing-forum-text" data-testid="purchasing-report-forum"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clipboard-check"/></svg> <span th:text="#{purchasing.report.forum}">Forumtext</span></button>
+        </th:block>
+    </th:block>
+
+    <th:block th:replace="~{purchasing/fragments/purchasing-tabs :: tabs(active='report')}"></th:block>
+
+    <section class="list-panel">
+        <form id="purchasing-report-filter" class="no-track" role="search" method="get" th:action="@{/purchasing/report}">
+            <div class="toolbar">
+                <div class="demand-filter-field">
+                    <label class="form-label-xs" for="purchasing-report-from" th:text="#{purchasing.report.from}">Von</label>
+                    <input type="month" id="purchasing-report-from" name="from" th:value="${from}">
+                </div>
+                <div class="demand-filter-field">
+                    <label class="form-label-xs" for="purchasing-report-to" th:text="#{purchasing.report.to}">Bis</label>
+                    <input type="month" id="purchasing-report-to" name="to" th:value="${to}">
+                </div>
+            </div>
+        </form>
+    </section>
+
+    <div id="purchasing-report-results">
+    <th:block th:fragment="reportResults">
+    <th:block th:if="${report != null}">
+        <div class="kpi-grid purchasing-totals" data-testid="purchasing-report-totals">
+            <div class="kpi-total">
+                <div class="kpi-label" th:text="#{purchasing.report.deals}">Gesch&auml;fte</div>
+                <div class="kpi-value" th:text="${report.totals().dealCount()}">0</div>
+            </div>
+            <div class="kpi-total">
+                <div class="kpi-label" th:text="#{purchasing.report.settled}">Abgerechnet</div>
+                <div class="kpi-value" th:text="${report.totals().settledCount()}">0</div>
+            </div>
+            <div class="kpi-total">
+                <div class="kpi-label" th:text="#{purchasing.report.failed}">Gescheitert</div>
+                <div class="kpi-value" th:text="${report.totals().failedCount()}">0</div>
+            </div>
+            <div class="kpi-total">
+                <div class="kpi-label" th:text="#{purchasing.report.overdue}">&Uuml;berf&auml;llig</div>
+                <div class="kpi-value" th:text="${report.totals().overdueCount()}">0</div>
+            </div>
+            <div class="kpi-total">
+                <div class="kpi-label" th:text="#{purchasing.report.bought}">Gekaufte Menge</div>
+                <div class="kpi-value" th:text="${report.totals().boughtAmount()}">0</div>
+            </div>
+            <div class="kpi-total">
+                <div class="kpi-label" th:text="#{purchasing.report.funded}">Bewilligt</div>
+                <div class="kpi-value" th:text="#{purchasing.money(${#numbers.formatInteger(report.totals().funded(), 1, 'POINT')})}">0 aUEC</div>
+            </div>
+            <div class="kpi-total">
+                <div class="kpi-label" th:text="#{purchasing.report.returned}">Zur&uuml;ckgeflossen</div>
+                <div class="kpi-value" th:text="#{purchasing.money(${#numbers.formatInteger(report.totals().returned(), 1, 'POINT')})}">0 aUEC</div>
+            </div>
+            <div class="kpi-total">
+                <div class="kpi-label" th:text="#{purchasing.report.spent}">Netto ausgegeben</div>
+                <div class="kpi-value" th:text="#{purchasing.money(${#numbers.formatInteger(report.totals().spent(), 1, 'POINT')})}">0 aUEC</div>
+            </div>
+            <div class="kpi-total">
+                <div class="kpi-label" th:text="#{purchasing.report.loss}">Verlust</div>
+                <div class="kpi-value" th:text="#{purchasing.money(${#numbers.formatInteger(report.totals().loss(), 1, 'POINT')})}">0 aUEC</div>
+            </div>
+        </div>
+
+        <section class="card">
+            <div class="card-head">
+                <h2 class="card-title" th:text="#{purchasing.report.byMonth}">Je Monat</h2>
+            </div>
+            <div class="table-responsive">
+                <table class="data-table data-table--stack" data-testid="purchasing-report-months">
+                    <thead>
+                        <tr>
+                            <th th:text="#{purchasing.report.month}">Monat</th>
+                            <th class="num" th:text="#{purchasing.report.deals}">Gesch&auml;fte</th>
+                            <th class="num" th:text="#{purchasing.report.bought}">Gekaufte Menge</th>
+                            <th class="num" th:text="#{purchasing.report.spent}">Netto ausgegeben</th>
+                            <th class="num" th:text="#{purchasing.report.loss}">Verlust</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="m : ${report.months()}">
+                            <td th:text="${m.month()}">2026-10</td>
+                            <td class="num" th:attr="data-label=#{purchasing.report.deals}" th:text="${m.dealCount()}">0</td>
+                            <td class="num" th:attr="data-label=#{purchasing.report.bought}" th:text="${m.boughtAmount()}">0</td>
+                            <td class="num" th:attr="data-label=#{purchasing.report.spent}" th:text="${#numbers.formatInteger(m.spent(), 1, 'POINT')}">0</td>
+                            <td class="num" th:attr="data-label=#{purchasing.report.loss}" th:text="${#numbers.formatInteger(m.loss(), 1, 'POINT')}">0</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="card-head">
+                <h2 class="card-title" th:text="#{purchasing.report.byMaterial}">Je Material</h2>
+            </div>
+            <div class="table-responsive" th:if="${!#lists.isEmpty(report.materials())}">
+                <table class="data-table data-table--stack" data-testid="purchasing-report-materials">
+                    <thead>
+                        <tr>
+                            <th th:text="#{purchasing.deal.entry}">Material / Item</th>
+                            <th class="num" th:text="#{purchasing.report.deals}">Gesch&auml;fte</th>
+                            <th class="num" th:text="#{purchasing.report.bought}">Gekaufte Menge</th>
+                            <th class="num" th:text="#{purchasing.report.avgPrice}">&Oslash; Preis</th>
+                            <th class="num" th:text="#{purchasing.report.uex}">UEX-Referenz</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="m : ${report.materials()}">
+                            <td th:text="${m.name()}">Quantanium</td>
+                            <td class="num" th:attr="data-label=#{purchasing.report.deals}" th:text="${m.dealCount()}">0</td>
+                            <td class="num" th:attr="data-label=#{purchasing.report.bought}" th:text="${m.boughtAmount()}">0</td>
+                            <td class="num" th:attr="data-label=#{purchasing.report.avgPrice}"
+                                th:text="${#numbers.formatDecimal(m.averageUnitPrice(), 1, 'POINT', 0, 'COMMA')}">0</td>
+                            <td class="num" th:attr="data-label=#{purchasing.report.uex}"
+                                th:text="${m.uexReferencePrice() != null ? #numbers.formatDecimal(m.uexReferencePrice(), 1, 'POINT', 0, 'COMMA') : '&ndash;'}">&ndash;</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <th:block th:if="${#lists.isEmpty(report.materials())}">
+                <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='purchasing.report.empty', textKey='purchasing.report.empty.text')}"></th:block>
+            </th:block>
+        </section>
+
+        <section class="card" th:if="${!#lists.isEmpty(report.needs())}">
+            <div class="card-head">
+                <h2 class="card-title" th:text="#{purchasing.report.byNeed}">Je Bedarf</h2>
+            </div>
+            <div class="table-responsive">
+                <table class="data-table data-table--stack" data-testid="purchasing-report-needs">
+                    <thead>
+                        <tr>
+                            <th th:text="#{purchasing.deal.unit}">Einheit</th>
+                            <th th:text="#{purchasing.deal.entry}">Material / Item</th>
+                            <th class="num" th:text="#{purchasing.report.deals}">Gesch&auml;fte</th>
+                            <th class="num" th:text="#{purchasing.report.bought}">Gekaufte Menge</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="n : ${report.needs()}">
+                            <td th:text="${n.unit()}">ARGON</td>
+                            <td th:attr="data-label=#{purchasing.deal.entry}" th:text="${n.entry()}">Quantanium</td>
+                            <td class="num" th:attr="data-label=#{purchasing.report.deals}" th:text="${n.dealCount()}">0</td>
+                            <td class="num" th:attr="data-label=#{purchasing.report.bought}" th:text="${n.boughtAmount()}">0</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </th:block>
+    </th:block>
+    </div>
+
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='purchasing-forum-modal', titleKey='purchasing.report.forum', titleId='purchasing-forum-title', variant='krt-modal--wide', body=~{::purchasing-forum-modal-body})}">
+        <th:block th:ref="purchasing-forum-modal-body">
+            <div class="krt-modal-body">
+                <div class="form-group">
+                    <textarea id="purchasing-forum-text" rows="14" readonly data-testid="purchasing-forum-text"
+                              th:attr="aria-label=#{purchasing.report.forum}"></textarea>
+                </div>
+            </div>
+            <div class="krt-modal-foot">
+                <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="purchasing-forum-modal" th:text="#{purchasing.report.forum.close}">Schlie&szlig;en</button>
+                <button type="button" class="btn btn--cta" data-trigger="purchasing-forum-copy" data-testid="purchasing-forum-copy" th:text="#{purchasing.report.forum.copy}">Kopieren</button>
+            </div>
+        </th:block>
+    </th:block>
+</main>
+</th:block>
+
+<th:block th:fragment="pageTail">
+<th:block th:replace="~{purchasing/fragments/purchasing-script :: purchasingBootstrap}"></th:block>
+<script type="module" th:src="@{/js/purchasing/purchasing-report.js}" th:attr="nonce=${cspNonce}"></script>
+</th:block>
+</body>
+</html>

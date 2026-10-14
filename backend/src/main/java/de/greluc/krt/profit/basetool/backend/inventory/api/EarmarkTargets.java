@@ -49,6 +49,19 @@ public final class EarmarkTargets {
     Map<UUID, MissionEarmark> missions(@NotNull Collection<UUID> ids);
   }
 
+  /** The donations a Lager row's pledge earmark points at; implemented by the supply module. */
+  public interface Donations {
+
+    /**
+     * Looks the donations up in one read.
+     *
+     * @param ids the donations
+     * @return each existing donation by id; an unknown id is absent
+     */
+    @NotNull
+    Map<UUID, DonationEarmark> donations(@NotNull Collection<UUID> ids);
+  }
+
   /** The job orders the Lager's stock is earmarked to; implemented by the job-order module. */
   public interface JobOrders {
 

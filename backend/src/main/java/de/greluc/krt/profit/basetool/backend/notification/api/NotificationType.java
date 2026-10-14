@@ -378,7 +378,65 @@ public enum NotificationType {
    * The exchange was switched off (REQ-XCH-041); connected applications cannot read or write until
    * it is on again.
    */
-  EXCHANGE_SWITCHED_OFF;
+  EXCHANGE_SWITCHED_OFF,
+
+  /**
+   * A member pledged a material donation (REQ-SUP-016). The default rule notifies the lead and the
+   * Logisticians of the receiving unit, excluding the actor; superseded when the pledge is
+   * received, declined or withdrawn.
+   */
+  SUPPLY_DONATION_PLEDGED,
+
+  /**
+   * A receiving unit confirmed a donation, in full or in part (REQ-SUP-016). The default rule
+   * notifies the donor; rendered with the unit, the material and the received amount.
+   */
+  SUPPLY_DONATION_RECEIVED,
+
+  /**
+   * A receiving unit declined a pledge (REQ-SUP-016). The default rule notifies the donor; rendered
+   * with the unit, the material and the reason code.
+   */
+  SUPPLY_DONATION_DECLINED,
+
+  /**
+   * A need was released for purchase (REQ-PUR-024). Rendered with the unit, the material and the
+   * amount; superseded when the need is fulfilled or withdrawn.
+   */
+  PURCHASING_NEED_RELEASED,
+
+  /**
+   * A delegate recorded a delivery for acceptance (REQ-PUR-024). Rendered with the deal number, the
+   * material and the amount; superseded by the decision.
+   */
+  PURCHASING_DELIVERY_RECORDED,
+
+  /**
+   * A delivery was accepted or rejected (REQ-PUR-024). Rendered with the deal number and an outcome
+   * code.
+   */
+  PURCHASING_DELIVERY_DECIDED,
+
+  /**
+   * A deal's settlement is overdue (REQ-PUR-018). Rendered with the deal number; superseded when
+   * the settlement is saved.
+   */
+  PURCHASING_SETTLEMENT_OVERDUE,
+
+  /**
+   * Purchasing was paused (REQ-PUR-024). Rendered with a scope code and a reason code; superseded
+   * by the resume.
+   */
+  PURCHASING_PAUSED,
+
+  /** Purchasing was resumed (REQ-PUR-024). Rendered with a scope code. */
+  PURCHASING_RESUMED,
+
+  /** The member was appointed Handelsbeauftragter (REQ-PUR-024); superseded by a revocation. */
+  PURCHASING_DELEGATE_APPOINTED,
+
+  /** The member's appointment was revoked (REQ-PUR-024). */
+  PURCHASING_DELEGATE_REVOKED;
 
   /**
    * Whether a member may mute this type (REQ-NOTIF-027). The account-deletion types serve a legal
@@ -391,7 +449,14 @@ public enum NotificationType {
     return switch (this) {
       case ACCOUNT_DELETION_REQUESTED,
           ACCOUNT_DELETION_REQUEST_DECLINED,
-          EXCHANGE_INSTALLATION_CONNECTED ->
+          EXCHANGE_INSTALLATION_CONNECTED,
+          PURCHASING_DELIVERY_RECORDED,
+          PURCHASING_DELIVERY_DECIDED,
+          PURCHASING_SETTLEMENT_OVERDUE,
+          PURCHASING_PAUSED,
+          PURCHASING_RESUMED,
+          PURCHASING_DELEGATE_APPOINTED,
+          PURCHASING_DELEGATE_REVOKED ->
           false;
       case JOB_ORDER_CREATED,
           JOB_ORDER_UPDATED_BY_REQUESTER,
@@ -448,7 +513,11 @@ public enum NotificationType {
           EXCHANGE_CLIENT_ACTIVATED,
           EXCHANGE_CLIENT_UPDATE_REQUIRED,
           EXCHANGE_CLIENT_CAPABILITY_REMOVED,
-          EXCHANGE_SWITCHED_OFF ->
+          EXCHANGE_SWITCHED_OFF,
+          SUPPLY_DONATION_PLEDGED,
+          SUPPLY_DONATION_RECEIVED,
+          SUPPLY_DONATION_DECLINED,
+          PURCHASING_NEED_RELEASED ->
           true;
     };
   }

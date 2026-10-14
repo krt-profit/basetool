@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<nav th:fragment="tabs(active)" class="tab-nav supply-tabs" th:aria-label="#{supply.title}" data-testid="supply-tabs">
+    <a th:href="@{/supply/needs}" class="tab" th:classappend="${active == 'needs'} ? 'active'"
+       th:attr="aria-current=${active == 'needs'} ? 'page' : null" data-testid="supply-tab-needs"
+       th:text="#{supply.tab.needs}">Bedarf</a>
+    <a th:href="@{/supply/donations/mine}" class="tab" th:classappend="${active == 'mine'} ? 'active'"
+       th:attr="aria-current=${active == 'mine'} ? 'page' : null" data-testid="supply-tab-mine"
+       th:text="#{supply.tab.mine}">Meine Spenden</a>
+    <a th:if="${supplyTabs.incoming()}" th:href="@{/supply/donations/incoming}" class="tab"
+       th:classappend="${active == 'incoming'} ? 'active'"
+       th:attr="aria-current=${active == 'incoming'} ? 'page' : null" data-testid="supply-tab-incoming"
+       th:text="#{supply.tab.incoming}">Eingehende Spenden</a>
+    <a th:if="${supplyTabs.stats()}" th:href="@{/supply/stats}" class="tab"
+       th:classappend="${active == 'stats'} ? 'active'"
+       th:attr="aria-current=${active == 'stats'} ? 'page' : null" data-testid="supply-tab-stats"
+       th:text="#{supply.tab.stats}">Statistik</a>
+</nav>
+</body>
+</html>

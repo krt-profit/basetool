@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.inventory.api;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import java.util.Objects;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -40,4 +41,25 @@ public record StockLot(
     @Nullable GameItem gameItem,
     @NotNull Location location,
     @Nullable Integer quality,
-    boolean stolen) {}
+    boolean stolen) {
+
+  /**
+   * Returns the lot's key as {@link StockCommands#lockLots} and the change feed know it.
+   *
+   * @return the key: the catalogue id, location, quality and stolen marker
+   */
+  @NotNull
+  public String key() {
+    String head =
+        material != null
+            ? "m:" + material.getId()
+            : "i:" + Objects.requireNonNull(gameItem).getId();
+    return head
+        + "|l:"
+        + location.getId()
+        + "|q:"
+        + (quality == null ? 0 : quality)
+        + "|s:"
+        + (stolen ? "1" : "0");
+  }
+}

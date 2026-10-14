@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import de.greluc.krt.profit.basetool.backend.inventory.api.DonationEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargets;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
@@ -49,6 +50,7 @@ public class InventoryEarmarkTargetCache implements InventoryEarmarkLookup {
 
   private final EarmarkTargets.Missions missions;
   private final EarmarkTargets.JobOrders jobOrders;
+  private final EarmarkTargets.Donations donations;
   private final EntityManager entityManager;
 
   @Override
@@ -79,6 +81,39 @@ public class InventoryEarmarkTargetCache implements InventoryEarmarkLookup {
       }
     }
     return Objects.requireNonNull(memo.get(jobOrderId)).orElse(null);
+  }
+
+  @Override
+  public @Nullable DonationEarmark donation(@NotNull UUID donationId) {
+    Map<UUID, Optional<DonationEarmark>> memo = memoObject().donations;
+    if (!memo.containsKey(donationId)) {
+      Set<UUID> wanted = new LinkedHashSet<>(earmarkedDonationsInContext());
+      wanted.add(donationId);
+      wanted.removeAll(memo.keySet());
+      Map<UUID, DonationEarmark> found = donations.donations(wanted);
+      for (UUID id : wanted) {
+        memo.put(id, Optional.ofNullable(found.get(id)));
+      }
+    }
+    return Objects.requireNonNull(memo.get(donationId)).orElse(null);
+  }
+
+  private Set<UUID> earmarkedDonationsInContext() {
+    Set<UUID> ids = new LinkedHashSet<>();
+    if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+      return ids;
+    }
+    for (Map.Entry<Object, ?> entry :
+        entityManager
+            .unwrap(SessionImplementor.class)
+            .getPersistenceContextInternal()
+            .reentrantSafeEntityEntries()) {
+      if (entry.getKey() instanceof InventoryDonationAllocation allocation
+          && allocation.getDonationId() != null) {
+        ids.add(allocation.getDonationId());
+      }
+    }
+    return ids;
   }
 
   private Set<UUID> earmarkedJobOrdersInContext() {
@@ -145,5 +180,8 @@ public class InventoryEarmarkTargetCache implements InventoryEarmarkLookup {
 
     /** The looked-up job orders by id, empty for an unknown one. */
     private final Map<UUID, Optional<JobOrderEarmark>> jobOrders = new HashMap<>();
+
+    /** The looked-up donations by id, empty for an unknown one. */
+    private final Map<UUID, Optional<DonationEarmark>> donations = new HashMap<>();
   }
 }

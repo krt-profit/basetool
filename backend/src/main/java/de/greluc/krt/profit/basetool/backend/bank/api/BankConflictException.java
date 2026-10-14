@@ -113,6 +113,13 @@ public final class BankConflictException extends DomainProblem {
       BankProblemCode.BANK_OWNER_APPROVAL_REQUIRED.code();
 
   /**
+   * Owner approval or confirmation of a booking request by the member who raised it; a second
+   * person must decide (REQ-BANK-062).
+   */
+  public static final String CODE_BANK_FOUR_EYES_REQUIRED =
+      BankProblemCode.BANK_FOUR_EYES_REQUIRED.code();
+
+  /**
    * Direct booking out of the KRT ({@code CARTEL}) account by a plain bank employee above the
    * ceiling T1 (REQ-BANK-047). Not thrown: the direct-booking controller files such an attempt as a
    * {@code PENDING} approval request and answers {@code 202} (ADR-0109).

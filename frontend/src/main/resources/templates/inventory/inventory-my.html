@@ -6,6 +6,9 @@
 <link rel="stylesheet" th:href="@{/css/materialexchange/materialboerse.css}"/>
 <link rel="stylesheet" th:href="@{/css/inventory/inventory-lager.css}">
 <link rel="stylesheet" th:href="@{/css/pages/inventory/inventory-my.css}">
+<th:block th:if="${supplyEnabled == true}">
+<th:block th:replace="~{supply/fragments/supply-links :: supplyLinks}"></th:block>
+</th:block>
     </th:block>
 </head>
 <body>
@@ -691,6 +694,9 @@
 <th:block th:if="${canMarkStolen}">
     <th:block th:replace="~{inventory/fragments/inventory-stolen-mark :: stolenMarkModal('inv-my')}"></th:block>
 </th:block>
+<th:block th:if="${supplyEnabled == true}">
+    <th:block th:replace="~{supply/fragments/lager-pledge-modal :: lagerPledgeModal}"></th:block>
+</th:block>
 </th:block>
 <th:block th:fragment="pageTail">
 <th:block th:replace="~{materialexchange/fragments/materialboerse-modal :: releaseModal}"/>
@@ -812,6 +818,10 @@
 <script type="module" th:src="@{/js/inventory/inventory-common.js}" th:attr="nonce=${cspNonce}"></script>
 <script type="module" th:src="@{/js/inventory/inventory-my.js}" th:attr="nonce=${cspNonce}"></script>
 <script type="module" th:src="@{/js/inventory/inventory-materialboerse.js}" th:attr="nonce=${cspNonce}"></script>
+<th:block th:if="${supplyEnabled == true}">
+<th:block th:replace="~{supply/fragments/supply-script :: supplyBootstrap}"></th:block>
+<script type="module" th:src="@{/js/supply/supply-lager.js}" th:attr="nonce=${cspNonce}"></script>
+</th:block>
 </th:block>
 </body>
 </html>

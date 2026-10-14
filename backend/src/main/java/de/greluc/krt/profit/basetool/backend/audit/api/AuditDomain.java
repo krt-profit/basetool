@@ -86,5 +86,19 @@ public enum AuditDomain {
    * the global exchange switch (REQ-XCH-003). The subject is the registry client with its client id
    * as label.
    */
-  CONNECTED_APPS
+  CONNECTED_APPS,
+
+  /**
+   * Material supply (Bedarf & Spenden): the needs of the raising units, the members' material
+   * donations and the unit settings. The subject is the need or the donation with its catalogue
+   * entry as label; the donor is the target.
+   */
+  SUPPLY,
+
+  /**
+   * Material purchasing (Ankauf): the trade deals with their tranches, deliveries and settlements,
+   * the partners, the delegates and the purchasing settings. The subject is the deal, the partner
+   * or the delegate; the details carry ids, enums and amounts, never a partner name or a note.
+   */
+  PURCHASING
 }

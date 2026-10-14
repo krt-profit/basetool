@@ -744,7 +744,133 @@ public enum AuditEventType {
   CONNECTED_APPS_AUDIT_EXPORTED(AuditDomain.CONNECTED_APPS),
 
   /** Connected-applications audit rows older than an admin-chosen cutoff were purged. */
-  CONNECTED_APPS_AUDIT_PURGED(AuditDomain.CONNECTED_APPS);
+  CONNECTED_APPS_AUDIT_PURGED(AuditDomain.CONNECTED_APPS),
+
+  /** A unit raised a need (REQ-SUP-003). */
+  NEED_RAISED(AuditDomain.SUPPLY),
+
+  /** A need's amount, priority, purchasable flag or job-order link changed (REQ-SUP-003). */
+  NEED_UPDATED(AuditDomain.SUPPLY),
+
+  /** A need was paused (REQ-SUP-005). */
+  NEED_PAUSED(AuditDomain.SUPPLY),
+
+  /** A paused need was opened again (REQ-SUP-005). */
+  NEED_RESUMED(AuditDomain.SUPPLY),
+
+  /** A need was withdrawn (REQ-SUP-005). */
+  NEED_WITHDRAWN(AuditDomain.SUPPLY),
+
+  /** A need reached its amount and was fulfilled (REQ-SUP-005). */
+  NEED_FULFILLED(AuditDomain.SUPPLY),
+
+  /** A member pledged a donation (REQ-SUP-007). */
+  DONATION_PLEDGED(AuditDomain.SUPPLY),
+
+  /** A receiving unit confirmed a donation, in full or in part (REQ-SUP-009). */
+  DONATION_RECEIVED(AuditDomain.SUPPLY),
+
+  /** A receiving unit declined a pledge (REQ-SUP-010). */
+  DONATION_DECLINED(AuditDomain.SUPPLY),
+
+  /** A donor withdrew a pledge (REQ-SUP-010). */
+  DONATION_WITHDRAWN(AuditDomain.SUPPLY),
+
+  /** A receiving unit recorded a donation it already received (REQ-SUP-011). */
+  DONATION_RECORDED(AuditDomain.SUPPLY),
+
+  /** An admin changed what an org unit does in the supply module (REQ-SUP-002). */
+  SUPPLY_UNIT_SETTING_CHANGED(AuditDomain.SUPPLY),
+
+  /** An admin switched the supply surface on or off or changed the governing Bereich. */
+  SUPPLY_SETTINGS_CHANGED(AuditDomain.SUPPLY),
+
+  /** The supply audit log was exported as a PDF or JSON for a period. */
+  SUPPLY_AUDIT_EXPORTED(AuditDomain.SUPPLY),
+
+  /** Supply audit rows older than an admin-chosen cutoff were purged. */
+  SUPPLY_AUDIT_PURGED(AuditDomain.SUPPLY),
+
+  /** A delegate created a trade deal (REQ-PUR-007). */
+  DEAL_CREATED(AuditDomain.PURCHASING),
+
+  /** A draft deal was edited (REQ-PUR-007). */
+  DEAL_UPDATED(AuditDomain.PURCHASING),
+
+  /** A deal was cancelled before any money was confirmed (REQ-PUR-022). */
+  DEAL_CANCELLED(AuditDomain.PURCHASING),
+
+  /** A money tranche was requested from the bank (REQ-PUR-012). */
+  DEAL_TRANCHE_REQUESTED(AuditDomain.PURCHASING),
+
+  /** The bank confirmed a tranche (REQ-PUR-014). */
+  DEAL_TRANCHE_FUNDED(AuditDomain.PURCHASING),
+
+  /** The bank rejected or cancelled a tranche request (REQ-PUR-014). */
+  DEAL_TRANCHE_REFUSED(AuditDomain.PURCHASING),
+
+  /** A delegate recorded a delivery (REQ-PUR-015). */
+  DEAL_DELIVERY_RECORDED(AuditDomain.PURCHASING),
+
+  /** The raising unit accepted a delivery in full or in part (REQ-PUR-016). */
+  DEAL_DELIVERY_ACCEPTED(AuditDomain.PURCHASING),
+
+  /** The raising unit rejected a delivery in full (REQ-PUR-016). */
+  DEAL_DELIVERY_REJECTED(AuditDomain.PURCHASING),
+
+  /** A delegate closed the delivery of a deal (REQ-PUR-015). */
+  DEAL_DELIVERY_CLOSED(AuditDomain.PURCHASING),
+
+  /** A delegate recorded the settlement figures of a deal (REQ-PUR-017). */
+  DEAL_SETTLEMENT_RECORDED(AuditDomain.PURCHASING),
+
+  /** A deal was settled and its remainder returned (REQ-PUR-017). */
+  DEAL_SETTLED(AuditDomain.PURCHASING),
+
+  /** A deal ended with money out and no goods accepted (REQ-PUR-017). */
+  DEAL_FAILED(AuditDomain.PURCHASING),
+
+  /** A partner was created (REQ-PUR-004). */
+  PARTNER_CREATED(AuditDomain.PURCHASING),
+
+  /** A partner was edited (REQ-PUR-004). */
+  PARTNER_UPDATED(AuditDomain.PURCHASING),
+
+  /** A partner was blocked (REQ-PUR-004). */
+  PARTNER_BLOCKED(AuditDomain.PURCHASING),
+
+  /** A partner was unblocked (REQ-PUR-004). */
+  PARTNER_UNBLOCKED(AuditDomain.PURCHASING),
+
+  /** An individual partner was erased on request (REQ-PUR-006). */
+  PARTNER_ERASED(AuditDomain.PURCHASING),
+
+  /** A member was appointed Handelsbeauftragter (REQ-PUR-003). */
+  DELEGATE_APPOINTED(AuditDomain.PURCHASING),
+
+  /** An appointment was revoked (REQ-PUR-003). */
+  DELEGATE_REVOKED(AuditDomain.PURCHASING),
+
+  /** A delegate's monthly limit changed (REQ-PUR-003). */
+  DELEGATE_LIMIT_CHANGED(AuditDomain.PURCHASING),
+
+  /** Purchasing was paused, globally or for one unit (REQ-PUR-019). */
+  PURCHASING_PAUSED(AuditDomain.PURCHASING),
+
+  /** Purchasing was resumed (REQ-PUR-019). */
+  PURCHASING_RESUMED(AuditDomain.PURCHASING),
+
+  /** The purchasing settings or the feature switch changed (REQ-PUR-002). */
+  PURCHASING_SETTINGS_CHANGED(AuditDomain.PURCHASING),
+
+  /** The risk-class table changed (REQ-PUR-011). */
+  RISK_CLASSES_CHANGED(AuditDomain.PURCHASING),
+
+  /** The Ankauf audit log was exported (REQ-AUDIT-004). */
+  PURCHASING_AUDIT_EXPORTED(AuditDomain.PURCHASING),
+
+  /** The Ankauf audit log was purged (REQ-AUDIT-004). */
+  PURCHASING_AUDIT_PURGED(AuditDomain.PURCHASING);
 
   /** The functional area this event type belongs to; pins the persisted {@code domain} column. */
   private final @NotNull AuditDomain domain;

@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<head>
+    <title th:text="#{supply.incoming.title} + ' - ' + ${appTitle}">Eingehende Spenden - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+<th:block th:replace="~{supply/fragments/supply-links :: supplyLinks}"></th:block>
+    </th:block>
+</head>
+<body>
+<th:block th:fragment="pageContent">
+<main>
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.supply', titleText=#{supply.incoming.title},
+        count=${unit != null and donationsPage != null ? donationsPage.totalElements() : null}, countId='supply-incoming-count', countFor='supply-incoming-results', actions=~{::incoming-actions})}">
+        <th:block th:ref="incoming-actions">
+            <button type="button" class="btn btn--cta" data-trigger="supply-open-record" data-testid="supply-record"
+                    th:if="${unit != null}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{supply.record.action}">Erhaltene Spende erfassen</span></button>
+        </th:block>
+    </th:block>
+
+    <th:block th:replace="~{supply/fragments/supply-tabs :: tabs(active='incoming')}"></th:block>
+
+    <div th:if="${unit == null}" class="alert alert-info" th:text="#{supply.incoming.noUnit}" data-testid="supply-no-unit">Du verwaltest keine annehmende Einheit.</div>
+
+    <section class="list-panel" th:if="${unit != null}">
+        <form id="supply-incoming-filter" class="no-track" role="search" method="get" th:action="@{/supply/donations/incoming}">
+            <div class="toolbar">
+                <label class="visually-hidden" for="supply-incoming-unit" th:text="#{supply.filter.unit}">Einheit</label>
+                <select id="supply-incoming-unit" name="orgUnitId" data-testid="supply-incoming-unit" data-filter-chip-ignore>
+                    <option th:each="u : ${managedUnits}" th:value="${u.orgUnitId()}"
+                            th:selected="${u.orgUnitId() == unit.orgUnitId()}" th:text="${u.name()}">ARGON</option>
+                </select>
+                <label class="visually-hidden" for="supply-incoming-status" th:text="#{supply.filter.status}">Status</label>
+                <select id="supply-incoming-status" name="status" data-testid="supply-incoming-status" data-filter-chip-ignore>
+                    <option value="" th:text="#{supply.filter.status.all}">Alle</option>
+                    <option th:each="s : ${ {'PLEDGED','RECEIVED','PARTIALLY_RECEIVED','DECLINED','WITHDRAWN'} }" th:value="${s}"
+                            th:selected="${s == selectedStatus}" th:text="#{'supply.donation.status.' + ${s}}">Angemeldet</option>
+                </select>
+            </div>
+            <input type="hidden" name="size" th:value="${pageSize}">
+        </form>
+
+        <div id="supply-incoming-results" class="card card--flush" th:data-live-sync-topic="${supplyLiveSyncTopic}"
+             th:data-unit-id="${unit.orgUnitId()}">
+        <th:block th:fragment="incomingResults">
+            <div id="supply-incoming-meta" hidden th:if="${unitSwitch}"
+                 th:data-unit-id="${unit.orgUnitId()}" th:data-live-sync-topic="${supplyLiveSyncTopic}">
+                <template>
+                    <option th:each="n : ${openNeeds}" th:value="${n.id()}"
+                            th:data-quantity-type="${n.quantityType()}"
+                            th:text="${n.material() != null ? n.material().name() : n.gameItem().name()}">Quantanium</option>
+                </template>
+            </div>
+            <div class="table-responsive" th:if="${!#lists.isEmpty(donations)}">
+                <table class="data-table data-table--stack supply-table">
+                    <thead>
+                        <tr>
+                            <th th:text="#{supply.donation.entry}">Material / Item</th>
+                            <th th:text="#{supply.donation.donor}">Spender</th>
+                            <th class="num" th:text="#{supply.donation.amount}">Menge</th>
+                            <th class="cell-status" th:text="#{supply.need.status}">Status</th>
+                            <th class="cell-actions"><span class="visually-hidden" th:text="#{supply.actions}">Aktionen</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="d : ${donations}" data-testid="supply-incoming-row" th:data-donation-id="${d.id()}">
+                            <td>
+                                <span class="cell-title" th:text="${d.material() != null ? d.material().name() : d.gameItem().name()}">Quantanium</span>
+                                <span class="cell-sub">
+                                    <span th:if="${d.quality() != null}" th:text="#{supply.donation.quality(${#strings.toString(d.quality())})}">Q500</span>
+                                    <span th:if="${d.fromStock()}" class="chip chip--muted" th:text="#{supply.donation.fromStock}">aus dem Lager</span>
+                                </span>
+                            </td>
+                            <td th:attr="data-label=#{supply.donation.donor}">
+                                <span th:if="${d.donorName() != null}" th:text="${d.donorName()}">Name</span>
+                                <span th:if="${d.donorName() == null}">&ndash;</span>
+                            </td>
+                            <td class="num" th:attr="data-label=#{supply.donation.amount}"
+                                th:text="${d.receivedAmount() != null ? d.receivedAmount() + ' / ' + d.pledgedAmount() : d.pledgedAmount()}">3</td>
+                            <td class="cell-status">
+                                <th:block th:replace="~{supply/fragments/status-chip :: chip(kind='donation', status=${d.status()})}"></th:block>
+                            </td>
+                            <td class="cell-actions">
+                                <div class="supply-row-actions">
+                                    <th:block th:if="${d.canReceive()}">
+                                        <button type="button" class="btn btn-success btn-xs" data-trigger="supply-donation-receive"
+                                                data-testid="supply-donation-receive"
+                                                th:data-donation-id="${d.id()}" th:data-version="${d.version()}"
+                                                th:data-amount="${d.pledgedAmount()}"
+                                                th:data-entry="${d.material() != null ? d.material().name() : d.gameItem().name()}"
+                                                th:data-quantity-type="${d.quantityType()}"
+                                                th:text="#{supply.donation.receive}">Empfang best&auml;tigen</button>
+                                        <button type="button" class="btn btn-quiet-danger btn-xs" data-trigger="supply-donation-decline"
+                                                data-testid="supply-donation-decline"
+                                                th:data-donation-id="${d.id()}" th:data-version="${d.version()}"
+                                                th:text="#{supply.donation.decline}">Ablehnen</button>
+                                    </th:block>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <th:block th:if="${#lists.isEmpty(donations)}">
+                <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='supply.incoming.empty.title', textKey='supply.incoming.empty.text')}"></th:block>
+            </th:block>
+            <th:block th:replace="~{kernel/fragments/components :: listFoot(pageResponse=${donationsPage}, baseUrl=${paginationBaseUrl})}"></th:block>
+            <nav th:replace="~{kernel/fragments/pagination :: pageSizePicker(pageResponse=${donationsPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
+        </th:block>
+        </div>
+    </section>
+
+    <th:block th:if="${unit != null}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='supply-receive-modal', titleKey='supply.receive.title', titleId='supply-receive-title', body=~{::supply-receive-modal-body})}">
+        <th:block th:ref="supply-receive-modal-body">
+            <form id="supply-receive-form" class="no-track" novalidate>
+                <div class="krt-modal-body">
+                    <input type="hidden" id="supply-receive-id">
+                    <input type="hidden" id="supply-receive-version">
+                    <p id="supply-receive-entry" class="m-0"></p>
+                    <div class="form-group">
+                        <label for="supply-receive-amount" th:text="#{supply.receive.amount}">Erhaltene Menge</label>
+                        <input type="number" id="supply-receive-amount" min="0.001" step="any" inputmode="decimal" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="supply-receive-location" th:text="#{supply.receive.location}">Lagerort</label>
+                        <select id="supply-receive-location" required>
+                            <option th:each="l : ${locations}" th:value="${l.id()}" th:text="${l.name()}">Lorville</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="supply-receive-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta" data-testid="supply-receive-submit" th:text="#{supply.receive.submit}">Best&auml;tigen</button>
+                </div>
+            </form>
+        </th:block>
+    </th:block>
+
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='supply-decline-modal', titleKey='supply.decline.title', titleId='supply-decline-title', variant='krt-modal--danger', body=~{::supply-decline-modal-body})}">
+        <th:block th:ref="supply-decline-modal-body">
+            <form id="supply-decline-form" class="no-track" novalidate>
+                <div class="krt-modal-body">
+                    <input type="hidden" id="supply-decline-id">
+                    <input type="hidden" id="supply-decline-version">
+                    <div class="form-group">
+                        <label for="supply-decline-reason" th:text="#{supply.decline.reason}">Grund</label>
+                        <select id="supply-decline-reason">
+                            <option th:each="r : ${ {'WRONG_ITEM','NOT_NEEDED','QUALITY_TOO_LOW','DONOR_ABSENT','OTHER'} }" th:value="${r}"
+                                    th:text="#{'supply.donation.reason.' + ${r}}">Falscher Gegenstand</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="supply-decline-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn-danger" data-testid="supply-decline-submit" th:text="#{supply.decline.submit}">Ablehnen</button>
+                </div>
+            </form>
+        </th:block>
+    </th:block>
+
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='supply-record-modal', titleKey='supply.record.title', titleId='supply-record-title', variant='krt-modal--wide', body=~{::supply-record-modal-body})}">
+        <th:block th:ref="supply-record-modal-body">
+            <form id="supply-record-form" class="no-track" novalidate>
+                <div class="krt-modal-body">
+                    <div class="form-group">
+                        <label for="supply-record-need" th:text="#{supply.record.need}">F&uuml;r den Bedarf (optional)</label>
+                        <select id="supply-record-need">
+                            <option value="" th:text="#{supply.record.noNeed}">Keinem Bedarf zuordnen</option>
+                            <option th:each="n : ${openNeeds}" th:value="${n.id()}"
+                                    th:data-quantity-type="${n.quantityType()}"
+                                    th:text="${n.material() != null ? n.material().name() : n.gameItem().name()}">Quantanium</option>
+                        </select>
+                    </div>
+                    <div id="supply-record-catalogue">
+                        <div class="form-group">
+                            <label for="supply-record-kind" th:text="#{supply.need.kind}">Art</label>
+                            <select id="supply-record-kind">
+                                <option value="material" th:text="#{supply.kind.material}">Material</option>
+                                <option value="item" th:text="#{supply.kind.item}">Item</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="supply-record-material-row">
+                            <label for="supply-record-material" th:text="#{supply.need.material}">Material</label>
+                            <select id="supply-record-material">
+                                <option th:each="m : ${materials}" th:value="${m.id()}" th:data-quantity-type="${m.quantityType()}" th:text="${m.name()}">Quantanium</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="supply-record-item-row" hidden>
+                            <label for="supply-record-item" th:text="#{supply.need.item}">Item</label>
+                            <select id="supply-record-item">
+                                <option th:each="i : ${items}" th:value="${i.id()}" th:text="${i.name()}">Item</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="supply-record-quality-row">
+                            <label for="supply-record-quality" th:text="#{supply.pledge.quality}">Qualit&auml;t (0&ndash;1000)</label>
+                            <input type="number" id="supply-record-quality" min="0" max="1000" step="1" inputmode="numeric" value="0">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="supply-record-donor" th:text="#{supply.record.donor}">Spender (optional)</label>
+                        <select id="supply-record-donor" data-krt-combobox="remote-users" data-testid="supply-record-donor">
+                            <option value=""></option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="supply-record-amount" th:text="#{supply.receive.amount}">Erhaltene Menge</label>
+                        <input type="number" id="supply-record-amount" min="0.001" step="any" inputmode="decimal" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="supply-record-location" th:text="#{supply.receive.location}">Lagerort</label>
+                        <select id="supply-record-location" required>
+                            <option th:each="l : ${locations}" th:value="${l.id()}" th:text="${l.name()}">Lorville</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="supply-record-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta" data-testid="supply-record-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{supply.record.submit}">Erfassen</span></button>
+                </div>
+            </form>
+        </th:block>
+    </th:block>
+    </th:block>
+</main>
+</th:block>
+
+<th:block th:fragment="pageTail">
+<th:block th:replace="~{supply/fragments/supply-script :: supplyBootstrap}"></th:block>
+<script type="module" th:src="@{/js/supply/supply-incoming.js}" th:attr="nonce=${cspNonce}"></script>
+</th:block>
+</body>
+</html>

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import de.greluc.krt.profit.basetool.backend.inventory.api.DonationEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
 import java.util.UUID;
@@ -50,4 +51,14 @@ public interface InventoryEarmarkLookup {
    */
   @Nullable
   JobOrderEarmark jobOrder(@NotNull UUID jobOrderId);
+
+  /**
+   * Returns a donation the Lager's stock is earmarked to; the first miss in a transaction loads
+   * every donation the loaded Lager rows are earmarked to in one read.
+   *
+   * @param donationId the donation
+   * @return the donation, or {@code null} when it does not exist
+   */
+  @Nullable
+  DonationEarmark donation(@NotNull UUID donationId);
 }

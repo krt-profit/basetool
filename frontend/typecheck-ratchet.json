@@ -183,6 +183,15 @@
       "promotion/promotion-manage.js",
       "promotion/promotion-my-evaluations.js"
     ],
+    "purchasing": [
+      "purchasing/purchasing-admin.js",
+      "purchasing/purchasing-common.js",
+      "purchasing/purchasing-deal.js",
+      "purchasing/purchasing-deals.js",
+      "purchasing/purchasing-delegates.js",
+      "purchasing/purchasing-partners.js",
+      "purchasing/purchasing-report.js"
+    ],
     "refinery": [
       "refinery/refinery-orders-create.js",
       "refinery/refinery-orders-details.js",
@@ -194,6 +203,15 @@
     ],
     "shell": [
       "shell/sc-links.js"
+    ],
+    "supply": [
+      "supply/supply-admin.js",
+      "supply/supply-common.js",
+      "supply/supply-incoming.js",
+      "supply/supply-lager.js",
+      "supply/supply-mine.js",
+      "supply/supply-needs.js",
+      "supply/supply-stats.js"
     ]
   }
 }

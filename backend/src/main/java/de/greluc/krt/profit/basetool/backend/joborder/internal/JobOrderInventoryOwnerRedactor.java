@@ -154,6 +154,7 @@ public class JobOrderInventoryOwnerRedactor {
         item.jobOrderRest(),
         item.missionAllocations(),
         item.missionRest(),
+        List.of(),
         item.note(),
         null,
         item.version(),

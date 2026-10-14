@@ -525,5 +525,42 @@
       "updated_at" : "<instant>"
     } ],
     "truncated" : false
+  }, {
+    "key" : "supplyDonations",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "created_at" : "<instant>",
+      "status" : "RECEIVED",
+      "entry" : "Zzz Export Ore",
+      "quality" : 500,
+      "pledged_amount" : 4.0,
+      "received_amount" : 4.0,
+      "receiving_unit" : "IRIDIUM"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "purchasingDeals",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "created_at" : "<instant>",
+      "status" : "SETTLED",
+      "entry" : "Zzz Export Ore",
+      "amount" : 4.0,
+      "unit_price" : 100,
+      "total" : 400,
+      "payment_model" : "ADVANCE",
+      "risk_class" : "A"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "purchasingAppointments",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "appointed_at" : "<instant>",
+      "valid_until" : null,
+      "monthly_limit" : null,
+      "revoked_at" : null
+    } ],
+    "truncated" : false
   } ]
 }

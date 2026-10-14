@@ -1097,5 +1097,50 @@ public final class MetricNames {
   /** {@link #TAG_FIELD} value: the release page. */
   public static final String FIELD_RELEASES_URL = "releases_url";
 
+  /**
+   * Counter {@code basetool_supply_needs_total} — needs by lifecycle event, tag {@code event}
+   * (REQ-OBS-011).
+   */
+  public static final String SUPPLY_NEEDS = "basetool.supply.needs";
+
+  /**
+   * Counter {@code basetool_supply_donations_total} — donations by the state they reached, tag
+   * {@code status} (REQ-OBS-011).
+   */
+  public static final String SUPPLY_DONATIONS = "basetool.supply.donations";
+
+  /** Gauge {@code basetool_supply_needs_open} — needs open for donations. */
+  public static final String SUPPLY_NEEDS_OPEN = "basetool.supply.needs.open";
+
+  /** Gauge {@code basetool_supply_donations_pledged_open} — pledges awaiting their receipt. */
+  public static final String SUPPLY_DONATIONS_PLEDGED_OPEN =
+      "basetool.supply.donations.pledged.open";
+
+  /**
+   * Counter {@code basetool_purchasing_deals_total} — deals by lifecycle event, tag {@code event}
+   * (REQ-OBS-011).
+   */
+  public static final String PURCHASING_DEALS = "basetool.purchasing.deals";
+
+  /**
+   * Counter {@code basetool_purchasing_tranches_total} — money tranches, tags {@code kind} ({@link
+   * #TAG_KIND}) and {@code outcome} ({@link #TAG_OUTCOME}: requested, confirmed, refused,
+   * cancelled) (REQ-OBS-011).
+   */
+  public static final String PURCHASING_TRANCHES = "basetool.purchasing.tranches";
+
+  /** Gauge {@code basetool_purchasing_deals} — deals by state, tag {@code status}. */
+  public static final String PURCHASING_DEALS_BY_STATUS = "basetool.purchasing.deals.by.status";
+
+  /** Gauge {@code basetool_purchasing_settlements_overdue} — deals past their settlement date. */
+  public static final String PURCHASING_SETTLEMENTS_OVERDUE =
+      "basetool.purchasing.settlements.overdue";
+
+  /** Gauge {@code basetool_purchasing_paused} — {@code 1} while purchasing is paused globally. */
+  public static final String PURCHASING_PAUSED = "basetool.purchasing.paused";
+
+  /** Gauge {@code basetool_purchasing_delegates_active} — active Handelsbeauftragte. */
+  public static final String PURCHASING_DELEGATES_ACTIVE = "basetool.purchasing.delegates.active";
+
   private MetricNames() {}
 }

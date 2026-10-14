@@ -45,3 +45,6 @@
 45|bankAuditActionsOnMember|ART_15|09668c132366e434||
 46|payoutPreference|ART_15_20|c2551d2dbd6dce66||
 47|blueprintSharing|ART_15_20|61c70ab961a6406a||
+48|supplyDonations|ART_15_20|d2a50ef07a187ae8||entry,receiving_unit
+49|purchasingDeals|ART_15_20|671189ea89a219de||entry
+50|purchasingAppointments|ART_15_20|458d0230d3fdb40a||

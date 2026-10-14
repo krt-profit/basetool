@@ -41,8 +41,10 @@
       "operation::api",
       "orgunit::api",
       "platform::api",
+      "purchasing::api",
       "refinery::api",
-      "scope::api"
+      "scope::api",
+      "supply::api"
     })
 package de.greluc.krt.profit.basetool.backend.privacy;
 

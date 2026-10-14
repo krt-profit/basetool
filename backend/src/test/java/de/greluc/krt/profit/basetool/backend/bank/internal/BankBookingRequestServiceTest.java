@@ -1260,6 +1260,169 @@ class BankBookingRequestServiceTest {
   }
 
   @Test
+  void confirm_byTheRequester_isRefusedAsFourEyes() {
+    UUID requestId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID requester = UUID.randomUUID();
+    BankBookingRequest request =
+        pending(requestId, account(accountId), BankBookingRequestType.DEPOSIT, requester, 0L);
+    when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
+
+    BankConflictException ex =
+        assertThrows(
+            BankConflictException.class,
+            () -> service.confirm(requestId, UUID.randomUUID(), null, false, null, 0L, null));
+
+    assertThat(ex.getCode()).isEqualTo(BankConflictException.CODE_BANK_FOUR_EYES_REQUIRED);
+    verify(bankLedgerService, never()).bookDeposit(any());
+    assertThat(request.getStatus()).isEqualTo(BankBookingRequestStatus.PENDING);
+  }
+
+  @Test
+  void confirm_byTheRequesterWhoIsAdmin_booksAndConfirms() {
+    UUID requestId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID holderId = UUID.randomUUID();
+    UUID txId = UUID.randomUUID();
+    UUID requester = UUID.randomUUID();
+    BankBookingRequest request =
+        pending(requestId, account(accountId), BankBookingRequestType.DEPOSIT, requester, 0L);
+    when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
+    when(authHelperService.isAdmin()).thenReturn(true);
+    when(bankSecurityService.canConfirm(eq(BankBookingRequestType.DEPOSIT), eq(accountId), any()))
+        .thenReturn(true);
+    when(bankLedgerService.bookDeposit(any(BankDepositRequest.class)))
+        .thenReturn(new BankTransactionDto(txId, BankTransactionType.DEPOSIT, null, Instant.now()));
+    BankHolder holder = new BankHolder();
+    holder.setId(holderId);
+    holder.setHandle("greluc");
+    holder.setActive(true);
+    when(holderRepository.findById(holderId)).thenReturn(Optional.of(holder));
+    when(transactionRepository.findById(txId)).thenReturn(Optional.of(new BankTransaction()));
+    when(userRepository.findById(any())).thenReturn(Optional.of(new User()));
+
+    BankBookingRequestDto dto = service.confirm(requestId, holderId, null, false, null, 0L, null);
+
+    assertThat(dto.status()).isEqualTo(BankBookingRequestStatus.CONFIRMED);
+  }
+
+  @Test
+  void reject_byTheRequester_isAllowed() {
+    UUID requestId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID requester = UUID.randomUUID();
+    BankBookingRequest request =
+        pending(requestId, account(accountId), BankBookingRequestType.DEPOSIT, requester, 0L);
+    when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
+    when(bankSecurityService.canSee(eq(accountId), any())).thenReturn(true);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
+    when(userRepository.findById(requester)).thenReturn(Optional.of(new User()));
+
+    BankBookingRequestDto dto = service.reject(requestId, "changed my mind", 0L, null);
+
+    assertThat(dto.status()).isEqualTo(BankBookingRequestStatus.REJECTED);
+  }
+
+  @Test
+  void applyOwnerApprovalWithinTransaction_grantByTheRequester_isRefusedAsFourEyes() {
+    UUID requester = UUID.randomUUID();
+    BankBookingRequest request =
+        pending(
+            UUID.randomUUID(),
+            account(UUID.randomUUID()),
+            BankBookingRequestType.WITHDRAWAL,
+            requester,
+            0L);
+    request.setRequiresOwnerApproval(true);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
+
+    BankConflictException ex =
+        assertThrows(
+            BankConflictException.class,
+            () -> service.applyOwnerApprovalWithinTransaction(request, true));
+
+    assertThat(ex.getCode()).isEqualTo(BankConflictException.CODE_BANK_FOUR_EYES_REQUIRED);
+    assertThat(request.isOwnerApprovalGranted()).isFalse();
+    verify(eventPublisher, never()).publishEvent(any());
+  }
+
+  @Test
+  void applyOwnerApprovalWithinTransaction_grantByTheRequesterWhoIsAdmin_isGranted() {
+    UUID requester = UUID.randomUUID();
+    BankBookingRequest request =
+        pending(
+            UUID.randomUUID(),
+            account(UUID.randomUUID()),
+            BankBookingRequestType.WITHDRAWAL,
+            requester,
+            0L);
+    request.setRequiresOwnerApproval(true);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
+    when(authHelperService.isAdmin()).thenReturn(true);
+    when(userRepository.findById(requester)).thenReturn(Optional.of(new User()));
+
+    BankBookingRequestDto dto = service.applyOwnerApprovalWithinTransaction(request, true);
+
+    assertThat(dto.ownerApprovalGranted()).isTrue();
+  }
+
+  @Test
+  void listQueue_marksTheCallersOwnRequestAsNotConfirmable() {
+    UUID caller = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    BankBookingRequest own =
+        pending(UUID.randomUUID(), account(accountId), BankBookingRequestType.DEPOSIT, caller, 0L);
+    BankBookingRequest foreign =
+        pending(
+            UUID.randomUUID(),
+            account(accountId),
+            BankBookingRequestType.DEPOSIT,
+            UUID.randomUUID(),
+            0L);
+    Pageable pageable = PageRequest.of(0, 10);
+    Set<BankBookingRequestStatus> statuses = Set.of(BankBookingRequestStatus.PENDING);
+    when(bankSecurityService.confirmCheck(any())).thenReturn((type, id) -> true);
+    when(bankSecurityService.isManagement()).thenReturn(true);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(caller));
+    when(requestRepository.findByStatusIn(statuses, pageable))
+        .thenReturn(new PageImpl<>(List.of(own, foreign), pageable, 2));
+
+    Page<BankBookingRequestDto> page = service.listQueue(statuses, pageable, null);
+
+    assertThat(page.getContent())
+        .extracting(BankBookingRequestDto::callerMayConfirm)
+        .containsExactly(false, true);
+  }
+
+  @Test
+  void listForAccounts_leavesOutTheCallersOwnRequestsUnlessAdmin() {
+    UUID caller = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    BankBookingRequest own =
+        pending(UUID.randomUUID(), account(accountId), BankBookingRequestType.DEPOSIT, caller, 0L);
+    BankBookingRequest foreign =
+        pending(
+            UUID.randomUUID(),
+            account(accountId),
+            BankBookingRequestType.DEPOSIT,
+            UUID.randomUUID(),
+            0L);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(caller));
+    when(requestRepository.findByAccountIdInOrderByCreatedAtDesc(List.of(accountId)))
+        .thenReturn(List.of(own, foreign));
+
+    assertThat(service.listForAccounts(List.of(accountId)))
+        .extracting(BankBookingRequestDto::id)
+        .containsExactly(foreign.getId());
+
+    when(authHelperService.isAdmin()).thenReturn(true);
+
+    assertThat(service.listForAccounts(List.of(accountId))).hasSize(2);
+  }
+
+  @Test
   void confirm_transfer_bypassesDestinationVisibilityGate() {
     UUID requestId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();

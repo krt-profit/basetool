@@ -137,7 +137,20 @@ public class AdminNotificationRulePageController {
           "EXCHANGE_CLIENT_UPDATE_REQUIRED",
           "EXCHANGE_CLIENT_CAPABILITY_REMOVED",
           "EXCHANGE_SWITCHED_OFF",
-          "EXCHANGE_SWITCHED_ON");
+          "EXCHANGE_SWITCHED_ON",
+          "SUPPLY_DONATION_PLEDGED",
+          "SUPPLY_DONATION_RECEIVED",
+          "SUPPLY_DONATION_DECLINED",
+          "SUPPLY_DONATION_WITHDRAWN",
+          "PURCHASING_NEED_RELEASED",
+          "PURCHASING_NEED_CLOSED",
+          "PURCHASING_DELIVERY_RECORDED",
+          "PURCHASING_DELIVERY_DECIDED",
+          "PURCHASING_SETTLEMENT_OVERDUE",
+          "PURCHASING_PAUSED",
+          "PURCHASING_RESUMED",
+          "PURCHASING_DELEGATE_APPOINTED",
+          "PURCHASING_DELEGATE_REVOKED");
 
   /**
    * {@code NotificationType} codes, labelled via {@code admin.notificationRules.notificationType}.
@@ -202,7 +215,18 @@ public class AdminNotificationRulePageController {
           "EXCHANGE_CLIENT_ACTIVATED",
           "EXCHANGE_CLIENT_UPDATE_REQUIRED",
           "EXCHANGE_CLIENT_CAPABILITY_REMOVED",
-          "EXCHANGE_SWITCHED_OFF");
+          "EXCHANGE_SWITCHED_OFF",
+          "SUPPLY_DONATION_PLEDGED",
+          "SUPPLY_DONATION_RECEIVED",
+          "SUPPLY_DONATION_DECLINED",
+          "PURCHASING_NEED_RELEASED",
+          "PURCHASING_DELIVERY_RECORDED",
+          "PURCHASING_DELIVERY_DECIDED",
+          "PURCHASING_SETTLEMENT_OVERDUE",
+          "PURCHASING_PAUSED",
+          "PURCHASING_RESUMED",
+          "PURCHASING_DELEGATE_APPOINTED",
+          "PURCHASING_DELEGATE_REVOKED");
 
   /**
    * {@code SelectorKind} codes, labelled via {@code admin.notificationRules.selector.kind}. All but

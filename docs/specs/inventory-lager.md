@@ -1484,6 +1484,71 @@ moving a member's row — the **previous owner** is told as well.
 `V267__seed_inventory_transfer_notification_rules.sql`, `NotificationPageController` ·
 **Issues:** #2409.
 
+> **Amended (supply and purchasing):** a transfer into an org unit's pool for a donation
+> (REQ-INV-057, `StockCommands.transferToPool`) publishes neither this notice nor the booked-out
+> notice of REQ-INV-056; the donor hears about it through the donation notices (REQ-SUP-016).
+
+### REQ-INV-057 — Pool and donation commands of the Lager
+
+`inventory.api.StockCommands` MUST offer, alongside its existing calls, the commands a module needs to
+put stock into an org unit's pool and to earmark it for a donation. Each runs in the caller's
+transaction (`MANDATORY`), under the lot-lock protocol (ADR-0229), and records its `INVENTORY` audit
+event with a `StockBookingReason` (`DONATION`, `PURCHASE`):
+
+- `bookIntoPool(holder, poolUnit, lot, amount, reason)` books stock in as a shared row
+  (`personal = false`) held by `holder` and stamped with the pool's org unit, merged into the holder's
+  pool row of the same lot; records `INVENTORY_ITEM_CREATED`.
+- `transferToPool(sourceRowId, amount, poolUnit, holder, location, reason)` moves an amount of a row
+  into such a pool row. The source is lowered or deleted with its job-order and mission slices shrunk
+  by the default plan and its offers kept in step; records `INVENTORY_ITEM_TRANSFERRED`. It publishes
+  neither `InventoryTransferredTo/FromUserEvent` nor the booked-out-by-other notice, so a donation
+  tells the donor once, through the donation notices.
+- `earmarkForDonation(rowId, donationId, amount)` adds the donation's slice to a row; stolen stock
+  cannot be earmarked; records `INVENTORY_ALLOCATION_ADDED` with the dimension `DONATION`.
+- `releaseDonationEarmark(donationId)` removes the donation's slices from every row; records
+  `INVENTORY_ALLOCATION_REMOVED`.
+
+A pool is not a table: it is a shared row held by a member and stamped with `owning_org_unit_id`. The
+caller authorises the action; the commands do not read the donation.
+
+**Acceptance**
+
+- [x] A pool book-in creates a shared row stamped with the unit, held by the holder, and merges it.
+- [x] A partial transfer lowers the source and books the amount into the pool; a full transfer deletes
+  the source and tells the offers.
+- [x] A transfer or earmark that would leave a slice uncovered is refused (422).
+- [x] A pool command publishes no event of its own.
+
+**Enforced by:** `InventoryPoolCommandsTest` · **Code:** `inventory/api/StockCommands`,
+`inventory/api/StockBookingReason`, `inventory/internal/InventoryStockCommands`,
+`V284__create_inventory_donation_allocation.sql` · **ADR:**
+[ADR-0252](../adr/0252-stockcommands-gains-the-pool-and-donation-commands.md)
+
+### REQ-INV-058 — Earmarked stock
+
+A donation earmark is a third allocation kind beside the job-order and mission slices, in the table
+`inventory_item_donation_allocation`. Its slices MUST reduce the row's available amount for every path
+that lowers or moves the row:
+
+- the three slice sums are each checked against the row's amount (`InventoryAllocations.fits`) on
+  every amount-lowering write, so book-out, sale, transfer, rebooking and the stolen split refuse a
+  write that would leave a pledge uncovered (422);
+- a row that still carries a donation slice is neither depleted nor moved in full;
+- the exchange counts the donation slice in its free-stock calculation;
+- a stock merge unions the slices of the folded row into the survivor;
+- the row's DTO lists the slices as `donationAllocations` (the donation, the receiving unit's name,
+  the earmarked amount), which the Lager reads through the `EarmarkTargets.Donations` SPI that the
+  supply module implements, so inventory never names it. The personal Lager shows a pledged slice as
+  a chip and offers „Spenden" on the row while the supply surface is on.
+
+Concurrent pledge and sale of the same row cannot both succeed: both take the row's lot lock first and
+the row's `@Version` guards the write.
+
+**Enforced by:** `InventoryPoolCommandsTest`, `InventoryItemMapperTest`, `SupplyDonationEarmarksTest`,
+`InventorySupplyRenderTest` · **Code:** `inventory/internal/InventoryAllocations`,
+`inventory/internal/InventoryCheckoutService`, `inventory/internal/InventoryDonationAllocation`,
+`exchange/internal/ExchangeStockWriteService`
+
 ## Out of scope
 
 - Tenancy / visibility scope of inventory (strict-staffel Lager-View) is governed by

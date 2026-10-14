@@ -435,6 +435,8 @@ interface KrtReceiverConfig {
 interface KrtReceiver {
     /** Applies the changed sections, or every section when the list is empty or absent. */
     apply(incomingSections: string[] | null | undefined): void;
+    /** Moves the receiver to another topic room, or to none when the topic is empty. */
+    retarget(topic: string | null | undefined): void;
 }
 
 /** One peer shown as editing a section in a presence message. */
@@ -681,6 +683,8 @@ interface DocumentEventMap {
     'krt:mission-changed': CustomEvent<{ section?: string }>;
     /** Fired when the mission page must drop its local state and re-fetch. */
     'krt:mission-resync': CustomEvent<null>;
+    /** Fired when stock changed locally outside the Lager scripts, so the personal Lager re-renders. */
+    'krt:inventory-changed': CustomEvent<null>;
 }
 
 /** Fetches combobox options on demand for a query. */

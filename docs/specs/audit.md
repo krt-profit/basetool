@@ -8,15 +8,15 @@ Area: `AUDIT` · Related: [`bank.md`](bank.md) (the bank's own audit trail, REQ-
 ## Context
 
 The Kartell bank already keeps an immutable, admin-only audit trail (REQ-BANK-012). The same
-guarantee is extended to twelve more areas — **Lagerverwaltung** (`InventoryItem`),
+guarantee is extended to thirteen more areas — **Lagerverwaltung** (`InventoryItem`),
 **Auftragsverwaltung** (`JobOrder`), **Raffinerieverwaltung** (`RefineryOrder`), **Mein
 Inventar** (`PersonalInventoryItem`), **Missionen** (`Mission`), **Operationen** (`Operation`),
 **Rollen & Mitglieder** (`org_unit_membership`, epic #800), **Beförderung** (the promotion
 catalogue + member gradings), **Materialbörse** (`MaterialExchangeOffer` /
 `MaterialExchangeInterest`), **Hangar** (`Ship`), **Blueprints** (`PersonalBlueprint`,
-`DefaultBlueprint`) and **Verbundene Anwendungen** (`ExchangeClient`, `ExchangeSettings`). Every
+`DefaultBlueprint`), **Verbundene Anwendungen** (`ExchangeClient`, `ExchangeSettings`) and **Bedarf & Spenden** (`SupplyNeed`, `SupplyDonation`). Every
 activity in each area is captured into a separate, admin-only
-log; all thirteen logs (the twelve here plus the bank's) are read on one page with a tab switcher, and
+log; all fourteen logs (the thirteen here plus the bank's) are read on one page with a tab switcher, and
 each can be exported as a PDF or JSON for a chosen period.
 
 The generic areas share **one** physical table (`audit_event`) with a `domain` discriminator; the
@@ -278,6 +278,24 @@ web, naming its client (REQ-AUDIT-005):
 
   The bank trail gains the same `HANDLE_SNAPSHOTS_ANONYMISED` marker, and
   `CARTEL_APPROVAL_TIERS_CLEARED` for the unrelated approval-tier reset.
+- **Bedarf & Spenden** (`SupplyNeed`, `SupplyDonation`, `SupplyUnitSetting`, `AuditDomain.SUPPLY`,
+  REQ-SUP-017) — `NEED_RAISED`, `NEED_UPDATED`, `NEED_PAUSED`, `NEED_RESUMED`, `NEED_WITHDRAWN`,
+  `NEED_FULFILLED` (written in the statement that covers the need), `DONATION_PLEDGED`,
+  `DONATION_RECEIVED`, `DONATION_DECLINED`, `DONATION_WITHDRAWN`, `DONATION_RECORDED`,
+  `SUPPLY_UNIT_SETTING_CHANGED` (the flags before and after) and `SUPPLY_SETTINGS_CHANGED` (the
+  switch and the number of governing Bereiche). The details carry ids, enums, amounts and tier codes, never a
+  name; the donor of a donation is its target user. The stock movement of a receipt additionally
+  audits in the Lager area through `StockCommands`.
+- **Ankauf** (`PurchasingDeal`, `PurchasingPartner`, `PurchasingDelegate`, `PurchasingSetting`,
+  `AuditDomain.PURCHASING`, REQ-PUR-025) — `DEAL_CREATED`, `DEAL_UPDATED`, `DEAL_CANCELLED`,
+  `DEAL_TRANCHE_REQUESTED`, `DEAL_TRANCHE_FUNDED`, `DEAL_TRANCHE_REFUSED`, `DEAL_DELIVERY_RECORDED`,
+  `DEAL_DELIVERY_ACCEPTED`, `DEAL_DELIVERY_REJECTED`, `DEAL_DELIVERY_CLOSED`,
+  `DEAL_SETTLEMENT_RECORDED`, `DEAL_SETTLED`, `DEAL_FAILED`, `PARTNER_CREATED`, `PARTNER_UPDATED`,
+  `PARTNER_BLOCKED`, `PARTNER_UNBLOCKED`, `PARTNER_ERASED`, `DELEGATE_APPOINTED`, `DELEGATE_REVOKED`,
+  `DELEGATE_LIMIT_CHANGED`, `PURCHASING_PAUSED`, `PURCHASING_RESUMED`, `PURCHASING_SETTINGS_CHANGED` and
+  `RISK_CLASSES_CHANGED`. The details carry ids, enums, amounts and quality, never a partner name, handle or
+  note. The money of a tranche audits in the bank's own trail; the stock movement of an accepted delivery
+  audits in the Lager area through `StockCommands` (reason `PURCHASE`).
 
 The audit table is **business data, not logging** — the [`observability.md`](observability.md) rule
 (never write names, emails or tokens to the **log stream**) is unaffected and still applies. User

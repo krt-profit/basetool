@@ -1195,7 +1195,7 @@ in the backend and frontend, `observability` in the ingest; the single source of
 tag keys and the non-enum label values). The backend
 `metrics` package is a dependency leaf (Micrometer only) so `service` / `task` / `filter` /
 `exception` reuse it without a package cycle (ADR-0047). Scheduled-job health flows through the
-shared `platform.api.TaskMetrics` wrapper; queue depth is sampled by the `app.internal.BusinessMetricsCollector`, which runs the `platform.api.BusinessGaugeSource` each owning module publishes (`IdentityBusinessGauges`, `DeletionRequestBusinessGauges`, `BankBusinessGauges`, `JobOrderBusinessGauges`, `OperationBusinessGauges`, `RefineryBusinessGauges`, `P4kImportBusinessGauges`, `MaterialExchangeBusinessGauges`),
+shared `platform.api.TaskMetrics` wrapper; queue depth is sampled by the `app.internal.BusinessMetricsCollector`, which runs the `platform.api.BusinessGaugeSource` each owning module publishes (`IdentityBusinessGauges`, `DeletionRequestBusinessGauges`, `BankBusinessGauges`, `JobOrderBusinessGauges`, `OperationBusinessGauges`, `RefineryBusinessGauges`, `P4kImportBusinessGauges`, `MaterialExchangeBusinessGauges`, `SupplyBusinessGauges`),
 on a fixed timer (`app.monitoring.business-metrics.interval-ms`, default 60 s, one read-only
 transaction per pass) rather than per-scrape.
 
@@ -1699,10 +1699,11 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   detection is two-tier: `AuditSilenceAnomaly` (no audited mutation anywhere for 5 d while the
   backend is up) plus, since #1041 item 10, `AuditDomainSilenceAnomaly` (a single domain silent for
   **30 d** while others stay active — the domain-lost-its-wiring failure mode the global sum masks).
-  Seven domains are excluded from the per-domain rule and never notify at any horizon: `PROMOTION`,
+  Eight domains are excluded from the per-domain rule and never notify at any horizon: `PROMOTION`,
   `PERSONAL_INVENTORY`, `MARKET`, — since 2026-08-16 — `ROLE`, — since 2026-09-26 — `HANGAR` and
-  `BLUEPRINT`, and — since 2026-09-27, by owner decision — `CONNECTED_APPS`, whose registry changes
-  are rare admin actions like `ROLE`'s and are announced by `ExchangeRegistryChanged` anyway. *(Changed 2026-09-26 by owner decision: the window was 14 d and the two new areas were
+  `BLUEPRINT`, — since 2026-09-27, by owner decision — `CONNECTED_APPS`, whose registry changes
+  are rare admin actions like `ROLE`'s and are announced by `ExchangeRegistryChanged` anyway, and
+  `SUPPLY` (REQ-SUP-017), which stays silent while its feature switch is off. *(Changed 2026-09-26 by owner decision: the window was 14 d and the two new areas were
   alerted by default. Production over the preceding 180 days, read-only: ship changes happened on 40
   days with one pause of 15.1 days, blueprint changes on 64 days with a longest pause of 10.9 days —
   a 14-day window would have fired on the hangar once in half a year, on an ordinary quiet stretch.)* `ROLE` covers
@@ -1908,6 +1909,22 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   (REQ-MARKET-018, REQ-OBS-011). Counts only, equally label-frugal (no per-request/per-user/per-kind
   label). Requests reuse `AuditDomain.MARKET`, so they inherit the existing
   `AuditDomainSilenceAnomaly` exclusion — no alert change is needed.
+- `basetool_supply_needs_total{event}` and `basetool_supply_donations_total{status}` counters in the
+  supply services (`event` = raised, updated, paused, resumed, withdrawn, fulfilled; `status` = the
+  state a donation reached), plus the gauges `basetool_supply_needs_open` and
+  `basetool_supply_donations_pledged_open` sampled by `SupplyBusinessGauges`
+  (REQ-SUP-017, REQ-OBS-011). Counts only; no unit, material or member label. The `SUPPLY` audit
+  domain is excluded from `AuditDomainSilenceAnomaly`.
+- `basetool_purchasing_deals_total{event}` counter (`event` = created, updated, cancelled, settled,
+  delivery_recorded, delivery_accepted, delivery_rejected, delivery_closed, delivery_failed),
+  `basetool_purchasing_tranches_total{kind,outcome}` counter (`outcome` = requested, confirmed,
+  refused, cancelled) and the gauges `basetool_purchasing_deals_by_status{status}`,
+  `basetool_purchasing_settlements_overdue`, `basetool_purchasing_paused` and
+  `basetool_purchasing_delegates_active`, sampled by `PurchasingBusinessGauges`
+  (REQ-PUR-018, REQ-OBS-011). Counts only; no partner, member, amount or deal label. The alert
+  `PurchasingSettlementOverdue` fires when a settlement has been overdue for 3 days (covered by a
+  promtool test); the `PURCHASING` audit domain is excluded from `AuditDomainSilenceAnomaly` like
+  `SUPPLY`, and the operations dashboard gains the purchasing panels.
 - `basetool_bank_audit_events_total{event_type}` counter at the single `BankAuditService.record`
   choke point (`event_type` = the bounded `BankAuditEventType` enum). The bank keeps a physically
   separate `bank_audit_event` table excluded from `AuditDomain`, so before #1041 item 10 the most

@@ -4,7 +4,7 @@
 > (booking requests); ADR-0039, ADR-0040 (holders); ADR-0041, ADR-0052 (transfer fee); ADR-0054
 > (counterparty); ADR-0045, ADR-0066, ADR-0109, ADR-0123 (approval limits and the KRT ladder);
 > ADR-0070 (responsible-holder audit); ADR-0106 (account search); ADR-0153 (client attribution);
-> ADR-0156 (app direct booking); ADR-0179 (audit retention) — all under [`docs/adr/`](../adr/README.md)
+> ADR-0156 (app direct booking); ADR-0179 (audit retention); ADR-0251 (four-eyes); ADR-0254 (purpose reference and observer) — all under [`docs/adr/`](../adr/README.md)
 > **Status:** Implemented — epic
 > [#556](https://github.com/krt-profit/basetool/issues/556) delivered (Phases 1–5). The
 > acceptance boxes are ticked and the `Enforced by` links point at the shipped code and
@@ -2871,6 +2871,78 @@ frontend `OrgUnitBankPageControllerMvcTest` (modal renders after the table, with
 `bank/internal/BankAuditEventType`, frontend `bank/web/OrgUnitBankProxyController`,
 `audit/web/AdminAuditLogPageController` (audit filter), `templates/bank/org-unit-bank.html` ·
 **ADR:** [ADR-0133](../adr/0133-editable-pending-booking-requests.md)
+
+### REQ-BANK-062 — Four-eyes for every booking request
+
+The member who raised a booking request **MUST NOT grant its owner approval and MUST NOT confirm it**
+(`BANK_FOUR_EYES_REQUIRED`, 409). A second person decides. The check runs in
+`BankBookingRequestService` under the row lock, after the pending and version guards, for `confirm`
+and for the grant of the owner approval; revoking an approval is not a grant and stays open.
+
+- **Reject stays open to the requester.** A rejection moves no money and is in effect the cancel the
+  requester may do anyway.
+- **Direct bookings are not requests.** A bank employee's direct deposit, withdrawal and transfer,
+  a payout to themselves included, are unchanged.
+- **The holder exemption stays** (ADR-0123): a responsible holder's own request needs no owner
+  approval, the second person is the bank employee who confirms it, and the holder may not confirm
+  it themselves.
+- **Admin is not bound.** An admin MAY grant and confirm their own request (emergency path). Bank
+  management and bank employees are bound.
+- **The surfaces follow the rule.** `callerMayConfirm` on the staff queue is `false` for the
+  requester; the "Fremde Anträge" approval list omits the caller's own requests unless the caller is
+  an admin.
+- A request whose only eligible confirmer is its requester stays `PENDING` until another employee
+  with the grant, a member of the bank management or an admin confirms it.
+
+**Acceptance**
+
+- [x] Confirming or granting the owner approval of one's own request is a 409
+  `BANK_FOUR_EYES_REQUIRED` and changes nothing.
+- [x] An admin confirms and approves their own request.
+- [x] The requester rejects their own request.
+- [x] The queue marks the caller's own request as not confirmable; the approval list omits it for a
+  non-admin.
+
+**Enforced by:** `BankBookingRequestServiceTest` (requester refused, admin allowed, reject allowed,
+queue flag, approval list) · **Code:** `bank/internal/BankBookingRequestService`,
+`bank/api/BankProblemCode`, `bank/api/BankConflictException` · **ADR:**
+[ADR-0251](../adr/0251-four-eyes-for-every-bank-booking-request-admin-excepted.md)
+
+### REQ-BANK-061 — Purpose reference
+
+A booking request MAY carry a purpose: `purpose_kind` (`BankPurposeKind`, today `PURCHASING_DEAL`) and
+`purpose_ref` (an id the bank never reads), both or neither (a check constraint). They are set only
+through the bank's command API `bank.api.PurposeBoundRequests`, never by the member or staff REST
+surface, are immutable, and are returned read-only on the request (`purposeKind`, `purposeRef`); the
+staff queue shows a chip for the kind. The booked transaction is reached through the request's
+`resultingTransactionId`.
+
+- `requestWithdrawal` raises a `WITHDRAWAL` from an active `CARTEL` or `SPECIAL` account to a named
+  member and takes a generated justification (REQ-BANK-045); a `CARTEL` withdrawal is routed through
+  the KRT ladder (REQ-BANK-047), a `SPECIAL` withdrawal needs the bank's confirmation only.
+- `requestDeposit` raises a `DEPOSIT` into such an account and needs no owner approval.
+- `cancel` withdraws a pending request of the given kind on behalf of its owner.
+- The caller becomes the requester, so REQ-BANK-062 keeps them from granting or confirming it.
+- Any other account type, a closed account and a `TRANSFER` are refused (400).
+
+**Enforced by:** `PurposeBoundRoutingTest`, `BankPurposeBoundRequestServiceTest` · **Code:**
+`bank/api/PurposeBoundRequests`, `bank/internal/BankPurposeBoundRequestsService`,
+`bank/internal/OrgUnitBankAccessService#raisePurposeBoundRequest`, `V287__bank_booking_request_purpose.sql`
+· **ADR:** [ADR-0254](../adr/0254-a-bank-booking-request-may-carry-an-opaque-purpose.md)
+
+### REQ-BANK-063 — Purpose observer
+
+When the bank confirms, rejects or cancels a purpose-bound request it MUST call the observer
+registered for the request's purpose kind (`BookingRequestPurposeObserver`) inside its own
+transaction, with the request id, the stored reference and, on confirmation, the booked transaction.
+The owner's state equals the request's state when the transaction commits; an observer that throws
+rolls the bank's decision back. A request without a purpose calls no observer. A cancellation the
+owner itself asked for through `PurposeBoundRequests#cancel` is reported like any other, so an
+observer treats the call as idempotent.
+
+**Enforced by:** `BankPurposeBoundRequestServiceTest` · **Code:**
+`bank/api/BookingRequestPurposeObserver`, `bank/internal/BankBookingRequestService` · **ADR:**
+[ADR-0254](../adr/0254-a-bank-booking-request-may-carry-an-opaque-purpose.md)
 
 ## Out of scope
 

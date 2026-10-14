@@ -80,10 +80,12 @@ class ModularityTest {
           "platform",
           "privacy",
           "promotion",
+          "purchasing",
           "refinery",
-          "scope");
+          "scope",
+          "supply");
 
-  private static final int DECLARED_MODULE_FLOOR = 26;
+  private static final int DECLARED_MODULE_FLOOR = 27;
 
   /**
    * Modules without an {@code api} package: their types lie in the base package, which is their

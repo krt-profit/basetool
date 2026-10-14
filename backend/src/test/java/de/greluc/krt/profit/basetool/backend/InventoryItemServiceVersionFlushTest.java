@@ -93,7 +93,7 @@ class InventoryItemServiceVersionFlushTest {
             new de.greluc.krt.profit.basetool.backend.mission.internal.MissionSaleIncome(
                 missionParticipantRepository, missionFinanceEntryRepository),
             new de.greluc.krt.profit.basetool.backend.inventory.internal
-                .InventoryEarmarkTargetCache(null, null, null),
+                .InventoryEarmarkTargetCache(null, null, null, null),
             new MaterialExchangeStockOfferLookup(materialExchangeOfferRepository),
             offerRatchet,
             inventoryItemMapper,
@@ -111,7 +111,7 @@ class InventoryItemServiceVersionFlushTest {
             inventoryItemMapper,
             ownerScopeService,
             null,
-            new InventoryStockCommands(null, null, null, null, null, null, null),
+            new InventoryStockCommands(null, null, null, null, null, null, null, null),
             null,
             auditService,
             null,

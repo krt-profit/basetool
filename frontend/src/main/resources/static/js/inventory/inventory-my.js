@@ -990,6 +990,10 @@ function broadcastInventoryChanged() {
 }
 inventoryHooks.notifyChanged = broadcastInventoryChanged;
 
+document.addEventListener('krt:inventory-changed', () => {
+    filterMyInventory();
+});
+
 if (document.getElementById('myInventoryTableContainer')) {
     krtLiveSync.createReceiver({
         topic: 'inventory',

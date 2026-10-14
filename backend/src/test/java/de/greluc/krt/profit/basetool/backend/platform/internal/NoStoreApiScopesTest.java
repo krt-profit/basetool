@@ -83,7 +83,9 @@ class NoStoreApiScopesTest {
         "/api/v1/orders/00000000-0000-4000-8000-000000000000/item-blueprint-owners",
         "/api/v1/org-chart",
         "/api/v1/special-commands/00000000-0000-4000-8000-000000000000/members",
-        "/api/v1/terms/status"
+        "/api/v1/terms/status",
+        "/api/v1/supply/needs",
+        "/api/v1/purchasing/deals"
       })
   @DisplayName("every sensitive family is recognised, container path included")
   void sensitiveFamiliesMatch(String uri) {
@@ -188,7 +190,7 @@ class NoStoreApiScopesTest {
         .as(
             "the number of no-store families. Raise it here when you add one, and add the path to"
                 + " sensitiveFamiliesMatch in the same change")
-        .isEqualTo(32);
+        .isEqualTo(34);
     assertThat(NoStoreApiScopes.revalidateFamilies()).hasSize(30);
   }
 }

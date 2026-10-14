@@ -124,7 +124,8 @@ class JobOrderItemProductionServiceTest {
             null,
             auditService,
             bookInPolicy,
-            offerRatchet));
+            offerRatchet,
+            null));
     orderId = UUID.randomUUID();
     lineId = UUID.randomUUID();
     inventoryId = UUID.randomUUID();

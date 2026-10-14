@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<span th:fragment="chip" class="chip"
+      th:with="tone=${#lists.contains({'SETTLED','CONFIRMED','ACCEPTED','DELIVERED','ACTIVE'}, status) ? 'success' : (#lists.contains({'SUBMITTED','REQUESTED','FUNDED','IN_DELIVERY','RECORDED'}, status) ? 'info' : (#lists.contains({'PARTIALLY_ACCEPTED','PAUSED','OVERDUE'}, status) ? 'warning' : (#lists.contains({'FAILED','DECLINED','REJECTED','REFUSED','BLOCKED'}, status) ? 'danger' : 'muted')))}"
+      th:classappend="${'chip--' + tone}"
+      th:attr="data-testid=${testid},data-status=${status}"
+      th:text="#{__${labelKey}__}">Status</span>
+</body>
+</html>

@@ -703,7 +703,7 @@ groups:
           description: "The backend has been up but recorded zero bank audit events for 60 days — possible bank audit-logging regression (REQ-AUDIT-001). Every bank mutation must write a bank_audit_event row."
 
       - alert: AuditDomainSilenceAnomaly
-        expr: (sum by (domain) (increase(basetool_audit_events_total{domain!~"ROLE|PROMOTION|PERSONAL_INVENTORY|MARKET|HANGAR|BLUEPRINT|CONNECTED_APPS"}[30d])) == 0) and on() (up{job="basetool-backend"} == 1)
+        expr: (sum by (domain) (increase(basetool_audit_events_total{domain!~"ROLE|PROMOTION|PERSONAL_INVENTORY|MARKET|HANGAR|BLUEPRINT|CONNECTED_APPS|SUPPLY|PURCHASING"}[30d])) == 0) and on() (up{job="basetool-backend"} == 1)
         for: 1h
         keep_firing_for: 15m
         labels:
@@ -711,6 +711,16 @@ groups:
         annotations:
           summary: "Audit domain silent 30d ({{ $labels.domain }})"
           description: "The {{ $labels.domain }} audit domain recorded zero events in 30 days while the backend is up — this domain may have lost its audit wiring (REQ-AUDIT-001) even though other domains are still active."
+
+      - alert: PurchasingSettlementOverdue
+        expr: basetool_purchasing_settlements_overdue > 0
+        for: 3d
+        keep_firing_for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Purchasing settlements overdue ({{ $value }})"
+          description: "At least one purchasing deal has been past its settlement date for 3 days ({{ $value }} now). The delegate, the governing leadership and the bank management were told once; check the deal list for the overdue marker (REQ-PUR-018)."
 
       - alert: BackendCallFailureSustained
         expr: sum(rate(basetool_backend_client_errors_total[5m])) > 0.5

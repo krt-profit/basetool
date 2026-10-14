@@ -60,7 +60,14 @@ class NotificationMuteServiceTest {
         .containsExactlyInAnyOrder(
             NotificationType.ACCOUNT_DELETION_REQUESTED,
             NotificationType.ACCOUNT_DELETION_REQUEST_DECLINED,
-            NotificationType.EXCHANGE_INSTALLATION_CONNECTED);
+            NotificationType.EXCHANGE_INSTALLATION_CONNECTED,
+            NotificationType.PURCHASING_DELIVERY_RECORDED,
+            NotificationType.PURCHASING_DELIVERY_DECIDED,
+            NotificationType.PURCHASING_SETTLEMENT_OVERDUE,
+            NotificationType.PURCHASING_PAUSED,
+            NotificationType.PURCHASING_RESUMED,
+            NotificationType.PURCHASING_DELEGATE_APPOINTED,
+            NotificationType.PURCHASING_DELEGATE_REVOKED);
   }
 
   @Test

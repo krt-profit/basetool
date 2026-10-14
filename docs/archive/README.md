@@ -37,6 +37,7 @@ section number, not because it describes the system today.
 | [`SC_WIKI_SYNC_PLAN.md`](SC_WIKI_SYNC_PLAN.md) | The SC Wiki + UEX item sync | Shipped (R1–R9) |
 | [`SC_WIKI_SYNC_AGENT_PROMPT.md`](SC_WIKI_SYNC_AGENT_PROMPT.md) | The implementation briefing for the sync | Shipped |
 | [`SC_WIKI_SYNC_DESTRUCTIVE_ROADMAP.md`](SC_WIKI_SYNC_DESTRUCTIVE_ROADMAP.md) | Dropping the sync's legacy columns | Executed 2026-06-01 (V125) |
+| [`SUPPLY_AND_PURCHASING_PLAN.md`](SUPPLY_AND_PURCHASING_PLAN.md) | Material supply (needs, donations) and purchasing (trade delegates, bank-paid deals) | Shipped 2026-10-14 (B1, S1 … S6; V284–V289; #2573) |
 | [`REFINERY_SCREENSHOT_IMPORT_PLAN.md`](REFINERY_SCREENSHOT_IMPORT_PLAN.md) | Refinery orders from game screenshots | v1 shipped 2026-06-10 |
 | [`BANK_PLAN.md`](BANK_PLAN.md) | The Kartellbank | Shipped 2026-06-13 (epic #556) |
 | [`materialboerse_PLAN.md`](materialboerse_PLAN.md) | The Materialbörse | Shipped |

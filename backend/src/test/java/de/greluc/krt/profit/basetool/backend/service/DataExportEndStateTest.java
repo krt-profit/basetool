@@ -320,6 +320,38 @@ class DataExportEndStateTest {
               .build());
     }
     entityManager.flush();
+    for (User owner : new User[] {subject, other}) {
+      jdbc.update(
+          "INSERT INTO supply_donation (id, donor_user_id, receiving_org_unit_id,"
+              + " material_id, quality, pledged_amount, received_amount, status)"
+              + " VALUES (?, ?, ?, ?, 500, 4, 4, 'RECEIVED')",
+          UUID.randomUUID(),
+          owner.getId(),
+          squadron.getId(),
+          material.getId());
+    }
+    UUID partner = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO purchasing_partner (id, kind, name, channel, contact_via, status)"
+            + " VALUES (?, 'ORG', 'Zzz Export Partner', 'OTHER', 'OTHER', 'ACTIVE')",
+        partner);
+    for (User owner : new User[] {subject, other}) {
+      jdbc.update(
+          "INSERT INTO purchasing_deal (id, need_id, raising_org_unit_id, partner_id,"
+              + " delegate_user_id, material_id, amount, unit_price, total, payment_model,"
+              + " risk_class, status) VALUES (?, ?, ?, ?, ?, ?, 4, 100, 400, 'ADVANCE', 'A',"
+              + " 'SETTLED')",
+          UUID.randomUUID(),
+          UUID.randomUUID(),
+          squadron.getId(),
+          partner,
+          owner.getId(),
+          material.getId());
+      jdbc.update(
+          "INSERT INTO purchasing_delegate (id, user_id, appointed_at) VALUES (?, ?, now())",
+          UUID.randomUUID(),
+          owner.getId());
+    }
   }
 
   private void seedExchange() {

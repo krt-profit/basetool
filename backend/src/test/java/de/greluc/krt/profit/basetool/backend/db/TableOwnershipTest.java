@@ -106,12 +106,14 @@ class TableOwnershipTest {
           "materialexchange",
           "operation",
           "bank",
+          "supply",
+          "purchasing",
           "exchange",
           "privacy",
           "app");
 
   /** Today's table count; the sweep must see at least this many. */
-  private static final int TABLE_FLOOR = 117;
+  private static final int TABLE_FLOOR = 127;
 
   /** Today's user-defined trigger count; the sweep must see at least this many. */
   private static final int TRIGGER_FLOOR = 18;

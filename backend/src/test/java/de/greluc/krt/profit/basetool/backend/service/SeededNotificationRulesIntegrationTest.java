@@ -272,7 +272,67 @@ class SeededNotificationRulesIntegrationTest {
             NotificationEventType.OPERATION_COMPLETED_UNOWNED,
             NotificationType.OPERATION_COMPLETED,
             true,
-            SelectorKind.ROLE));
+            SelectorKind.ROLE),
+        rule(
+            NotificationEventType.SUPPLY_DONATION_PLEDGED,
+            NotificationType.SUPPLY_DONATION_PLEDGED,
+            true,
+            SelectorKind.ORG_RELATIVE_ROLE,
+            SelectorKind.ORG_RELATIVE_ROLE),
+        rule(
+            NotificationEventType.SUPPLY_DONATION_RECEIVED,
+            NotificationType.SUPPLY_DONATION_RECEIVED,
+            true,
+            SelectorKind.EVENT_RECIPIENT),
+        rule(
+            NotificationEventType.SUPPLY_DONATION_DECLINED,
+            NotificationType.SUPPLY_DONATION_DECLINED,
+            true,
+            SelectorKind.EVENT_RECIPIENT),
+        rule(
+            NotificationEventType.PURCHASING_NEED_RELEASED,
+            NotificationType.PURCHASING_NEED_RELEASED,
+            true,
+            SelectorKind.EVENT_RECIPIENTS),
+        rule(
+            NotificationEventType.PURCHASING_DELIVERY_RECORDED,
+            NotificationType.PURCHASING_DELIVERY_RECORDED,
+            true,
+            SelectorKind.ORG_RELATIVE_ROLE,
+            SelectorKind.ORG_RELATIVE_ROLE),
+        rule(
+            NotificationEventType.PURCHASING_DELIVERY_DECIDED,
+            NotificationType.PURCHASING_DELIVERY_DECIDED,
+            true,
+            SelectorKind.EVENT_RECIPIENT),
+        rule(
+            NotificationEventType.PURCHASING_SETTLEMENT_OVERDUE,
+            NotificationType.PURCHASING_SETTLEMENT_OVERDUE,
+            false,
+            SelectorKind.EVENT_RECIPIENTS,
+            SelectorKind.ROLE),
+        rule(
+            NotificationEventType.PURCHASING_PAUSED,
+            NotificationType.PURCHASING_PAUSED,
+            true,
+            SelectorKind.ORG_RELATIVE_ROLE,
+            SelectorKind.EVENT_RECIPIENTS),
+        rule(
+            NotificationEventType.PURCHASING_RESUMED,
+            NotificationType.PURCHASING_RESUMED,
+            true,
+            SelectorKind.ORG_RELATIVE_ROLE,
+            SelectorKind.EVENT_RECIPIENTS),
+        rule(
+            NotificationEventType.PURCHASING_DELEGATE_APPOINTED,
+            NotificationType.PURCHASING_DELEGATE_APPOINTED,
+            true,
+            SelectorKind.EVENT_RECIPIENT),
+        rule(
+            NotificationEventType.PURCHASING_DELEGATE_REVOKED,
+            NotificationType.PURCHASING_DELEGATE_REVOKED,
+            true,
+            SelectorKind.EVENT_RECIPIENT));
   }
 
   @ParameterizedTest(name = "{0} raises {1}")

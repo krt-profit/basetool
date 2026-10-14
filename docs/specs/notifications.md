@@ -113,6 +113,19 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `EXCHANGE_CLIENT_CAPABILITY_REMOVED` | `EXCHANGE_CLIENT_CAPABILITY_REMOVED` | V281 | `EXCHANGE_CLIENT_HOLDERS` (the client); the removed scopes | REQ-XCH-040 |
 | `EXCHANGE_SWITCHED_OFF` | `EXCHANGE_SWITCHED_OFF` | V281 | `EXCHANGE_CLIENT_HOLDERS` (any client, `contextAllExchangeClients`) | REQ-XCH-041 |
 | `EXCHANGE_SWITCHED_ON` | none (no rule) | — | supersedes `EXCHANGE_SWITCHED_OFF` | REQ-XCH-041 |
+| `SUPPLY_DONATION_PLEDGED` | `SUPPLY_DONATION_PLEDGED` | V286 | `ORG_RELATIVE_ROLE` leadership and Logisticians of the receiving unit | REQ-SUP-016 |
+| `SUPPLY_DONATION_RECEIVED` | `SUPPLY_DONATION_RECEIVED` | V286 | `EVENT_RECIPIENT` (the donor); supersedes the pledge notices | REQ-SUP-016 |
+| `SUPPLY_DONATION_DECLINED` | `SUPPLY_DONATION_DECLINED` | V286 | `EVENT_RECIPIENT` (the donor); coded `reasonCode`; supersedes the pledge notices | REQ-SUP-016 |
+| `SUPPLY_DONATION_WITHDRAWN` | none (no rule) | — | supersedes the pledge notices | REQ-SUP-016 |
+| `PURCHASING_NEED_RELEASED` | `PURCHASING_NEED_RELEASED` | V289 | `EVENT_RECIPIENTS` (the active Handelsbeauftragten); the only purchasing notice a member can mute | REQ-PUR-024 |
+| `PURCHASING_NEED_CLOSED` | none (no rule) | — | supersedes the need's release notices when it is fulfilled or withdrawn | REQ-PUR-024 |
+| `PURCHASING_DELIVERY_RECORDED` | `PURCHASING_DELIVERY_RECORDED` | V289 | `ORG_RELATIVE_ROLE` `UNIT_LEADERSHIP` and `LOGISTICIAN` on `RESPONSIBLE` (the raising unit); not mutable | REQ-PUR-024 |
+| `PURCHASING_DELIVERY_DECIDED` | `PURCHASING_DELIVERY_DECIDED` | V289 | `EVENT_RECIPIENT` (the deal's HB); coded `outcomeCode`; supersedes the delivery notice; not mutable | REQ-PUR-024 |
+| `PURCHASING_SETTLEMENT_OVERDUE` | `PURCHASING_SETTLEMENT_OVERDUE` | V289 | `EVENT_RECIPIENTS` (the HB and the Bereichsleiter and Bereichskoordinatoren of every governing Bereich), `ROLE` `BANK_MANAGEMENT`; raised once per deal by the `purchasing_settlement_overdue` timed producer; not mutable | REQ-PUR-018 |
+| `PURCHASING_PAUSED` | `PURCHASING_PAUSED` | V289 | `EVENT_RECIPIENTS` (the active HBs) and, for a unit pause, the unit's leadership; coded `scopeCode`, `reasonCode`; not mutable | REQ-PUR-019 |
+| `PURCHASING_RESUMED` | `PURCHASING_RESUMED` | V289 | as the pause; supersedes `PURCHASING_PAUSED`; not mutable | REQ-PUR-019 |
+| `PURCHASING_DELEGATE_APPOINTED` | `PURCHASING_DELEGATE_APPOINTED` | V289 | `EVENT_RECIPIENT` (the appointed member); not mutable | REQ-PUR-003 |
+| `PURCHASING_DELEGATE_REVOKED` | `PURCHASING_DELEGATE_REVOKED` | V289 | `EVENT_RECIPIENT` (the former HB); supersedes the appointment notice; not mutable | REQ-PUR-003 |
 
 Every notification type renders through `notifications.type.<TYPE>` in all three frontend bundles.
 The e-mail consumers of REQ-NOTIF-013 (`UserApprovalMailService`, `PendingRegistrationMailService`)

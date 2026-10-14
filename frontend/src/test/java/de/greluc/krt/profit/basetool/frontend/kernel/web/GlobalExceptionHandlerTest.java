@@ -360,6 +360,25 @@ class GlobalExceptionHandlerTest {
   }
 
   @Test
+  void bankFourEyesRequired409_mapsToDedicatedKey_notUnexpected() {
+    BackendServiceException ex =
+        new BackendServiceException(
+            "own request", null, 409, "BANK_FOUR_EYES_REQUIRED", "corr-bank", List.of(), null);
+
+    Object result = handler.handleBackendServiceException(ex, jsonRequest(), new ConcurrentModel());
+
+    assertInstanceOf(ResponseEntity.class, result);
+    ResponseEntity<?> response = (ResponseEntity<?>) result;
+    assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+    @SuppressWarnings("unchecked")
+    Map<String, Object> body = (Map<String, Object>) response.getBody();
+    assertNotNull(body);
+    assertEquals("BANK_FOUR_EYES_REQUIRED", body.get("code"));
+    assertEquals("error.bank.fourEyesRequired", body.get("message"));
+    assertEquals(Boolean.FALSE, body.get("reloadHint"));
+  }
+
+  @Test
   void noResourceFound_setsModelAttributes_andReturnsErrorView() {
     Model model = new ConcurrentModel();
 

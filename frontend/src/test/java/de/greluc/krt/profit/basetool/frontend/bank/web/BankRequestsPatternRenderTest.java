@@ -164,6 +164,8 @@ class BankRequestsPatternRenderTest {
         null,
         null,
         null,
+        null,
+        null,
         3L,
         callerMayConfirm);
   }

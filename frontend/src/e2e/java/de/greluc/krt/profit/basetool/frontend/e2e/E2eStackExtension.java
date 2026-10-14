@@ -282,6 +282,8 @@ public final class E2eStackExtension implements BeforeAllCallback {
         EPHEMERAL_BASE_URL, root, BackendSeeder.trustingTestCa());
     BackendSeeder seeder = new BackendSeeder();
     seeder.seedCatalog();
+    seeder.seedSql("/supply-e2e-seed.sql");
+    seeder.seedSql("/purchasing-e2e-seed.sql");
     seeder.ensureRefineryMaterial(E2E_ADMIN_USER, E2E_ADMIN_PASSWORD, PICKER_MATERIAL_IMPORT);
     seeder.ensureRefineryMaterial(E2E_ADMIN_USER, E2E_ADMIN_PASSWORD, PICKER_MATERIAL_REFINERY);
     seeder.ensureRefineryMaterialWithRefinedOutput(

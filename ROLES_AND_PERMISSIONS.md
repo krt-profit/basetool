@@ -946,6 +946,8 @@ Building on 3.11.1/3.11.2, still solely via the seam `OrgUnitBankAccessService` 
 
 \* Bank Empl./Bank Management reach the request endpoint only as far as they may view the account themselves (view/oversight scope). The two approval acts lie on **different surfaces of different users**; an out-of-band approval bumps the `@Version` of the request — an open bank queue with an old version runs into 409 `OPTIMISTIC_LOCK` on the next confirmation and recovers via reload (intended behavior, REQ-BANK-041).
 
+**Four-eyes (REQ-BANK-062, ADR-0251):** for every booking request the member who raised it can neither grant its owner approval nor confirm it (409 `BANK_FOUR_EYES_REQUIRED`) — a second person decides. This binds bank employees, bank management and every other role; an **Admin** may approve and confirm their own request. The requester may still reject or cancel it, and direct bookings (no request) are unchanged.
+
 #### 3.11.4 KRT-account 3-stage approval ladder & the "Mitglieder des Bereichs" audience (REQ-BANK-047/-048)
 
 - **KRT-account (`CARTEL`) amount ladder (REQ-BANK-047):** the KRT account replaces the per-audience limits of 3.11.3 with an **amount-tiered** approval on withdrawals/transfers leaving it. Two thresholds `T1 ≤ T2` define who approves: **≤ T1** the **bank employee** (self-approve), **T1..T2** the **Bankleitung** (`ROLE_BANK_MANAGEMENT`), **> T2** the **Organisationsleitung** (corrected from the Bereichsleiter Profit by ADR-0109). The thresholds are set **only by the Bankleitung** (`ROLE_BANK_MANAGEMENT`; Admin via hierarchy) in the **new „KRT-Freigaben" tab** of the bank Verwaltung (`PATCH …/approval-tiers`, audited `CARTEL_APPROVAL_TIERS_SET/CLEARED`); the account-detail pages show the ladder read-only to every viewer. The **Bankleitung** and **OL** approve their band's requests in Org-Einheits-Bank → „Anträge an unsere Konten" (band-routed: each sees only its own band; an **Admin** sees **and approves all three bands**), then a bank employee confirms with the same mandatory checkbox as 3.11.3 — the Bankleitung, reaching `BANK_EMPLOYEE` through the role hierarchy, can also confirm/book directly from the bank-staff queue. A plain bank employee's **direct** KRT withdrawal/transfer above `T1` is **not booked**: it is auto-filed as the band-routed approval request and the endpoint answers `202` (the employee is told to notify the Bankleitung), rather than being refused `409 BANK_CARTEL_APPROVAL_REQUIRED` (management/admin uncapped; ADR-0109).
@@ -990,6 +992,66 @@ owner-only exactly like the interessenten of an offer (REQ-MARKET-015…020).
 ¹ Only for the caller's **own** offers / requests / own Lager items (enforced in the service, not by
 role). Every Materialbörse mutation — offers and requests — is audited under `AuditDomain.MARKET` (see
 [`docs/specs/audit.md`](docs/specs/audit.md)).
+
+### 3.13 Bedarf & Spenden (supply, REQ-SUP-\*)
+
+The supply surface (`/supply/...`, group „Beschaffung") is off until an admin sets `supply.enabled`
+on `/admin/supply`; while it is off every endpoint except the state read and the admin endpoints
+answers `404`. Every controller is class-gated on `hasRole('KRT_MEMBER')`; the admin controller on
+`hasRole('ADMIN')`. Within that gate the unit-scoped writes are role-scoped in `SupplyAccessPolicy`
+(`canManageUnit`: the lead or a Logistician of the unit, or an admin), not tenant-scoped — a need is
+visible to every member. The purchase fields of a need (maximum unit price, purchased amount, UEX
+reference price) are returned only to the raising unit's managers, the governing leadership and a
+trade delegate.
+
+| Action                                                                      | Member | Log. / Lead of the unit | Governing leadership | Admin |
+|:----------------------------------------------------------------------------|:-------|:------------------------|:---------------------|:------|
+| See the `OPEN` needs                                                        | ✅      | ✅                       | ✅                    | ✅     |
+| See every state of a unit's needs                                           | —      | ✅ (own unit)            | ✅                    | ✅     |
+| See a need's purchase fields                                                | —      | ✅ (own unit)            | ✅                    | ✅     |
+| Raise / edit / pause / resume / withdraw a need                             | —      | ✅ (unit may raise)      | —                    | ✅ (unit may raise) |
+| Pledge a donation (optionally from an own Lager row), withdraw an own pledge | ✅      | ✅                       | ✅                    | ✅ ²   |
+| Receive / decline a pledge, record a received donation                      | —      | ✅ (receiving unit)      | —                    | ✅     |
+| See a unit's donations                                                      | —      | ✅ (own unit)            | ✅                    | ✅     |
+| See a donation's donor                                                       | donor  | ✅ (receiving unit)      | ✅                    | ✅     |
+| Monthly statistics                                                          | own totals | ✅ (own unit)        | ✅ (all, per donor)   | ✅     |
+| Switch the surface on, mark units as raising / receiving                    | —      | —                       | —                    | ✅     |
+
+² An admin may withdraw any unreceived pledge. „Governing leadership" is the Bereichsleiter of the
+governing Bereich (`supply.governing_area_id`), the Organisationsleitung and an admin. Every supply
+mutation is audited under `AuditDomain.SUPPLY`.
+
+### 3.14 Ankauf (purchasing, REQ-PUR-\*)
+
+The purchasing surface (`/purchasing/...`, group „Beschaffung") is off until an admin sets
+`purchasing.enabled` on `/admin/purchasing`; while it is off every endpoint except the state read and the
+admin endpoints answers `404`. Every controller is class-gated on `hasRole('KRT_MEMBER')`; the admin
+controller on `hasRole('ADMIN')`. Within that gate `PurchasingAccessPolicy` decides (ADR-0255): the
+**Handelsbeauftragter (HB)** is not a Keycloak role but an in-app appointment — active while not revoked
+and not past its end date — made by the governing leadership. Deals are not tenant scoped; a deal is read
+by its own HB (also after the appointment ended), the governing leadership, bank staff, and the lead and
+Logisticians of the raising unit. Partner notes are returned to HBs and the governing leadership only.
+
+| Action                                                               | Member | HB (active) | Former HB | Log. / Lead of raising unit | Governing leadership | Bank staff | Admin |
+|:---------------------------------------------------------------------|:-------|:------------|:----------|:----------------------------|:---------------------|:-----------|:------|
+| Create / edit a deal, request money, record a delivery               | —      | ✅ (own)     | —         | —                           | —                    | —          | —     |
+| Close the delivery, record the settlement                            | —      | ✅ (own)     | ✅ (own)   | —                           | —                    | —          | —     |
+| Cancel a deal before any money was confirmed                         | —      | ✅ (own)     | ✅ (own)   | —                           | ✅                    | —          | ✅     |
+| Accept / reject a delivery (never one's own)                         | —      | —           | —         | ✅ (own unit)                | ✅                    | —          | ✅     |
+| Read a deal                                                          | —      | ✅ (own)     | ✅ (own)   | ✅ (own unit)                | ✅                    | ✅          | ✅     |
+| Read the partner notes of a deal                                     | —      | ✅           | ✅ (own)   | —                           | ✅                    | —          | ✅     |
+| Create / edit / block / unblock a partner                            | —      | ✅           | —         | —                           | ✅                    | —          | ✅     |
+| Erase an individual partner                                          | —      | —           | —         | —                           | ✅                    | —          | ✅     |
+| Appoint / revoke an HB, set a personal limit                         | —      | —           | —         | —                           | ✅                    | —          | ✅     |
+| Pause / resume purchasing                                            | —      | —           | —         | ✅ (own unit)                | ✅ (also global)      | —          | ✅     |
+| Read the report, CSV and forum text                                  | —      | ✅           | —         | ✅ (own unit)                | ✅                    | ✅          | ✅     |
+| Switch the surface on, set the funding account, limits, risk classes | —      | —           | —         | —                           | —                    | —          | ✅     |
+
+„Governing leadership" is a Bereichsleiter or Bereichskoordinator of a governing Bereich (the set in
+`purchasing_setting_governing_area`, the Bereich Profit by default; a Bereichsoperator does not govern), the
+Organisationsleitung and an admin. Every purchasing mutation is audited under `AuditDomain.PURCHASING`;
+the money itself moves only through bank requests, which obey the four-eyes rule (REQ-BANK-062): the HB is the
+requester and can neither grant nor confirm a tranche.
 
 ---
 

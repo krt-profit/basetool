@@ -81,7 +81,9 @@ class AdminAuditLogPageControllerTest {
           "MARKET",
           "HANGAR",
           "BLUEPRINT",
-          "CONNECTED_APPS");
+          "CONNECTED_APPS",
+          "SUPPLY",
+          "PURCHASING");
 
   private BackendApiClient backendApiClient;
   private AdminAuditLogPageController controller;

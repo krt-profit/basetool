@@ -75,6 +75,10 @@ import org.jetbrains.annotations.Nullable;
  *     named
  * @param counterpartyOrgUnitId the Empf&auml;nger's chosen org unit, or {@code null}
  * @param counterpartyOrgUnitName name snapshot of that org unit, or {@code null}
+ * @param purposeKind what another module raised the request for (REQ-BANK-061), as an enum name, or
+ *     {@code null} for a request a member or employee filed
+ * @param purposeRef that module's opaque reference, or {@code null} exactly when there is no
+ *     purpose
  * @param version the optimistic-locking version echoed on cancel/confirm/reject
  * @param callerMayConfirm on the staff queue, whether the caller may confirm this request now;
  *     {@code null} on every other read (REQ-BANK-023)
@@ -115,6 +119,8 @@ public record BankBookingRequestDto(
     @Nullable String counterpartyHandle,
     @Nullable UUID counterpartyOrgUnitId,
     @Nullable String counterpartyOrgUnitName,
+    @BackendEnumAsString @Nullable String purposeKind,
+    @Nullable UUID purposeRef,
     Long version,
     @Nullable Boolean callerMayConfirm) {
 

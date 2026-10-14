@@ -70,15 +70,31 @@ public final class InventoryAllocations {
   }
 
   /**
-   * Checks, epsilon-tolerantly, whether the entry's amount still covers both allocation sums; a
-   * decrement path rejects the write (422) when it does not.
+   * Sums the amounts of the entry's donation slices.
+   *
+   * @param item the entry (its donation allocations must be loaded within the tx); never {@code
+   *     null}
+   * @return the total SCU pledged as donations
+   */
+  public static double sumDonation(@NotNull InventoryItem item) {
+    return item.getDonationAllocations().stream()
+        .mapToDouble(a -> a.getAmount() != null ? a.getAmount() : 0.0)
+        .sum();
+  }
+
+  /**
+   * Checks, epsilon-tolerantly, whether the entry's amount still covers the three allocation sums;
+   * a decrement path rejects the write (422) when it does not.
    *
    * @param item the entry with its post-decrement amount and allocations loaded; never {@code null}
-   * @return {@code true} when Σ(job) ≤ amount and Σ(mission) ≤ amount within {@link #EPSILON}
+   * @return {@code true} when Σ(job), Σ(mission) and Σ(donation) are each ≤ amount within {@link
+   *     #EPSILON}
    */
   public static boolean fits(@NotNull InventoryItem item) {
     double amount = item.getAmount() != null ? item.getAmount() : 0.0;
-    return sumJobOrder(item) <= amount + EPSILON && sumMission(item) <= amount + EPSILON;
+    return sumJobOrder(item) <= amount + EPSILON
+        && sumMission(item) <= amount + EPSILON
+        && sumDonation(item) <= amount + EPSILON;
   }
 
   /**
@@ -131,6 +147,50 @@ public final class InventoryAllocations {
     slice.setAmount(amount);
     item.getMissionAllocations().add(slice);
     return slice;
+  }
+
+  /**
+   * Appends a donation slice earmarking {@code amount} of the entry, or raises the existing slice
+   * of the same donation; the caller owns the sum guard.
+   *
+   * @param item the owning entry; never {@code null}
+   * @param donationId the pledged donation; never {@code null}
+   * @param amount the amount to earmark
+   * @return the created or raised slice, already part of the entry
+   */
+  @NotNull
+  public static InventoryDonationAllocation addDonation(
+      InventoryItem item, UUID donationId, double amount) {
+    InventoryDonationAllocation existing = donationSlice(item, donationId);
+    if (existing != null) {
+      existing.setAmount(existing.getAmount() + amount);
+      return existing;
+    }
+    InventoryDonationAllocation slice = new InventoryDonationAllocation();
+    slice.setInventoryItem(item);
+    slice.setDonationId(donationId);
+    slice.setAmount(amount);
+    item.addDonationAllocation(slice);
+    return slice;
+  }
+
+  /**
+   * Finds the entry's donation slice for {@code donationId}.
+   *
+   * @param item the entry; never {@code null}
+   * @param donationId the donation id to match; may be {@code null}
+   * @return the matching slice, or {@code null} when none
+   */
+  @Nullable
+  public static InventoryDonationAllocation donationSlice(
+      InventoryItem item, @Nullable UUID donationId) {
+    if (donationId == null) {
+      return null;
+    }
+    return item.getDonationAllocations().stream()
+        .filter(a -> donationId.equals(a.getDonationId()))
+        .findFirst()
+        .orElse(null);
   }
 
   /**
@@ -205,6 +265,9 @@ public final class InventoryAllocations {
       } else {
         addMission(survivor, va.getMissionId(), va.getAmount());
       }
+    }
+    for (InventoryDonationAllocation va : victim.getDonationAllocations()) {
+      addDonation(survivor, va.getDonationId(), va.getAmount());
     }
   }
 

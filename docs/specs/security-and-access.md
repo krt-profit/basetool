@@ -2076,6 +2076,7 @@ family decides, so a sub-family can differ from its parent.
 | `/api/v1/promotion/**` | evaluations of named members |
 | `/api/v1/roles/**`, `/api/v1/settings/**`, `/api/v1/catalog/admin/**`, `/api/v1/blueprints/admin/**` | the administration of roles, of the raw key store (ADMIN-only reads, REQ-SEC-083), of the catalogue (imports, quality tiers, sync reports) and of the default blueprints; the other administration trees sit under `users`, `terms`, `personal-*`, `hangar`, `notifications` and `connected-apps`, which are `no-store` already |
 | `/api/v1/audit/**` | **new** — who did what, by actor |
+| `/api/v1/supply/**`, `/api/v1/purchasing/**` | the needs' purchase fields, donors, deals, partners and the delegates' limits |
 | `/api/v1/announcements/**` (the public banner `/api/v1/announcements/current` excepted, the admin read `/api/v1/announcements/current/admin` included) | the read marker is the caller's own state; the admin read is an administration tree |
 | `/api/v1/connected-apps/**` | **new** — the member's installations and their activity |
 | `/api/v1/exchange/**` | **new** — the acting member's stock, ships, blueprints and installation |

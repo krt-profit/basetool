@@ -23,6 +23,9 @@ import static de.greluc.krt.profit.basetool.backend.bank.api.BankAmounts.plain;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankPurpose;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankPurposeKind;
+import de.greluc.krt.profit.basetool.backend.bank.api.BookingRequestPurposeObserver;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCancelledEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestConfirmedEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCreatedEvent;
@@ -48,12 +51,14 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 import java.util.function.BiPredicate;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -90,6 +95,7 @@ public class BankBookingRequestService {
   private final UserRepository userRepository;
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   private final ApplicationEventPublisher eventPublisher;
+  private final ObjectProvider<BookingRequestPurposeObserver> purposeObservers;
 
   /**
    * Persists a new {@code PENDING} booking request, audits it and fires the notification event
@@ -139,6 +145,62 @@ public class BankBookingRequestService {
       @Nullable BigDecimal splitPercent,
       @Nullable UUID counterpartyUserId,
       @Nullable UUID counterpartyOrgUnitId) {
+    return create(
+        accountId,
+        type,
+        amount,
+        note,
+        justification,
+        targetAccountId,
+        requiresOwnerApproval,
+        applicableLimit,
+        requiredApprover,
+        splitEnabled,
+        splitPercent,
+        counterpartyUserId,
+        counterpartyOrgUnitId,
+        null);
+  }
+
+  /**
+   * Persists a new {@code PENDING} booking request that another module raised for a purpose
+   * (REQ-BANK-061); otherwise exactly {@link #create(UUID, BankBookingRequestType, BigDecimal,
+   * String, String, UUID, boolean, BigDecimal, BankRequestApprover, boolean, BigDecimal, UUID,
+   * UUID)}.
+   *
+   * @param accountId the source account
+   * @param type deposit, withdrawal or transfer
+   * @param amount the requested whole-aUEC amount
+   * @param note the requester's optional note
+   * @param justification the requester's optional Begr&uuml;ndung
+   * @param targetAccountId the transfer destination, or {@code null}
+   * @param requiresOwnerApproval whether the amount exceeds the requester's approval limit
+   * @param applicableLimit the requester's resolved approval limit, or {@code null}
+   * @param requiredApprover the approver class a flagged request needs, or {@code null}
+   * @param splitEnabled whether a deposit is split across the squadron accounts
+   * @param splitPercent the whole percent to distribute, or {@code null}
+   * @param counterpartyUserId the Empf&auml;nger of a {@code WITHDRAWAL}, or {@code null}
+   * @param counterpartyOrgUnitId that Empf&auml;nger's org unit, or {@code null}
+   * @param purpose what the request is for, or {@code null} for a request without a purpose
+   * @return the created request
+   */
+  @NotNull
+  @Transactional
+  public BankBookingRequestDto create(
+      @NotNull UUID accountId,
+      @NotNull BankBookingRequestType type,
+      @NotNull BigDecimal amount,
+      @Nullable String note,
+      @Nullable String justification,
+      @Nullable UUID targetAccountId,
+      boolean requiresOwnerApproval,
+      @Nullable BigDecimal applicableLimit,
+      @Nullable BankRequestApprover requiredApprover,
+      boolean splitEnabled,
+      @Nullable BigDecimal splitPercent,
+      @Nullable UUID counterpartyUserId,
+      @Nullable UUID counterpartyOrgUnitId,
+      @Nullable BankPurpose purpose) {
     BankAccount account =
         Entities.require(accountRepository.findById(accountId), "Bank account not found");
     requireActiveForRequest(account);
@@ -181,6 +243,8 @@ public class BankBookingRequestService {
     request.setRequiredApprover(requiredApprover);
     request.setSplitEnabled(splitEnabled);
     request.setSplitPercent(splitPercent);
+    request.setPurposeKind(purpose == null ? null : purpose.kind());
+    request.setPurposeRef(purpose == null ? null : purpose.ref());
     BankBookingRequest saved = requestRepository.save(request);
 
     bankAuditService.record(
@@ -437,7 +501,8 @@ public class BankBookingRequestService {
   /**
    * Lists every request on the given accounts, newest first (REQ-BANK-041) — backs the responsible
    * holder's "Fremde Anträge" tab. Org-unit-blind: the caller ({@link OrgUnitBankAccessService})
-   * supplies the set of accounts the holder is responsible for.
+   * supplies the set of accounts the holder is responsible for. The caller's own requests are left
+   * out unless they are an admin, because they may not approve them (REQ-BANK-062).
    *
    * @param accountIds the accounts to list requests for
    * @return the requests on those accounts, newest first; empty when the set is empty
@@ -447,7 +512,10 @@ public class BankBookingRequestService {
     if (accountIds.isEmpty()) {
       return List.of();
     }
+    UUID callerId = authHelperService.currentUserId().orElse(null);
+    boolean admin = authHelperService.isAdmin();
     return requestRepository.findByAccountIdInOrderByCreatedAtDesc(accountIds).stream()
+        .filter(request -> !isBoundByFourEyes(request, callerId, admin))
         .map(this::toDto)
         .toList();
   }
@@ -487,7 +555,60 @@ public class BankBookingRequestService {
     eventPublisher.publishEvent(
         new BankBookingRequestCancelledEvent(
             request.getId(), request.getAccount().getId(), caller));
+    notifyPurposeObserver(request, (observer, ref) -> observer.onCancelled(request.getId(), ref));
     return toDto(request);
+  }
+
+  /**
+   * Cancels a pending request on behalf of the module that raised it for a purpose (REQ-BANK-061),
+   * for example because the deal it pays for was cancelled. Joins the caller's transaction, skips
+   * the requester check and tells the purpose observer like any other cancellation.
+   *
+   * @param requestId the request to cancel
+   * @param kind the purpose kind the request must carry
+   * @throws NotFoundException when the request does not exist or carries another purpose kind
+   * @throws BankConflictException with {@code BANK_REQUEST_NOT_PENDING} when already decided
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void cancelForPurpose(@NotNull UUID requestId, @NotNull BankPurposeKind kind) {
+    BankBookingRequest request = lockRequest(requestId);
+    if (request.getPurposeKind() != kind) {
+      throw new NotFoundException("Booking request not found");
+    }
+    requirePending(request);
+    UUID actor = authHelperService.currentUserId().orElse(null);
+    request.setStatus(BankBookingRequestStatus.CANCELLED);
+    request.setDecidedAt(Instant.now());
+    bankAuditService.record(
+        BankAuditEventType.BOOKING_REQUEST_CANCELLED,
+        request.getAccount().getId(),
+        null,
+        actor,
+        "cancelled request " + shortId(request.getId()));
+    eventPublisher.publishEvent(
+        new BankBookingRequestCancelledEvent(request.getId(), request.getAccount().getId(), actor));
+    notifyPurposeObserver(request, (observer, ref) -> observer.onCancelled(request.getId(), ref));
+  }
+
+  /**
+   * Tells the observer that owns the request's purpose kind how the request ended, inside the
+   * bank's transaction (REQ-BANK-063); nothing for a request without a purpose.
+   *
+   * @param request the request that just reached its terminal state
+   * @param call the observer call, given the observer and the stored purpose reference
+   */
+  private void notifyPurposeObserver(
+      @NotNull BankBookingRequest request,
+      @NotNull BiConsumer<BookingRequestPurposeObserver, UUID> call) {
+    BankPurposeKind kind = request.getPurposeKind();
+    UUID ref = request.getPurposeRef();
+    if (kind == null || ref == null) {
+      return;
+    }
+    purposeObservers
+        .orderedStream()
+        .filter(observer -> observer.kind() == kind)
+        .forEach(observer -> call.accept(observer, ref));
   }
 
   /**
@@ -513,8 +634,45 @@ public class BankBookingRequestService {
     }
     BiPredicate<BankBookingRequestType, UUID> confirmCheck =
         bankSecurityService.confirmCheck(authentication);
+    UUID callerId = authHelperService.currentUserId().orElse(null);
+    boolean admin = authHelperService.isAdmin();
     return pageQueue(statuses, pageable)
-        .map(request -> toDto(request, callerMayConfirm(request, confirmCheck)));
+        .map(
+            request ->
+                toDto(
+                    request,
+                    callerMayConfirm(request, confirmCheck)
+                        && !isBoundByFourEyes(request, callerId, admin)));
+  }
+
+  /**
+   * Whether the four-eyes rule bars the caller from approving or confirming the request: the caller
+   * raised it and is not an admin (REQ-BANK-062).
+   *
+   * @param request the request to judge
+   * @param callerId the caller's user id, or {@code null} when unknown
+   * @param admin whether the caller is an admin, who may decide their own request
+   * @return {@code true} iff the caller must leave the decision to a second person
+   */
+  private static boolean isBoundByFourEyes(
+      @NotNull BankBookingRequest request, @Nullable UUID callerId, boolean admin) {
+    return !admin && callerId != null && callerId.equals(request.getRequestedBy());
+  }
+
+  /**
+   * Fails the decision when the four-eyes rule bars the current caller from granting or confirming
+   * the request (REQ-BANK-062).
+   *
+   * @param request the request being decided
+   * @throws BankConflictException with {@code BANK_FOUR_EYES_REQUIRED} when the caller raised it
+   */
+  private void requireSecondPerson(@NotNull BankBookingRequest request) {
+    if (isBoundByFourEyes(
+        request, authHelperService.currentUserId().orElse(null), authHelperService.isAdmin())) {
+      throw new BankConflictException(
+          BankConflictException.CODE_BANK_FOUR_EYES_REQUIRED,
+          "The requester of a booking request cannot approve or confirm it");
+    }
   }
 
   /**
@@ -580,9 +738,10 @@ public class BankBookingRequestService {
    * @throws NotFoundException when the request does not exist
    * @throws AccessDeniedException when the employee lacks the matching per-account capability
    * @throws BankConflictException with {@code BANK_REQUEST_NOT_PENDING}, {@code
-   *     BANK_OWNER_APPROVAL_REQUIRED}, or a ledger conflict ({@code BANK_ACCOUNT_CLOSED}, {@code
-   *     BANK_OVERDRAFT}, {@code BANK_SELF_TRANSFER}); the holder may go negative (REQ-BANK-006,
-   *     ADR-0039)
+   *     BANK_FOUR_EYES_REQUIRED} (the caller raised the request and is no admin, REQ-BANK-062),
+   *     {@code BANK_OWNER_APPROVAL_REQUIRED}, or a ledger conflict ({@code BANK_ACCOUNT_CLOSED},
+   *     {@code BANK_OVERDRAFT}, {@code BANK_SELF_TRANSFER}); the holder may go negative
+   *     (REQ-BANK-006, ADR-0039)
    * @throws ObjectOptimisticLockingFailureException on a version mismatch (409)
    */
   @NotNull
@@ -598,6 +757,7 @@ public class BankBookingRequestService {
     BankBookingRequest request = lockRequest(requestId);
     requireVersion(request, version);
     requirePending(request);
+    requireSecondPerson(request);
     if (request.isRequiresOwnerApproval() && !ownerApprovalConfirmed) {
       throw new BankConflictException(
           BankConflictException.CODE_BANK_OWNER_APPROVAL_REQUIRED,
@@ -700,6 +860,9 @@ public class BankBookingRequestService {
             request.getAmount(),
             request.getRequestedBy(),
             decider));
+    notifyPurposeObserver(
+        request,
+        (observer, ref) -> observer.onConfirmed(request.getId(), ref, transaction.getId()));
     return toDto(request);
   }
 
@@ -753,6 +916,7 @@ public class BankBookingRequestService {
             reason,
             request.getRequestedBy(),
             decider));
+    notifyPurposeObserver(request, (observer, ref) -> observer.onRejected(request.getId(), ref));
     return toDto(request);
   }
 
@@ -765,13 +929,17 @@ public class BankBookingRequestService {
    * @param granted whether to grant ({@code true}) or revoke ({@code false}) the approval
    * @return the updated request
    * @throws BadRequestException when granting approval to a request that needs none
-   * @throws BankConflictException with {@code BANK_REQUEST_NOT_PENDING} when no longer pending
+   * @throws BankConflictException with {@code BANK_REQUEST_NOT_PENDING} when no longer pending, or
+   *     {@code BANK_FOUR_EYES_REQUIRED} when a non-admin grants their own request (REQ-BANK-062)
    */
   @NotNull
   @Transactional(propagation = Propagation.MANDATORY)
   public BankBookingRequestDto applyOwnerApprovalWithinTransaction(
       @NotNull BankBookingRequest request, boolean granted) {
     requirePending(request);
+    if (granted) {
+      requireSecondPerson(request);
+    }
     if (granted && !request.isRequiresOwnerApproval()) {
       throw new BadRequestException(
           "This request does not require the responsible holder's approval");
@@ -981,6 +1149,8 @@ public class BankBookingRequestService {
         request.getCounterpartyHandle(),
         request.getCounterpartyOrgUnitId(),
         request.getCounterpartyOrgUnitName(),
+        request.getPurposeKind(),
+        request.getPurposeRef(),
         request.getVersion(),
         callerMayConfirm);
   }

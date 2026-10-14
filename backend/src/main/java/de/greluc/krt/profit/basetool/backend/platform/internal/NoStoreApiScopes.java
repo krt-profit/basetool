@@ -77,11 +77,13 @@ public final class NoStoreApiScopes {
           "/api/v1/personal-blueprints/**",
           "/api/v1/personal-inventory/**",
           "/api/v1/promotion/**",
+          "/api/v1/purchasing/**",
           "/api/v1/refinery-orders/**",
           "/api/v1/roles/**",
           "/api/v1/settings/**",
           "/api/v1/special-commands/*/members/**",
           "/api/v1/squadrons/*/members/**",
+          "/api/v1/supply/**",
           "/api/v1/terms/**",
           "/api/v1/users/**");
 

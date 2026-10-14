@@ -22,6 +22,7 @@ requires it and duplicating it into further files spreads personal data for no g
 |----------------------------------|-----------------------------------------------------------------------------------------------------------------------------|
 | **Members**                      | Register via Keycloak (credentials or Discord), approved by an admin                                                        |
 | **Applicants**                   | Registered but not yet decided (`PENDING`) or refused (`REJECTED`)                                                          |
+| **External trade partners** | Entered by a trade delegate as a partner of a purchasing deal; individuals by handle, organisations by name (A12) |
 | **Non-registered third parties** | Named in free-text fields by a member: external mission participants, job-order handover recipients, org-chart placeholders |
 | **Visitors**                     | Reach the landing page, Impressum, terms and privacy pages without an account — the only pages without a login (ADR-0159)  |
 
@@ -234,6 +235,30 @@ requires it and duplicating it into further files spreads personal data for no g
 - **After the transfer:** the client runs on the member's device and is not operated by the
   controller; what it does with the data is governed by its provider's privacy statement, which the
   approval requires (REQ-XCH-002). See [Recipients](#recipients).
+
+
+### A12 — Material purchasing from external partners (Ankauf)
+
+- **Purpose:** let appointed trade delegates buy released needs from external partners, request the money
+  through the bank, hand the goods to the raising unit and account for the money (REQ-PUR-*,
+  [`purchasing.md`](../specs/purchasing.md)).
+- **Data:** per delegate the appointment (member, appointed by and when, end date, personal limit,
+  revocation); per partner the kind, the name or handle (of an individual: a game handle, no real name),
+  an optional tag, the contact channel, the way the contact came about and two short free-text notes on
+  conditions and reputation; per deal the delegate, the partner, the goods, amounts and prices, the
+  tranches (each mirrored from its bank request), the deliveries with the accepting member, the
+  settlement and the `PURCHASING` audit rows (ids, enums and amounts, never a partner name or note).
+- **Legal basis:** Art. 6(1)(b) for the delegate's appointment and duties; Art. 6(1)(f) for the partner
+  records and the audit (accounting for the organisation's money, avoiding fraud). Members are never
+  partners (REQ-PUR-005).
+- **Where:** `purchasing_*` tables; the money in `bank_booking_request` / `bank_transaction`.
+- **Retention:** deals, tranches, deliveries and settlements are never deleted (REQ-PUR-022). A
+  delegate's rows are detached with the account (`ON DELETE SET NULL`); an admin erases an individual
+  partner's handle and notes on request, the deals keep a placeholder (REQ-PUR-006). The delegate's own
+  deals and appointments are in the Art. 15 export (REQ-PUR-028); the partner is a third party and is not.
+- **Recipients:** the delegates, the governing leadership, the raising unit's lead and Logisticians and
+  the bank staff within the roles of REQ-PUR-021; partner notes only the delegates and the governing
+  leadership.
 
 ---
 

@@ -299,7 +299,9 @@ class LiveSyncSubscriptionAuthorizerTest {
               || topicClass == LiveSyncTopicClass.INVENTORY_ALL
               || topicClass == LiveSyncTopicClass.MISSIONS_LIST
               || topicClass == LiveSyncTopicClass.REFINERY
-              || topicClass == LiveSyncTopicClass.ORG_STRUCTURE;
+              || topicClass == LiveSyncTopicClass.ORG_STRUCTURE
+              || topicClass == LiveSyncTopicClass.SUPPLY_NEEDS
+              || topicClass == LiveSyncTopicClass.PURCHASING_DEALS;
       assertThat(topicClass.needsCheck()).isEqualTo(!authenticationOnly);
     }
   }
