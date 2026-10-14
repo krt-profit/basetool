@@ -44,10 +44,6 @@
                         <label for="supply-pledge-amount" th:text="#{supply.need.amount}">Menge</label>
                         <input type="number" id="supply-pledge-amount" min="0.001" step="any" inputmode="decimal" required>
                     </div>
-                    <div class="form-group flex-gap-sm">
-                        <input type="checkbox" id="supply-pledge-anonymous">
-                        <label for="supply-pledge-anonymous" th:text="#{supply.pledge.anonymous}">Anonym spenden</label>
-                    </div>
                 </div>
                 <div class="krt-modal-foot">
                     <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="supply-pledge-modal" th:text="#{general.cancel}">Abbrechen</button>

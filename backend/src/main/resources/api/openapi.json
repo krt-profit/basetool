@@ -81005,9 +81005,6 @@
       "DonationDto" : {
         "type" : "object",
         "properties" : {
-          "anonymous" : {
-            "type" : "boolean"
-          },
           "canReceive" : {
             "type" : "boolean"
           },
@@ -88478,9 +88475,6 @@
             "format" : "double",
             "exclusiveMinimum" : 0
           },
-          "anonymous" : {
-            "type" : "boolean"
-          },
           "gameItemId" : {
             "type" : "string",
             "format" : "uuid"
@@ -89262,9 +89256,6 @@
             "type" : "number",
             "format" : "double",
             "exclusiveMinimum" : 0
-          },
-          "anonymous" : {
-            "type" : "boolean"
           },
           "donorUserId" : {
             "type" : "string",

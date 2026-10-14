@@ -182,7 +182,6 @@ public class SupplyDonationService {
 
     SupplyDonation donation = new SupplyDonation();
     donation.setDonorUserId(donor);
-    donation.setAnonymous(request.anonymous());
     donation.setReceivingOrgUnitId(unitId);
     donation.setMaterial(material);
     donation.setGameItem(item);
@@ -199,12 +198,11 @@ public class SupplyDonationService {
         AuditEventType.DONATION_PLEDGED,
         saved.getId(),
         label(saved),
-        saved.isAnonymous() ? null : donor,
+        donor,
         AuditDetails.of("unit", unitId)
             .with("amount", amount)
             .with("need", saved.getNeedId())
-            .with("fromStock", row != null)
-            .with("anonymous", saved.isAnonymous()));
+            .with("fromStock", row != null));
     OrgUnit unit = requireUnit(unitId);
     eventPublisher.publishEvent(
         SupplyNotices.pledged(
@@ -214,7 +212,7 @@ public class SupplyDonationService {
             unit.getName(),
             label(saved),
             plain(amount),
-            saved.isAnonymous() ? null : requireUser(donor).getEffectiveName(),
+            requireUser(donor).getEffectiveName(),
             donor));
     count("PLEDGED");
     return one(saved);
@@ -266,7 +264,6 @@ public class SupplyDonationService {
 
     SupplyDonation donation = new SupplyDonation();
     donation.setDonorUserId(request.donorUserId());
-    donation.setAnonymous(request.anonymous());
     donation.setReceivingOrgUnitId(unitId);
     donation.setMaterial(material);
     donation.setGameItem(item);
@@ -285,7 +282,7 @@ public class SupplyDonationService {
         AuditEventType.DONATION_RECORDED,
         saved.getId(),
         label(saved),
-        saved.isAnonymous() ? null : saved.getDonorUserId(),
+        saved.getDonorUserId(),
         AuditDetails.of("unit", unitId).with("amount", amount).with("need", saved.getNeedId()));
     if (saved.getDonorUserId() != null) {
       eventPublisher.publishEvent(
@@ -359,7 +356,7 @@ public class SupplyDonationService {
         AuditEventType.DONATION_RECEIVED,
         saved.getId(),
         label(saved),
-        saved.isAnonymous() ? null : saved.getDonorUserId(),
+        saved.getDonorUserId(),
         AuditDetails.of("unit", unitId)
             .with("amount", received)
             .with("pledged", saved.getPledgedAmount())
@@ -397,7 +394,7 @@ public class SupplyDonationService {
         AuditEventType.DONATION_DECLINED,
         saved.getId(),
         label(saved),
-        saved.isAnonymous() ? null : saved.getDonorUserId(),
+        saved.getDonorUserId(),
         AuditDetails.of("unit", saved.getReceivingOrgUnitId())
             .with("reason", request.reason().name()));
     eventPublisher.publishEvent(
@@ -434,7 +431,7 @@ public class SupplyDonationService {
         AuditEventType.DONATION_WITHDRAWN,
         saved.getId(),
         label(saved),
-        saved.isAnonymous() ? null : saved.getDonorUserId(),
+        saved.getDonorUserId(),
         AuditDetails.of("unit", saved.getReceivingOrgUnitId()));
     eventPublisher.publishEvent(SupplyNotices.withdrawn(saved.getId(), actor));
     count("WITHDRAWN");

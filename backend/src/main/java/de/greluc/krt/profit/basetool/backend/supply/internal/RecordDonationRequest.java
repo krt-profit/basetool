@@ -34,7 +34,6 @@ import org.jetbrains.annotations.Nullable;
  * @param quality the quality of a material, {@code 0} when omitted
  * @param amount the received amount
  * @param donorUserId the donor, or {@code null} for a donation without one
- * @param anonymous whether the donor stays anonymous to the receiving unit
  * @param locationId where the stock lies now
  */
 public record RecordDonationRequest(
@@ -45,5 +44,4 @@ public record RecordDonationRequest(
     @Nullable Integer quality,
     @NotNull @Positive Double amount,
     @Nullable UUID donorUserId,
-    boolean anonymous,
     @NotNull UUID locationId) {}

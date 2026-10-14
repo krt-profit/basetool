@@ -53,7 +53,6 @@ CREATE TABLE supply_donation (
     created_at               TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     updated_at               TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     donor_user_id            UUID,
-    anonymous                BOOLEAN                  NOT NULL DEFAULT FALSE,
     receiving_org_unit_id    UUID                     NOT NULL,
     material_id              UUID,
     game_item_id             UUID,

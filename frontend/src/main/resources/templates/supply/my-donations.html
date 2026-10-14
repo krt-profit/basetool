@@ -46,7 +46,6 @@
                                 <span class="cell-title" th:text="${d.material() != null ? d.material().name() : d.gameItem().name()}">Quantanium</span>
                                 <span class="cell-sub">
                                     <span th:if="${d.quality() != null}" th:text="'Q' + ${d.quality()}">Q500</span>
-                                    <span th:if="${d.anonymous()}" class="chip chip--muted" th:text="#{supply.donation.anonymous}">anonym</span>
                                     <span th:if="${d.fromStock()}" class="chip chip--muted" th:text="#{supply.donation.fromStock}">aus dem Lager</span>
                                 </span>
                             </td>

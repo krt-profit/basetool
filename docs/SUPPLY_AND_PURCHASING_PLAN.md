@@ -203,13 +203,11 @@ Two ways in (E-07):
    - free pledge: `StockCommands.bookIntoPool` books it in at the receiver's location.
    The receiver may confirm a smaller amount (partial) or decline with a reason code.
 2. **Recorded** — a Logistician of the receiving unit records a donation already received, for a
-   named donor (or anonymously, as the donor wishes), and books it in at once.
+   named donor (or without one), and books it in at once.
 
 A donation is credited to at most one need. It never carries free text beyond an optional note
 that appears nowhere outside the donation itself (not in notifications, audit details or metrics).
-The donor may choose **„anonym spenden"**: the receiving unit sees the donation, but the donor's
-name is hidden from everyone except admin and the governing Bereichsleitung (for medal decisions);
-the donor's own statistics still count it.
+The receiving unit always sees the donor: it has to know in the game from whom the goods arrive.
 
 Transfer-notice interplay (REQ-INV-055, REQ-INV-056): a donation transfer changes a row's owner. It
 must produce the **donation** notices only — not the generic „Umbuchung" notices
@@ -417,7 +415,7 @@ below shows:
 | --- | --- | --- |
 | `supply_unit_setting` | supply | `org_unit_id` (unique), `may_raise_needs`, `accepts_donations`, `version` |
 | `supply_need` | supply | unit, `material_id` xor `game_item_id`, `quality_tier_id`, `amount`, `priority`, `purchasable`, `purchase_reason`, `max_unit_price`, `job_order_id` (id reference, no FK into another module's aggregate — §5.6 of the modularisation plan), `status`, audit columns, `version` |
-| `supply_donation` | supply | donor `user_id` (nullable after erasure), `anonymous`, receiving unit, material xor item, quality, `pledged_amount`, `received_amount`, `need_id`, `source_inventory_item_id` (id reference), `status` (`PLEDGED`, `RECEIVED`, `PARTIALLY_RECEIVED`, `DECLINED`, `WITHDRAWN`), `decline_reason`, `received_by`, timestamps, `version` |
+| `supply_donation` | supply | donor `user_id` (nullable after erasure), receiving unit, material xor item, quality, `pledged_amount`, `received_amount`, `need_id`, `source_inventory_item_id` (id reference), `status` (`PLEDGED`, `RECEIVED`, `PARTIALLY_RECEIVED`, `DECLINED`, `WITHDRAWN`), `decline_reason`, `received_by`, timestamps, `version` |
 | `purchasing_setting` | purchasing | singleton: `governing_area_id`, `funding_account_id`, `default_monthly_limit`, `budget_cap`, `budget_period`, `settlement_due_days`, `paused`, `pause_reason`, `version` |
 | `purchasing_unit_pause` | purchasing | per raising unit pause |
 | `purchasing_risk_class` | purchasing | `code` A/B/C, `max_total`, `max_advance_percent`, `requires_known_partner`, `escort_suggested` |
@@ -446,7 +444,7 @@ queries; the list reads are statement-bounded (REQ-DATA-003, no N+1).
   `ADMIN` matcher already stands in `SecurityConfig` before every domain rule, so the two admin roots
   need no new rule — only a test that they are fenced. Scope and ownership live in the module API so
   non-HTTP callers hit the same gates.
-- Redaction: a need's `maxUnitPrice` and purchase progress, a donation's donor when anonymous —
+- Redaction: a need's `maxUnitPrice` and purchase progress, a donation's donor for members who are neither the donor nor in the floor —
   stripped in the module's mapper for callers outside the floor, with redaction tests.
 - No exchange (`/exchange/v1`) surface; the edge allow-list for the app vhost is not widened (web
   only, E-10), and the edge deny probe asserts the new roots stay closed there.
@@ -623,6 +621,9 @@ Each step is one pull request (or a short stack), shippable alone, behind the fe
 
 ### 8.2 Where S3 … S6 deviate from this text
 
+- A donation has no anonymous mode (decided after the review): the receiving unit must know from whom
+  the goods arrive in the game (REQ-SUP-012).
+
 - The governing Bereich of purchasing is a column of `purchasing_setting` and the switch
   `purchasing.enabled` a system setting; supply keeps its own pair. The delegate's capability is the
   appointment row itself (ADR-0255).
@@ -703,9 +704,9 @@ approved.
 - **REQ-SUP-011 Recorded donation.** A Logistician or lead of a receiving unit MUST be able to record
   a donation already received for a named member donor or without donor, booking it into the pool in
   the same transaction.
-- **REQ-SUP-012 Anonymous donation.** A donor MUST be able to mark a donation anonymous. The donor's
-  identity MUST then be returned only to the donor, the governing Bereichsleitung and admin; the
-  receiving unit sees „anonym".
+- **REQ-SUP-012 Donor visibility.** A donation MUST NOT have an anonymous mode. The donor's identity
+  MUST be returned to the donor, the receiving unit's lead and Logisticians, the governing
+  Bereichsleitung and admin, and to nobody else.
 - **REQ-SUP-013 Statistics.** The tool MUST provide per month and receiving unit: number of donations,
   distinct donors, received amount per material and item. A member MUST see their own totals; the
   per-donor list MUST be visible only to the governing Bereichsleitung and admin.
@@ -851,7 +852,7 @@ The next free number on `main` is ADR-0251 (2026-10-13); claim at push time.
 | Risk | Mitigation |
 | --- | --- |
 | The tool suggests control it does not have: in-game payments are invisible | Every money and goods figure is the HB's or ARGON's declaration; the deal shows who declared what; acceptance by a second party (ARGON) and the bank's four-eyes are the actual controls |
-| Members feel watched by the donation statistics | Own statistics private to the member, per-donor list only for the governing Bereichsleitung, anonymous donation option, no ranking page |
+| Members feel watched by the donation statistics | Own statistics private to the member, per-donor list only for the governing Bereichsleitung, no ranking page |
 | Earmark logic interferes with existing Lager paths (sale, rebook, Materialbörse ratchet) | Earmark as an allocation kind inside inventory (beside job-order and mission allocations), concurrency tests per path (REQ-SUP-008) |
 | A bank change regresses the money path | The bank change is additive (two nullable columns, an SPI) and the four-eyes check ships as its own step B1 with its own tests (requester refused, admin allowed, reject allowed, direct booking unchanged, holder exemption unchanged); the existing bank suites, `BankReadNoNPlusOneTest`, the ladder tests and E2E stay green unchanged |
 | Notification noise | Donor notices mutable (REQ-NOTIF-027), N4/N8 only to the listed HB (`EVENT_RECIPIENTS`), one notice per action, N7 once per deal |

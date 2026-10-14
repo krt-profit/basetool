@@ -1013,7 +1013,7 @@ trade delegate.
 | Pledge a donation (optionally from an own Lager row), withdraw an own pledge | ✅      | ✅                       | ✅                    | ✅ ²   |
 | Receive / decline a pledge, record a received donation                      | —      | ✅ (receiving unit)      | —                    | ✅     |
 | See a unit's donations                                                      | —      | ✅ (own unit)            | ✅                    | ✅     |
-| See an anonymous donor's name                                               | donor  | —                       | ✅                    | ✅     |
+| See a donation's donor                                                       | donor  | ✅ (receiving unit)      | ✅                    | ✅     |
 | Monthly statistics                                                          | own totals | ✅ (own unit)        | ✅ (all, per donor)   | ✅     |
 | Switch the surface on, mark units as raising / receiving                    | —      | —                       | —                    | ✅     |
 

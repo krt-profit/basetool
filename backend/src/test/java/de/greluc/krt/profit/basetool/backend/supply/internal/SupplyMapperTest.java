@@ -141,11 +141,10 @@ class SupplyMapperTest {
     assertThat(dto.uexReferencePrice()).isNull();
   }
 
-  private SupplyDonation donation(boolean anonymous, DonationStatus status) {
+  private SupplyDonation donation(DonationStatus status) {
     SupplyDonation donation = new SupplyDonation();
     donation.setId(UUID.randomUUID());
     donation.setDonorUserId(DONOR);
-    donation.setAnonymous(anonymous);
     donation.setReceivingOrgUnitId(unit.getId());
     donation.setMaterial(material);
     donation.setQuality(500);
@@ -161,26 +160,30 @@ class SupplyMapperTest {
   }
 
   @Test
-  void theReceivingUnitSeesAPlainDonorButNotAnAnonymousOne() {
-    SupplyMapper.DonationContext manager =
-        donationContext(OTHER, false, false, Set.of(unit.getId()));
+  void theDonorTheReceivingUnitTheLeadershipAndAnAdminSeeTheDonor() {
+    SupplyDonation donation = donation(DonationStatus.RECEIVED);
 
-    assertThat(mapper.toDto(donation(false, DonationStatus.RECEIVED), manager).donorName())
+    assertThat(mapper.toDto(donation, donationContext(DONOR, false, false, Set.of())).donorName())
         .isEqualTo("Donor Dana");
-    assertThat(mapper.toDto(donation(true, DonationStatus.RECEIVED), manager).donorName()).isNull();
+    assertThat(
+            mapper
+                .toDto(donation, donationContext(OTHER, false, false, Set.of(unit.getId())))
+                .donorName())
+        .isEqualTo("Donor Dana");
+    assertThat(mapper.toDto(donation, donationContext(OTHER, false, true, Set.of())).donorName())
+        .isEqualTo("Donor Dana");
+    assertThat(mapper.toDto(donation, donationContext(OTHER, true, false, Set.of())).donorName())
+        .isEqualTo("Donor Dana");
   }
 
   @Test
-  void theDonorTheLeadershipAndAnAdminSeeAnAnonymousDonor() {
-    SupplyDonation anonymous = donation(true, DonationStatus.RECEIVED);
-
-    assertThat(mapper.toDto(anonymous, donationContext(DONOR, false, false, Set.of())).donorName())
-        .isEqualTo("Donor Dana");
-    assertThat(mapper.toDto(anonymous, donationContext(OTHER, false, true, Set.of())).donorName())
-        .isEqualTo("Donor Dana");
-    assertThat(mapper.toDto(anonymous, donationContext(OTHER, true, false, Set.of())).donorName())
-        .isEqualTo("Donor Dana");
-    assertThat(mapper.toDto(anonymous, donationContext(OTHER, false, false, Set.of())).donorName())
+  void anotherMemberDoesNotSeeTheDonor() {
+    assertThat(
+            mapper
+                .toDto(
+                    donation(DonationStatus.RECEIVED),
+                    donationContext(OTHER, false, false, Set.of()))
+                .donorName())
         .isNull();
   }
 
@@ -190,9 +193,9 @@ class SupplyMapperTest {
         donationContext(OTHER, false, false, Set.of(unit.getId()));
     SupplyMapper.DonationContext owner = donationContext(DONOR, false, false, Set.of());
 
-    DonationDto pledgedForManager = mapper.toDto(donation(false, DonationStatus.PLEDGED), manager);
-    DonationDto pledgedForOwner = mapper.toDto(donation(false, DonationStatus.PLEDGED), owner);
-    DonationDto received = mapper.toDto(donation(false, DonationStatus.RECEIVED), manager);
+    DonationDto pledgedForManager = mapper.toDto(donation(DonationStatus.PLEDGED), manager);
+    DonationDto pledgedForOwner = mapper.toDto(donation(DonationStatus.PLEDGED), owner);
+    DonationDto received = mapper.toDto(donation(DonationStatus.RECEIVED), manager);
 
     assertThat(pledgedForManager.canReceive()).isTrue();
     assertThat(pledgedForManager.canWithdraw()).isFalse();

@@ -34,7 +34,6 @@ import java.util.UUID;
  * @param quality the quality of a free material pledge, or {@code null}
  * @param amount the pledged amount
  * @param sourceInventoryItemId the donor's Lager row to earmark, or {@code null}
- * @param anonymous whether the donor stays anonymous to the receiving unit
  */
 @DtoMirror
 public record PledgeRequest(
@@ -44,5 +43,4 @@ public record PledgeRequest(
     UUID gameItemId,
     Integer quality,
     @NotNull @Positive Double amount,
-    UUID sourceInventoryItemId,
-    boolean anonymous) {}
+    UUID sourceInventoryItemId) {}

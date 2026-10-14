@@ -535,8 +535,7 @@
       "quality" : 500,
       "pledged_amount" : 4.0,
       "received_amount" : 4.0,
-      "receiving_unit" : "IRIDIUM",
-      "anonymous" : false
+      "receiving_unit" : "IRIDIUM"
     } ],
     "truncated" : false
   }, {

@@ -94,7 +94,7 @@ A pledge from a Lager row earmarks the pledged amount on the row in the same tra
 (REQ-INV-057, REQ-INV-058). The earmarked amount cannot be sold, discarded, transferred or pledged again
 until the pledge is received, declined or withdrawn. The pledge takes the row's lot lock first. The
 personal Lager row offers „Spenden" (a dialog for the receiving unit, the amount up to the free
-remainder and the anonymous choice) and shows the pledged slice as a chip (REQ-INV-058).
+remainder) and shows the pledged slice as a chip (REQ-INV-058).
 
 **Enforced by:** `SupplyDonationServiceTest`, `InventoryPoolCommandsTest`, `InventorySupplyRenderTest`,
 `SupplyPledgeReceiveE2eTest` · **Code:** `supply/internal/SupplyDonationService`,
@@ -121,15 +121,15 @@ earmark.
 
 The lead or a Logistician of a receiving unit records a donation already received, for a named member or
 without a donor, and books it into the pool in the same transaction. The page picks the donor from the
-member search or leaves it empty, and offers the anonymous choice.
+member search or leaves it empty.
 
 **Enforced by:** `SupplyDonationServiceTest`, `SupplyPledgeReceiveE2eTest` · **Code:** `supply/internal/SupplyDonationService#record`
 
-### REQ-SUP-012 — Anonymous donation
+### REQ-SUP-012 — Donor visibility
 
-A donor may mark a donation anonymous. The donor's name is then returned only to the donor, the
-governing leadership and an admin; the receiving unit sees „anonym". An anonymous donation records no
-target in the audit row.
+A donation has no anonymous mode: the receiving unit has to know in the game who hands the goods over.
+The donor's name is returned to the donor, the lead and the Logisticians of the receiving unit, the
+governing leadership and an admin, and to nobody else. The audit row names the donor as its target.
 
 **Enforced by:** `SupplyMapperTest` · **Code:** `supply/internal/SupplyMapper`
 
@@ -161,8 +161,7 @@ owner-change notices of REQ-INV-055 nor the booked-out-by-other notice of REQ-IN
 A pledge tells the receiving unit's lead and Logisticians (`SUPPLY_DONATION_PLEDGED`, cleared when the
 pledge is received, declined or withdrawn); a received or partially received donation and a declined one
 tell the donor (`SUPPLY_DONATION_RECEIVED`, `SUPPLY_DONATION_DECLINED`). After commit, actor excluded,
-mutable (REQ-NOTIF-027), no free text. The anonymous donor is the coded word `donorCode = ANONYMOUS`
-(REQ-NOTIF-028).
+mutable (REQ-NOTIF-027), no free text. The pledge notice carries the donor's name.
 
 **Enforced by:** `NotificationRuleEngineIntegrationTest`, `NotificationTypeMessageCoverageTest` ·
 **Code:** `supply/api/events/SupplyNotices`, `V286__seed_supply_notification_rules.sql`

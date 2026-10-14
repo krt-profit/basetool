@@ -234,11 +234,7 @@ public class SupplyMapper {
     boolean donorIsMe =
         context.caller() != null && Objects.equals(context.caller(), donation.getDonorUserId());
     boolean manages = context.manages(donation.getReceivingOrgUnitId());
-    boolean seesDonor =
-        donorIsMe
-            || context.admin()
-            || context.leadership()
-            || (manages && !donation.isAnonymous());
+    boolean seesDonor = donorIsMe || context.admin() || context.leadership() || manages;
     User donor =
         donation.getDonorUserId() == null ? null : context.donors().get(donation.getDonorUserId());
     boolean pledged = donation.getStatus() == DonationStatus.PLEDGED;
@@ -255,7 +251,6 @@ public class SupplyMapper {
         donation.getNeedId(),
         donation.getStatus(),
         donation.getDeclineReason(),
-        donation.isAnonymous(),
         seesDonor && donor != null ? donor.getEffectiveName() : null,
         donorIsMe,
         donation.getSourceInventoryItemId() != null,

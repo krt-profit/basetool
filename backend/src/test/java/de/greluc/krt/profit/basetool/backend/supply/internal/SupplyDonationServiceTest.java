@@ -177,8 +177,7 @@ class SupplyDonationServiceTest {
   }
 
   private PledgeRequest plainPledge(UUID needId, double amount, Integer quality) {
-    return new PledgeRequest(
-        needId, unit.getId(), material.getId(), null, quality, amount, null, false);
+    return new PledgeRequest(needId, unit.getId(), material.getId(), null, quality, amount, null);
   }
 
   @Test
@@ -239,8 +238,7 @@ class SupplyDonationServiceTest {
     when(needRepository.findById(need.getId())).thenReturn(Optional.of(need));
 
     PledgeRequest request =
-        new PledgeRequest(
-            need.getId(), UUID.randomUUID(), material.getId(), null, 500, 2.0, null, false);
+        new PledgeRequest(need.getId(), UUID.randomUUID(), material.getId(), null, 500, 2.0, null);
 
     assertThatThrownBy(() -> service.pledge(request))
         .isInstanceOfSatisfying(
@@ -261,8 +259,7 @@ class SupplyDonationServiceTest {
     unitAccepts(true);
     when(stockReads.findRow(rowId)).thenReturn(Optional.of(row));
 
-    PledgeRequest request =
-        new PledgeRequest(null, unit.getId(), null, null, null, 2.0, rowId, false);
+    PledgeRequest request = new PledgeRequest(null, unit.getId(), null, null, null, 2.0, rowId);
 
     assertThatThrownBy(() -> service.pledge(request))
         .isInstanceOfSatisfying(
@@ -302,27 +299,6 @@ class SupplyDonationServiceTest {
             eq(DONOR),
             any());
     verify(eventPublisher).publishEvent(any(NoticeEvent.class));
-  }
-
-  @Test
-  void anAnonymousPledgeNamesNoTargetInTheAuditRow() {
-    callerIs(DONOR);
-    unitAccepts(true);
-    when(materialRepository.findById(material.getId())).thenReturn(Optional.of(material));
-    when(orgUnitRepository.findById(unit.getId())).thenReturn(Optional.of(unit));
-    when(donationRepository.save(any(SupplyDonation.class)))
-        .thenAnswer(
-            invocation -> {
-              SupplyDonation saved = invocation.getArgument(0);
-              saved.setId(UUID.randomUUID());
-              return saved;
-            });
-
-    service.pledge(
-        new PledgeRequest(null, unit.getId(), material.getId(), null, 500, 1.0, null, true));
-
-    verify(auditRecorder)
-        .record(eq(AuditEventType.DONATION_PLEDGED), any(), any(), eq(null), any());
   }
 
   @Test
@@ -533,7 +509,7 @@ class SupplyDonationServiceTest {
 
     service.record(
         new RecordDonationRequest(
-            unit.getId(), null, material.getId(), null, 500, 3.0, null, false, location.getId()));
+            unit.getId(), null, material.getId(), null, 500, 3.0, null, location.getId()));
 
     ArgumentCaptor<SupplyDonation> saved = ArgumentCaptor.forClass(SupplyDonation.class);
     verify(donationRepository).save(saved.capture());
@@ -568,7 +544,6 @@ class SupplyDonationServiceTest {
                         500,
                         3.0,
                         null,
-                        false,
                         location.getId())))
         .isInstanceOf(AccessDeniedException.class);
 

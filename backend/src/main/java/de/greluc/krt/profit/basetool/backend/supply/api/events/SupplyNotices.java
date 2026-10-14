@@ -56,7 +56,7 @@ public final class SupplyNotices {
    * @param unitName the receiving unit's name
    * @param entry the material or item name
    * @param amount the pledged amount
-   * @param donorName the donor's display name, or {@code null} for an anonymous donation
+   * @param donorName the donor's display name
    * @param actorSub the donor, kept out of the recipients
    * @return the event
    */
@@ -68,17 +68,13 @@ public final class SupplyNotices {
       @NotNull String unitName,
       @NotNull String entry,
       @NotNull String amount,
-      @Nullable String donorName,
+      @NotNull String donorName,
       @Nullable UUID actorSub) {
     Map<String, String> params = new LinkedHashMap<>();
     params.put("unit", unitName);
     params.put("entry", entry);
     params.put("amount", amount);
-    if (donorName == null) {
-      params.put("donorCode", "ANONYMOUS");
-    } else {
-      params.put("donor", donorName);
-    }
+    params.put("donor", donorName);
     return NoticeEvent.builder()
         .eventType(NotificationEventType.SUPPLY_DONATION_PLEDGED)
         .actorSub(actorSub)

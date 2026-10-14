@@ -64,8 +64,7 @@
                             </td>
                             <td>
                                 <span th:if="${d.donorName() != null}" th:text="${d.donorName()}">Name</span>
-                                <span th:if="${d.donorName() == null and d.anonymous()}" class="chip chip--muted" th:text="#{supply.donation.anonymous}">anonym</span>
-                                <span th:if="${d.donorName() == null and !d.anonymous()}">&ndash;</span>
+                                <span th:if="${d.donorName() == null}">&ndash;</span>
                             </td>
                             <td th:text="${d.receivedAmount() != null ? d.receivedAmount() + ' / ' + d.pledgedAmount() : d.pledgedAmount()}">3</td>
                             <td class="cell-status">
@@ -192,10 +191,6 @@
                         <select id="supply-record-donor" data-krt-combobox="remote-users" data-testid="supply-record-donor">
                             <option value=""></option>
                         </select>
-                    </div>
-                    <div class="form-group flex-gap-sm">
-                        <input type="checkbox" id="supply-record-anonymous">
-                        <label for="supply-record-anonymous" th:text="#{supply.pledge.anonymous}">Anonym spenden</label>
                     </div>
                     <div class="form-group">
                         <label for="supply-record-amount" th:text="#{supply.receive.amount}">Erhaltene Menge</label>

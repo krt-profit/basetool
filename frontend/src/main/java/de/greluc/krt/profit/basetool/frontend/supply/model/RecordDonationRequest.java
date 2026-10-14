@@ -34,7 +34,6 @@ import java.util.UUID;
  * @param quality the quality of a material, or {@code null}
  * @param amount the received amount
  * @param donorUserId the donor, or {@code null}
- * @param anonymous whether the donor stays anonymous to the receiving unit
  * @param locationId where the stock lies now
  */
 @DtoMirror
@@ -46,5 +45,4 @@ public record RecordDonationRequest(
     Integer quality,
     @NotNull @Positive Double amount,
     UUID donorUserId,
-    boolean anonymous,
     @NotNull UUID locationId) {}

@@ -130,7 +130,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 quality: null,
                 amount: numberOrNull(field('supply-lager-amount').value),
                 sourceInventoryItemId: textOrNull(field('supply-lager-source-id').value),
-                anonymous: field('supply-lager-anonymous').checked,
             },
             successMessage: supplyI18n.pledgeSaved,
             errorMessage: supplyI18n.pledgeError,

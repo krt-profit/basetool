@@ -284,7 +284,7 @@ web, naming its client (REQ-AUDIT-005):
   `DONATION_RECEIVED`, `DONATION_DECLINED`, `DONATION_WITHDRAWN`, `DONATION_RECORDED`,
   `SUPPLY_UNIT_SETTING_CHANGED` (the flags before and after) and `SUPPLY_SETTINGS_CHANGED` (the
   switch and the governing Bereich). The details carry ids, enums, amounts and tier codes, never a
-  name; an anonymous donation records no target user. The stock movement of a receipt additionally
+  name; the donor of a donation is its target user. The stock movement of a receipt additionally
   audits in the Lager area through `StockCommands`.
 - **Ankauf** (`PurchasingDeal`, `PurchasingPartner`, `PurchasingDelegate`, `PurchasingSetting`,
   `AuditDomain.PURCHASING`, REQ-PUR-025) — `DEAL_CREATED`, `DEAL_UPDATED`, `DEAL_CANCELLED`,

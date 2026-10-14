@@ -36,7 +36,6 @@ import org.jetbrains.annotations.Nullable;
  * @param quality the quality of a free material pledge, {@code 0} when omitted
  * @param amount the pledged amount
  * @param sourceInventoryItemId the donor's Lager row to earmark, or {@code null} for a free pledge
- * @param anonymous whether the donor stays anonymous to the receiving unit
  */
 public record PledgeRequest(
     @Nullable UUID needId,
@@ -45,5 +44,4 @@ public record PledgeRequest(
     @Nullable UUID gameItemId,
     @Nullable Integer quality,
     @NotNull @Positive Double amount,
-    @Nullable UUID sourceInventoryItemId,
-    boolean anonymous) {}
+    @Nullable UUID sourceInventoryItemId) {}

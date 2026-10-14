@@ -240,7 +240,6 @@ export function initPledgeModal(afterWrite) {
                     needId || isItem ? null : numberOrNull(field('supply-pledge-quality').value),
                 amount: numberOrNull(field('supply-pledge-amount').value),
                 sourceInventoryItemId: textOrNull(field('supply-pledge-source-id').value),
-                anonymous: field('supply-pledge-anonymous').checked,
             },
             successMessage: supplyI18n.pledgeSaved,
             errorMessage: supplyI18n.pledgeError,

@@ -322,9 +322,9 @@ class DataExportEndStateTest {
     entityManager.flush();
     for (User owner : new User[] {subject, other}) {
       jdbc.update(
-          "INSERT INTO supply_donation (id, donor_user_id, anonymous, receiving_org_unit_id,"
+          "INSERT INTO supply_donation (id, donor_user_id, receiving_org_unit_id,"
               + " material_id, quality, pledged_amount, received_amount, status)"
-              + " VALUES (?, ?, false, ?, ?, 500, 4, 4, 'RECEIVED')",
+              + " VALUES (?, ?, ?, ?, 500, 4, 4, 'RECEIVED')",
           UUID.randomUUID(),
           owner.getId(),
           squadron.getId(),

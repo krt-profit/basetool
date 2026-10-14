@@ -27,8 +27,8 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * A donation as the pages show it (REQ-SUP-012). The donor's name is left {@code null} for a caller
- * who may not see it: everyone but the donor, the governing leadership and, for a donation that is
- * not anonymous, the receiving unit's managers.
+ * who may not see it: everyone but the donor, the governing leadership, admins and the receiving
+ * unit's managers.
  *
  * @param id the donation
  * @param receivingOrgUnitId the receiving unit
@@ -42,7 +42,6 @@ import org.jetbrains.annotations.Nullable;
  * @param needId the need the donation is credited to, or {@code null}
  * @param status the lifecycle state
  * @param declineReason why it was declined, or {@code null}
- * @param anonymous whether the donor asked to stay anonymous
  * @param donorName the donor's display name, or {@code null} when hidden or not recorded
  * @param donorIsMe whether the caller is the donor
  * @param fromStock whether the pledge is earmarked on a Lager row
@@ -65,7 +64,6 @@ public record DonationDto(
     @Nullable UUID needId,
     DonationStatus status,
     @Nullable DeclineReason declineReason,
-    boolean anonymous,
     @Nullable String donorName,
     boolean donorIsMe,
     boolean fromStock,

@@ -73,10 +73,6 @@ public class SupplyDonation extends AbstractEntity<UUID> {
   @Nullable
   private UUID donorUserId;
 
-  /** Whether the donor asked to stay anonymous to the receiving unit (REQ-SUP-012). */
-  @Column(nullable = false)
-  private boolean anonymous;
-
   /** The unit that confirms and receives the donation. */
   @Column(name = "receiving_org_unit_id", nullable = false)
   private UUID receivingOrgUnitId;

@@ -46,7 +46,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * The donation statistics (REQ-SUP-013): the trend the pilot's abort criterion needs per receiving
  * unit and month, a member's own totals and, for the governing leadership only, the per-donor
- * totals. An anonymous donation counts in the unit figures and in the donor's own totals.
+ * totals.
  */
 @Service
 @RequiredArgsConstructor
