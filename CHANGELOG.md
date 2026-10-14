@@ -12,6 +12,8 @@
 
 - **Bank: Vier-Augen-Prinzip für jeden Buchungsantrag.** Wer einen Antrag gestellt hat, kann ihn weder freigeben noch bestätigen (409 `BANK_FOUR_EYES_REQUIRED`); eine zweite Person entscheidet. Ablehnen bleibt möglich, direkte Buchungen bleiben unverändert, Admins sind ausgenommen (REQ-BANK-062, ADR-0251).
 
+- **Edge: kein 429 mehr auf Skripte, Schriften und Bilder beim schnellen Seitenwechsel.** Die statischen Dateien (`/js/`, `/css/`, `/fonts/`, `/images/`, `/logos/`) zählen jetzt in einem eigenen, großzügigen Limit (200 r/s, Burst 600), Seiten und API gelten 50 r/s mit Burst 150 statt 20/80; der Login-Token-Endpunkt bleibt unverändert begrenzt (REQ-SEC-023, ADR-0256).
+
 ### Fixed
 
 - **Monitoring: SC-Wiki-Abrufe erzeugen keine `uri`-Tag-Flut mehr.** Der Einzelabruf von Items und Blueprints trug die UUID im Pfad, sodass `http.client.requests` des Backends pro Ressource einen neuen `uri`-Wert anlegte und das Limit von 100 mit einer Warnung riss; der Pfad ist jetzt eine URI-Vorlage (`/api/items/{id}`).
