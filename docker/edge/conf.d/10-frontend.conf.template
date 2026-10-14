@@ -32,10 +32,21 @@ server {
   location ^~ /auth/metrics { return 404; }
 
   location ^~ /auth/realms/iri/protocol/openid-connect/token {
-    limit_req        zone=krt_req_perip burst=10 nodelay;
+    limit_req        zone=krt_token_perip burst=10 nodelay;
     limit_req_status 429;
 
     include /etc/nginx/edge/include/upstream-keycloak.conf;
+  }
+
+  location ~ ^/(?:js|css|fonts|images|logos)/ {
+    limit_req        zone=krt_static_perip burst=600 nodelay;
+    limit_req_status 429;
+
+    include /etc/nginx/edge/include/proxy.conf;
+    include /etc/nginx/edge/include/upstream-tls.conf;
+    proxy_ssl_name                frontend;
+    set $upstream_host frontend;
+    proxy_pass https://$upstream_host:18081$request_uri;
   }
 
   location = /auth {

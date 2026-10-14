@@ -1098,7 +1098,7 @@ def check_trace_pipeline(ctx: Context) -> str:
 def check_rate_limit_active(ctx: Context) -> str:
     """A burst past the per-IP cap is refused with 429.
 
-    Sends 200 requests against the REQ-SEC-023 limit (20 r/s, burst 80). Opt-in, since it is
+    Sends 400 requests against the REQ-SEC-023 limit (50 r/s, burst 150). Opt-in, since it is
     load against the target.
 
     Args:
@@ -1123,14 +1123,14 @@ def check_rate_limit_active(ctx: Context) -> str:
         except OSError:
             return 0
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=24) as pool:
-        statuses = list(pool.map(one, range(200)))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=64) as pool:
+        statuses = list(pool.map(one, range(400)))
     refused = sum(1 for s in statuses if s == 429)
     if refused == 0:
         raise CheckFailed(
-            f"200 requests drew no 429 (statuses seen: {sorted(set(statuses))}) - the per-IP "
+            f"400 requests drew no 429 (statuses seen: {sorted(set(statuses))}) - the per-IP "
             "limiter is not in the request path, or its bucket is not keyed on this client")
-    return f"{refused}/200 refused with 429"
+    return f"{refused}/400 refused with 429"
 
 
 @dataclasses.dataclass(frozen=True)

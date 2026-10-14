@@ -1308,13 +1308,24 @@ next free number.)
 > native edge replaced NPM.
 
 Every public vhost at the edge carries a **version-controlled** per-IP safety
-net: `limit_req` (20 r/s sustained, burst 80, `nodelay`) and `limit_conn` (500
+net: `limit_req` (50 r/s sustained, burst 150, `nodelay`) and `limit_conn` (500
 concurrent connections) keyed on the real client IP (`$krt_limit_key`: the full IPv4 address, or an
 IPv6 client's `/64` network prefix). `docker/edge/conf.d/00-maps.conf` defines the zones and
 `docker/edge/include/limits.conf` applies them; the frontend, ingest, Grafana and API vhosts each
 include it. The values are
 flood/brute-force **ceilings**, not fairness limits — a legitimate worst-case page load fits
-inside the burst. Two invariants:
+inside the burst. Three zones share the key (ADR-0256):
+
+| Zone | Applies to | Rate | Burst |
+| --- | --- | --- | --- |
+| `krt_req_perip` | every vhost (pages, fragments, API, ingest, Grafana, Keycloak pages) | 50 r/s | 150 |
+| `krt_static_perip` | the frontend's static asset trees `/js/`, `/css/`, `/fonts/`, `/images/`, `/logos/` | 200 r/s | 600 |
+| `krt_token_perip` | the Keycloak token endpoint | 20 r/s | 10 |
+
+The static asset trees are content-hashed and served `immutable` (REQ-FE-035), so a browser with a
+working cache requests each file once per release; their own zone keeps a cold load or a browser with
+its cache disabled from draining the bucket the pages and the API use. A `location` that declares its
+own `limit_req` replaces the vhost's, so a request is counted in exactly one zone. Two invariants:
 
 - **Rejections answer 429, never 503.** The nginx defaults would route rejected requests into the
   maintenance-page `error_page 502 503 504` intercept, serving a flooding client the maintenance
@@ -1357,9 +1368,11 @@ traffic (blackbox probes + the apps' OIDC hairpins, which since ADR-0166 go to
 `profit-base.online/auth` rather than to a Keycloak host of its own; on the rootless host ADR-0196
 aliases those public names to the container gateway), not masked external clients.
 
-The Keycloak token endpoint carries a stricter, versioned limit on the same zone (`burst=10`,
-status 429 — `location ^~ /auth/realms/iri/protocol/openid-connect/token` in
-`conf.d/10-frontend.conf.template`), the one anonymous POST worth brute-forcing. The backend's
+The Keycloak token endpoint carries a stricter, versioned limit in its own zone
+(`krt_token_perip`, 20 r/s, `burst=10`, status 429 —
+`location ^~ /auth/realms/iri/protocol/openid-connect/token` in
+`conf.d/10-frontend.conf.template`), the one anonymous POST worth brute-forcing; raising the
+general zone does not loosen it. The backend's
 application-level Bucket4j limiter (REQ-SEC-011, REQ-SEC-032, REQ-SEC-033) is unchanged and remains
 the precise, per-subject layer behind this coarse edge net.
 
@@ -1371,13 +1384,18 @@ the precise, per-subject layer behind this coarse edge net.
 - [ ] Legitimate concurrency (many members each holding the mission page's SSE + WebSocket) does not
   exhaust the 500 per-IP `limit_conn` and is never 429'd.
 - [ ] A normal page load (asset fan-out within the burst) is never limited.
+- [ ] Navigating quickly between pages with the browser cache disabled draws no 429 on a static
+  asset, and the static requests do not count against the pages' and the API's zone.
+- [ ] A burst against the token endpoint is refused after 10 requests, independent of the general
+  zone.
 - [ ] A sustained 429 rate at the edge raises `EdgeRateLimitSpike`.
 
 **Enforced by:** `docker/edge/conf.d/00-maps.conf` (zones, `$krt_limit_key`) ·
 `docker/edge/include/limits.conf` (per-vhost application, 429 statuses) ·
 `scripts/check-edge-nginx.sh` (CI renders and starts the edge) ·
-`monitoring/loki/rules/fake/basetool-log-alerts.yml` (`EdgeRateLimitSpike`) · **Decisions:**
-ADR-0112, ADR-0162, ADR-0187 · **Runbook:** [`deployment.md` → Edge rate limiting](../deployment.md#edge-rate-limiting)
+`monitoring/loki/rules/fake/basetool-log-alerts.yml` (`EdgeRateLimitSpike`) ·
+`scripts/check-conformance.py` (`rate-limit-active`, opt-in load) · **Decisions:**
+ADR-0112, ADR-0162, ADR-0187, ADR-0256 · **Runbook:** [`deployment.md` → Edge rate limiting](../deployment.md#edge-rate-limiting)
 
 ### REQ-SEC-024 — Keycloak resilience: internal JWKS + retryable 503 on IdP outage
 
