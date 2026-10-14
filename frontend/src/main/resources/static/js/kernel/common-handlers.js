@@ -78,6 +78,25 @@ function initCommonHandlers() {
         repositionHintFrom(/** @type {Element | null} */ (event.target));
     });
 
+    /**
+     * Publishes the sticky page header's height as `--krt-header-height` on the root element, so
+     * sticky content below it can stop at its lower edge.
+     */
+    function trackHeaderHeight() {
+        const header = document.querySelector('body > header');
+        if (!header) return;
+        const root = document.documentElement;
+        const publish = () => {
+            root.style.setProperty(
+                '--krt-header-height',
+                `${Math.round(header.getBoundingClientRect().height)}px`,
+            );
+        };
+        publish();
+        new ResizeObserver(publish).observe(header);
+    }
+    trackHeaderHeight();
+
     const on = krtEvents.on;
 
     /**

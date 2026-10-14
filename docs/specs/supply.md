@@ -203,6 +203,16 @@ surviving account.
 `UserReassignmentOrderTest` · **Code:** `supply/internal/SupplyExportSections`,
 `supply/internal/SupplyUserErasure`, `supply/internal/SupplyUserReassignment`
 
+### REQ-SUP-021 — List tables
+
+The supply tables keep their column headers visible below the sticky page header while the page
+scrolls, and above 768 px a row's actions sit side by side on one line. The tables do not clip their
+content, so a row's „⋯" menu is never cut off by the table; it opens upwards when it does not fit
+below (REQ-UI-027).
+
+**Enforced by:** manual check · **Code:** `static/css/pages/supply/supply.css`,
+`static/js/kernel/krt-overflow-menu.js`, `static/js/kernel/common-handlers.js`
+
 ## Out of scope
 
 Money, deals and partners ([`purchasing.md`](purchasing.md)); profit medals; Android screens beyond the

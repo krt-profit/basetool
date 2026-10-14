@@ -49,6 +49,52 @@ function itemsOf(panel) {
 }
 
 /**
+ * The vertical band a menu's panel may occupy: the viewport below the sticky page header, narrowed
+ * to the body of an enclosing table and to every ancestor that clips its overflow.
+ *
+ * @param {HTMLElement} menu the menu being placed
+ * @returns {{ top: number, bottom: number }} the band in viewport coordinates
+ */
+function boundsOf(menu) {
+    let top = 0;
+    let bottom = document.documentElement.clientHeight;
+    const header = document.querySelector('body > header');
+    if (header) top = Math.max(top, header.getBoundingClientRect().bottom);
+    const table = menu.closest('table');
+    if (table) {
+        const rect = table.getBoundingClientRect();
+        const head = table.querySelector('thead th');
+        top = Math.max(top, head ? head.getBoundingClientRect().bottom : rect.top);
+        bottom = Math.min(bottom, rect.bottom);
+    }
+    for (let node = menu.parentElement; node && node !== document.body; node = node.parentElement) {
+        const style = window.getComputedStyle(node);
+        if (style.overflowX === 'visible' && style.overflowY === 'visible') continue;
+        const rect = node.getBoundingClientRect();
+        top = Math.max(top, rect.top);
+        bottom = Math.min(bottom, rect.bottom);
+    }
+    return { top, bottom };
+}
+
+/**
+ * Opens the panel upwards when it does not fit below its toggle and there is more room above.
+ *
+ * @param {HTMLElement} menu the menu being opened
+ * @param {HTMLElement} toggle the menu's toggle
+ * @param {HTMLElement} panel the menu's visible panel
+ */
+function place(menu, toggle, panel) {
+    panel.classList.remove('overflow-menu__panel--up');
+    const { top, bottom } = boundsOf(menu);
+    const anchor = toggle.getBoundingClientRect();
+    const height = panel.getBoundingClientRect().height;
+    const below = bottom - anchor.bottom;
+    const above = anchor.top - top;
+    if (height > below && above > below) panel.classList.add('overflow-menu__panel--up');
+}
+
+/**
  * Opens a menu, closing every other one first.
  *
  * @param {HTMLElement} menu the menu to open
@@ -59,6 +105,7 @@ function open(menu, focus) {
     const { toggle, panel } = partsOf(menu);
     if (!toggle || !panel) return;
     panel.hidden = false;
+    place(menu, toggle, panel);
     toggle.setAttribute('aria-expanded', 'true');
     if (!focus) return;
     const items = itemsOf(panel);
