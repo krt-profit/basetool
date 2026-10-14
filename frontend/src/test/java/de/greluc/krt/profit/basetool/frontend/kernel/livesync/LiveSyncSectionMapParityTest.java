@@ -84,6 +84,27 @@ class LiveSyncSectionMapParityTest {
   }
 
   @Test
+  void supplyPages_coverExactlyTheSupplyNeedsWhitelist() throws IOException {
+    Set<String> sections = new LinkedHashSet<>();
+    String needs = readResource("/static/js/supply/supply-needs.js");
+    String mine = readResource("/static/js/supply/supply-mine.js");
+    String stats = readResource("/static/js/supply/supply-stats.js");
+    String common = readResource("/static/js/supply/supply-common.js");
+    assertThat(needs).contains("section: 'needs'");
+    sections.add("needs");
+    assertThat(mine).contains("section: 'mine'");
+    sections.add("mine");
+    assertThat(stats).contains("topic: 'supply-needs'").contains("stats: { container");
+    sections.add("stats");
+    assertThat(common)
+        .as("a donation write must refresh the peers' statistics")
+        .contains("sendChanged(STATS_TOPIC, ['stats'])");
+
+    assertThat(sections)
+        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.SUPPLY_NEEDS.allowedSections());
+  }
+
+  @Test
   void hangarSeamMap_matchesTheOwnHangarTopicWhitelist() throws IOException {
     Set<String> jsKeys = seamMapKeys("/static/js/hangar/hangar.js", "HANGAR_SECTIONS");
     assertThat(jsKeys)

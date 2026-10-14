@@ -250,10 +250,12 @@ public enum LiveSyncTopicClass {
       Set.of(Roles.authority(Roles.ADMIN))),
 
   /**
-   * Global supply room for {@code /supply/needs} and {@code /supply/donations/mine} with the
-   * sections {@code needs} and {@code mine}, authorized by the socket's authentication alone.
+   * Global supply room for {@code /supply/needs}, {@code /supply/donations/mine} and the statistics
+   * with the sections {@code needs}, {@code mine} and {@code stats}, authorized by the socket's
+   * authentication alone.
    */
-  SUPPLY_NEEDS("supply-needs", false, Set.of("needs", "mine"), false, "supply_needs", null, null),
+  SUPPLY_NEEDS(
+      "supply-needs", false, Set.of("needs", "mine", "stats"), false, "supply_needs", null, null),
 
   /**
    * A receiving unit's donation room for {@code /supply/donations/incoming}, keyed by the unit's

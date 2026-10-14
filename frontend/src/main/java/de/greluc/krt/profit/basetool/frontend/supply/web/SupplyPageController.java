@@ -254,13 +254,18 @@ public class SupplyPageController {
             "/supply/donations/incoming", unit == null ? null : unit.orgUnitId(), effectiveStatus));
     model.addAttribute(
         "supplyLiveSyncTopic", unit == null ? null : "supply-donations:" + unit.orgUnitId());
-    if (!"results".equalsIgnoreCase(fragment)) {
+    boolean unitSwitch = "unit".equalsIgnoreCase(fragment) && unit != null;
+    boolean fragmentOnly = unitSwitch || "results".equalsIgnoreCase(fragment);
+    model.addAttribute("unitSwitch", unitSwitch);
+    if (!fragmentOnly || unitSwitch) {
       model.addAttribute(
           "openNeeds",
           unit == null ? List.of() : orEmpty(supplyClient.openNeeds(unit.orgUnitId())));
+    }
+    if (!fragmentOnly) {
       addCatalogues(model);
     }
-    return "results".equalsIgnoreCase(fragment)
+    return fragmentOnly
         ? "supply/incoming-donations :: incomingResults"
         : "supply/incoming-donations";
   }

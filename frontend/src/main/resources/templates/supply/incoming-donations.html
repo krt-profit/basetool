@@ -42,6 +42,14 @@
         <div id="supply-incoming-results" class="card card--flush" th:data-live-sync-topic="${supplyLiveSyncTopic}"
              th:data-unit-id="${unit.orgUnitId()}">
         <th:block th:fragment="incomingResults">
+            <div id="supply-incoming-meta" hidden th:if="${unitSwitch}"
+                 th:data-unit-id="${unit.orgUnitId()}" th:data-live-sync-topic="${supplyLiveSyncTopic}">
+                <template>
+                    <option th:each="n : ${openNeeds}" th:value="${n.id()}"
+                            th:data-quantity-type="${n.quantityType()}"
+                            th:text="${n.material() != null ? n.material().name() : n.gameItem().name()}">Quantanium</option>
+                </template>
+            </div>
             <div class="table-responsive" th:if="${!#lists.isEmpty(donations)}">
                 <table class="data-table data-table--stack supply-table">
                     <thead>

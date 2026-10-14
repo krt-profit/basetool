@@ -21,7 +21,13 @@
 
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { showKrtConfirm } from '/js/kernel/toast.js';
-import { bindResults, initPledgeModal, numberOrNull, sendWrite } from '/js/supply/supply-common.js';
+import {
+    announceStats,
+    bindResults,
+    initPledgeModal,
+    numberOrNull,
+    sendWrite,
+} from '/js/supply/supply-common.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const afterWrite = bindResults({
@@ -45,7 +51,10 @@ document.addEventListener('DOMContentLoaded', () => {
             successMessage: supplyI18n.withdrawn,
             errorMessage: supplyI18n.donationError,
             submitter: button,
-            afterWrite,
+            afterWrite() {
+                afterWrite();
+                announceStats();
+            },
         });
     });
 });

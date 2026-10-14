@@ -108,27 +108,26 @@ class PurchasingNoticesTest {
   }
 
   @Test
-  void anOverdueSettlementNamesTheGoverningAreaAsItsContext() {
-    UUID area = UUID.randomUUID();
+  void anOverdueSettlementListsTheDelegateAndTheGoverningLeadership() {
+    UUID leader = UUID.randomUUID();
+    UUID coordinator = UUID.randomUUID();
 
-    NoticeEvent notice = PurchasingNotices.settlementOverdue(ENTITY, 42L, MEMBER, area);
+    NoticeEvent notice =
+        PurchasingNotices.settlementOverdue(ENTITY, 42L, MEMBER, Set.of(leader, coordinator));
 
     assertThat(notice.eventType()).isEqualTo(NotificationEventType.PURCHASING_SETTLEMENT_OVERDUE);
     assertThat(notice.entityType()).isEqualTo(PurchasingNotices.DEAL_ENTITY_TYPE);
     assertThat(notice.actorSub()).isNull();
-    assertThat(notice.contextRecipientUserId()).isEqualTo(MEMBER);
-    assertThat(notice.contextOrgUnits())
-        .containsEntry(
-            NotificationContextRole.RESPONSIBLE, new OrgUnitRef(area, OrgUnitKind.BEREICH));
+    assertThat(notice.contextRecipientUserIds())
+        .containsExactlyInAnyOrder(MEMBER, leader, coordinator);
     assertThat(notice.renderParams()).containsOnlyKeys("deal").containsEntry("deal", "42");
   }
 
   @Test
-  void anOverdueSettlementWithoutAGoverningAreaHasNoOrgUnitContext() {
-    NoticeEvent notice = PurchasingNotices.settlementOverdue(ENTITY, 42L, null, null);
+  void anOverdueSettlementWithoutADelegateOrALeadershipListsNobody() {
+    NoticeEvent notice = PurchasingNotices.settlementOverdue(ENTITY, 42L, null, Set.of());
 
-    assertThat(notice.contextOrgUnits()).isEmpty();
-    assertThat(notice.contextRecipientUserId()).isNull();
+    assertThat(notice.contextRecipientUserIds()).isEmpty();
   }
 
   @Test

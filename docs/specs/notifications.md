@@ -121,7 +121,7 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `PURCHASING_NEED_CLOSED` | none (no rule) | — | supersedes the need's release notices when it is fulfilled or withdrawn | REQ-PUR-024 |
 | `PURCHASING_DELIVERY_RECORDED` | `PURCHASING_DELIVERY_RECORDED` | V289 | `ORG_RELATIVE_ROLE` `UNIT_LEADERSHIP` and `LOGISTICIAN` on `RESPONSIBLE` (the raising unit); not mutable | REQ-PUR-024 |
 | `PURCHASING_DELIVERY_DECIDED` | `PURCHASING_DELIVERY_DECIDED` | V289 | `EVENT_RECIPIENT` (the deal's HB); coded `outcomeCode`; supersedes the delivery notice; not mutable | REQ-PUR-024 |
-| `PURCHASING_SETTLEMENT_OVERDUE` | `PURCHASING_SETTLEMENT_OVERDUE` | V289 | `EVENT_RECIPIENT` (the HB), `ORG_RELATIVE_ROLE` `UNIT_LEADERSHIP` on the first governing Bereich (by id), `ROLE` `BANK_MANAGEMENT`; raised once per deal by the `purchasing_settlement_overdue` timed producer; not mutable | REQ-PUR-018 |
+| `PURCHASING_SETTLEMENT_OVERDUE` | `PURCHASING_SETTLEMENT_OVERDUE` | V289 | `EVENT_RECIPIENTS` (the HB and the Bereichsleiter and Bereichskoordinatoren of every governing Bereich), `ROLE` `BANK_MANAGEMENT`; raised once per deal by the `purchasing_settlement_overdue` timed producer; not mutable | REQ-PUR-018 |
 | `PURCHASING_PAUSED` | `PURCHASING_PAUSED` | V289 | `EVENT_RECIPIENTS` (the active HBs) and, for a unit pause, the unit's leadership; coded `scopeCode`, `reasonCode`; not mutable | REQ-PUR-019 |
 | `PURCHASING_RESUMED` | `PURCHASING_RESUMED` | V289 | as the pause; supersedes `PURCHASING_PAUSED`; not mutable | REQ-PUR-019 |
 | `PURCHASING_DELEGATE_APPOINTED` | `PURCHASING_DELEGATE_APPOINTED` | V289 | `EVENT_RECIPIENT` (the appointed member); not mutable | REQ-PUR-003 |

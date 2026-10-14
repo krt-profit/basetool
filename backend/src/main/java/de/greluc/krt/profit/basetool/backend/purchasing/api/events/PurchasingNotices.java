@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventT
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -180,7 +181,8 @@ public final class PurchasingNotices {
    * @param dealId the deal
    * @param dealNo the deal's running number
    * @param delegateId the deal's delegate, or {@code null} once erased
-   * @param governingAreaId the governing Bereich, or {@code null} when none is set
+   * @param governingLeadership the Bereichsleiter and Bereichskoordinatoren of every governing
+   *     Bereich
    * @return the event
    */
   @NotNull
@@ -188,19 +190,16 @@ public final class PurchasingNotices {
       @NotNull UUID dealId,
       long dealNo,
       @Nullable UUID delegateId,
-      @Nullable UUID governingAreaId) {
-    Map<NotificationContextRole, OrgUnitRef> contexts =
-        governingAreaId == null
-            ? Map.of()
-            : Map.of(
-                NotificationContextRole.RESPONSIBLE,
-                new OrgUnitRef(governingAreaId, OrgUnitKind.BEREICH));
+      @NotNull Set<UUID> governingLeadership) {
+    Set<UUID> recipients = new HashSet<>(governingLeadership);
+    if (delegateId != null) {
+      recipients.add(delegateId);
+    }
     return NoticeEvent.builder()
         .eventType(NotificationEventType.PURCHASING_SETTLEMENT_OVERDUE)
         .entityType(DEAL_ENTITY_TYPE)
         .entityId(dealId)
-        .contextRecipientUserId(delegateId)
-        .contextOrgUnits(contexts)
+        .contextRecipientUserIds(recipients)
         .renderParams(Map.of("deal", Long.toString(dealNo)))
         .build();
   }

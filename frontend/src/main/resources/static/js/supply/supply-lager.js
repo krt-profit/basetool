@@ -139,7 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.dispatchEvent(new CustomEvent('krt:inventory-changed'));
                 if (typeof krtLiveSync.sendChanged === 'function') {
                     krtLiveSync.sendChanged('inventory', ['stock']);
-                    krtLiveSync.sendChanged('supply-needs', ['mine']);
+                    krtLiveSync.sendChanged('supply-needs', ['mine', 'stats']);
                     if (unitId)
                         krtLiveSync.sendChanged(`supply-donations:${unitId}`, ['donations']);
                 }

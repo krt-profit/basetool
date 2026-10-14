@@ -20,8 +20,13 @@
 package de.greluc.krt.profit.basetool.backend.purchasing.internal;
 
 import de.greluc.krt.profit.basetool.backend.notification.api.TimedNoticeProducer;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.events.PurchasingNotices;
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -31,10 +36,10 @@ import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
 
 /**
- * Tells the delegate, the governing leadership and the bank management when a deal's settlement is
- * past its due date (REQ-PUR-018), once per deal: the marker is set by an atomic update that does
- * not touch the deal's version, and only the caller whose update changed the row publishes. While
- * the purchasing surface is off nothing is announced.
+ * Tells the delegate, the Bereichsleiter and Bereichskoordinatoren of the governing Bereiche and
+ * the bank management when a deal's settlement is past its due date (REQ-PUR-018), once per deal:
+ * the marker is set by an atomic update that does not touch the deal's version, and only the caller
+ * whose update changed the row publishes. While the purchasing surface is off nothing is announced.
  */
 @Component
 @Order(4)
@@ -43,6 +48,7 @@ public class SettlementOverdueNoticeProducer implements TimedNoticeProducer {
 
   private final PurchasingDealRepository dealRepository;
   private final PurchasingSettingsService settingsService;
+  private final OrgUnitMembershipRepository membershipRepository;
   private final ApplicationEventPublisher eventPublisher;
 
   @Override
@@ -56,7 +62,16 @@ public class SettlementOverdueNoticeProducer implements TimedNoticeProducer {
     if (!settingsService.isEnabled()) {
       return 0;
     }
-    UUID governingArea = settingsService.governingAreaIds().stream().findFirst().orElse(null);
+    List<UUID> areas = settingsService.governingAreaIds();
+    Set<UUID> leadership = new HashSet<>();
+    if (!areas.isEmpty()) {
+      leadership.addAll(
+          membershipRepository.findUserIdsByOrgUnitIdsAndRole(
+              areas, MembershipRole.BEREICHSLEITER));
+      leadership.addAll(
+          membershipRepository.findUserIdsByOrgUnitIdsAndRole(
+              areas, MembershipRole.BEREICHSKOORDINATOR));
+    }
     int raised = 0;
     for (UUID id : dealRepository.findOverdueNotYetAnnouncedIds(now, Limit.of(limit))) {
       if (dealRepository.markOverdueNotified(id, now) != 1) {
@@ -68,7 +83,7 @@ public class SettlementOverdueNoticeProducer implements TimedNoticeProducer {
       }
       eventPublisher.publishEvent(
           PurchasingNotices.settlementOverdue(
-              deal.getId(), deal.getDealNo(), deal.getDelegateUserId(), governingArea));
+              deal.getId(), deal.getDealNo(), deal.getDelegateUserId(), leadership));
       raised++;
     }
     return raised;

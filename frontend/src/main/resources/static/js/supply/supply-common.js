@@ -96,6 +96,12 @@ export function sendWrite(opts) {
     });
 }
 
+/** The global supply room; the statistics page listens to it with the section `stats`. */
+const STATS_TOPIC = 'supply-needs';
+
+/** @type {WeakMap<Element, KrtReceiver>} */
+const receivers = new WeakMap();
+
 /**
  * Wires the live refresh of a results container: reloads it when a peer reports a change and tells
  * the peers after the own write.
@@ -121,24 +127,50 @@ export function bindResults(cfg) {
         });
     }
 
-    if (topic) {
-        krtLiveSync.createReceiver({
-            topic,
-            sections,
-            coalesceMs: 1500,
-            refresh() {
-                reswap();
-            },
-        });
+    if (container) {
+        receivers.set(
+            container,
+            krtLiveSync.createReceiver({
+                topic,
+                sections,
+                coalesceMs: 1500,
+                refresh() {
+                    reswap();
+                },
+            }),
+        );
     }
     krtFetch.bindSwap({ container: cfg.containerSelector, history: true });
 
     return function afterWrite() {
         reswap();
-        if (topic && typeof krtLiveSync.sendChanged === 'function') {
-            krtLiveSync.sendChanged(topic, Object.keys(sections));
+        const current = container ? container.getAttribute('data-live-sync-topic') || '' : '';
+        if (current && typeof krtLiveSync.sendChanged === 'function') {
+            krtLiveSync.sendChanged(current, Object.keys(sections));
         }
     };
+}
+
+/**
+ * Points a bound results container at another topic room, for a page whose list switches between
+ * rooms in place.
+ *
+ * @param {string} containerSelector the selector of the results container
+ * @param {string} topic the new topic room, empty for none
+ */
+export function retargetResults(containerSelector, topic) {
+    const container = document.querySelector(containerSelector);
+    if (!container) return;
+    container.setAttribute('data-live-sync-topic', topic);
+    const receiver = receivers.get(container);
+    if (receiver) receiver.retarget(topic);
+}
+
+/** Tells the statistics page of the peers that a donation changed. */
+export function announceStats() {
+    if (typeof krtLiveSync.sendChanged === 'function') {
+        krtLiveSync.sendChanged(STATS_TOPIC, ['stats']);
+    }
 }
 
 /**
@@ -148,8 +180,8 @@ export function bindResults(cfg) {
  * @param {object} cfg the wiring
  * @param {string} cfg.formId the id of the filter form
  * @param {string} cfg.containerSelector the selector of the results container
- * @param {string[]} [cfg.navigateOn] names of the fields whose change submits the form as a
- *     navigation, because state outside the container depends on them
+ * @param {Record<string, string>} [cfg.fragmentOn] fragment values for the fields whose change
+ *     needs more than the plain results, keyed by field name
  */
 export function bindFilterForm(cfg) {
     const found = document.getElementById(cfg.formId);
@@ -157,10 +189,14 @@ export function bindFilterForm(cfg) {
         return;
     }
     const form = found;
-    const navigateOn = cfg.navigateOn || [];
+    const fragmentOn = cfg.fragmentOn || {};
 
-    /** Swaps the results for the form's current values. */
-    function apply() {
+    /**
+     * Swaps the results for the form's current values.
+     *
+     * @param {string} fragmentValue the fragment to request
+     */
+    function apply(fragmentValue) {
         const params = new URLSearchParams();
         for (const [key, value] of new FormData(form).entries()) {
             if (value !== '') params.append(key, String(value));
@@ -169,13 +205,14 @@ export function bindFilterForm(cfg) {
         krtFetch.swap({
             url: `${form.getAttribute('action') || window.location.pathname}${query ? `?${query}` : ''}`,
             container: cfg.containerSelector,
+            fragmentValue,
             history: true,
         });
     }
 
     form.addEventListener('submit', (event) => {
         event.preventDefault();
-        apply();
+        apply('results');
     });
     form.addEventListener('change', (event) => {
         const target = event.target;
@@ -183,11 +220,7 @@ export function bindFilterForm(cfg) {
             target instanceof HTMLSelectElement || target instanceof HTMLInputElement
                 ? target.name
                 : '';
-        if (name !== '' && navigateOn.includes(name)) {
-            form.submit();
-            return;
-        }
-        apply();
+        apply(fragmentOn[name] || 'results');
     });
 }
 
@@ -297,6 +330,7 @@ export function initPledgeModal(afterWrite) {
             afterWrite() {
                 krtModal.close(modal);
                 afterWrite();
+                announceStats();
             },
         });
     });

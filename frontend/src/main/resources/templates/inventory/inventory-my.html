@@ -6,6 +6,9 @@
 <link rel="stylesheet" th:href="@{/css/materialexchange/materialboerse.css}"/>
 <link rel="stylesheet" th:href="@{/css/inventory/inventory-lager.css}">
 <link rel="stylesheet" th:href="@{/css/pages/inventory/inventory-my.css}">
+<th:block th:if="${supplyEnabled == true}">
+<th:block th:replace="~{supply/fragments/supply-links :: supplyLinks}"></th:block>
+</th:block>
     </th:block>
 </head>
 <body>

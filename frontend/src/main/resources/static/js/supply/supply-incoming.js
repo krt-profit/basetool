@@ -22,15 +22,39 @@
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import {
+    announceStats,
     bindFilterForm,
     bindKindToggle,
     bindResults,
     field,
     numberOrNull,
+    retargetResults,
     select,
     sendWrite,
     textOrNull,
 } from '/js/supply/supply-common.js';
+
+const RESULTS = '#supply-incoming-results';
+
+/**
+ * Applies the unit data a unit switch delivers with the swapped results: the unit id, the live
+ * sync room and the open needs of the record dialog.
+ *
+ * @param {Element} container the results container
+ * @param {HTMLSelectElement | null} needSelect the need select of the record dialog
+ */
+function applyUnitMeta(container, needSelect) {
+    const meta = container.querySelector('#supply-incoming-meta');
+    if (!meta) return;
+    container.setAttribute('data-unit-id', meta.getAttribute('data-unit-id') || '');
+    retargetResults(RESULTS, meta.getAttribute('data-live-sync-topic') || '');
+    const options = meta.querySelector('template');
+    if (needSelect && options instanceof HTMLTemplateElement) {
+        const keep = needSelect.querySelector('option[value=""]');
+        needSelect.replaceChildren(...(keep ? [keep] : []), ...options.content.children);
+        needSelect.dispatchEvent(new Event('change'));
+    }
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     const afterWrite = bindResults({
@@ -41,12 +65,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     bindFilterForm({
         formId: 'supply-incoming-filter',
-        containerSelector: '#supply-incoming-results',
-        navigateOn: ['orgUnitId'],
+        containerSelector: RESULTS,
+        fragmentOn: { orgUnitId: 'unit' },
     });
 
     const results = document.getElementById('supply-incoming-results');
-    const unitId = results ? results.getAttribute('data-unit-id') || '' : '';
+    const unitId = () => (results ? results.getAttribute('data-unit-id') || '' : '');
+    const needField = document.getElementById('supply-record-need');
+    document.addEventListener('krt:swapped', (event) => {
+        const container = /** @type {CustomEvent} */ (event).detail.container;
+        if (results && container === results) {
+            applyUnitMeta(results, needField instanceof HTMLSelectElement ? needField : null);
+        }
+    });
 
     const receiveModal = document.getElementById('supply-receive-modal');
     const receiveForm = document.getElementById('supply-receive-form');
@@ -78,6 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 afterWrite() {
                     krtModal.close(receiveModal);
                     afterWrite();
+                    announceStats();
                 },
             });
         });
@@ -108,6 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 afterWrite() {
                     krtModal.close(declineModal);
                     afterWrite();
+                    announceStats();
                 },
             });
         });
@@ -142,7 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'POST',
                 url: '/api/proxy/supply/donations/recorded',
                 payload: {
-                    receivingOrgUnitId: unitId,
+                    receivingOrgUnitId: unitId(),
                     needId,
                     materialId:
                         needId || isItem
@@ -166,6 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 afterWrite() {
                     krtModal.close(recordModal);
                     afterWrite();
+                    announceStats();
                 },
             });
         });

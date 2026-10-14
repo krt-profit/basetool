@@ -28,14 +28,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
-import de.greluc.krt.profit.basetool.backend.notification.api.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
-import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,16 +53,21 @@ class SettlementOverdueNoticeProducerTest {
   private static final Instant NOW = Instant.parse("2026-10-14T08:00:00Z");
   private static final UUID AREA = UUID.randomUUID();
   private static final UUID DELEGATE = UUID.randomUUID();
+  private static final UUID LEADER = UUID.randomUUID();
+  private static final UUID COORDINATOR = UUID.randomUUID();
 
   @Mock private PurchasingDealRepository dealRepository;
   @Mock private PurchasingSettingsService settingsService;
+  @Mock private OrgUnitMembershipRepository membershipRepository;
   @Mock private ApplicationEventPublisher eventPublisher;
 
   private SettlementOverdueNoticeProducer producer;
 
   @BeforeEach
   void setUp() {
-    producer = new SettlementOverdueNoticeProducer(dealRepository, settingsService, eventPublisher);
+    producer =
+        new SettlementOverdueNoticeProducer(
+            dealRepository, settingsService, membershipRepository, eventPublisher);
   }
 
   @Test
@@ -87,6 +92,12 @@ class SettlementOverdueNoticeProducerTest {
     PurchasingDeal third = deal(9L);
     when(settingsService.isEnabled()).thenReturn(true);
     when(settingsService.governingAreaIds()).thenReturn(List.of(AREA));
+    when(membershipRepository.findUserIdsByOrgUnitIdsAndRole(
+            List.of(AREA), MembershipRole.BEREICHSLEITER))
+        .thenReturn(Set.of(LEADER));
+    when(membershipRepository.findUserIdsByOrgUnitIdsAndRole(
+            List.of(AREA), MembershipRole.BEREICHSKOORDINATOR))
+        .thenReturn(Set.of(COORDINATOR));
     when(dealRepository.findOverdueNotYetAnnouncedIds(eq(NOW), any(Limit.class)))
         .thenReturn(List.of(first.getId(), lost.getId(), third.getId()));
     when(dealRepository.markOverdueNotified(first.getId(), NOW)).thenReturn(1);
@@ -109,10 +120,8 @@ class SettlementOverdueNoticeProducerTest {
         .containsExactly(first.getId(), third.getId());
     NoticeEvent notice = notices.getAllValues().getFirst();
     assertThat(notice.eventType()).isEqualTo(NotificationEventType.PURCHASING_SETTLEMENT_OVERDUE);
-    assertThat(notice.contextRecipientUserId()).isEqualTo(DELEGATE);
-    assertThat(notice.contextOrgUnits())
-        .containsEntry(
-            NotificationContextRole.RESPONSIBLE, new OrgUnitRef(AREA, OrgUnitKind.BEREICH));
+    assertThat(notice.contextRecipientUserIds())
+        .containsExactlyInAnyOrder(DELEGATE, LEADER, COORDINATOR);
     assertThat(notice.renderParams()).containsEntry("deal", "7");
   }
 
@@ -132,7 +141,7 @@ class SettlementOverdueNoticeProducerTest {
   }
 
   @Test
-  void withoutAGoverningAreaTheNoticeCarriesNoOrgUnitContext() {
+  void withoutAGoverningAreaOnlyTheDelegateIsListed() {
     PurchasingDeal deal = deal(3L);
     when(settingsService.isEnabled()).thenReturn(true);
     when(settingsService.governingAreaIds()).thenReturn(List.of());
@@ -145,8 +154,8 @@ class SettlementOverdueNoticeProducerTest {
 
     ArgumentCaptor<NoticeEvent> notice = ArgumentCaptor.forClass(NoticeEvent.class);
     verify(eventPublisher).publishEvent(notice.capture());
-    assertThat(notice.getValue().contextOrgUnits()).isEmpty();
-    assertThat(notice.getValue().contextRecipientUserId()).isEqualTo(DELEGATE);
+    assertThat(notice.getValue().contextRecipientUserIds()).containsExactly(DELEGATE);
+    verifyNoInteractions(membershipRepository);
   }
 
   private static PurchasingDeal deal(long no) {

@@ -465,8 +465,23 @@ function createReceiver(cfg) {
         });
     }
 
-    if (cfg && cfg.topic) {
-        syncSocket.subscribe(cfg.topic, {
+    /** @type {{unsubscribe(): void} | null} */
+    let subscription = null;
+
+    /**
+     * Subscribes to a topic room and drops the subscription of the previous one.
+     *
+     * @param {string | null | undefined} topic the topic room, or nothing to stay unsubscribed
+     */
+    function retarget(topic) {
+        if (subscription) {
+            subscription.unsubscribe();
+            subscription = null;
+        }
+        if (!topic) {
+            return;
+        }
+        subscription = syncSocket.subscribe(topic, {
             onChanged(sections) {
                 apply(sections);
             },
@@ -479,7 +494,11 @@ function createReceiver(cfg) {
         });
     }
 
-    return { apply };
+    if (cfg && cfg.topic) {
+        retarget(cfg.topic);
+    }
+
+    return { apply, retarget };
 }
 
 /** @type {KrtLiveSyncApi} */
