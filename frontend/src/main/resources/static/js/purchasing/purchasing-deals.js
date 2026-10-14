@@ -22,6 +22,7 @@
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import {
+    bindFilterForm,
     bindResults,
     field,
     numberOrNull,
@@ -36,6 +37,11 @@ document.addEventListener('DOMContentLoaded', () => {
         containerSelector: '#purchasing-deals-results',
         listUrl: '/purchasing/deals',
         section: 'deals',
+    });
+    bindFilterForm({
+        formSelector: '#purchasing-deals-filter',
+        containerSelector: '#purchasing-deals-results',
+        listUrl: '/purchasing/deals',
     });
 
     const dealModal = document.getElementById('purchasing-deal-modal');

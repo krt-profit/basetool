@@ -21,6 +21,7 @@
 
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
+import { showKrtConfirm } from '/js/kernel/toast.js';
 import {
     bindResults,
     field,
@@ -101,7 +102,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    krtEvents.on('click', 'purchasing-delegate-revoke', (button) => {
+    krtEvents.on('click', 'purchasing-delegate-revoke', async (button) => {
+        const confirmed = await showKrtConfirm(
+            String(purchasingI18n.revokeTitle),
+            String(purchasingI18n.revokeConfirm),
+            String(purchasingI18n.revokeAction),
+        );
+        if (!confirmed) return;
         sendWrite({
             method: 'POST',
             url: `/api/proxy/purchasing/delegates/${button.getAttribute('data-delegate-id')}/revoke`,

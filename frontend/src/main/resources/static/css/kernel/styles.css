@@ -1253,6 +1253,7 @@
     input[type='date'],
     input[type='time'],
     input[type='datetime-local'],
+    input[type='month'],
     select,
     textarea {
         background-color: var(--color-surface-input);
@@ -1275,7 +1276,8 @@
     input[type='url'],
     input[type='date'],
     input[type='time'],
-    input[type='datetime-local'] {
+    input[type='datetime-local'],
+    input[type='month'] {
         height: 2.75rem;
     }
 
@@ -1707,6 +1709,7 @@
     input[type='date']:focus,
     input[type='time']:focus,
     input[type='datetime-local']:focus,
+    input[type='month']:focus,
     select:focus,
     textarea:focus {
         border-color: var(--color-primary);

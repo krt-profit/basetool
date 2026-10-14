@@ -128,6 +128,7 @@ export function bindResults(cfg) {
         krtFetch.swap({
             url: `${cfg.listUrl}?${query.toString()}`,
             container: cfg.containerSelector,
+            fragmentValue: fragment,
             history: false,
         });
     }
@@ -142,7 +143,11 @@ export function bindResults(cfg) {
             },
         });
     }
-    krtFetch.bindSwap({ container: cfg.containerSelector, history: fragment === 'results' });
+    krtFetch.bindSwap({
+        container: cfg.containerSelector,
+        fragmentValue: fragment,
+        history: fragment === 'results',
+    });
 
     return function afterWrite() {
         reswap();
@@ -150,4 +155,67 @@ export function bindResults(cfg) {
             krtLiveSync.sendChanged(topic, Object.keys(sections));
         }
     };
+}
+
+/**
+ * Tells a free-text control from a discrete one.
+ *
+ * @param {EventTarget | null} target the event target
+ * @returns {boolean} true for a text or search input
+ */
+function isTextInput(target) {
+    if (!(target instanceof HTMLInputElement)) return false;
+    return target.type === 'search' || target.type === 'text';
+}
+
+/**
+ * Wires a filter form to its results container: a change of any control, or a pause in typing in a
+ * text field, swaps the container in place and keeps the address bar in step.
+ *
+ * @param {object} cfg the wiring
+ * @param {string} cfg.formSelector the selector of the filter form
+ * @param {string} cfg.containerSelector the selector of the results container
+ * @param {string} cfg.listUrl the path of the list page
+ * @param {string} [cfg.fragment] the value of the fragment parameter, `results` by default
+ * @param {() => void} [cfg.onApply] called whenever the filter values are applied
+ */
+export function bindFilterForm(cfg) {
+    const form = /** @type {HTMLFormElement | null} */ (document.querySelector(cfg.formSelector));
+    const container = document.querySelector(cfg.containerSelector);
+    if (!form || !container) return;
+    const fragment = cfg.fragment || 'results';
+    /** @type {number | undefined} */
+    let timer;
+
+    /** Swaps the results for the current filter values. */
+    const apply = () => {
+        const params = new URLSearchParams();
+        for (const [key, value] of new FormData(form).entries()) {
+            if (value !== '') params.append(key, String(value));
+        }
+        const query = params.toString();
+        if (cfg.onApply) cfg.onApply();
+        krtFetch.swap({
+            url: `${cfg.listUrl}${query ? `?${query}` : ''}`,
+            container: cfg.containerSelector,
+            fragmentValue: fragment,
+            history: true,
+        });
+    };
+
+    form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        clearTimeout(timer);
+        apply();
+    });
+    form.addEventListener('change', (event) => {
+        if (isTextInput(event.target)) return;
+        clearTimeout(timer);
+        apply();
+    });
+    form.addEventListener('input', (event) => {
+        if (!isTextInput(event.target)) return;
+        clearTimeout(timer);
+        timer = setTimeout(apply, 300);
+    });
 }

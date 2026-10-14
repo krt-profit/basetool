@@ -291,14 +291,16 @@ public class PurchasingPageController {
    *
    * @param from the first month as {@code yyyy-MM}
    * @param to the last month as {@code yyyy-MM}
+   * @param fragment {@code results} renders only the report fragment
    * @param model the model
-   * @return the {@code purchasing/report} view
+   * @return the {@code purchasing/report} view or its {@code reportResults} fragment
    */
   @NotNull
   @GetMapping("/purchasing/report")
   public String report(
       @RequestParam(required = false) String from,
       @RequestParam(required = false) String to,
+      @RequestParam(required = false) String fragment,
       @NotNull Model model) {
     requireEnabled();
     String effectiveFrom = month(from);
@@ -307,7 +309,9 @@ public class PurchasingPageController {
     model.addAttribute("report", report);
     model.addAttribute("from", report == null ? effectiveFrom : report.from());
     model.addAttribute("to", report == null ? effectiveTo : report.to());
-    return "purchasing/report";
+    return "results".equalsIgnoreCase(fragment)
+        ? "purchasing/report :: reportResults"
+        : "purchasing/report";
   }
 
   /**

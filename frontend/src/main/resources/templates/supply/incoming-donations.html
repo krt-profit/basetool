@@ -9,7 +9,8 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.supply', titleText=#{supply.incoming.title}, count=null, actions=~{::incoming-actions})}">
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.supply', titleText=#{supply.incoming.title},
+        count=${unit != null and donationsPage != null ? donationsPage.totalElements() : null}, countId='supply-incoming-count', countFor='supply-incoming-results', actions=~{::incoming-actions})}">
         <th:block th:ref="incoming-actions">
             <button type="button" class="btn btn--cta" data-trigger="supply-open-record" data-testid="supply-record"
                     th:if="${unit != null}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{supply.record.action}">Erhaltene Spende erfassen</span></button>
@@ -24,17 +25,16 @@
         <form id="supply-incoming-filter" class="no-track" role="search" method="get" th:action="@{/supply/donations/incoming}">
             <div class="toolbar">
                 <label class="visually-hidden" for="supply-incoming-unit" th:text="#{supply.filter.unit}">Einheit</label>
-                <select id="supply-incoming-unit" name="orgUnitId" class="toolbar__select" data-testid="supply-incoming-unit">
+                <select id="supply-incoming-unit" name="orgUnitId" data-testid="supply-incoming-unit" data-filter-chip-ignore>
                     <option th:each="u : ${managedUnits}" th:value="${u.orgUnitId()}"
                             th:selected="${u.orgUnitId() == unit.orgUnitId()}" th:text="${u.name()}">ARGON</option>
                 </select>
                 <label class="visually-hidden" for="supply-incoming-status" th:text="#{supply.filter.status}">Status</label>
-                <select id="supply-incoming-status" name="status" class="toolbar__select">
+                <select id="supply-incoming-status" name="status" data-testid="supply-incoming-status" data-filter-chip-ignore>
                     <option value="" th:text="#{supply.filter.status.all}">Alle</option>
                     <option th:each="s : ${ {'PLEDGED','RECEIVED','PARTIALLY_RECEIVED','DECLINED','WITHDRAWN'} }" th:value="${s}"
                             th:selected="${s == selectedStatus}" th:text="#{'supply.donation.status.' + ${s}}">Angemeldet</option>
                 </select>
-                <span class="toolbar__spacer"></span>
             </div>
             <input type="hidden" name="size" th:value="${pageSize}">
         </form>
@@ -48,7 +48,7 @@
                         <tr>
                             <th th:text="#{supply.donation.entry}">Material / Item</th>
                             <th th:text="#{supply.donation.donor}">Spender</th>
-                            <th th:text="#{supply.donation.amount}">Menge</th>
+                            <th class="num" th:text="#{supply.donation.amount}">Menge</th>
                             <th class="cell-status" th:text="#{supply.need.status}">Status</th>
                             <th class="cell-actions"><span class="visually-hidden" th:text="#{supply.actions}">Aktionen</span></th>
                         </tr>
@@ -58,33 +58,35 @@
                             <td>
                                 <span class="cell-title" th:text="${d.material() != null ? d.material().name() : d.gameItem().name()}">Quantanium</span>
                                 <span class="cell-sub">
-                                    <span th:if="${d.quality() != null}" th:text="'Q' + ${d.quality()}">Q500</span>
+                                    <span th:if="${d.quality() != null}" th:text="#{supply.donation.quality(${#strings.toString(d.quality())})}">Q500</span>
                                     <span th:if="${d.fromStock()}" class="chip chip--muted" th:text="#{supply.donation.fromStock}">aus dem Lager</span>
                                 </span>
                             </td>
-                            <td>
+                            <td th:attr="data-label=#{supply.donation.donor}">
                                 <span th:if="${d.donorName() != null}" th:text="${d.donorName()}">Name</span>
                                 <span th:if="${d.donorName() == null}">&ndash;</span>
                             </td>
-                            <td th:text="${d.receivedAmount() != null ? d.receivedAmount() + ' / ' + d.pledgedAmount() : d.pledgedAmount()}">3</td>
+                            <td class="num" th:attr="data-label=#{supply.donation.amount}"
+                                th:text="${d.receivedAmount() != null ? d.receivedAmount() + ' / ' + d.pledgedAmount() : d.pledgedAmount()}">3</td>
                             <td class="cell-status">
-                                <span class="chip" th:classappend="${d.status() == 'PLEDGED'} ? 'chip--primary' : 'chip--muted'"
-                                      th:text="#{'supply.donation.status.' + ${d.status()}}">Angemeldet</span>
+                                <th:block th:replace="~{supply/fragments/status-chip :: chip(kind='donation', status=${d.status()})}"></th:block>
                             </td>
                             <td class="cell-actions">
-                                <th:block th:if="${d.canReceive()}">
-                                    <button type="button" class="btn btn--cta" data-trigger="supply-donation-receive"
-                                            data-testid="supply-donation-receive"
-                                            th:data-donation-id="${d.id()}" th:data-version="${d.version()}"
-                                            th:data-amount="${d.pledgedAmount()}"
-                                            th:data-entry="${d.material() != null ? d.material().name() : d.gameItem().name()}"
-                                            th:data-quantity-type="${d.quantityType()}"
-                                            th:text="#{supply.donation.receive}">Empfang best&auml;tigen</button>
-                                    <button type="button" class="btn btn-quiet-danger" data-trigger="supply-donation-decline"
-                                            data-testid="supply-donation-decline"
-                                            th:data-donation-id="${d.id()}" th:data-version="${d.version()}"
-                                            th:text="#{supply.donation.decline}">Ablehnen</button>
-                                </th:block>
+                                <div class="supply-row-actions">
+                                    <th:block th:if="${d.canReceive()}">
+                                        <button type="button" class="btn btn-success btn-xs" data-trigger="supply-donation-receive"
+                                                data-testid="supply-donation-receive"
+                                                th:data-donation-id="${d.id()}" th:data-version="${d.version()}"
+                                                th:data-amount="${d.pledgedAmount()}"
+                                                th:data-entry="${d.material() != null ? d.material().name() : d.gameItem().name()}"
+                                                th:data-quantity-type="${d.quantityType()}"
+                                                th:text="#{supply.donation.receive}">Empfang best&auml;tigen</button>
+                                        <button type="button" class="btn btn-quiet-danger btn-xs" data-trigger="supply-donation-decline"
+                                                data-testid="supply-donation-decline"
+                                                th:data-donation-id="${d.id()}" th:data-version="${d.version()}"
+                                                th:text="#{supply.donation.decline}">Ablehnen</button>
+                                    </th:block>
+                                </div>
                             </td>
                         </tr>
                     </tbody>

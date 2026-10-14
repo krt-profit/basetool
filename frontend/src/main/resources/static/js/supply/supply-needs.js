@@ -21,7 +21,9 @@
 
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
+import { showKrtConfirm } from '/js/kernel/toast.js';
 import {
+    bindFilterForm,
     bindKindToggle,
     bindResults,
     field,
@@ -37,6 +39,10 @@ document.addEventListener('DOMContentLoaded', () => {
         containerSelector: '#supply-needs-results',
         listUrl: '/supply/needs',
         section: 'needs',
+    });
+    bindFilterForm({
+        formId: 'supply-needs-filter',
+        containerSelector: '#supply-needs-results',
     });
     initPledgeModal(afterWrite);
 
@@ -172,7 +178,12 @@ document.addEventListener('DOMContentLoaded', () => {
     krtEvents.on('click', 'supply-need-resume', (button) => {
         changeNeed(button, 'resume');
     });
-    krtEvents.on('click', 'supply-need-withdraw', (button) => {
-        changeNeed(button, 'withdraw');
+    krtEvents.on('click', 'supply-need-withdraw', async (button) => {
+        const confirmed = await showKrtConfirm(
+            String(supplyI18n.withdrawNeedTitle),
+            String(supplyI18n.withdrawNeedText),
+            String(supplyI18n.withdrawNeedAction),
+        );
+        if (confirmed) changeNeed(button, 'withdraw');
     });
 });

@@ -9,7 +9,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.supply', titleText=#{purchasing.delegates.title}, count=null, actions=~{::delegates-actions})}">
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.supply', titleText=#{purchasing.delegates.title}, count=${#lists.size(delegates)}, countId='purchasing-delegates-count', countFor='purchasing-delegates-results', actions=~{::delegates-actions})}">
         <th:block th:ref="delegates-actions">
             <button type="button" class="btn btn--cta" data-trigger="purchasing-open-appoint" data-testid="purchasing-appoint">
                 <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-user-plus"/></svg> <span th:text="#{purchasing.delegate.appoint}">Bestellen</span></button>
@@ -18,16 +18,16 @@
 
     <th:block th:replace="~{purchasing/fragments/purchasing-tabs :: tabs(active='delegates')}"></th:block>
 
-    <div id="purchasing-delegates-results" class="card card--flush" th:data-live-sync-topic="${purchasingLiveSyncTopic}">
+    <div id="purchasing-delegates-results" th:data-live-sync-topic="${purchasingLiveSyncTopic}">
     <th:block th:fragment="delegatesResults">
-        <div class="table-responsive" th:if="${!#lists.isEmpty(delegates)}">
-            <table class="data-table data-table--stack purchasing-table">
+        <div class="card card--flush" th:data-list-total="${#lists.size(delegates)}">
+            <table class="data-table data-table--stack" th:if="${!#lists.isEmpty(delegates)}">
                 <thead>
                     <tr>
                         <th th:text="#{purchasing.delegate.member}">Mitglied</th>
                         <th th:text="#{purchasing.delegate.appointed}">Bestellt</th>
                         <th th:text="#{purchasing.delegate.until}">G&uuml;ltig bis</th>
-                        <th th:text="#{purchasing.delegate.limit}">Monatslimit</th>
+                        <th class="num" th:text="#{purchasing.delegate.limit}">Monatslimit</th>
                         <th class="cell-status" th:text="#{purchasing.delegate.state}">Stand</th>
                         <th class="cell-actions"><span class="visually-hidden" th:text="#{purchasing.actions}">Aktionen</span></th>
                     </tr>
@@ -35,33 +35,41 @@
                 <tbody>
                     <tr th:each="d : ${delegates}" data-testid="purchasing-delegate-row" th:data-delegate-id="${d.id()}">
                         <td th:text="${d.displayName() != null ? d.displayName() : '&ndash;'}">Name</td>
-                        <td>
+                        <td th:attr="data-label=#{purchasing.delegate.appointed}">
                             <span th:text="${#temporals.format(d.appointedAt(), 'dd.MM.yyyy')}">01.01.2026</span>
                             <span class="cell-sub" th:if="${d.appointedByName() != null}" th:text="${d.appointedByName()}">Leitung</span>
                         </td>
-                        <td th:text="${d.validUntil() != null ? #temporals.format(d.validUntil(), 'dd.MM.yyyy') : '&ndash;'}">&ndash;</td>
-                        <td>
+                        <td th:attr="data-label=#{purchasing.delegate.until}"
+                            th:text="${d.validUntil() != null ? #temporals.format(d.validUntil(), 'dd.MM.yyyy') : '&ndash;'}">&ndash;</td>
+                        <td class="num" th:attr="data-label=#{purchasing.delegate.limit}">
                             <span th:text="#{purchasing.money(${#numbers.formatInteger(d.effectiveLimit(), 1, 'POINT')})}">0 aUEC</span>
                             <span class="cell-sub" th:if="${d.monthlyLimit() == null}" th:text="#{purchasing.delegate.limit.default}">Standard</span>
                         </td>
-                        <td class="cell-status"><span class="chip" th:classappend="${d.active()} ? 'chip--primary' : 'chip--muted'"
-                                                      th:text="${d.active()} ? #{purchasing.delegate.active} : #{purchasing.delegate.inactive}">Aktiv</span></td>
+                        <td class="cell-status">
+                            <th:block th:replace="~{purchasing/fragments/status-chip :: chip(labelKey=${d.active() ? 'purchasing.delegate.active' : 'purchasing.delegate.inactive'}, status=${d.active() ? 'ACTIVE' : 'INACTIVE'})}"></th:block>
+                        </td>
                         <td class="cell-actions">
-                            <button type="button" class="btn btn-ghost" data-trigger="purchasing-delegate-limit" data-testid="purchasing-delegate-limit"
-                                    th:if="${d.revokedAt() == null}"
-                                    th:data-delegate-id="${d.id()}" th:data-version="${d.version()}" th:data-limit="${d.monthlyLimit()}"
-                                    th:text="#{purchasing.delegate.setLimit}">Limit</button>
-                            <button type="button" class="btn btn-quiet-danger" data-trigger="purchasing-delegate-revoke" data-testid="purchasing-delegate-revoke"
-                                    th:if="${d.revokedAt() == null}" th:data-delegate-id="${d.id()}" th:data-version="${d.version()}"
-                                    th:text="#{purchasing.delegate.revoke}">Widerrufen</button>
+                            <div class="purchasing-actions" th:if="${d.revokedAt() == null}">
+                                <button type="button" class="btn btn-ghost btn-xs" data-trigger="purchasing-delegate-limit" data-testid="purchasing-delegate-limit"
+                                        th:data-delegate-id="${d.id()}" th:data-version="${d.version()}" th:data-limit="${d.monthlyLimit()}"
+                                        th:text="#{purchasing.delegate.setLimit}">Limit</button>
+                                <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id=${'purchasing-delegate-more-' + d.id()}, items=~{::purchasing-delegate-more-items})}">
+                                    <th:block th:ref="purchasing-delegate-more-items">
+                                        <button type="button" class="overflow-menu__item overflow-menu__item--danger" role="menuitem"
+                                                data-trigger="purchasing-delegate-revoke" data-testid="purchasing-delegate-revoke"
+                                                th:data-delegate-id="${d.id()}" th:data-version="${d.version()}"
+                                                th:text="#{purchasing.delegate.revoke}">Widerrufen</button>
+                                    </th:block>
+                                </th:block>
+                            </div>
                         </td>
                     </tr>
                 </tbody>
             </table>
+            <th:block th:if="${#lists.isEmpty(delegates)}">
+                <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='purchasing.delegates.empty.title', textKey='purchasing.delegates.empty.text')}"></th:block>
+            </th:block>
         </div>
-        <th:block th:if="${#lists.isEmpty(delegates)}">
-            <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='purchasing.delegates.empty.title', textKey='purchasing.delegates.empty.text')}"></th:block>
-        </th:block>
     </th:block>
     </div>
 

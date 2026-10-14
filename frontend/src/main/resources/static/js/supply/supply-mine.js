@@ -20,6 +20,7 @@
 /* global supplyI18n */
 
 import { krtEvents } from '/js/kernel/event-delegation.js';
+import { showKrtConfirm } from '/js/kernel/toast.js';
 import { bindResults, initPledgeModal, numberOrNull, sendWrite } from '/js/supply/supply-common.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -30,7 +31,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     initPledgeModal(afterWrite);
 
-    krtEvents.on('click', 'supply-donation-withdraw', (button) => {
+    krtEvents.on('click', 'supply-donation-withdraw', async (button) => {
+        const confirmed = await showKrtConfirm(
+            String(supplyI18n.withdrawDonationTitle),
+            String(supplyI18n.withdrawDonationText),
+            String(supplyI18n.withdrawDonationAction),
+        );
+        if (!confirmed) return;
         sendWrite({
             method: 'POST',
             url: `/api/proxy/supply/donations/${button.getAttribute('data-donation-id')}/withdraw`,

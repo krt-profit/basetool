@@ -23,22 +23,47 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { bindFilterForm, field } from '/js/purchasing/purchasing-common.js';
+
+/**
+ * Builds the query of the chosen period from the two month fields.
+ *
+ * @returns {URLSearchParams} the query, without an empty month
+ */
+function periodQuery() {
+    const query = new URLSearchParams();
+    const from = field('purchasing-report-from').value;
+    const to = field('purchasing-report-to').value;
+    if (from) query.set('from', from);
+    if (to) query.set('to', to);
+    return query;
+}
+
+/** Points the CSV export at the period currently chosen in the filter. */
+function syncExportLink() {
+    const link = document.getElementById('purchasing-report-csv');
+    if (!link) return;
+    const query = periodQuery().toString();
+    link.setAttribute('href', `/api/proxy/purchasing/report/export${query ? `?${query}` : ''}`);
+}
 
 document.addEventListener('DOMContentLoaded', () => {
+    bindFilterForm({
+        formSelector: '#purchasing-report-filter',
+        containerSelector: '#purchasing-report-results',
+        listUrl: '/purchasing/report',
+        onApply: syncExportLink,
+    });
+
     const modal = document.getElementById('purchasing-forum-modal');
     const area = /** @type {HTMLTextAreaElement | null} */ (
         document.getElementById('purchasing-forum-text')
     );
     if (!modal || !area) return;
 
-    krtEvents.on('click', 'purchasing-forum-text', async (button) => {
-        const query = new URLSearchParams();
-        const from = button.getAttribute('data-from');
-        const to = button.getAttribute('data-to');
-        if (from) query.set('from', from);
-        if (to) query.set('to', to);
+    krtEvents.on('click', 'purchasing-forum-text', async () => {
         const response = await krtFetch.get(
-            `/api/proxy/purchasing/report/forum-text?${query.toString()}`,
+            `/api/proxy/purchasing/report/forum-text?${periodQuery().toString()}`,
             { accept: 'text/plain' },
         );
         if (!response || !response.ok) {
@@ -51,7 +76,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     krtEvents.on('click', 'purchasing-forum-copy', async () => {
         area.select();
-        await navigator.clipboard.writeText(area.value);
+        try {
+            await navigator.clipboard.writeText(area.value);
+        } catch (_err) {
+            showFrontendErrorToast(String(purchasingI18n.clipboardError));
+            return;
+        }
         showFrontendSuccessToast(String(purchasingI18n.forumCopied));
     });
 });

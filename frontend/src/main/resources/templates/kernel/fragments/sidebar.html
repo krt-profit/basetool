@@ -129,7 +129,8 @@
                             <a th:href="@{/supply/donations/mine}" th:if="${supplyEnabled}" class="nav-link" data-testid="nav-supply-mine" th:text="#{nav.supply.mine}">Meine Spenden</a>
                             <a th:href="@{/purchasing/deals}" th:if="${purchasingEnabled}" class="nav-link" data-testid="nav-purchasing-deals" th:text="#{nav.purchasing.deals}">Ankauf</a>
                         </div>
-                    </section>                    <section class="nav-group" data-group-key="organisation" data-nav-icon="users"
+                    </section>
+                    <section class="nav-group" data-group-key="organisation" data-nav-icon="users"
                              th:data-nav-group="#{nav.section.organisation}">
                         <button type="button" class="nav-group-head" aria-expanded="true" aria-controls="nav-group-organisation">
                             <svg class="krt-icon nav-group-icon" aria-hidden="true"><use href="#krt-icon-users"></use></svg>

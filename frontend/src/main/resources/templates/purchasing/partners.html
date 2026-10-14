@@ -9,7 +9,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.supply', titleText=#{purchasing.partners.title}, count=null, actions=~{::partners-actions})}">
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.supply', titleText=#{purchasing.partners.title}, count=${partnersPage.totalElements()}, countId='purchasing-partners-count', countFor='purchasing-partners-results', actions=~{::partners-actions})}">
         <th:block th:ref="partners-actions">
             <button type="button" class="btn btn--cta" data-trigger="purchasing-open-partner" data-testid="purchasing-new-partner">
                 <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{purchasing.partner.new}">Neuer Partner</span></button>
@@ -21,79 +21,83 @@
     <section class="list-panel">
         <form id="purchasing-partners-filter" class="no-track" role="search" method="get" th:action="@{/purchasing/partners}">
             <div class="toolbar">
-                <label class="visually-hidden" for="purchasing-partner-query" th:text="#{purchasing.partner.search}">Suche</label>
-                <input type="search" id="purchasing-partner-query" name="query" class="toolbar__search" th:value="${query}"
-                       th:placeholder="#{purchasing.partner.search}" data-testid="purchasing-partner-query">
+                <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('purchasing-partner-query', 'query', ${query}, 'purchasing.partner.search')}"></th:block>
                 <label class="visually-hidden" for="purchasing-partner-kind-filter" th:text="#{purchasing.partner.kind}">Art</label>
-                <select id="purchasing-partner-kind-filter" name="kind" class="toolbar__select">
+                <select id="purchasing-partner-kind-filter" name="kind" data-testid="purchasing-partner-kind-filter">
                     <option value="" th:text="#{purchasing.partner.kind.all}">Alle Arten</option>
                     <option th:each="k : ${ {'ORG','INDIVIDUAL'} }" th:value="${k}" th:selected="${k == selectedKind}"
                             th:text="#{'purchasing.partner.kind.' + ${k}}">Organisation</option>
                 </select>
                 <label class="visually-hidden" for="purchasing-partner-status-filter" th:text="#{purchasing.partner.status}">Status</label>
-                <select id="purchasing-partner-status-filter" name="status" class="toolbar__select">
+                <select id="purchasing-partner-status-filter" name="status" data-testid="purchasing-partner-status-filter">
                     <option value="" th:text="#{purchasing.partner.status.all}">Alle Zust&auml;nde</option>
                     <option th:each="s : ${ {'ACTIVE','BLOCKED'} }" th:value="${s}" th:selected="${s == selectedStatus}"
                             th:text="#{'purchasing.partner.status.' + ${s}}">Aktiv</option>
                 </select>
-                <span class="toolbar__spacer"></span>
-                <button type="submit" class="btn btn-ghost" th:text="#{purchasing.filter.apply}">Anwenden</button>
             </div>
             <input type="hidden" name="size" th:value="${pageSize}">
         </form>
 
-        <div id="purchasing-partners-results" class="card card--flush" th:data-live-sync-topic="${purchasingLiveSyncTopic}">
+        <div id="purchasing-partners-results" th:data-live-sync-topic="${purchasingLiveSyncTopic}">
         <th:block th:fragment="partnersResults">
-            <div class="table-responsive" th:if="${!#lists.isEmpty(partners)}">
-                <table class="data-table data-table--stack purchasing-table">
-                    <thead>
-                        <tr>
-                            <th th:text="#{purchasing.partner.name}">Name</th>
-                            <th th:text="#{purchasing.partner.kind}">Art</th>
-                            <th th:text="#{purchasing.partner.channel}">Kanal</th>
-                            <th th:text="#{purchasing.partner.history}">Gesch&auml;fte</th>
-                            <th class="cell-status" th:text="#{purchasing.partner.status}">Status</th>
-                            <th class="cell-actions"><span class="visually-hidden" th:text="#{purchasing.actions}">Aktionen</span></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr th:each="p : ${partners}" data-testid="purchasing-partner-row" th:data-partner-id="${p.id()}">
-                            <td>
-                                <span class="cell-title" th:text="${p.name()}">Partner</span>
-                                <span class="cell-sub" th:if="${p.orgTag() != null}" th:text="${p.orgTag()}">TAG</span>
-                            </td>
-                            <td th:text="#{'purchasing.partner.kind.' + ${p.kind()}}">Organisation</td>
-                            <td th:text="#{'purchasing.partner.channel.' + ${p.channel()}}">Discord</td>
-                            <td th:text="#{purchasing.partner.historyOf(${p.settledClean()}, ${p.dealCount()})}">1 von 2 sauber abgerechnet</td>
-                            <td class="cell-status"><span class="chip" th:classappend="${p.status() == 'ACTIVE'} ? 'chip--primary' : 'chip--muted'"
-                                                          th:text="#{'purchasing.partner.status.' + ${p.status()}}">Aktiv</span></td>
-                            <td class="cell-actions">
+            <div class="card card--flush">
+            <table class="data-table data-table--stack" th:if="${!#lists.isEmpty(partners)}">
+                <thead>
+                    <tr>
+                        <th th:text="#{purchasing.partner.name}">Name</th>
+                        <th th:text="#{purchasing.partner.kind}">Art</th>
+                        <th th:text="#{purchasing.partner.channel}">Kanal</th>
+                        <th th:text="#{purchasing.partner.history}">Gesch&auml;fte</th>
+                        <th class="cell-status" th:text="#{purchasing.partner.status}">Status</th>
+                        <th class="cell-actions"><span class="visually-hidden" th:text="#{purchasing.actions}">Aktionen</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="p : ${partners}" data-testid="purchasing-partner-row" th:data-partner-id="${p.id()}">
+                        <td>
+                            <span class="cell-title" th:text="${p.name()}">Partner</span>
+                            <span class="cell-sub" th:if="${p.orgTag() != null}" th:text="${p.orgTag()}">TAG</span>
+                        </td>
+                        <td th:attr="data-label=#{purchasing.partner.kind}" th:text="#{'purchasing.partner.kind.' + ${p.kind()}}">Organisation</td>
+                        <td th:attr="data-label=#{purchasing.partner.channel}" th:text="#{'purchasing.partner.channel.' + ${p.channel()}}">Discord</td>
+                        <td th:attr="data-label=#{purchasing.partner.history}"
+                            th:text="#{purchasing.partner.historyOf(${p.settledClean()}, ${p.dealCount()})}">1 von 2 sauber abgerechnet</td>
+                        <td class="cell-status">
+                            <th:block th:replace="~{purchasing/fragments/status-chip :: chip(labelKey=${'purchasing.partner.status.' + p.status()}, status=${p.status()})}"></th:block>
+                        </td>
+                        <td class="cell-actions">
+                            <div class="purchasing-actions" th:if="${!p.erased()}">
                                 <button type="button" class="btn btn-ghost btn-icon" data-trigger="purchasing-edit-partner" data-testid="purchasing-edit-partner"
-                                        th:if="${!p.erased()}"
                                         th:data-partner-id="${p.id()}" th:data-version="${p.version()}" th:data-name="${p.name()}"
                                         th:data-org-tag="${p.orgTag()}" th:data-channel="${p.channel()}" th:data-contact="${p.contactVia()}"
                                         th:data-conditions="${p.conditionsNote()}" th:data-reputation="${p.reputationNote()}"
                                         th:attr="title=#{purchasing.partner.edit},aria-label=#{purchasing.partner.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
-                                <button type="button" class="btn btn-ghost" data-trigger="purchasing-partner-block" data-testid="purchasing-block-partner"
-                                        th:if="${p.status() == 'ACTIVE' and !p.erased()}" th:data-partner-id="${p.id()}" th:data-version="${p.version()}"
-                                        th:text="#{purchasing.partner.block}">Sperren</button>
-                                <button type="button" class="btn btn-ghost" data-trigger="purchasing-partner-unblock"
-                                        th:if="${p.status() == 'BLOCKED' and !p.erased()}" th:data-partner-id="${p.id()}" th:data-version="${p.version()}"
-                                        th:text="#{purchasing.partner.unblock}">Entsperren</button>
-                                <button type="button" class="btn btn-quiet-danger" data-trigger="purchasing-partner-erase"
-                                        th:if="${purchasingState.governing() and p.kind() == 'INDIVIDUAL' and !p.erased()}"
-                                        th:data-partner-id="${p.id()}" th:data-version="${p.version()}"
-                                        th:text="#{purchasing.partner.erase}">L&ouml;schen</button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+                                <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id=${'purchasing-partner-more-' + p.id()}, items=~{::purchasing-partner-more-items})}">
+                                    <th:block th:ref="purchasing-partner-more-items">
+                                        <button type="button" class="overflow-menu__item" role="menuitem" data-trigger="purchasing-partner-unblock"
+                                                th:if="${p.status() == 'BLOCKED'}" th:data-partner-id="${p.id()}" th:data-version="${p.version()}"
+                                                th:text="#{purchasing.partner.unblock}">Entsperren</button>
+                                        <button type="button" class="overflow-menu__item overflow-menu__item--danger" role="menuitem" data-trigger="purchasing-partner-block"
+                                                data-testid="purchasing-block-partner"
+                                                th:if="${p.status() == 'ACTIVE'}" th:data-partner-id="${p.id()}" th:data-version="${p.version()}"
+                                                th:text="#{purchasing.partner.block}">Sperren</button>
+                                        <button type="button" class="overflow-menu__item overflow-menu__item--danger" role="menuitem" data-trigger="purchasing-partner-erase"
+                                                th:if="${purchasingState.governing() and p.kind() == 'INDIVIDUAL'}"
+                                                th:data-partner-id="${p.id()}" th:data-version="${p.version()}"
+                                                th:text="#{purchasing.partner.erase}">L&ouml;schen</button>
+                                    </th:block>
+                                </th:block>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
             <th:block th:if="${#lists.isEmpty(partners)}">
                 <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='purchasing.partners.empty.title', textKey='purchasing.partners.empty.text')}"></th:block>
             </th:block>
             <th:block th:replace="~{kernel/fragments/components :: listFoot(pageResponse=${partnersPage}, baseUrl=${paginationBaseUrl})}"></th:block>
             <nav th:replace="~{kernel/fragments/pagination :: pageSizePicker(pageResponse=${partnersPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
+            </div>
         </th:block>
         </div>
     </section>

@@ -9,7 +9,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.supply', titleText=#{purchasing.deals.title}, count=null, actions=~{::deals-actions})}">
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.supply', titleText=#{purchasing.deals.title}, count=${dealsPage.totalElements()}, countId='purchasing-deals-count', countFor='purchasing-deals-results', actions=~{::deals-actions})}">
         <th:block th:ref="deals-actions">
             <button type="button" class="btn btn-ghost" data-trigger="purchasing-open-pause" data-testid="purchasing-pause"
                     th:if="${purchasingState.governing() or !#lists.isEmpty(pausableUnits)}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-warning"/></svg> <span th:text="#{purchasing.pause.action}">Ankauf pausieren</span></button>
@@ -24,50 +24,49 @@
         <form id="purchasing-deals-filter" class="no-track" role="search" method="get" th:action="@{/purchasing/deals}">
             <div class="toolbar">
                 <label class="visually-hidden" for="purchasing-filter-status" th:text="#{purchasing.filter.status}">Status</label>
-                <select id="purchasing-filter-status" name="status" class="toolbar__select" data-testid="purchasing-filter-status">
+                <select id="purchasing-filter-status" name="status" data-testid="purchasing-filter-status">
                     <option value="" th:text="#{purchasing.filter.status.all}">Alle Zust&auml;nde</option>
                     <option th:each="s : ${ {'DRAFT','SUBMITTED','FUNDED','IN_DELIVERY','DELIVERED','SETTLED','CANCELLED','FAILED'} }" th:value="${s}"
                             th:selected="${s == selectedStatus}" th:text="#{'purchasing.deal.status.' + ${s}}">Entwurf</option>
                 </select>
-                <span class="flex-gap-sm">
-                    <input type="checkbox" id="purchasing-filter-mine" name="mine" value="true" th:checked="${mine}">
-                    <label for="purchasing-filter-mine" th:text="#{purchasing.filter.mine}">Nur meine</label>
-                </span>
-                <span class="flex-gap-sm">
-                    <input type="checkbox" id="purchasing-filter-overdue" name="overdue" value="true" th:checked="${overdue}">
-                    <label for="purchasing-filter-overdue" th:text="#{purchasing.filter.overdue}">Nur &uuml;berf&auml;llige</label>
-                </span>
-                <span class="toolbar__spacer"></span>
-                <button type="submit" class="btn btn-ghost" th:text="#{purchasing.filter.apply}">Anwenden</button>
+                <label class="krt-switch" for="purchasing-filter-mine">
+                    <input type="checkbox" role="switch" id="purchasing-filter-mine" name="mine" value="true" th:checked="${mine}">
+                    <span th:text="#{purchasing.filter.mine}">Nur meine</span>
+                </label>
+                <label class="krt-switch" for="purchasing-filter-overdue">
+                    <input type="checkbox" role="switch" id="purchasing-filter-overdue" name="overdue" value="true" th:checked="${overdue}">
+                    <span th:text="#{purchasing.filter.overdue}">Nur &uuml;berf&auml;llige</span>
+                </label>
             </div>
             <input type="hidden" name="size" th:value="${pageSize}">
         </form>
 
-        <div id="purchasing-deals-results" class="card card--flush" th:data-live-sync-topic="${purchasingLiveSyncTopic}">
+        <div id="purchasing-deals-results" th:data-live-sync-topic="${purchasingLiveSyncTopic}">
         <th:block th:fragment="dealsResults">
-            <div class="purchasing-banner" role="status" data-testid="purchasing-paused-banner"
+            <div class="alert alert-warning" role="status" data-testid="purchasing-paused-banner"
                  th:if="${pauseState != null and (pauseState.globalPaused() or !#lists.isEmpty(pauseState.units()))}">
                 <p class="m-0" th:if="${pauseState.globalPaused()}"
                    th:text="#{purchasing.pause.banner.global(#{'purchasing.pause.reason.' + ${pauseState.globalReason()}})}">Der Ankauf ist pausiert.</p>
                 <p class="m-0" th:each="u : ${pauseState.units()}"
                    th:text="#{purchasing.pause.banner.unit(${u.orgUnitName()}, #{'purchasing.pause.reason.' + ${u.reason()}})}">Der Ankauf f&uuml;r ARGON ist pausiert.</p>
-                <span class="purchasing-banner__actions" th:if="${purchasingState.governing()}">
-                    <button type="button" class="btn btn-ghost" data-trigger="purchasing-resume" data-testid="purchasing-resume-global"
+                <div class="purchasing-actions" th:if="${purchasingState.governing()}">
+                    <button type="button" class="btn btn-ghost btn-xs" data-trigger="purchasing-resume" data-testid="purchasing-resume-global"
                             th:if="${pauseState.globalPaused()}" th:text="#{purchasing.pause.resume}">Fortsetzen</button>
-                    <button type="button" class="btn btn-ghost" data-trigger="purchasing-resume"
+                    <button type="button" class="btn btn-ghost btn-xs" data-trigger="purchasing-resume"
                             th:each="u : ${pauseState.units()}" th:data-unit-id="${u.orgUnitId()}"
                             th:text="#{purchasing.pause.resume.unit(${u.orgUnitName()})}">ARGON fortsetzen</button>
-                </span>
+                </div>
             </div>
+            <div class="card card--flush">
             <div class="table-responsive" th:if="${!#lists.isEmpty(deals)}">
-                <table class="data-table data-table--stack purchasing-table">
+                <table class="data-table data-table--stack">
                     <thead>
                         <tr>
                             <th th:text="#{purchasing.deal.no}">Nr.</th>
                             <th th:text="#{purchasing.deal.unit}">Einheit</th>
                             <th th:text="#{purchasing.deal.entry}">Material / Item</th>
-                            <th th:text="#{purchasing.deal.amount}">Menge</th>
-                            <th th:text="#{purchasing.deal.total}">Summe</th>
+                            <th class="num" th:text="#{purchasing.deal.amount}">Menge</th>
+                            <th class="num" th:text="#{purchasing.deal.total}">Summe</th>
                             <th class="cell-status" th:text="#{purchasing.deal.status}">Status</th>
                             <th class="cell-actions"><span class="visually-hidden" th:text="#{purchasing.actions}">Aktionen</span></th>
                         </tr>
@@ -75,22 +74,23 @@
                     <tbody>
                         <tr th:each="d : ${deals}" data-testid="purchasing-deal-row" th:data-deal-id="${d.id()}">
                             <td><span class="cell-title" th:text="'#' + ${d.dealNo()}">#1</span></td>
-                            <td th:text="${d.raisingOrgUnit().name()}">ARGON</td>
-                            <td>
+                            <td th:attr="data-label=#{purchasing.deal.unit}" th:text="${d.raisingOrgUnit().name()}">ARGON</td>
+                            <td th:attr="data-label=#{purchasing.deal.entry}">
                                 <span class="cell-title" th:text="${d.material() != null ? d.material().name() : d.gameItem().name()}">Quantanium</span>
                                 <span class="cell-sub" th:if="${d.qualityTier() != null}"
-                                      th:text="${#locale.language == 'en' ? d.qualityTier().labelEn() : d.qualityTier().labelDe()}">Keine</span>
+                                      th:text="#{purchasing.deal.quality(${#locale.language == 'en' ? d.qualityTier().labelEn() : d.qualityTier().labelDe()})}">Qualit&auml;t: Keine</span>
                             </td>
-                            <td th:text="#{purchasing.deal.amountOf(${d.acceptedAmount()}, ${d.amount()}, #{'purchasing.unit.' + ${d.quantityType()}})}">3 von 10 SCU</td>
-                            <td th:text="#{purchasing.money(${#numbers.formatInteger(d.total(), 1, 'POINT')})}">10.000 aUEC</td>
+                            <td class="num" th:attr="data-label=#{purchasing.deal.amount}"
+                                th:text="#{purchasing.deal.amountOf(${d.acceptedAmount()}, ${d.amount()}, #{'purchasing.unit.' + ${d.quantityType()}})}">3 von 10 SCU</td>
+                            <td class="num" th:attr="data-label=#{purchasing.deal.total}"
+                                th:text="#{purchasing.money(${#numbers.formatInteger(d.total(), 1, 'POINT')})}">10.000 aUEC</td>
                             <td class="cell-status">
-                                <span class="chip" th:classappend="${d.status() == 'SETTLED'} ? 'chip--primary' : 'chip--muted'"
-                                      th:text="#{'purchasing.deal.status.' + ${d.status()}}">Entwurf</span>
-                                <span class="chip chip--danger" th:if="${d.overdue()}" data-testid="purchasing-overdue"
+                                <th:block th:replace="~{purchasing/fragments/status-chip :: chip(labelKey=${'purchasing.deal.status.' + d.status()}, status=${d.status()})}"></th:block>
+                                <span class="chip chip--warning" th:if="${d.overdue()}" data-testid="purchasing-overdue"
                                       th:text="#{purchasing.deal.overdue}">&uuml;berf&auml;llig</span>
                             </td>
                             <td class="cell-actions">
-                                <a class="btn btn-ghost" th:href="@{/purchasing/deals/{id}(id=${d.id()})}" data-testid="purchasing-open-deal"
+                                <a class="btn btn-ghost btn-xs" th:href="@{/purchasing/deals/{id}(id=${d.id()})}" data-testid="purchasing-open-deal"
                                    th:text="#{purchasing.deal.open}">&Ouml;ffnen</a>
                             </td>
                         </tr>
@@ -102,6 +102,7 @@
             </th:block>
             <th:block th:replace="~{kernel/fragments/components :: listFoot(pageResponse=${dealsPage}, baseUrl=${paginationBaseUrl})}"></th:block>
             <nav th:replace="~{kernel/fragments/pagination :: pageSizePicker(pageResponse=${dealsPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
+            </div>
         </th:block>
         </div>
     </section>
@@ -120,7 +121,7 @@
                                     th:data-unit="${n.orgUnitName()}"
                                     th:text="${n.orgUnitName() + ' - ' + (n.material() != null ? n.material().name() : n.gameItem().name())}">ARGON - Quantanium</option>
                         </select>
-                        <p id="purchasing-deal-need-hint" class="cell-sub m-0"></p>
+                        <p id="purchasing-deal-need-hint" class="form-hint"></p>
                     </div>
                     <div class="form-group">
                         <label for="purchasing-deal-partner" th:text="#{purchasing.deal.partner}">Partner</label>
@@ -150,7 +151,7 @@
                             <option th:each="c : ${ {'A','B','C'} }" th:value="${c}" th:text="#{'purchasing.deal.riskClass.' + ${c}}">A</option>
                         </select>
                     </div>
-                    <div class="form-group flex-gap-sm">
+                    <div class="form-group check-row">
                         <input type="checkbox" id="purchasing-deal-escort">
                         <label for="purchasing-deal-escort" th:text="#{purchasing.deal.escort}">Begleitschutz gew&uuml;nscht</label>
                     </div>

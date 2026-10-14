@@ -142,6 +142,56 @@ export function bindResults(cfg) {
 }
 
 /**
+ * Wires a filter form to a results container: a change of a field or a submit swaps the results
+ * for the form's current values in place and keeps the address bar in step.
+ *
+ * @param {object} cfg the wiring
+ * @param {string} cfg.formId the id of the filter form
+ * @param {string} cfg.containerSelector the selector of the results container
+ * @param {string[]} [cfg.navigateOn] names of the fields whose change submits the form as a
+ *     navigation, because state outside the container depends on them
+ */
+export function bindFilterForm(cfg) {
+    const found = document.getElementById(cfg.formId);
+    if (!(found instanceof HTMLFormElement) || !document.querySelector(cfg.containerSelector)) {
+        return;
+    }
+    const form = found;
+    const navigateOn = cfg.navigateOn || [];
+
+    /** Swaps the results for the form's current values. */
+    function apply() {
+        const params = new URLSearchParams();
+        for (const [key, value] of new FormData(form).entries()) {
+            if (value !== '') params.append(key, String(value));
+        }
+        const query = params.toString();
+        krtFetch.swap({
+            url: `${form.getAttribute('action') || window.location.pathname}${query ? `?${query}` : ''}`,
+            container: cfg.containerSelector,
+            history: true,
+        });
+    }
+
+    form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        apply();
+    });
+    form.addEventListener('change', (event) => {
+        const target = event.target;
+        const name =
+            target instanceof HTMLSelectElement || target instanceof HTMLInputElement
+                ? target.name
+                : '';
+        if (name !== '' && navigateOn.includes(name)) {
+            form.submit();
+            return;
+        }
+        apply();
+    });
+}
+
+/**
  * Switches the material and item rows of a catalogue picker with its kind select.
  *
  * @param {string} kindId the id of the kind select

@@ -227,14 +227,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 button.getAttribute('data-delivery-id') || '';
             field('purchasing-accept-version').value = button.getAttribute('data-version') || '';
             accepted.value = button.getAttribute('data-amount') || '';
-            if (total) total.textContent = button.getAttribute('data-amount') || '';
+            if (total) {
+                total.textContent = String(purchasingI18n.totalDelivered)
+                    .replace('{0}', button.getAttribute('data-amount') || '0')
+                    .replace('{1}', button.getAttribute('data-unit') || '');
+            }
             const isMaterial = button.getAttribute('data-material') === 'true';
             const qualityRow = document.getElementById('purchasing-accept-quality-row');
             if (qualityRow) qualityRow.hidden = !isMaterial;
             const qualityHint = document.getElementById('purchasing-accept-quality-hint');
             if (qualityHint) {
+                const minQuality = button.getAttribute('data-min-quality') || '0';
                 qualityHint.textContent = isMaterial
-                    ? `≥ ${button.getAttribute('data-min-quality') || '0'}`
+                    ? String(purchasingI18n.qualityMin).replace('{0}', minQuality)
                     : '';
             }
             const location = button.getAttribute('data-location-id') || '';
@@ -288,7 +293,11 @@ document.addEventListener('DOMContentLoaded', () => {
             field('purchasing-settle-version').value = button.getAttribute('data-version') || '';
             paid.value = button.getAttribute('data-paid') || '';
             loss.value = button.getAttribute('data-loss') || '0';
-            if (received) received.textContent = button.getAttribute('data-received') || '0';
+            if (received) {
+                const format = new Intl.NumberFormat(document.documentElement.lang || undefined);
+                const amount = format.format(Number(button.getAttribute('data-received') || '0'));
+                received.textContent = String(purchasingI18n.receivedOf).replace('{0}', amount);
+            }
             syncLoss();
             krtModal.open(settle.modal);
         });

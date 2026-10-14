@@ -48,6 +48,10 @@ import de.greluc.krt.profit.basetool.frontend.purchasing.model.DealDto;
 import de.greluc.krt.profit.basetool.frontend.purchasing.model.DelegateDto;
 import de.greluc.krt.profit.basetool.frontend.purchasing.model.PartnerDto;
 import de.greluc.krt.profit.basetool.frontend.purchasing.model.PauseStateDto;
+import de.greluc.krt.profit.basetool.frontend.purchasing.model.PurchasingReportDto;
+import de.greluc.krt.profit.basetool.frontend.purchasing.model.ReportMaterialDto;
+import de.greluc.krt.profit.basetool.frontend.purchasing.model.ReportMonthDto;
+import de.greluc.krt.profit.basetool.frontend.purchasing.model.ReportTotalsDto;
 import de.greluc.krt.profit.basetool.frontend.purchasing.model.UnitPause;
 import de.greluc.krt.profit.basetool.frontend.purchasing.web.PurchasingFeatureState;
 import java.nio.charset.StandardCharsets;
@@ -125,6 +129,9 @@ class PurchasingTemplateRenderTest {
     }
     if (uri.startsWith("/api/v1/purchasing/pause")) {
       return answers.get("pause");
+    }
+    if (uri.startsWith("/api/v1/purchasing/report")) {
+      return answers.get("report");
     }
     if (uri.startsWith("/api/v1/purchasing/deals/{id}")) {
       return answers.get("deal:" + variable);
@@ -222,18 +229,18 @@ class PurchasingTemplateRenderTest {
         .contains("#7")
         .contains("ARGON")
         .contains("Quantanium")
-        .contains("Hoch")
+        .contains("Qualität: Hoch")
         .contains("3 von 10 SCU")
         .contains("12.500 aUEC")
         .doesNotContain("purchasing-overdue");
-    assertThat(hasChip(settledRow, "chip chip--primary", "Abgerechnet")).isTrue();
+    assertThat(hasChip(settledRow, "chip chip--success", "Abgerechnet")).isTrue();
     String lateRow = rowOf(html, "data-deal-id=\"" + late.id() + "\"");
     assertThat(lateRow)
         .contains("#8")
         .contains("2.000.000 aUEC")
         .contains("data-testid=\"purchasing-overdue\"");
-    assertThat(hasChip(lateRow, "chip chip--muted", "Finanziert")).isTrue();
-    assertThat(hasChip(lateRow, "chip chip--danger", "überfällig")).isTrue();
+    assertThat(hasChip(lateRow, "chip chip--info", "Finanziert")).isTrue();
+    assertThat(hasChip(lateRow, "chip chip--warning", "überfällig")).isTrue();
     assertThat(count(html, "data-testid=\"purchasing-deal-row\"")).isEqualTo(2);
     assertThat(count(html, "data-testid=\"purchasing-overdue\"")).isEqualTo(1);
   }
@@ -244,7 +251,7 @@ class PurchasingTemplateRenderTest {
 
     String html = render("/purchasing/deals?fragment=results");
 
-    assertThat(html).doesNotContain("purchasing-deal-row").doesNotContain("purchasing-table");
+    assertThat(html).doesNotContain("purchasing-deal-row").doesNotContain("data-table");
   }
 
   @Test
@@ -344,8 +351,8 @@ class PurchasingTemplateRenderTest {
         .contains("5.000 von 12.500 aUEC")
         .contains("Klasse B")
         .contains("01.09.2026");
-    assertThat(hasChip(html, "chip chip--muted", "In Lieferung")).isTrue();
-    assertThat(hasChip(html, "chip chip--danger", "überfällig")).isTrue();
+    assertThat(hasChip(html, "chip chip--info", "In Lieferung")).isTrue();
+    assertThat(hasChip(html, "chip chip--warning", "überfällig")).isTrue();
     assertThat(hasChip(html, "chip chip--muted", "Begleitschutz")).isTrue();
   }
 
@@ -455,14 +462,14 @@ class PurchasingTemplateRenderTest {
         .contains("1.000 aUEC")
         .contains("Vorkasse")
         .contains("Schlusszahlung");
-    assertThat(hasChip(html, "chip chip--primary", "Ausgezahlt")).isTrue();
-    assertThat(hasChip(html, "chip chip--muted", "Angefordert")).isTrue();
+    assertThat(hasChip(html, "chip chip--success", "Ausgezahlt")).isTrue();
+    assertThat(hasChip(html, "chip chip--info", "Angefordert")).isTrue();
     String row = rowOf(html, "data-delivery-id=\"" + decided + "\"");
     assertThat(row)
         .contains("4 angenommen, 1 abgelehnt")
         .contains("Beschädigt")
         .contains("Qualität 700");
-    assertThat(hasChip(row, "chip chip--primary", "Angenommen")).isTrue();
+    assertThat(hasChip(row, "chip chip--success", "Angenommen")).isTrue();
   }
 
   @Test
@@ -517,14 +524,14 @@ class PurchasingTemplateRenderTest {
         .contains("Zuverlaessig")
         .doesNotContain("purchasing-partner-unblock")
         .doesNotContain("purchasing-partner-erase");
-    assertThat(hasChip(activeRow, "chip chip--primary", "Aktiv")).isTrue();
+    assertThat(hasChip(activeRow, "chip chip--success", "Aktiv")).isTrue();
     String blockedRow = rowOf(html, "data-partner-id=\"" + blocked.id() + "\"");
     assertThat(blockedRow)
         .contains("data-trigger=\"purchasing-partner-unblock\"")
         .contains("data-trigger=\"purchasing-edit-partner\"")
         .doesNotContain("purchasing-partner-block\"")
         .doesNotContain("purchasing-partner-erase");
-    assertThat(hasChip(blockedRow, "chip chip--muted", "Gesperrt")).isTrue();
+    assertThat(hasChip(blockedRow, "chip chip--danger", "Gesperrt")).isTrue();
     String erasedRow = rowOf(html, "data-partner-id=\"" + erased.id() + "\"");
     assertThat(erasedRow)
         .doesNotContain("purchasing-edit-partner")
@@ -553,12 +560,117 @@ class PurchasingTemplateRenderTest {
   }
 
   @Test
+  void rowActionsKeepOneIconActionVisibleAndMoveTheRestIntoTheOverflowMenu() throws Exception {
+    PartnerDto active = partner("Orion", "ORG", "ACTIVE", false, null, null);
+    DelegateDto standard = delegate("Alpha", null, 50_000L, null);
+    givenPartners(active);
+    answers.put("delegates", List.of(standard));
+    givenState(true, true);
+
+    String partnerRow =
+        rowOf(
+            render("/purchasing/partners?fragment=results"),
+            "data-partner-id=\"" + active.id() + "\"");
+    String delegateRow =
+        rowOf(
+            render("/purchasing/delegates?fragment=results"),
+            "data-delegate-id=\"" + standard.id() + "\"");
+
+    assertThat(partnerRow)
+        .contains("btn btn-ghost btn-icon")
+        .contains("data-overflow-menu")
+        .contains("overflow-menu__item--danger");
+    assertThat(delegateRow)
+        .contains("btn btn-ghost btn-xs")
+        .contains("data-overflow-menu")
+        .contains("data-trigger=\"purchasing-delegate-revoke\"");
+  }
+
+  @Test
+  void statusChipsFollowTheEstablishedToneOfTheirState() throws Exception {
+    DealDto failed =
+        deal()
+            .status("FAILED")
+            .tranches(
+                List.of(tranche("ADVANCE", 100L, "REFUSED"), tranche("FINAL", 100L, "CANCELLED")))
+            .build();
+
+    String html = renderDeal(failed);
+
+    assertThat(hasChip(html, "chip chip--danger", "Gescheitert")).isTrue();
+    assertThat(hasChip(html, "chip chip--danger", "Abgelehnt")).isTrue();
+    assertThat(hasChip(html, "chip chip--muted", "Zurückgezogen")).isTrue();
+    assertThat(html)
+        .contains("data-testid=\"purchasing-deal-status\"")
+        .contains("data-status=\"FAILED\"");
+  }
+
+  @Test
+  void stackedRowsLabelTheirCellsAndNumbersAreAligned() throws Exception {
+    DealDto deal = deal().build();
+    givenDeals(deal);
+
+    String row =
+        rowOf(render("/purchasing/deals?fragment=results"), "data-deal-id=\"" + deal.id() + "\"");
+
+    assertThat(row)
+        .contains("data-label=\"Einheit\"")
+        .contains("data-label=\"Menge\"")
+        .contains("class=\"num\"")
+        .contains("btn btn-ghost btn-xs");
+  }
+
+  @Test
+  void theReportResultsShowTheTotalsAsKpisAndTheTables() throws Exception {
+    answers.put(
+        "report",
+        new PurchasingReportDto(
+            "2026-08",
+            "2026-09",
+            new ReportTotalsDto(4, 3, 1, 0, 12.5, 9_000L, 1_000L, 8_000L, 500L),
+            List.of(new ReportMonthDto("2026-09", 4, 12.5, 9_000L, 1_000L, 8_000L, 500L)),
+            List.of(new ReportMaterialDto(UUID.randomUUID(), "Quantanium", 4, 12.5, 640.0, null)),
+            List.of()));
+
+    String html = render("/purchasing/report?fragment=results&from=2026-08&to=2026-09");
+
+    assertThat(html)
+        .contains("kpi-grid")
+        .contains("data-testid=\"purchasing-report-totals\"")
+        .contains("data-testid=\"purchasing-report-months\"")
+        .contains("data-testid=\"purchasing-report-materials\"")
+        .contains("Quantanium")
+        .contains("9.000 aUEC")
+        .doesNotContain("purchasing-report-needs")
+        .doesNotContain("Anwenden");
+  }
+
+  @Test
+  void theReportResultsOfAPeriodWithoutDealsShowTheEmptyState() throws Exception {
+    answers.put(
+        "report",
+        new PurchasingReportDto(
+            "2026-08",
+            "2026-09",
+            new ReportTotalsDto(0, 0, 0, 0, 0.0, 0L, 0L, 0L, 0L),
+            List.of(),
+            List.of(),
+            List.of()));
+
+    String html = render("/purchasing/report?fragment=results");
+
+    assertThat(html)
+        .contains("data-testid=\"empty-state\"")
+        .contains("Keine Geschäfte im Zeitraum.");
+  }
+
+  @Test
   void partnersResultsWithoutPartnersShowNoTable() throws Exception {
     givenPartners();
 
     assertThat(render("/purchasing/partners?fragment=results"))
         .doesNotContain("purchasing-partner-row")
-        .doesNotContain("purchasing-table");
+        .doesNotContain("data-table");
   }
 
   @Test
@@ -577,7 +689,7 @@ class PurchasingTemplateRenderTest {
         .contains("Standard")
         .contains("data-testid=\"purchasing-delegate-limit\"")
         .contains("data-testid=\"purchasing-delegate-revoke\"");
-    assertThat(hasChip(standardRow, "chip chip--primary", "Aktiv")).isTrue();
+    assertThat(hasChip(standardRow, "chip chip--success", "Aktiv")).isTrue();
     String personalRow = rowOf(html, "data-delegate-id=\"" + personal.id() + "\"");
     assertThat(personalRow).contains("75.000 aUEC").doesNotContain("Standard");
     String revokedRow = rowOf(html, "data-delegate-id=\"" + revoked.id() + "\"");
@@ -594,6 +706,6 @@ class PurchasingTemplateRenderTest {
 
     assertThat(render("/purchasing/delegates?fragment=results"))
         .doesNotContain("purchasing-delegate-row")
-        .doesNotContain("purchasing-table");
+        .doesNotContain("data-table");
   }
 }

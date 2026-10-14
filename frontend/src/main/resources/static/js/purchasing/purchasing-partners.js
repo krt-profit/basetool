@@ -23,6 +23,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { showKrtConfirm } from '/js/kernel/toast.js';
 import {
+    bindFilterForm,
     bindResults,
     field,
     numberOrNull,
@@ -37,6 +38,11 @@ document.addEventListener('DOMContentLoaded', () => {
         containerSelector: '#purchasing-partners-results',
         listUrl: '/purchasing/partners',
         section: 'deals',
+    });
+    bindFilterForm({
+        formSelector: '#purchasing-partners-filter',
+        containerSelector: '#purchasing-partners-results',
+        listUrl: '/purchasing/partners',
     });
 
     const modal = document.getElementById('purchasing-partner-modal');
@@ -120,8 +126,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    krtEvents.on('click', 'purchasing-partner-block', (button) => {
-        changePartner(button, 'block');
+    krtEvents.on('click', 'purchasing-partner-block', async (button) => {
+        const confirmed = await showKrtConfirm(
+            String(purchasingI18n.blockTitle),
+            String(purchasingI18n.blockConfirm),
+            String(purchasingI18n.blockAction),
+        );
+        if (confirmed) changePartner(button, 'block');
     });
     krtEvents.on('click', 'purchasing-partner-unblock', (button) => {
         changePartner(button, 'unblock');

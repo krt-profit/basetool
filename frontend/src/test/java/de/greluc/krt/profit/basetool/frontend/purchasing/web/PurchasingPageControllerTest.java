@@ -140,7 +140,7 @@ class PurchasingPageControllerTest {
     assertNotFound(() -> controller.deal(UUID.randomUUID(), null, model));
     assertNotFound(() -> controller.partners(null, null, null, null, null, null, model));
     assertNotFound(() -> controller.delegates(null, model));
-    assertNotFound(() -> controller.report(null, null, model));
+    assertNotFound(() -> controller.report(null, null, null, model));
 
     verifyNoInteractions(purchasingClient, supplyClient, qualityTierCatalog);
   }
@@ -495,7 +495,7 @@ class PurchasingPageControllerTest {
     when(purchasingClient.report("2026-09", null)).thenReturn(null);
     Model model = new ExtendedModelMap();
 
-    String view = controller.report("2026-09", "2026-13", model);
+    String view = controller.report("2026-09", "2026-13", null, model);
 
     assertThat(view).isEqualTo("purchasing/report");
     assertThat(model.getAttribute("from")).isEqualTo("2026-09");
@@ -508,7 +508,7 @@ class PurchasingPageControllerTest {
     switchOn();
     when(purchasingClient.report(null, null)).thenReturn(null);
 
-    controller.report("2026-9", "September", new ExtendedModelMap());
+    controller.report("2026-9", "September", null, new ExtendedModelMap());
 
     verify(purchasingClient).report(null, null);
   }
@@ -521,11 +521,22 @@ class PurchasingPageControllerTest {
     when(purchasingClient.report(null, null)).thenReturn(report);
     Model model = new ExtendedModelMap();
 
-    controller.report(null, null, model);
+    controller.report(null, null, null, model);
 
     assertThat(model.getAttribute("report")).isSameAs(report);
     assertThat(model.getAttribute("from")).isEqualTo("2026-08");
     assertThat(model.getAttribute("to")).isEqualTo("2026-09");
+  }
+
+  @Test
+  void reportRendersItsResultsFragmentOnRequest() {
+    switchOn();
+    when(purchasingClient.report("2026-08", "2026-09")).thenReturn(null);
+
+    assertThat(controller.report("2026-08", "2026-09", "results", new ExtendedModelMap()))
+        .isEqualTo("purchasing/report :: reportResults");
+    assertThat(controller.report("2026-08", "2026-09", null, new ExtendedModelMap()))
+        .isEqualTo("purchasing/report");
   }
 
   @Test

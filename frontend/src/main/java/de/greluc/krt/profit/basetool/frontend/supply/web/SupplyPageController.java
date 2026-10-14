@@ -269,17 +269,21 @@ public class SupplyPageController {
    * Renders the donation statistics per receiving unit and month (REQ-SUP-013).
    *
    * @param months how many months back
+   * @param fragment {@code results} renders only the statistics fragment
    * @param model the model
-   * @return the {@code supply/stats} view
+   * @return the {@code supply/stats} view or its {@code statsResults} fragment
    */
   @NotNull
   @GetMapping("/supply/stats")
-  public String stats(@RequestParam(defaultValue = "6") int months, @NotNull Model model) {
+  public String stats(
+      @RequestParam(defaultValue = "6") int months,
+      @RequestParam(required = false) String fragment,
+      @NotNull Model model) {
     requireEnabled();
     SupplyStatsDto stats = supplyClient.stats(months);
     model.addAttribute("stats", stats);
     model.addAttribute("months", Math.max(1, Math.min(36, months)));
-    return "supply/stats";
+    return "results".equalsIgnoreCase(fragment) ? "supply/stats :: statsResults" : "supply/stats";
   }
 
   /**

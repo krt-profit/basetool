@@ -32,7 +32,6 @@ import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.assertions.LocatorAssertions;
 import java.nio.file.Path;
-import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -61,13 +60,8 @@ class SupplyPledgeReceiveE2eTest {
 
   private static Playwright playwright;
   private static Browser browser;
-  private static String materialId;
-  private static String locationId;
 
-  /**
-   * Launches the browser, switches the supply surface on, lets IRIDIUM take donations and seeds a
-   * material and a location the dialogs select.
-   */
+  /** Launches the browser, switches the supply surface on, lets IRIDIUM take donations. */
   @BeforeAll
   static void setUp() {
     playwright = Playwright.create();
@@ -76,9 +70,6 @@ class SupplyPledgeReceiveE2eTest {
     if (STACK.managesStack()) {
       seeder.ensureIridiumMembership(USERNAME, PASSWORD);
     }
-    String suffix = UUID.randomUUID().toString().substring(0, 8);
-    materialId = seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, "Supply E2E Ore " + suffix);
-    locationId = seeder.createLocation(USERNAME, PASSWORD, "Supply E2E Port " + suffix);
     int settings =
         seeder.putForStatus(
             USERNAME,
@@ -129,7 +120,7 @@ class SupplyPledgeReceiveE2eTest {
 
         page.locator("[data-testid='supply-free-pledge']").click();
         page.locator("#supply-pledge-unit").selectOption(IRIDIUM_ID);
-        page.locator("#supply-pledge-material").selectOption(materialId);
+        selectFirstOption(page, "#supply-pledge-material");
         page.locator("#supply-pledge-quality").fill("500");
         page.locator("#supply-pledge-amount").fill("3");
         clearToasts(page);
@@ -152,7 +143,7 @@ class SupplyPledgeReceiveE2eTest {
         Locator receive = page.locator("[data-testid='supply-donation-receive']").first();
         assertThat(receive).isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
         receive.click();
-        page.locator("#supply-receive-location").selectOption(locationId);
+        selectFirstOption(page, "#supply-receive-location");
         clearToasts(page);
         page.locator("[data-testid='supply-receive-submit']").click();
 
@@ -179,6 +170,19 @@ class SupplyPledgeReceiveE2eTest {
   private static void clearToasts(Page page) {
     page.evaluate(
         "() => { document.querySelectorAll('.notification-toast').forEach((t) => t.remove()); }");
+  }
+
+  /**
+   * Selects the first real option of a select, so a catalogue the frontend caches needs no seeded
+   * entry.
+   *
+   * @param page the page
+   * @param selectSelector the select's selector
+   */
+  private static void selectFirstOption(Page page, String selectSelector) {
+    String value =
+        page.locator(selectSelector + " option:not([value=''])").first().getAttribute("value");
+    page.locator(selectSelector).selectOption(value);
   }
 
   /**

@@ -502,4 +502,4 @@ supply/stats.html html <html lang="de">
 supply/stats.html head-fixed 9555df4e9114e159
 supply/stats.html head-own <title>Statistik - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/supply/supply.css">
 supply/stats.html body <body>
-supply/stats.html parts chrome:434d458bee213826 x-content
+supply/stats.html parts chrome:434d458bee213826 x-content x-tail

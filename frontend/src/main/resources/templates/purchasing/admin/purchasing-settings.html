@@ -11,21 +11,13 @@
 <main>
     <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{purchasing.admin.title}, count=null, actions=null)}"></th:block>
 
-    <section class="card">
-        <form id="purchasing-settings-form" class="no-track" novalidate th:data-version="${settings != null ? settings.version() : ''}">
-            <div class="form-group flex-gap-sm">
+    <form id="purchasing-settings-form" class="form-layout card no-track" novalidate th:data-version="${settings != null ? settings.version() : ''}">
+        <fieldset class="form-section">
+            <legend class="form-section__head" th:text="#{purchasing.admin.section.general}">Einstellungen</legend>
+            <div class="form-group check-row">
                 <input type="checkbox" id="purchasing-settings-enabled" th:checked="${settings != null and settings.enabled()}">
                 <label for="purchasing-settings-enabled" th:text="#{purchasing.admin.enabled}">Ankauf einschalten</label>
             </div>
-            <fieldset class="form-group">
-                <legend th:text="#{purchasing.admin.areas}">Bereiche, die Handelsbeauftragte einsetzen</legend>
-                <small class="form-hint" th:text="#{purchasing.admin.areas.hint}">Bereichsleiter und Bereichskoordinatoren dieser Bereiche</small>
-                <label class="flex-gap-sm" th:each="u : ${areas}">
-                    <input type="checkbox" class="purchasing-area" th:value="${u.orgUnitId()}" data-testid="purchasing-settings-area"
-                           th:checked="${settings != null and settings.governs(u.orgUnitId())}">
-                    <span th:text="${u.orgUnitName()}">Profit</span>
-                </label>
-            </fieldset>
             <div class="form-group">
                 <label for="purchasing-settings-account" th:text="#{purchasing.admin.account}">Finanzierungskonto</label>
                 <select id="purchasing-settings-account" data-testid="purchasing-settings-account">
@@ -58,28 +50,44 @@
                 <input type="number" id="purchasing-settings-due" min="1" max="90" step="1" inputmode="numeric" required
                        th:value="${settings != null ? settings.settlementDueDays() : 7}">
             </div>
-            <fieldset class="form-group">
-                <legend th:text="#{purchasing.admin.tiers}">Erlaubte Qualit&auml;tsstufen</legend>
-                <label class="flex-gap-sm" th:each="t : ${tiers}">
-                    <input type="checkbox" class="purchasing-tier" th:value="${t.id()}"
-                           th:checked="${settings != null and settings.allowedQualityTierIds().contains(t.id())}">
-                    <span th:text="${t.label(#locale)}">Keine</span>
-                </label>
-            </fieldset>
-            <button type="submit" class="btn btn--cta" data-testid="purchasing-settings-save"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{general.save}">Speichern</span></button>
-        </form>
-    </section>
+        </fieldset>
 
-    <section class="card card--flush">
-        <h2 class="purchasing-section-title" th:text="#{purchasing.admin.riskClasses}">Risikoklassen</h2>
+        <fieldset class="form-section">
+            <legend class="form-section__head" th:text="#{purchasing.admin.areas}">Bereiche, die Handelsbeauftragte einsetzen</legend>
+            <small class="form-hint" th:text="#{purchasing.admin.areas.hint}">Bereichsleiter und Bereichskoordinatoren dieser Bereiche</small>
+            <label class="check-row" th:each="u : ${areas}">
+                <input type="checkbox" class="purchasing-area" th:value="${u.orgUnitId()}" data-testid="purchasing-settings-area"
+                       th:checked="${settings != null and settings.governs(u.orgUnitId())}">
+                <span th:text="${u.orgUnitName()}">Profit</span>
+            </label>
+        </fieldset>
+
+        <fieldset class="form-section">
+            <legend class="form-section__head" th:text="#{purchasing.admin.tiers}">Erlaubte Qualit&auml;tsstufen</legend>
+            <label class="check-row" th:each="t : ${tiers}">
+                <input type="checkbox" class="purchasing-tier" th:value="${t.id()}"
+                       th:checked="${settings != null and settings.allowedQualityTierIds().contains(t.id())}">
+                <span th:text="${t.label(#locale)}">Keine</span>
+            </label>
+        </fieldset>
+
+        <div class="form-actions--sticky">
+            <button type="submit" class="btn btn--cta" data-testid="purchasing-settings-save"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{general.save}">Speichern</span></button>
+        </div>
+    </form>
+
+    <section class="card">
+        <div class="card-head">
+            <h2 class="card-title" th:text="#{purchasing.admin.riskClasses}">Risikoklassen</h2>
+        </div>
         <form id="purchasing-classes-form" class="no-track" novalidate>
             <div class="table-responsive">
-                <table class="data-table data-table--stack purchasing-table" data-testid="purchasing-classes-table">
+                <table class="data-table data-table--stack" data-testid="purchasing-classes-table">
                     <thead>
                         <tr>
                             <th th:text="#{purchasing.admin.class}">Klasse</th>
-                            <th th:text="#{purchasing.admin.class.maxTotal}">H&ouml;chstsumme (aUEC)</th>
-                            <th th:text="#{purchasing.admin.class.advance}">Vorkasse (%)</th>
+                            <th class="num" th:text="#{purchasing.admin.class.maxTotal}">H&ouml;chstsumme (aUEC)</th>
+                            <th class="num" th:text="#{purchasing.admin.class.advance}">Vorkasse (%)</th>
                             <th th:text="#{purchasing.admin.class.known}">Bew&auml;hrter Partner</th>
                             <th th:text="#{purchasing.admin.class.escort}">Begleitschutz</th>
                         </tr>
@@ -87,13 +95,17 @@
                     <tbody>
                         <tr th:each="c : ${riskClasses}" th:data-code="${c.code()}" th:data-version="${c.version()}" data-testid="purchasing-class-row">
                             <td th:text="#{'purchasing.deal.riskClass.' + ${c.code()}}">A</td>
-                            <td><input type="number" class="purchasing-class-total" min="1" step="1" inputmode="numeric" th:value="${c.maxTotal()}"
+                            <td class="num" th:attr="data-label=#{purchasing.admin.class.maxTotal}">
+                                <input type="number" class="purchasing-class-total" min="1" step="1" inputmode="numeric" th:value="${c.maxTotal()}"
                                        th:attr="aria-label=#{purchasing.admin.class.maxTotal}"></td>
-                            <td><input type="number" class="purchasing-class-advance" min="0" max="100" step="1" inputmode="numeric" th:value="${c.maxAdvancePercent()}"
+                            <td class="num" th:attr="data-label=#{purchasing.admin.class.advance}">
+                                <input type="number" class="purchasing-class-advance" min="0" max="100" step="1" inputmode="numeric" th:value="${c.maxAdvancePercent()}"
                                        th:attr="aria-label=#{purchasing.admin.class.advance}"></td>
-                            <td><input type="checkbox" class="purchasing-class-known" th:checked="${c.requiresKnownPartner()}"
+                            <td th:attr="data-label=#{purchasing.admin.class.known}">
+                                <input type="checkbox" class="purchasing-class-known" th:checked="${c.requiresKnownPartner()}"
                                        th:attr="aria-label=#{purchasing.admin.class.known}"></td>
-                            <td><input type="checkbox" class="purchasing-class-escort" th:checked="${c.escortSuggested()}"
+                            <td th:attr="data-label=#{purchasing.admin.class.escort}">
+                                <input type="checkbox" class="purchasing-class-escort" th:checked="${c.escortSuggested()}"
                                        th:attr="aria-label=#{purchasing.admin.class.escort}"></td>
                         </tr>
                     </tbody>

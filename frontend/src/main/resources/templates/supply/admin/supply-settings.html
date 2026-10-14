@@ -11,14 +11,15 @@
 <main>
     <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{supply.admin.title}, count=null, actions=null)}"></th:block>
 
-    <section class="card">
-        <form id="supply-settings-form" class="no-track" novalidate>
-            <div class="form-group flex-gap-sm">
+    <form id="supply-settings-form" class="form-layout card no-track" novalidate>
+        <fieldset class="form-section">
+            <legend class="form-section__head" th:text="#{supply.admin.section.general}">Allgemein</legend>
+            <label class="check-row">
                 <input type="checkbox" id="supply-settings-enabled" th:checked="${settings != null and settings.enabled()}">
-                <label for="supply-settings-enabled" th:text="#{supply.admin.enabled}">Bedarf &amp; Spenden einschalten</label>
-            </div>
+                <span th:text="#{supply.admin.enabled}">Bedarf &amp; Spenden einschalten</span>
+            </label>
             <div class="form-group">
-                <label for="supply-settings-area" th:text="#{supply.admin.area}">Federf&uuml;hrender Bereich</label>
+                <label for="supply-settings-area" class="form-label" th:text="#{supply.admin.area}">Federf&uuml;hrender Bereich</label>
                 <select id="supply-settings-area" data-testid="supply-settings-area">
                     <option value="" th:text="#{supply.admin.area.none}">Keiner</option>
                     <option th:each="u : ${adminUnits}" th:if="${u.kind() == 'BEREICH'}" th:value="${u.orgUnitId()}"
@@ -26,32 +27,39 @@
                             th:text="${u.name()}">Profit</option>
                 </select>
             </div>
-            <button type="submit" class="btn btn--cta" data-testid="supply-settings-save"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{supply.need.save}">Speichern</span></button>
-        </form>
-    </section>
+        </fieldset>
 
-    <section class="card card--flush">
-        <h2 class="supply-section-title" th:text="#{supply.admin.units}">Teilnehmende Einheiten</h2>
-        <div class="table-responsive">
-            <table class="data-table data-table--stack supply-table" data-testid="supply-units-table">
-                <thead>
-                    <tr>
-                        <th th:text="#{supply.donation.unit}">Einheit</th>
-                        <th th:text="#{supply.admin.mayRaise}">Stellt Bedarf</th>
-                        <th th:text="#{supply.admin.accepts}">Nimmt Spenden an</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:each="u : ${adminUnits}" th:data-unit-id="${u.orgUnitId()}" th:data-version="${u.version()}"
-                        data-testid="supply-unit-row">
-                        <td th:text="${u.name()}">ARGON</td>
-                        <td><input type="checkbox" class="supply-unit-raise" th:checked="${u.mayRaiseNeeds()}"
-                                   data-trigger="supply-unit-change" th:attr="aria-label=#{supply.admin.mayRaise}"></td>
-                        <td><input type="checkbox" class="supply-unit-accept" th:checked="${u.acceptsDonations()}"
-                                   data-trigger="supply-unit-change" th:attr="aria-label=#{supply.admin.accepts}"></td>
-                    </tr>
-                </tbody>
-            </table>
+        <div class="form-actions--sticky">
+            <button type="submit" class="btn btn--cta" data-testid="supply-settings-save"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{supply.need.save}">Speichern</span></button>
+        </div>
+    </form>
+
+    <section class="supply-admin-units">
+        <div class="card-head">
+            <h2 class="card-title" th:text="#{supply.admin.units}">Teilnehmende Einheiten</h2>
+        </div>
+        <div class="card card--flush">
+            <div class="table-responsive">
+                <table class="data-table data-table--stack supply-table" data-testid="supply-units-table">
+                    <thead>
+                        <tr>
+                            <th th:text="#{supply.donation.unit}">Einheit</th>
+                            <th th:text="#{supply.admin.mayRaise}">Stellt Bedarf</th>
+                            <th th:text="#{supply.admin.accepts}">Nimmt Spenden an</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="u : ${adminUnits}" th:data-unit-id="${u.orgUnitId()}" th:data-version="${u.version()}"
+                            data-testid="supply-unit-row">
+                            <td th:text="${u.name()}">ARGON</td>
+                            <td th:attr="data-label=#{supply.admin.mayRaise}"><input type="checkbox" class="supply-unit-raise" th:checked="${u.mayRaiseNeeds()}"
+                                       data-trigger="supply-unit-change" th:attr="aria-label=#{supply.admin.mayRaise}"></td>
+                            <td th:attr="data-label=#{supply.admin.accepts}"><input type="checkbox" class="supply-unit-accept" th:checked="${u.acceptsDonations()}"
+                                       data-trigger="supply-unit-change" th:attr="aria-label=#{supply.admin.accepts}"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </section>
 </main>

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageTail=~{::pageTail})}">
 <head>
     <title th:text="#{supply.stats.title} + ' - ' + ${appTitle}">Statistik - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -13,68 +13,83 @@
 
     <th:block th:replace="~{supply/fragments/supply-tabs :: tabs(active='stats')}"></th:block>
 
-    <form class="no-track toolbar" method="get" th:action="@{/supply/stats}">
-        <label for="supply-stats-months" th:text="#{supply.stats.months}">Zeitraum (Monate)</label>
-        <select id="supply-stats-months" name="months" data-testid="supply-stats-months">
-            <option th:each="m : ${ {3,6,12,24} }" th:value="${m}" th:selected="${m == months}" th:text="${m}">6</option>
-        </select>
-        <button type="submit" class="btn btn-ghost" th:text="#{supply.stats.apply}">&Uuml;bernehmen</button>
-    </form>
+    <section class="list-panel">
+        <form id="supply-stats-filter" class="no-track" role="search" method="get" th:action="@{/supply/stats}">
+            <div class="toolbar">
+                <label for="supply-stats-months" th:text="#{supply.stats.months}">Zeitraum (Monate)</label>
+                <select id="supply-stats-months" name="months" data-testid="supply-stats-months" data-filter-chip-ignore>
+                    <option th:each="m : ${ {3,6,12,24} }" th:value="${m}" th:selected="${m == months}" th:text="${m}">6</option>
+                </select>
+            </div>
+        </form>
 
-    <section class="card card--flush">
-        <div class="table-responsive" th:if="${stats != null and !#lists.isEmpty(stats.units())}">
-            <table class="data-table data-table--stack supply-table" data-testid="supply-stats-table">
-                <thead>
-                    <tr>
-                        <th th:text="#{supply.stats.month}">Monat</th>
-                        <th th:text="#{supply.donation.unit}">Einheit</th>
-                        <th th:text="#{supply.stats.donations}">Spenden</th>
-                        <th th:text="#{supply.stats.donors}">Verschiedene Spender</th>
-                        <th th:text="#{supply.stats.amounts}">Mengen</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:each="row : ${stats.units()}">
-                        <td th:text="${row.month()}">2026-10</td>
-                        <td th:text="${row.orgUnitName()}">ARGON</td>
-                        <td th:text="${row.donations()}">4</td>
-                        <td th:text="${row.distinctDonors()}">3</td>
-                        <td>
-                            <span th:each="a, st : ${row.amounts()}" th:text="${a.entry()} + ': ' + ${a.amount()} + (${st.last} ? '' : ', ')">Quantanium: 4</span>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        <th:block th:if="${stats == null or #lists.isEmpty(stats.units())}">
-            <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='supply.stats.empty.title', textKey='supply.stats.empty.text')}"></th:block>
+        <div id="supply-stats-results">
+        <th:block th:fragment="statsResults">
+            <div class="card card--flush">
+                <div class="table-responsive" th:if="${stats != null and !#lists.isEmpty(stats.units())}">
+                    <table class="data-table data-table--stack supply-table" data-testid="supply-stats-table">
+                        <thead>
+                            <tr>
+                                <th th:text="#{supply.stats.month}">Monat</th>
+                                <th th:text="#{supply.donation.unit}">Einheit</th>
+                                <th class="num" th:text="#{supply.stats.donations}">Spenden</th>
+                                <th class="num" th:text="#{supply.stats.donors}">Verschiedene Spender</th>
+                                <th th:text="#{supply.stats.amounts}">Mengen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="row : ${stats.units()}">
+                                <td th:text="${row.month()}">2026-10</td>
+                                <td th:attr="data-label=#{supply.donation.unit}" th:text="${row.orgUnitName()}">ARGON</td>
+                                <td class="num" th:attr="data-label=#{supply.stats.donations}" th:text="${row.donations()}">4</td>
+                                <td class="num" th:attr="data-label=#{supply.stats.donors}" th:text="${row.distinctDonors()}">3</td>
+                                <td th:attr="data-label=#{supply.stats.amounts}">
+                                    <span th:each="a, st : ${row.amounts()}" th:text="${a.entry()} + ': ' + ${a.amount()} + (${st.last} ? '' : ', ')">Quantanium: 4</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <th:block th:if="${stats == null or #lists.isEmpty(stats.units())}">
+                    <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='supply.stats.empty.title', textKey='supply.stats.empty.text')}"></th:block>
+                </th:block>
+            </div>
+
+            <section class="supply-stats-donors" th:if="${stats != null and !#lists.isEmpty(stats.donors())}" data-testid="supply-stats-donors">
+                <div class="card-head">
+                    <h2 class="card-title" th:text="#{supply.stats.donorList}">Spenden je Mitglied</h2>
+                </div>
+                <div class="card card--flush">
+                    <div class="table-responsive">
+                        <table class="data-table data-table--stack supply-table">
+                            <thead>
+                                <tr>
+                                    <th th:text="#{supply.donation.donor}">Spender</th>
+                                    <th th:text="#{supply.donation.entry}">Material / Item</th>
+                                    <th class="num" th:text="#{supply.stats.donations}">Spenden</th>
+                                    <th class="num" th:text="#{supply.donation.amount}">Menge</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="d : ${stats.donors()}">
+                                    <td th:text="${d.donorName()}">Name</td>
+                                    <td th:attr="data-label=#{supply.donation.entry}" th:text="${d.entry()}">Quantanium</td>
+                                    <td class="num" th:attr="data-label=#{supply.stats.donations}" th:text="${d.donations()}">2</td>
+                                    <td class="num" th:attr="data-label=#{supply.donation.amount}" th:text="${d.amount()}">8</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
         </th:block>
-    </section>
-
-    <section class="card card--flush" th:if="${stats != null and !#lists.isEmpty(stats.donors())}" data-testid="supply-stats-donors">
-        <h2 class="supply-section-title" th:text="#{supply.stats.donorList}">Spenden je Mitglied</h2>
-        <div class="table-responsive">
-            <table class="data-table data-table--stack supply-table">
-                <thead>
-                    <tr>
-                        <th th:text="#{supply.donation.donor}">Spender</th>
-                        <th th:text="#{supply.donation.entry}">Material / Item</th>
-                        <th th:text="#{supply.stats.donations}">Spenden</th>
-                        <th th:text="#{supply.donation.amount}">Menge</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:each="d : ${stats.donors()}">
-                        <td th:text="${d.donorName()}">Name</td>
-                        <td th:text="${d.entry()}">Quantanium</td>
-                        <td th:text="${d.donations()}">2</td>
-                        <td th:text="${d.amount()}">8</td>
-                    </tr>
-                </tbody>
-            </table>
         </div>
     </section>
 </main>
+</th:block>
+
+<th:block th:fragment="pageTail">
+<script type="module" th:src="@{/js/supply/supply-stats.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

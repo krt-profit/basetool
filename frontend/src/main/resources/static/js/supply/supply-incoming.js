@@ -22,6 +22,7 @@
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import {
+    bindFilterForm,
     bindKindToggle,
     bindResults,
     field,
@@ -36,6 +37,12 @@ document.addEventListener('DOMContentLoaded', () => {
         containerSelector: '#supply-incoming-results',
         listUrl: '/supply/donations/incoming',
         section: 'donations',
+    });
+
+    bindFilterForm({
+        formId: 'supply-incoming-filter',
+        containerSelector: '#supply-incoming-results',
+        navigateOn: ['orgUnitId'],
     });
 
     const results = document.getElementById('supply-incoming-results');

@@ -210,7 +210,8 @@
       "supply/supply-incoming.js",
       "supply/supply-lager.js",
       "supply/supply-mine.js",
-      "supply/supply-needs.js"
+      "supply/supply-needs.js",
+      "supply/supply-stats.js"
     ]
   }
 }
