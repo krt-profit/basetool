@@ -1116,5 +1116,31 @@ public final class MetricNames {
   public static final String SUPPLY_DONATIONS_PLEDGED_OPEN =
       "basetool.supply.donations.pledged.open";
 
+  /**
+   * Counter {@code basetool_purchasing_deals_total} — deals by lifecycle event, tag {@code event}
+   * (REQ-OBS-011).
+   */
+  public static final String PURCHASING_DEALS = "basetool.purchasing.deals";
+
+  /**
+   * Counter {@code basetool_purchasing_tranches_total} — money tranches, tags {@code kind} ({@link
+   * #TAG_KIND}) and {@code outcome} ({@link #TAG_OUTCOME}: requested, confirmed, refused,
+   * cancelled) (REQ-OBS-011).
+   */
+  public static final String PURCHASING_TRANCHES = "basetool.purchasing.tranches";
+
+  /** Gauge {@code basetool_purchasing_deals} — deals by state, tag {@code status}. */
+  public static final String PURCHASING_DEALS_BY_STATUS = "basetool.purchasing.deals.by.status";
+
+  /** Gauge {@code basetool_purchasing_settlements_overdue} — deals past their settlement date. */
+  public static final String PURCHASING_SETTLEMENTS_OVERDUE =
+      "basetool.purchasing.settlements.overdue";
+
+  /** Gauge {@code basetool_purchasing_paused} — {@code 1} while purchasing is paused globally. */
+  public static final String PURCHASING_PAUSED = "basetool.purchasing.paused";
+
+  /** Gauge {@code basetool_purchasing_delegates_active} — active Handelsbeauftragte. */
+  public static final String PURCHASING_DELEGATES_ACTIVE = "basetool.purchasing.delegates.active";
+
   private MetricNames() {}
 }

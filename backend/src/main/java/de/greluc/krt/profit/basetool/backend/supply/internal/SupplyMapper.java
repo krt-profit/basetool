@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.supply.api.DonationStatus;
+import de.greluc.krt.profit.basetool.backend.supply.api.NeedRef;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedStatus;
 import java.util.Collection;
 import java.util.HashMap;
@@ -295,6 +296,33 @@ public class SupplyMapper {
       return "ITEM";
     }
     return material.getQuantityType() == QuantityType.PIECE ? "PIECE" : "SCU";
+  }
+
+  /**
+   * Projects a need onto what other modules may read of it.
+   *
+   * @param need the need, with its catalogue entry and tier loaded
+   * @return the reference
+   */
+  static @NotNull NeedRef toRef(@NotNull SupplyNeed need) {
+    Material material = need.getMaterial();
+    GameItem gameItem = need.getGameItem();
+    QualityTier tier = need.getQualityTier();
+    return new NeedRef(
+        need.getId(),
+        need.getOrgUnitId(),
+        material == null ? null : material.getId(),
+        gameItem == null ? null : gameItem.getId(),
+        tier == null ? null : tier.getId(),
+        tier == null ? 0 : tier.getMinQuality(),
+        material != null ? material.getName() : gameItem == null ? "—" : gameItem.getName(),
+        gameItem != null || (material != null && material.getQuantityType() == QuantityType.PIECE),
+        need.getAmount(),
+        need.getFulfilledAmount(),
+        need.getPurchasedAmount(),
+        need.isPurchasable(),
+        need.getMaxUnitPrice(),
+        need.getStatus());
   }
 
   /**

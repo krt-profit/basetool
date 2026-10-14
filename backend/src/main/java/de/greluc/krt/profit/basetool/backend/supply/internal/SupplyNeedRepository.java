@@ -21,8 +21,11 @@ package de.greluc.krt.profit.basetool.backend.supply.internal;
 
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedStatus;
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
@@ -116,4 +119,22 @@ public interface SupplyNeedRepository
    * @return the number of needs in it
    */
   long countByStatus(NeedStatus status);
+
+  /**
+   * Reads one need with its catalogue entry and tier in the same statement.
+   *
+   * @param id the need
+   * @return the need, or empty
+   */
+  @EntityGraph(attributePaths = {"material", "gameItem", "qualityTier"})
+  Optional<SupplyNeed> findWithCatalogueById(UUID id);
+
+  /**
+   * Reads several needs with their catalogue entries and tiers in one statement.
+   *
+   * @param ids the needs
+   * @return the existing needs
+   */
+  @EntityGraph(attributePaths = {"material", "gameItem", "qualityTier"})
+  List<SupplyNeed> findWithCatalogueByIdIn(Collection<UUID> ids);
 }

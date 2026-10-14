@@ -42,6 +42,7 @@
       "orgunit::api",
       "platform::api",
       "privacy::api",
+      "purchasing::api",
       "refinery::api",
       "scope::api",
       "supply::api",

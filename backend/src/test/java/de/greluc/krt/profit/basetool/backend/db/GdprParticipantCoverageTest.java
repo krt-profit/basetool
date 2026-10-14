@@ -196,6 +196,32 @@ class GdprParticipantCoverageTest {
               "deletion_request.decided_by_id",
               "Names the admin who decided another member's erasure request."),
           Map.entry(
+              "purchasing_delegate.appointed_by",
+              "Names the leader who appointed another member as trade delegate; the appointment is"
+                  + " the delegate's."),
+          Map.entry(
+              "purchasing_delegate.revoked_by",
+              "Names the leader who revoked another member's appointment."),
+          Map.entry(
+              "purchasing_partner.created_by",
+              "Names the delegate who entered a trade partner; the partner is the organisation's"
+                  + " record."),
+          Map.entry(
+              "purchasing_setting.paused_by",
+              "Names the leader who paused purchasing for the organisation."),
+          Map.entry(
+              "purchasing_unit_pause.paused_by",
+              "Names the lead who paused purchasing for a unit."),
+          Map.entry(
+              "purchasing_deal_delivery.recorded_by",
+              "The act on a deal, which the purchasingDeals section exports as the deal."),
+          Map.entry(
+              "purchasing_deal_delivery.accepted_by",
+              "Names the lead or Logistician who accepted another member's delivery."),
+          Map.entry(
+              "purchasing_deal_settlement.recorded_by",
+              "The act on a deal, which the purchasingDeals section exports as the deal."),
+          Map.entry(
               "supply_donation.received_by",
               "Names the member who confirmed another member's donation; the row is the donor's."),
           Map.entry(

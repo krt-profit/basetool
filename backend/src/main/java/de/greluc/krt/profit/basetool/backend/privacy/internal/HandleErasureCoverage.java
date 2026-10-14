@@ -177,6 +177,13 @@ public final class HandleErasureCoverage {
               "org_unit.grand_admiral_display_name",
               "The organisation's own office holder, carried as configuration rather than as a"
                   + " membership record."),
+          notTheMember(
+              "purchasing_partner.name",
+              "A trade partner, a third party; an admin erases an individual partner's handle and"
+                  + " notes on request."),
+          notTheMember("purchasing_partner.org_tag", "See purchasing_partner.name."),
+          notTheMember("purchasing_partner.conditions_note", "See purchasing_partner.name."),
+          notTheMember("purchasing_partner.reputation_note", "See purchasing_partner.name."),
           notTheMember("bank_account.name", "An account's name, chosen by the bank."),
           notTheMember("location.name", "A station or outpost from the synced catalogue."),
           notTheMember("location.description", "See location.name."),

@@ -102,6 +102,16 @@ poi catalogue
 promotion_category promotion
 promotion_level_content promotion
 promotion_topic promotion
+purchasing_deal purchasing
+purchasing_deal_delivery purchasing
+purchasing_deal_settlement purchasing
+purchasing_deal_tranche purchasing
+purchasing_delegate purchasing
+purchasing_partner purchasing
+purchasing_risk_class purchasing
+purchasing_setting purchasing
+purchasing_setting_allowed_tier purchasing
+purchasing_unit_pause purchasing
 quality_tier catalogue
 rank_requirement promotion
 refinery_good refinery

@@ -37,7 +37,9 @@ import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
+import de.greluc.krt.profit.basetool.backend.supply.api.NeedLifecycleObserver;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedPriority;
+import de.greluc.krt.profit.basetool.backend.supply.api.NeedRef;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedStatus;
 import de.greluc.krt.profit.basetool.backend.supply.api.PurchaseReason;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyProblemCode;
@@ -51,6 +53,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -84,6 +87,7 @@ public class SupplyNeedService {
   private final AuditRecorder auditRecorder;
   private final AuthHelperService authHelperService;
   private final MeterRegistry meterRegistry;
+  private final ObjectProvider<NeedLifecycleObserver> lifecycleObservers;
 
   /**
    * Pages over the needs the caller may see: everyone sees the open ones, the managers of a unit
@@ -193,6 +197,9 @@ public class SupplyNeedService {
             .with("tier", saved.getQualityTier() == null ? null : saved.getQualityTier().getCode())
             .with("purchasable", saved.isPurchasable()));
     count("raised");
+    if (saved.isPurchasable()) {
+      releasedForPurchase(saved);
+    }
     return mapper.toDto(saved, mapper.needContext(List.of(saved)));
   }
 
@@ -207,6 +214,7 @@ public class SupplyNeedService {
   public @NotNull NeedDto update(@NotNull UUID id, @NotNull UpdateNeedRequest request) {
     settingsService.requireEnabled();
     SupplyNeed need = lockManaged(id, request.version());
+    final boolean wasPurchasable = need.isPurchasable();
     requireOpenOrPaused(need);
     double amount = validAmount(need, request.amount());
     if (amount + COVERED_TOLERANCE < need.getFulfilledAmount()) {
@@ -229,6 +237,9 @@ public class SupplyNeedService {
     if (saved.getStatus() == NeedStatus.FULFILLED) {
       recordFulfilled(saved);
     }
+    if (!wasPurchasable && saved.isPurchasable() && saved.getStatus() == NeedStatus.OPEN) {
+      releasedForPurchase(saved);
+    }
     count("updated");
     return mapper.toDto(saved, mapper.needContext(List.of(saved)));
   }
@@ -248,6 +259,7 @@ public class SupplyNeedService {
     need.setStatus(NeedStatus.WITHDRAWN);
     SupplyNeed saved = needRepository.saveAndFlush(need);
     auditRecorder.record(AuditEventType.NEED_WITHDRAWN, saved.getId(), label(saved), null, null);
+    lifecycleObservers.orderedStream().forEach(observer -> observer.onWithdrawn(saved.getId()));
     count("withdrawn");
     return mapper.toDto(saved, mapper.needContext(List.of(saved)));
   }
@@ -314,6 +326,26 @@ public class SupplyNeedService {
     }
   }
 
+  /**
+   * Adds an accepted purchase delivery to a need's covered and purchased amounts and fulfils the
+   * need once it is covered (REQ-SUP-005). Joins the delivery's transaction.
+   *
+   * @param needId the need
+   * @param amount the accepted amount
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void creditPurchase(@NotNull UUID needId, double amount) {
+    if (needRepository.addPurchased(needId, amount, NeedStatus.OPEN, NeedStatus.PAUSED) == 0) {
+      return;
+    }
+    if (needRepository.markFulfilledIfCovered(
+            needId, COVERED_TOLERANCE, NeedStatus.FULFILLED, NeedStatus.OPEN, NeedStatus.PAUSED)
+        > 0) {
+      needRepository.findById(needId).ifPresent(this::recordFulfilled);
+      count("fulfilled");
+    }
+  }
+
   private void recordFulfilled(@NotNull SupplyNeed need) {
     auditRecorder.record(
         AuditEventType.NEED_FULFILLED,
@@ -321,6 +353,15 @@ public class SupplyNeedService {
         label(need),
         null,
         AuditDetails.of("amount", need.getAmount()));
+    lifecycleObservers.orderedStream().forEach(observer -> observer.onFulfilled(need.getId()));
+  }
+
+  private void releasedForPurchase(@NotNull SupplyNeed need) {
+    NeedRef ref = SupplyMapper.toRef(need);
+    UUID actor = authHelperService.currentUserId().orElse(null);
+    lifecycleObservers
+        .orderedStream()
+        .forEach(observer -> observer.onReleasedForPurchase(ref, actor));
   }
 
   private @NotNull SupplyNeed loadVisible(@NotNull UUID id) {

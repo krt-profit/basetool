@@ -41,6 +41,7 @@
       "operation::api",
       "orgunit::api",
       "platform::api",
+      "purchasing::api",
       "refinery::api",
       "scope::api",
       "supply::api"

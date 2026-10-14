@@ -66,6 +66,8 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitParentUpdateRequ
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrganisationsleitungDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronDto;
+import de.greluc.krt.profit.basetool.backend.purchasing.internal.PausePurchasingRequest;
+import de.greluc.krt.profit.basetool.backend.purchasing.internal.ResumePurchasingRequest;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderCreateRequest;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStoreItemDto;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderUpdateRequest;
@@ -212,6 +214,18 @@ class MassAssignmentGuardTest {
                   "orgUnitId",
                   "the raising unit, authorised by SupplyNeedService.create through"
                       + " canManageUnit")),
+          Map.entry(
+              PausePurchasingRequest.class,
+              Map.of(
+                  "orgUnitId",
+                  "the raising unit to pause, authorised by PurchasingPauseService through"
+                      + " canPause")),
+          Map.entry(
+              ResumePurchasingRequest.class,
+              Map.of(
+                  "orgUnitId",
+                  "the raising unit to resume, authorised by PurchasingPauseService through"
+                      + " canPause")),
           Map.entry(
               PledgeRequest.class,
               Map.of(

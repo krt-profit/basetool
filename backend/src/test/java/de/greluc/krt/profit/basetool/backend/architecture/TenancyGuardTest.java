@@ -69,6 +69,10 @@ import de.greluc.krt.profit.basetool.backend.promotion.web.PromotionCategoryCont
 import de.greluc.krt.profit.basetool.backend.promotion.web.PromotionLevelContentController;
 import de.greluc.krt.profit.basetool.backend.promotion.web.PromotionTopicController;
 import de.greluc.krt.profit.basetool.backend.promotion.web.RankRequirementController;
+import de.greluc.krt.profit.basetool.backend.purchasing.internal.PurchasingAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.purchasing.internal.PurchasingDeal;
+import de.greluc.krt.profit.basetool.backend.purchasing.internal.PurchasingUnitPause;
+import de.greluc.krt.profit.basetool.backend.purchasing.web.PurchasingDealController;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.web.RefineryOrderController;
@@ -118,7 +122,8 @@ class TenancyGuardTest {
           MissionSecurityService.class,
           SpecialCommandSecurityService.class,
           OrgRoleManagementSecurityService.class,
-          SupplyAccessPolicy.class);
+          SupplyAccessPolicy.class,
+          PurchasingAccessPolicy.class);
 
   /** Org-unit references that are no tenancy boundary, each with the reason. */
   private static final Map<String, String> NOT_TENANT_SCOPE =
@@ -174,6 +179,15 @@ class TenancyGuardTest {
               "the receiving unit of a donation; the unit's managers and the donor read it through"
                   + " SupplyAccessPolicy, which is a role scope and not a tenancy boundary"),
           Map.entry(
+              key(PurchasingDeal.class, "raisingOrgUnitId"),
+              "the raising unit of the need a deal serves; deals are read through"
+                  + " PurchasingAccessPolicy (the delegate, the governing leadership, the unit's"
+                  + " managers), a role scope and not a tenancy boundary"),
+          Map.entry(
+              key(PurchasingUnitPause.class, "orgUnitId"),
+              "the unit a pause of purchasing applies to, set by the unit's lead or the governing"
+                  + " leadership"),
+          Map.entry(
               key(SupplyUnitSetting.class, "id"),
               "the key of the unit's own supply setting, an admin-edited flag row"),
           Map.entry(key(OrgUnit.class, "parent"), "the org-unit hierarchy itself (REQ-ORG-014)"),
@@ -184,6 +198,28 @@ class TenancyGuardTest {
   /** Write handlers whose scope check lives in the service layer, each with the reason. */
   private static final Map<HandlerKey, String> SERVICE_GATED =
       Map.ofEntries(
+          Map.entry(
+              new HandlerKey(PurchasingDealController.class, "update"),
+              "PurchasingDealService.update checks the deal's own delegate"),
+          Map.entry(
+              new HandlerKey(PurchasingDealController.class, "cancel"),
+              "PurchasingDealService.cancel checks the deal's delegate or the governing"
+                  + " leadership"),
+          Map.entry(
+              new HandlerKey(PurchasingDealController.class, "requestTranche"),
+              "PurchasingTrancheService.request checks the deal's own active delegate"),
+          Map.entry(
+              new HandlerKey(PurchasingDealController.class, "recordDelivery"),
+              "PurchasingDeliveryService.record checks the deal's own delegate"),
+          Map.entry(
+              new HandlerKey(PurchasingDealController.class, "acceptDelivery"),
+              "PurchasingDeliveryService.accept checks canAcceptDeliveries on the raising unit"),
+          Map.entry(
+              new HandlerKey(PurchasingDealController.class, "closeDelivery"),
+              "PurchasingDeliveryService.close checks the deal's own delegate"),
+          Map.entry(
+              new HandlerKey(PurchasingDealController.class, "settle"),
+              "PurchasingSettlementService.settle checks the deal's own delegate"),
           Map.entry(
               new HandlerKey(SupplyDonationController.class, "receive"),
               "SupplyDonationService.receive checks canManageUnit on the receiving unit"),

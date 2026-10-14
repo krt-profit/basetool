@@ -25,7 +25,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -40,7 +42,9 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.supply.api.NeedLifecycleObserver;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedPriority;
+import de.greluc.krt.profit.basetool.backend.supply.api.NeedRef;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedStatus;
 import de.greluc.krt.profit.basetool.backend.supply.api.PurchaseReason;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyProblemCode;
@@ -51,6 +55,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -58,6 +63,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
@@ -83,6 +89,8 @@ class SupplyNeedServiceTest {
   @Mock private SupplyMapper mapper;
   @Mock private AuditRecorder auditRecorder;
   @Mock private AuthHelperService authHelperService;
+  @Mock private ObjectProvider<NeedLifecycleObserver> lifecycleObservers;
+  @Mock private NeedLifecycleObserver observer;
 
   private SupplyNeedService service;
   private Material material;
@@ -103,7 +111,11 @@ class SupplyNeedServiceTest {
             mapper,
             auditRecorder,
             authHelperService,
-            new SimpleMeterRegistry());
+            new SimpleMeterRegistry(),
+            lifecycleObservers);
+    lenient()
+        .when(lifecycleObservers.orderedStream())
+        .thenAnswer(invocation -> Stream.of(observer));
     material = new Material();
     material.setId(UUID.randomUUID());
     material.setName("Quantainium");
@@ -374,6 +386,122 @@ class SupplyNeedServiceTest {
 
     verify(auditRecorder, never()).record(any(), any(), any(), any(), any());
     verify(needRepository, never()).findById(any());
+  }
+
+  @Test
+  void aPurchasableNeedIsReleasedToTheObserversWhenItIsRaised() {
+    when(accessPolicy.canManageUnit(UNIT)).thenReturn(true);
+    raisingUnit();
+    when(materialRepository.findById(material.getId())).thenReturn(Optional.of(material));
+    when(qualityTierRepository.findByMinQuality(0)).thenReturn(Optional.of(baseTier));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(CALLER));
+    when(needRepository.save(any(SupplyNeed.class)))
+        .thenAnswer(
+            invocation -> {
+              SupplyNeed need = invocation.getArgument(0);
+              need.setId(UUID.randomUUID());
+              return need;
+            });
+
+    service.create(createRequest(material.getId(), null, 5, true, 4000L));
+
+    ArgumentCaptor<NeedRef> released = ArgumentCaptor.forClass(NeedRef.class);
+    verify(observer).onReleasedForPurchase(released.capture(), eq(CALLER));
+    assertThat(released.getValue().purchasable()).isTrue();
+    assertThat(released.getValue().maxUnitPrice()).isEqualTo(4000L);
+    assertThat(released.getValue().label()).isEqualTo("Quantainium");
+  }
+
+  @Test
+  void aNeedThatIsNotPurchasableIsNotReleased() {
+    when(accessPolicy.canManageUnit(UNIT)).thenReturn(true);
+    raisingUnit();
+    when(materialRepository.findById(material.getId())).thenReturn(Optional.of(material));
+    when(qualityTierRepository.findByMinQuality(0)).thenReturn(Optional.of(baseTier));
+    when(needRepository.save(any(SupplyNeed.class)))
+        .thenAnswer(
+            invocation -> {
+              SupplyNeed need = invocation.getArgument(0);
+              need.setId(UUID.randomUUID());
+              return need;
+            });
+
+    service.create(createRequest(material.getId(), null, 5, false, null));
+
+    verify(observer, never()).onReleasedForPurchase(any(), any());
+  }
+
+  @Test
+  void settingAnOpenNeedPurchasableReleasesItButEditingAPurchasableOneDoesNot() {
+    SupplyNeed need = storedNeed(NeedStatus.OPEN, 10, 0);
+    when(needRepository.findByIdForUpdate(need.getId())).thenReturn(Optional.of(need));
+    when(accessPolicy.canManageUnit(UNIT)).thenReturn(true);
+    when(needRepository.saveAndFlush(need)).thenReturn(need);
+
+    service.update(
+        need.getId(),
+        new UpdateNeedRequest(
+            10.0, NeedPriority.NORMAL, true, PurchaseReason.RARE_SOURCE, 900L, null, 3L));
+    verify(observer).onReleasedForPurchase(any(NeedRef.class), any());
+
+    need.setVersion(4L);
+    service.update(
+        need.getId(),
+        new UpdateNeedRequest(
+            11.0, NeedPriority.NORMAL, true, PurchaseReason.RARE_SOURCE, 900L, null, 4L));
+    verify(observer, times(1)).onReleasedForPurchase(any(), any());
+  }
+
+  @Test
+  void aWithdrawnNeedIsReportedToTheObservers() {
+    SupplyNeed need = storedNeed(NeedStatus.OPEN, 10, 0);
+    when(needRepository.findByIdForUpdate(need.getId())).thenReturn(Optional.of(need));
+    when(accessPolicy.canManageUnit(UNIT)).thenReturn(true);
+    when(needRepository.saveAndFlush(need)).thenReturn(need);
+
+    service.withdraw(need.getId(), 3L);
+
+    verify(observer).onWithdrawn(need.getId());
+  }
+
+  @Test
+  void aFulfilledNeedIsReportedToTheObservers() {
+    SupplyNeed need = storedNeed(NeedStatus.FULFILLED, 10, 10);
+    when(needRepository.addFulfilled(need.getId(), 4.0, NeedStatus.OPEN, NeedStatus.PAUSED))
+        .thenReturn(1);
+    when(needRepository.markFulfilledIfCovered(eq(need.getId()), anyDouble(), any(), any(), any()))
+        .thenReturn(1);
+    when(needRepository.findById(need.getId())).thenReturn(Optional.of(need));
+
+    service.credit(need.getId(), 4.0);
+
+    verify(observer).onFulfilled(need.getId());
+  }
+
+  @Test
+  void anAcceptedPurchaseIsAddedAsCoveredAndPurchasedAmount() {
+    SupplyNeed need = storedNeed(NeedStatus.FULFILLED, 10, 10);
+    when(needRepository.addPurchased(need.getId(), 6.0, NeedStatus.OPEN, NeedStatus.PAUSED))
+        .thenReturn(1);
+    when(needRepository.markFulfilledIfCovered(eq(need.getId()), anyDouble(), any(), any(), any()))
+        .thenReturn(1);
+    when(needRepository.findById(need.getId())).thenReturn(Optional.of(need));
+
+    service.creditPurchase(need.getId(), 6.0);
+
+    verify(needRepository, never()).addFulfilled(any(), anyDouble(), any(), any());
+    verify(auditRecorder)
+        .record(eq(AuditEventType.NEED_FULFILLED), eq(need.getId()), any(), any(), any());
+  }
+
+  @Test
+  void aPurchaseOnAClosedNeedChangesNothing() {
+    UUID id = UUID.randomUUID();
+    when(needRepository.addPurchased(eq(id), anyDouble(), any(), any())).thenReturn(0);
+
+    service.creditPurchase(id, 2.0);
+
+    verify(needRepository, never()).markFulfilledIfCovered(any(), anyDouble(), any(), any(), any());
   }
 
   @Test

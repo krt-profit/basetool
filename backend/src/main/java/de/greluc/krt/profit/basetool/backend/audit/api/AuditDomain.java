@@ -93,5 +93,12 @@ public enum AuditDomain {
    * donations and the unit settings. The subject is the need or the donation with its catalogue
    * entry as label; the donor is the target, never recorded for an anonymous donation.
    */
-  SUPPLY
+  SUPPLY,
+
+  /**
+   * Material purchasing (Ankauf): the trade deals with their tranches, deliveries and settlements,
+   * the partners, the delegates and the purchasing settings. The subject is the deal, the partner
+   * or the delegate; the details carry ids, enums and amounts, never a partner name or a note.
+   */
+  PURCHASING
 }
