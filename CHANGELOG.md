@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.16.3](https://github.com/krt-profit/basetool/releases/tag/v1.16.3) - 2026-10-14
+
 ### Fixed
 
 - **Bedarf & Spenden: kompaktere Tabellen.** Die Zeilenaktionen („Spenden", Bearbeiten, „⋯") stehen auf Desktop nebeneinander statt untereinander, die Spaltenüberschriften bleiben beim Scrollen sichtbar, und ein „⋯"-Menü, das unten nicht mehr in Tabelle oder Fenster passt, klappt nach oben auf – das gilt für alle „⋯"-Menüs (REQ-SUP-021).
