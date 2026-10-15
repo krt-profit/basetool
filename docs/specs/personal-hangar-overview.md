@@ -232,8 +232,9 @@ An admin MUST be able to list, add, edit and delete the ships of one member on
   „Meine Schiffe" and the unit read-only. A hint says that every change notifies the member.
 - **Writes.** Add, edit and delete use the ship dialog of „Meine Schiffe" (design system: one CTA in
   the page head and one in the dialog, icon-only edit per row, quiet-danger delete behind a danger
-  confirm). An added ship takes the unit picked from the member's direct memberships, or is stamped as
-  for the member's own add when the member has one or none. An edit echoes the ship's `version` and
+  confirm). An added ship takes the unit picked from the member's direct memberships; with more than
+  one, the pick is required and starts empty, never preset from the admin's own active unit. With
+  one or none the ship is stamped as for the member's own add. An edit echoes the ship's `version` and
   never changes the unit; a stale version is a 409 with the conflict dialog.
 - **Live update.** Every write swaps the list and the count in place (REQ-FE-001). Peer sync between
   this page and the member's own hangar is not part of this requirement (#2606).

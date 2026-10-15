@@ -157,8 +157,8 @@
                     <input type="checkbox" id="member-ship-fitted" name="fitted">
                     <label for="member-ship-fitted" class="ship-fitted-label" th:text="#{hangar.ship.fitted.label}">Fitted (Einsatzbereit)</label>
                 </div>
-                <div id="member-ship-owner-picker-slot">
-                <th:block th:replace="~{kernel/fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=null, required=false)}"></th:block>
+                <div id="member-ship-owner-picker-slot" th:with="activeSquadronId=${null}">
+                <th:block th:replace="~{kernel/fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=null, required=true)}"></th:block>
                 </div>
                 </div>
                 <div class="krt-modal-foot">

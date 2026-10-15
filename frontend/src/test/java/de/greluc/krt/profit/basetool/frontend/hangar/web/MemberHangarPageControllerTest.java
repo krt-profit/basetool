@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.hangar.web;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -46,6 +47,7 @@ import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -114,6 +116,33 @@ class MemberHangarPageControllerTest {
         .andExpect(content().string(containsString("Iron Mule")))
         .andExpect(content().string(containsString("data-testid=\"member-hangar-add\"")))
         .andExpect(content().string(containsString("data-version=\"3\"")));
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void ownerPickerOfAMemberWithSeveralUnitsIsRequiredAndStartsEmpty() throws Exception {
+    when(backendApiClient.get(eq(SHIPS_READ), anyTypeRef(), eq(MEMBER)))
+        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+    when(backendApiClient.get(
+            eq("/api/v1/org-units/members/{id}/memberships?allKinds=true"),
+            anyTypeRef(),
+            eq(MEMBER)))
+        .thenReturn(
+            List.of(
+                new OrgUnitMembershipOptionDto(
+                    UUID.randomUUID(), "Iridium", "IRI", "SQUADRON", Boolean.FALSE),
+                new OrgUnitMembershipOptionDto(
+                    UUID.randomUUID(), "Sondereinheit", "SE", "SPECIAL_COMMAND", Boolean.FALSE)));
+
+    mockMvc
+        .perform(get(BASE))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    matchesPattern(
+                        "(?s).*<select id=\"owningOrgUnitId\" name=\"owningOrgUnitId\""
+                            + " required=\"required\">\\s*<option value=\"\">.*")));
   }
 
   @Test

@@ -144,7 +144,9 @@ function initMemberHangar() {
         if (!ownerSlot) return;
         ownerSlot.hidden = !visible;
         const select = /** @type {HTMLSelectElement | null} */ (ownerSlot.querySelector('select'));
-        if (select) select.disabled = !visible;
+        if (!select) return;
+        select.disabled = !visible;
+        if (visible) select.value = '';
     }
 
     function closeShipModal() {
