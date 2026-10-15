@@ -1785,6 +1785,7 @@ ShipDto.insurance=string
 ShipDto.location=$LocationDto
 ShipDto.name=string
 ShipDto.owner=$UserDto
+ShipDto.owningOrgUnitVersion=integer/int64
 ShipDto.owningSquadron=$SquadronReferenceDto
 ShipDto.shipType=$ShipTypeDto
 ShipDto.version=integer/int64

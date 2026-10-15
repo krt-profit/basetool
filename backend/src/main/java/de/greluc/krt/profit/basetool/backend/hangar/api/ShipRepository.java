@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.hangar.api;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;
@@ -104,6 +105,26 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   @Modifying(clearAutomatically = true)
   @Query("UPDATE Ship s SET s.fitted = false")
   void resetAllFitted();
+
+  /**
+   * Sets a ship's owning org unit and bumps its unit counter in one conditional statement, leaving
+   * the row {@code @Version} untouched (ADR-0258). Zero rows means the counter moved on, a
+   * conflict.
+   *
+   * @param shipId the ship
+   * @param orgUnit the new owning org unit, or {@code null} for none
+   * @param expectedVersion the unit counter the caller last saw
+   * @return {@code 1} when the unit was changed, {@code 0} when the counter did not match
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "UPDATE Ship s SET s.owningOrgUnit = :orgUnit,"
+          + " s.owningOrgUnitVersion = s.owningOrgUnitVersion + 1"
+          + " WHERE s.id = :shipId AND s.owningOrgUnitVersion = :expectedVersion")
+  int changeOwningOrgUnitIfVersionMatches(
+      @Param("shipId") UUID shipId,
+      @Param("orgUnit") @Nullable OrgUnit orgUnit,
+      @Param("expectedVersion") long expectedVersion);
 
   /**
    * OrgUnit-scoped variant of {@link #resetAllFitted()}: clears the {@code fitted} flag only on

@@ -280,7 +280,23 @@ public class HangarPageController {
     if (fragmentOnly) {
       return "hangar/hangar :: hangarResults";
     }
+    model.addAttribute("unitOptions", fetchDirectOrgUnits());
     return "hangar/hangar";
+  }
+
+  /**
+   * Fetches the caller's direct org units for the „Einheit ändern" dialog (REQ-HANGAR-009).
+   *
+   * @return the options, or an empty list on backend failure; never {@code null}
+   */
+  private @NotNull List<OrgUnitMembershipOptionDto> fetchDirectOrgUnits() {
+    try {
+      List<OrgUnitMembershipOptionDto> options = hangarClient.directOrgUnits();
+      return options != null ? options : List.of();
+    } catch (Exception e) {
+      log.warn("Failed to fetch direct org units for the hangar unit dialog", e);
+      return List.of();
+    }
   }
 
   /**

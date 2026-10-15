@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.StarSystemDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.TerminalDto;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.ShipOrgUnitRequestDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.MembershipDeltaRequest.SpecialCommandChange;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.BulkOrgUnitChangeRequest;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.BulkRebookRequest;
@@ -295,6 +296,16 @@ class MassAssignmentGuardTest {
               Map.of(
                   "owningOrgUnitId",
                   "the reassignment target, validated by MissionService (REQ-ORG-018)")),
+          Map.entry(
+              ShipOrgUnitRequestDto.class,
+              Map.of(
+                  "orgUnitId",
+                  "the new unit of the caller's own ship, which"
+                      + " OwnerScopeService.resolveOwnerMembershipTarget requires to be a direct"
+                      + " membership of the owner (REQ-HANGAR-009)",
+                  "owningOrgUnitVersion",
+                  "the unit counter the caller last saw, checked by the conditional update"
+                      + " (ADR-0258)")),
           Map.entry(
               OrgChartPositionCreateRequest.class,
               Map.of("orgUnitId", "the unit an ADMIN-edited org-chart position describes")),

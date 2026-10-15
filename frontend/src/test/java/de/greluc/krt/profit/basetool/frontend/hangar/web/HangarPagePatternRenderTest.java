@@ -37,6 +37,8 @@ import de.greluc.krt.profit.basetool.frontend.hangar.model.SquadronShipDetailDto
 import de.greluc.krt.profit.basetool.frontend.hangar.model.SquadronShipOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -120,7 +122,8 @@ class HangarPagePatternRenderTest {
         fitted,
         null,
         null,
-        3L);
+        3L,
+        0L);
   }
 
   /**
@@ -146,6 +149,52 @@ class HangarPagePatternRenderTest {
     String id = "data-testid=\"" + testid + "\"";
     String current = "aria-current=\"page\"";
     return "<a[^>]*(" + id + "[^>]*" + current + "|" + current + "[^>]*" + id + ")";
+  }
+
+  /**
+   * Each own ship shows its unit and offers „Einheit ändern", whose dialog lists „Keine Einheit"
+   * and the caller's direct units; the create/edit dialog wraps its unit picker in a slot the
+   * script hides for an edit (REQ-HANGAR-009).
+   */
+  @Test
+  @WithMockUser
+  void rendersTheUnitChangeActionAndDialog() throws Exception {
+    UUID unitId = UUID.randomUUID();
+    ShipDto assigned =
+        new ShipDto(
+            UUID.randomUUID(),
+            "Iron Mule",
+            type("Cutlass Black", "Drake"),
+            "LTI",
+            null,
+            true,
+            null,
+            new SquadronReferenceDto(unitId, "Owner SK", "OSK"),
+            3L,
+            4L);
+    when(backendApiClient.get(startsWith(MY_SHIPS), anyTypeRef()))
+        .thenReturn(page(List.of(assigned), 1L));
+    when(backendApiClient.get(startsWith(OVERVIEW), anyTypeRef())).thenReturn(page(List.of(), 0L));
+    when(backendApiClient.get(eq("/api/v1/org-units/me/memberships?allKinds=true"), anyTypeRef()))
+        .thenReturn(
+            List.of(
+                new OrgUnitMembershipOptionDto(unitId, "Owner SK", "OSK", "SPECIAL_COMMAND", true),
+                new OrgUnitMembershipOptionDto(
+                    UUID.randomUUID(), "Iridium", "IRI", "SQUADRON", true)));
+
+    String html = render("/hangar");
+
+    assertThat(html)
+        .containsPattern("data-testid=\"hangar-ship-unit\"[^>]*>\\s*<span[^>]*>OSK<")
+        .containsPattern(
+            "data-trigger=\"hangar-change-unit\"[^>]*data-action=\"/hangar/[0-9a-f-]+/org-unit\"")
+        .contains("data-org-unit-id=\"" + unitId + "\"")
+        .contains("data-org-unit-version=\"4\"")
+        .contains("id=\"ship-unit-modal\"")
+        .containsPattern("<option value=\"\">Keine Einheit</option>")
+        .contains("Owner SK (OSK)")
+        .contains("Iridium (IRI)")
+        .contains("id=\"ship-owner-picker-slot\"");
   }
 
   /** The own-ships tab renders head, tabs, toolbar, chips, status and the readiness counter. */

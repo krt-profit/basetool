@@ -147,7 +147,8 @@ public class MissionPeerRedactor {
         dto.fitted(),
         dto.owner() == null ? null : cleanupUserForPeer(dto.owner()),
         dto.owningSquadron(),
-        dto.version());
+        dto.version(),
+        dto.owningOrgUnitVersion());
   }
 
   /**

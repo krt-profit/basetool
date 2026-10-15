@@ -95,7 +95,7 @@ class HangarControllerTest {
   }
 
   private static ShipDto shipDto(String name) {
-    return new ShipDto(UUID.randomUUID(), name, null, "LTI", null, true, null, null, 1L);
+    return new ShipDto(UUID.randomUUID(), name, null, "LTI", null, true, null, null, 1L, 0L);
   }
 
   private static Jwt jwt(String sub) {

@@ -287,6 +287,7 @@
 /hangar/squadron GET -> HangarPageController#viewSquadron gate=class:isAuthenticated() layout=yes
 /hangar/{id}/delete POST -> HangarPageController#deleteShip gate=class:isAuthenticated() layout=yes
 /hangar/{id}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> HangarPageController#deleteShipAjax gate=class:isAuthenticated() layout=yes
+/hangar/{id}/org-unit POST headers=[X-Requested-With=XMLHttpRequest] -> HangarShipOrgUnitProxyController#changeShipOrgUnit gate=class:isAuthenticated() layout=no
 /hangar/{id}/update POST -> HangarPageController#updateShip gate=class:isAuthenticated() layout=yes
 /hangar/{id}/update POST headers=[X-Requested-With=XMLHttpRequest] -> HangarPageController#updateShipAjax gate=class:isAuthenticated() layout=yes
 /impressum GET -> ImpressumController#showImpressum gate=none layout=yes

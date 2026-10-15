@@ -159,6 +159,30 @@ public class OrgUnitStampingService {
   }
 
   /**
+   * Resolves the target of a later org-unit change of an owner's aggregate (REQ-HANGAR-009): one of
+   * the owner's direct memberships of any kind, or none. Neither the caller's scope nor an
+   * active-context pin widens it.
+   *
+   * @param owner the aggregate's owner
+   * @param targetOrgUnitId the chosen org unit, or {@code null} for none
+   * @return the chosen org unit as its concrete subtype, or {@code null} for none
+   * @throws BadRequestException when the target is not a direct membership of the owner
+   */
+  @Nullable
+  public OrgUnit resolveOwnerMembershipTarget(@NotNull User owner, @Nullable UUID targetOrgUnitId) {
+    if (targetOrgUnitId == null) {
+      return null;
+    }
+    if (!collectMemberOrgUnitIds(owner).contains(targetOrgUnitId)) {
+      throw new BadRequestException("Target org unit is not a direct membership of the owner");
+    }
+    return orgUnitRepository
+        .findById(targetOrgUnitId)
+        .map(ou -> Hibernate.unproxy(ou, OrgUnit.class))
+        .orElseThrow(() -> new BadRequestException("Target org unit does not exist"));
+  }
+
+  /**
    * Variant of {@link #resolveOrgUnitForPickerOutput(User, UUID)} for the ownerless-personal
    * aggregates (ship, refinery order, inventory item): a membershipless user without a pick
    * resolves to {@code null} instead of a 400. Every other case behaves identically.

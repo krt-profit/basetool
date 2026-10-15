@@ -122,7 +122,7 @@ class HangarPageControllerMvcTest {
     ShipTypeDto shipType =
         new ShipTypeDto(UUID.randomUUID(), "Avenger Titan", manufacturer, "Titan", 0, false);
     ShipDto ship =
-        new ShipDto(UUID.randomUUID(), "My Titan", shipType, "LTI", null, true, null, null, 0L);
+        new ShipDto(UUID.randomUUID(), "My Titan", shipType, "LTI", null, true, null, null, 0L, 0L);
     PageResponse<ShipDto> ships = new PageResponse<>(List.of(ship), 0, 50, 1, 1, List.of());
 
     when(backendApiClient.get(eq("/api/v1/hangar/my-ships?page=0&size=50"), anyTypeRef()))
@@ -146,7 +146,7 @@ class HangarPageControllerMvcTest {
     ShipTypeDto shipType =
         new ShipTypeDto(UUID.randomUUID(), "Avenger Titan", manufacturer, "Titan", 0, false);
     ShipDto ship =
-        new ShipDto(UUID.randomUUID(), "My Titan", shipType, "LTI", null, true, null, null, 0L);
+        new ShipDto(UUID.randomUUID(), "My Titan", shipType, "LTI", null, true, null, null, 0L, 0L);
     PageResponse<ShipDto> ships = new PageResponse<>(List.of(ship), 0, 1000, 1, 1, List.of());
 
     LocationDto homeLoc = new LocationDto(UUID.randomUUID(), "Orison", null, false, true, 1L);
@@ -173,7 +173,7 @@ class HangarPageControllerMvcTest {
     ShipTypeDto shipType =
         new ShipTypeDto(UUID.randomUUID(), "Avenger Titan", manufacturer, "Titan", 0, false);
     ShipDto ship =
-        new ShipDto(UUID.randomUUID(), "My Titan", shipType, "LTI", null, true, null, null, 0L);
+        new ShipDto(UUID.randomUUID(), "My Titan", shipType, "LTI", null, true, null, null, 0L, 0L);
     PageResponse<ShipDto> ships = new PageResponse<>(List.of(ship), 0, 50, 1, 1, List.of());
 
     when(backendApiClient.get(eq("/api/v1/hangar/my-ships?page=0&size=50"), anyTypeRef()))
