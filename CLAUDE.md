@@ -83,7 +83,7 @@ Two binding requirements govern every frontend change, and their full rules live
 
 - **The DAS KARTELL design system is binding**, and its git submodule at
   `.claude/skills/das-kartell-design/` **must be populated before any UI work** — a `SessionStart`
-  hook materialises it, but if that directory is still empty, populate it yourself
+  hook materialises it and fast-forwards it to the design system's latest `main` (ADR-0259), but if that directory is still empty, populate it yourself
   (`git submodule update --init .claude/skills/das-kartell-design`) before touching any frontend
   surface. Never do UI work against an empty design system, and never treat its absence as "no
   design system applies".

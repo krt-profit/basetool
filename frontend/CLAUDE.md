@@ -19,7 +19,12 @@ present before any UI work.** `git worktree add` does not populate submodules, s
 worktree `.claude/skills/das-kartell-design/` is empty and the source of truth above is
 unreadable. A `SessionStart` hook (`.claude/settings.json`) materialises it automatically at
 session start (offline-first from the module store, with a copy from the main worktree as
-fallback). The hook is cross-platform via two self-guarding entries that dispatch on `command -v
+fallback) **and then fast-forwards it to the design system's `origin/main`**, so a session always
+reads the latest published design system (ADR-0259). It leaves the checkout alone when the fetch
+fails, when it has local changes, or when it holds commits that are not on `origin/main`.
+`.gitmodules` sets `ignore = all`: the moved submodule stays out of `git status` and `git add -A`,
+and the recorded pin moves only on purpose (`git add --force .claude/skills/das-kartell-design`).
+The hook is cross-platform via two self-guarding entries that dispatch on `command -v
 pwsh`: Windows runs [`.claude/hooks/ensure-design-system.ps1`](../.claude/hooks/ensure-design-system.ps1),
 Linux/macOS/CI run the portable
 [`.claude/hooks/ensure-design-system.sh`](../.claude/hooks/ensure-design-system.sh) — exactly one
