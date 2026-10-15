@@ -33,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ExchangeOrgUnitService {
 
-  /** Lists the member's direct memberships across all four kinds. */
+  /** Source of the direct memberships, ordered top-down by kind and then by name. */
   private final OrgUnitMembershipQueryService membershipQueryService;
 
   /**

@@ -27,10 +27,10 @@ import org.jetbrains.annotations.NotNull;
  * One org unit the member directly belongs to, in the shape of the published {@code
  * org-unit.schema.json} (REQ-XCH-048).
  *
- * @param id the org unit's id
- * @param name the org unit's name
- * @param shorthand the org unit's shorthand
- * @param kind the org unit's kind
+ * @param id the unit's primary key, which the client keeps and echoes as an opaque string
+ * @param name the unit's display name as the Basetool shows it; changes when the unit is renamed
+ * @param shorthand the unit's short label, never blank
+ * @param kind whether it is a Staffel, a Spezialkommando, a Bereich or the Organisationsleitung
  */
 public record ExchangeOrgUnitDto(
     @NotNull UUID id, @NotNull String name, @NotNull String shorthand, @NotNull OrgUnitKind kind) {}

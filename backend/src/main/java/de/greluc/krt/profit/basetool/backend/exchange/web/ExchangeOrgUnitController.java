@@ -44,7 +44,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Exchange — org units", description = "The member's direct org-unit memberships")
 public class ExchangeOrgUnitController {
 
-  /** Lists the memberships. */
+  /** Builds the answer from the acting member's direct memberships. */
   private final ExchangeOrgUnitService orgUnitService;
 
   /**
