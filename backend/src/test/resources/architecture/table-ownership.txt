@@ -31,6 +31,7 @@ exchange_client_revocation exchange
 exchange_feed_horizon exchange
 exchange_installation exchange
 exchange_journal exchange
+exchange_name_withholding exchange
 exchange_settings exchange
 exchange_ship_link exchange
 external_sync_report catalogue

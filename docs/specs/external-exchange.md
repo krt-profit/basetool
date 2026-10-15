@@ -2365,14 +2365,24 @@ lots in the feed. The setting is part of the member's data export; the privacy n
 („Verbundene Anwendungen") and the records of processing state which names reach a connected
 application and how to withhold them.
 
+The setting is the member's own row in `exchange_name_withholding` with its own version, read and
+written only from the member's browser session (`GET`/`PUT /api/v1/connected-apps/name-withholding`,
+like the other connected-apps controls), saved in place from the profile and audited in
+„Verbundene Anwendungen" as `EXCHANGE_NAME_WITHHOLDING_CHANGED` when it changes.
+
 **Acceptance**
 
+- [x] The member switches the setting on the profile without a reload; it survives a reload, is
+  part of the data export, is audited on a change, and no connected application can read or change
+  it (`ExchangeNameWithholdingsTest`, `ExchangeNameWithholdingControllerTest`,
+  `ProfileNameWithholdingInPlaceE2eTest`, `DataExportEndStateTest`).
 - [ ] With the setting on, no org-stock entry or roster answer carries the member's name, `ref` or
   note; with it off, they do.
 - [ ] Switching it produces feed entries for every lot the member has an entry in.
-- [ ] The privacy notice section „Verbundene Anwendungen" states the named data and the setting.
+- [x] The privacy notice section „Verbundene Anwendungen" states the named data and the setting.
 
-**Status:** planned — PR 2 of ADR-0257
+**Status:** the setting, its export, audit and privacy text built; the org stock honours it with
+REQ-XCH-042…045 (PR 2 of ADR-0257)
 
 ### REQ-XCH-045 — A Logistician of the pool writes the org stock as in the web
 

@@ -36,6 +36,8 @@ import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeSettingsDto
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeSettingsUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeUndoRequestDto;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeUndoResultDto;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.NameWithholdingRequest;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.NameWithholdingResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import java.time.Instant;
 import java.util.List;
@@ -67,6 +69,9 @@ public class ExchangeBackendClient {
   /** The backend's connected-apps endpoints. */
   private static final String CONNECTED_APPS = "/api/v1/connected-apps";
 
+  /** The backend's name-withholding setting of the member. */
+  private static final String NAME_WITHHOLDING = "/api/v1/connected-apps/name-withholding";
+
   /** The backend's mass-change endpoints. */
   private static final String MASS_CHANGES = "/api/v1/connected-apps/mass-changes/";
 
@@ -87,6 +92,28 @@ public class ExchangeBackendClient {
 
   /** Sends every call through the one filter chain and error mapping. */
   private final BackendApiClient backendApiClient;
+
+  /**
+   * Reads whether the caller withholds their name from connected applications (REQ-XCH-044).
+   *
+   * @return the choice with its version, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public NameWithholdingResponse nameWithholding() {
+    return backendApiClient.get(NAME_WITHHOLDING, NameWithholdingResponse.class);
+  }
+
+  /**
+   * Saves whether the caller withholds their name from connected applications (REQ-XCH-044).
+   *
+   * @param update the new choice and the version the caller last read
+   * @return the persisted choice with its new version, or {@code null} when the backend sent no
+   *     body
+   */
+  @Nullable
+  public NameWithholdingResponse updateNameWithholding(@NotNull NameWithholdingRequest update) {
+    return backendApiClient.put(NAME_WITHHOLDING, update, NameWithholdingResponse.class);
+  }
 
   /**
    * Lists the registered exchange clients.

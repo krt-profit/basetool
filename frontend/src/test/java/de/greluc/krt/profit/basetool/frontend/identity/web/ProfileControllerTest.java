@@ -24,6 +24,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.frontend.exchange.client.ExchangeBackendClient;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.NameWithholdingRequest;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.NameWithholdingResponse;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ProfileNameWithholdingForm;
 import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.identity.model.MyBlueprintSharingRequest;
 import de.greluc.krt.profit.basetool.frontend.identity.model.MyBlueprintSharingResponse;
@@ -73,6 +77,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 class ProfileControllerTest {
 
   private static final String ME = "/api/v1/users/me";
+  private static final String NAME_WITHHOLDING = "/api/v1/connected-apps/name-withholding";
 
   @Mock private BackendApiClient backendApiClient;
   @Mock private OidcUser principal;
@@ -88,6 +93,7 @@ class ProfileControllerTest {
         new ProfileController(
             new IdentityBackendClient(backendApiClient),
             new NotificationBackendClient(backendApiClient),
+            new ExchangeBackendClient(backendApiClient),
             messageSource);
     ReflectionTestUtils.setField(controller, "issuerUri", "https://kc.example.com/realms/iri");
   }
@@ -140,11 +146,18 @@ class ProfileControllerTest {
         .thenReturn(new MyPayoutPreferenceResponse("DONATE", 6L));
     when(backendApiClient.get("/api/v1/blueprints/me/sharing", MyBlueprintSharingResponse.class))
         .thenReturn(new MyBlueprintSharingResponse(true, 8L));
+    when(backendApiClient.get(NAME_WITHHOLDING, NameWithholdingResponse.class))
+        .thenReturn(new NameWithholdingResponse(true, 3L));
 
     Model model = new ConcurrentModel();
     String view = controller.profile(model, principal);
 
     assertEquals("identity/profile", view);
+    ProfileNameWithholdingForm withholdingForm =
+        (ProfileNameWithholdingForm) model.getAttribute("profileNameWithholdingForm");
+    assertNotNull(withholdingForm);
+    assertTrue(withholdingForm.withholdName());
+    assertEquals(3L, withholdingForm.version(), "the withholding form carries its own version");
     assertEquals("jdoe", model.getAttribute("username"));
     assertEquals("jdoe@example.com", model.getAttribute("email"));
     assertEquals(7, model.getAttribute("rank"));
@@ -673,5 +686,62 @@ class ProfileControllerTest {
     assertNotNull(response.getBody());
     assertEquals("OPTIMISTIC_LOCK", response.getBody().get("code"));
     assertEquals("conflict-message", response.getBody().get("detail"));
+  }
+
+  @Test
+  void profile_nameWithholdingUnavailable_defaultsToSharedAtVersionZero() {
+    when(backendApiClient.get(NAME_WITHHOLDING, NameWithholdingResponse.class))
+        .thenThrow(new IllegalStateException("backend down"));
+
+    Model model = new ConcurrentModel();
+    controller.profile(model, principal);
+
+    ProfileNameWithholdingForm form =
+        (ProfileNameWithholdingForm) model.getAttribute("profileNameWithholdingForm");
+    assertNotNull(form);
+    assertFalse(form.withholdName());
+    assertEquals(0L, form.version());
+  }
+
+  @Test
+  void updateNameWithholding_happyPath_putsAndRedirectsWithSuccessToast() {
+    when(bindingResult.hasErrors()).thenReturn(false);
+
+    String view =
+        controller.updateNameWithholding(
+            new ProfileNameWithholdingForm(true, 2L),
+            bindingResult,
+            new ConcurrentModel(),
+            principal,
+            redirectAttributes);
+
+    assertEquals("redirect:/profile", view);
+    verify(backendApiClient)
+        .put(NAME_WITHHOLDING, new NameWithholdingRequest(true, 2L), NameWithholdingResponse.class);
+    verify(redirectAttributes).addFlashAttribute("successToast", "notification.success.save");
+  }
+
+  @Test
+  void updateNameWithholding_conflict_redirectsWithTheConflictToast() {
+    when(bindingResult.hasErrors()).thenReturn(false);
+    BackendServiceException conflict =
+        org.mockito.Mockito.spy(
+            new BackendServiceException(
+                "concurrency-conflict", null, 409, "OPTIMISTIC_LOCK", null, List.of(), null));
+    org.mockito.Mockito.doReturn("concurrency-conflict").when(conflict).getProblemType();
+    doThrow(conflict)
+        .when(backendApiClient)
+        .put(eq(NAME_WITHHOLDING), any(), eq(NameWithholdingResponse.class));
+
+    String view =
+        controller.updateNameWithholding(
+            new ProfileNameWithholdingForm(false, 1L),
+            bindingResult,
+            new ConcurrentModel(),
+            principal,
+            redirectAttributes);
+
+    assertEquals("redirect:/profile", view);
+    verify(redirectAttributes).addFlashAttribute("errorToast", "error.concurrency.conflict");
   }
 }

@@ -408,6 +408,12 @@ class DataExportEndStateTest {
         subject.getId(),
         thumbprint,
         ship.getId());
+    jdbc.update(
+        "INSERT INTO exchange_name_withholding (user_id, withhold_name) VALUES (?, TRUE)",
+        subject.getId());
+    jdbc.update(
+        "INSERT INTO exchange_name_withholding (user_id, withhold_name) VALUES (?, FALSE)",
+        other.getId());
   }
 
   private void seedNotifications() {

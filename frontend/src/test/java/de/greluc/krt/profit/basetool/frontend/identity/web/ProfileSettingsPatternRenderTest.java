@@ -26,6 +26,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.exchange.model.NameWithholdingResponse;
 import de.greluc.krt.profit.basetool.frontend.identity.model.MyBlueprintSharingResponse;
 import de.greluc.krt.profit.basetool.frontend.identity.model.MyPayoutPreferenceResponse;
 import de.greluc.krt.profit.basetool.frontend.identity.model.MyRsiHandleResponse;
@@ -97,6 +98,9 @@ class ProfileSettingsPatternRenderTest {
         .thenReturn(new MyPayoutPreferenceResponse("DONATE", 7L));
     when(backendApiClient.get("/api/v1/blueprints/me/sharing", MyBlueprintSharingResponse.class))
         .thenReturn(new MyBlueprintSharingResponse(true, 7L));
+    when(backendApiClient.get(
+            "/api/v1/connected-apps/name-withholding", NameWithholdingResponse.class))
+        .thenReturn(new NameWithholdingResponse(true, 7L));
     when(backendApiClient.get("/api/v1/users/me/rsi-handle", MyRsiHandleResponse.class))
         .thenReturn(new MyRsiHandleResponse("Valk_RSI", 7L));
     MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
@@ -128,6 +132,7 @@ class ProfileSettingsPatternRenderTest {
         .contains("href=\"#profile-section-rsi\"")
         .contains("href=\"#profile-section-payout\"")
         .contains("href=\"#profile-section-blueprints\"")
+        .contains("href=\"#profile-section-name-withholding\"")
         .contains("href=\"#profile-security-card\"")
         .contains("href=\"#profile-export-card\"")
         .contains("href=\"#profile-deletion-card\"")
@@ -136,9 +141,9 @@ class ProfileSettingsPatternRenderTest {
         .contains("id=\"profile-deletion-card\"");
   }
 
-  /** The four sections keep their forms and endpoints and share one save bar that starts hidden. */
+  /** The five sections keep their forms and endpoints and share one save bar that starts hidden. */
   @Test
-  void rendersFourSectionsAndOneHiddenSaveBar() throws Exception {
+  void rendersFiveSectionsAndOneHiddenSaveBar() throws Exception {
     String html = render();
 
     assertThat(html)
@@ -151,9 +156,12 @@ class ProfileSettingsPatternRenderTest {
         .contains(">1 · Profil<")
         .contains(">2 · RSI-Handle<")
         .contains(">3 · Standard-Auszahlungsart<")
-        .contains(">4 · Blaupausen-Verfügbarkeit<");
-    assertThat(html.split("class=\"form-section\"", -1)).hasSize(5);
-    assertThat(NOSCRIPT_SAVE.matcher(html).results().count()).isEqualTo(4);
+        .contains(">4 · Blaupausen-Verfügbarkeit<")
+        .containsPattern(
+            "id=\"profile-name-withholding-form\"[^>]*action=\"/profile/name-withholding\"")
+        .contains(">5 · Verbundene Anwendungen<");
+    assertThat(html.split("class=\"form-section\"", -1)).hasSize(6);
+    assertThat(NOSCRIPT_SAVE.matcher(html).results().count()).isEqualTo(5);
     assertThat(html)
         .containsPattern("class=\"form-actions--sticky profile-save-bar\"[^>]*hidden")
         .contains("data-testid=\"profile-save\"")
@@ -175,6 +183,7 @@ class ProfileSettingsPatternRenderTest {
         .doesNotContainPattern("<select[^>]*defaultPayoutPreference")
         .contains("value=\"Valk_RSI\"")
         .containsPattern("id=\"shareBlueprintsGlobally\"[^>]*checked")
+        .containsPattern("id=\"withholdName\"[^>]*checked")
         .contains("5 / 2000")
         .containsPattern("name=\"version\"[^>]*value=\"7\"");
   }
