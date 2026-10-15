@@ -167,8 +167,9 @@ Authority: [`api-conventions.md`](../specs/api-conventions.md) (`REQ-API-*`).
 
 Two binding rules shape every UI change:
 
-- **The design system is binding** — the DAS KARTELL design system, delivered as a git submodule,
-  must be populated before any UI work. UI built against an absent design system is not "no design
+- **The design system is binding** — the DAS KARTELL design system, delivered as a git submodule
+  that the `SessionStart` hook fast-forwards to the design system's `main` (ADR-0259), must be
+  populated before any UI work. UI built against an absent design system is not "no design
   system applies"; it is unreviewed.
 - **Live update is binding** — every create/update/delete/toggle/reorder/filter/paginate updates
   the DOM in place via `krtFetch`, with no full-page reload on success, and on shared surfaces a
