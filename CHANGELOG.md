@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Passwort vergessen: klarer, was einzugeben ist.** Die Seite fragt nach E-Mail-Adresse oder Benutzername und erklärt, dass bei Discord-Konten der Discord-Benutzername gilt (nicht Server-Nickname oder Anzeigename), und zwar der von der ersten Anmeldung (Keycloak-Theme, REQ-SEC-082).
+
 ## [v1.16.4](https://github.com/krt-profit/basetool/releases/tag/v1.16.4) - 2026-10-15
 
 ### Added
