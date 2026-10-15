@@ -174,6 +174,7 @@ class DialogA11yE2eTest {
           seeder.createPurchasingDeal(
               USERNAME, PASSWORD, purchasingNeed, "E2E Dialog Partner " + purchasingSuffix);
       SEEDED_DETAILS.add("/purchasing/deals/" + dealId);
+      SEEDED_DETAILS.add("/admin/members/" + seeder.getUserId(USERNAME, PASSWORD) + "/hangar");
     }
   }
 

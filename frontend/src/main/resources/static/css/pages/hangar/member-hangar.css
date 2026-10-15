@@ -1,0 +1,11 @@
+@layer base, components, page, utilities;
+
+@layer page {
+    #member-ship-modal [hidden] {
+        display: none;
+    }
+    #member-ship-modal .btn {
+        font-family: var(--font-body);
+        font-weight: 700;
+    }
+}

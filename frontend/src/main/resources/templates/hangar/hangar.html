@@ -3,6 +3,7 @@
 <head>
     <title th:text="#{hangar.title} + ' - ' + ${appTitle}">Hangar - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
+<link rel="stylesheet" th:href="@{/css/hangar/hangar-ships.css}">
 <link rel="stylesheet" th:href="@{/css/pages/hangar/hangar.css}">
 <link th:if="${activeTab == 'unit'}" rel="stylesheet" th:href="@{/css/pages/hangar/hangar-squadron.css}">
     </th:block>

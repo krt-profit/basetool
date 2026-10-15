@@ -195,9 +195,14 @@ exchange/connected-apps.html body <body>
 exchange/connected-apps.html parts chrome:434d458bee213826 x-content
 hangar/hangar.html html <html lang="de">
 hangar/hangar.html head-fixed 9555df4e9114e159
-hangar/hangar.html head-own <title>Hangar - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/hangar/hangar.css">
+hangar/hangar.html head-own <title>Hangar - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/hangar/hangar-ships.css"><link rel="stylesheet" href="/css/pages/hangar/hangar.css">
 hangar/hangar.html body <body>
 hangar/hangar.html parts chrome:434d458bee213826 x-content
+hangar/member-hangar.html html <html lang="de">
+hangar/member-hangar.html head-fixed 9555df4e9114e159
+hangar/member-hangar.html head-own <title>Hangar des Mitglieds - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/hangar/hangar-ships.css"><link rel="stylesheet" href="/css/pages/hangar/member-hangar.css">
+hangar/member-hangar.html body <body>
+hangar/member-hangar.html parts chrome:434d458bee213826 x-content toast:a1359ecc4bd4b21d x-tail
 identity/admin/deletion-requests.html html <html lang="de">
 identity/admin/deletion-requests.html head-fixed 9555df4e9114e159
 identity/admin/deletion-requests.html head-own <title>Löschanträge - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/identity/admin-deletion-requests.css">

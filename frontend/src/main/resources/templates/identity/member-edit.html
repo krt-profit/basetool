@@ -12,7 +12,13 @@
                backHref=${fromProfile ? '/profile' : '/members'},
                descriptionLength=${memberEditForm.description != null ? memberEditForm.description.length() : 0}">
     <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey=${fromProfile ? 'nav.profile' : 'nav.members'},
-        eyebrowHref=@{${backHref}}, titleText=${user.effectiveName})}"></th:block>
+        eyebrowHref=@{${backHref}}, titleText=${user.effectiveName}, actions=~{::member-edit-actions})}">
+        <th:block th:ref="member-edit-actions">
+            <a sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)"
+               th:href="@{/admin/members/{id}/hangar(id=${user.id})}" class="btn btn-ghost"
+               data-testid="member-edit-hangar"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-arrow-right"/></svg> <span th:text="#{members.edit.hangar}">Hangar</span></a>
+        </th:block>
+    </th:block>
 
     <div class="tab-nav member-edit-tabs" role="tablist" th:aria-label="#{members.edit.title}" data-testid="member-edit-tabs">
         <button class="tab active" id="member-tab-profile" type="button" role="tab" aria-selected="true"
