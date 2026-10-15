@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Profil: Namen von verbundenen Anwendungen zurückhalten.** Der neue Schalter „Meinen Namen nicht an verbundene Anwendungen weitergeben" im Profil (standardmäßig aus) speichert in place, ist Teil des Datenexports und wird im Bereich „Verbundene Anwendungen" protokolliert; die Datenschutzerklärung nennt, welche Namen eine Anwendung erhält. Wirksam wird er mit dem Einheitsbestand für Logistiker (REQ-XCH-044, ADR-0257, Migration V294).
+
 ### Fixed
 
 - **Passwort vergessen: klarer, was einzugeben ist.** Die Seite fragt nach E-Mail-Adresse oder Benutzername und erklärt, dass bei Discord-Konten der Discord-Benutzername gilt (nicht Server-Nickname oder Anzeigename), und zwar der von der ersten Anmeldung (Keycloak-Theme, REQ-SEC-082).

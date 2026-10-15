@@ -375,6 +375,7 @@ public class AdminAuditLogPageController {
                   "EXCHANGE_BULK_UNDO_STARTED",
                   "EXCHANGE_BULK_UNDO_FINISHED",
                   "EXCHANGE_CONNECTIONS_PURGED",
+                  "EXCHANGE_NAME_WITHHOLDING_CHANGED",
                   "CONNECTED_APPS_AUDIT_EXPORTED",
                   "CONNECTED_APPS_AUDIT_PURGED")),
           Map.entry(

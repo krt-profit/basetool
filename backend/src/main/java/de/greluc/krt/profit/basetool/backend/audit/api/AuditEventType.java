@@ -746,6 +746,9 @@ public enum AuditEventType {
    */
   EXCHANGE_CONNECTIONS_PURGED(AuditDomain.CONNECTED_APPS),
 
+  /** A member turned the withholding of their name from connected applications on or off. */
+  EXCHANGE_NAME_WITHHOLDING_CHANGED(AuditDomain.CONNECTED_APPS),
+
   /** The connected-applications audit log was exported as a PDF or JSON for a period. */
   CONNECTED_APPS_AUDIT_EXPORTED(AuditDomain.CONNECTED_APPS),
 

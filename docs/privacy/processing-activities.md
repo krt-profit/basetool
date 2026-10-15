@@ -1,6 +1,6 @@
 # Record of processing activities (Art. 30 GDPR)
 
-> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-10-02.
+> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-10-15.
 
 Art. 30 GDPR requires a controller to maintain a record of its processing activities. The small-
 organisation exemption in **Art. 30(5) does not apply**: it is available only where processing is
@@ -213,17 +213,27 @@ requires it and duplicating it into further files spreads personal data for no g
   `EXCHANGE_INSTALLATION_CONNECTED` and `EXCHANGE_BULK_UNDO_APPLIED`; transient entries (idempotency
   results 24 h, a staged mass change 30 min, the Redis revocation and deny-list mirror 90 days); in
   Keycloak the member's consent per client and the client's offline session. The account check
-  compares a sent RSI handle with the stored one and keeps neither (REQ-XCH-031).
+  compares a sent RSI handle with the stored one and keeps neither (REQ-XCH-031). The member's
+  choice to withhold their name from connected applications (off by default, set on the profile,
+  audited as `EXCHANGE_NAME_WITHHOLDING_CHANGED`; REQ-XCH-044).
 - **Disclosed to the client:** only the member's own data within the capabilities the member
   consented to, the anonymised org demand, the member's direct org units and the org unit of each
-  of the member's ships (name, shorthand, kind) and catalogue data — never the e-mail address, the
-  display name or another member's data (REQ-XCH-009, REQ-XCH-017, REQ-XCH-018, REQ-XCH-048).
+  of the member's ships (name, shorthand, kind) and catalogue data — never the e-mail address
+  (REQ-XCH-009, REQ-XCH-017, REQ-XCH-018, REQ-XCH-048). The one exception for other members' data
+  is the shared stock of a unit (ADR-0257, REQ-XCH-042…045; planned — until it ships no client
+  receives another member's data): a client approved for its details
+  shows a Logistician or leader of that unit the name as the web shows it, a per-client pseudonym
+  and the note of each member's shared entries in that unit, and the unit's member roster. A member
+  who withholds their name is left out of both; their entries stay, without name, pseudonym or
+  note. The privacy notice („Verbundene Anwendungen") names this and the setting; the legal basis
+  is Art. 6(1)(f), coordinating the shared stock, and the setting is the member's objection.
 - **Legal basis:** Art. 6(1)(b) for the transfer the member asked for and the connection records;
   Art. 6(1)(f) for the journal and the audit attribution (detecting misuse, undoing it). The
   Keycloak consent is an OAuth authorisation of the client, not a consent under Art. 6(1)(a) (owner
   decision 2026-09-28).
 - **Where:** `exchange_installation`, `exchange_client_revocation`, `exchange_change`,
-  `exchange_journal`, `exchange_ship_link`, `exchange_bulk_undo_run` / `exchange_bulk_undo_skip`;
+  `exchange_journal`, `exchange_ship_link`, `exchange_bulk_undo_run` / `exchange_bulk_undo_skip`,
+  `exchange_name_withholding`;
   Redis `exchange:*` and `ingest:xch:*`; the Keycloak realm.
 - **Retention:** a connected installation for as long as it stays connected; a **disconnected
   installation with its label 90 days after the disconnection**, and a **client revocation 90 days
@@ -231,8 +241,8 @@ requires it and duplicating it into further files spreads personal data for no g
   each run is audited in „Verbundene Anwendungen" as counts only); a ship link until its
   ship is deleted, at the latest with the account; the change sequence, the journal and the
   bulk-undo runs 90 days. Every member row goes with the account (`ON DELETE CASCADE`,
-  REQ-DATA-008); a bulk-undo run keeps its counts with `requested_by` nulled. All six are in the
-  Art. 15 export (REQ-SEC-058).
+  REQ-DATA-008); a bulk-undo run keeps its counts with `requested_by` nulled. The name withholding
+  is kept for as long as the account exists. All seven are in the Art. 15 export (REQ-SEC-058).
 - **After the transfer:** the client runs on the member's device and is not operated by the
   controller; what it does with the data is governed by its provider's privacy statement, which the
   approval requires (REQ-XCH-002). See [Recipients](#recipients).

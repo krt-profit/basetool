@@ -28,6 +28,8 @@ import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientStatu
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeSettingsUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeUndoRequestDto;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.NameWithholdingRequest;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.NameWithholdingResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
 import java.time.Instant;
 import java.util.List;
@@ -72,6 +74,20 @@ class ExchangeBackendClientTest {
     backend.expect("GET", "/api/v1/connected-apps/admin/clients/" + ID);
     backend.expect("GET", "/api/v1/connected-apps/admin/clients/usage");
     backend.expect("GET", "/api/v1/connected-apps/admin/settings");
+  }
+
+  @Test
+  void nameWithholding() {
+    backend.answerJson("{\"withholdName\":false,\"version\":0}");
+    backend.answerJson("{\"withholdName\":true,\"version\":1}");
+
+    assertThat(client.nameWithholding()).isEqualTo(new NameWithholdingResponse(false, 0L));
+    assertThat(client.updateNameWithholding(new NameWithholdingRequest(true, 0L)))
+        .isEqualTo(new NameWithholdingResponse(true, 1L));
+
+    backend.expect("GET", "/api/v1/connected-apps/name-withholding");
+    backend.expect(
+        "PUT", "/api/v1/connected-apps/name-withholding", "{\"withholdName\":true,\"version\":0}");
   }
 
   @Test

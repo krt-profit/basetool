@@ -208,6 +208,15 @@
     } ],
     "truncated" : false
   }, {
+    "key" : "connectedAppsNameWithholding",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "withhold_name" : true,
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
     "key" : "personalInventory",
     "legalBasis" : "ART_15_20",
     "rows" : [ {

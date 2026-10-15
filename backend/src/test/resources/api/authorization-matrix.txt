@@ -117,6 +117,8 @@ DELETE /api/v1/connected-apps/installations/{installationId} | ConnectedAppsCont
 POST /api/v1/connected-apps/installations/{installationId}/seen | ConnectedAppsController#markSeen | pre=@connectedAppsGate.isMemberSession(authentication) | url=anyRequest -> authenticated
 POST /api/v1/connected-apps/mass-changes/confirm | ConnectedAppsController#confirmMassChange | pre=@connectedAppsGate.isMemberSession(authentication) | url=anyRequest -> authenticated
 POST /api/v1/connected-apps/mass-changes/preview | ConnectedAppsController#previewMassChange | pre=@connectedAppsGate.isMemberSession(authentication) | url=anyRequest -> authenticated
+GET /api/v1/connected-apps/name-withholding | ExchangeNameWithholdingController#getNameWithholding | pre=@connectedAppsGate.isMemberSession(authentication) | url=anyRequest -> authenticated
+PUT /api/v1/connected-apps/name-withholding | ExchangeNameWithholdingController#updateNameWithholding | pre=@connectedAppsGate.isMemberSession(authentication) | url=anyRequest -> authenticated
 DELETE /api/v1/connected-apps/{clientId} | ConnectedAppsController#disconnectClient | pre=@connectedAppsGate.isMemberSession(authentication) | url=anyRequest -> authenticated
 POST /api/v1/connected-apps/{clientId}/undo | ConnectedAppsController#undo | pre=@connectedAppsGate.isMemberSession(authentication) | url=anyRequest -> authenticated
 GET /api/v1/exchange/catalog/locations | ExchangeCatalogController#locations | pre=@exchangeGate.allowsAny(authentication) | url=anyRequest -> authenticated

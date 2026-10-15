@@ -54,6 +54,7 @@ public class ExchangeUserReassignment extends OwnedRowsReassignment {
             "exchange_change.user_id",
             "exchange_journal.user_id",
             "exchange_bulk_undo_run.requested_by",
-            "exchange_bulk_undo_skip.user_id"));
+            "exchange_bulk_undo_skip.user_id",
+            "exchange_name_withholding.user_id"));
   }
 }

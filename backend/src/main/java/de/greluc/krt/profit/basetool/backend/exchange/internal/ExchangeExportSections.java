@@ -106,6 +106,15 @@ public class ExchangeExportSections implements PersonalDataExportSection {
             """
             SELECT client_id, external_id, ship_id, created_at
             FROM exchange_ship_link WHERE user_id = :userId ORDER BY created_at
+            """),
+        new Section(
+            175,
+            "connectedAppsNameWithholding",
+            ART_15_20,
+            "Chosen by the member on the profile page.",
+            """
+            SELECT withhold_name, created_at, updated_at
+            FROM exchange_name_withholding WHERE user_id = :userId
             """));
   }
 }

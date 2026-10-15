@@ -103,6 +103,16 @@ function initProfile() {
                 return { shareBlueprintsGlobally: checkbox ? checkbox.checked : false, version };
             },
         },
+        {
+            formId: 'profile-name-withholding-form',
+            ownVersion: true,
+            payload(form, version) {
+                const checkbox = /** @type {HTMLInputElement | null} */ (
+                    form.querySelector('input[name="withholdName"]')
+                );
+                return { withholdName: checkbox ? checkbox.checked : false, version };
+            },
+        },
     ];
 
     const settings = document.getElementById('profile-settings');

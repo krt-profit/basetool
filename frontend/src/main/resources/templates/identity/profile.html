@@ -51,6 +51,7 @@
                     <li><a href="#profile-section-rsi" th:text="#{profile.rsiHandle.label}">RSI-Handle</a></li>
                     <li><a href="#profile-section-payout" th:text="#{profile.section.payout}">Auszahlung</a></li>
                     <li><a href="#profile-section-blueprints" th:text="#{profile.section.blueprints}">Blaupausen</a></li>
+                    <li><a href="#profile-section-name-withholding" th:text="#{profile.nameWithholding.label}">Verbundene Anwendungen</a></li>
                     <li><a href="#profile-notifications-card" th:text="#{profile.notifications.title}">Benachrichtigungen</a></li>
                     <li><a href="#profile-security-card" th:text="#{profile.security.title}">Zugang &amp; Sicherheit</a></li>
                     <li><a href="#profile-export-card" th:text="#{profile.section.export}">Datenexport</a></li>
@@ -143,6 +144,24 @@
                             </div>
                             <noscript>
                                 <button type="submit" class="btn btn-ghost btn-xs" th:text="#{profile.blueprintSharing.save}">Save</button>
+                            </noscript>
+                        </fieldset>
+                    </form>
+
+                    <form id="profile-name-withholding-form" th:action="@{/profile/name-withholding}" method="post" th:object="${profileNameWithholdingForm}"
+                          th:data-section-name="#{profile.nameWithholding.label}">
+                        <input type="hidden" name="version" th:field="*{version}">
+                        <fieldset class="form-section" id="profile-section-name-withholding">
+                            <legend class="form-section__head" th:text="'5 · ' + #{profile.nameWithholding.label}">5 · Verbundene Anwendungen</legend>
+                            <div class="check-row">
+                                <input type="checkbox" id="withholdName" th:field="*{withholdName}" data-testid="profile-name-withholding-toggle" />
+                                <div>
+                                    <label for="withholdName" th:text="#{profile.nameWithholding.toggle}">Meinen Namen nicht an verbundene Anwendungen weitergeben</label>
+                                    <p class="form-hint" th:text="#{profile.nameWithholding.hint}">Ist das aus, sehen Logistiker und Leitungen deiner Einheiten deinen Namen an euren gemeinsamen Lagereinträgen.</p>
+                                </div>
+                            </div>
+                            <noscript>
+                                <button type="submit" class="btn btn-ghost btn-xs" th:text="#{profile.nameWithholding.save}">Save</button>
                             </noscript>
                         </fieldset>
                     </form>

@@ -19,6 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.web;
 
+import de.greluc.krt.profit.basetool.frontend.exchange.client.ExchangeBackendClient;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.NameWithholdingRequest;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.NameWithholdingResponse;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ProfileNameWithholdingForm;
 import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.identity.model.AdminDeletionRequestDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.MyBlueprintSharingRequest;
@@ -70,7 +74,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
  * Controller of the user profile page ({@code /profile}) and its editable fields: description,
- * display name, default payout preference and blueprint sharing.
+ * display name, default payout preference, blueprint sharing and the name withholding from
+ * connected applications.
  *
  * <p>Renders from token claims overlaid with {@code /api/v1/users/me}, and still renders from the
  * token alone when the backend is unreachable.
@@ -87,6 +92,9 @@ public class ProfileController {
 
   /** Reads the member's notification preferences for the profile card. */
   private final NotificationBackendClient notificationClient;
+
+  /** Reads and writes the member's name withholding from connected applications. */
+  private final ExchangeBackendClient exchangeClient;
 
   private final MessageSource messageSource;
 
@@ -168,6 +176,18 @@ public class ProfileController {
     }
     model.addAttribute("shareBlueprintsGlobally", shareBlueprintsGlobally);
 
+    boolean withholdName = false;
+    long withholdingVersion = 0L;
+    try {
+      NameWithholdingResponse withholding = exchangeClient.nameWithholding();
+      if (withholding != null) {
+        withholdName = withholding.withholdName();
+        withholdingVersion = withholding.version();
+      }
+    } catch (Exception e) {
+      log.debug("Could not load the name withholding; defaulting the toggle to off", e);
+    }
+
     String rsiHandle = null;
     try {
       MyRsiHandleResponse handle = identityClient.myRsiHandle();
@@ -216,6 +236,12 @@ public class ProfileController {
       model.addAttribute(
           "profileBlueprintSharingForm",
           new ProfileBlueprintSharingForm(shareBlueprintsGlobally, sharingVersion));
+    }
+
+    if (!model.containsAttribute("profileNameWithholdingForm")) {
+      model.addAttribute(
+          "profileNameWithholdingForm",
+          new ProfileNameWithholdingForm(withholdName, withholdingVersion));
     }
 
     if (!model.containsAttribute("profileRsiHandleForm")) {
@@ -517,6 +543,48 @@ public class ProfileController {
     body.put("version", ownVersion(saved == null ? null : saved.version(), form.version()));
     body.put("shareBlueprintsGlobally", form.shareBlueprintsGlobally());
     return ResponseEntity.ok(body);
+  }
+
+  /**
+   * Handles the name-withholding toggle form post (REQ-XCH-044); a {@code concurrency-conflict} 409
+   * shows the optimistic-lock toast.
+   *
+   * @param form validated toggle payload
+   * @param bindingResult validation errors carrier
+   * @param model model used when re-rendering inline
+   * @param principal authenticated OIDC user
+   * @param redirectAttributes flash attributes carrier for the result toast
+   * @return the inline {@code profile} view on validation failure, otherwise a redirect to {@code
+   *     /profile}
+   */
+  @NotNull
+  @PostMapping("/profile/name-withholding")
+  public String updateNameWithholding(
+      @Valid @ModelAttribute("profileNameWithholdingForm") ProfileNameWithholdingForm form,
+      BindingResult bindingResult,
+      Model model,
+      @AuthenticationPrincipal OidcUser principal,
+      RedirectAttributes redirectAttributes) {
+    if (bindingResult.hasErrors()) {
+      return profile(model, principal);
+    }
+    try {
+      exchangeClient.updateNameWithholding(
+          new NameWithholdingRequest(
+              form.withholdName(), form.version() == null ? 0L : form.version()));
+      redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
+    } catch (BackendServiceException e) {
+      log.debug("Name-withholding update failed", e);
+      if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
+        redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
+      } else {
+        redirectAttributes.addFlashAttribute("errorToast", "error.profile.update.failed");
+      }
+    } catch (Exception e) {
+      log.error("Name-withholding update failed", e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.profile.update.failed");
+    }
+    return "redirect:/profile";
   }
 
   /**
