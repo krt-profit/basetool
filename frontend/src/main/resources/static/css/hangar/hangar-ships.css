@@ -13,6 +13,31 @@
     .hangar-row__name {
         min-width: 0;
     }
+    .hangar-row__ship {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        min-width: 0;
+    }
+    .hangar-row__pick {
+        display: inline-flex;
+        flex: 0 0 var(--touch-target-dense);
+        align-items: center;
+        justify-content: center;
+        min-height: var(--touch-target-dense);
+    }
+    .hangar-table tbody tr:has(.hangar-ship-check:checked) {
+        background-color: var(--control-selected-bg);
+    }
+    .hangar-selection-bar .form-actions__summary strong {
+        font-variant-numeric: tabular-nums;
+    }
+    .hangar-selection-bar[hidden] {
+        display: none;
+    }
+    .ship-unit-bulk-message {
+        margin: 0 0 var(--space-4);
+    }
     .hangar-table .hangar-row__loc {
         display: none;
     }

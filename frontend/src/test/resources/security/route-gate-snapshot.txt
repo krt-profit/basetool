@@ -63,7 +63,9 @@
 /admin/members/{userId}/export/pdf GET -> DataExportProxyController#adminPdf gate=method:hasRole('ADMIN') layout=no
 /admin/members/{userId}/hangar GET -> MemberHangarPageController#viewMemberHangar gate=class:hasRole('ADMIN') layout=yes
 /admin/members/{userId}/hangar/add POST headers=[X-Requested-With=XMLHttpRequest] -> MemberHangarShipProxyController#addShip gate=class:hasRole('ADMIN') layout=no
+/admin/members/{userId}/hangar/bulk-org-unit POST headers=[X-Requested-With=XMLHttpRequest] -> MemberHangarShipProxyController#bulkChangeShipOrgUnit gate=class:hasRole('ADMIN') layout=no
 /admin/members/{userId}/hangar/{shipId}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> MemberHangarShipProxyController#deleteShip gate=class:hasRole('ADMIN') layout=no
+/admin/members/{userId}/hangar/{shipId}/org-unit POST headers=[X-Requested-With=XMLHttpRequest] -> MemberHangarShipProxyController#changeShipOrgUnit gate=class:hasRole('ADMIN') layout=no
 /admin/members/{userId}/hangar/{shipId}/update POST headers=[X-Requested-With=XMLHttpRequest] -> MemberHangarShipProxyController#updateShip gate=class:hasRole('ADMIN') layout=no
 /admin/mission-data GET -> AdminMissionDataPageController#listData gate=class:hasRole('ADMIN') layout=yes
 /admin/mission-data/frequency-types POST -> AdminMissionDataPageController#createFrequencyType gate=class:hasRole('ADMIN') layout=yes

@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
@@ -52,6 +53,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -77,6 +79,9 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class HangarService {
+
+  /** The {@code changeCode} of an admin's notice that a ship moved to another org unit. */
+  private static final String ORG_UNIT_CHANGED = "ORG_UNIT_CHANGED";
 
   private final ShipRepository shipRepository;
   private final UserRepository userRepository;
@@ -363,11 +368,56 @@ public class HangarService {
       @NotNull UUID shipId,
       @Nullable UUID orgUnitId,
       long owningOrgUnitVersion) {
+    return moveShip(userId, shipId, orgUnitId, owningOrgUnitVersion).ship();
+  }
+
+  /**
+   * Changes the owning org unit of a member's ship on an admin's behalf to one of the member's
+   * direct memberships or none, and tells the member when it moved (REQ-HANGAR-012). Same rules as
+   * {@link #changeShipOrgUnit}.
+   *
+   * @param memberId the ship's owner
+   * @param shipId ship primary key
+   * @param orgUnitId the new org unit, or {@code null} for none
+   * @param owningOrgUnitVersion the unit counter the admin last saw
+   * @return the ship as it is after the change
+   * @throws NotFoundException when the ship does not exist
+   * @throws AccessDeniedException when the ship belongs to another member
+   * @throws BadRequestException when the target is not a direct membership of the member
+   * @throws ObjectOptimisticLockingFailureException when the unit counter is stale
+   */
+  @Transactional
+  public Ship changeShipOrgUnitByAdmin(
+      @NotNull UUID memberId,
+      @NotNull UUID shipId,
+      @Nullable UUID orgUnitId,
+      long owningOrgUnitVersion) {
+    ShipMove move = moveShip(memberId, shipId, orgUnitId, owningOrgUnitVersion);
+    if (move.moved()) {
+      announceByAdmin(memberId, ORG_UNIT_CHANGED, move.ship());
+    }
+    return move.ship();
+  }
+
+  /**
+   * Moves one ship of {@code userId} to the target unit behind its unit counter and audits it.
+   *
+   * @param userId the ship's owner
+   * @param shipId ship primary key
+   * @param orgUnitId the new org unit, or {@code null} for none
+   * @param owningOrgUnitVersion the unit counter the caller last saw
+   * @return the ship after the change and whether it moved
+   */
+  private @NotNull ShipMove moveShip(
+      @NotNull UUID userId,
+      @NotNull UUID shipId,
+      @Nullable UUID orgUnitId,
+      long owningOrgUnitVersion) {
     Ship ship = Entities.require(shipRepository.findById(shipId), "Ship not found");
     requireOwner(ship, userId);
     OrgUnit current = ship.getOwningOrgUnit();
     if (Objects.equals(current == null ? null : current.getId(), orgUnitId)) {
-      return ship;
+      return new ShipMove(ship, false);
     }
     OrgUnit target = ownerScopeService.resolveOwnerMembershipTarget(ship.getOwner(), orgUnitId);
     String from = orgUnitRef(current);
@@ -382,7 +432,7 @@ public class HangarService {
         shipTypeName,
         userId,
         AuditDetails.of("from", from).with("to", orgUnitRef(target)));
-    return Entities.require(shipRepository.findById(shipId), "Ship not found");
+    return new ShipMove(Entities.require(shipRepository.findById(shipId), "Ship not found"), true);
   }
 
   /**
@@ -403,6 +453,47 @@ public class HangarService {
   @Transactional
   public @NotNull ShipBulkOrgUnitResultDto bulkChangeShipOrgUnit(
       @NotNull UUID userId, @NotNull List<UUID> shipIds, @Nullable UUID orgUnitId) {
+    return moveShips(userId, shipIds, orgUnitId).result();
+  }
+
+  /**
+   * Changes the owning org unit of a selection of a member's ships on an admin's behalf to one of
+   * the member's direct memberships or none, with the rules of {@link #bulkChangeShipOrgUnit}
+   * (REQ-HANGAR-012). The member hears one notice: about the ship when one moved, a summary with
+   * the count when several did, nothing when none did.
+   *
+   * @param memberId the ships' owner
+   * @param shipIds the selected ships
+   * @param orgUnitId the new org unit, or {@code null} for none
+   * @return how many ships moved and how many were skipped
+   * @throws NotFoundException when a selected ship does not exist
+   * @throws AccessDeniedException when a selected ship belongs to another member
+   * @throws BadRequestException when the target is not a direct membership of the member
+   */
+  @Transactional
+  public @NotNull ShipBulkOrgUnitResultDto bulkChangeShipOrgUnitByAdmin(
+      @NotNull UUID memberId, @NotNull List<UUID> shipIds, @Nullable UUID orgUnitId) {
+    BulkMove move = moveShips(memberId, shipIds, orgUnitId);
+    int moved = move.movedShips().size();
+    if (moved == 1) {
+      announceByAdmin(memberId, ORG_UNIT_CHANGED, move.movedShips().getFirst());
+    } else if (moved > 1) {
+      tellMember(memberId, actor -> HangarNotices.shipsOrgUnitChanged(memberId, moved, actor));
+    }
+    return move.result();
+  }
+
+  /**
+   * Moves the selected ships of {@code userId} to the target unit under sorted row locks and
+   * records one summary event when anything moved.
+   *
+   * @param userId the ships' owner
+   * @param shipIds the selected ships
+   * @param orgUnitId the new org unit, or {@code null} for none
+   * @return the ships that moved and the counts
+   */
+  private @NotNull BulkMove moveShips(
+      @NotNull UUID userId, @NotNull List<UUID> shipIds, @Nullable UUID orgUnitId) {
     List<UUID> distinctIds = shipIds.stream().distinct().toList();
     List<Ship> ships = shipRepository.lockAllByIdOrderById(distinctIds);
     if (ships.size() != distinctIds.size()) {
@@ -415,7 +506,7 @@ public class HangarService {
             .toList();
     int skipped = ships.size() - moving.size();
     if (moving.isEmpty()) {
-      return new ShipBulkOrgUnitResultDto(0, skipped);
+      return new BulkMove(List.of(), new ShipBulkOrgUnitResultDto(0, skipped));
     }
     OrgUnit target =
         ownerScopeService.resolveOwnerMembershipTarget(moving.getFirst().getOwner(), orgUnitId);
@@ -439,8 +530,25 @@ public class HangarService {
             .with("skipped", skipped)
             .with("from", from)
             .with("to", orgUnitRef(target)));
-    return new ShipBulkOrgUnitResultDto(moving.size(), skipped);
+    return new BulkMove(moving, new ShipBulkOrgUnitResultDto(moving.size(), skipped));
   }
+
+  /**
+   * The outcome of a single unit change.
+   *
+   * @param ship the ship as it is after the change
+   * @param moved whether its unit changed
+   */
+  private record ShipMove(@NotNull Ship ship, boolean moved) {}
+
+  /**
+   * The outcome of a bulk unit change.
+   *
+   * @param movedShips the ships whose unit changed
+   * @param result the changed and skipped counts
+   */
+  private record BulkMove(
+      @NotNull List<Ship> movedShips, @NotNull ShipBulkOrgUnitResultDto result) {}
 
   /**
    * Reads an org unit's id without initialising a lazy reference.
@@ -609,16 +717,27 @@ public class HangarService {
   }
 
   private void announceByAdmin(UUID memberId, String changeCode, Ship ship) {
+    tellMember(
+        memberId,
+        actor ->
+            HangarNotices.hangarChanged(
+                memberId,
+                changeCode,
+                ship.getShipType() == null ? ActorRef.UNKNOWN_NAME : ship.getShipType().getName(),
+                actor));
+  }
+
+  /**
+   * Publishes a notice to a member about an admin's change, unless the admin is that member.
+   *
+   * @param memberId the member the change concerns
+   * @param notice builds the notice from the acting admin
+   */
+  private void tellMember(@NotNull UUID memberId, @NotNull Function<ActorRef, NoticeEvent> notice) {
     ActorRef actor = userService.currentActor();
-    if (memberId.equals(actor.id())) {
-      return;
+    if (!memberId.equals(actor.id())) {
+      eventPublisher.publishEvent(notice.apply(actor));
     }
-    eventPublisher.publishEvent(
-        HangarNotices.hangarChanged(
-            memberId,
-            changeCode,
-            ship.getShipType() == null ? ActorRef.UNKNOWN_NAME : ship.getShipType().getName(),
-            actor));
   }
 
   /**

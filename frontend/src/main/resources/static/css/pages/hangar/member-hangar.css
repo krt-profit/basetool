@@ -1,7 +1,8 @@
 @layer base, components, page, utilities;
 
 @layer page {
-    #member-ship-modal [hidden] {
+    #member-ship-modal [hidden],
+    #member-ship-unit-modal [hidden] {
         display: none;
     }
     #member-ship-modal .btn {

@@ -37,8 +37,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * An admin opens a member's hangar from the member edit page and adds, edits and deletes a ship
- * there, each in place (REQ-HANGAR-011, REQ-FE-001).
+ * An admin opens a member's hangar from the member edit page, adds, edits and deletes a ship there
+ * and changes the unit of one and of several ships, each in place (REQ-HANGAR-011, REQ-HANGAR-012,
+ * REQ-FE-001).
  */
 @Tag("e2e")
 class MemberHangarE2eTest {
@@ -101,17 +102,7 @@ class MemberHangarE2eTest {
         String name = "Admin Kept " + suffix;
         String renamed = "Admin Renamed " + suffix;
 
-        page.getByTestId("member-hangar-add").click();
-        page.getByTestId("member-hangar-type")
-            .selectOption(new SelectOption().setLabel("E2E Ship Type"));
-        page.getByTestId("member-hangar-name").fill(name);
-        page.getByTestId("segment-insuranceKind-lti").click();
-        Locator owner = page.locator("#member-ship-owner-picker-slot select");
-        if (owner.count() > 0 && owner.isVisible()) {
-          owner.selectOption(new SelectOption().setIndex(owner.inputValue().isEmpty() ? 1 : 0));
-        }
-        submit(page, "/hangar/add");
-        assertThat(row(page, name)).isVisible();
+        addShip(page, name);
 
         row(page, name).getByTestId("member-hangar-edit").click();
         page.getByTestId("member-hangar-name").fill(renamed);
@@ -134,6 +125,115 @@ class MemberHangarE2eTest {
         E2eSupport.dump(page, "member-hangar");
         throw failure;
       }
+    }
+  }
+
+  /**
+   * The admin moves one ship of the member with the row action and then two ships with the
+   * selection bar; the unit column follows each change without a reload (REQ-HANGAR-012).
+   */
+  @Test
+  void changesTheUnitOfOneAndOfSeveralShipsInPlace() {
+    String baseUrl = STACK.baseUrl();
+    Path storageState = E2eSupport.authenticatedStorageState(browser, baseUrl, USERNAME, PASSWORD);
+    try (BrowserContext context =
+        browser.newContext(
+            new Browser.NewContextOptions()
+                .setIgnoreHTTPSErrors(true)
+                .setStorageStatePath(storageState))) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.navigate(page, baseUrl + "/admin/members/" + memberId + "/hangar");
+        hideFooter(page);
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        String first = "Admin Unit A " + suffix;
+        String second = "Admin Unit B " + suffix;
+        addShip(page, first);
+        addShip(page, second);
+        page.evaluate("window.__krtNoReload = true;");
+
+        row(page, first).getByTestId("member-hangar-change-unit").click();
+        boolean assigned = applyOtherUnit(page, "/org-unit");
+        assertUnit(page, first, assigned);
+
+        Locator bar = page.getByTestId("member-hangar-selection-bar");
+        assertThat(bar).isHidden();
+        row(page, first).getByTestId("member-hangar-check").check();
+        row(page, second).getByTestId("member-hangar-check").check();
+        assertThat(bar).isVisible();
+        assertThat(page.locator("#member-hangar-selection-count")).hasText("2");
+        page.getByTestId("member-hangar-bulk-unit-open").click();
+        assertThat(page.getByTestId("member-hangar-unit-bulk-message")).isVisible();
+        boolean bulkAssigned = applyOtherUnit(page, "/bulk-org-unit");
+        assertThat(bar).isHidden();
+        assertUnit(page, first, bulkAssigned);
+        assertUnit(page, second, bulkAssigned);
+
+        assertEquals(
+            Boolean.TRUE,
+            page.evaluate("window.__krtNoReload === true"),
+            "the member hangar unit changes must not reload the page");
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "member-hangar-unit");
+        throw failure;
+      }
+    }
+  }
+
+  /**
+   * Adds a ship of the seeded type with a name through the member's ship dialog.
+   *
+   * @param page the member hangar page
+   * @param name the ship's name
+   */
+  private static void addShip(Page page, String name) {
+    page.getByTestId("member-hangar-add").click();
+    page.getByTestId("member-hangar-type")
+        .selectOption(new SelectOption().setLabel("E2E Ship Type"));
+    page.getByTestId("member-hangar-name").fill(name);
+    page.getByTestId("segment-insuranceKind-lti").click();
+    Locator owner = page.locator("#member-ship-owner-picker-slot select");
+    if (owner.count() > 0 && owner.isVisible()) {
+      owner.selectOption(new SelectOption().setIndex(owner.inputValue().isEmpty() ? 1 : 0));
+    }
+    submit(page, "/hangar/add");
+    assertThat(row(page, name)).isVisible();
+  }
+
+  /**
+   * Picks the other choice than the unit dialog's preset — „Keine Einheit" for a ship with a unit,
+   * the first unit for one without — and saves.
+   *
+   * @param page the member hangar page
+   * @param urlPart a part of the write's URL
+   * @return whether the ships now have a unit
+   */
+  private static boolean applyOtherUnit(Page page, String urlPart) {
+    Locator select = page.getByTestId("member-hangar-unit-select");
+    boolean assign = select.inputValue().isEmpty();
+    select.selectOption(assign ? new SelectOption().setIndex(1) : new SelectOption().setValue(""));
+    page.waitForResponse(
+        r -> r.url().contains(urlPart) && "POST".equals(r.request().method()),
+        () -> page.getByTestId("member-hangar-unit-submit").click());
+    return assign;
+  }
+
+  /**
+   * Asserts whether a ship's row shows a unit badge.
+   *
+   * @param page the member hangar page
+   * @param name the ship's name
+   * @param assigned whether the ship is expected to have a unit
+   */
+  private static void assertUnit(Page page, String name, boolean assigned) {
+    Locator badge =
+        row(page, name)
+            .getByTestId("member-hangar-unit")
+            .locator(".squadron-badge:not(.squadron-badge-muted)");
+    if (assigned) {
+      assertThat(badge).isVisible();
+    } else {
+      assertThat(badge).isHidden();
     }
   }
 

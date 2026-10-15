@@ -62,7 +62,8 @@
     "hangar": [
       "hangar/hangar-squadron.js",
       "hangar/hangar.js",
-      "hangar/member-hangar.js"
+      "hangar/member-hangar.js",
+      "hangar/ship-unit-change.js"
     ],
     "identity": [
       "identity/admin-deletion-requests.js",

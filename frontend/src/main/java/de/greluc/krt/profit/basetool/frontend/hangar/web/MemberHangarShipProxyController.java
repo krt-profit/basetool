@@ -22,6 +22,9 @@ package de.greluc.krt.profit.basetool.frontend.hangar.web;
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.hangar.client.HangarBackendClient;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOrgUnitRequestDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOrgUnitResultDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipOrgUnitRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipRequestDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import java.util.Map;
@@ -41,9 +44,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Frontend proxy of the admin member hangar's writes (REQ-HANGAR-011): add, edit and delete a ship
- * of one member through the backend's admin hangar paths, each answering {@code 204} for an
- * in-place list swap.
+ * Frontend proxy of the admin member hangar's writes: add, edit and delete a ship of one member
+ * (REQ-HANGAR-011) and change the org unit of one or several of its ships (REQ-HANGAR-012), each
+ * through the backend's admin hangar paths and ending in an in-place list swap.
  */
 @Slf4j
 @RestController
@@ -139,6 +142,58 @@ public class MemberHangarShipProxyController {
         () -> {
           hangarClient.deleteMemberShip(userId, shipId);
           return ResponseEntity.noContent().build();
+        });
+  }
+
+  /**
+   * Changes the owning org unit of the member's ship to one of the member's units or none
+   * (REQ-HANGAR-012).
+   *
+   * @param userId the member
+   * @param shipId the ship
+   * @param request the new org unit, or none, and the last-seen unit counter
+   * @return {@code 204} on success, {@code 422} with code {@code VALIDATION} without a unit
+   *     counter, or the relayed backend {@code problem+json}
+   */
+  @PostMapping(value = "/{shipId}/org-unit", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> changeShipOrgUnit(
+      @PathVariable @NotNull UUID userId,
+      @PathVariable @NotNull UUID shipId,
+      @RequestBody @Nullable ShipOrgUnitRequestDto request) {
+    if (request == null || request.owningOrgUnitVersion() == null) {
+      return validationError();
+    }
+    return relay(
+        log,
+        "change member ship org unit (ajax)",
+        () -> {
+          hangarClient.changeMemberShipOrgUnit(userId, shipId, request);
+          return ResponseEntity.noContent().build();
+        });
+  }
+
+  /**
+   * Changes the owning org unit of a selection of the member's ships (REQ-HANGAR-012).
+   *
+   * @param userId the member
+   * @param request the selected ships and the new org unit, or none
+   * @return {@code 200} with the changed and skipped counts, {@code 422} with code {@code
+   *     VALIDATION} for an empty selection, or the relayed backend {@code problem+json}
+   */
+  @PostMapping(value = "/bulk-org-unit", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> bulkChangeShipOrgUnit(
+      @PathVariable @NotNull UUID userId,
+      @RequestBody @Nullable ShipBulkOrgUnitRequestDto request) {
+    if (request == null || request.shipIds() == null || request.shipIds().isEmpty()) {
+      return validationError();
+    }
+    return relay(
+        log,
+        "bulk change member ship org unit (ajax)",
+        () -> {
+          ShipBulkOrgUnitResultDto result =
+              hangarClient.bulkChangeMemberShipOrgUnit(userId, request);
+          return ResponseEntity.ok(result != null ? result : new ShipBulkOrgUnitResultDto(0, 0));
         });
   }
 

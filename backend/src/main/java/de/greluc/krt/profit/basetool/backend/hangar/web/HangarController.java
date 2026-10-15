@@ -344,6 +344,71 @@ public class HangarController {
     return shipMapper.toDto(hangarService.updateShipByAdmin(userId, shipId, shipRequest));
   }
 
+  /**
+   * Admin-only: changes the owning org unit of a target user's ship to one of that user's direct
+   * memberships or none, and tells the user (REQ-HANGAR-012).
+   *
+   * @param userId the ship's owner
+   * @param shipId ship id
+   * @param request the new org unit and the unit counter the admin last saw
+   * @return the ship as it is after the change
+   */
+  @Operation(
+      summary = "Change the org unit of a member's ship",
+      description =
+          "Moves a member's ship into one of the member's direct org units, or out of every unit."
+              + " Guarded by the ship's owningOrgUnitVersion only; the member is notified.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Ship as it is after the change"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "Target is not a direct membership of the member"),
+    @ApiResponse(responseCode = "403", description = "Not an admin, or ship of another member"),
+    @ApiResponse(responseCode = "409", description = "Stale owningOrgUnitVersion")
+  })
+  @PutMapping("/admin/users/{userId}/ships/{shipId}/org-unit")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
+  @Transactional
+  public ShipDto changeUserShipOrgUnit(
+      @PathVariable @NotNull UUID userId,
+      @PathVariable @NotNull UUID shipId,
+      @RequestBody @Valid @NotNull ShipOrgUnitRequestDto request) {
+    return shipMapper.toDto(
+        hangarService.changeShipOrgUnitByAdmin(
+            userId, shipId, request.orgUnitId(), request.owningOrgUnitVersion()));
+  }
+
+  /**
+   * Admin-only: changes the owning org unit of a selection of a target user's ships in one
+   * transaction, and tells the user once (REQ-HANGAR-012).
+   *
+   * @param userId the ships' owner
+   * @param request the selected ships and the new org unit
+   * @return how many ships moved and how many already were in the target
+   */
+  @Operation(
+      summary = "Change the org unit of several ships of a member",
+      description =
+          "Moves a selection of a member's ships into one of the member's direct org units, or"
+              + " out of every unit. Ships already there are skipped; an unknown ship or one of"
+              + " another member refuses the whole selection. The member is notified once.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Changed and skipped counts"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "Empty or oversized selection, or a target outside the direct memberships"),
+    @ApiResponse(responseCode = "403", description = "Not an admin, or ship of another member"),
+    @ApiResponse(responseCode = "404", description = "A selected ship does not exist")
+  })
+  @PostMapping("/admin/users/{userId}/ships/bulk-org-unit")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
+  public ShipBulkOrgUnitResultDto bulkChangeUserShipsOrgUnit(
+      @PathVariable @NotNull UUID userId,
+      @RequestBody @Valid @NotNull ShipBulkOrgUnitRequestDto request) {
+    return hangarService.bulkChangeShipOrgUnitByAdmin(
+        userId, request.shipIds(), request.orgUnitId());
+  }
+
   /** Admin-only: deletes a target user's ship. */
   @DeleteMapping("/admin/users/{userId}/ships/{shipId}")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)

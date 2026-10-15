@@ -133,6 +133,7 @@ class HangarNoticeIntegrationTest {
   void aFittedResetAndAnAdminsChangesReachTheMemberOnly() {
     creationService.createFromEvent(HangarNotices.fittedReset(OWNER, 3, ACTING));
     creationService.createFromEvent(HangarNotices.hangarChanged(OWNER, "ADDED", "Carrack", ACTING));
+    creationService.createFromEvent(HangarNotices.shipsOrgUnitChanged(OWNER, 4, ACTING));
     creationService.createFromEvent(
         HangarNotices.blueprintsChanged(OWNER, "IMPORTED", "5×", ACTING));
     creationService.createFromEvent(HangarNotices.blueprintsPurged(OWNER, 12, ACTING));
@@ -141,6 +142,7 @@ class HangarNoticeIntegrationTest {
         .containsExactlyInAnyOrder(
             NotificationType.HANGAR_FITTED_RESET,
             NotificationType.HANGAR_CHANGED_BY_ADMIN,
+            NotificationType.HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN,
             NotificationType.BLUEPRINT_CHANGED_BY_ADMIN,
             NotificationType.BLUEPRINT_PURGED_BY_ADMIN);
     assertThat(inbox(ACTOR)).isEmpty();

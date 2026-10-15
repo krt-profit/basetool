@@ -209,6 +209,27 @@ class HangarBackendClientTest {
   }
 
   @Test
+  void memberUnitChangesGoThroughTheAdminPathsOfThatMember() {
+    backend.answerJson("{}");
+    backend.answerJson("{\"changed\":2,\"skipped\":0}");
+
+    client.changeMemberShipOrgUnit(MEMBER, SHIP, new ShipOrgUnitRequestDto(UNIT, 3L));
+    assertThat(
+            client.bulkChangeMemberShipOrgUnit(
+                MEMBER, new ShipBulkOrgUnitRequestDto(List.of(SHIP), null)))
+        .isEqualTo(new ShipBulkOrgUnitResultDto(2, 0));
+
+    backend.expect(
+        "PUT",
+        "/api/v1/hangar/admin/users/" + MEMBER + "/ships/" + SHIP + "/org-unit",
+        "{\"orgUnitId\":\"" + UNIT + "\",\"owningOrgUnitVersion\":3}");
+    backend.expect(
+        "POST",
+        "/api/v1/hangar/admin/users/" + MEMBER + "/ships/bulk-org-unit",
+        "{\"shipIds\":[\"" + SHIP + "\"],\"orgUnitId\":null}");
+  }
+
+  @Test
   void importsStreamTheUploadAsTheFilePart() {
     backend.answerJson(IMPORT_RESULT);
 

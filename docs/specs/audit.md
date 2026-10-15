@@ -202,7 +202,9 @@ web, naming its client (REQ-AUDIT-005):
   (`HANGAR_SHIP_ORG_UNIT_CHANGED`, REQ-HANGAR-009, only when the unit changed; `from` / `to` as
   `kind:id` or `none`, never a name), org-unit change of a selection
   (`HANGAR_SHIPS_BULK_ORG_UNIT_CHANGED`, REQ-HANGAR-010, one summary only when a ship moved; the
-  `changed` / `skipped` counts, the distinct `from` units and `to`, never a name), delete (`HANGAR_SHIP_DELETED`, with the
+  `changed` / `skipped` counts, the distinct `from` units and `to`, never a name) — both also when an
+  admin changes a member's ships (REQ-HANGAR-012: the admin is the actor, the member the target
+  user) —, delete (`HANGAR_SHIP_DELETED`, with the
   number of mission units detached), empty own hangar (`HANGAR_EMPTIED`), import of a hangar or
   Fleetview export (`HANGAR_IMPORTED`, only when it created ships; created / already present /
   unmatched counts), the officer's fitted reset (`HANGAR_FITTED_RESET`, only when it cleared a
