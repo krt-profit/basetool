@@ -1013,10 +1013,16 @@ data is never sent. Detaching a ship from a mission by removal is reported in
 with the external client. A ship's `name` is optional and up to 255 characters, as in the web: an
 unnamed ship is sent without it, and an upsert may leave it out (owner decision 2026-09-27). An
 `upsert` sets the ship as sent: a `name` or `location` it leaves out is cleared, and only an absent
-`fitted` keeps its value. A ship a client creates belongs to the member's only direct org unit, or to
-none when the member has none or several, because a client names no unit; the member assigns it
-later in the web with „Einheit ändern" (REQ-HANGAR-009, ADR-0258; owner decision 2026-09-27,
-`HangarService.addShipForClient`).
+`fitted` keeps its value. An `upsert` may name the ship's org unit as `orgUnit`, one of the member's
+direct memberships of any kind or `null` for none (#2602). A create without it puts the ship in the
+member's only direct org unit, or in none when the member has none or several, and the member can
+assign it later in the web with „Einheit ändern" (REQ-HANGAR-009, ADR-0258; owner decision
+2026-09-27, `HangarService.addShipForClient`). An update without `orgUnit` keeps the stored unit, so
+an older client never clears a unit set in the web; an update that changes it also sends the ship's
+`orgUnitVersion` and goes through the Hangar's unit change, which never moves the ship's `version`;
+naming the stored unit writes nothing, even when the member has since left it. A unit outside the
+member's direct memberships rejects that op with `ORG_UNIT_NOT_ALLOWED`, and a missing or stale
+`orgUnitVersion` with `ORG_UNIT_VERSION_CONFLICT`; the rest of the batch still applies.
 *Corrected 2026-09-27: a member of several units had the whole batch refused with
 `OWNER_ORG_UNIT_REQUIRED`.*
 
@@ -1031,6 +1037,12 @@ later in the web with „Einheit ändern" (REQ-HANGAR-009, ADR-0258; owner decis
 - [x] A ship carries its org unit and `orgUnitVersion`, a ship without one no `orgUnit`; a change
   of a ship's unit, and a rename of a unit, bring its ships into the next delta pull and no other
   ship. *`ExchangeShipControllerTest`, `ExchangeWireContractTest`.*
+- [x] A member of two units creates a ship in the unit the `upsert` names; a create without
+  `orgUnit` is stamped as before; an update without it keeps the stored unit; `"orgUnit": null`
+  with the right counter clears it without moving the ship's `version`, audited
+  `HANGAR_SHIP_ORG_UNIT_CHANGED` with the client; a foreign unit and a stale counter reject only
+  their own op. *`ExchangeShipWriteControllerTest`, `ExchangeShipChangeSetJsonTest`,
+  `ExchangeSchemasTest`.*
 
 The ship feed keys a ship by its id and sends its `version`, the ship type's id as `shipType.bt`,
 insurance as `LTI` or a number of months, and the location when it has one. A ship stored without

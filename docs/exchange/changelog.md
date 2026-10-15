@@ -5,6 +5,13 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
 
 ## 2026-10-15
 
+- **New: an upsert sets a ship's org unit.** An `upsert` in `POST /exchange/v1/me/ships/changes`
+  may carry `orgUnit`, one of the member's units or `null` for none, and with `shipId` the ship's
+  `orgUnitVersion`. Without `orgUnit` nothing changes: a create still gets the member's only unit,
+  an update keeps the ship's. New reasons `ORG_UNIT_NOT_ALLOWED` and `ORG_UNIT_VERSION_CONFLICT`
+  reject only their own op
+  ([ships](resources/ships.md#changing-ships--post-exchangev1meshipschanges)).
+  `change-set.schema.json` gains both fields, optional.
 - **New: a ship's org unit.** A ship in `GET /exchange/v1/me/ships` carries `orgUnit`, its unit's
   `{id, name, shorthand, kind}` (absent when it has none), and `orgUnitVersion`, the unit's own
   counter. A change of the unit, or a rename of it, brings the ship back into the feed

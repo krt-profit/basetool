@@ -39,6 +39,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.StarSystemDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.TerminalDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitChoice;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeShipChangeSet;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.ShipBulkOrgUnitRequestDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.ShipOrgUnitRequestDto;
@@ -314,6 +316,22 @@ class MassAssignmentGuardTest {
                   "the new unit of a selection of the caller's own ships, which"
                       + " OwnerScopeService.resolveOwnerMembershipTarget requires to be a direct"
                       + " membership of the owner (REQ-HANGAR-010)")),
+          Map.entry(
+              ExchangeShipChangeSet.Op.class,
+              Map.of(
+                  "orgUnit",
+                  "the unit a client names for the member's own ship, which"
+                      + " ExchangeShipWriteService requires to be a direct membership of the"
+                      + " member (REQ-XCH-017)",
+                  "orgUnitVersion",
+                  "the unit counter the client last saw, checked by the conditional update"
+                      + " (ADR-0258)")),
+          Map.entry(
+              ExchangeOrgUnitChoice.class,
+              Map.of(
+                  "orgUnitId",
+                  "the id inside an exchange ship upsert's orgUnit, checked against the member's"
+                      + " direct memberships (REQ-XCH-017)")),
           Map.entry(
               OrgChartPositionCreateRequest.class,
               Map.of("orgUnitId", "the unit an ADMIN-edited org-chart position describes")),

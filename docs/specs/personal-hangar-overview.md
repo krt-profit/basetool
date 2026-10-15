@@ -145,7 +145,8 @@ bumps the ship's `version`, and an edit of name, type, insurance, location or fi
 counter, so neither 409s nor overwrites the other. Leaving the unit unchanged writes nothing and
 records nothing, even when the stored unit is one the owner has since left; the dialog then offers
 that unit as the current choice instead of silently clearing it. A change records `HANGAR_SHIP_ORG_UNIT_CHANGED` (REQ-HANGAR-004) with `from` and
-`to` as `kind:id` or `none`, no names.
+`to` as `kind:id` or `none`, no names. A connected application changes the unit under the same
+rules through an `upsert` with `orgUnit` (REQ-XCH-017), audited with its client.
 
 The table swaps in place and the owner's other open hangar pages refresh through the live-sync room
 `hangar:{owner}` (REQ-FE-001/010). After the commit the backend announces the move to the unit-tab

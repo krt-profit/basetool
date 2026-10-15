@@ -66,6 +66,11 @@ public record ExchangeShipChangeSet(
    * @param fitted whether the ship is fitted, or {@code null} to keep it
    * @param override whether an {@code upsert} may bring back a ship removed elsewhere, after asking
    *     the member
+   * @param orgUnit the org unit an {@code upsert} puts the ship in, possibly none; {@code null}
+   *     when the op leaves the field out, which keeps the stored unit or stamps the member's only
+   *     one on create
+   * @param orgUnitVersion the ship's unit counter the client last saw; required to change the unit
+   *     of a ship the server knows
    */
   @Schema(name = "ExchangeShipOp")
   public record Op(
@@ -79,7 +84,17 @@ public record ExchangeShipChangeSet(
       @Nullable @Valid Insurance insurance,
       @Nullable @Valid ExchangeLocationRef location,
       @Nullable Boolean fitted,
-      @Nullable Boolean override) {}
+      @Nullable Boolean override,
+      @Nullable
+          @Valid
+          @Schema(
+              implementation = String.class,
+              nullable = true,
+              minLength = 1,
+              maxLength = 128,
+              description = "The ship's org unit; null for none, absent to keep it")
+          ExchangeOrgUnitChoice orgUnit,
+      @Nullable @Min(0) Long orgUnitVersion) {}
 
   /**
    * A ship's insurance.

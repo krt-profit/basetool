@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +44,20 @@ public class HangarShipCommands implements ShipCommands {
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull Ship addShipForClient(@NotNull UUID member, @NotNull ShipRequestDto ship) {
     return hangarService.addShipForClient(member, ship);
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public @NotNull Ship addShipForClientInOrgUnit(
+      @NotNull UUID member, @NotNull ShipRequestDto ship, @Nullable UUID orgUnitId) {
+    return hangarService.addShipForClientInOrgUnit(member, ship, orgUnitId);
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public @NotNull Ship changeShipOrgUnit(
+      @NotNull UUID member, @NotNull UUID shipId, @Nullable UUID orgUnitId, long orgUnitVersion) {
+    return hangarService.changeShipOrgUnit(member, shipId, orgUnitId, orgUnitVersion);
   }
 
   @Override

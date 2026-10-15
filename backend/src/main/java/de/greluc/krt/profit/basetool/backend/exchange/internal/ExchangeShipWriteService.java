@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemExcepti
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeCatalogKind;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemRef;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitChoice;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveRequest;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeShipChangeSet;
@@ -32,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.hangar.api.ShipCommands;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -92,6 +94,12 @@ public class ExchangeShipWriteService {
   /** The refusal of bringing back a ship removed by another channel or installation. */
   static final String REMOVED_ELSEWHERE = "REMOVED_ELSEWHERE";
 
+  /** The refusal of an org unit that is not one of the member's direct memberships. */
+  static final String ORG_UNIT_NOT_ALLOWED = "ORG_UNIT_NOT_ALLOWED";
+
+  /** The refusal of a unit counter the ship no longer has. */
+  static final String ORG_UNIT_VERSION_CONFLICT = "ORG_UNIT_VERSION_CONFLICT";
+
   private final ExchangeResolveService resolveService;
   private final ExchangeLocationResolver locationResolver;
   private final ShipRepository shipRepository;
@@ -102,6 +110,7 @@ public class ExchangeShipWriteService {
   private final ExchangeMassChangeGuard guard;
   private final MeterRegistry meterRegistry;
   private final ExchangeLiveSync liveSync;
+  private final OrgUnitMembershipQueryService membershipQueryService;
 
   /**
    * Plans and applies one change set in one transaction.
@@ -205,6 +214,10 @@ public class ExchangeShipWriteService {
     Map<Integer, ShipTypeMatch> types = resolveTypes(ops);
     Links links = new Links(caller);
     Set<UUID> touched = new HashSet<>();
+    Set<UUID> memberships =
+        ops.stream().anyMatch(op -> op.orgUnit() != null)
+            ? membershipQueryService.findDirectMembershipOrgUnitIds(caller.member())
+            : Set.of();
     List<Planned> plan = new ArrayList<>();
     for (int i = 0; i < ops.size(); i++) {
       ExchangeShipChangeSet.Op op = ops.get(i);
@@ -212,7 +225,8 @@ public class ExchangeShipWriteService {
           switch (op.op()) {
             case ExchangeShipChangeSet.LINK -> planLink(caller, op, links, touched);
             case ExchangeShipChangeSet.UPSERT ->
-                planUpsert(caller, op, Objects.requireNonNull(types.get(i)), links, touched);
+                planUpsert(
+                    caller, op, Objects.requireNonNull(types.get(i)), links, touched, memberships);
             case ExchangeShipChangeSet.REMOVE -> planRemove(caller, op, touched);
             default -> throw new IllegalArgumentException("Unknown ship operation: " + op.op());
           };
@@ -260,6 +274,7 @@ public class ExchangeShipWriteService {
    * @param type the resolved ship type, or the result that ends the op
    * @param links the installation's links as the earlier ops leave them
    * @param touched the ships the earlier ops change
+   * @param memberships the member's direct org-unit memberships, empty when no op names a unit
    * @return the plan
    */
   private @NotNull Planned planUpsert(
@@ -267,7 +282,8 @@ public class ExchangeShipWriteService {
       @NotNull ExchangeShipChangeSet.Op op,
       @NotNull ShipTypeMatch type,
       @NotNull Links links,
-      @NotNull Set<UUID> touched) {
+      @NotNull Set<UUID> touched,
+      @NotNull Set<UUID> memberships) {
     String externalId = require(op.externalId(), "externalId");
     String insurance = insurance(require(op.insurance(), "insurance"));
     if (type.result() != null) {
@@ -281,7 +297,11 @@ public class ExchangeShipWriteService {
       }
       locationId = location.get().getId();
     }
+    UnitTarget unit = unitTarget(op);
     if (op.shipId() == null) {
+      if (!unitAllowed(unit, memberships)) {
+        return new Skip(REJECTED, ORG_UNIT_NOT_ALLOWED);
+      }
       if (links.shipOf(externalId) != null) {
         return new Skip(REJECTED, VERSION_CONFLICT);
       }
@@ -295,14 +315,19 @@ public class ExchangeShipWriteService {
               locationId,
               Boolean.TRUE.equals(op.fitted()),
               null,
-              null));
+              null),
+          unit);
     }
     UUID shipId = parse(op.shipId());
     Optional<Ship> locked = lockOwn(caller, shipId);
     if (locked.isEmpty()) {
       return shipId != null && shipRepository.existsById(shipId)
           ? new Skip(UNMATCHED, UNMATCHED_REASON)
-          : planReturn(caller, op, externalId, shipId, type, insurance, locationId, links);
+          : planReturn(
+              caller, op, externalId, shipId, type, insurance, locationId, links, memberships);
+    }
+    if (unit != null && !unit.valid()) {
+      return new Skip(REJECTED, ORG_UNIT_NOT_ALLOWED);
     }
     Ship ship = locked.get();
     UUID ownedId = Objects.requireNonNull(shipId);
@@ -316,6 +341,16 @@ public class ExchangeShipWriteService {
     if (linked != null && !linked.equals(externalId)) {
       return new Skip(REJECTED, LINK_TARGET_TAKEN);
     }
+    UnitMove move =
+        unit == null || Objects.equals(unit.orgUnitId(), orgUnitIdOf(ship))
+            ? null
+            : new UnitMove(unit.orgUnitId(), ship.getOwningOrgUnitVersion());
+    if (move != null && !unitAllowed(unit, memberships)) {
+      return new Skip(REJECTED, ORG_UNIT_NOT_ALLOWED);
+    }
+    if (move != null && !Objects.equals(op.orgUnitVersion(), move.expectedVersion())) {
+      return new Skip(REJECTED, ORG_UNIT_VERSION_CONFLICT);
+    }
     ShipRequestDto dto =
         new ShipRequestDto(
             op.name(),
@@ -326,7 +361,7 @@ public class ExchangeShipWriteService {
             ship.getVersion(),
             null);
     boolean changes = !state(ship).equals(state(dto));
-    if (!changes && linked != null) {
+    if (!changes && move == null && linked != null) {
       return new Skip(UNCHANGED, null);
     }
     touched.add(ownedId);
@@ -334,7 +369,7 @@ public class ExchangeShipWriteService {
     boolean removal =
         !Objects.equals(ship.getName(), dto.name())
             && !Objects.equals(ship.getShipType().getId(), dto.shipTypeId());
-    return new Update(externalId, ownedId, state(ship), dto, changes, removal);
+    return new Update(externalId, ownedId, journalState(ship), dto, changes, removal, move);
   }
 
   /**
@@ -349,6 +384,7 @@ public class ExchangeShipWriteService {
    * @param insurance the stored insurance
    * @param locationId the location, or {@code null}
    * @param links the installation's links as the earlier ops leave them
+   * @param memberships the member's direct org-unit memberships, empty when no op names a unit
    * @return the plan
    */
   private @NotNull Planned planReturn(
@@ -359,7 +395,8 @@ public class ExchangeShipWriteService {
       @NotNull ShipTypeMatch type,
       @NotNull String insurance,
       @Nullable UUID locationId,
-      @NotNull Links links) {
+      @NotNull Links links,
+      @NotNull Set<UUID> memberships) {
     Optional<ExchangeChange> tombstone =
         shipId == null
             ? Optional.empty()
@@ -370,6 +407,10 @@ public class ExchangeShipWriteService {
     }
     if (!Boolean.TRUE.equals(op.override()) && !writtenBy(caller, tombstone.get())) {
       return new Skip(REJECTED, REMOVED_ELSEWHERE);
+    }
+    UnitTarget unit = unitTarget(op);
+    if (!unitAllowed(unit, memberships)) {
+      return new Skip(REJECTED, ORG_UNIT_NOT_ALLOWED);
     }
     UUID current = links.shipOf(externalId);
     if (current != null) {
@@ -385,7 +426,8 @@ public class ExchangeShipWriteService {
             locationId,
             Boolean.TRUE.equals(op.fitted()),
             null,
-            null));
+            null),
+        unit);
   }
 
   /**
@@ -419,7 +461,7 @@ public class ExchangeShipWriteService {
       return new Skip(REJECTED, VERSION_CONFLICT);
     }
     touched.add(ownedId);
-    return new Remove(ownedId, state(ship));
+    return new Remove(ownedId, journalState(ship));
   }
 
   /**
@@ -446,7 +488,11 @@ public class ExchangeShipWriteService {
         yield 0;
       }
       case Create create -> {
-        Ship saved = shipCommands.addShipForClient(caller.member(), create.dto());
+        Ship saved =
+            create.unit() == null
+                ? shipCommands.addShipForClient(caller.member(), create.dto())
+                : shipCommands.addShipForClientInOrgUnit(
+                    caller.member(), create.dto(), create.unit().orgUnitId());
         relink(caller, create.externalId(), saved.getId());
         journalService.record(
             caller,
@@ -455,13 +501,23 @@ public class ExchangeShipWriteService {
             saved.getId().toString(),
             false,
             null,
-            state(saved));
+            journalState(saved));
         yield 0;
       }
       case Update update -> {
         Map<String, Object> after = update.before();
         if (update.changes()) {
-          after = state(shipCommands.updateShip(caller.member(), update.shipId(), update.dto()));
+          after =
+              journalState(shipCommands.updateShip(caller.member(), update.shipId(), update.dto()));
+        }
+        if (update.move() != null) {
+          after =
+              journalState(
+                  shipCommands.changeShipOrgUnit(
+                      caller.member(),
+                      update.shipId(),
+                      update.move().orgUnitId(),
+                      update.move().expectedVersion()));
         }
         relink(caller, update.externalId(), update.shipId());
         journalService.record(
@@ -661,7 +717,7 @@ public class ExchangeShipWriteService {
   }
 
   /**
-   * Captures a ship's synced fields for the journal and the no-change check.
+   * Captures a ship's synced fields for the no-change check.
    *
    * @param ship the ship
    * @return its state
@@ -708,6 +764,63 @@ public class ExchangeShipWriteService {
     state.put("location", location == null ? null : location.toString());
     state.put("fitted", fitted);
     return state;
+  }
+
+  /**
+   * Captures a ship's synced fields and its org unit for the journal.
+   *
+   * @param ship the ship
+   * @return its state
+   */
+  private static @NotNull Map<String, Object> journalState(@NotNull Ship ship) {
+    Map<String, Object> state = state(ship);
+    UUID orgUnit = orgUnitIdOf(ship);
+    state.put("orgUnit", orgUnit == null ? null : orgUnit.toString());
+    return state;
+  }
+
+  /**
+   * Reads a ship's org unit id without initialising a lazy reference.
+   *
+   * @param ship the ship
+   * @return its org unit's id, or {@code null} for none
+   */
+  private static @Nullable UUID orgUnitIdOf(@NotNull Ship ship) {
+    return ship.getOwningOrgUnit() == null ? null : ship.getOwningOrgUnit().getId();
+  }
+
+  /**
+   * Reads the org unit an upsert names.
+   *
+   * @param op the upsert
+   * @return the target, or {@code null} when the op leaves the unit out
+   */
+  private static @Nullable UnitTarget unitTarget(@NotNull ExchangeShipChangeSet.Op op) {
+    ExchangeOrgUnitChoice orgUnit = op.orgUnit();
+    if (orgUnit == null) {
+      return null;
+    }
+    String raw = orgUnit.orgUnitId();
+    if (raw == null) {
+      return new UnitTarget(null, true);
+    }
+    UUID orgUnitId = parse(raw);
+    return new UnitTarget(orgUnitId, orgUnitId != null);
+  }
+
+  /**
+   * Whether an upsert's org unit may own the member's ship.
+   *
+   * @param unit the unit the op names, or {@code null} when it names none
+   * @param memberships the member's direct org-unit memberships
+   * @return {@code true} when the op names no unit, names none, or names one of the memberships
+   */
+  private static boolean unitAllowed(@Nullable UnitTarget unit, @NotNull Set<UUID> memberships) {
+    if (unit == null) {
+      return true;
+    }
+    UUID orgUnitId = unit.orgUnitId();
+    return unit.valid() && (orgUnitId == null || memberships.contains(orgUnitId));
   }
 
   /**
@@ -834,8 +947,10 @@ public class ExchangeShipWriteService {
    *
    * @param externalId the installation's id
    * @param dto the ship
+   * @param unit the org unit the op names, or {@code null} to stamp the member's only one
    */
-  private record Create(@NotNull String externalId, @NotNull ShipRequestDto dto)
+  private record Create(
+      @NotNull String externalId, @NotNull ShipRequestDto dto, @Nullable UnitTarget unit)
       implements Planned {}
 
   /**
@@ -847,6 +962,7 @@ public class ExchangeShipWriteService {
    * @param dto the update
    * @param changes whether any synced field changes
    * @param removal whether it counts against the mass-change guard
+   * @param move the change of the ship's org unit, or {@code null} when it keeps its unit
    */
   private record Update(
       @NotNull String externalId,
@@ -854,8 +970,25 @@ public class ExchangeShipWriteService {
       @NotNull Map<String, Object> before,
       @NotNull ShipRequestDto dto,
       boolean changes,
-      boolean removal)
+      boolean removal,
+      @Nullable UnitMove move)
       implements Planned {}
+
+  /**
+   * The org unit an upsert names.
+   *
+   * @param orgUnitId the unit, or {@code null} for none or for an id that is no unit id
+   * @param valid whether the client's id is a unit id or {@code null}
+   */
+  private record UnitTarget(@Nullable UUID orgUnitId, boolean valid) {}
+
+  /**
+   * A change of a ship's org unit behind its unit counter.
+   *
+   * @param orgUnitId the new unit, or {@code null} for none
+   * @param expectedVersion the unit counter the ship has
+   */
+  private record UnitMove(@Nullable UUID orgUnitId, long expectedVersion) {}
 
   /**
    * Removes a ship.
