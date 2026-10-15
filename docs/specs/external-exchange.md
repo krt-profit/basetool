@@ -1357,6 +1357,10 @@ the same undo for every member of one client at once (REQ-XCH-034).
 - [x] An entry without a change-log entry is skipped, the reach follows the configured retention, a
   removed ship of a member of several units comes back without a unit, and a replaced link is not
   put back on another member's ship. *`ExchangeUndoControllerTest`.*
+- [x] A client's unit change is undone through the Hangar's unit change without moving the ship's
+  `version`, a removed ship comes back in its earlier unit, an earlier unit the member has left is
+  not restored and does not fail the undo, and an entry journaled without `orgUnit` leaves the unit
+  alone. *`ExchangeUndoControllerTest`.*
 
 The journal is `exchange_journal`: one row per written entry with the client, installation, change
 set, resource, key, action, whether it counts as a removal, the entry before and after as JSON, the
@@ -1376,15 +1380,24 @@ since. One that no longer belongs to the member or names something gone is skipp
 ship is locked only when it is still the member's; one given to another member is skipped without
 locking its row. The lots to restore are locked like a stock write's (ADR-0229) before any entry is
 checked, and restored in the order of their keys, so an undo meeting a running write waits for it
-and then skips its lot as `CHANGED_AFTERWARDS`. A recreated ship is stamped like a client's create (REQ-XCH-017): the member's
-only direct org unit, or none for a member of several. Links the client made are taken back, and a
+and then skips its lot as `CHANGED_AFTERWARDS`. A ship also goes back to the org unit its journaled
+earlier state names (`orgUnit`, none included): one that still exists moves there through the
+Hangar's unit change behind its current unit counter (REQ-HANGAR-009, ADR-0258, audited
+`HANGAR_SHIP_ORG_UNIT_CHANGED`, its `version` untouched), and a recreated one is created in it. An
+earlier unit the member no longer directly belongs to is not restored — the ship keeps its current
+unit — and the entry still counts as restored. A recreated ship whose unit is not restored, or whose
+journaled state has no `orgUnit` key, is stamped like a client's create (REQ-XCH-017): the member's
+only direct org unit, or none for a member of several; an existing ship whose state has no
+`orgUnit` key keeps its unit. Links the client made are taken back, and a
 link one of them replaced is put back only while the ship is still the member's. The restored
 entries' journal rows are marked undone, the undo is audited as `EXCHANGE_CHANGES_UNDONE` (restored
 and skipped counts) and counted in `basetool_exchange_undo_total{resource,outcome}`, and the
 member's pages refresh live. *Corrected 2026-09-27 (second security review L9): the reach was a
 fixed 90 days whatever the retention, an entry without a change-log entry was restored unchecked, a
 removed ship of a member of several units failed the whole undo with `OWNER_ORG_UNIT_REQUIRED`, and
-a replaced link was put back on a ship that merely still existed.*
+a replaced link was put back on a ship that merely still existed. Corrected 2026-10-15 (#2615): the
+undo ignored the journaled org unit, so a client's unit change stayed in place after a reported
+restore.*
 
 **Status:** journal and undo built — WP 3.3 (#2083), WP 4.1 (#2084), WP 4.2 (#2085), WP 4.4 (#2086),
 WP 4.5 (#2087)

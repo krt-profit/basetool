@@ -48,9 +48,11 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -345,6 +347,140 @@ class ExchangeUndoControllerTest {
   }
 
   @Test
+  void aClientsUnitChangeIsUndoneBehindTheUnitCounter() throws Exception {
+    UUID cutlass = shipType("Cutlass Black");
+    UUID squadron = orgUnit("SQUADRON");
+    UUID command = orgUnit("SPECIAL_COMMAND");
+    joins(squadron);
+    joins(command);
+    UUID moved = ship("Moved", cutlass, squadron);
+    UUID second = ship("Second", cutlass, squadron);
+    write("ships", "{\"ops\":[" + move(moved, cutlass, "Moved", command) + "]}")
+        .andExpect(jsonPath("$.applied").value(1));
+    write("ships", "{\"ops\":[" + move(second, cutlass, "Second", command) + "]}")
+        .andExpect(jsonPath("$.applied").value(1));
+    long version = version(moved);
+
+    undo(Instant.now().minus(1, ChronoUnit.HOURS))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.restored").value(2))
+        .andExpect(jsonPath("$.skipped.length()").value(0));
+
+    assertThat(unitOf(moved)).isEqualTo(squadron);
+    assertThat(unitOf(second)).isEqualTo(squadron);
+    assertThat(version(moved)).isEqualTo(version);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM audit_event WHERE event_type ="
+                    + " 'HANGAR_SHIP_ORG_UNIT_CHANGED' AND subject_id = ?",
+                Integer.class,
+                moved))
+        .isEqualTo(2);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM exchange_journal WHERE user_id = ? AND undone_at IS NULL",
+                Integer.class,
+                member))
+        .isZero();
+  }
+
+  @Test
+  void aShipRemovedByTheClientComesBackInItsEarlierUnit() throws Exception {
+    UUID cutlass = shipType("Cutlass Black");
+    UUID squadron = orgUnit("SQUADRON");
+    joins(squadron);
+    joins(orgUnit("SPECIAL_COMMAND"));
+    UUID removed = ship("Retired", cutlass, squadron);
+    write(
+            "ships",
+            "{\"ops\":[{\"op\":\"remove\",\"shipId\":\"%s\",\"version\":0}]}".formatted(removed))
+        .andExpect(jsonPath("$.applied").value(1));
+
+    undo(Instant.now().minus(1, ChronoUnit.HOURS)).andExpect(jsonPath("$.restored").value(1));
+
+    assertThat(
+            jdbc.queryForList(
+                "SELECT owning_org_unit_id FROM ship WHERE owner_id = ?", UUID.class, member))
+        .containsExactly(squadron);
+  }
+
+  @Test
+  void anEarlierUnitTheMemberHasLeftIsNotRestored() throws Exception {
+    UUID cutlass = shipType("Cutlass Black");
+    UUID squadron = orgUnit("SQUADRON");
+    UUID command = orgUnit("SPECIAL_COMMAND");
+    joins(squadron);
+    joins(command);
+    UUID moved = ship("Moved", cutlass, squadron);
+    UUID removed = ship("Retired", cutlass, squadron);
+    write(
+            "ships",
+            "{\"ops\":["
+                + move(moved, cutlass, "Moved", command)
+                + ",{\"op\":\"remove\",\"shipId\":\"%s\",\"version\":0}]}".formatted(removed))
+        .andExpect(jsonPath("$.applied").value(2));
+    jdbc.update(
+        "DELETE FROM org_unit_membership WHERE user_id = ? AND org_unit_id = ?", member, squadron);
+
+    undo(Instant.now().minus(1, ChronoUnit.HOURS))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.restored").value(2))
+        .andExpect(jsonPath("$.skipped.length()").value(0));
+
+    assertThat(unitOf(moved)).isEqualTo(command);
+    assertThat(
+            jdbc.queryForList(
+                "SELECT owning_org_unit_id FROM ship WHERE owner_id = ? AND id <> ?",
+                UUID.class,
+                member,
+                moved))
+        .containsExactly(command);
+  }
+
+  @Test
+  void anEntryJournaledWithoutAUnitLeavesTheUnitAlone() throws Exception {
+    UUID cutlass = shipType("Cutlass Black");
+    UUID squadron = orgUnit("SQUADRON");
+    UUID command = orgUnit("SPECIAL_COMMAND");
+    joins(squadron);
+    joins(command);
+    UUID moved = ship("Moved", cutlass, squadron);
+    write("ships", "{\"ops\":[" + move(moved, cutlass, "Moved", command) + "]}")
+        .andExpect(jsonPath("$.applied").value(1));
+    jdbc.update(
+        "UPDATE exchange_journal SET before_state = (before_state::jsonb - 'orgUnit')::text"
+            + " WHERE user_id = ?",
+        member);
+
+    undo(Instant.now().minus(1, ChronoUnit.HOURS)).andExpect(jsonPath("$.restored").value(1));
+
+    assertThat(unitOf(moved)).isEqualTo(command);
+  }
+
+  @Test
+  void aRemovalJournaledWithoutAUnitIsStampedAsAClientCreate() throws Exception {
+    UUID cutlass = shipType("Cutlass Black");
+    UUID squadron = orgUnit("SQUADRON");
+    UUID removed = ship("Retired", cutlass);
+    joins(squadron);
+    write(
+            "ships",
+            "{\"ops\":[{\"op\":\"remove\",\"shipId\":\"%s\",\"version\":0}]}".formatted(removed))
+        .andExpect(jsonPath("$.applied").value(1));
+    jdbc.update(
+        "UPDATE exchange_journal SET before_state = (before_state::jsonb - 'orgUnit')::text"
+            + " WHERE user_id = ?",
+        member);
+
+    undo(Instant.now().minus(1, ChronoUnit.HOURS)).andExpect(jsonPath("$.restored").value(1));
+
+    assertThat(
+            jdbc.queryForList(
+                "SELECT owning_org_unit_id FROM ship WHERE owner_id = ?", UUID.class, member))
+        .containsExactly(squadron);
+  }
+
+  @Test
   void aReplacedLinkIsNotPutBackOnAShipGivenToAnotherMember() throws Exception {
     UUID cutlass = shipType("Cutlass Black");
     UUID given = ship("Given away", cutlass);
@@ -511,15 +647,47 @@ class ExchangeUndoControllerTest {
   }
 
   private @NotNull UUID ship(@NotNull String name, @NotNull UUID type) {
+    return ship(name, type, null);
+  }
+
+  private @NotNull UUID ship(@NotNull String name, @NotNull UUID type, @Nullable UUID orgUnit) {
     UUID id = UUID.randomUUID();
     jdbc.update(
-        "INSERT INTO ship (id, version, name, ship_type_id, insurance, fitted, owner_id)"
-            + " VALUES (?, 0, ?, ?, 'LTI', false, ?)",
+        "INSERT INTO ship (id, version, name, ship_type_id, insurance, fitted, owner_id,"
+            + " owning_org_unit_id) VALUES (?, 0, ?, ?, 'LTI', false, ?, ?)",
         id,
         name,
         type,
-        member);
+        member,
+        orgUnit);
     return id;
+  }
+
+  /**
+   * Builds an upsert that keeps a ship's fields and moves it to another unit.
+   *
+   * @param ship the ship
+   * @param type its type
+   * @param name its name
+   * @param orgUnit the unit to move it to
+   * @return the op
+   */
+  private static @NotNull String move(
+      @NotNull UUID ship, @NotNull UUID type, @NotNull String name, @NotNull UUID orgUnit) {
+    return ("{\"op\":\"upsert\",\"externalId\":\"vk-%s\",\"shipId\":\"%s\",\"version\":0,"
+            + "\"shipType\":{\"bt\":\"%s\"},\"name\":\"%s\",\"insurance\":{\"kind\":\"LTI\"},"
+            + "\"orgUnit\":\"%s\",\"orgUnitVersion\":0}")
+        .formatted(ship, ship, type, name, orgUnit);
+  }
+
+  private @Nullable UUID unitOf(@NotNull UUID ship) {
+    return jdbc.queryForObject(
+        "SELECT owning_org_unit_id FROM ship WHERE id = ?", UUID.class, ship);
+  }
+
+  private long version(@NotNull UUID ship) {
+    return Objects.requireNonNull(
+        jdbc.queryForObject("SELECT version FROM ship WHERE id = ?", Long.class, ship));
   }
 
   /**
