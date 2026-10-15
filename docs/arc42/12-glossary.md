@@ -15,6 +15,7 @@ worth reading even if you know the domain.
 | **Organisationsleitung (OL)** | The organisation's leadership, at the top of the hierarchy. |
 | **Bereichsleitung** | The leadership of a Bereich — Bereichsleiter, -koordinator and -operator, carried as membership flags. |
 | **Leitung** | Leadership, both as a role and as the delegated administration page. |
+| **Logistiker (einer Einheit)** | A member whose membership in that unit carries `is_logistician` **or** any leadership rank. Not the same as the flag alone: an officer of a unit is its Logistician without the flag being set. The web also grants it to a leadership rank's cascaded reach; the exchange does not (ADR-0257). |
 | **Beförderung** | Promotion — the evaluation matrix (**Bewertungen** per category against rank requirements). Only a Staffel carries it, never an SK, Bereich or OL; one of the audited areas. |
 | **Organigramm** | The organisation's org chart of functional positions (Funktionsränge), separate from the tenancy tree. |
 
@@ -67,7 +68,7 @@ worth reading even if you know the domain.
 | **Edge** | The nginx container terminating TLS for the four public names, behind the haproxy front end. **acme** is a separate container that issues and renews the certificates it serves. |
 | **Ingest** | The internet-facing gateway module serving the **Exchange (API)** of approved clients, the SC Extractor included; its former `/v1` extractor routes were removed on 2026-09-28. Owns no database; relays to the backend internally. |
 | **Handoff** | The single-use Redis entry through which ingest passes a matched draft to the member's browser for review. |
-| **Exchange (API)** | `/exchange/v1/**` on the ingest gateway: the capability-scoped contract through which approved external clients sync the member's own data (`REQ-XCH-*`, ADR-0216). Not the backend API, and not the **Materialbörse**, whose code is named `MaterialExchange*`. |
+| **Exchange (API)** | `/exchange/v1/**` on the ingest gateway: the capability-scoped contract through which approved external clients sync the member's own data and, for a Logistician, their units' org stock (`REQ-XCH-*`, ADR-0216, ADR-0257). Not the backend API, and not the **Materialbörse**, whose code is named `MaterialExchange*`. |
 | **Capability** | An OAuth scope such as `exchange.stock.write` — what an external client is approved for and a member consents to. A route passes only when its capability is both in the token and granted to the client in the registry. |
 | **Client registry** | The backend's table of approved exchange clients with their status and capabilities, plus the global exchange switch; `ADMIN` only, audited as „Verbundene Anwendungen“ (REQ-XCH-003). |
 | **Registry mirror** | The JSON copy of the client registry under `exchange:registry` in Redis, which the gateway reads. Restrictions reach it before their commit, everything else after, and a 60-second reconcile repairs it. |
@@ -77,6 +78,7 @@ worth reading even if you know the domain.
 | **Tombstone** | A feed entry for a key that is gone, saying who removed it and when; live for 90 days. A client may not re-add what another channel removed without asking the member (`REMOVED_ELSEWHERE`). |
 | **Journal** | `exchange_journal`: every entry an exchange write changed, before and after, kept 90 days. The guard counts removals from it and the undo restores from it. Not the audit trail, which records the same write for people. |
 | **Stack / Lot** | A Lager **stack** is the Lager's stock identity — owner, material, location, quality, „gestohlen", personal flag and org-unit pool. An exchange **lot** is material + location + quality + „gestohlen" over every row the member holds, personal and shared, summed across org-unit pools (ADR-0230). One lot can span several stacks. |
+| **Pool / Org-Bestand** | A **pool** is one unit's shared (non-personal) Lager stock. The **org stock** (`orgstock`) is what the exchange serves of the pools of the units a member belongs to directly — the web's „Globales Lager" without oversight reach. Its lot is keyed by unit first, so one material in two units is two lots (REQ-XCH-042, ADR-0257). „Staffellager" is colloquial for a Staffel's pool. |
 | **Draft** | A client upload staged for review in the browser — a blueprint import or a refinery order — that writes nothing until the member saves it through the ordinary path. Distinct from a **mass change held for confirmation**, which is a staged change set. |
 | **Restore drill** | The weekly job that restores the **latest snapshot** into a throwaway PostgreSQL and scores seven artifacts. It reports on the *snapshot*, never on the host. |
 | **Conformance suite** | `check-conformance.py` — invariants asserted against a **running host**, because the recurring defect class is configuration that is correct on disk and not in force in the process. |

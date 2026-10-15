@@ -1,12 +1,13 @@
 > **Doc type:** Living spec — requirements accepted by the owner, built except where a status line
 > says otherwise (epic [#2078](https://github.com/krt-profit/basetool/issues/2078)). Last reviewed:
-> 2026-10-10.
+> 2026-10-15.
 > **Owner area:** XCH · **Related ADRs:** [ADR-0216](../adr/0216-the-exchange-api-is-a-separate-contract-on-the-ingest-gateway.md),
 > [ADR-0217](../adr/0217-third-party-clients-are-public-device-grant-clients-in-a-db-registry.md),
 > [ADR-0218](../adr/0218-exchange-sync-semantics.md),
 > [ADR-0219](../adr/0219-the-exchange-contract-grows-additively-under-a-path-major-version.md),
 > [ADR-0220](../adr/0220-external-clients-see-only-anonymised-org-demand-and-the-location-list.md),
-> [ADR-0221](../adr/0221-redis-grows-to-768-mb-and-holds-a-bounded-exchange-partition.md)
+> [ADR-0221](../adr/0221-redis-grows-to-768-mb-and-holds-a-bounded-exchange-partition.md),
+> [ADR-0257](../adr/0257-logisticians-read-and-write-their-units-shared-stock-through-the-exchange.md)
 
 # External client exchange
 
@@ -14,7 +15,8 @@
 
 Approved external client software — VerseKit first, our own SC Extractor second — lets a member keep
 blueprints, their stock in the Lager and their ships in step between that program and the
-Basetool, and read what their own units still need. It does so only through the **exchange API**
+Basetool, and read what their own units still need. A Logistician of a unit can also read and keep
+that unit's shared stock (REQ-XCH-042…046, ADR-0257). It does so only through the **exchange API**
 on the ingest gateway, never through the backend API. This spec states what must hold; the ADRs
 above say why. The work is tracked in epic #2078; each requirement names the work package (WP) and
 sub-issue that implements it.
@@ -50,7 +52,13 @@ The exchange API is served by the ingest gateway at `/exchange/v1/**`
 | `GET /exchange/v1/me/blueprints` · `POST …/changes` | `exchange.blueprints.read` / `.write` | REQ-XCH-015 |
 | `GET /exchange/v1/me/stock` · `POST …/changes` | `exchange.stock.read` / `.write` | REQ-XCH-016 |
 | `GET /exchange/v1/me/ships` · `POST …/changes` | `exchange.hangar.read` / `.write` | REQ-XCH-017 |
-| `GET /exchange/v1/me/org-demand` | `exchange.demand.read` | REQ-XCH-018 |
+| `GET /exchange/v1/me/org-demand` | `exchange.demand.read` (+ `exchange.demand.details`) | REQ-XCH-018, REQ-XCH-047 |
+| `GET /exchange/v1/org-stock` | `exchange.orgstock.read` (+ `exchange.orgstock.details`) | REQ-XCH-042, REQ-XCH-043 |
+| `POST /exchange/v1/org-stock/changes` | `exchange.orgstock.write` | REQ-XCH-045 |
+| `GET /exchange/v1/org-stock/units/{unit}/members` · `…/targets` | `exchange.orgstock.write` | REQ-XCH-045 |
+
+The three `org-stock` rows and the two `.details` capabilities are planned (ADR-0257); until they
+are built the gateway serves neither.
 | `POST /exchange/v1/me/drafts/blueprints` · `…/drafts/refinery-orders` | `exchange.drafts.blueprints` / `.refinery` | REQ-XCH-019 |
 
 Every route is deny-by-default, uses only `GET` or `POST` (the ingest bot filter admits nothing
@@ -257,8 +265,10 @@ configuration cannot stretch a suspension's delay, `ExchangeGatewayPropertiesTes
 
 The capabilities are `exchange.connect` (base: service document, installation label, account
 check), `exchange.blueprints.read` / `.write`, `exchange.stock.read` / `.write`,
-`exchange.hangar.read` / `.write`, `exchange.demand.read`, `exchange.drafts.blueprints` and
-`exchange.drafts.refinery`. A request passes only if the route's scope is in the token **and**
+`exchange.hangar.read` / `.write`, `exchange.demand.read` / `.details`,
+`exchange.orgstock.read` / `.details` / `.write`, `exchange.drafts.blueprints` and
+`exchange.drafts.refinery`. A `.details` capability only widens the answer of its `.read` route and
+needs it; it opens no route of its own. A request passes only if the route's scope is in the token **and**
 granted to the client in the registry (`403 SCOPE_MISSING`); the backend's exchange layer checks
 the relayed capabilities again (`@PreAuthorize("@exchangeGate.allows(…)")`). Each scope stamps the
 `basetool-ingest` audience, and the gateway enforces that audience on exchange routes in code, not
@@ -641,6 +651,12 @@ own ships; they never
 use the admin all-scope or an admin pin. The membership, pending-approval and terms gates apply
 unchanged. No exchange response carries personal data of
 anyone.
+
+Two surfaces are the deliberate exception (ADR-0257): the org stock (REQ-XCH-042…046) reads the
+shared rows of the member's units and, for a Logistician of the unit, names their holders and
+writes them; the demand details (REQ-XCH-047) carry the orders' Auftraggeber and comment. Both
+decide from the database, never from a stored role and never with the admin all-scope or pin, and
+the org stock names no member who withholds their name (REQ-XCH-044).
 
 **How it is built** (WP 3.1). `ActingMemberFilter` keeps an explicit list of exchange routes
 next to the two ingest routes. On an exchange route the member gets
@@ -1045,7 +1061,9 @@ WP 4.4 (#2086), and its write route (`POST …/changes`)
 units the member merely oversees or administers: `materials[]` (material, `rawRefs[]`, open
 quantity per `minQuality`, `source: material-order|item-order`) and `items[]` (item, open quantity,
 `craftableByMe`), plus `updatedAt`. It carries no requester, assignee, order title, free text or
-per-order breakdown and no low-count suppression; a client may cache it for up to 7 days.
+per-order breakdown and no low-count suppression; a client may cache it for up to 7 days. A client
+approved for `exchange.demand.details` adds a per-order breakdown for the member's Logistician
+units (REQ-XCH-047, ADR-0257); without it the answer is exactly as described here.
 `GET /exchange/v1/catalog/locations` lists the non-hidden `location` rows with their UEX link.
 
 The backend serves the location list as `GET /api/v1/exchange/catalog/locations` (any exchange
@@ -2224,6 +2242,180 @@ never served to a client. The external contract stays the gateway's `exchange-v1
 **Enforced by:** `OpenApiGeneratorTest`, `ExchangeFenceTest`, `OpenApiDocumentAssertionsTest`,
 `ExternalContractTest` · **Status:** implemented (plan step 0.7, the exchange fence)
 
+### REQ-XCH-042 — Org stock is the shared stock of the member's own units, as lots per pool
+
+`GET /exchange/v1/org-stock` (`exchange.orgstock.read`; backend `GET /api/v1/exchange/org-stock`)
+serves the **org stock**: the shared (`personal = false`) Lager rows whose owning org unit is a unit
+the member is a **direct** member of, of any of the four kinds. A unit the member only oversees —
+a Bereich rank's child units, the Organisationsleitung's reach — is not served, although the web's
+Globales Lager shows it (ADR-0257). Personal rows of any member, ownerless shared rows and rows of
+other units never appear; the admin all-scope and pin never apply.
+
+- **Pool and lot.** Each unit is a **pool**. A lot is unit + material or game item + location +
+  quality + „gestohlen", summed over every holder's shared rows in that pool; its key is
+  `u:<unit>|` followed by the stock lot key of REQ-XCH-016. A lot carries the unit (id and name),
+  the material or item reference with `materialKind` as in REQ-XCH-016, location, quality,
+  „gestohlen", the amount and, per dimension, the amount earmarked to job orders and to missions.
+- **Units.** Every snapshot page and feed page lists the units the member currently reads. A unit
+  that is no longer listed — the member left it — is gone for the client with all its lots; a
+  departure takes effect on the next request.
+- **Feed.** Org stock is its own feed resource, keyed by unit instead of by member, with the
+  cursor, tombstone, 90-day retention and `410 CURSOR_EXPIRED` rules of REQ-XCH-013. Its entries are
+  written by triggers on every change that alters a lot or the details of REQ-XCH-043: an
+  `inventory_item` insert or delete, a change of its amount, holder, material, item, location,
+  quality, „gestohlen", personal flag, owning org unit or note, an insert, update or delete on either
+  allocation table, and a holder's name change or name withholding (REQ-XCH-044), which announces
+  every lot the holder has an entry in. A rebooking between personal and shared therefore shows up
+  here although it changes no `/me/stock` lot.
+- **Gates.** The pending-approval, role and terms gates of REQ-XCH-009 apply. A client may cache
+  org stock for up to 7 days.
+
+**Acceptance**
+
+- [ ] A member reads the shared lots of each unit they are a direct member of, one pool per unit,
+  and nothing of a unit they only oversee, of another member's personal rows or of ownerless rows.
+- [ ] An `ADMIN` member, with or without a pin, reads only the pools of their own memberships.
+- [ ] The same material at the same place in two of the member's units is two lots.
+- [ ] Rebooking an entry from personal to shared, changing its unit, editing its note and adding an
+  earmark each produce an org-stock feed entry for the lot concerned.
+- [ ] After the member leaves a unit, the next page no longer lists the unit or its lots.
+
+**Status:** planned — PR 2 of ADR-0257
+
+### REQ-XCH-043 — A Logistician of the pool sees the single entries by name
+
+With `exchange.orgstock.details` in addition to `.read`, every lot of a pool in which the member is
+a **Logistician of the unit** carries `entries[]`; in any other pool a lot carries none.
+
+- **Logistician of a unit.** The member's membership in exactly that unit carries `is_logistician`
+  or a leadership rank — `SK_LEAD`, `STAFFELLEITER`, `KOMMANDOLEITER`, `STELLV_KOMMANDOLEITER`,
+  `ENSIGN`, `BEREICHSLEITER`, `BEREICHSKOORDINATOR`, `BEREICHSOPERATOR` or `OL_MEMBER`. The rule is
+  read from the database by one method that the web's `CustomJwtGrantedAuthoritiesConverter` uses
+  for its own-unit contextual `LOGISTICIAN` authority too; the exchange omits the converter's
+  cascade, and the `OFFICER` realm role plays no part.
+- **An entry** carries its id and `version`, the holder, the amount, the note, the job-order
+  earmarks (order id, number `#displayId`, amount, delivered) and the mission earmarks (mission id,
+  name, amount)
+  with the unearmarked rest per dimension — what the web's entry row shows.
+- **The holder** is the name the web shows (`effectiveName`) and a `ref`: an HMAC-SHA256 of the
+  user id under a 32-byte random salt the backend stores with the client in `exchange_client`. The
+  salt is created when the client is registered, never leaves the backend and is never mirrored, so
+  the same member has a different `ref` at every client and the same `ref` at every request of one.
+- A holder who withholds their name (REQ-XCH-044) appears with `withheld: true` and neither name,
+  `ref` nor note.
+
+**Acceptance**
+
+- [ ] A member with `is_logistician` in a unit, and one holding any leadership rank there without
+  the flag, get entries for that unit's pool; a plain member gets none; a Bereich rank gets none
+  for a child unit's pool they are not a member of.
+- [ ] Without `exchange.orgstock.details` granted and consented, no lot carries entries.
+- [ ] The converter and the exchange answer "Logistician of this unit" through the same method; a
+  test pins every `MembershipRole` against it.
+- [ ] One member's `ref` is stable across requests of one client and differs between two clients.
+
+**Status:** planned — PR 2 of ADR-0257
+
+### REQ-XCH-044 — A member can withhold their name from connected applications
+
+A profile setting „Meinen Namen nicht an verbundene Anwendungen weitergeben" is off by default.
+While it is on, the member's entries in the org stock carry no name, `ref` or note
+(REQ-XCH-043) and the member is left out of the roster (REQ-XCH-045) and cannot be chosen as a
+holder. Their entries stay in the lots
+and stay writable by id. Switching it takes effect on the next request and announces the affected
+lots in the feed. The setting is part of the member's data export; the privacy notice
+(„Verbundene Anwendungen") and the records of processing state which names reach a connected
+application and how to withhold them.
+
+**Acceptance**
+
+- [ ] With the setting on, no org-stock entry or roster answer carries the member's name, `ref` or
+  note; with it off, they do.
+- [ ] Switching it produces feed entries for every lot the member has an entry in.
+- [ ] The privacy notice section „Verbundene Anwendungen" states the named data and the setting.
+
+**Status:** planned — PR 2 of ADR-0257
+
+### REQ-XCH-045 — A Logistician of the pool writes the org stock as in the web
+
+`POST /exchange/v1/org-stock/changes` (`exchange.orgstock.write`) applies a batch of ops in one
+transaction under an idempotency key (REQ-XCH-020), within the batch cap of `/me/stock`. Every op
+names its pool, and the writer must be a Logistician of that unit (REQ-XCH-043) and a direct member
+of it; any other op is refused `NOT_PERMITTED`. An op that names an entry carries its `version`, and
+a stale one is `409 VERSION_CONFLICT`. Only shared rows of the named pool are ever touched.
+
+- **Ops** — each through the Lager service the web uses for it, with its rules:
+  - `book-in`: a new shared entry in the pool for a holder given by `ref` from the roster, with
+    material or item, location, quality, „gestohlen", amount, optional note, optional earmarks and
+    the SCU merge opt-in of REQ-INV-026;
+  - `book-out` and `sell` of an entry, with the deduct-from plans of REQ-INV-027;
+  - `move-location`: a transfer to another location, same holder and pool;
+  - `move-holder`: a transfer to a holder who is a direct member of one of the writer's Logistician
+    units and does not withhold their name, into that unit's pool;
+  - `allocation-add`, `allocation-change`, `allocation-remove` on an entry;
+  - `note` and `stolen` on an entry.
+- **Roster.** `GET /exchange/v1/org-stock/units/{unit}/members` lists the unit's direct members with
+  `ref` and name, without those who withhold their name.
+- **Targets.** `GET /exchange/v1/org-stock/units/{unit}/targets?material=…|item=…` lists the job
+  orders and missions the web's „+ Zuordnen" picker offers for that unit and that material or item,
+  with id, the order's number or the mission's name, and status.
+- **Side effects as in the web.** Reservations are protected (`STOCK_EARMARKED`, `OVER_ALLOCATION`),
+  Materialbörse offers follow, the web's notifications are sent, peers see the change live
+  (REQ-XCH-030), and the Lager audit records each op with the writer and the external client.
+- Each op counts toward the client's writes per day (REQ-XCH-023).
+
+**Acceptance**
+
+- [ ] A Logistician of the pool books in for another member of the unit, books out, sells, moves an
+  entry to another location and to another member, edits earmarks, the note and „gestohlen"; each
+  result equals the same action in the web, its audit event included.
+- [ ] An op on a pool where the writer is not a Logistician, on a personal row or on a row of
+  another pool is refused and changes nothing.
+- [ ] A `book-in` or `move-holder` naming a member who withholds their name, or who is not a member
+  of the target unit, is refused.
+- [ ] The roster leaves out members who withhold their name; the targets equal the web picker's.
+
+**Status:** planned — PR 3 of ADR-0257
+
+### REQ-XCH-046 — Org-stock writes are journaled, undoable and guarded per writer and pool
+
+Every org-stock op is journaled under the writer (REQ-XCH-022) with the before and after of each
+entry it changed. The writer can undo their own client writes from „Verbundene Anwendungen"; an
+undo that meets an entry changed since is refused for that entry as a conflict. The admin's bulk
+undo of a client (REQ-XCH-034) includes org-stock writes. The holders of the entries are notified
+as in the web and cannot undo the writer's changes. The mass-change guard (REQ-XCH-021) counts
+book-outs, sales and moves out of a pool per writer and pool with its own window rules; a batch over
+the threshold is held for confirmation in the writer's browser.
+
+**Acceptance**
+
+- [ ] An undo restores the entries a write changed, refuses an entry changed since, and is
+  audited.
+- [ ] A batch that books out more of one pool than the guard allows is held and applies only after
+  the writer confirms it.
+- [ ] The admin's bulk undo of a client restores its org-stock writes for every writer.
+
+**Status:** planned — PR 3 of ADR-0257
+
+### REQ-XCH-047 — The demand details name orders for a Logistician of the responsible unit
+
+With `exchange.demand.details` in addition to `.read`, `GET /exchange/v1/me/org-demand` adds
+`orders[]` for the open and in-progress orders whose responsible unit is one of the member's
+Logistician units (REQ-XCH-043): order id, number (`#displayId`), type, status, priority, the
+requesting unit, the Auftraggeber (`handle`), the comment and the open lines. The `handle` and the
+comment are free text the order's author typed, not a member account, so REQ-XCH-044 does not apply
+to them; no assignee is named. The summed `materials[]` and `items[]` are unchanged, and orders of
+the member's other units stay summed only. The job-order gate of REQ-XCH-018 applies first.
+
+**Acceptance**
+
+- [ ] A Logistician of a unit gets the orders of that unit with number, Auftraggeber and comment; a
+  plain member and a client without `exchange.demand.details` get the answer of REQ-XCH-018
+  unchanged.
+- [ ] No answer names an assignee.
+
+**Status:** planned — PR 4 of ADR-0257
+
 ## Threat model
 
 | Threat | Countered by |
@@ -2243,11 +2435,14 @@ never served to a client. The external contract stays the gateway's `exchange-v1
 | Guard evasion by batching, near-zero cuts or overwriting stock updates | window counting rules against each lot's state at window start (REQ-XCH-021) |
 | Guard evasion by overwriting ship updates (retyping every ship, clearing names and locations) | counted only when one `upsert` changes both name and type, with no comparison to the window start; journal and undo restore the ships (REQ-XCH-021/-022) — accepted risk (owner decision 2026-09-27) |
 | A malicious release changing many members' data at once | journal and each member's own undo, suspension, and the admin's audited undo of the client for every member at once, which suspends it first (REQ-XCH-022/-034); Materialbörse offers and mission units it removed stay reported, not undone (rows below). *Changed 2026-09-27: the admin bulk undo is built; the row still said it was being addressed.* |
-| A single open order recognisable in the org demand feed | withheld unless the member passes the web's job-order gate (`canViewJobOrders`, under the reduced authorities); membership-only scope, catalogue fields only, no requester, title or free text; no low-count suppression, 7-day client cache (REQ-XCH-018) — accepted risk (ADR-0220 and its 2026-09-28 amendment) |
+| A single open order recognisable in the org demand feed | withheld unless the member passes the web's job-order gate (`canViewJobOrders`, under the reduced authorities); membership-only scope, catalogue fields only, no requester, title or free text; no low-count suppression, 7-day client cache (REQ-XCH-018) — accepted risk (ADR-0220 and its 2026-09-28 amendment); the per-order details go only to a Logistician of the responsible unit under their own capability (REQ-XCH-047, ADR-0257) |
+| Members' names and notes on a third-party program's PC | only for a Logistician of the pool, under `exchange.orgstock.details`, membership-only scope, 7-day client cache; each member can withhold their name; a per-client pseudonym instead of the user id (REQ-XCH-043/-044) — accepted (ADR-0257) |
+| A faulty or malicious client release changing other members' shared stock | only a Logistician of the pool, only shared rows of that pool, through the Lager's services with web rules; journal, the writer's and the admin's undo, the guard per writer and pool, audit naming writer and client (REQ-XCH-045/-046) — accepted (ADR-0257) |
+| Correlating members across clients | the holder `ref` is an HMAC under a per-client salt that never leaves the backend (REQ-XCH-043) |
 | Silent removal of Materialbörse offers by a sync book-out | reported and audited, not undoable — accepted (REQ-XCH-016/-022) |
 | A ship removal through the exchange detaching the ship from its mission units, which are org data | reported (`detachedFromMissions`) and audited (`MISSION_UNIT_UPDATED`), not undoable: undo recreates the ship under a new id without its mission units — accepted (REQ-XCH-017/-022) |
 | The version gate bypassed by a manipulated client | cooperative by design — accepted (REQ-XCH-024) |
-| Data poisoning of org-wide views | own rows only, validated through the domain services; a client books in only personal rows, so it can add nothing to an org-wide view, and lowers the member's own shared rows only as far as their reservations allow, journaled and undoable (REQ-XCH-009/-016/-021/-022, ADR-0230) |
+| Data poisoning of org-wide views | outside the org stock's writes (REQ-XCH-045) own rows only, validated through the domain services; a client books in only personal rows, so it can add nothing to an org-wide view, and lowers the member's own shared rows only as far as their reservations allow, journaled and undoable (REQ-XCH-009/-016/-021/-022, ADR-0230) |
 | A client booking out shared stock the org counts on | the member's own rows only, as the member may in the web; reserved stock never taken (`STOCK_EARMARKED`); offers lowered and audited; mass-change guard, journal and undo (REQ-XCH-016/-021/-022) — accepted (owner decision 2026-10-02, ADR-0230) |
 | Token leakage via backups, diagnostics or a problem-report webhook | client security requirements (REQ-XCH-027) |
 | A switchable issuer used for phishing | only through a developer environment variable, never in the UI (REQ-XCH-027) |

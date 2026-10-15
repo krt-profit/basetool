@@ -2,7 +2,10 @@
 
 - **Status:** Accepted — owner gate G0 of epic [#2078](https://github.com/krt-profit/basetool/issues/2078),
   taken with the merge of #2111 and #2112 (2026-09-26); implemented on main by 2026-09-28 (epic #2078), production rollout with the go-live
-  ([#2092](https://github.com/krt-profit/basetool/issues/2092)).
+  ([#2092](https://github.com/krt-profit/basetool/issues/2092)). Decision 1 amended by
+  [ADR-0257](0257-logisticians-read-and-write-their-units-shared-stock-through-the-exchange.md)
+  (2026-10-15): a client approved for `exchange.demand.details` gets number, Auftraggeber and comment
+  of the orders of the member's Logistician units.
 - **Date:** 2026-09-26
 - **Deciders:** @greluc
 - **Related:** spec [`external-exchange.md`](../specs/external-exchange.md) ·
