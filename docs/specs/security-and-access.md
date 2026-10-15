@@ -5786,8 +5786,12 @@ dry run by default, with a rollback file, never deleting.
   admin with a device is asked once, by the built-in second-factor step; an admin without one is
   made to set one up at that login. The required action **Configure OTP** is registered and enabled
   (without it such an admin is refused with *credential setup required*). The Discord identity
-  provider's *post login flow* is a small top-level flow of its own (`Admin` role, OTP Form), never
-  the browser copy: a brokered login must not run the username and password pages again.
+  provider's *post login flow* is a small top-level flow of its own, never the browser copy: a
+  brokered login must not run the username and password pages again. It holds a **required
+  *Allow access*** step followed by the conditional block (`Admin` role, OTP Form). The *Allow
+  access* step is load-bearing: Keycloak fails a flow whose only entry is a conditional sub-flow
+  that does not apply, which would refuse every Discord login of a member with *invalid username
+  or password*, and an *alternative* beside the block is ignored.
 - **Forgot password (step 2).** The switch and the realm's own SMTP sender are one decision: a link
   that cannot be answered with a mail is not offered. The reset page (`login-reset-password.ftl`)
   asks for the e-mail address or the username and tells a Discord-registered user that the username
@@ -5816,6 +5820,11 @@ dry run by default, with a rollback file, never deleting.
   The self-test models that refusal (`harden-keycloak-realm.py --selftest`).
 - [x] The provisioner's session windows are the file's `active` profile
   (`harden-keycloak-realm.py --selftest`).
+- [x] The post login flow carries a required *Allow access* in front of the Admin OTP block; a
+  realm without it is reported by the dry run and repaired by `--apply`, and the self-test's model
+  of Keycloak's flow evaluation lets a member's brokered login through and asks an admin for the
+  code (`harden-keycloak-realm.py --selftest`; the flow's shape on a real Keycloak:
+  `harden-keycloak-realm.integration.py`).
 - [ ] A login that comes in through Discord is gated: **not testable in the repository** (the test
   realm has no real Discord provider, only a disabled stand-in the bind is exercised on); the owner checks it at the production run
   ([`OWNER_STEPS_2026-10.md`](../archive/OWNER_STEPS_2026-10.md) § 7).

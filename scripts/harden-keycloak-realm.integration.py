@@ -288,6 +288,14 @@ def run(stack: Stack, sink: SmtpSink, workdir: Path) -> None:
                 "the identity provider runs the post-broker flow")
     stack.check(idp.get("providerId") == "oidc" and idp.get("alias") == "discord",
                 "the bind left the identity provider's id and alias alone")
+    post_broker = [entry for entry in stack.get_json("authentication/flows/post-broker-admin-otp/executions")
+                   if entry.get("level", 0) == 0]
+    stack.check(any(entry.get("providerId") == "allow-access-authenticator"
+                    and entry.get("requirement") == "REQUIRED" for entry in post_broker),
+                "the post-broker flow carries a required 'Allow access', so a member's brokered login completes")
+    stack.check(bool(post_broker) and post_broker[-1].get("displayName") == "Admin OTP (post-broker)"
+                and post_broker[-1].get("requirement") == "CONDITIONAL",
+                "the Admin OTP block is the last entry of the post-broker flow")
 
     print("step 2: forgot password")
     before = len(sink.messages())
