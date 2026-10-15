@@ -120,7 +120,8 @@ class MemberHangarPageControllerTest {
         .andExpect(content().string(containsString("Pilot Alpha")))
         .andExpect(content().string(containsString("Iron Mule")))
         .andExpect(content().string(containsString("data-testid=\"member-hangar-add\"")))
-        .andExpect(content().string(containsString("data-version=\"3\"")));
+        .andExpect(content().string(containsString("data-version=\"3\"")))
+        .andExpect(content().string(containsString("data-live-sync-topic=\"hangar:" + MEMBER)));
   }
 
   @Test

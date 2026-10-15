@@ -252,7 +252,7 @@ class LiveSyncTopicTest {
   @Test
   void everyScopedClassExposesAnAuthProbePathWithAnIdPlaceholder() {
     for (LiveSyncTopicClass topicClass : LiveSyncTopicClass.values()) {
-      if (topicClass.selfOnly()) {
+      if (topicClass.personal()) {
         assertThat(topicClass.authProbePath())
             .as("personal class %s is authorized locally, never by a probe", topicClass)
             .isNull();

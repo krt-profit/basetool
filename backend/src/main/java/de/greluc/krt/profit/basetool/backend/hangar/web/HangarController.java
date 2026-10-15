@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDto;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipMapper;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.FleetviewImportResponseDto;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarImportService;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarService;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.SetHomeLocationRequestDto;
@@ -50,6 +51,7 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -101,6 +103,7 @@ public class HangarController {
   private final ShipMapper shipMapper;
   private final UserMapper userMapper;
   private final AuthHelperService authHelperService;
+  private final HangarAccessPolicy hangarAccessPolicy;
 
   /**
    * Returns one page of the calling user's own ships in the fixed personal-hangar order, with the
@@ -173,6 +176,27 @@ public class HangarController {
     Page<SquadronShipOverviewDto> p =
         hangarService.getSquadronOverview(pageable, includeOwnerDetails, search);
     return PageResponse.of(p);
+  }
+
+  /**
+   * Answers whether the caller's unit overview shows the ships of one org unit, the check behind a
+   * subscribe to that unit's live-sync room (REQ-HANGAR-003, ADR-0260).
+   *
+   * @param orgUnitId the org unit
+   * @return 204 when the unit overview admits the unit; 403 otherwise
+   */
+  @Operation(summary = "Check access to an org unit's hangar overview")
+  @ApiResponses({
+    @ApiResponse(responseCode = "204", description = "The unit overview shows this unit"),
+    @ApiResponse(responseCode = "403", description = "It does not")
+  })
+  @GetMapping("/units/{orgUnitId}/overview-access")
+  @PreAuthorize(HANGAR_ACCESS)
+  public ResponseEntity<Void> unitOverviewAccess(@PathVariable @NotNull UUID orgUnitId) {
+    if (!hangarAccessPolicy.canSeeUnitHangar(orgUnitId)) {
+      throw new AccessDeniedException("The unit overview does not show this org unit");
+    }
+    return ResponseEntity.noContent().build();
   }
 
   /**

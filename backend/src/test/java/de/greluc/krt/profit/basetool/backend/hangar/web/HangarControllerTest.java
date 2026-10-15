@@ -86,7 +86,8 @@ class HangarControllerTest {
             userService,
             shipMapper,
             userMapper,
-            RoleGateFixture.realAuthHelper());
+            RoleGateFixture.realAuthHelper(),
+            null);
   }
 
   @AfterEach

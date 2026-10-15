@@ -212,9 +212,11 @@ class ExchangeShipWriteControllerTest {
 
     jdbc.update(
         "DELETE FROM org_unit_membership WHERE user_id = ? AND org_unit_id = ?", member, command);
+    double unitFramesBefore = frames("hangar_unit");
     change(ops(upsert("vk-10", null, null, cutlass, "One unit", "{\"kind\":\"LTI\"}", null)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.applied").value(1));
+    assertThat(frames("hangar_unit")).isEqualTo(unitFramesBefore + 1);
     assertThat(
             jdbc.queryForObject(
                 "SELECT owning_org_unit_id FROM ship WHERE owner_id = ? AND name = 'One unit'",
@@ -339,6 +341,7 @@ class ExchangeShipWriteControllerTest {
     UUID mission = mission();
     UUID unit = missionUnit(mission, first);
     double framesBefore = frames("hangar_own");
+    double unitFramesBefore = frames("hangar_units");
 
     change(ops(remove(first, 0L)))
         .andExpect(status().isOk())
@@ -347,6 +350,7 @@ class ExchangeShipWriteControllerTest {
 
     assertThat(ships(member)).isZero();
     assertThat(frames("hangar_own")).isEqualTo(framesBefore + 1);
+    assertThat(frames("hangar_units")).isEqualTo(unitFramesBefore + 1);
     assertThat(
             jdbc.queryForObject(
                 "SELECT COUNT(*) FROM mission_unit WHERE id = ? AND ship_id IS NULL",

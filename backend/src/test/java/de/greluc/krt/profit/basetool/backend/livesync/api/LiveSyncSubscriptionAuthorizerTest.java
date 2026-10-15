@@ -28,6 +28,8 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankAccessService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankLiveSyncTopicAuthorizer;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarUnitLiveSyncTopicAuthorizer;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderLiveSyncTopicAuthorizer;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
@@ -69,6 +71,7 @@ class LiveSyncSubscriptionAuthorizerTest {
   @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
   @Mock private AuthHelperService authHelperService;
   @Mock private OrgUnitBankAccessService orgUnitBankAccessService;
+  @Mock private HangarAccessPolicy hangarAccessPolicy;
 
   private MeterRegistry meterRegistry;
   private LiveSyncSubscriptionAuthorizer authorizer;
@@ -87,6 +90,7 @@ class LiveSyncSubscriptionAuthorizerTest {
         new OperationLiveSyncTopicAuthorizer(operationAccessPolicy),
         new JobOrderLiveSyncTopicAuthorizer(ownerScopeService, jobOrderAccessPolicy),
         new RefineryLiveSyncTopicAuthorizer(refineryAccessPolicy),
+        new HangarUnitLiveSyncTopicAuthorizer(hangarAccessPolicy),
         new OrgUnitBankLiveSyncTopicAuthorizer(orgUnitBankAccessService));
   }
 
@@ -189,6 +193,25 @@ class LiveSyncSubscriptionAuthorizerTest {
 
     when(authHelperService.currentUserId()).thenReturn(java.util.Optional.empty());
     assertThat(authorizer.maySubscribe(LiveSyncTopic.parse("blueprints:" + RESOURCE))).isFalse();
+  }
+
+  @Test
+  @DisplayName("a unit hangar room asks the unit-overview gate; the all-units room admits a member")
+  void theUnitHangarRoomsUseTheUnitOverviewGate() {
+    when(hangarAccessPolicy.canSeeUnitHangar(RESOURCE)).thenReturn(true, false);
+
+    assertThat(authorizer.maySubscribe(LiveSyncTopic.parse("hangar-unit:" + RESOURCE))).isTrue();
+    assertThat(authorizer.maySubscribe(LiveSyncTopic.parse("hangar-unit:" + RESOURCE))).isFalse();
+    assertThat(authorizer.maySubscribe(LiveSyncTopic.parse("hangar-units"))).isTrue();
+  }
+
+  @Test
+  @DisplayName("the app bridge keeps a member's hangar room closed to an admin")
+  void thePersonalHangarRoomStaysSelfOnlyOnTheBridge() {
+    lenient().when(authHelperService.isAdmin()).thenReturn(true);
+    when(authHelperService.currentUserId()).thenReturn(java.util.Optional.of(UUID.randomUUID()));
+
+    assertThat(authorizer.maySubscribe(LiveSyncTopic.parse("hangar:" + RESOURCE))).isFalse();
   }
 
   @Test

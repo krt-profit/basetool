@@ -75,4 +75,15 @@ public class HangarAccessPolicy {
         .map(s -> ownerScopeService.permitsOwnedRow(s.getOwner(), s.getOwningOrgUnit(), true))
         .orElse(false);
   }
+
+  /**
+   * Checks whether the ships of org unit {@code orgUnitId} appear in the caller's unit overview
+   * (REQ-HANGAR-003), the read behind the unit's live-sync room.
+   *
+   * @param orgUnitId the org unit to inspect; never {@code null}
+   * @return {@code true} iff the caller's unit-overview scope admits the unit
+   */
+  public boolean canSeeUnitHangar(@NotNull UUID orgUnitId) {
+    return ownerScopeService.currentUnitOverviewScope().permits(orgUnitId);
+  }
 }

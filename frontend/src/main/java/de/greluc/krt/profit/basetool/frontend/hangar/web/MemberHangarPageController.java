@@ -96,7 +96,8 @@ public class MemberHangarPageController {
    * @param page zero-based page index; negatives are clamped to 0
    * @param size page size, validated against {@link #PAGE_SIZES}
    * @param fragment {@code "results"} renders only the ship-list fragment (REQ-FE-005)
-   * @param model model populated with the member, the ship page and the form catalogues
+   * @param model model populated with the member, the ship page, the form catalogues and the
+   *     member's hangar live-sync room
    * @return the {@code hangar/member-hangar} view, or its {@code memberHangarResults} fragment
    */
   @NotNull
@@ -174,6 +175,7 @@ public class MemberHangarPageController {
     model.addAttribute("shipTypes", shipTypes);
     model.addAttribute("locations", locations);
     model.addAttribute("manufacturers", manufacturers);
+    model.addAttribute("memberHangarLiveSyncTopic", "hangar:" + userId);
     return "hangar/member-hangar";
   }
 

@@ -44,7 +44,7 @@
     <div th:if="${error}" class="alert alert-danger" th:text="#{__${error}__}">Fehler</div>
 
     <section class="list-panel">
-        <div id="member-hangar-results" class="card card--flush">
+        <div id="member-hangar-results" class="card card--flush" th:data-live-sync-topic="${memberHangarLiveSyncTopic}">
         <th:block th:fragment="memberHangarResults">
             <div hidden id="member-hangar-stats" th:data-total="${shipsPage.totalElements()}"></div>
             <div class="table-responsive" th:if="${!#lists.isEmpty(ships)}">

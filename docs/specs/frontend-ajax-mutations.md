@@ -1243,14 +1243,25 @@ this requirement exists to prevent, #1102). Covered topics and their section whi
 | `members` (global)       | roster                                                                                                                        | no            | `ROLE_ADMIN` (local check — the `/members` class-level page gate)                                     |
 | `exchange-clients` (global) | registry, undoRuns (the admin bulk undo runs, REQ-XCH-034)                                                                    | no            | `ROLE_ADMIN` (local check — the `/admin/exchange-clients` class-level page gate)                      |
 | `org-structure` (global) | units, forms, chart                                                                                                           | no            | authenticated (the Organigramm is member-visible; the admin sections stay protected per fragment)     |
-| `hangar:{userId}`        | ships                                                                                                                         | no            | the member whose id it is, and nobody else (local check against the socket's subject, fails closed)   |
+| `hangar:{userId}`        | ships                                                                                                                         | no            | the member whose id it is, or `ROLE_ADMIN` for the admin member hangar (local check against the socket's subject and authorities, fails closed) |
+| `hangar-unit:{orgUnitId}` | ships (the unit tab with a pinned unit, ADR-0260)                                                                            | no            | `GET /api/v1/hangar/units/{id}/overview-access` (the unit-overview scope, REQ-HANGAR-003)             |
+| `hangar-units` (global)  | ships (the unit tab across every unit the viewer sees, ADR-0260)                                                              | no            | authenticated (each viewer re-pulls its own scoped overview)                                          |
 | `blueprints:{userId}`    | list                                                                                                                          | no            | the member whose id it is, and nobody else (local check against the socket's subject, fails closed)   |
 
 The two personal rooms carry a member's own pages, `/hangar` and „Meine Blueprints": the page
 names its room from the model (`hangarLiveSyncTopic`, `blueprintsLiveSyncTopic`), sends `changed` on
 its own writes so the member's other tabs follow, and re-pulls its fragment when the backend reports
 that a connected application wrote there (REQ-XCH-013). No probe is asked — the id must be the
-socket's own subject, captured at the handshake.
+socket's own subject, captured at the handshake. `hangar:{userId}` also admits an admin: the admin
+member hangar (`/admin/members/{id}/hangar`, REQ-HANGAR-011) subscribes to the member's room, sends
+`changed` after each of its writes and re-pulls its list on the member's own change. The backend's
+app bridge keeps the room self-only (ADR-0260).
+
+The two unit hangar rooms carry the org-unit tab (`/hangar/squadron`, `unitLiveSyncTopic`): with a
+pinned unit it listens to `hangar-unit:{orgUnitId}`, without one to the single `hangar-units` room,
+so the all-units view opens one subscription however many units it spans. Neither page sends on
+them: the backend announces every committed ship change after the commit, to the room of each unit
+the change touched (both units for a move) and once to `hangar-units` (ADR-0260).
 
 The `inventory` room is the squadron Lager (#1307/#1309): a single opaque `stock` section stands for
 "the inventory changed". **All** inventory views subscribe and re-pull their own fragment on a peer's

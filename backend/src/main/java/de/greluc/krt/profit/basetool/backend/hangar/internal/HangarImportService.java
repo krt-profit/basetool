@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -77,6 +78,7 @@ public class HangarImportService {
   private final ObjectMapper objectMapper;
   private final OwnerScopeService ownerScopeService;
   private final AuditRecorder auditRecorder;
+  private final HangarUnitLiveSync unitLiveSync;
 
   /**
    * Parses an uploaded ship-export JSON file and adds every resolvable ship missing from the user's
@@ -204,6 +206,7 @@ public class HangarImportService {
           AuditDetails.of("created", importedCount)
               .with("alreadyPresent", alreadySufficientCount)
               .with("unmatched", skippedShips.size()));
+      unitLiveSync.shipsChanged(Collections.singletonList(owningOrgUnit));
     }
 
     return new FleetviewImportResponseDto(

@@ -22,6 +22,7 @@ import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 import {
     createShipSelection,
     formatMessage,
@@ -31,10 +32,13 @@ import {
 
 const RESULTS = '#member-hangar-results';
 
+const MEMBER_HANGAR_SECTIONS = { ships: { container: RESULTS } };
+
 /**
  * Wires the admin member hangar: the add, edit and delete dialogs (REQ-HANGAR-011) and the unit
- * change of one ship or a selection (REQ-HANGAR-012) write through the member's admin paths and
- * swap the ship list in place.
+ * change of one ship or a selection (REQ-HANGAR-012) write through the member's admin paths, swap
+ * the ship list in place and tell the member's open hangar pages through hangar:{memberId}; a
+ * change made there refreshes this list the same way.
  */
 function initMemberHangar() {
     const root = document.getElementById('member-hangar');
@@ -173,6 +177,31 @@ function initMemberHangar() {
         });
     }
 
+    const resultsEl = document.getElementById('member-hangar-results');
+    const memberTopic = resultsEl ? resultsEl.dataset.liveSyncTopic || '' : '';
+
+    /**
+     * Re-reads the list after one of this page's writes and tells the member's other open hangar
+     * pages.
+     */
+    function afterWrite() {
+        refreshList();
+        if (memberTopic) {
+            krtLiveSync.sendChanged(memberTopic, Object.keys(MEMBER_HANGAR_SECTIONS));
+        }
+    }
+
+    if (memberTopic) {
+        krtLiveSync.createReceiver({
+            topic: memberTopic,
+            sections: MEMBER_HANGAR_SECTIONS,
+            coalesceMs: 1500,
+            refresh() {
+                refreshList();
+            },
+        });
+    }
+
     document.addEventListener('krt:swapped', (e) => {
         const container = e && e.detail ? e.detail.container : null;
         if (!container || container.id !== 'member-hangar-results') return;
@@ -265,7 +294,7 @@ function initMemberHangar() {
                 errorMessage: message(isUpdate ? 'updateError' : 'addError'),
                 onSuccess() {
                     closeShipModal();
-                    refreshList();
+                    afterWrite();
                 },
             })
             .then(() => {
@@ -289,7 +318,7 @@ function initMemberHangar() {
                 onSuccess() {
                     krtModal.close(confirmModal);
                     closeShipModal();
-                    refreshList();
+                    afterWrite();
                 },
             })
             .then(() => {
@@ -436,7 +465,7 @@ function initMemberHangar() {
                           });
                           selectedShips.clear();
                           renderSelection();
-                          refreshList();
+                          afterWrite();
                       },
                   })
                 : krtFetch.write({
@@ -451,7 +480,7 @@ function initMemberHangar() {
                       conflict,
                       onSuccess() {
                           krtModal.close(modalEl);
-                          refreshList();
+                          afterWrite();
                       },
                   });
             request.then(() => {

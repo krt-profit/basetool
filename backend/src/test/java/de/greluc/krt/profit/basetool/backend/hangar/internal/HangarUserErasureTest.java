@@ -21,12 +21,13 @@ package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant.Erased;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant.Phase;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -40,6 +41,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class HangarUserErasureTest {
 
   @Mock private ShipRepository shipRepository;
+  @Mock private HangarUnitLiveSync unitLiveSync;
 
   @InjectMocks private HangarUserErasure participant;
 
@@ -53,11 +55,21 @@ class HangarUserErasureTest {
   }
 
   @Test
-  void deletesTheShipsOfTheMemberAndReportsTheCount() {
+  void deletesTheShipsOfTheMemberReportsTheCountAndTellsTheirUnits() {
+    UUID unit = UUID.randomUUID();
+    when(shipRepository.findOrgUnitIdsByOwnerId(userId)).thenReturn(List.of(unit));
     when(shipRepository.deleteByOwnerId(userId)).thenReturn(7);
 
     assertThat(participant.erase(userId, adminId)).isEqualTo(Map.of(Erased.SHIPS, 7));
     verify(shipRepository).deleteByOwnerId(userId);
-    verifyNoMoreInteractions(shipRepository);
+    verify(unitLiveSync).unitsChanged(List.of(unit));
+  }
+
+  @Test
+  void announcesNothingWhenTheMemberHadNoShips() {
+    when(shipRepository.deleteByOwnerId(userId)).thenReturn(0);
+
+    assertThat(participant.erase(userId, adminId)).isEqualTo(Map.of(Erased.SHIPS, 0));
+    verifyNoInteractions(unitLiveSync);
   }
 }

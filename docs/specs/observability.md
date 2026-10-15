@@ -2149,11 +2149,12 @@ symptom of a section-key skew is one panel going stale while the rest of the pag
 which an all-rejected-only counter would never see. The rejected key is client-supplied and therefore
 never becomes a tag value; it appears once, sanitised, in the `DEBUG` line (REQ-OBS-001) —
 the component that shipped the REQ-FE-010 staleness defect. Since #1102 (REQ-FE-015 / ADR-0094) both
-counters carry a bounded `topic_class` label (one of the sixteen `LiveSyncTopicClass` labels:
+counters carry a bounded `topic_class` label (one of the `LiveSyncTopicClass` labels:
 `mission`, `operation`, `order_detail`, `orders_queue`, `bank_account`, `bank_staff`, `orgunit_bank`,
 `materialboard`, `inventory_all`, since #1235 `missions_list`, `refinery_queue`, `members_roster`,
 `org_structure`, since #1238 `refinery_order`, and since WP 4.4 of the exchange epic the personal
-`hangar_own` and `blueprints_own`), and
+`hangar_own` and `blueprints_own`, and the unit hangar rooms `hangar_unit` and `hangar_units`,
+ADR-0260), and
 the meter names stay put — a rename would break the `07` panels and this alert set.
 
 Both drop signals are **alerted** since #1238, on a threshold measured rather than guessed: read on

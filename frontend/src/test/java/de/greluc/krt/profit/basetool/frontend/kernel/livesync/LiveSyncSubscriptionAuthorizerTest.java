@@ -97,6 +97,46 @@ class LiveSyncSubscriptionAuthorizerTest {
   }
 
   @Test
+  void aMembersHangarRoomAlsoAdmitsAnAdminButNoOtherRole() {
+    UUID member = UUID.randomUUID();
+    UUID admin = UUID.randomUUID();
+    LiveSyncTopic hangar = LiveSyncTopic.parse("hangar:" + member);
+    LiveSyncTopic blueprints = LiveSyncTopic.parse("blueprints:" + member);
+    Set<String> adminAuthorities = Set.of("ROLE_ADMIN", "ROLE_KRT_MEMBER");
+
+    assertThat(authorizer.authorize(hangar, TOKEN, PIN, adminAuthorities, admin))
+        .isEqualTo(Decision.ALLOW);
+    assertThat(authorizer.authorize(hangar, TOKEN, PIN, Set.of("ROLE_OFFICER"), admin))
+        .isEqualTo(Decision.DENY);
+    assertThat(authorizer.authorize(hangar, TOKEN, PIN, null, admin))
+        .isEqualTo(Decision.DENY_INDETERMINATE);
+    assertThat(authorizer.authorize(blueprints, TOKEN, PIN, adminAuthorities, admin))
+        .isEqualTo(Decision.DENY);
+    assertThat(server.getRequestCount()).isZero();
+  }
+
+  @Test
+  void aUnitHangarRoomAsksTheUnitOverviewGate() throws Exception {
+    UUID unit = UUID.randomUUID();
+    LiveSyncTopic topic = LiveSyncTopic.parse("hangar-unit:" + unit);
+    server.enqueue(new MockResponse().setResponseCode(204));
+    server.enqueue(new MockResponse().setResponseCode(403));
+
+    assertThat(authorizer.authorize(topic, TOKEN, PIN)).isEqualTo(Decision.ALLOW);
+    RecordedRequest request = server.takeRequest(2, TimeUnit.SECONDS);
+    assertThat(request).isNotNull();
+    assertThat(request.getPath()).isEqualTo("/api/v1/hangar/units/" + unit + "/overview-access");
+    assertThat(authorizer.authorize(topic, TOKEN, PIN)).isEqualTo(Decision.DENY);
+  }
+
+  @Test
+  void theAllUnitsHangarRoomNeedsOnlyTheSocketsAuthentication() {
+    assertThat(authorizer.authorize(LiveSyncTopic.parse("hangar-units"), null, null))
+        .isEqualTo(Decision.ALLOW);
+    assertThat(server.getRequestCount()).isZero();
+  }
+
+  @Test
   void authorize_403_denies() {
     server.enqueue(new MockResponse().setResponseCode(403));
     assertThat(authorizer.authorize(operationTopic, TOKEN, PIN)).isEqualTo(Decision.DENY);
@@ -301,7 +341,8 @@ class LiveSyncSubscriptionAuthorizerTest {
               || topicClass == LiveSyncTopicClass.REFINERY
               || topicClass == LiveSyncTopicClass.ORG_STRUCTURE
               || topicClass == LiveSyncTopicClass.SUPPLY_NEEDS
-              || topicClass == LiveSyncTopicClass.PURCHASING_DEALS;
+              || topicClass == LiveSyncTopicClass.PURCHASING_DEALS
+              || topicClass == LiveSyncTopicClass.HANGAR_UNITS;
       assertThat(topicClass.needsCheck()).isEqualTo(!authenticationOnly);
     }
   }

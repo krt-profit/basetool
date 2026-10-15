@@ -8,6 +8,7 @@
 - **Hangar: Einheit mehrerer Schiffe auf einmal ändern.** In „Meine Schiffe" lassen sich Schiffe per Checkbox markieren; die Auswahlleiste ordnet alle markierten Schiffe mit einer Aktion einer eigenen Einheit zu oder setzt „Keine Einheit". Schiffe, die schon dort sind, werden übersprungen; ein fremdes Schiff in der Auswahl bricht die ganze Aktion ab (REQ-HANGAR-010).
 - **Admin: Hangar eines Mitglieds.** Die neue Seite `/admin/members/{id}/hangar`, verlinkt in „Mitglied bearbeiten", zeigt Admins die Schiffe eines Mitglieds und lässt sie dort hinzufügen, bearbeiten und löschen; das Mitglied wird über jede Änderung benachrichtigt (REQ-HANGAR-011).
 - **Admin: Einheit der Schiffe eines Mitglieds ändern.** Im Hangar eines Mitglieds ordnen Admins ein Schiff per Zeilenaktion oder mehrere über die Auswahlleiste einer Einheit des Mitglieds zu oder setzen „Keine Einheit". Das Mitglied erhält eine Benachrichtigung, bei mehreren Schiffen eine Sammelmeldung (REQ-HANGAR-012, Migration V291).
+- **Hangar: Einheiten-Tab und Admin-Hangar aktualisieren sich live.** Der Tab „Org-Einheit" zeigt neue, geänderte, gelöschte und in eine andere Einheit verschobene Schiffe ohne Neuladen, auch wenn eine verbundene Anwendung sie geschrieben hat. Änderungen im Admin-Hangar eines Mitglieds erscheinen sofort in dessen „Meine Schiffe" und umgekehrt (REQ-HANGAR-013, ADR-0260).
 
 ## [v1.16.3](https://github.com/krt-profit/basetool/releases/tag/v1.16.3) - 2026-10-14
 

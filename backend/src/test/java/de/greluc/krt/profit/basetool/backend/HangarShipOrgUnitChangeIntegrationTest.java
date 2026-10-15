@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -143,6 +144,26 @@ class HangarShipOrgUnitChangeIntegrationTest {
         .contains("SPECIAL_COMMAND:" + ownersCommand.getId())
         .doesNotContain("Owner SK")
         .doesNotContain("Iron Mule");
+  }
+
+  @Test
+  @DisplayName("the unit-room probe admits a unit the caller's overview shows and refuses another")
+  void unitOverviewAccessFollowsTheUnitOverviewScope() throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/hangar/units/" + ownersCommand.getId() + "/overview-access")
+                .with(as(owner)))
+        .andExpect(status().isNoContent());
+    mockMvc
+        .perform(
+            get("/api/v1/hangar/units/" + foreignCommand.getId() + "/overview-access")
+                .with(as(owner)))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(
+            get("/api/v1/hangar/units/" + ownersCommand.getId() + "/overview-access")
+                .with(jwt().jwt(builder -> builder.subject(owner.getId().toString()))))
+        .andExpect(status().isForbidden());
   }
 
   @Test
