@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.exchange.web;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -51,7 +52,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.web.FilterChainProxy;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -114,6 +117,7 @@ class ExchangeShipControllerTest {
     jdbc.update("DELETE FROM exchange_client WHERE client_id = ?", client);
     for (UUID id : List.of(member, other)) {
       jdbc.update("DELETE FROM ship WHERE owner_id = ?", id);
+      jdbc.update("DELETE FROM org_unit_membership WHERE user_id = ?", id);
       jdbc.update("DELETE FROM user_roles WHERE user_id = ?", id);
       jdbc.update("DELETE FROM app_user WHERE id = ?", id);
     }
@@ -244,18 +248,25 @@ class ExchangeShipControllerTest {
   }
 
   @Test
-  void theFeedAnswersAShipWhoseUnitChangedWithTheNewUnitAndCounter() throws Exception {
+  void aUnitChangeInTheWebBringsTheShipIntoTheFeedWithTheNewUnitAndCounter() throws Exception {
     UUID cutlass = shipType("Cutlass Black");
     UUID unit = orgUnit("SQUADRON");
+    jdbc.update(
+        "INSERT INTO org_unit_membership (user_id, org_unit_id) VALUES (?, ?)", member, unit);
     UUID moved = ship(member, "Moved", cutlass, "LTI", null, false);
     ship(member, "Untouched", cutlass, "LTI", null, false);
     String cursor = snapshotEnd();
 
-    jdbc.update(
-        "UPDATE ship SET owning_org_unit_id = ?,"
-            + " owning_org_unit_version = owning_org_unit_version + 1 WHERE id = ?",
-        unit,
-        moved);
+    mockMvc
+        .perform(
+            put("/api/v1/hangar/ships/" + moved + "/org-unit")
+                .with(
+                    jwt()
+                        .jwt(t -> t.subject(member.toString()))
+                        .authorities(new SimpleGrantedAuthority("HANGAR_WRITE")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"orgUnitId\":\"" + unit + "\",\"owningOrgUnitVersion\":0}"))
+        .andExpect(status().isOk());
 
     read(relayed(get(PATH).param("cursor", cursor)))
         .andExpect(status().isOk())

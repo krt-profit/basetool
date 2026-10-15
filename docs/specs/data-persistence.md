@@ -1131,7 +1131,7 @@ The listed crossings:
 | Crossing | Foreign tables | Why |
 | --- | --- | --- |
 | The four V252/V260 change-feed triggers on `personal_blueprint`, `default_blueprint`, `inventory_item`, `ship` | `exchange_change` (write), `app_user` (read) | The exchange's key log is written with the row (ADR-0224) |
-| The V293 change-feed trigger `trg_org_unit_exchange_change` on `org_unit` | `exchange_change` (write), `app_user`, `ship` (read) | A renamed unit re-announces its ships in the exchange's key log (REQ-XCH-017) |
+| The V293 change-feed trigger `trg_org_unit_exchange_change` on `org_unit` | `exchange_change` (write), `app_user`, `ship` (read) | A renamed unit re-announces its ships in the exchange's key log (REQ-XCH-017, ADR-0261) |
 | `trg_guard_promotion_topic_owner_kind`, `trg_guard_rank_requirement_owner_kind` | `org_unit` (read) | The owning unit must be a squadron; a downward read |
 | `InventoryItemRepository#findExchangeLots`, `#findExchangeLotsByKeys` | `city`, `game_item`, `location`, `material`, `space_station` (read) | Catalogue names joined into the exchange's stock lots |
 | `PersonalBlueprintRepository#grantDefaultBlueprintsToAllUsers` | `app_user` (read) | Grants the default set to every active account in one statement |

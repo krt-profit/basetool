@@ -1,6 +1,6 @@
 # ADR-0258 — A ship's org unit has its own optimistic counter
 
-- **Status:** Accepted
+- **Status:** Accepted — **amended by [ADR-0261](0261-a-unit-rename-re-announces-its-ships-in-the-exchange-feed.md)** (a unit change and a unit rename move the ship in the Exchange feed)
 - **Date:** 2026-10-15
 - **Deciders:** @greluc
 - **Related:** spec [`personal-hangar-overview.md`](../specs/personal-hangar-overview.md)
@@ -43,9 +43,8 @@ would 409 the other although they touch different data, which the fine-grained l
 
 - A unit change and a concurrent field edit of the same ship both succeed; two concurrent unit
   changes still 409 one of them.
-- The ship's `version` does not move on a unit change. The Exchange feed still announces the ship,
-  with the new unit and `orgUnitVersion`, and announces every ship of a unit again when the unit's
-  name, shorthand or kind changes (REQ-XCH-017).
+- The ship's change-feed position and its `version` do not move on a unit change; the Exchange
+  feed announces it through its own field.
 - The create dialog keeps the „Zuordnen zu" picker; the edit dialog no longer shows it, because it
   saved nothing.
 - A further editable part of `Ship` that must not collide with field edits takes its own counter the

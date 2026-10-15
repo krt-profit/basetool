@@ -25,7 +25,7 @@ tombstones as [blueprints](blueprints.md#reading-the-set--get-exchangev1mebluepr
 member's own ships are in it; a ship given to another member arrives as a tombstone.
 
 A ship is in the feed again when its unit changes, and when its unit is renamed or gets a new
-shorthand or kind; so the `orgUnit` you hold is never stale. Read `orgUnit` as the ship's unit
+shorthand; so the `orgUnit` you hold is never stale. Read `orgUnit` as the ship's unit
 as it is now: it need not be one of the units `GET /exchange/v1/me/org-units` lists, for example
 after the member left that unit.
 
