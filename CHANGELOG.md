@@ -2,19 +2,28 @@
 
 ## [Unreleased]
 
+## [v1.16.4](https://github.com/krt-profit/basetool/releases/tag/v1.16.4) - 2026-10-15
+
 ### Added
 
 - **Hangar: Einheit eines Schiffs nachträglich ändern.** Die neue Zeilenaktion „Einheit ändern" in „Meine Schiffe" ordnet ein eigenes Schiff einer der eigenen Einheiten zu oder nimmt es mit „Keine Einheit" heraus, etwa ein Schiff, das eine verbundene Anwendung ohne Einheit angelegt hat. Jede Zeile zeigt ihre Einheit; der Bearbeiten-Dialog zeigt „Zuordnen zu" nicht mehr (REQ-HANGAR-009, ADR-0258, Migration V290).
+
 - **Hangar: Einheit mehrerer Schiffe auf einmal ändern.** In „Meine Schiffe" lassen sich Schiffe per Checkbox markieren; die Auswahlleiste ordnet alle markierten Schiffe mit einer Aktion einer eigenen Einheit zu oder setzt „Keine Einheit". Schiffe, die schon dort sind, werden übersprungen; ein fremdes Schiff in der Auswahl bricht die ganze Aktion ab (REQ-HANGAR-010).
+
 - **Admin: Hangar eines Mitglieds.** Die neue Seite `/admin/members/{id}/hangar`, verlinkt in „Mitglied bearbeiten", zeigt Admins die Schiffe eines Mitglieds und lässt sie dort hinzufügen, bearbeiten und löschen; das Mitglied wird über jede Änderung benachrichtigt (REQ-HANGAR-011).
+
 - **Admin: Einheit der Schiffe eines Mitglieds ändern.** Im Hangar eines Mitglieds ordnen Admins ein Schiff per Zeilenaktion oder mehrere über die Auswahlleiste einer Einheit des Mitglieds zu oder setzen „Keine Einheit". Das Mitglied erhält eine Benachrichtigung, bei mehreren Schiffen eine Sammelmeldung (REQ-HANGAR-012, Migration V291).
+
 - **Hangar: Einheiten-Tab und Admin-Hangar aktualisieren sich live.** Der Tab „Org-Einheit" zeigt neue, geänderte, gelöschte und in eine andere Einheit verschobene Schiffe ohne Neuladen, auch wenn eine verbundene Anwendung sie geschrieben hat. Änderungen im Admin-Hangar eines Mitglieds erscheinen sofort in dessen „Meine Schiffe" und umgekehrt (REQ-HANGAR-013, ADR-0260).
+
 - **Datenaustausch: eigene Einheiten lesen.** Verbundene Anwendungen mit der neuen Berechtigung `exchange.orgunits.read` lesen über `GET /exchange/v1/me/org-units` die Einheiten, denen das Mitglied direkt angehört (Name, Kürzel, Art), etwa um sie zur Auswahl anzubieten. Einwilligungsseite, „Verbundene Anwendungen" und Datenschutzerklärung nennen die Berechtigung (REQ-XCH-048, Migration V292).
+
 - **Datenaustausch: Schiffe nennen ihre Einheit.** Der Schiffs-Feed `GET /exchange/v1/me/ships` liefert je Schiff `orgUnit` (ID, Name, Kürzel, Art; fehlt ohne Einheit) und den Zähler `orgUnitVersion`. Ein Einheitenwechsel und das Umbenennen einer Einheit bringen die betroffenen Schiffe in den nächsten Abruf, damit Anwendungen keinen veralteten Namen behalten (REQ-XCH-017, Migration V293).
 
 ### Fixed
 
 - **Datenaustausch: Anwendungen setzen die Einheit eines Schiffs.** Ein `upsert` in `POST /exchange/v1/me/ships/changes` kann mit `orgUnit` eine eigene Einheit oder `null` für keine wählen; zum Ändern sendet er `orgUnitVersion` mit. Ohne `orgUnit` bleibt alles wie bisher: Ein neues Schiff erhält die einzige Einheit des Mitglieds, ein bestehendes behält seine. Eine fremde Einheit (`ORG_UNIT_NOT_ALLOWED`) oder ein veralteter Zähler (`ORG_UNIT_VERSION_CONFLICT`) lehnt nur diese Operation ab (REQ-XCH-017).
+
 - **Datenaustausch: Rückgängig stellt auch die Einheit eines Schiffs wieder her.** Hat eine Anwendung ein Schiff in eine andere Einheit verschoben oder gelöscht, bringt „Rückgängig" es in seine frühere Einheit zurück. Gehört das Mitglied dieser Einheit nicht mehr an, bleibt die aktuelle Einheit, ohne dass das Rückgängigmachen scheitert (REQ-XCH-022).
 
 ## [v1.16.3](https://github.com/krt-profit/basetool/releases/tag/v1.16.3) - 2026-10-14
