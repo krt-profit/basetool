@@ -191,8 +191,7 @@ class PurchasingPartnerServiceTest {
   void listFiltersByTheEscapedNameFragmentTheKindAndTheStatus() {
     maintainer();
     Pageable pageable = PageRequest.of(0, 10);
-    ArgumentCaptor<Specification<PurchasingPartner>> spec =
-        ArgumentCaptor.forClass(Specification.class);
+    ArgumentCaptor<Specification<PurchasingPartner>> spec = ArgumentCaptor.captor();
     when(partnerRepository.findAll(spec.capture(), eq(pageable))).thenReturn(Page.empty(pageable));
 
     Page<PartnerDto> page =
@@ -210,8 +209,7 @@ class PurchasingPartnerServiceTest {
   void listWithoutFiltersAddsNoNameKindOrStatusCriterion() {
     maintainer();
     Pageable pageable = PageRequest.of(0, 10);
-    ArgumentCaptor<Specification<PurchasingPartner>> spec =
-        ArgumentCaptor.forClass(Specification.class);
+    ArgumentCaptor<Specification<PurchasingPartner>> spec = ArgumentCaptor.captor();
     when(partnerRepository.findAll(spec.capture(), eq(pageable))).thenReturn(Page.empty(pageable));
 
     service.list("  ", null, null, pageable);
