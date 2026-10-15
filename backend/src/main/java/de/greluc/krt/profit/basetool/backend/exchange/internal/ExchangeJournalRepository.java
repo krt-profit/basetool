@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -74,6 +75,19 @@ public interface ExchangeJournalRepository extends JpaRepository<ExchangeJournal
       @Param("userId") UUID userId,
       @Param("clientId") String clientId,
       @Param("since") Instant since);
+
+  /**
+   * Sets {@code undoneAt} on the listed entries in one statement, so an undo can mark them even
+   * after a clearing update detached the entries it loaded; entities already loaded keep their old
+   * value.
+   *
+   * @param ids the journal entries an undo restored
+   * @param undoneAt the time of the undo
+   * @return how many rows were updated
+   */
+  @Modifying
+  @Query("UPDATE ExchangeJournalEntry j SET j.undoneAt = :undoneAt WHERE j.id IN :ids")
+  int markUndone(@Param("ids") Collection<UUID> ids, @Param("undoneAt") Instant undoneAt);
 
   /**
    * Deletes every entry recorded before a cutoff.

@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -52,6 +53,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -59,6 +61,7 @@ import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.function.SingletonSupplier;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -94,6 +97,7 @@ public class ExchangeUndoService {
   private final ShipTypeRepository shipTypeRepository;
   private final LocationRepository locationRepository;
   private final ShipCommands shipCommands;
+  private final OrgUnitMembershipQueryService membershipQueryService;
   private final ExchangeShipLinkRepository linkRepository;
   private final AuditRecorder auditRecorder;
   private final ExchangeLiveSync liveSync;
@@ -211,21 +215,26 @@ public class ExchangeUndoService {
     List<ExchangeJournalEntry> skippedEntries = new ArrayList<>();
     List<Skipped> skipped = new ArrayList<>();
     Set<ExchangeResource> touched = EnumSet.noneOf(ExchangeResource.class);
-    Instant now = clock.instant();
+    List<UUID> undone = new ArrayList<>();
+    Supplier<Set<UUID>> memberships =
+        SingletonSupplier.of(() -> membershipQueryService.findDirectMembershipOrgUnitIds(member));
     for (List<ExchangeJournalEntry> group : groups.values()) {
       ExchangeJournalEntry newest = group.getFirst();
       ExchangeResource entryResource = newest.getResource();
-      String reason = restore(member, clientId, group);
+      String reason = restore(member, clientId, group, memberships);
       if (reason != null) {
         skippedEntries.add(newest);
         skipped.add(new Skipped(newest.getId(), entryResource, reason));
         counter(clientId, entryResource, SKIPPED).increment();
         continue;
       }
-      group.forEach(entry -> entry.setUndoneAt(now));
+      group.forEach(entry -> undone.add(entry.getId()));
       restored++;
       touched.add(entryResource);
       counter(clientId, entryResource, RESTORED).increment();
+    }
+    if (!undone.isEmpty()) {
+      journalRepository.markUndone(undone, clock.instant());
     }
     touched.forEach(entryResource -> refresh(member, entryResource));
     return new Outcome(restored, List.copyOf(skipped), List.copyOf(skippedEntries));
@@ -239,10 +248,14 @@ public class ExchangeUndoService {
    * @param member the member
    * @param clientId the client
    * @param group the client's writes to the entry, newest first
+   * @param memberships the member's direct org-unit memberships, loaded on first use
    * @return {@code null} when restored, else the reason it was left alone
    */
   private @Nullable String restore(
-      @NotNull UUID member, @NotNull String clientId, @NotNull List<ExchangeJournalEntry> group) {
+      @NotNull UUID member,
+      @NotNull String clientId,
+      @NotNull List<ExchangeJournalEntry> group,
+      @NotNull Supplier<Set<UUID>> memberships) {
     List<ExchangeJournalEntry> data =
         group.stream().filter(e -> e.getAction() != ExchangeJournalAction.SHIP_LINK).toList();
     List<ExchangeJournalEntry> links =
@@ -264,7 +277,7 @@ public class ExchangeUndoService {
           switch (resource) {
             case BLUEPRINT -> restoreBlueprint(member, newest.getEntityKey(), before);
             case STOCK -> restoreLot(member, newest.getEntityKey(), before);
-            case SHIP -> restoreShip(member, newest.getEntityKey(), before);
+            case SHIP -> restoreShip(member, newest.getEntityKey(), before, memberships);
           };
       if (!done) {
         return GONE;
@@ -319,17 +332,21 @@ public class ExchangeUndoService {
   }
 
   /**
-   * Removes, updates or recreates a ship to match its earlier state; a recreated ship gets a new
-   * id, does not rejoin mission units and is stamped like a client's create, so a member of several
-   * org units gets it without a unit.
+   * Removes, updates or recreates a ship to match its earlier state, including its earlier org unit
+   * while the member still directly belongs to it; a recreated ship gets a new id and does not
+   * rejoin mission units, and one whose unit is not restored is stamped like a client's create.
    *
    * @param member the member
    * @param rawId the ship's id
    * @param before the state before the client's first write, or {@code null} when it was absent
+   * @param memberships the member's direct org-unit memberships, loaded on first use
    * @return whether the ship could be restored
    */
   private boolean restoreShip(
-      @NotNull UUID member, @NotNull String rawId, @Nullable JsonNode before) {
+      @NotNull UUID member,
+      @NotNull String rawId,
+      @Nullable JsonNode before,
+      @NotNull Supplier<Set<UUID>> memberships) {
     UUID shipId = UUID.fromString(rawId);
     Optional<Ship> ship = shipRepository.lockOwnedById(shipId, member);
     if (ship.isEmpty() && shipRepository.existsById(shipId)) {
@@ -358,12 +375,51 @@ public class ExchangeUndoService {
             fitted != null && fitted.asBoolean(),
             ship.map(Ship::getVersion).orElse(null),
             null);
-    if (ship.isPresent()) {
-      shipCommands.updateShip(member, shipId, dto);
-    } else {
-      shipCommands.addShipForClient(member, dto);
+    EarlierUnit unit = earlierUnit(before, memberships);
+    if (ship.isEmpty()) {
+      if (unit == null) {
+        shipCommands.addShipForClient(member, dto);
+      } else {
+        shipCommands.addShipForClientInOrgUnit(member, dto, unit.orgUnitId());
+      }
+      return true;
+    }
+    Ship current = ship.get();
+    UUID currentUnit =
+        current.getOwningOrgUnit() == null ? null : current.getOwningOrgUnit().getId();
+    long unitVersion = current.getOwningOrgUnitVersion();
+    shipCommands.updateShip(member, shipId, dto);
+    if (unit != null && !Objects.equals(unit.orgUnitId(), currentUnit)) {
+      shipCommands.changeShipOrgUnit(member, shipId, unit.orgUnitId(), unitVersion);
     }
     return true;
+  }
+
+  /**
+   * Reads the org unit a ship had before the client's first write, when it may be restored.
+   *
+   * @param before the ship's earlier state
+   * @param memberships the member's direct org-unit memberships, loaded on first use
+   * @return the earlier unit, whose id is {@code null} when the ship had none; {@code null} when
+   *     the state has no {@code orgUnit} key, names no valid unit id, or names a unit the member no
+   *     longer directly belongs to
+   */
+  private static @Nullable EarlierUnit earlierUnit(
+      @NotNull JsonNode before, @NotNull Supplier<Set<UUID>> memberships) {
+    if (!before.has("orgUnit")) {
+      return null;
+    }
+    String raw = text(before, "orgUnit");
+    if (raw == null) {
+      return new EarlierUnit(null);
+    }
+    UUID orgUnitId;
+    try {
+      orgUnitId = UUID.fromString(raw);
+    } catch (IllegalArgumentException _) {
+      return null;
+    }
+    return memberships.get().contains(orgUnitId) ? new EarlierUnit(orgUnitId) : null;
   }
 
   /**
@@ -494,4 +550,11 @@ public class ExchangeUndoService {
    */
   public record Skipped(
       @NotNull UUID journalEntryId, @NotNull ExchangeResource resource, @NotNull String reason) {}
+
+  /**
+   * The org unit an undo puts a ship back in.
+   *
+   * @param orgUnitId the unit, or {@code null} for none
+   */
+  private record EarlierUnit(@Nullable UUID orgUnitId) {}
 }

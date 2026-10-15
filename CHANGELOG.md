@@ -15,6 +15,7 @@
 ### Fixed
 
 - **Datenaustausch: Anwendungen setzen die Einheit eines Schiffs.** Ein `upsert` in `POST /exchange/v1/me/ships/changes` kann mit `orgUnit` eine eigene Einheit oder `null` für keine wählen; zum Ändern sendet er `orgUnitVersion` mit. Ohne `orgUnit` bleibt alles wie bisher: Ein neues Schiff erhält die einzige Einheit des Mitglieds, ein bestehendes behält seine. Eine fremde Einheit (`ORG_UNIT_NOT_ALLOWED`) oder ein veralteter Zähler (`ORG_UNIT_VERSION_CONFLICT`) lehnt nur diese Operation ab (REQ-XCH-017).
+- **Datenaustausch: Rückgängig stellt auch die Einheit eines Schiffs wieder her.** Hat eine Anwendung ein Schiff in eine andere Einheit verschoben oder gelöscht, bringt „Rückgängig" es in seine frühere Einheit zurück. Gehört das Mitglied dieser Einheit nicht mehr an, bleibt die aktuelle Einheit, ohne dass das Rückgängigmachen scheitert (REQ-XCH-022).
 
 ## [v1.16.3](https://github.com/krt-profit/basetool/releases/tag/v1.16.3) - 2026-10-14
 
