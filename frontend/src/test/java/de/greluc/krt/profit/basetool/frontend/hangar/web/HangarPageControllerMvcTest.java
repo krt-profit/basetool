@@ -227,7 +227,19 @@ class HangarPageControllerMvcTest {
         .andExpect(content().string(containsString("page-size-picker")))
         .andExpect(content().string(containsString("/hangar/squadron?page=0&amp;size=10")))
         .andExpect(content().string(containsString("/hangar/squadron?page=0&amp;size=100")))
-        .andExpect(content().string(containsString("Cutlass Black")));
+        .andExpect(content().string(containsString("Cutlass Black")))
+        .andExpect(content().string(containsString("data-live-sync-topic=\"hangar-units\"")));
+  }
+
+  /** The org-unit tab listens to the pinned unit's room, or to the all-units room without a pin. */
+  @Test
+  void unitLiveSyncTopic_namesThePinnedUnitsRoomOrTheAllUnitsRoom() {
+    UUID pin = UUID.fromString("3c9e1d2a-4b5f-4a6e-8d7c-9b0a1f2e3d4c");
+
+    org.assertj.core.api.Assertions.assertThat(HangarPageController.unitLiveSyncTopic(pin))
+        .isEqualTo("hangar-unit:" + pin);
+    org.assertj.core.api.Assertions.assertThat(HangarPageController.unitLiveSyncTopic(null))
+        .isEqualTo("hangar-units");
   }
 
   /** The org-unit tab's swap returns only the tree fragment, without the tabs or the toolbar. */

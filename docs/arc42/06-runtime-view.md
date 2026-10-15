@@ -153,7 +153,8 @@ The building blocks are in §5.5; every rule is in
    domain's own services and journals each entry, all in one transaction; the feed triggers record
    the write as `client|<id>|<installation>`.
 6. **Live sync.** After the commit `ExchangeLiveSync` raises the frames the member's pages listen
-   on — Hangar, Blueprints, Lager, and the Materialbörse when an offer changed (§6.4).
+   on — Hangar, Blueprints, Lager, and the Materialbörse when an offer changed (§6.4). A ship write
+   also reaches the open unit overviews through `HangarUnitLiveSync` (ADR-0260).
 
 **A mass change held for confirmation.** When a batch would take the rolling 24-hour removals of
 one resource past the guard's limit, the backend writes nothing and answers

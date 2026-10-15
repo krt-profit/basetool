@@ -79,6 +79,7 @@ class HangarServiceTest {
   @Mock private AuditService auditService;
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private UserService userService;
+  @Mock private HangarUnitLiveSync unitLiveSync;
 
   @InjectMocks private HangarService hangarService;
 
@@ -244,6 +245,34 @@ class HangarServiceTest {
         userId, shipId, new ShipRequestDto("Test", typeId, "LTI", null, false, null, null));
 
     verifyNoInteractions(auditService);
+    verifyNoInteractions(unitLiveSync);
+  }
+
+  @Test
+  void bulkUnitChange_announcesTheOldUnitsAndTheTarget() {
+    UUID userId = UUID.randomUUID();
+    User owner = new User();
+    owner.setId(userId);
+    de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron from =
+        new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
+    from.setId(UUID.randomUUID());
+    de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron target =
+        new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
+    target.setId(UUID.randomUUID());
+    Ship inFrom = new Ship();
+    inFrom.setId(UUID.randomUUID());
+    inFrom.setOwner(owner);
+    inFrom.setOwningOrgUnit(from);
+    Ship unitless = new Ship();
+    unitless.setId(UUID.randomUUID());
+    unitless.setOwner(owner);
+    List<UUID> ids = List.of(inFrom.getId(), unitless.getId());
+    when(shipRepository.lockAllByIdOrderById(ids)).thenReturn(List.of(inFrom, unitless));
+    when(ownerScopeService.resolveOwnerMembershipTarget(owner, target.getId())).thenReturn(target);
+
+    hangarService.bulkChangeShipOrgUnit(userId, ids, target.getId());
+
+    verify(unitLiveSync).shipsChanged(java.util.Arrays.asList(target, from, null));
   }
 
   @Test
@@ -259,10 +288,16 @@ class HangarServiceTest {
     ship.setOwner(owner);
     ship.setShipType(type);
     ship.setName("Private free-text name");
+    de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron unit =
+        new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
+    unit.setId(UUID.randomUUID());
+    ship.setOwningOrgUnit(unit);
     when(shipRepository.findById(shipId)).thenReturn(Optional.of(ship));
     when(shipDeletionObserver.beforeShipDelete(shipId)).thenReturn(1);
 
     hangarService.deleteShip(userId, shipId);
+
+    verify(unitLiveSync).shipsChanged(List.of(unit));
 
     verify(shipDeletionObserver).beforeShipDelete(shipId);
     verify(auditService)
@@ -296,9 +331,14 @@ class HangarServiceTest {
         .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(shipRepository.countFittedByOwnerScoped(false, null, Set.of())).thenReturn(List.of(a, b));
     when(shipRepository.resetAllFittedScoped(false, null, Set.of())).thenReturn(4);
+    UUID unit = UUID.randomUUID();
+    when(shipRepository.findFittedOrgUnitIdsScoped(false, null, Set.of()))
+        .thenReturn(List.of(unit));
     when(userService.currentActor()).thenReturn(ACTOR);
 
     hangarService.resetAllFittedStatus();
+
+    verify(unitLiveSync).unitsChanged(List.of(unit));
 
     List<NoticeEvent> sent = published(2);
     assertEquals(first, sent.get(0).contextRecipientUserId());
@@ -408,6 +448,7 @@ class HangarServiceTest {
         resolved,
         saved.getOwningOrgUnit(),
         "picker output must flow through OwnerScopeService.resolveOrgUnitForPickerOutputNullable");
+    verify(unitLiveSync).shipsChanged(List.of(resolved));
   }
 
   @Test
@@ -437,6 +478,7 @@ class HangarServiceTest {
 
     org.junit.jupiter.api.Assertions.assertNull(
         saved.getOwningOrgUnit(), "a membershipless user's ship must be ownerless (null org unit)");
+    verify(unitLiveSync).shipsChanged(java.util.Collections.singletonList(null));
     org.junit.jupiter.api.Assertions.assertSame(
         user, saved.getOwner(), "the ship is still attributable through its per-user owner");
   }

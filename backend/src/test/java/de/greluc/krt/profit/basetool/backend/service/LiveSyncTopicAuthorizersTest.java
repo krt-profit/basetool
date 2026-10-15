@@ -26,6 +26,8 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankAccessService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankLiveSyncTopicAuthorizer;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarUnitLiveSyncTopicAuthorizer;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderLiveSyncTopicAuthorizer;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncAuthorization;
@@ -37,6 +39,8 @@ import de.greluc.krt.profit.basetool.backend.operation.internal.OperationLiveSyn
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryLiveSyncTopicAuthorizer;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -60,6 +64,7 @@ class LiveSyncTopicAuthorizersTest {
 
   @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
   @Mock private OrgUnitBankAccessService orgUnitBankAccessService;
+  @Mock private HangarAccessPolicy hangarAccessPolicy;
 
   @Test
   @DisplayName("the mission authorizer decides the Einsatz room by canSeeMission")
@@ -112,6 +117,34 @@ class LiveSyncTopicAuthorizersTest {
     assertThat(authorizer.authorizations()).containsExactly(LiveSyncAuthorization.REFINERY_ORDER);
     assertThat(authorizer.mayJoin(LiveSyncTopic.parse("refinery-order:" + RESOURCE))).isTrue();
     assertThat(authorizer.mayJoin(LiveSyncTopic.parse("refinery-order:" + RESOURCE))).isFalse();
+  }
+
+  @Test
+  @DisplayName("the hangar authorizer decides the unit room by the unit-overview gate")
+  void hangarAuthorizerAsksTheUnitOverviewGate() {
+    HangarUnitLiveSyncTopicAuthorizer authorizer =
+        new HangarUnitLiveSyncTopicAuthorizer(hangarAccessPolicy);
+    when(hangarAccessPolicy.canSeeUnitHangar(RESOURCE)).thenReturn(true, false);
+
+    assertThat(authorizer.authorizations()).containsExactly(LiveSyncAuthorization.HANGAR_UNIT);
+    assertThat(authorizer.mayJoin(LiveSyncTopic.parse("hangar-unit:" + RESOURCE))).isTrue();
+    assertThat(authorizer.mayJoin(LiveSyncTopic.parse("hangar-unit:" + RESOURCE))).isFalse();
+  }
+
+  @Test
+  @DisplayName("the unit-overview gate admits exactly the units the caller's overview shows")
+  void unitHangarGateFollowsTheUnitOverviewScope() {
+    HangarAccessPolicy policy = new HangarAccessPolicy(ownerScopeService, null);
+    UUID other = UUID.fromString("5d0e2c1a-7b3f-4e8d-a9c2-1f6b4e3d2c10");
+    when(ownerScopeService.currentUnitOverviewScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of(RESOURCE)));
+
+    assertThat(policy.canSeeUnitHangar(RESOURCE)).isTrue();
+    assertThat(policy.canSeeUnitHangar(other)).isFalse();
+
+    when(ownerScopeService.currentUnitOverviewScope())
+        .thenReturn(new ScopePredicate(true, null, Set.of()));
+    assertThat(policy.canSeeUnitHangar(other)).isTrue();
   }
 
   @Test

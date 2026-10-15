@@ -100,8 +100,9 @@ in the request thread:
 | `mission:{id}`, `operation:{id}`, `order:{id}`, `refinery-order:{id}` | the matching `ownerScopeService.canSee…(id)`                   |
 | `bank:{accountId}`                                                    | the org-unit account read the app's Bank screen performs       |
 | `orders` (queue)                                                      | `ownerScopeService.canViewJobOrders()`                         |
-| `missions`, `inventory`, `materialboard`, `refinery`, `orgunit-bank`  | member role, matching the page gate ADR-0094 gives these rooms |
+| `missions`, `inventory`, `materialboard`, `refinery`, `orgunit-bank`, `hangar-units` | member role, matching the page gate ADR-0094 gives these rooms |
 | `hangar:{userId}`, `blueprints:{userId}`                              | the id is the caller's own user id                             |
+| `hangar-unit:{orgUnitId}`                                             | `hangarAccessPolicy.canSeeUnitHangar(id)` (ADR-0260)           |
 
 A refused topic is **dropped from the set**, not made fatal: a stream asking for three topics and
 allowed two delivers two and says so in `subscribed`. A stream where nothing is allowed is `403`.

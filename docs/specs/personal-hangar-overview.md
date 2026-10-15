@@ -148,9 +148,10 @@ that unit as the current choice instead of silently clearing it. A change record
 `to` as `kind:id` or `none`, no names.
 
 The table swaps in place and the owner's other open hangar pages refresh through the live-sync room
-`hangar:{owner}` (REQ-FE-001/010). The unit tab has no live-sync room; another member's open unit
-overview shows the change on its next load. The create dialog keeps the „Zuordnen zu" picker; the edit dialog
-does not show it.
+`hangar:{owner}` (REQ-FE-001/010). After the commit the backend announces the move to the unit-tab
+rooms of the old and the new unit (`hangar-unit:{orgUnitId}`) and to the all-units room
+(`hangar-units`), so every open unit overview adds or drops the ship in place (REQ-HANGAR-013,
+ADR-0260). The create dialog keeps the „Zuordnen zu" picker; the edit dialog does not show it.
 
 **Acceptance**
 
@@ -201,8 +202,8 @@ is the repair after a connected application created many ships without a unit.
   `skipped`, `from` (the distinct previous units, `kind:id` or `none`, comma-separated) and `to`; no
   names, no per-ship events.
 - **Live update.** The list swaps in place, the bar hides, a toast names the counts, and the owner's
-  other open hangar pages refresh through `hangar:{owner}` (REQ-FE-001/010). The unit tab keeps the
-  rule of REQ-HANGAR-009: it shows the change on its next load.
+  other open hangar pages refresh through `hangar:{owner}` (REQ-FE-001/010). The open unit overviews
+  of every unit a ship left or joined refresh in place, as in REQ-HANGAR-009 (REQ-HANGAR-013).
 
 **Acceptance**
 
@@ -237,8 +238,10 @@ An admin MUST be able to list, add, edit and delete the ships of one member on
   one, the pick is required and starts empty, never preset from the admin's own active unit. With
   one or none the ship is stamped as for the member's own add. An edit echoes the ship's `version` and
   never changes the unit; a stale version is a 409 with the conflict dialog.
-- **Live update.** Every write swaps the list and the count in place (REQ-FE-001). Peer sync between
-  this page and the member's own hangar is not part of this requirement (#2606).
+- **Live update.** Every write swaps the list and the count in place (REQ-FE-001) and tells the
+  member's open „Meine Schiffe" pages through `hangar:{memberId}`; the page listens on the same room
+  and re-pulls its list when the member, another admin or a connected application changes the hangar
+  (REQ-FE-015, ADR-0260).
 
 **Acceptance**
 
@@ -279,8 +282,8 @@ REQ-HANGAR-009 and REQ-HANGAR-010 applied to the **member**.
 - **UI.** The page gets the row action, the checkboxes, the sticky selection bar and the „Einheit
   ändern" dialog of „Meine Schiffe" (design system: icon-only row action, ghost / outline bar
   buttons, one CTA in the dialog, the conflict dialog on a 409). Every change swaps the list in place
-  and clears the selection; a toast names the counts (REQ-FE-001). Peer sync between this page and
-  the member's own hangar follows with #2606.
+  and clears the selection; a toast names the counts (REQ-FE-001). The member's open hangar pages
+  and the affected unit overviews follow through live sync (REQ-HANGAR-011, REQ-HANGAR-013).
 
 **Acceptance**
 

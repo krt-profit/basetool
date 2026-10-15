@@ -171,6 +171,35 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
       @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
 
+  /**
+   * Lists the org units of the fitted ships {@link #resetAllFittedScoped} is about to clear, for
+   * the unit hangar live sync (ADR-0260).
+   *
+   * @param isAdminAllScope {@code true} iff the caller is admin without an active selection
+   * @param activeOrgUnitId pinned OrgUnit id, or {@code null}
+   * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path)
+   * @return the distinct org unit ids; ships without a unit are left out
+   */
+  @Query(
+      "SELECT DISTINCT s.owningOrgUnit.id FROM Ship s WHERE s.fitted = true"
+          + " AND s.owningOrgUnit IS NOT NULL AND "
+          + ShipScope.TRIPLE)
+  List<UUID> findFittedOrgUnitIdsScoped(
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
+
+  /**
+   * Lists the org units an owner's ships belong to, for the unit hangar live sync (ADR-0260).
+   *
+   * @param ownerId the owner
+   * @return the distinct org unit ids; ships without a unit are left out
+   */
+  @Query(
+      "SELECT DISTINCT s.owningOrgUnit.id FROM Ship s"
+          + " WHERE s.owner.id = :ownerId AND s.owningOrgUnit IS NOT NULL")
+  List<UUID> findOrgUnitIdsByOwnerId(@Param("ownerId") UUID ownerId);
+
   /** Row of {@link #countFittedByOwnerScoped}: an owner and how many of their ships it counts. */
   interface OwnerShipCount {
 

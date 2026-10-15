@@ -111,7 +111,13 @@ public class LiveSyncSubscriptionAuthorizer {
             case MEMBER -> true;
             case SELF ->
                 topic.requiredResourceId().equals(authHelperService.currentUserId().orElse(null));
-            case MISSION, OPERATION, JOB_ORDER, JOB_ORDER_QUEUE, REFINERY_ORDER, BANK_ACCOUNT ->
+            case MISSION,
+                OPERATION,
+                JOB_ORDER,
+                JOB_ORDER_QUEUE,
+                REFINERY_ORDER,
+                BANK_ACCOUNT,
+                HANGAR_UNIT ->
                 Objects.requireNonNull(topicAuthorizers.get(kind)).mayJoin(topic);
           };
       return allowed ? Verdict.permit() : Verdict.refuse(MetricNames.SUBSCRIBE_DENY_AUTHZ);

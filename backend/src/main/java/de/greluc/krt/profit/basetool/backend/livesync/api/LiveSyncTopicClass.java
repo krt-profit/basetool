@@ -75,6 +75,15 @@ public enum LiveSyncTopicClass {
   /** A member's own hangar, keyed by the member's id; only that member may subscribe. */
   HANGAR_OWN("hangar", true, "hangar_own", LiveSyncAuthorization.SELF),
 
+  /** One org unit's hangar overview, keyed by the unit's id (ADR-0260). */
+  HANGAR_UNIT("hangar-unit", true, "hangar_unit", LiveSyncAuthorization.HANGAR_UNIT),
+
+  /**
+   * The hangar overview across every unit the viewer can see: one opaque key that every ship change
+   * pokes, because each viewer re-reads its own scoped view (ADR-0260).
+   */
+  HANGAR_UNITS("hangar-units", false, "hangar_units", LiveSyncAuthorization.MEMBER),
+
   /** A member's own blueprints, keyed by the member's id; only that member may subscribe. */
   BLUEPRINTS_OWN("blueprints", true, "blueprints_own", LiveSyncAuthorization.SELF),
 
@@ -131,7 +140,7 @@ public enum LiveSyncTopicClass {
   private static final Set<String> REFINERY_ORDER_SECTIONS = Set.of("order", "store");
   private static final Set<String> REFINERY_SECTIONS = Set.of("queue");
   private static final Set<String> INVENTORY_ALL_SECTIONS = Set.of("stock");
-  private static final Set<String> HANGAR_OWN_SECTIONS = Set.of("ships");
+  private static final Set<String> SHIPS_SECTIONS = Set.of("ships");
   private static final Set<String> BLUEPRINTS_OWN_SECTIONS = Set.of("list");
   private static final Set<String> MATERIALBOARD_SECTIONS = Set.of("board", "requests");
   private static final Set<String> BANK_ACCOUNT_SECTIONS = Set.of("account", "bookings", "chart");
@@ -196,7 +205,7 @@ public enum LiveSyncTopicClass {
       case REFINERY_ORDER -> REFINERY_ORDER_SECTIONS;
       case REFINERY -> REFINERY_SECTIONS;
       case INVENTORY_ALL -> INVENTORY_ALL_SECTIONS;
-      case HANGAR_OWN -> HANGAR_OWN_SECTIONS;
+      case HANGAR_OWN, HANGAR_UNIT, HANGAR_UNITS -> SHIPS_SECTIONS;
       case BLUEPRINTS_OWN -> BLUEPRINTS_OWN_SECTIONS;
       case MATERIALBOARD -> MATERIALBOARD_SECTIONS;
       case BANK_ACCOUNT -> BANK_ACCOUNT_SECTIONS;

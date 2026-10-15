@@ -121,6 +121,48 @@ these scopes like a ship created in the web.
 [ADR-0048](../adr/0048-ol-sees-every-ship-in-the-unit-overview.md) · amends
 [REQ-ORG-015](org-unit-tenancy.md) · **Issues:** —
 
+### REQ-HANGAR-013 — The unit overview updates in place when a unit's ships change
+
+The org-unit tab (`/hangar/squadron`) MUST show another member's ship change without a reload. The
+backend announces every committed ship change that alters a unit's overview, after the commit and
+never for a rolled-back write, so a change written without a browser (a connected application,
+REQ-XCH-013 pattern) reaches the tab as well ([ADR-0260](../adr/0260-the-unit-hangar-overview-listens-to-one-room-per-unit-and-one-for-all.md)):
+
+- **Rooms.** `hangar-unit:{orgUnitId}` per unit and one global `hangar-units`, both with the section
+  `ships` (REQ-FE-015). The tab listens to the pinned unit's room, or to `hangar-units` when no unit
+  is pinned, so the all-units view (a multi-unit member, BL, OL, an admin's „Alle Org-Einheiten")
+  holds one subscription however many units it spans, and re-pulls its own scoped page.
+- **Who may listen.** A unit's room opens for whoever sees that unit's ships in the overview
+  (REQ-HANGAR-003): the web relay asks `GET /api/v1/hangar/units/{orgUnitId}/overview-access`
+  (`HANGAR_READ` / `HANGAR_WRITE` / admin and the unit-overview scope; 204 or 403), the app bridge
+  asks the same gate. `hangar-units` carries no data and admits any signed-in member.
+- **What announces.** Create, an edit that changed a field, delete, empty, import, the fitted reset,
+  the home location and every unit change (owner, admin, single, bulk) announce to the room of each
+  unit the change touched — a move to both the old and the new unit — and once per transaction to
+  `hangar-units`. A ship without a unit announces only to `hangar-units`. A member's account deletion
+  announces the units their ships belonged to.
+- **Receiver.** The tab re-pulls `#squadron-results` with its current page, size and search,
+  coalesced over 1.5 s like the own hangar.
+
+**Acceptance**
+
+- [x] A ship moved into or out of a unit, singly or in bulk, by its owner or an admin, refreshes the
+  open overview of both units in place.
+- [x] A ship created, edited, deleted or imported in a unit, also through the exchange, refreshes the
+  unit's open overviews in place.
+- [x] A caller whose overview does not show a unit is refused its room (403 on the probe, refused on
+  the app bridge).
+- [x] The all-units view holds one subscription and still refreshes.
+
+**Enforced by:** `HangarUnitLiveSyncTest`, `HangarServiceTest`, `HangarUserErasureTest`,
+`LiveSyncTopicAuthorizersTest`, `LiveSyncSubscriptionAuthorizerTest` (backend and frontend),
+`LiveSyncSectionMapParityTest`, `LiveSyncTopicRegistryParityTest`, `ExchangeShipWriteControllerTest`,
+`HangarPageControllerMvcTest`, `AuthorizationMatrixTest` · **Code:** `HangarUnitLiveSync`,
+`HangarUnitLiveSyncTopicAuthorizer`, `HangarAccessPolicy#canSeeUnitHangar`,
+`HangarController#unitOverviewAccess`, both `LiveSyncTopicClass` registries,
+`HangarPageController#unitLiveSyncTopic`, `hangar/hangar-squadron.js` · **Issues:** #2606 (epic
+#2595, #2581).
+
 ## Out of scope
 
 - The personal hangar (`/hangar`) — its own server-side pagination/sort/filter contract is

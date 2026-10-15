@@ -58,6 +58,12 @@ public enum LiveSyncAuthorization {
    */
   BANK_ACCOUNT,
 
+  /**
+   * {@code hangarAccessPolicy.canSeeUnitHangar(id)} — whether the unit's ships appear in the
+   * caller's unit overview (REQ-HANGAR-003).
+   */
+  HANGAR_UNIT,
+
   /** The room's id is the caller's own user id — a member's personal page. */
   SELF
 }

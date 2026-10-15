@@ -77,6 +77,7 @@ class HangarImportServiceTest {
   @Mock private UserRepository userRepository;
   @Mock private OwnerScopeService ownerScopeService;
   @Mock private AuditService auditService;
+  @Mock private HangarUnitLiveSync unitLiveSync;
 
   private HangarImportService hangarImportService;
 
@@ -91,7 +92,8 @@ class HangarImportServiceTest {
             userRepository,
             objectMapper,
             ownerScopeService,
-            auditService);
+            auditService,
+            unitLiveSync);
     de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron stubSquadron =
         new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
     stubSquadron.setId(UUID.randomUUID());

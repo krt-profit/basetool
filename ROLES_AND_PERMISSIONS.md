@@ -409,6 +409,8 @@ gets past the four public paths of §1. The tables carried an `Anonymous` column
 | Change the org unit of one or several of a member's ships to one of the member's direct units or none (`PUT /hangar/admin/users/{userId}/ships/{shipId}/org-unit`, `POST /hangar/admin/users/{userId}/ships/bulk-org-unit`, `hasRole('ADMIN')`; the member is notified, REQ-HANGAR-012) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | `resetAllFittedStatus` (`hasAnyRole('ADMIN','OFFICER')`)                                           |   ❌    |  ❌   | ❌  |   ✅³    |   ✅   |
 | Read the unit tab „Org-Einheit" of the hangar (`/hangar/squadron`, `HANGAR_READ`)                  |   ✅²   |  ✅²  | ✅² |   ✅²    |   ✅   |
+| Live updates of the unit tab: a unit's room `hangar-unit:{orgUnitId}` (the unit-overview scope, `GET /hangar/units/{orgUnitId}/overview-access`) and the data-free `hangar-units` room (signed in), REQ-HANGAR-013 |   ✅²   |  ✅²  | ✅² |   ✅²    |   ✅   |
+| Live updates of another member's hangar on the web (`hangar:{userId}` room, `ROLE_ADMIN`; the app bridge keeps it self-only, ADR-0260) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Personal inventory / personal blueprints (own) (`isAuthenticated()`)                               |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Manage personal inventory/blueprints of **others** (`/admin/...`, `hasRole('ADMIN')`)              |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Read blueprint availability of the org unit (`/blueprint-overview`, `canAccessBlueprintOverview`)  |   ❌    |  ❌¹  | ❌  |    ✅    |   ✅   |

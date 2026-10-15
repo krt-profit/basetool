@@ -180,14 +180,46 @@ public enum LiveSyncTopicClass {
   INVENTORY_ALL("inventory", false, Set.of("stock"), false, "inventory_all", null, null),
 
   /**
-   * A member's own hangar room for {@code /hangar}, keyed by the member's id, with the {@code
-   * ships} section; only that member may subscribe ({@link #selfOnly}).
+   * A member's own hangar room for {@code /hangar} and the admin member hangar, keyed by the
+   * member's id, with the {@code ships} section; that member or an admin may subscribe ({@link
+   * #personal}, {@link #requiredAnyRole}).
    */
-  HANGAR_OWN("hangar", true, Set.of("ships"), false, "hangar_own", null, null, null, null, true),
+  HANGAR_OWN(
+      "hangar",
+      true,
+      Set.of("ships"),
+      false,
+      "hangar_own",
+      null,
+      null,
+      null,
+      Set.of(Roles.authority(Roles.ADMIN)),
+      true),
+
+  /**
+   * One org unit's hangar overview room for {@code /hangar/squadron} with a pinned unit, keyed by
+   * the unit's id, with the {@code ships} section; authorized by the backend's unit-overview gate
+   * (ADR-0260).
+   */
+  HANGAR_UNIT(
+      "hangar-unit",
+      true,
+      Set.of("ships"),
+      false,
+      "hangar_unit",
+      "/api/v1/hangar/units/{id}/overview-access",
+      null),
+
+  /**
+   * The hangar overview room across every unit the viewer sees, for {@code /hangar/squadron}
+   * without a pinned unit, with the {@code ships} section; authorized by the socket's
+   * authentication alone, each refresh reading the viewer's own scope (ADR-0260).
+   */
+  HANGAR_UNITS("hangar-units", false, Set.of("ships"), false, "hangar_units", null, null),
 
   /**
    * A member's own blueprints room for „Meine Blueprints", keyed by the member's id, with the
-   * {@code list} section; only that member may subscribe ({@link #selfOnly}).
+   * {@code list} section; only that member may subscribe ({@link #personal}).
    */
   BLUEPRINTS_OWN(
       "blueprints", true, Set.of("list"), false, "blueprints_own", null, null, null, null, true),
@@ -324,10 +356,11 @@ public enum LiveSyncTopicClass {
   private final @Nullable Set<String> requiredAnyRole;
 
   /**
-   * Whether only the member whose id the topic carries may subscribe, checked against the socket's
-   * own subject with no backend call and failing closed.
+   * Whether the topic is a member's personal room: the member whose id it carries may subscribe,
+   * and otherwise only a holder of {@link #requiredAnyRole}, checked against the socket's subject
+   * and authorities with no backend call and failing closed.
    */
-  private final boolean selfOnly;
+  private final boolean personal;
 
   /**
    * Defines one topic class that is not a member's personal room.
@@ -496,12 +529,13 @@ public enum LiveSyncTopicClass {
   }
 
   /**
-   * Reports whether only the member whose id the topic carries may subscribe.
+   * Reports whether the topic is a member's personal room, admitting that member and, when {@link
+   * #requiredAnyRole} is set, a holder of one of those authorities.
    *
    * @return {@code true} for a member's personal room
    */
-  public boolean selfOnly() {
-    return selfOnly;
+  public boolean personal() {
+    return personal;
   }
 
   /**
@@ -511,6 +545,6 @@ public enum LiveSyncTopicClass {
    * @return {@code false} only for a class authorized by the socket's authentication alone
    */
   public boolean needsCheck() {
-    return authProbePath != null || requiredAnyRole != null || selfOnly;
+    return authProbePath != null || requiredAnyRole != null || personal;
   }
 }

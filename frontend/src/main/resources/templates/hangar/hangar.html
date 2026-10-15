@@ -212,7 +212,7 @@
             Aggregation across all org units. Select a single org unit to filter.
         </div>
 
-        <div id="squadron-results" class="card card--flush">
+        <div id="squadron-results" class="card card--flush" th:data-live-sync-topic="${unitLiveSyncTopic}">
         <th:block th:fragment="squadronResults">
             <div class="table-responsive" th:if="${!#lists.isEmpty(overview)}">
                 <table class="data-table data-table--stack hangar-tree" data-testid="squadron-table">

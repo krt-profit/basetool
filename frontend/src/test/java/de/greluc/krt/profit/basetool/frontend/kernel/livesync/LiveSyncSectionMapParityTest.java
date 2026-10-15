@@ -113,6 +113,28 @@ class LiveSyncSectionMapParityTest {
   }
 
   @Test
+  void memberHangarSeamMap_matchesTheOwnHangarTopicWhitelist() throws IOException {
+    Set<String> jsKeys =
+        seamMapKeys("/static/js/hangar/member-hangar.js", "MEMBER_HANGAR_SECTIONS");
+    assertThat(jsKeys)
+        .as(
+            "MEMBER_HANGAR_SECTIONS keys in member-hangar.js vs LiveSyncTopicClass.HANGAR_OWN"
+                + " whitelist")
+        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.HANGAR_OWN.allowedSections());
+  }
+
+  @Test
+  void unitHangarSeamMap_matchesBothUnitHangarTopicWhitelists() throws IOException {
+    Set<String> jsKeys = seamMapKeys("/static/js/hangar/hangar-squadron.js", "UNIT_SECTIONS");
+    assertThat(jsKeys)
+        .as("UNIT_SECTIONS keys in hangar-squadron.js vs LiveSyncTopicClass.HANGAR_UNIT whitelist")
+        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.HANGAR_UNIT.allowedSections());
+    assertThat(jsKeys)
+        .as("UNIT_SECTIONS keys in hangar-squadron.js vs LiveSyncTopicClass.HANGAR_UNITS whitelist")
+        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.HANGAR_UNITS.allowedSections());
+  }
+
+  @Test
   void blueprintSeamMap_matchesTheOwnBlueprintsTopicWhitelist() throws IOException {
     Set<String> jsKeys =
         seamMapKeys(

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +39,7 @@ public class HangarUserErasure implements UserErasureParticipant {
   static final int POSITION = 30;
 
   private final ShipRepository shipRepository;
+  private final HangarUnitLiveSync unitLiveSync;
 
   @Override
   public @NotNull Phase phase() {
@@ -50,7 +52,8 @@ public class HangarUserErasure implements UserErasureParticipant {
   }
 
   /**
-   * Deletes every ship of the member through one bulk delete.
+   * Deletes every ship of the member through one bulk delete and tells the open overviews of the
+   * units they belonged to.
    *
    * @param userId the departing member's {@code app_user.id}
    * @param fallbackAdminId unused
@@ -58,6 +61,11 @@ public class HangarUserErasure implements UserErasureParticipant {
    */
   @Override
   public @NotNull Map<Erased, Integer> erase(@NotNull UUID userId, @NotNull UUID fallbackAdminId) {
-    return Map.of(Erased.SHIPS, shipRepository.deleteByOwnerId(userId));
+    List<UUID> units = shipRepository.findOrgUnitIdsByOwnerId(userId);
+    int deleted = shipRepository.deleteByOwnerId(userId);
+    if (deleted > 0) {
+      unitLiveSync.unitsChanged(units);
+    }
+    return Map.of(Erased.SHIPS, deleted);
   }
 }

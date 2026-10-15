@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.ActiveSquadronContext;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
@@ -407,6 +408,12 @@ public class HangarPageController {
   /** The {@code activeTab} value of the org-unit overview tab. */
   private static final String TAB_UNIT = "unit";
 
+  /** The live-sync room of the org-unit tab when no unit is pinned (ADR-0260). */
+  private static final String ALL_UNITS_TOPIC = "hangar-units";
+
+  /** The prefix of one org unit's hangar live-sync room (ADR-0260). */
+  private static final String UNIT_TOPIC_PREFIX = "hangar-unit:";
+
   /**
    * Response type for the cached ship-type catalog page ({@code /ship-types}), unwrapped into the
    * hangar's ship-type dropdown.
@@ -492,7 +499,19 @@ public class HangarPageController {
     if (fragmentOnly) {
       return "hangar/hangar :: squadronResults";
     }
+    model.addAttribute("unitLiveSyncTopic", unitLiveSyncTopic(ActiveSquadronContext.get()));
     return "hangar/hangar";
+  }
+
+  /**
+   * Names the live-sync room of the org-unit tab (ADR-0260): the pinned unit's own room, or the
+   * all-units room when no unit is pinned and the tab spans every unit the caller sees.
+   *
+   * @param pinnedOrgUnitId the active org-unit pin relayed to the backend, or {@code null}
+   * @return {@code hangar-unit:<id>} for a pin, otherwise {@code hangar-units}
+   */
+  static @NotNull String unitLiveSyncTopic(@Nullable UUID pinnedOrgUnitId) {
+    return pinnedOrgUnitId == null ? ALL_UNITS_TOPIC : UNIT_TOPIC_PREFIX + pinnedOrgUnitId;
   }
 
   /**

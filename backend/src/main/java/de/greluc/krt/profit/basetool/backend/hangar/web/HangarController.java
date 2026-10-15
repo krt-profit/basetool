@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDto;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipMapper;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.FleetviewImportResponseDto;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarImportService;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarService;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.SetHomeLocationRequestDto;
@@ -173,6 +174,25 @@ public class HangarController {
     Page<SquadronShipOverviewDto> p =
         hangarService.getSquadronOverview(pageable, includeOwnerDetails, search);
     return PageResponse.of(p);
+  }
+
+  /**
+   * Answers whether the caller's unit overview shows the ships of one org unit, the check behind a
+   * subscribe to that unit's live-sync room (REQ-HANGAR-003, ADR-0260).
+   *
+   * @param orgUnitId the org unit
+   * @return 204 when the unit overview admits the unit; 403 otherwise
+   */
+  @Operation(summary = "Check access to an org unit's hangar overview")
+  @ApiResponses({
+    @ApiResponse(responseCode = "204", description = "The unit overview shows this unit"),
+    @ApiResponse(responseCode = "403", description = "It does not")
+  })
+  @GetMapping("/units/{orgUnitId}/overview-access")
+  @PreAuthorize(
+      HANGAR_ACCESS + " and @" + HangarAccessPolicy.BEAN_NAME + ".canSeeUnitHangar(#orgUnitId)")
+  public ResponseEntity<Void> unitOverviewAccess(@PathVariable @NotNull UUID orgUnitId) {
+    return ResponseEntity.noContent().build();
   }
 
   /**

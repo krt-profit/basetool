@@ -48,6 +48,7 @@ import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -94,6 +95,7 @@ public class HangarService {
   private final AuditRecorder auditRecorder;
   private final ApplicationEventPublisher eventPublisher;
   private final UserService userService;
+  private final HangarUnitLiveSync unitLiveSync;
 
   /**
    * Returns the paged ship list in the caller's squadron scope; an admin without an active squadron
@@ -180,6 +182,7 @@ public class HangarService {
         saved.getShipType().getName(),
         user.getId(),
         AuditDetails.of("shipType", saved.getShipType().getId()));
+    unitLiveSync.shipsChanged(Arrays.asList(owningOrgUnit));
     return saved;
   }
 
@@ -342,6 +345,7 @@ public class HangarService {
           saved.getShipType().getName(),
           userId,
           AuditDetails.of("changed", String.join(",", changed)));
+      unitLiveSync.shipsChanged(Arrays.asList(saved.getOwningOrgUnit()));
     }
     return saved;
   }
@@ -432,6 +436,7 @@ public class HangarService {
         shipTypeName,
         userId,
         AuditDetails.of("from", from).with("to", orgUnitRef(target)));
+    unitLiveSync.shipsChanged(Arrays.asList(current, target));
     return new ShipMove(Entities.require(shipRepository.findById(shipId), "Ship not found"), true);
   }
 
@@ -510,6 +515,9 @@ public class HangarService {
     }
     OrgUnit target =
         ownerScopeService.resolveOwnerMembershipTarget(moving.getFirst().getOwner(), orgUnitId);
+    List<OrgUnit> touched = new ArrayList<>();
+    touched.add(target);
+    moving.forEach(ship -> touched.add(ship.getOwningOrgUnit()));
     String from =
         moving.stream()
             .map(ship -> orgUnitRef(ship.getOwningOrgUnit()))
@@ -530,6 +538,7 @@ public class HangarService {
             .with("skipped", skipped)
             .with("from", from)
             .with("to", orgUnitRef(target)));
+    unitLiveSync.shipsChanged(touched);
     return new BulkMove(moving, new ShipBulkOrgUnitResultDto(moving.size(), skipped));
   }
 
@@ -609,6 +618,7 @@ public class HangarService {
         ship.getShipType().getName(),
         userId,
         AuditDetails.of("detachedUnits", detached));
+    unitLiveSync.shipsChanged(Arrays.asList(ship.getOwningOrgUnit()));
     return detached;
   }
 
@@ -638,6 +648,7 @@ public class HangarService {
         null,
         userId,
         AuditDetails.of("ships", ships.size()).with("detachedUnits", detached));
+    unitLiveSync.shipsChanged(ships.stream().map(Ship::getOwningOrgUnit).toList());
     log.info("deleteAllShipsForUser: deleted {} ships for user {}", ships.size(), userId);
   }
 
@@ -650,6 +661,9 @@ public class HangarService {
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     List<ShipRepository.OwnerShipCount> perOwner =
         shipRepository.countFittedByOwnerScoped(
+            scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
+    List<UUID> units =
+        shipRepository.findFittedOrgUnitIdsScoped(
             scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
     int reset =
         shipRepository.resetAllFittedScoped(
@@ -666,6 +680,7 @@ public class HangarService {
         eventPublisher.publishEvent(
             HangarNotices.fittedReset(owner.getOwnerId(), owner.getShipCount(), actor));
       }
+      unitLiveSync.unitsChanged(units);
     }
   }
 
@@ -768,6 +783,7 @@ public class HangarService {
           location.getName(),
           userId,
           AuditDetails.of("ships", updated));
+      unitLiveSync.unitsChanged(shipRepository.findOrgUnitIdsByOwnerId(userId));
     }
     return updated;
   }
