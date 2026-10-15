@@ -10,7 +10,9 @@
 Step 2: report the realm's own SMTP sender and switch "Forgot password" on or off (the sender's
 test stays a console action: Keycloak mails the admin who runs it).
 Step 11: a browser-flow copy and a post-broker flow that demand an OTP of every holder of the
-Admin realm role, and their binding to the realm and to the Discord identity provider.
+Admin realm role, and their binding to the realm and to the Discord identity provider. The
+post-broker flow also carries a required "Allow access" step, so a brokered login of a user who
+is not an admin completes.
 Step 12: the realm's SSO session windows, from keycloak/session-windows.json.
 
 Dry run by default (exit 2 when something is to do, 0 when the realm is in shape). --apply writes
@@ -50,6 +52,7 @@ TOTP_ACTION = "CONFIGURE_TOTP"
 ROLE_PROVIDER = "conditional-user-role"
 CREDENTIAL_PROVIDER = "conditional-credential"
 OTP_PROVIDER = "auth-otp-form"
+ALLOW_PROVIDER = "allow-access-authenticator"
 WINDOW_FIELDS = ("ssoSessionIdleTimeout", "ssoSessionMaxLifespan",
                  "ssoSessionIdleTimeoutRememberMe", "ssoSessionMaxLifespanRememberMe")
 SMTP_FIELDS = ("host", "port", "from", "fromDisplayName", "auth", "user", "starttls", "ssl")
@@ -128,12 +131,17 @@ class Block:
     `credential_alias` is set for the browser flow only: its built-in second-factor step already asks
     every user who has an OTP device, so the block must run only while no OTP was presented in this
     login, which is exactly the admin who has no device yet and has to set one up.
+
+    `allow_access` is set for the post-broker flow only: the block is the only other entry of that
+    flow, and Keycloak fails a flow whose only entry is a conditional sub-flow that does not apply,
+    so the parent needs a required step that always succeeds.
     """
 
     parent: str
     name: str
     role_alias: str
     credential_alias: str | None
+    allow_access: bool = False
 
 
 def browser_block(forms_alias: str) -> Block:
@@ -143,7 +151,8 @@ def browser_block(forms_alias: str) -> Block:
 
 def post_broker_block() -> Block:
     """The block in the top-level post-broker flow, where nothing has asked for an OTP yet."""
-    return Block(POST_BROKER_FLOW, POST_BROKER_BLOCK, POST_BROKER_ROLE_CONDITION, None)
+    return Block(POST_BROKER_FLOW, POST_BROKER_BLOCK, POST_BROKER_ROLE_CONDITION, None,
+                 allow_access=True)
 
 
 def desired_conditions(block: Block, role: str) -> list[tuple[str, str, str, dict[str, str]]]:
@@ -246,6 +255,14 @@ def block_problems(kc: HardenKcadm, block: Block, role: str) -> list[str]:
     if found is None:
         return [f"'{block.parent}' has no sub-flow '{block.name}'"]
     problems: list[str] = []
+    if block.allow_access:
+        allow = find_provider(siblings(parent_executions), ALLOW_PROVIDER)
+        if allow is None:
+            problems.append(f"'{block.parent}' has no 'Allow access': every brokered login of a user "
+                            f"who is not an admin fails the flow")
+        elif allow.get("requirement") != "REQUIRED":
+            problems.append(f"'Allow access' in '{block.parent}' is {allow.get('requirement')}, "
+                            f"not REQUIRED")
     if not block_is_last(parent_executions, block):
         problems.append(f"sub-flow '{block.name}' is not the last entry of '{block.parent}': an "
                         f"admin with an OTP device would be asked for the code twice")
@@ -313,6 +330,8 @@ def ensure_block(kc: HardenKcadm, block: Block, role: str) -> None:
         found = find_block(executions_of(kc, block.parent), block.name)
     if found is not None and found.get("requirement") != "CONDITIONAL":
         set_requirement(kc, block.parent, found, "CONDITIONAL")
+    if block.allow_access:
+        ensure_allow_access(kc, block.parent)
     sink_to_end(kc, block)
 
     for provider, label, alias, wanted in desired_conditions(block, role):
@@ -325,6 +344,17 @@ def ensure_block(kc: HardenKcadm, block: Block, role: str) -> None:
         otp = find_provider(executions_of(kc, block.name), OTP_PROVIDER)
     if otp is not None and otp.get("requirement") != "REQUIRED":
         set_requirement(kc, block.name, otp, "REQUIRED")
+
+
+def ensure_allow_access(kc: HardenKcadm, parent: str) -> None:
+    """Create the required 'Allow access' step of a flow, or make an existing one required."""
+    allow = find_provider(siblings(executions_of(kc, parent)), ALLOW_PROVIDER)
+    if allow is None:
+        kc.post(f"authentication/flows/{quote(parent, safe='')}/executions/execution",
+                {"provider": ALLOW_PROVIDER}, f"execution 'Allow access' in '{parent}'")
+        allow = find_provider(siblings(executions_of(kc, parent)), ALLOW_PROVIDER)
+    if allow is not None and allow.get("requirement") != "REQUIRED":
+        set_requirement(kc, parent, allow, "REQUIRED")
 
 
 def ensure_browser_copy(kc: HardenKcadm) -> None:
@@ -699,6 +729,35 @@ class FakeKeycloak:
                     return execution
         raise KcadmError(f"no execution {execution_id}")
 
+    def brokered_login(self, flow: str, is_admin: bool) -> str:
+        """How Keycloak 26.8 ends a top-level flow of this realm: 'allowed', 'otp' or 'failed'.
+
+        Mirrors DefaultAuthenticationFlow.processFlow: REQUIRED and CONDITIONAL entries are the
+        required list, a CONDITIONAL sub-flow whose role condition does not hold is dropped from it,
+        ALTERNATIVE entries are ignored beside a non-empty required list, and a flow with nothing
+        left that succeeded fails.
+        """
+        entries = [entry for entry in self.flows[flow] if entry.get("requirement") != "DISABLED"]
+        required = [entry for entry in entries if entry["requirement"] in ("REQUIRED", "CONDITIONAL")]
+        alternatives = [] if required else [entry for entry in entries
+                                            if entry["requirement"] == "ALTERNATIVE"]
+        outcomes = []
+        for entry in required:
+            if entry["requirement"] == "CONDITIONAL":
+                if not is_admin:
+                    continue
+                outcomes.append("otp")
+            elif entry.get("providerId") == ALLOW_PROVIDER:
+                outcomes.append("allowed")
+            else:
+                outcomes.append("failed")
+        if not outcomes:
+            allowed = any(entry.get("providerId") == ALLOW_PROVIDER for entry in alternatives)
+            return "allowed" if allowed else "failed"
+        if "failed" in outcomes:
+            return "failed"
+        return "otp" if "otp" in outcomes else "allowed"
+
 
 class FakeKcadm(HardenKcadm):
     """HardenKcadm over a FakeKeycloak; counts writes so dry runs can be shown to write nothing."""
@@ -781,7 +840,7 @@ class FakeKcadm(HardenKcadm):
             parent = path[len("authentication/flows/"):-len("/executions/execution")]
             fake.flows[parent].append({"id": fake.next_id(), "providerId": payload["provider"],
                                        "displayName": payload["provider"], "requirement": "DISABLED",
-                                       "level": 1})
+                                       "level": 0})
         elif verb == "create" and path.endswith("/config"):
             execution = fake.execution_by_id(path.split("/")[2])
             config_id = fake.next_id()
@@ -846,6 +905,15 @@ def selftest() -> int:
           "the rollback file holds the values from before")
     check(fake.required_actions.get(TOTP_ACTION, {}).get("enabled") is True,
           "Configure OTP is registered and enabled")
+    allow = find_provider(fake.flows[POST_BROKER_FLOW], ALLOW_PROVIDER)
+    check(allow is not None and allow["requirement"] == "REQUIRED",
+          "the post-broker flow carries a required 'Allow access'")
+    check(fake.flows[POST_BROKER_FLOW][-1]["displayName"] == POST_BROKER_BLOCK,
+          "the Admin OTP block stays the last entry of the post-broker flow")
+    check(fake.brokered_login(POST_BROKER_FLOW, is_admin=False) == "allowed",
+          "a brokered login of a member completes")
+    check(fake.brokered_login(POST_BROKER_FLOW, is_admin=True) == "otp",
+          "a brokered login of an admin is asked for the code")
 
     print("a second run finds nothing to do")
     writes_before = len(fake.writes)
@@ -865,6 +933,19 @@ def selftest() -> int:
     check(code == 2, "a dry run reports the misplaced block")
     code = run(FakeKcadm(fake, dry_run=True), arguments("--apply", "--windows", "proposal", "--reset-password", "off"))
     check(code == 0 and forms[-1]["displayName"] == BROWSER_BLOCK, "apply moves it back behind them")
+
+    print("a post-broker flow without 'Allow access' is repaired")
+    pb = fake.flows[POST_BROKER_FLOW]
+    pb.remove(find_provider(pb, ALLOW_PROVIDER))
+    check(fake.brokered_login(POST_BROKER_FLOW, is_admin=False) == "failed",
+          "without it a brokered login of a member fails")
+    code = run(FakeKcadm(fake, dry_run=True), arguments("--windows", "proposal", "--reset-password", "off"))
+    check(code == 2, "a dry run reports the missing step")
+    code = run(FakeKcadm(fake, dry_run=True), arguments("--apply", "--windows", "proposal", "--reset-password", "off"))
+    check(code == 0 and fake.brokered_login(POST_BROKER_FLOW, is_admin=False) == "allowed"
+          and fake.brokered_login(POST_BROKER_FLOW, is_admin=True) == "otp"
+          and pb[-1]["displayName"] == POST_BROKER_BLOCK,
+          "apply adds it in front of the block; members pass, admins are asked for the code")
 
     print("rollback puts the bound values back and deletes nothing")
     code = run(FakeKcadm(fake, dry_run=True), arguments("--apply", "--rollback", str(backup_path)))
