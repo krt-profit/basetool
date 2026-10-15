@@ -404,6 +404,7 @@ gets past the four public paths of §1. The tables carried an `Anonymous` column
 | Maintain own ships / import (CCU, HangarXPLOR, Fleetyards, StarJump) (`isAuthenticated()` + Owner) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Delete all own ships (`DELETE /hangar/ships`, `HANGAR_WRITE`)                                      |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Change an own ship's org unit to an own direct unit or none (`PUT /hangar/ships/{id}/org-unit`, Owner, REQ-HANGAR-009) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Change the org unit of a selection of own ships (`POST /hangar/ships/bulk-org-unit`, `HANGAR_READ`/`HANGAR_WRITE` + Owner of every ship, REQ-HANGAR-010) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Manage other members' ships (`hasRole('ADMIN')`)                                                   |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | `resetAllFittedStatus` (`hasAnyRole('ADMIN','OFFICER')`)                                           |   ❌    |  ❌   | ❌  |   ✅³    |   ✅   |
 | Read the unit tab „Org-Einheit" of the hangar (`/hangar/squadron`, `HANGAR_READ`)                  |   ✅²   |  ✅²  | ✅² |   ✅²    |   ✅   |

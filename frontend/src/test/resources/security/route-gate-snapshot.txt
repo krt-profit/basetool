@@ -280,6 +280,7 @@
 /hangar GET -> HangarPageController#viewHangar gate=class:isAuthenticated() layout=yes
 /hangar/add POST -> HangarPageController#addShip gate=class:isAuthenticated() layout=yes
 /hangar/add POST headers=[X-Requested-With=XMLHttpRequest] -> HangarPageController#addShipAjax gate=class:isAuthenticated() layout=yes
+/hangar/bulk-org-unit POST headers=[X-Requested-With=XMLHttpRequest] -> HangarShipOrgUnitProxyController#bulkChangeShipOrgUnit gate=class:isAuthenticated() layout=no
 /hangar/home-location POST -> HangarPageController#setHomeLocation gate=class:isAuthenticated() layout=yes
 /hangar/home-location POST headers=[X-Requested-With=XMLHttpRequest] -> HangarPageController#setHomeLocationAjax gate=class:isAuthenticated() layout=yes
 /hangar/import/ships POST consumes=[multipart/form-data] -> HangarImportProxyController#importShips gate=method:isAuthenticated() layout=no

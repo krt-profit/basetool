@@ -174,6 +174,51 @@ does not show it.
 `HangarShipOrgUnitProxyController`, `hangar/hangar.html`, `hangar/hangar.js` ·
 **Issues:** #2596 (epic #2595, #2581).
 
+### REQ-HANGAR-010 — The owner changes the org unit of several ships at once
+
+The owner MUST be able to select several ships in „Meine Schiffe" and move them to one of their
+direct memberships, or to „Keine Einheit", in one action (REQ-HANGAR-009 for the single ship). This
+is the repair after a connected application created many ships without a unit.
+
+- **Selection bar.** Each row has a checkbox, the list head a box that selects the shown page. While
+  anything is selected, a sticky bar below the list shows the count, „Auswahl aufheben" and „Einheit
+  ändern" (design system: the sticky form-actions bar, ghost / outline buttons, one CTA in the
+  dialog). The selection holds only ships the list shows: a filter, page change or peer refresh drops
+  the others.
+- **Dialog.** The „Einheit ändern" dialog of REQ-HANGAR-009 names the number of selected ships and is
+  preset to their unit when they all share one (a unit the owner has since left included), otherwise
+  to „Keine Einheit".
+- **Endpoint.** `POST /api/v1/hangar/ships/bulk-org-unit` with `shipIds` (1 – 1000) and `orgUnitId`
+  (or `null`) answers the `changed` and `skipped` counts. The ships are locked pessimistically in
+  ascending id order and carry no counters, like REQ-INV-036 / REQ-INV-052, so two bulk actions over
+  overlapping selections queue instead of deadlocking. Every moved ship's `owningOrgUnitVersion`
+  goes up (ADR-0258), so a single-ship dialog opened before the bulk action 409s.
+- **Refusal as a whole.** An unknown ship → 404, another member's ship → 403, a target outside the
+  owner's direct memberships → 400; nothing changes. Ships already in the target are skipped and
+  counted; a selection already wholly in the target writes nothing, records nothing and validates no
+  target.
+- **Audit.** One `HANGAR_SHIPS_BULK_ORG_UNIT_CHANGED` summary (REQ-HANGAR-004) with `changed`,
+  `skipped`, `from` (the distinct previous units, `kind:id` or `none`, comma-separated) and `to`; no
+  names, no per-ship events.
+- **Live update.** The list swaps in place, the bar hides, a toast names the counts, and the owner's
+  other open hangar pages refresh through `hangar:{owner}` (REQ-FE-001/010). The unit tab keeps the
+  rule of REQ-HANGAR-009: it shows the change on its next load.
+
+**Acceptance**
+
+- [x] Selected ships move to a unit and back to „Keine Einheit" in one request each, in place.
+- [x] A selection with a foreign or unknown ship is refused as a whole and changes nothing.
+- [x] Ships already in the target are skipped; one summary event records the counts and from / to.
+- [x] Two concurrent bulk actions over overlapping selections in opposite orders both finish.
+- [x] A bulk change makes a stale single-ship change 409.
+
+**Enforced by:** `HangarShipBulkOrgUnitChangeIntegrationTest`,
+`HangarShipBulkOrgUnitConcurrencyIntegrationTest`, `HangarWriteAjaxControllerTest`,
+`HangarBackendClientTest`, `HangarPagePatternRenderTest`, `HangarBulkUnitE2eTest` · **Code:**
+`HangarController#bulkChangeMyShipsOrgUnit`, `HangarService#bulkChangeShipOrgUnit`,
+`ShipRepository#lockAllByIdOrderById`, `HangarShipOrgUnitProxyController`, `hangar/hangar.html`,
+`hangar/hangar.js` · **Issues:** #2599 (epic #2595, #2581).
+
 ## Out of scope
 
 - The **squadron** hangar overview (`/hangar/squadron`) — REQ-HANGAR-001 — and the **admin per-user**

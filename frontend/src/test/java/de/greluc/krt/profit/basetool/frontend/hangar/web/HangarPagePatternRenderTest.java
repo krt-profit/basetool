@@ -197,6 +197,53 @@ class HangarPagePatternRenderTest {
         .contains("id=\"ship-owner-picker-slot\"");
   }
 
+  /**
+   * Each own ship carries a selection checkbox with its id and unit, the list head a select-all
+   * box, and the page a hidden selection bar outside the swapped list whose „Einheit ändern" opens
+   * the unit dialog with its bulk message slot (REQ-HANGAR-010).
+   */
+  @Test
+  @WithMockUser
+  void rendersTheSelectionBar() throws Exception {
+    UUID unitId = UUID.randomUUID();
+    UUID shipId = UUID.randomUUID();
+    ShipDto assigned =
+        new ShipDto(
+            shipId,
+            "Iron Mule",
+            type("Cutlass Black", "Drake"),
+            "LTI",
+            null,
+            true,
+            null,
+            new SquadronReferenceDto(unitId, "Owner SK", "OSK"),
+            3L,
+            4L);
+    when(backendApiClient.get(startsWith(MY_SHIPS), anyTypeRef()))
+        .thenReturn(page(List.of(assigned), 1L));
+    when(backendApiClient.get(startsWith(OVERVIEW), anyTypeRef())).thenReturn(page(List.of(), 0L));
+
+    String html = render("/hangar");
+
+    assertThat(html)
+        .contains("id=\"hangar-select-all\"")
+        .containsPattern(
+            "class=\"hangar-ship-check\"[^>]*value=\""
+                + shipId
+                + "\"[^>]*data-org-unit-id=\""
+                + unitId
+                + "\"")
+        .contains("aria-label=\"Auswählen: Iron Mule\"")
+        .containsPattern(
+            "id=\"hangar-selection-bar\"[^>]*class=\"form-actions--sticky hangar-selection-bar\"")
+        .containsPattern("data-testid=\"hangar-selection-bar\" hidden")
+        .contains("data-trigger=\"hangar-open-bulk-unit\"")
+        .contains("data-trigger=\"hangar-clear-selection\"")
+        .contains("id=\"ship-unit-bulk-message\"");
+    assertThat(html.indexOf("id=\"hangar-selection-bar\""))
+        .isGreaterThan(html.indexOf("id=\"hangar-results\""));
+  }
+
   /** The own-ships tab renders head, tabs, toolbar, chips, status and the readiness counter. */
   @Test
   @WithMockUser

@@ -4,7 +4,7 @@
 - **Date:** 2026-10-15
 - **Deciders:** @greluc
 - **Related:** spec [`personal-hangar-overview.md`](../specs/personal-hangar-overview.md)
-  (REQ-HANGAR-009) · [`external-exchange.md`](../specs/external-exchange.md) (REQ-XCH-017) ·
+  (REQ-HANGAR-009, REQ-HANGAR-010) · [`external-exchange.md`](../specs/external-exchange.md) (REQ-XCH-017) ·
   [`org-unit-tenancy.md`](../specs/org-unit-tenancy.md) · epic #2595, issue #2581
 
 ## Context
@@ -34,6 +34,10 @@ would 409 the other although they touch different data, which the fine-grained l
    unchanged unit writes and records nothing.
 4. **Exchange shape.** The Exchange carries the counter as `orgUnitVersion`. In a ship `upsert`, an
    absent `orgUnit` keeps the stored unit and an explicit `null` clears it.
+5. **Selections lock, they do not echo.** A change of several ships at once (REQ-HANGAR-010) takes
+   pessimistic row locks in ascending id order and carries no counters, like the Lager bulk actions
+   (REQ-INV-036 / REQ-INV-052). It still bumps the counter of every ship it moves, so a single-ship
+   change prepared before it 409s.
 
 ## Consequences
 

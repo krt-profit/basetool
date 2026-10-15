@@ -386,6 +386,73 @@ public class HangarService {
   }
 
   /**
+   * Changes the owning org unit of a selection of ships owned by {@code userId} to one of the
+   * owner's direct memberships or none (REQ-HANGAR-010). The ships are locked in ascending id order
+   * and checked before the first write, so a foreign or unknown ship refuses the whole selection;
+   * ships already in the target are skipped. Each moved ship's unit counter goes up, and one
+   * summary event is recorded when anything moved.
+   *
+   * @param userId calling user's id
+   * @param shipIds the selected ships
+   * @param orgUnitId the new org unit, or {@code null} for none
+   * @return how many ships moved and how many were skipped
+   * @throws NotFoundException when a selected ship does not exist
+   * @throws AccessDeniedException when a selected ship belongs to another member
+   * @throws BadRequestException when the target is not a direct membership of the owner
+   */
+  @Transactional
+  public @NotNull ShipBulkOrgUnitResultDto bulkChangeShipOrgUnit(
+      @NotNull UUID userId, @NotNull List<UUID> shipIds, @Nullable UUID orgUnitId) {
+    List<UUID> distinctIds = shipIds.stream().distinct().toList();
+    List<Ship> ships = shipRepository.lockAllByIdOrderById(distinctIds);
+    if (ships.size() != distinctIds.size()) {
+      throw new NotFoundException("Ship not found");
+    }
+    ships.forEach(ship -> requireOwner(ship, userId));
+    List<Ship> moving =
+        ships.stream()
+            .filter(ship -> !Objects.equals(orgUnitIdOf(ship.getOwningOrgUnit()), orgUnitId))
+            .toList();
+    int skipped = ships.size() - moving.size();
+    if (moving.isEmpty()) {
+      return new ShipBulkOrgUnitResultDto(0, skipped);
+    }
+    OrgUnit target =
+        ownerScopeService.resolveOwnerMembershipTarget(moving.getFirst().getOwner(), orgUnitId);
+    String from =
+        moving.stream()
+            .map(ship -> orgUnitRef(ship.getOwningOrgUnit()))
+            .distinct()
+            .sorted()
+            .collect(Collectors.joining(","));
+    for (Ship ship : moving) {
+      ship.setOwningOrgUnit(target);
+      ship.setOwningOrgUnitVersion(ship.getOwningOrgUnitVersion() + 1);
+    }
+    shipRepository.flush();
+    auditRecorder.record(
+        AuditEventType.HANGAR_SHIPS_BULK_ORG_UNIT_CHANGED,
+        null,
+        null,
+        userId,
+        AuditDetails.of("changed", moving.size())
+            .with("skipped", skipped)
+            .with("from", from)
+            .with("to", orgUnitRef(target)));
+    return new ShipBulkOrgUnitResultDto(moving.size(), skipped);
+  }
+
+  /**
+   * Reads an org unit's id without initialising a lazy reference.
+   *
+   * @param orgUnit the org unit, or {@code null}
+   * @return its id, or {@code null} for none
+   */
+  private static @Nullable UUID orgUnitIdOf(@Nullable OrgUnit orgUnit) {
+    return orgUnit == null ? null : orgUnit.getId();
+  }
+
+  /**
    * Renders an org unit for an audit detail as {@code kind:id}, or {@code none}.
    *
    * @param orgUnit the org unit, or {@code null}

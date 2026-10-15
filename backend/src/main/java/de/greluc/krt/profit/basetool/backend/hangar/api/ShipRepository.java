@@ -88,6 +88,17 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   Optional<Ship> lockOwnedById(@Param("id") UUID id, @Param("owner") UUID owner);
 
   /**
+   * Locks the ships with the given ids in ascending id order, so two writers over overlapping
+   * selections queue instead of deadlocking (REQ-HANGAR-010).
+   *
+   * @param ids the ship ids
+   * @return the ships that exist, locked for this transaction, ordered by id
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT s FROM Ship s WHERE s.id IN :ids ORDER BY s.id")
+  List<Ship> lockAllByIdOrderById(@Param("ids") Collection<UUID> ids);
+
+  /**
    * Counts a member's ships.
    *
    * @param owner the member
