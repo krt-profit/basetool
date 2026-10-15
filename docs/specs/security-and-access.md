@@ -5793,7 +5793,11 @@ dry run by default, with a rollback file, never deleting.
   that does not apply, which would refuse every Discord login of a member with *invalid username
   or password*, and an *alternative* beside the block is ignored.
 - **Forgot password (step 2).** The switch and the realm's own SMTP sender are one decision: a link
-  that cannot be answered with a mail is not offered.
+  that cannot be answered with a mail is not offered. The reset page (`login-reset-password.ftl`)
+  asks for the e-mail address or the username and tells a Discord-registered user that the username
+  is the Discord username, not the server nickname or display name, and that the values of the first
+  sign-in count: the `discord` provider imports username and e-mail once (`syncMode` `IMPORT`,
+  ADR-0262) and Keycloak's reset looks the user up by exactly those two.
 - **Session windows (step 12).** The four SSO windows are `keycloak/session-windows.json`, profile
   `active`. The realm provisioner and the hardening script read the same file, so neither puts the
   other's numbers back.
