@@ -811,7 +811,9 @@ feed is sequenced at the database level, so writes that bypass the services — 
 provisioning, „delete all", admin purge, user deletion, org re-stamping, owner reassignment and a
 change of the default blueprint set — appear in it. Removals leave tombstones with `removedBy`
 (`web`, `app`, `client` with client id and installation id, `system`) and `removedAt`, kept 90 days
-and purged nightly. A cursor older than the tombstones answers `410 CURSOR_EXPIRED`.
+and purged nightly. A cursor older than the tombstones answers `410 CURSOR_EXPIRED`. One interim
+exception: the org stock answers its own feed cursor `410 CURSOR_EXPIRED` until its feed is built
+(REQ-XCH-042, owner decision 2026-10-15).
 
 The sequence is `exchange_change` (ADR-0224): an `AFTER` row trigger on every synced table records
 `(member, resource, key)` with its writing transaction's id and a sequence number, and the feed reads
@@ -2312,7 +2314,8 @@ other units never appear; the admin all-scope and pin never apply.
   snapshot pages by each lot's lowest row id, as `/me/stock` does, and its last page carries the
   feed cursor it was taken at (REQ-XCH-013). Until the feed is built, resuming with that cursor is
   `410 CURSOR_EXPIRED`, so a client refreshes by reading a new snapshot; once it is built the same
-  cursor resumes the feed. The backend counts each page served as
+  cursor resumes the feed (owner decision 2026-10-15, an exception to REQ-XCH-013's use of the
+  code). The backend counts each page served as
   `basetool_exchange_org_stock_pages_total{client_id}`.
 
 **Acceptance**
