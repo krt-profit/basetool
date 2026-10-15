@@ -220,8 +220,9 @@ requires it and duplicating it into further files spreads personal data for no g
   consented to, the anonymised org demand, the member's direct org units and the org unit of each
   of the member's ships (name, shorthand, kind) and catalogue data — never the e-mail address
   (REQ-XCH-009, REQ-XCH-017, REQ-XCH-018, REQ-XCH-048). The one exception for other members' data
-  is the shared stock of a unit (ADR-0257, REQ-XCH-042…045; planned — until it ships no client
-  receives another member's data): a client approved for its details
+  is the shared stock of a unit (ADR-0257, REQ-XCH-042…045): a client approved for it receives the
+  shared stock of each unit the member directly belongs to, summed per lot over every holder and
+  naming none (REQ-XCH-042, built); a client approved for its details (planned)
   shows a Logistician or leader of that unit the name as the web shows it, a per-client pseudonym
   and the note of each member's shared entries in that unit, and the unit's member roster. A member
   who withholds their name is left out of both; their entries stay, without name, pseudonym or

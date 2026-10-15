@@ -5,6 +5,13 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
 
 ## 2026-10-15
 
+- **New: the org stock.** `GET /exchange/v1/org-stock` under the new scope `exchange.orgstock.read`
+  serves the shared warehouse stock of the units the member directly belongs to, one pool per unit:
+  lots summed over every holder, with the amounts earmarked to job orders and missions, and on every
+  page the units the member reads ([org stock](resources/org-stock.md)). A snapshot only for now:
+  reading with the feed cursor of its last page is `410 CURSOR_EXPIRED`. New schema
+  `org-stock-lot.schema.json` and the
+  `orgStockPage` definition in `page.schema.json`.
 - **New: an upsert sets a ship's org unit.** An `upsert` in `POST /exchange/v1/me/ships/changes`
   may carry `orgUnit`, one of the member's units or `null` for none, and with `shipId` the ship's
   `orgUnitVersion`. Without `orgUnit` nothing changes: a create still gets the member's only unit,

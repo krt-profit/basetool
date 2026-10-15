@@ -77,7 +77,8 @@ class FilterExemptionSetsTest {
           "/api/v1/exchange/me/ships",
           "/api/v1/exchange/me/ships/changes",
           "/api/v1/exchange/me/stock",
-          "/api/v1/exchange/me/stock/changes");
+          "/api/v1/exchange/me/stock/changes",
+          "/api/v1/exchange/org-stock");
 
   @Autowired private WebApplicationContext context;
 

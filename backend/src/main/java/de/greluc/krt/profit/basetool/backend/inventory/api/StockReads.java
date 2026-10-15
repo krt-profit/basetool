@@ -46,6 +46,19 @@ public interface StockReads {
   List<ExchangeStockLotRow> exchangeLots(@NotNull UUID member, @NotNull UUID after, int limit);
 
   /**
+   * Returns one snapshot page of the shared lots of the given units' pools, ordered by their lowest
+   * row id (REQ-XCH-042).
+   *
+   * @param units the units whose pools are read; an empty collection yields an empty list
+   * @param after the lowest row id of the last lot delivered, or the zero id for the first page
+   * @param limit the most lots to return
+   * @return the lots
+   */
+  @NotNull
+  List<ExchangeOrgStockLotRow> exchangeOrgLots(
+      @NotNull Collection<UUID> units, @NotNull UUID after, int limit);
+
+  /**
    * Returns the member's lots with the given keys, as they are now.
    *
    * @param member the member

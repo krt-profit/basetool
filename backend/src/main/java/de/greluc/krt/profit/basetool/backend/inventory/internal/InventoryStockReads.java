@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.inventory.api.ExchangeOrgStockLotRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.ExchangeStockLotRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
@@ -60,6 +61,14 @@ public class InventoryStockReads implements StockReads, OrderLinkedStockRows {
   public @NotNull List<ExchangeStockLotRow> exchangeLots(
       @NotNull UUID member, @NotNull UUID after, int limit) {
     return inventoryRepository.findExchangeLots(member, after, limit);
+  }
+
+  @Override
+  public @NotNull List<ExchangeOrgStockLotRow> exchangeOrgLots(
+      @NotNull Collection<UUID> units, @NotNull UUID after, int limit) {
+    return units.isEmpty()
+        ? List.of()
+        : inventoryRepository.findExchangeOrgLots(units, after, limit);
   }
 
   @Override

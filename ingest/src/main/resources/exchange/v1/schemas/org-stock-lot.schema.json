@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ingest.profit-base.online/exchange/v1/schemas/org-stock-lot.schema.json",
+  "title": "Org stock lot",
+  "description": "The shared stock of one unit's pool of one material at one location, quality and stolen state, summed over every holder, with the amounts earmarked to job orders and to missions. The same material at the same place in two units is two lots.",
+  "type": "object",
+  "properties": {
+    "key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Opaque identifier issued by the Basetool. Clients store and echo it, never parse it."
+    },
+    "unit": {
+      "type": "object",
+      "description": "The unit whose pool holds the lot.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Opaque identifier issued by the Basetool. Clients store and echo it, never parse it."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ]
+    },
+    "material": {
+      "$ref": "item-ref.schema.json"
+    },
+    "materialKind": {
+      "$ref": "material-kind.schema.json"
+    },
+    "location": {
+      "$ref": "location-ref.schema.json"
+    },
+    "quality": {
+      "$ref": "quality.schema.json"
+    },
+    "stolen": {
+      "type": "boolean"
+    },
+    "quantity": {
+      "$ref": "quantity.schema.json"
+    },
+    "earmarked": {
+      "type": "object",
+      "description": "The part of the lot reserved for job orders and for missions, in the lot's unit.",
+      "properties": {
+        "jobOrders": {
+          "$ref": "quantity.schema.json"
+        },
+        "missions": {
+          "$ref": "quantity.schema.json"
+        }
+      },
+      "required": [
+        "jobOrders",
+        "missions"
+      ]
+    },
+    "extensions": {
+      "$ref": "extensions.schema.json"
+    }
+  },
+  "required": [
+    "key",
+    "unit",
+    "material",
+    "location",
+    "quality",
+    "stolen",
+    "quantity",
+    "earmarked"
+  ]
+}

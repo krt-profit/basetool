@@ -58,8 +58,9 @@ The exchange API is served by the ingest gateway at `/exchange/v1/**`
 | `POST /exchange/v1/org-stock/changes` | `exchange.orgstock.write` | REQ-XCH-045 |
 | `GET /exchange/v1/org-stock/units/{unit}/members` · `…/targets` | `exchange.orgstock.write` | REQ-XCH-045 |
 
-The three `org-stock` rows and the two `.details` capabilities are planned (ADR-0257); until they
-are built the gateway serves neither.
+Of the three `org-stock` rows the read is built, as a snapshot (REQ-XCH-042); the writes, the
+roster, the targets and the two `.details` capabilities are planned (ADR-0257), and until they are
+built the gateway serves none of them.
 | `POST /exchange/v1/me/drafts/blueprints` · `…/drafts/refinery-orders` | `exchange.drafts.blueprints` / `.refinery` | REQ-XCH-019 |
 
 Every route is deny-by-default, uses only `GET` or `POST` (the ingest bot filter admits nothing
@@ -810,7 +811,9 @@ feed is sequenced at the database level, so writes that bypass the services — 
 provisioning, „delete all", admin purge, user deletion, org re-stamping, owner reassignment and a
 change of the default blueprint set — appear in it. Removals leave tombstones with `removedBy`
 (`web`, `app`, `client` with client id and installation id, `system`) and `removedAt`, kept 90 days
-and purged nightly. A cursor older than the tombstones answers `410 CURSOR_EXPIRED`.
+and purged nightly. A cursor older than the tombstones answers `410 CURSOR_EXPIRED`. One interim
+exception: the org stock answers its own feed cursor `410 CURSOR_EXPIRED` until its feed is built
+(REQ-XCH-042, owner decision 2026-10-15).
 
 The sequence is `exchange_change` (ADR-0224): an `AFTER` row trigger on every synced table records
 `(member, resource, key)` with its writing transaction's id and a sequence number, and the feed reads
@@ -2123,7 +2126,7 @@ succeeding, never succeeded).
 ### REQ-XCH-036 — The frozen exchange is pinned at build time
 
 The exchange contract and the backend surface the gateway relays to keep their behaviour
-byte-identical (D-05 of the domain modularisation plan): the 15 relay operations on 14 backend
+byte-identical (D-05 of the domain modularisation plan): the 16 relay operations on 15 backend
 paths, their parameters, request and answer shapes, the relayed codes and statuses, and the
 gateway's security filters. Four build-time guards hold it, so a drift fails a build instead of
 surfacing in production as a `502 BACKEND_RELAY_FAILED` or a `400 SCHEMA_INVALID` for a body the
@@ -2148,7 +2151,7 @@ contract allows.
   key thumbprint, connection time, correlation id, DPoP nonce, idempotency key, trace context,
   the rate-limit counters). A difference writes the observed answer under
   `ingest/build/exchange-golden/` for review; a deliberate change replaces the golden in the same
-  pull request. The test also asserts that the backend stub received exactly the 15 relay
+  pull request. The test also asserts that the backend stub received exactly the 16 relay
   operations.
 - **Security filter order.** `SecurityFilterChainOrderTest` and
   `SecurityFilterChainProductionShapeTest` pin, through `FilterChainProxy`, the gateway's chains in
@@ -2173,7 +2176,7 @@ Every guard is proven able to fail by a planted violation in its own test.
   answer validates against its published schema.
   *`ExchangeWireContractTest`.*
 - [x] Every `/exchange/v1` route answers byte for byte as recorded, and the relay sends exactly the
-  seam's 15 operations. *`ExchangeGoldenAnswerTest`.*
+  seam's 16 operations. *`ExchangeGoldenAnswerTest`.*
 - [x] The gateway's security filter chains hold exactly the pinned filters in order.
   *`SecurityFilterChainOrderTest`, `SecurityFilterChainProductionShapeTest`.*
 - [x] A pull request touching the exchange path without the `e2e` label fails.
@@ -2187,12 +2190,12 @@ Every identifier the modules exchange on the relay seam is declared once, in
 `test-support`'s `ExchangeSeam`, and each module's parity test asserts its own declarations against
 it, so a rename on one side alone fails that side's build:
 
-- the 15 relay operations with their gateway route, backend path, capability, paging and published
-  schemas — against the backend's nine exchange controllers and their `@exchangeGate`
-  expressions, `ActingMemberFilter`'s 14 exact paths, the gateway's `ExchangeRoutes` and its relay
+- the 16 relay operations with their gateway route, backend path, capability, paging and published
+  schemas — against the backend's ten exchange controllers and their `@exchangeGate`
+  expressions, `ActingMemberFilter`'s 15 exact paths, the gateway's `ExchangeRoutes` and its relay
   prefix (`ExchangeRelaySeamParityTest` in both modules), and the paths the relay actually calls
   (`ExchangeGoldenAnswerTest`);
-- the five relay headers, the eleven capability scopes, the seven gate codes with their statuses, the
+- the five relay headers, the twelve capability scopes, the seven gate codes with their statuses, the
   codes the gateway passes through and the four backend codes it translates;
 - the registry mirror document: the backend's writer must produce the seam's sample document, and
   the gateway's reader must read every member of it — renaming any member it reads changes what it
@@ -2232,7 +2235,7 @@ G-18)
 
 ### REQ-XCH-039 — The relay surface has its own internal OpenAPI document
 
-The backend operations the gateway relays to — the 15 operations under `/api/v1/exchange/**` —
+The backend operations the gateway relays to — the 16 operations under `/api/v1/exchange/**` —
 are described in their own committed document,
 `backend/src/main/resources/api/exchange-relay.openapi.json`, and in no other (ADR-0216, amendment
 of 2026-10-02). The published `openapi.json`, which the app vendors and the frontend generates its
@@ -2247,7 +2250,7 @@ never served to a client. The external contract stays the gateway's `exchange-v1
   reach. A component both reach is in both, identical. The runtime `/v3/api-docs` is unchanged: it
   still describes the full model, ADMIN-only, and is switched off in production.
 - **Its own assertions.** Before writing, the generator requires of the relay document exactly the
-  15 relay operations, all of the `exchange` domain and tier `T0`, none anonymous, the `bearer-jwt`
+  16 relay operations, all of the `exchange` domain and tier `T0`, none anonymous, the `bearer-jwt`
   scheme and requirement, and no dangling reference; of `openapi.json` no relay path and no dangling
   reference (REQ-API-018).
 - **Its own staleness check.** Each document is compared with its committed file, line ends
@@ -2261,7 +2264,7 @@ never served to a client. The external contract stays the gateway's `exchange-v1
 
 **Acceptance**
 
-- [x] The relay document holds exactly the 15 relay operations and 66 schemas; `openapi.json` holds
+- [x] The relay document holds exactly the 16 relay operations and 70 schemas; `openapi.json` holds
   none of them and the 50 schemas only they reach left it; the union of both is the generated
   model. *`ExchangeFenceTest`, `OpenApiDocumentAssertionsTest`.*
 - [x] A stale relay document fails the generator in CI and is rewritten outside it — proven by
@@ -2305,18 +2308,36 @@ other units never appear; the admin all-scope and pin never apply.
   here although it changes no `/me/stock` lot.
 - **Gates.** The pending-approval, role and terms gates of REQ-XCH-009 apply. A client may cache
   org stock for up to 7 days.
+- **Wire shape.** The answer is `page.schema.json#/$defs/orgStockPage`: the page members of
+  REQ-XCH-013 plus `units[]` of `org-unit.schema.json`, its lots `org-stock-lot.schema.json` with
+  `unit` `{id, name}` and `earmarked` `{jobOrders, missions}` as quantities in the lot's unit. A
+  snapshot pages by each lot's lowest row id, as `/me/stock` does, and its last page carries the
+  feed cursor it was taken at (REQ-XCH-013). Until the feed is built, resuming with that cursor is
+  `410 CURSOR_EXPIRED`, so a client refreshes by reading a new snapshot; once it is built the same
+  cursor resumes the feed (owner decision 2026-10-15, an exception to REQ-XCH-013's use of the
+  code). The backend counts each page served as
+  `basetool_exchange_org_stock_pages_total{client_id}`.
 
 **Acceptance**
 
-- [ ] A member reads the shared lots of each unit they are a direct member of, one pool per unit,
+- [x] A member reads the shared lots of each unit they are a direct member of, one pool per unit,
   and nothing of a unit they only oversee, of another member's personal rows or of ownerless rows.
-- [ ] An `ADMIN` member, with or without a pin, reads only the pools of their own memberships.
-- [ ] The same material at the same place in two of the member's units is two lots.
+  *`ExchangeOrgStockControllerTest`.*
+- [x] An `ADMIN` member, with or without a pin, reads only the pools of their own memberships.
+  *`ExchangeOrgStockControllerTest`.*
+- [x] The same material at the same place in two of the member's units is two lots.
+  *`ExchangeOrgStockControllerTest`.*
+- [x] A client without `exchange.orgstock.read` granted and consented gets `403 SCOPE_MISSING`
+  from the gateway before the relay, and the backend refuses a relayed request the same way.
+  *`ExchangeOrgStockRouteTest`, `ExchangeOrgStockControllerTest`.*
 - [ ] Rebooking an entry from personal to shared, changing its unit, editing its note and adding an
   earmark each produce an org-stock feed entry for the lot concerned.
 - [ ] After the member leaves a unit, the next page no longer lists the unit or its lots.
 
-**Status:** planned — PR 2 of ADR-0257
+**Code:** `ExchangeOrgStockController`, `ExchangeOrgStockService`, `StockReads#exchangeOrgLots`,
+`ExchangeController#orgStock` · **Status:** the snapshot, the capability (`V295`, the provisioner's
+`xchConsentOrgStockRead`), the schemas, the docs and the page counter built (#2586); the feed
+(#2587) remains
 
 ### REQ-XCH-043 — A Logistician of the pool sees the single entries by name
 

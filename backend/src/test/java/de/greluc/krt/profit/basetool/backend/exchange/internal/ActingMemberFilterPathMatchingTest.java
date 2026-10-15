@@ -172,7 +172,8 @@ class ActingMemberFilterPathMatchingTest {
         "/api/v1/exchange/me/ships",
         "/api/v1/exchange/me/ships/changes",
         "/api/v1/exchange/me/stock",
-        "/api/v1/exchange/me/stock/changes"
+        "/api/v1/exchange/me/stock/changes",
+        "/api/v1/exchange/org-stock"
       })
   void actsOnEveryExchangeRouteWithTheExchangeAuthorities(String path) throws Exception {
     MockHttpServletResponse response = new MockHttpServletResponse();

@@ -40,7 +40,7 @@ same `.env`, so the old backend walls old apps while new apps find their paths g
 2. **Contract tiers.** Every operation carries one tier, marked on its handler and emitted into
    `openapi.json` as `x-contract-tier`:
    - **T0** never breaks: `GET /api/v1/app/version-policy`, `POST /internal/discord/account-existence`,
-     the 15 exchange relay operations under `/api/v1/exchange/**` (D-05, frozen byte for byte), and
+     the 16 exchange relay operations under `/api/v1/exchange/**` (D-05, frozen byte for byte), and
      the two SSE streams plus `POST /api/v1/live-sync/changed`. A T0 break fails every build.
    - **T1** is the Android contract — every operation a released app build calls, minus T0. It
      breaks only in a declared hard-cut wave.
@@ -94,7 +94,8 @@ grows with the additive exchange contract (ADR-0219). An added T0 operation is n
 removed afterwards. The previous-release comparison still requires its baseline to document every
 T0 operation; an operation added after that release is named in
 `TIER_ZERO_NEWER_THAN_THE_LATEST_RELEASE` of `ExternalContractTest` until a release ships it
-(REQ-API-017). The first such operation is `GET /api/v1/exchange/me/org-units` (REQ-XCH-048).
+(REQ-API-017). The first such operation is `GET /api/v1/exchange/me/org-units` (REQ-XCH-048), the
+second `GET /api/v1/exchange/org-stock` (REQ-XCH-042).
 
 ## Alternatives considered
 

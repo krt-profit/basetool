@@ -40,6 +40,8 @@
       path: resources/org-demand.md
     - title: Org units
       path: resources/org-units.md
+    - title: Org stock
+      path: resources/org-stock.md
     - title: Drafts
       path: resources/drafts.md
 - section: Reference

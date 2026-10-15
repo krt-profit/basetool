@@ -180,6 +180,10 @@ class TableOwnershipTest {
           new Crossing(
               Set.of("city", "game_item", "location", "material", "space_station"),
               "The keyed variant of findExchangeLots; the same downward read into catalogue."),
+          "InventoryItemRepository#findExchangeOrgLots",
+          new Crossing(
+              Set.of("city", "game_item", "location", "material", "space_station"),
+              "The org-stock variant of findExchangeLots; the same downward read into catalogue."),
           "PersonalBlueprintRepository#grantDefaultBlueprintsToAllUsers",
           new Crossing(
               Set.of("app_user"),

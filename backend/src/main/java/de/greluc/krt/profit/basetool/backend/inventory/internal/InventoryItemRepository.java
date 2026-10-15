@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.inventory.api.ExchangeOrgStockLotRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.ExchangeStockLotRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryScope;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow;
@@ -91,6 +92,63 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       nativeQuery = true)
   List<ExchangeStockLotRow> findExchangeLots(
       @Param("member") UUID member, @Param("after") UUID after, @Param("limit") int limit);
+
+  /** The shared lots of the given units' pools with their earmarks (REQ-XCH-042). */
+  String EXCHANGE_ORG_LOTS =
+      """
+      SELECT lots.anchor AS anchor, lots.lot_key AS lotKey, lots.unit_id AS unitId,
+             lots.material_id AS materialId, m.name AS materialName, m.type AS materialType,
+             (m.id IS NOT NULL AND m.id_commodity IS NOT NULL) AS commodity,
+             m.is_mineral AS mineral, m.is_harvestable AS harvestable, m.is_raw AS raw,
+             m.is_refined AS refined, m.is_buyable AS buyable, m.is_sellable AS sellable,
+             m.quantity_type AS quantityType, lots.game_item_id AS gameItemId,
+             g.name AS gameItemName, l.name AS locationName, c.id_city AS uexCityId,
+             s.id_space_station AS uexSpaceStationId, lots.quality AS quality,
+             lots.stolen AS stolen, lots.amount AS amount,
+             lots.job_order_earmarked AS jobOrderEarmarked,
+             lots.mission_earmarked AS missionEarmarked
+      FROM (SELECT CAST(MIN(CAST(i.id AS text)) AS uuid) AS anchor,
+                   'u:' || i.owning_org_unit_id || '|'
+                       || exchange_stock_lot_key(i.material_id, i.game_item_id, i.location_id,
+                                                 COALESCE(i.quality, 0), i.stolen) AS lot_key,
+                   i.owning_org_unit_id AS unit_id, i.material_id, i.game_item_id,
+                   i.location_id, COALESCE(i.quality, 0) AS quality, i.stolen,
+                   SUM(i.amount) AS amount,
+                   COALESCE(SUM(jo.amount), 0) AS job_order_earmarked,
+                   COALESCE(SUM(mi.amount), 0) AS mission_earmarked
+            FROM inventory_item i
+            LEFT JOIN LATERAL (SELECT SUM(a.amount) AS amount
+                               FROM inventory_item_job_order_allocation a
+                               WHERE a.inventory_item_id = i.id) jo ON TRUE
+            LEFT JOIN LATERAL (SELECT SUM(a.amount) AS amount
+                               FROM inventory_item_mission_allocation a
+                               WHERE a.inventory_item_id = i.id) mi ON TRUE
+            WHERE NOT i.personal AND i.owning_org_unit_id IN (:units)
+            GROUP BY i.owning_org_unit_id, i.material_id, i.game_item_id, i.location_id,
+                     COALESCE(i.quality, 0), i.stolen) lots
+      LEFT JOIN material m ON m.id = lots.material_id
+      LEFT JOIN game_item g ON g.id = lots.game_item_id
+      JOIN location l ON l.id = lots.location_id
+      LEFT JOIN city c ON c.id = l.city_id
+      LEFT JOIN space_station s ON s.id = l.space_station_id
+      """;
+
+  /**
+   * Returns one snapshot page of the shared lots of the given units' pools, ordered by their lowest
+   * row id (REQ-XCH-042).
+   *
+   * @param units the units whose pools are read; never empty
+   * @param after the lowest row id of the last lot delivered, or the zero id for the first page
+   * @param limit the most lots to return
+   * @return the lots
+   */
+  @Query(
+      value = EXCHANGE_ORG_LOTS + " WHERE lots.anchor > :after ORDER BY lots.anchor LIMIT :limit",
+      nativeQuery = true)
+  List<ExchangeOrgStockLotRow> findExchangeOrgLots(
+      @Param("units") Collection<UUID> units,
+      @Param("after") UUID after,
+      @Param("limit") int limit);
 
   /**
    * Returns the member's lots with the given keys, as they are now.
