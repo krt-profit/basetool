@@ -24,8 +24,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * One org unit the member directly belongs to, in the shape of the published {@code
- * org-unit.schema.json} (REQ-XCH-048).
+ * One org unit in the shape of the published {@code org-unit.schema.json}: one the member directly
+ * belongs to (REQ-XCH-048), or the one a ship belongs to (REQ-XCH-017).
  *
  * @param id the unit's primary key, which the client keeps and echoes as an opaque string
  * @param name the unit's display name as the Basetool shows it; changes when the unit is renamed

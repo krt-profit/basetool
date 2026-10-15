@@ -35,6 +35,8 @@ import org.jetbrains.annotations.Nullable;
  * @param insurance the insurance
  * @param location the location, or {@code null} when the ship has none
  * @param fitted whether the ship is fitted
+ * @param orgUnit the org unit the ship belongs to, or {@code null} when it has none
+ * @param orgUnitVersion the counter of the ship's org unit, which a change of the unit echoes
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ExchangeShipDto(
@@ -45,4 +47,6 @@ public record ExchangeShipDto(
     @Nullable String name,
     @NotNull ExchangeInsuranceDto insurance,
     @Nullable ExchangeLocationDto location,
-    boolean fitted) {}
+    boolean fitted,
+    @Nullable ExchangeOrgUnitDto orgUnit,
+    long orgUnitVersion) {}

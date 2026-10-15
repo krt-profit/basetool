@@ -1131,6 +1131,7 @@ The listed crossings:
 | Crossing | Foreign tables | Why |
 | --- | --- | --- |
 | The four V252/V260 change-feed triggers on `personal_blueprint`, `default_blueprint`, `inventory_item`, `ship` | `exchange_change` (write), `app_user` (read) | The exchange's key log is written with the row (ADR-0224) |
+| The V293 change-feed trigger `trg_org_unit_exchange_change` on `org_unit` | `exchange_change` (write), `app_user`, `ship` (read) | A renamed unit re-announces its ships in the exchange's key log (REQ-XCH-017) |
 | `trg_guard_promotion_topic_owner_kind`, `trg_guard_rank_requirement_owner_kind` | `org_unit` (read) | The owning unit must be a squadron; a downward read |
 | `InventoryItemRepository#findExchangeLots`, `#findExchangeLotsByKeys` | `city`, `game_item`, `location`, `material`, `space_station` (read) | Catalogue names joined into the exchange's stock lots |
 | `PersonalBlueprintRepository#grantDefaultBlueprintsToAllUsers` | `app_user` (read) | Grants the default set to every active account in one statement |
@@ -1142,11 +1143,11 @@ The listed crossings:
 - [x] A trigger or native statement naming a foreign table outside the list fails, and so does a
   listed crossing that no longer happens; a class running SQL outside a repository fails unless it
   is listed.
-- [x] Every table and column a trigger function names exists; the four change-feed triggers are
+- [x] Every table and column a trigger function names exists; the five change-feed triggers are
   among those checked.
 - [x] Each rule is proven able to fail: a table created, a cross-module trigger attached, a change-feed
   column and the change-feed table renamed — each inside a rolled-back transaction — and a planted
-  repository and SQL caller are all reported. Selection floors: 117 tables, 18 triggers, 30 native
+  repository and SQL caller are all reported. Selection floors: 117 tables, 19 triggers, 30 native
   statements.
 
 **Enforced by:** `TableOwnershipTest`, `TriggerColumnResolutionTest` · **Code:**

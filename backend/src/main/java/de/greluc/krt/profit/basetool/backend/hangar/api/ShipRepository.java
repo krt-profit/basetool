@@ -42,14 +42,18 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ShipRepository extends JpaRepository<Ship, UUID> {
 
-  /** A member's ships with their type and location, as the exchange reads them (REQ-XCH-017). */
+  /**
+   * A member's ships with their type, location and org unit, as the exchange reads them
+   * (REQ-XCH-017).
+   */
   String EXCHANGE_SHIPS =
       """
       SELECT new
       de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository$ExchangeShipRow(
       s.id, s.version, s.name, t.id, t.name, s.insurance, l.name, c.idCity, st.idSpaceStation,
-      s.fitted) FROM Ship s JOIN s.shipType t LEFT JOIN s.location l LEFT JOIN l.city c
-      LEFT JOIN l.spaceStation st WHERE s.owner.id = :member
+      s.fitted, o, s.owningOrgUnitVersion) FROM Ship s JOIN s.shipType t LEFT JOIN s.location l
+      LEFT JOIN l.city c LEFT JOIN l.spaceStation st LEFT JOIN s.owningOrgUnit o
+      WHERE s.owner.id = :member
       """;
 
   /**
@@ -480,8 +484,8 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
 
   /**
-   * One of a member's ships as the exchange reads it in one query, with its type and location
-   * (REQ-XCH-017).
+   * One of a member's ships as the exchange reads it in one query, with its type, location and org
+   * unit (REQ-XCH-017).
    *
    * @param id the ship's id
    * @param version the ship's optimistic-lock version, or {@code null} before its first write
@@ -493,6 +497,8 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * @param uexCityId the UEX id of the location's city, or {@code null}
    * @param uexSpaceStationId the UEX id of the location's space station, or {@code null}
    * @param fitted whether the ship is fitted
+   * @param orgUnit the org unit the ship belongs to, or {@code null} when it has none
+   * @param orgUnitVersion the optimistic counter of the ship's org unit (ADR-0258)
    */
   record ExchangeShipRow(
       UUID id,
@@ -504,5 +510,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
       String locationName,
       Integer uexCityId,
       Integer uexSpaceStationId,
-      boolean fitted) {}
+      boolean fitted,
+      @Nullable OrgUnit orgUnit,
+      long orgUnitVersion) {}
 }

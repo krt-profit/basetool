@@ -136,8 +136,9 @@ class ExchangeGoldenAnswerTest {
 
   private static final String SHIP_PAGE =
       "{\"items\":[{\"shipId\":\"0b9f6c1e-2a3d-4e5f-8a7b-9c0d1e2f3a4b\",\"version\":0,"
-          + "\"shipType\":{\"bt\":\"7c8d9e0f-1a2b-4c3d-8e4f-5a6b7c8d9e0f\","
-          + "\"name\":\"Cutlass Black\"},\"insurance\":{\"kind\":\"LTI\"},\"fitted\":false}],"
+          + "\"shipType\":{\"bt\":\"7c8d9e0f-1a2b-4c3d-8e4f-5a6b7c8d9e0f\",\"name\":\"Cutlass"
+          + " Black\"},\"insurance\":{\"kind\":\"LTI\"},\"fitted\":false,\"orgUnit\":{\"id\":\"0d6f3c1a-5b2e-4f7a-9c8d-1e2f3a4b5c6d\",\"name\":\"Staffel"
+          + " Nord\",\"shorthand\":\"NORD\",\"kind\":\"SQUADRON\"},\"orgUnitVersion\":1}],"
           + "\"removed\":[],\"nextCursor\":\"f1.9.0\",\"hasMore\":false}";
 
   private static MockWebServer backend;

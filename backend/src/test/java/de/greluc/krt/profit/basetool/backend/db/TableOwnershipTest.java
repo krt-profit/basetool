@@ -116,7 +116,7 @@ class TableOwnershipTest {
   private static final int TABLE_FLOOR = 127;
 
   /** Today's user-defined trigger count; the sweep must see at least this many. */
-  private static final int TRIGGER_FLOOR = 18;
+  private static final int TRIGGER_FLOOR = 19;
 
   /** Today's count of native statements in repositories and entity formulas. */
   private static final int NATIVE_STATEMENT_FLOOR = 30;
@@ -149,6 +149,11 @@ class TableOwnershipTest {
           new Crossing(
               Set.of("exchange_change", "app_user"),
               "V252 change feed: the ship id follows its owner (ADR-0224)."),
+          "trg_org_unit_exchange_change",
+          new Crossing(
+              Set.of("exchange_change", "app_user", "ship"),
+              "V293 change feed: a renamed unit re-announces its ships, read from ship, so a"
+                  + " client never keeps a stale unit (REQ-XCH-017)."),
           "trg_guard_promotion_topic_owner_kind",
           new Crossing(
               Set.of("org_unit"),

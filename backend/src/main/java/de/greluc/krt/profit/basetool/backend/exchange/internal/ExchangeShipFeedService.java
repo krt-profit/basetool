@@ -23,11 +23,13 @@ import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemExcepti
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeInsuranceDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemRefDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeLocationDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeShipDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeShipPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeTombstoneDto;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository.ExchangeShipRow;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -201,7 +203,21 @@ public class ExchangeShipFeedService {
         ship.locationName() == null
             ? null
             : new ExchangeLocationDto(cut(ship.locationName()), uex(ship)),
-        ship.fitted());
+        ship.fitted(),
+        orgUnit(ship.orgUnit()),
+        ship.orgUnitVersion());
+  }
+
+  /**
+   * Maps a ship's org unit.
+   *
+   * @param unit the unit, or {@code null}
+   * @return the unit with its id, name, shorthand and kind, or {@code null} when the ship has none
+   */
+  private static @Nullable ExchangeOrgUnitDto orgUnit(@Nullable OrgUnit unit) {
+    return unit == null
+        ? null
+        : new ExchangeOrgUnitDto(unit.getId(), unit.getName(), unit.getShorthand(), unit.getKind());
   }
 
   /**

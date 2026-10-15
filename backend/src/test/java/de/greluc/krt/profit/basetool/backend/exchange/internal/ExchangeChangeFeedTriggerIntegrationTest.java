@@ -52,7 +52,7 @@ class ExchangeChangeFeedTriggerIntegrationTest {
 
   /** Every table whose writes the feed must see, with the triggers that sequence them. */
   private static final Set<String> SYNCED_TABLES =
-      Set.of("personal_blueprint", "default_blueprint", "inventory_item", "ship");
+      Set.of("personal_blueprint", "default_blueprint", "inventory_item", "ship", "org_unit");
 
   @Autowired private JdbcTemplate jdbc;
   @Autowired private UserRepository userRepository;
