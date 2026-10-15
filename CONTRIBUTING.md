@@ -834,7 +834,8 @@ Javadoc is **gate-enforced** via Checkstyle (`MissingJavadocType`,
 
 The UI follows the *DAS KARTELL* Corporate Design Manual strictly — see
 [`.claude/skills/das-kartell-design/README.md`](.claude/skills/das-kartell-design/README.md)
-(a git submodule: run `git submodule update --init` if it is empty), the
+(a git submodule that follows the design system's `main`: run `git submodule update --init
+--remote .claude/skills/das-kartell-design` if it is empty or stale, ADR-0259), the
 binding rules in [`docs/specs/ui-design-system.md`](docs/specs/ui-design-system.md)
 and [`frontend/CLAUDE.md`](frontend/CLAUDE.md). Highlights:
 

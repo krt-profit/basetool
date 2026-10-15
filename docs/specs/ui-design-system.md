@@ -17,7 +17,8 @@
 > [0243](../adr/0243-colours-and-stacking-layers-are-written-through-tokens.md) (REQ-UI-001, REQ-UI-023) ·
 > **Next free id:** `REQ-UI-029` · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
-> (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)).
+> (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)),
+> read at the design system's latest `main` ([ADR-0259](../adr/0259-the-design-system-submodule-follows-its-main.md)).
 
 # UI & design system
 

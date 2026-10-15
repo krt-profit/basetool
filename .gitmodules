@@ -1,3 +1,5 @@
 [submodule ".claude/skills/das-kartell-design"]
 	path = .claude/skills/das-kartell-design
 	url = https://github.com/krt-profit/design-system
+	branch = main
+	ignore = all
