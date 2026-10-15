@@ -392,6 +392,29 @@ public class ExchangeController {
   }
 
   /**
+   * Returns the org units the member directly belongs to.
+   *
+   * @param request the admitted request
+   * @param acceptLanguage the caller's language
+   * @return the org units or a problem
+   */
+  @GetMapping("/me/org-units")
+  @PreAuthorize("isAuthenticated()")
+  public @NotNull ResponseEntity<?> orgUnits(
+      @NotNull HttpServletRequest request,
+      @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
+          String acceptLanguage) {
+    ExchangeRequestContext context = ExchangeRequestContext.of(request);
+    if (context == null) {
+      return failed();
+    }
+    return relayed(
+        relay.forward(HttpMethod.GET, BACKEND + "/me/org-units", null, context, acceptLanguage),
+        "org-unit-list.schema.json",
+        List.of());
+  }
+
+  /**
    * Adds or removes blueprints.
    *
    * @param body the change set

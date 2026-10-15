@@ -47,6 +47,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -147,6 +148,30 @@ class ConnectedAppsPageControllerMvcTest {
         .andExpect(content().string(containsString("trenne sie sofort")))
         .andExpect(content().string(containsString("data-ca-mark-seen")))
         .andExpect(model().attribute("anyUnseen", true));
+  }
+
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void theOrgUnitsCapabilityIsNamedInGermanAndEnglish() throws Exception {
+    ConnectedAppDto app =
+        new ConnectedAppDto(
+            "versekit",
+            "VerseKit",
+            List.of("exchange.connect", "exchange.orgunits.read"),
+            List.of(new ConnectedInstallationDto(INSTALLATION, "Desktop", null, null, false)),
+            List.of());
+    when(backendApiClient.get(eq("/api/v1/connected-apps"), anyTypeRef())).thenReturn(List.of(app));
+
+    mockMvc
+        .perform(get("/connected-apps").locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("Eigene Einheiten lesen")))
+        .andExpect(content().string(not(containsString("??"))));
+    mockMvc
+        .perform(get("/connected-apps").param("lang", "en"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("Read your own org units")))
+        .andExpect(content().string(not(containsString("??"))));
   }
 
   @Test

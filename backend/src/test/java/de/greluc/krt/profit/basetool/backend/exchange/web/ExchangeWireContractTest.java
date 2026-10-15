@@ -46,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChang
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeInstallationDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeLocationListDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgDemandDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitListDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeShipPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStockPageDto;
@@ -136,7 +137,8 @@ class ExchangeWireContractTest {
           "page--stockPage", ExchangeStockPageDto.class,
           "page--shipPage", ExchangeShipPageDto.class,
           "change-result", ExchangeChangeResultDto.class,
-          "org-demand", ExchangeOrgDemandDto.class);
+          "org-demand", ExchangeOrgDemandDto.class,
+          "org-unit-list", ExchangeOrgUnitListDto.class);
 
   private final SchemaRegistry registry =
       SchemaRegistry.withDefaultDialect(
@@ -163,6 +165,7 @@ class ExchangeWireContractTest {
   private final List<UUID> locations = new ArrayList<>();
   private final List<UUID> cities = new ArrayList<>();
   private final List<UUID> shipTypes = new ArrayList<>();
+  private final List<UUID> orgUnits = new ArrayList<>();
 
   @BeforeEach
   void setUp() {
@@ -199,6 +202,7 @@ class ExchangeWireContractTest {
     jdbc.update("DELETE FROM material_exchange_offer WHERE owner_id = ?", member);
     jdbc.update("DELETE FROM inventory_item WHERE user_id = ?", member);
     jdbc.update("DELETE FROM ship WHERE owner_id = ?", member);
+    jdbc.update("DELETE FROM org_unit_membership WHERE user_id = ?", member);
     jdbc.update("DELETE FROM user_roles WHERE user_id = ?", member);
     jdbc.update("DELETE FROM app_user WHERE id = ?", member);
     blueprints.forEach(id -> jdbc.update("DELETE FROM blueprint WHERE id = ?", id));
@@ -206,6 +210,7 @@ class ExchangeWireContractTest {
     shipTypes.forEach(id -> jdbc.update("DELETE FROM ship_type WHERE id = ?", id));
     locations.forEach(id -> jdbc.update("DELETE FROM location WHERE id = ?", id));
     cities.forEach(id -> jdbc.update("DELETE FROM city WHERE id = ?", id));
+    orgUnits.forEach(id -> jdbc.update("DELETE FROM org_unit WHERE id = ?", id));
     ExchangeSettings settings =
         settingsRepository.findById(ExchangeSettings.SINGLETON_ID).orElseThrow();
     settings.setEnabled(wasEnabled);
@@ -295,6 +300,10 @@ class ExchangeWireContractTest {
         .as("every feed shows its seeded entry")
         .hasSize(3)
         .allSatisfy((path, seen) -> assertThat(seen).as(path).isPositive());
+    assertThat(
+            mapper.readTree(read(ExchangeSeam.RELAY_PREFIX + "/me/org-units")).path("items").size())
+        .as("the seeded membership")
+        .isEqualTo(1);
   }
 
   @Test
@@ -348,7 +357,7 @@ class ExchangeWireContractTest {
         checked++;
       }
     }
-    assertThat(checked).as("answer fixtures").isGreaterThanOrEqualTo(14);
+    assertThat(checked).as("answer fixtures").isGreaterThanOrEqualTo(16);
   }
 
   @Test
@@ -364,7 +373,10 @@ class ExchangeWireContractTest {
         .isInstanceOf(AssertionError.class);
   }
 
-  /** Seeds one owned blueprint, one stock lot at a UEX city and one ship for the member. */
+  /**
+   * Seeds one owned blueprint, one stock lot at a UEX city, one ship and one Staffel membership for
+   * the member.
+   */
   private void seed() {
     Blueprint blueprint = new Blueprint();
     blueprint.setScwikiUuid(UUID.randomUUID());
@@ -422,6 +434,17 @@ class ExchangeWireContractTest {
         "Wire ship",
         shipType,
         member);
+
+    UUID orgUnit = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO org_unit (id, kind, name, shorthand, active, is_promotion_enabled,"
+            + " is_profit_eligible) VALUES (?, 'SQUADRON', ?, ?, TRUE, FALSE, FALSE)",
+        orgUnit,
+        "Wire unit " + orgUnit,
+        "W" + orgUnit.toString().substring(0, 8));
+    orgUnits.add(orgUnit);
+    jdbc.update(
+        "INSERT INTO org_unit_membership (user_id, org_unit_id) VALUES (?, ?)", member, orgUnit);
   }
 
   /**

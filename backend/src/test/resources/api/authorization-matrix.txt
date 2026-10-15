@@ -129,6 +129,7 @@ POST /api/v1/exchange/me/drafts/refinery-orders | ExchangeDraftController#refine
 GET /api/v1/exchange/me/installation | ExchangeInstallationController#current | pre=@exchangeGate.allows('exchange.connect', authentication) | url=anyRequest -> authenticated
 POST /api/v1/exchange/me/installation | ExchangeInstallationController#label | pre=@exchangeGate.allows('exchange.connect', authentication) | url=anyRequest -> authenticated
 GET /api/v1/exchange/me/org-demand | ExchangeDemandController#orgDemand | pre=@exchangeGate.allows('exchange.demand.read', authentication) | url=anyRequest -> authenticated
+GET /api/v1/exchange/me/org-units | ExchangeOrgUnitController#orgUnits | pre=@exchangeGate.allows('exchange.orgunits.read', authentication) | url=anyRequest -> authenticated
 GET /api/v1/exchange/me/ships | ExchangeShipController#ships | pre=@exchangeGate.allows('exchange.hangar.read', authentication) | url=anyRequest -> authenticated
 POST /api/v1/exchange/me/ships/changes | ExchangeShipController#shipChanges | pre=@exchangeGate.allows('exchange.hangar.write', authentication) | url=anyRequest -> authenticated
 GET /api/v1/exchange/me/stock | ExchangeStockController#stock | pre=@exchangeGate.allows('exchange.stock.read', authentication) | url=anyRequest -> authenticated

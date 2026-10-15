@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ingest.profit-base.online/exchange/v1/schemas/org-unit.schema.json",
+  "title": "Org unit",
+  "description": "An org unit of the organisation the member directly belongs to.",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Opaque identifier issued by the Basetool. Clients store and echo it, never parse it."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "shorthand": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "SQUADRON",
+        "SPECIAL_COMMAND",
+        "BEREICH",
+        "ORGANISATIONSLEITUNG"
+      ],
+      "description": "A squadron, a special command, an area or the organisation's leadership."
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "shorthand",
+    "kind"
+  ]
+}

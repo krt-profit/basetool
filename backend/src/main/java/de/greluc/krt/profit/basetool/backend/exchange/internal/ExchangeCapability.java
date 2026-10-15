@@ -59,6 +59,9 @@ public enum ExchangeCapability {
   /** Reading the anonymised demand of the member's org units. */
   DEMAND_READ("exchange.demand.read"),
 
+  /** Reading the member's direct org-unit memberships. */
+  ORGUNITS_READ("exchange.orgunits.read"),
+
   /** Submitting blueprint drafts for review in the browser. */
   DRAFTS_BLUEPRINTS("exchange.drafts.blueprints"),
 

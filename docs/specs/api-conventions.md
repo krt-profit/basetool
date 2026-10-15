@@ -16,7 +16,7 @@ stable, predictable surface.
 Paths are `/api/v1/...`. A breaking change is made by **hard cut** (ADR-0234): the operation
 moves or changes in place in one release, with no parallel old path, no deprecation alias and no
 sunset window. Every operation belongs to one contract tier — **T0** never breaks (the version gate
-`GET /api/v1/app/version-policy`, `POST /internal/discord/account-existence`, the 14 exchange relay
+`GET /api/v1/app/version-policy`, `POST /internal/discord/account-existence`, the 15 exchange relay
 operations under `/api/v1/exchange/**`, the two SSE streams and `POST /api/v1/live-sync/changed`);
 **T1**, what a released Android build calls, breaks only in a declared hard-cut wave under
 REQ-API-009 and REQ-API-010; **T2**, web-only, changes freely under the carve-out below.
@@ -394,7 +394,7 @@ the `bearer-jwt` scheme and the document-wide requirement on it, exactly the two
 operations (`GET /api/v1/app/version-policy`, `GET /api/v1/terms/document`), one domain tag and
 one contract tier on every operation, a per-domain operation-count floor, no exchange relay path, no
 dangling `$ref`, and unique schema names (REQ-API-018; `OpenApiDocumentAssertions`, `ExposedTypes`);
-of the relay document exactly the 14 relay operations, all `exchange` and `T0` (REQ-XCH-039).
+of the relay document exactly the 15 relay operations, all `exchange` and `T0` (REQ-XCH-039).
 
 > [!note] Corrected 2026-10-03
 > This paragraph described assertions (title, scheme, paths, schemas) that belonged to the removed
@@ -463,12 +463,12 @@ under a name of its own.
   an entry no controller needs fails. One published document stays — the app vendors it and the
   frontend generates its test types from it; per-domain views are filtered from it. The exchange
   relay surface alone is fenced into its own internal document (REQ-XCH-039), so the `exchange`
-  domain's 14 relay operations are counted there and its 21 member and admin operations here.
+  domain's 15 relay operations are counted there and its 21 member and admin operations here.
 - **One contract tier per operation**, as `x-contract-tier` (REQ-API-001 names the tiers):
   `T0` never breaks, `T1` is the Android contract, `T2` is web-only. The single source is
   `backend/src/main/resources/api/contract-tiers.txt`, one `<T0|T1> <VERB> <path>` line per frozen
   operation; every operation it does not name is `T2`. `ExternalContractTest` holds it to the record
-  that never changes (`T0`: the version gate, the 14 exchange relay operations, the two streams and
+  that never changes (`T0`: the version gate, the 15 exchange relay operations, the two streams and
   `POST /api/v1/live-sync/changed` — the SPI endpoint is T0 too but not in the document) and to the
   frozen set (`T1` = frozen set minus `T0`, both directions), checks the committed documents — the
   published one and the relay document — carry each tier, and refuses a declared-break ledger line
@@ -495,8 +495,8 @@ under a name of its own.
 - [x] Every operation carries exactly one tag, equal to `x-domain`, from the 22 domains; the tag list
   is the domains; every operation carries the tier its list entry or `T2` gives it — asserted by the
   generator before it writes and on the committed document (`OpenApiDocumentAssertionsTest`).
-- [x] Each domain's operation count has a floor at today's count (573 operations: 559 in
-  `openapi.json`, the 14 relay operations in the relay document, REQ-XCH-039).
+- [x] Each domain's operation count has a floor at today's count (574 operations: 559 in
+  `openapi.json`, the 15 relay operations in the relay document, REQ-XCH-039).
 - [x] `T0` equals its record, `T1` equals the frozen set minus `T0`, no ledger line breaks `T0`
   (`ExternalContractTest.theContractTiersMatchTheFrozenSet`).
 - [x] No two exposed types share a schema name; the scan reaches at least 441 names, and the domain
@@ -1444,7 +1444,11 @@ The same step also fetches the tag's exchange relay document
 the comparison joins it with that release's `openapi.json` and compares against the current two
 documents joined. A release before the fence carries the relay operations in `openapi.json`
 itself. Either way the joined baseline must document every `T0` operation, or the comparison fails
-(`aPreviousReleaseWithoutItsRelayDocumentFails`).
+(`aPreviousReleaseWithoutItsRelayDocumentFails`). The one exception is a `T0` operation added after
+that release, which its baseline cannot document yet: `ExternalContractTest` names each such
+operation in `TIER_ZERO_NEWER_THAN_THE_LATEST_RELEASE`, every entry must be a `T0` operation, and
+an entry is removed once a release ships it. A `T0` operation is only ever added this way, never
+changed or removed (ADR-0234).
 
 **Acceptance**
 

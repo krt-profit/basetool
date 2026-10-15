@@ -438,8 +438,8 @@ The eleventh check of one member within an hour is `429 RATE_LIMITED` with `Retr
 
 ### Reading
 
-**Snapshot and feed.** Read `GET /exchange/v1/me/blueprints`, `/me/stock`, `/me/ships` and
-`/me/org-demand`, and `GET /exchange/v1/catalog/locations` — each `200`. Page the snapshot until
+**Snapshot and feed.** Read `GET /exchange/v1/me/blueprints`, `/me/stock`, `/me/ships`,
+`/me/org-demand` and `/me/org-units`, and `GET /exchange/v1/catalog/locations` — each `200`. Page the snapshot until
 `hasMore` is `false`, keep `nextCursor`, and read again with `?cursor=<it>`: without changes in
 between, the feed is empty. Resolve with `POST /exchange/v1/catalog/resolve`, for example
 `{"kind": "BLUEPRINT", "refs": [{"scRecord": "BP_CRAFT_SBXM_HELMET_01"}]}`,

@@ -53,6 +53,7 @@ The exchange API is served by the ingest gateway at `/exchange/v1/**`
 | `GET /exchange/v1/me/stock` · `POST …/changes` | `exchange.stock.read` / `.write` | REQ-XCH-016 |
 | `GET /exchange/v1/me/ships` · `POST …/changes` | `exchange.hangar.read` / `.write` | REQ-XCH-017 |
 | `GET /exchange/v1/me/org-demand` | `exchange.demand.read` (+ `exchange.demand.details`) | REQ-XCH-018, REQ-XCH-047 |
+| `GET /exchange/v1/me/org-units` | `exchange.orgunits.read` | REQ-XCH-048 |
 | `GET /exchange/v1/org-stock` | `exchange.orgstock.read` (+ `exchange.orgstock.details`) | REQ-XCH-042, REQ-XCH-043 |
 | `POST /exchange/v1/org-stock/changes` | `exchange.orgstock.write` | REQ-XCH-045 |
 | `GET /exchange/v1/org-stock/units/{unit}/members` · `…/targets` | `exchange.orgstock.write` | REQ-XCH-045 |
@@ -265,7 +266,7 @@ configuration cannot stretch a suspension's delay, `ExchangeGatewayPropertiesTes
 
 The capabilities are `exchange.connect` (base: service document, installation label, account
 check), `exchange.blueprints.read` / `.write`, `exchange.stock.read` / `.write`,
-`exchange.hangar.read` / `.write`, `exchange.demand.read` / `.details`,
+`exchange.hangar.read` / `.write`, `exchange.demand.read` / `.details`, `exchange.orgunits.read`,
 `exchange.orgstock.read` / `.details` / `.write`, `exchange.drafts.blueprints` and
 `exchange.drafts.refinery`. A `.details` capability only widens the answer of its `.read` route and
 needs it; it opens no route of its own. A request passes only if the route's scope is in the token **and**
@@ -646,8 +647,8 @@ stack (`ExchangeConnectionsE2eTest`, `ExchangeDepartureE2eTest`)
 
 On `/api/v1/exchange/**` the acting member holds an exchange role and the relayed capability
 authorities — never their stored roles, permissions or contextual grants. Exchange reads and
-writes touch only the member's own blueprints, own Lager rows (personal and shared, ADR-0230) and
-own ships; they never
+writes touch only the member's own blueprints, own Lager rows (personal and shared, ADR-0230), own
+ships and own org-unit memberships (REQ-XCH-048); they never
 use the admin all-scope or an admin pin. The membership, pending-approval and terms gates apply
 unchanged. No exchange response carries personal data of
 anyone.
@@ -730,7 +731,7 @@ decision 2026-09-26), and a `$id` is never changed once published. The schemas a
 `observedAt`), `material-kind` (`RAW|REFINED|NO_REFINE` plus `commodity`, and the optional UEX
 flags `mineral`, `harvestable`, `raw`, `refined`, `buyable`, `sellable`), `blueprint`, `stock-lot`
 (material, location, quality, `stolen`, quantity — no org unit, no row id), `ship` (with required
-`version`), `org-demand`, `location`, `installation`, `account-check`, `change-set` (at most 500
+`version`), `org-demand`, `org-unit` and `org-unit-list`, `location`, `installation`, `account-check`, `change-set` (at most 500
 ops), `change-result` (compact, at most 32 KiB; its optional `cursor` is reserved and never sent in
 v1 — a client reads the feed after a push), `page`, `service-document`, `problem` and the
 offline-file `envelope` (`format`, `formatVersion`, `generator`, `generatedAt`, `items`,
@@ -2088,7 +2089,7 @@ succeeding, never succeeded).
 ### REQ-XCH-036 — The frozen exchange is pinned at build time
 
 The exchange contract and the backend surface the gateway relays to keep their behaviour
-byte-identical (D-05 of the domain modularisation plan): the 14 relay operations on 13 backend
+byte-identical (D-05 of the domain modularisation plan): the 15 relay operations on 14 backend
 paths, their parameters, request and answer shapes, the relayed codes and statuses, and the
 gateway's security filters. Four build-time guards hold it, so a drift fails a build instead of
 surfacing in production as a `502 BACKEND_RELAY_FAILED` or a `400 SCHEMA_INVALID` for a body the
@@ -2113,7 +2114,7 @@ contract allows.
   key thumbprint, connection time, correlation id, DPoP nonce, idempotency key, trace context,
   the rate-limit counters). A difference writes the observed answer under
   `ingest/build/exchange-golden/` for review; a deliberate change replaces the golden in the same
-  pull request. The test also asserts that the backend stub received exactly the 14 relay
+  pull request. The test also asserts that the backend stub received exactly the 15 relay
   operations.
 - **Security filter order.** `SecurityFilterChainOrderTest` and
   `SecurityFilterChainProductionShapeTest` pin, through `FilterChainProxy`, the gateway's chains in
@@ -2138,7 +2139,7 @@ Every guard is proven able to fail by a planted violation in its own test.
   answer validates against its published schema.
   *`ExchangeWireContractTest`.*
 - [x] Every `/exchange/v1` route answers byte for byte as recorded, and the relay sends exactly the
-  seam's 14 operations. *`ExchangeGoldenAnswerTest`.*
+  seam's 15 operations. *`ExchangeGoldenAnswerTest`.*
 - [x] The gateway's security filter chains hold exactly the pinned filters in order.
   *`SecurityFilterChainOrderTest`, `SecurityFilterChainProductionShapeTest`.*
 - [x] A pull request touching the exchange path without the `e2e` label fails.
@@ -2152,12 +2153,12 @@ Every identifier the modules exchange on the relay seam is declared once, in
 `test-support`'s `ExchangeSeam`, and each module's parity test asserts its own declarations against
 it, so a rename on one side alone fails that side's build:
 
-- the 14 relay operations with their gateway route, backend path, capability, paging and published
-  schemas — against the backend's eight exchange controllers and their `@exchangeGate`
-  expressions, `ActingMemberFilter`'s 13 exact paths, the gateway's `ExchangeRoutes` and its relay
+- the 15 relay operations with their gateway route, backend path, capability, paging and published
+  schemas — against the backend's nine exchange controllers and their `@exchangeGate`
+  expressions, `ActingMemberFilter`'s 14 exact paths, the gateway's `ExchangeRoutes` and its relay
   prefix (`ExchangeRelaySeamParityTest` in both modules), and the paths the relay actually calls
   (`ExchangeGoldenAnswerTest`);
-- the five relay headers, the ten capability scopes, the seven gate codes with their statuses, the
+- the five relay headers, the eleven capability scopes, the seven gate codes with their statuses, the
   codes the gateway passes through and the four backend codes it translates;
 - the registry mirror document: the backend's writer must produce the seam's sample document, and
   the gateway's reader must read every member of it — renaming any member it reads changes what it
@@ -2197,7 +2198,7 @@ G-18)
 
 ### REQ-XCH-039 — The relay surface has its own internal OpenAPI document
 
-The backend operations the gateway relays to — the 14 operations under `/api/v1/exchange/**` —
+The backend operations the gateway relays to — the 15 operations under `/api/v1/exchange/**` —
 are described in their own committed document,
 `backend/src/main/resources/api/exchange-relay.openapi.json`, and in no other (ADR-0216, amendment
 of 2026-10-02). The published `openapi.json`, which the app vendors and the frontend generates its
@@ -2212,7 +2213,7 @@ never served to a client. The external contract stays the gateway's `exchange-v1
   reach. A component both reach is in both, identical. The runtime `/v3/api-docs` is unchanged: it
   still describes the full model, ADMIN-only, and is switched off in production.
 - **Its own assertions.** Before writing, the generator requires of the relay document exactly the
-  14 relay operations, all of the `exchange` domain and tier `T0`, none anonymous, the `bearer-jwt`
+  15 relay operations, all of the `exchange` domain and tier `T0`, none anonymous, the `bearer-jwt`
   scheme and requirement, and no dangling reference; of `openapi.json` no relay path and no dangling
   reference (REQ-API-018).
 - **Its own staleness check.** Each document is compared with its committed file, line ends
@@ -2226,8 +2227,8 @@ never served to a client. The external contract stays the gateway's `exchange-v1
 
 **Acceptance**
 
-- [x] The relay document holds exactly the 14 relay operations and 64 schemas; `openapi.json` holds
-  none of them and the 48 schemas only they reach left it; the union of both is the generated
+- [x] The relay document holds exactly the 15 relay operations and 66 schemas; `openapi.json` holds
+  none of them and the 50 schemas only they reach left it; the union of both is the generated
   model. *`ExchangeFenceTest`, `OpenApiDocumentAssertionsTest`.*
 - [x] A stale relay document fails the generator in CI and is rewritten outside it — proven by
   editing the committed file and running the generator with `CI=true`.
@@ -2419,6 +2420,41 @@ the member's other units stay summed only. The job-order gate of REQ-XCH-018 app
 
 **Status:** planned — PR 4 of ADR-0257
 
+### REQ-XCH-048 — A client reads the org units the member directly belongs to
+
+`GET /exchange/v1/me/org-units` (`exchange.orgunits.read`) lists the org units the member is a
+direct member of, so a client can offer them as a choice — for example the owning unit of a ship.
+It answers `org-unit-list.schema.json`: `items[]` of `org-unit.schema.json`, each with `id`,
+`name`, `shorthand` and `kind` (`SQUADRON`, `SPECIAL_COMMAND`, `BEREICH`, `ORGANISATIONSLEITUNG`),
+ordered Organisationsleitung, Bereich, Staffel, Spezialkommando and then by name. All four kinds
+count; the leadership cascade does not, so a leader sees only the units they are a direct member of,
+not the ones below them. A member without memberships gets `items: []`. The answer names no other
+member and is the member's own data (REQ-XCH-009).
+
+The backend serves it as `GET /api/v1/exchange/me/org-units` (`ExchangeOrgUnitController`,
+`ExchangeOrgUnitService`), reading the direct memberships through
+`OrgUnitMembershipQueryService.listDirectMembershipOptions` — the same list the hangar's unit picker
+offers (REQ-HANGAR-009). The capability is additive within `v1` (ADR-0219, REQ-XCH-026): the
+registry's check constraint gains the scope (`V292`), and the provisioner creates its consent scope
+`xchConsentOrgUnitsRead` and offers it to every registry client.
+
+**Acceptance**
+
+- [x] A token with `exchange.orgunits.read` gets the member's direct memberships of all four kinds;
+  a member without memberships gets an empty list. *`ExchangeOrgUnitControllerTest`,
+  `ExchangeOrgUnitsRouteTest`.*
+- [x] Without the scope the gateway answers `403 SCOPE_MISSING` before the relay, and the backend
+  refuses a relayed request the same way. *`ExchangeOrgUnitsRouteTest`,
+  `ExchangeOrgUnitControllerTest`.*
+- [x] The consent page and „Verbundene Anwendungen" name the scope in German and English.
+  *`ConnectedAppsPageControllerMvcTest`, `AdminExchangeClientsPageControllerMvcTest`, the theme's
+  `xchConsentOrgUnitsRead`.*
+- [x] Schemas, fixtures, wire contract and goldens hold the route. *`ExchangeContractTest`,
+  `ExchangeWireContractTest`, `ExchangeGoldenAnswerTest`.*
+
+**Enforced by:** the tests above · **Code:** `ExchangeOrgUnitController`, `ExchangeOrgUnitService`,
+`ExchangeController#orgUnits` · **Status:** built (#2598)
+
 ## Threat model
 
 | Threat | Countered by |
@@ -2441,6 +2477,7 @@ the member's other units stay summed only. The job-order gate of REQ-XCH-018 app
 | A single open order recognisable in the org demand feed | withheld unless the member passes the web's job-order gate (`canViewJobOrders`, under the reduced authorities); membership-only scope, catalogue fields only, no requester, title or free text; no low-count suppression, 7-day client cache (REQ-XCH-018) — accepted risk (ADR-0220 and its 2026-09-28 amendment); the per-order details go only to a Logistician of the responsible unit under their own capability (REQ-XCH-047, ADR-0257) |
 | Members' names and notes on a third-party program's PC | only for a Logistician of the pool, under `exchange.orgstock.details`, membership-only scope, 7-day client cache; each member can withhold their name; a per-client pseudonym instead of the user id (REQ-XCH-043/-044) — accepted (ADR-0257) |
 | A faulty or malicious client release changing other members' shared stock | only a Logistician of the pool, only shared rows of that pool, through the Lager's services with web rules; journal, the writer's and the admin's undo, the guard per writer and pool, audit naming writer and client (REQ-XCH-045/-046) — accepted (ADR-0257) |
+| A client learning which units a member belongs to | the member's own direct memberships only, under their own capability and the member's consent; unit names and kinds, no other member, no roles or flags (REQ-XCH-048) — accepted |
 | Correlating members across clients | the holder `ref` is an HMAC under a per-client salt that never leaves the backend (REQ-XCH-043) |
 | Silent removal of Materialbörse offers by a sync book-out | reported and audited, not undoable — accepted (REQ-XCH-016/-022) |
 | A ship removal through the exchange detaching the ship from its mission units, which are org data | reported (`detachedFromMissions`) and audited (`MISSION_UNIT_UPDATED`), not undoable: undo recreates the ship under a new id without its mission units — accepted (REQ-XCH-017/-022) |

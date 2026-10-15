@@ -201,7 +201,8 @@ member can undo there.
 - [Authentication](authentication.md): refreshing, disconnecting, every sign-in error.
 - [Sync guide](sync-guide.md): baselines, conflicts, tombstones, the mass-change guard, back-off.
 - The resources: [blueprints](resources/blueprints.md), [stock](resources/stock.md),
-  [ships](resources/ships.md), [org demand](resources/org-demand.md), [drafts](resources/drafts.md).
+  [ships](resources/ships.md), [org demand](resources/org-demand.md),
+  [org units](resources/org-units.md), [drafts](resources/drafts.md).
 - [Conformance fixtures](examples/README.md): test your requests against them, or run
   `python3 scripts/sandbox-smoke.py --conformance`.
 - [Test scenarios](sandbox.md#test-scenarios): conflicts, tombstones, the mass-change guard,

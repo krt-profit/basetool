@@ -10,7 +10,7 @@ content-length: 74
 content-type: application/json
 traceparent: <trace>
 x-correlation-id: <correlation-id>
-x-exchange-capabilities: exchange.blueprints.read,exchange.blueprints.write,exchange.connect,exchange.demand.read,exchange.drafts.blueprints,exchange.drafts.refinery,exchange.hangar.read,exchange.hangar.write,exchange.stock.read,exchange.stock.write
+x-exchange-capabilities: exchange.blueprints.read,exchange.blueprints.write,exchange.connect,exchange.demand.read,exchange.drafts.blueprints,exchange.drafts.refinery,exchange.hangar.read,exchange.hangar.write,exchange.orgunits.read,exchange.stock.read,exchange.stock.write
 x-exchange-client: versekit
 x-exchange-connected-at: <connected-at>
 x-exchange-installation: <thumbprint>
