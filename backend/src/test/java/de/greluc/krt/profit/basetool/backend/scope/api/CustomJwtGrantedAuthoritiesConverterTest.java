@@ -56,6 +56,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -450,6 +451,30 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     for (UUID reached : List.of(BEREICH_ID, DESCENDANT_STAFFEL_ID, DESCENDANT_SK_ID)) {
       assertTrue(authorities.contains(new OrgUnitContextualAuthority("LOGISTICIAN", reached)));
       assertTrue(authorities.contains(new OrgUnitContextualAuthority("MISSION_MANAGER", reached)));
+    }
+  }
+
+  @Test
+  void bereichsleiter_ownUnitAndCascadeYieldEachContextualAuthorityOnce() {
+    when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
+    OrgUnitMembership lead = membership(BEREICH_ID, OrgUnitKind.BEREICH);
+    lead.setRole(MembershipRole.BEREICHSLEITER);
+    lead.setLogistician(true);
+    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of(lead));
+    when(orgUnitCascadeService.cascadedOfficerReach(any()))
+        .thenReturn(Set.of(BEREICH_ID, DESCENDANT_STAFFEL_ID));
+
+    Collection<GrantedAuthority> authorities = converter.convert(jwt);
+
+    for (UUID reached : List.of(BEREICH_ID, DESCENDANT_STAFFEL_ID)) {
+      assertEquals(
+          1,
+          Collections.frequency(
+              authorities, new OrgUnitContextualAuthority("LOGISTICIAN", reached)));
+      assertEquals(
+          1,
+          Collections.frequency(
+              authorities, new OrgUnitContextualAuthority("MISSION_MANAGER", reached)));
     }
   }
 

@@ -41,6 +41,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HexFormat;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -367,7 +368,9 @@ public class CustomJwtGrantedAuthoritiesConverter
    * <ul>
    *   <li>flat {@code ROLE_LOGISTICIAN} / {@code ROLE_MISSION_MANAGER} from the union of all
    *       memberships;
-   *   <li>one {@link OrgUnitContextualAuthority} per membership and flag;
+   *   <li>a contextual {@code LOGISTICIAN} for each membership's own org unit where {@link
+   *       OrgUnitMembership#isLogisticianOfOwnUnit()} holds, and a contextual {@code
+   *       MISSION_MANAGER} per flag or own-unit officer rank;
    *   <li>contextual authorities for the org units a leadership membership reaches downward, via
    *       {@link OrgUnitCascadeService#cascadedOfficerReach(java.util.Collection)} (REQ-ORG-015).
    * </ul>
@@ -385,7 +388,7 @@ public class CustomJwtGrantedAuthoritiesConverter
     }
 
     boolean anyLogistician =
-        memberships.stream().anyMatch(m -> m.isLogistician() || confersFlatOfficerRole(m));
+        memberships.stream().anyMatch(OrgUnitMembership::isLogisticianOfOwnUnit);
     boolean anyMissionManager =
         memberships.stream().anyMatch(m -> m.isMissionManager() || confersFlatOfficerRole(m));
 
@@ -396,21 +399,22 @@ public class CustomJwtGrantedAuthoritiesConverter
       authorities.add(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"));
     }
 
+    Set<GrantedAuthority> contextual = new LinkedHashSet<>();
     for (OrgUnitMembership m : memberships) {
-      boolean ownUnitOfficer = confersOwnUnitOfficerReach(m);
-      if (m.isLogistician() || ownUnitOfficer) {
-        authorities.add(new OrgUnitContextualAuthority("LOGISTICIAN", m.getId().getOrgUnitId()));
+      UUID orgUnitId = m.getId().getOrgUnitId();
+      if (m.isLogisticianOfOwnUnit()) {
+        contextual.add(new OrgUnitContextualAuthority("LOGISTICIAN", orgUnitId));
       }
-      if (m.isMissionManager() || ownUnitOfficer) {
-        authorities.add(
-            new OrgUnitContextualAuthority("MISSION_MANAGER", m.getId().getOrgUnitId()));
+      if (m.isMissionManager() || confersOwnUnitOfficerReach(m)) {
+        contextual.add(new OrgUnitContextualAuthority("MISSION_MANAGER", orgUnitId));
       }
     }
 
     for (UUID cascadedOrgUnitId : orgUnitCascadeService.cascadedOfficerReach(memberships)) {
-      authorities.add(new OrgUnitContextualAuthority("LOGISTICIAN", cascadedOrgUnitId));
-      authorities.add(new OrgUnitContextualAuthority("MISSION_MANAGER", cascadedOrgUnitId));
+      contextual.add(new OrgUnitContextualAuthority("LOGISTICIAN", cascadedOrgUnitId));
+      contextual.add(new OrgUnitContextualAuthority("MISSION_MANAGER", cascadedOrgUnitId));
     }
+    authorities.addAll(contextual);
   }
 
   /**
@@ -426,9 +430,9 @@ public class CustomJwtGrantedAuthoritiesConverter
   }
 
   /**
-   * Whether holding {@code m} mints its own org unit's contextual {@code LOGISTICIAN@<id>} and
-   * {@code MISSION_MANAGER@<id>} authorities without cascade (REQ-ROLE-002). Area and OL ranks get
-   * theirs from the cascade instead.
+   * Whether holding {@code m} mints its own org unit's contextual {@code MISSION_MANAGER@<id>}
+   * authority without cascade (REQ-ROLE-002). Area and OL ranks get theirs from the cascade
+   * instead.
    *
    * @param m the membership row to classify
    * @return {@code true} iff {@code m} is an SK-Lead or one of the four squadron ranks
