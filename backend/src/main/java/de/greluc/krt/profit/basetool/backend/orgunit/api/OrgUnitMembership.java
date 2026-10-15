@@ -149,4 +149,15 @@ public class OrgUnitMembership {
   @UpdateTimestamp
   @Column(name = "updated_at")
   private Instant updatedAt;
+
+  /**
+   * Whether this membership makes its user a Logistician of its own org unit: it carries {@code
+   * is_logistician} or any leadership rank, the Bereich and OL ranks included (REQ-XCH-043,
+   * ADR-0257). The cascade of a Bereich or OL rank to other org units is not part of this rule.
+   *
+   * @return {@code true} iff the flag is set or the rank is not {@link MembershipRole#MEMBER}
+   */
+  public boolean isLogisticianOfOwnUnit() {
+    return isLogistician || role.confersOwnLevelOversight();
+  }
 }

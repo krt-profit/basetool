@@ -2314,7 +2314,9 @@ a **Logistician of the unit** carries `entries[]`; in any other pool a lot carri
   test pins every `MembershipRole` against it.
 - [ ] One member's `ref` is stable across requests of one client and differs between two clients.
 
-**Status:** planned — PR 2 of ADR-0257
+**Status:** planned — PR 2 of ADR-0257. Built: the rule `OrgUnitMembership#isLogisticianOfOwnUnit`,
+which the converter uses for its own-unit contextual `LOGISTICIAN` (#2584), pinned against every
+`MembershipRole` by `OrgUnitMembershipTest`; the exchange's use of it remains.
 
 ### REQ-XCH-044 — A member can withhold their name from connected applications
 
