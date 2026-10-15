@@ -127,7 +127,7 @@ Optimistic locking with `@Version`, surfaced as HTTP 409, with the **finest gran
 allows** (§4.5, §6.3). The specific traps — the `kernel.OptimisticLock` helper family, Mission's
 manual per-section counters and their DB-enforced atomic bump (also a ship's org-unit counter,
 ADR-0258), pessimistic locking for bulk
-reorders, the `…WithinTransaction` pattern, bulk updates inside loops, and the find-or-create retry
+reorders and bulk selections (locked in ascending id order), the `…WithinTransaction` pattern, bulk updates inside loops, and the find-or-create retry
 — are enumerated in [`backend/CLAUDE.md`](../../backend/CLAUDE.md). **Read that before touching any
 multi-step transaction.** The frontend half — propagating the new version to every DOM element that
 carries it — is in [`frontend/CLAUDE.md`](../../frontend/CLAUDE.md).

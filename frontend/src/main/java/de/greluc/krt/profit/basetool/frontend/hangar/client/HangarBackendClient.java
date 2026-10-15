@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.hangar.client;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.LocationDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.FleetviewImportResponseDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.SetHomeLocationRequestDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOrgUnitRequestDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOrgUnitResultDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipOrgUnitRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipRequestDto;
@@ -159,6 +161,19 @@ public class HangarBackendClient {
   @Nullable
   public ShipDto changeShipOrgUnit(@NotNull UUID id, @NotNull ShipOrgUnitRequestDto request) {
     return backendApiClient.put("/api/v1/hangar/ships/{id}/org-unit", request, ShipDto.class, id);
+  }
+
+  /**
+   * Changes the owning org unit of a selection of the caller's ships (REQ-HANGAR-010).
+   *
+   * @param request the selected ships and the new org unit
+   * @return the changed and skipped counts, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public ShipBulkOrgUnitResultDto bulkChangeShipOrgUnit(
+      @NotNull ShipBulkOrgUnitRequestDto request) {
+    return backendApiClient.post(
+        "/api/v1/hangar/ships/bulk-org-unit", request, ShipBulkOrgUnitResultDto.class);
   }
 
   /**

@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.hangar.web;
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.hangar.client.HangarBackendClient;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOrgUnitRequestDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOrgUnitResultDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipOrgUnitRequestDto;
 import java.util.Map;
 import java.util.UUID;
@@ -39,9 +41,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Frontend proxy of the „Einheit ändern" row action (REQ-HANGAR-009): forwards {@code POST
+ * Frontend proxy of „Einheit ändern": the row action (REQ-HANGAR-009) forwards {@code POST
  * /hangar/{id}/org-unit} to the backend's {@code PUT /api/v1/hangar/ships/{id}/org-unit} and
- * answers {@code 204} for the in-place table swap.
+ * answers {@code 204}; the selection bar (REQ-HANGAR-010) forwards {@code POST
+ * /hangar/bulk-org-unit} and answers the counts. Both end in an in-place table swap.
  */
 @Slf4j
 @RestController
@@ -65,9 +68,7 @@ public class HangarShipOrgUnitProxyController {
   public ResponseEntity<Object> changeShipOrgUnit(
       @PathVariable @NotNull UUID id, @RequestBody @Nullable ShipOrgUnitRequestDto request) {
     if (request == null || request.owningOrgUnitVersion() == null) {
-      return ResponseEntity.status(422)
-          .contentType(MediaType.APPLICATION_PROBLEM_JSON)
-          .body(Map.of("status", 422, "code", "VALIDATION"));
+      return validationError();
     }
     return relay(
         log,
@@ -76,5 +77,39 @@ public class HangarShipOrgUnitProxyController {
           hangarClient.changeShipOrgUnit(id, request);
           return ResponseEntity.noContent().build();
         });
+  }
+
+  /**
+   * Changes the owning org unit of a selection of the caller's ships (REQ-HANGAR-010).
+   *
+   * @param request the selected ships and the new org unit, or none
+   * @return {@code 200} with the changed and skipped counts, {@code 422} with code {@code
+   *     VALIDATION} for an empty selection, or the relayed backend {@code problem+json}
+   */
+  @PostMapping(value = "/bulk-org-unit", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> bulkChangeShipOrgUnit(
+      @RequestBody @Nullable ShipBulkOrgUnitRequestDto request) {
+    if (request == null || request.shipIds() == null || request.shipIds().isEmpty()) {
+      return validationError();
+    }
+    return relay(
+        log,
+        "bulk change ship org unit (ajax)",
+        () -> {
+          ShipBulkOrgUnitResultDto result = hangarClient.bulkChangeShipOrgUnit(request);
+          return ResponseEntity.ok(result != null ? result : new ShipBulkOrgUnitResultDto(0, 0));
+        });
+  }
+
+  /**
+   * Builds the {@code 422} {@code problem+json} with code {@code VALIDATION} that the hangar page
+   * shows as an error toast.
+   *
+   * @return the response
+   */
+  private static @NotNull ResponseEntity<Object> validationError() {
+    return ResponseEntity.status(422)
+        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+        .body(Map.of("status", 422, "code", "VALIDATION"));
   }
 }

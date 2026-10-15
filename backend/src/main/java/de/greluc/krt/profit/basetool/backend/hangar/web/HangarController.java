@@ -28,6 +28,8 @@ import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarImportService
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarService;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.SetHomeLocationRequestDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.SetHomeLocationResponseDto;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.ShipBulkOrgUnitRequestDto;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.ShipBulkOrgUnitResultDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.ShipOrgUnitRequestDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.SquadronShipOverviewDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
@@ -236,6 +238,37 @@ public class HangarController {
             id,
             request.orgUnitId(),
             request.owningOrgUnitVersion()));
+  }
+
+  /**
+   * Changes the owning org unit of a selection of the calling user's ships to one of their direct
+   * memberships or none, in one transaction (REQ-HANGAR-010).
+   *
+   * @param jwt caller's JWT; its {@code sub} claim must own every selected ship
+   * @param request the selected ships and the new org unit
+   * @return how many ships moved and how many already were in the target
+   */
+  @Operation(
+      summary = "Change the org unit of several ships",
+      description =
+          "Moves a selection of the caller's ships into one of the caller's direct org units, or"
+              + " out of every unit. Ships already there are skipped; an unknown or a foreign ship"
+              + " refuses the whole selection.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Changed and skipped counts"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "Empty or oversized selection, or a target outside the direct memberships"),
+    @ApiResponse(responseCode = "403", description = "A selected ship belongs to someone else"),
+    @ApiResponse(responseCode = "404", description = "A selected ship does not exist")
+  })
+  @PostMapping("/ships/bulk-org-unit")
+  @PreAuthorize(HANGAR_ACCESS)
+  public ShipBulkOrgUnitResultDto bulkChangeMyShipsOrgUnit(
+      @AuthenticationPrincipal Jwt jwt,
+      @RequestBody @Valid @NotNull ShipBulkOrgUnitRequestDto request) {
+    return hangarService.bulkChangeShipOrgUnit(
+        userService.getUserIdFromJwt(jwt), request.shipIds(), request.orgUnitId());
   }
 
   /**

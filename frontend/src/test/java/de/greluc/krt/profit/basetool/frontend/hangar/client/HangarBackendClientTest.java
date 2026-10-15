@@ -23,6 +23,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.frontend.hangar.model.FleetviewImportResponseDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.SetHomeLocationRequestDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOrgUnitRequestDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOrgUnitResultDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipOrgUnitRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipRequestDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
@@ -111,6 +113,20 @@ class HangarBackendClientTest {
         "PUT",
         "/api/v1/hangar/ships/" + SHIP + "/org-unit",
         "{\"orgUnitId\":null,\"owningOrgUnitVersion\":3}");
+  }
+
+  @Test
+  void bulkUnitChangePostsTheSelectionAndTheTarget() {
+    backend.answerJson("{\"changed\":1,\"skipped\":0}");
+
+    ShipBulkOrgUnitResultDto result =
+        client.bulkChangeShipOrgUnit(new ShipBulkOrgUnitRequestDto(List.of(SHIP), UNIT));
+
+    assertThat(result).isEqualTo(new ShipBulkOrgUnitResultDto(1, 0));
+    backend.expect(
+        "POST",
+        "/api/v1/hangar/ships/bulk-org-unit",
+        "{\"shipIds\":[\"" + SHIP + "\"],\"orgUnitId\":\"" + UNIT + "\"}");
   }
 
   @Test

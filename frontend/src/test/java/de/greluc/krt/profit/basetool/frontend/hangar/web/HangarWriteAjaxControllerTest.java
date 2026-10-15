@@ -32,11 +32,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOrgUnitRequestDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOrgUnitResultDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipOrgUnitRequestDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -227,6 +230,76 @@ class HangarWriteAjaxControllerTest {
                 .content("{\"orgUnitId\":null,\"owningOrgUnitVersion\":0}"))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("OPTIMISTIC_LOCK"));
+  }
+
+  @Test
+  @WithMockUser
+  void bulkChangeShipOrgUnitAjax_valid_forwardsTheSelectionAndReturnsTheCounts() throws Exception {
+    UUID first = UUID.randomUUID();
+    UUID second = UUID.randomUUID();
+    UUID unit = UUID.randomUUID();
+    when(backendApiClient.post(
+            eq("/api/v1/hangar/ships/bulk-org-unit"), any(), eq(ShipBulkOrgUnitResultDto.class)))
+        .thenReturn(new ShipBulkOrgUnitResultDto(1, 1));
+
+    mockMvc
+        .perform(
+            post("/hangar/bulk-org-unit")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"shipIds\":[\""
+                        + first
+                        + "\",\""
+                        + second
+                        + "\"],\"orgUnitId\":\""
+                        + unit
+                        + "\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.changed").value(1))
+        .andExpect(jsonPath("$.skipped").value(1));
+
+    verify(backendApiClient)
+        .post(
+            eq("/api/v1/hangar/ships/bulk-org-unit"),
+            eq(new ShipBulkOrgUnitRequestDto(List.of(first, second), unit)),
+            eq(ShipBulkOrgUnitResultDto.class));
+  }
+
+  @Test
+  @WithMockUser
+  void bulkChangeShipOrgUnitAjax_emptySelection_returns422AndDoesNotCallBackend() throws Exception {
+    mockMvc
+        .perform(
+            post("/hangar/bulk-org-unit")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"shipIds\":[],\"orgUnitId\":null}"))
+        .andExpect(status().is(422))
+        .andExpect(jsonPath("$.code").value("VALIDATION"));
+
+    verify(backendApiClient, never()).post(anyString(), any(), eq(ShipBulkOrgUnitResultDto.class));
+  }
+
+  @Test
+  @WithMockUser
+  void bulkChangeShipOrgUnitAjax_foreignShip_isRelayedAs403() throws Exception {
+    when(backendApiClient.post(
+            eq("/api/v1/hangar/ships/bulk-org-unit"), any(), eq(ShipBulkOrgUnitResultDto.class)))
+        .thenThrow(
+            new BackendServiceException(
+                "forbidden", null, 403, "ACCESS_DENIED", null, Collections.emptyList(), null));
+
+    mockMvc
+        .perform(
+            post("/hangar/bulk-org-unit")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"shipIds\":[\"" + UUID.randomUUID() + "\"],\"orgUnitId\":null}"))
+        .andExpect(status().isForbidden());
   }
 
   @Test

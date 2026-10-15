@@ -635,6 +635,9 @@ public enum AuditEventType {
   /** A ship's owning org unit was changed after creation (REQ-HANGAR-009). */
   HANGAR_SHIP_ORG_UNIT_CHANGED(AuditDomain.HANGAR),
 
+  /** The owning org unit of a selection of ships was changed in one action (REQ-HANGAR-010). */
+  HANGAR_SHIPS_BULK_ORG_UNIT_CHANGED(AuditDomain.HANGAR),
+
   /** A ship was deleted; mission units it crewed were detached first. */
   HANGAR_SHIP_DELETED(AuditDomain.HANGAR),
 

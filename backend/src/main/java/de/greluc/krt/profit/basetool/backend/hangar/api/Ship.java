@@ -95,7 +95,8 @@ public class Ship extends AbstractEntity<UUID> {
    * visible and editable only by its {@link #owner} (plus admins in all-scopes mode) and never
    * appears in an org unit's hangar. Stamped at creation; changed afterwards only through {@link
    * ShipRepository#changeOwningOrgUnitIfVersionMatches}, guarded by {@link #owningOrgUnitVersion}
-   * (REQ-HANGAR-009, ADR-0258).
+   * (REQ-HANGAR-009, ADR-0258), or on a row locked by {@link ShipRepository#lockAllByIdOrderById}
+   * together with a bump of that counter (REQ-HANGAR-010).
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owning_org_unit_id", nullable = true)

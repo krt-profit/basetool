@@ -335,6 +335,7 @@ public class AdminAuditLogPageController {
                   "HANGAR_SHIP_CREATED",
                   "HANGAR_SHIP_UPDATED",
                   "HANGAR_SHIP_ORG_UNIT_CHANGED",
+                  "HANGAR_SHIPS_BULK_ORG_UNIT_CHANGED",
                   "HANGAR_SHIP_DELETED",
                   "HANGAR_EMPTIED",
                   "HANGAR_IMPORTED",

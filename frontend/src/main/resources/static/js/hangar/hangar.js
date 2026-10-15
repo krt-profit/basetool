@@ -132,6 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = e && e.detail ? e.detail.container : null;
         if (container && container.id === 'hangar-results') {
             syncHangarStats();
+            renderSelection();
         }
     });
 
@@ -298,8 +299,32 @@ document.addEventListener('DOMContentLoaded', () => {
     const unitSelect = /** @type {HTMLSelectElement | null} */ (
         document.getElementById('ship-unit-select')
     );
+    const unitBulkMessage = document.getElementById('ship-unit-bulk-message');
     let unitVersion = '';
     let unitCurrent = '';
+    /** @type {string[] | null} */
+    let bulkShipIds = null;
+
+    /**
+     * Presets the unit picker to a current unit, offering a unit the owner has since left as its own
+     * option instead of silently clearing it.
+     *
+     * @param {HTMLSelectElement} select the unit picker
+     * @param {string} current the current unit id, empty for none
+     * @param {string} currentName the current unit's name, empty when unknown
+     */
+    function presetUnitSelect(select, current, currentName) {
+        select.querySelectorAll('option[data-former-unit]').forEach((o) => o.remove());
+        const known = Array.from(select.options).some((o) => o.value === current);
+        if (!known && current) {
+            const former = document.createElement('option');
+            former.value = current;
+            former.textContent = currentName || current;
+            former.setAttribute('data-former-unit', '');
+            select.appendChild(former);
+        }
+        select.value = current;
+    }
 
     /**
      * Opens the "Einheit ändern" dialog preset to the clicked ship's unit (REQ-HANGAR-009).
@@ -312,22 +337,183 @@ document.addEventListener('DOMContentLoaded', () => {
             unitForm,
             safeSameOriginUrl(btn.getAttribute('data-action'), unitForm.action),
         );
+        bulkShipIds = null;
+        if (unitBulkMessage) unitBulkMessage.hidden = true;
         unitCurrent = btn.getAttribute('data-org-unit-id') || '';
         unitVersion = btn.getAttribute('data-org-unit-version') || '';
-        unitSelect.querySelectorAll('option[data-former-unit]').forEach((o) => o.remove());
-        const known = Array.from(unitSelect.options).some((o) => o.value === unitCurrent);
-        if (!known && unitCurrent) {
-            const former = document.createElement('option');
-            former.value = unitCurrent;
-            former.textContent = btn.getAttribute('data-org-unit-name') || unitCurrent;
-            former.setAttribute('data-former-unit', '');
-            unitSelect.appendChild(former);
-        }
-        unitSelect.value = unitCurrent;
+        presetUnitSelect(unitSelect, unitCurrent, btn.getAttribute('data-org-unit-name') || '');
         krtModal.open(unitModal);
     }
 
     krtEvents.on('click', 'hangar-change-unit', openUnitModal);
+
+    /** @type {Set<string>} */
+    const selectedShips = new Set();
+    const selectionBar = document.getElementById('hangar-selection-bar');
+    const selectionCount = document.getElementById('hangar-selection-count');
+
+    /**
+     * Lists the selection checkboxes of the rendered ship list.
+     *
+     * @returns {HTMLInputElement[]} one checkbox per visible ship
+     */
+    function shipChecks() {
+        return Array.from(
+            /** @type {NodeListOf<HTMLInputElement>} */ (
+                document.querySelectorAll('#hangar-results input.hangar-ship-check')
+            ),
+        );
+    }
+
+    /**
+     * Keeps the selection to the ships the list shows, ticks their checkboxes and the select-all
+     * box, and shows the selection bar with its count while anything is selected (REQ-HANGAR-010).
+     */
+    function renderSelection() {
+        const checks = shipChecks();
+        const visible = new Set(checks.map((c) => c.value));
+        Array.from(selectedShips).forEach((id) => {
+            if (!visible.has(id)) selectedShips.delete(id);
+        });
+        checks.forEach((c) => {
+            c.checked = selectedShips.has(c.value);
+        });
+        const selectAll = /** @type {HTMLInputElement | null} */ (
+            document.getElementById('hangar-select-all')
+        );
+        if (selectAll) selectAll.checked = checks.length > 0 && checks.every((c) => c.checked);
+        if (selectionCount) selectionCount.textContent = String(selectedShips.size);
+        if (selectionBar) selectionBar.hidden = selectedShips.size === 0;
+    }
+
+    /**
+     * Adds a ship to the selection or removes it.
+     *
+     * @param {string} shipId the ship
+     * @param {boolean} selected whether it is selected
+     */
+    function setShipSelected(shipId, selected) {
+        if (selected) {
+            selectedShips.add(shipId);
+        } else {
+            selectedShips.delete(shipId);
+        }
+    }
+
+    if (hangarResults) {
+        hangarResults.addEventListener('change', (e) => {
+            const target = e.target;
+            if (!(target instanceof HTMLInputElement)) return;
+            if (target.classList.contains('hangar-select-all')) {
+                shipChecks().forEach((c) => setShipSelected(c.value, target.checked));
+            } else if (target.classList.contains('hangar-ship-check')) {
+                setShipSelected(target.value, target.checked);
+            } else {
+                return;
+            }
+            renderSelection();
+        });
+    }
+
+    krtEvents.on('click', 'hangar-clear-selection', () => {
+        selectedShips.clear();
+        renderSelection();
+    });
+
+    /**
+     * Opens the "Einheit ändern" dialog for the selected ships, preset to their unit when they all
+     * share one and to "Keine Einheit" otherwise (REQ-HANGAR-010).
+     */
+    function openBulkUnitModal() {
+        if (!unitModal || !unitSelect || selectedShips.size === 0) return;
+        const picked = shipChecks().filter((c) => selectedShips.has(c.value));
+        bulkShipIds = picked.map((c) => c.value);
+        const units = new Set(picked.map((c) => c.getAttribute('data-org-unit-id') || ''));
+        const shared = units.size === 1 ? picked[0] : null;
+        unitCurrent = shared ? shared.getAttribute('data-org-unit-id') || '' : '';
+        unitVersion = '';
+        presetUnitSelect(
+            unitSelect,
+            unitCurrent,
+            shared ? shared.getAttribute('data-org-unit-name') || '' : '',
+        );
+        if (unitBulkMessage) {
+            unitBulkMessage.textContent = formatMessage(hangarI18n.bulkUnitMessage, [
+                bulkShipIds.length,
+            ]);
+            unitBulkMessage.hidden = false;
+        }
+        krtModal.open(unitModal);
+    }
+
+    krtEvents.on('click', 'hangar-open-bulk-unit', openBulkUnitModal);
+
+    /**
+     * Reports how many selected ships moved and how many already were in the target unit.
+     *
+     * @param {{ changed?: number, skipped?: number } | null} body the result counts
+     */
+    function reportBulkUnitOutcome(body) {
+        const changed = body && typeof body.changed === 'number' ? body.changed : 0;
+        const skipped = body && typeof body.skipped === 'number' ? body.skipped : 0;
+        if (changed === 0) {
+            showFrontendSuccessToast(formatMessage(hangarI18n.bulkUnitNone, []));
+            return;
+        }
+        showFrontendSuccessToast(
+            skipped > 0
+                ? formatMessage(hangarI18n.bulkUnitSuccessPartial, [changed, skipped])
+                : formatMessage(hangarI18n.bulkUnitSuccess, [changed]),
+        );
+    }
+
+    /**
+     * Fills the numbered placeholders {0}, {1}, … of a localized message.
+     *
+     * @param {string | undefined} template the message, empty when missing
+     * @param {Array<string | number>} args the values in placeholder order
+     * @returns {string} the filled message
+     */
+    function formatMessage(template, args) {
+        let text = String(template || '');
+        args.forEach((arg, index) => {
+            text = text.replace(`{${index}}`, String(arg));
+        });
+        return text;
+    }
+
+    /**
+     * Moves the selected ships to the chosen unit in one request, then swaps the list in place,
+     * clears the selection and tells peers (REQ-HANGAR-010).
+     *
+     * @param {string[]} shipIds the selected ships
+     * @param {string} chosen the chosen unit id, empty for none
+     * @param {HTMLButtonElement | null} submitBtn the dialog's submit button
+     */
+    function submitBulkUnit(shipIds, chosen, submitBtn) {
+        if (!unitModal) return;
+        const modalEl = unitModal;
+        if (submitBtn) submitBtn.disabled = true;
+        krtFetch
+            .write({
+                method: 'POST',
+                url: '/hangar/bulk-org-unit',
+                payload: { shipIds, orgUnitId: chosen || null },
+                toast: false,
+                errorMessage: hangarI18n.bulkUnitError,
+                conflict: hangarConflict,
+                onSuccess(body) {
+                    krtModal.close(modalEl);
+                    reportBulkUnitOutcome(body);
+                    selectedShips.clear();
+                    renderSelection();
+                    afterHangarWrite();
+                },
+            })
+            .then(() => {
+                if (submitBtn) submitBtn.disabled = false;
+            });
+    }
 
     if (unitModal) {
         unitModal.querySelectorAll('.close-unit-modal').forEach((el) => {
@@ -348,6 +534,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const submitBtn = /** @type {HTMLButtonElement | null} */ (
                 unitForm.querySelector('button[type="submit"]')
             );
+            if (bulkShipIds) {
+                submitBulkUnit(bulkShipIds, chosen, submitBtn);
+                return;
+            }
             if (submitBtn) submitBtn.disabled = true;
             krtFetch
                 .write({
