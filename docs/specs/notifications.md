@@ -105,6 +105,7 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `HANGAR_SHIP_DELETED_FROM_MISSION` | `HANGAR_SHIP_REMOVED_FROM_UNIT` | V280 | `MISSION_LEADERSHIP`, `EVENT_RECIPIENT` (the unit's responsible member) | REQ-HANGAR-006 |
 | `HANGAR_FITTED_RESET_FOR_OWNER` | `HANGAR_FITTED_RESET` | V280 | `EVENT_RECIPIENT` (the owner); one per owner per reset | REQ-HANGAR-007 |
 | `HANGAR_CHANGED_BY_ADMIN` | `HANGAR_CHANGED_BY_ADMIN` | V280 | `EVENT_RECIPIENT` (the member); coded `changeCode` | REQ-HANGAR-008 |
+| `HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN` | `HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN` | V291 | `EVENT_RECIPIENT` (the member); one per bulk action that moved several ships, with the `count` | REQ-HANGAR-008, REQ-HANGAR-012 |
 | `BLUEPRINT_CHANGED_BY_ADMIN` | `BLUEPRINT_CHANGED_BY_ADMIN` | V280 | `EVENT_RECIPIENT` (the member); coded `changeCode` | REQ-HANGAR-008 |
 | `BLUEPRINT_PURGED_BY_ADMIN` | `BLUEPRINT_PURGED_BY_ADMIN` | V280 | `EVENT_RECIPIENT` (each member who lost blueprints); one per member per purge | REQ-HANGAR-008 |
 | `EXCHANGE_CLIENT_SUSPENDED` | `EXCHANGE_CLIENT_SUSPENDED` | V281 | `EXCHANGE_CLIENT_HOLDERS` (the client); replaces a suspension and an activation | REQ-XCH-040 |

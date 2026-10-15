@@ -234,6 +234,11 @@ class SeededNotificationRulesIntegrationTest {
             true,
             SelectorKind.EVENT_RECIPIENT),
         rule(
+            NotificationEventType.HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN,
+            NotificationType.HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN,
+            true,
+            SelectorKind.EVENT_RECIPIENT),
+        rule(
             NotificationEventType.BLUEPRINT_CHANGED_BY_ADMIN,
             NotificationType.BLUEPRINT_CHANGED_BY_ADMIN,
             true,

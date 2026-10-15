@@ -287,6 +287,10 @@ class NotificationPageControllerTest {
     assertEquals(
         "/hangar", NotificationPageController.targetOf("HANGAR_CHANGED_BY_ADMIN", "HANGAR", id));
     assertEquals(
+        "/hangar",
+        NotificationPageController.targetOf(
+            "HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN", "HANGAR", id));
+    assertEquals(
         "/personal-inventory/blueprints",
         NotificationPageController.targetOf(
             "BLUEPRINT_PURGED_BY_ADMIN", "PERSONAL_BLUEPRINTS", id));

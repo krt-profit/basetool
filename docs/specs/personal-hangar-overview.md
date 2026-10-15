@@ -229,7 +229,8 @@ An admin MUST be able to list, add, edit and delete the ships of one member on
   `hasRole('ADMIN')`); anyone else gets 403. The member edit page links to it in its page head, and
   only for an admin.
 - **List.** The member's ships, ordered by name and paginated (10 / 50 / 100), with the same columns as
-  „Meine Schiffe" and the unit read-only. A hint says that every change notifies the member.
+  „Meine Schiffe"; the unit changes through its own action (REQ-HANGAR-012). A hint says that every
+  change notifies the member.
 - **Writes.** Add, edit and delete use the ship dialog of „Meine Schiffe" (design system: one CTA in
   the page head and one in the dialog, icon-only edit per row, quiet-danger delete behind a danger
   confirm). An added ship takes the unit picked from the member's direct memberships; with more than
@@ -252,11 +253,58 @@ An admin MUST be able to list, add, edit and delete the ships of one member on
 `hangar/member-hangar.html`, `hangar/member-hangar.js`, `identity/member-edit.html` · **Issues:**
 #2597 (epic #2595, #2581).
 
+### REQ-HANGAR-012 — An admin changes the org unit of a member's ships
+
+An admin MUST be able to change the owning org unit of a member's ships on the admin member hangar
+(REQ-HANGAR-011), singly from the row action and in bulk from a selection bar, with the rules of
+REQ-HANGAR-009 and REQ-HANGAR-010 applied to the **member**.
+
+- **Targets.** The member's direct memberships (all four kinds) or „Keine Einheit", never the
+  admin's own: a unit only the admin belongs to is a 400. The dialog offers the member's units, and a
+  unit the member has since left as the current choice.
+- **Endpoints.** `PUT /api/v1/hangar/admin/users/{userId}/ships/{shipId}/org-unit` (`orgUnitId`,
+  `owningOrgUnitVersion`; one conditional update on the ship's own counter, ADR-0258) and
+  `POST /api/v1/hangar/admin/users/{userId}/ships/bulk-org-unit` (`shipIds` 1 – 1000, `orgUnitId`;
+  pessimistic locks in ascending id order, `changed` / `skipped` counts). Both are
+  `hasRole('ADMIN')`; anyone else gets 403. A ship of another member under the member's path is a
+  403, an unknown ship in a selection a 404, a stale counter a 409. An unchanged unit writes,
+  records and announces nothing.
+- **Audit.** The events of REQ-HANGAR-009 / -010 with the admin as actor and the member as target
+  user; the single event's subject is the ship. No names, no free text.
+- **Notice.** The member hears one notice per action, after the commit: `HANGAR_CHANGED_BY_ADMIN`
+  with `changeCode` `ORG_UNIT_CHANGED` and the ship type when one ship moved, and one summary
+  `HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN` with the count when several did (seeded rule, V291,
+  `EVENT_RECIPIENT`, actor excluded; [`hangar-notifications.md`](hangar-notifications.md)
+  REQ-HANGAR-008). An admin acting on their own ships hears nothing.
+- **UI.** The page gets the row action, the checkboxes, the sticky selection bar and the „Einheit
+  ändern" dialog of „Meine Schiffe" (design system: icon-only row action, ghost / outline bar
+  buttons, one CTA in the dialog, the conflict dialog on a 409). Every change swaps the list in place
+  and clears the selection; a toast names the counts (REQ-FE-001). Peer sync between this page and
+  the member's own hangar follows with #2606.
+
+**Acceptance**
+
+- [x] An admin moves one ship and several ships of a member; the admin page updates in place.
+- [x] A target outside the member's direct memberships → 400, even when the admin belongs to it.
+- [x] A non-admin calling the admin endpoints → 403.
+- [x] The member receives one notice per single or bulk change; an admin acting on their own ships
+  hears nothing.
+- [x] Audit events record the admin as actor and the member's ship(s) as subject, no free text.
+
+**Enforced by:** `HangarShipAdminOrgUnitChangeIntegrationTest`, `HangarNoticeIntegrationTest`,
+`SeededNotificationRulesIntegrationTest`, `MemberHangarPageControllerTest`,
+`HangarBackendClientTest`, `NotificationPageControllerTest`, `MemberHangarE2eTest` · **Code:**
+`HangarController#changeUserShipOrgUnit`, `#bulkChangeUserShipsOrgUnit`,
+`HangarService#changeShipOrgUnitByAdmin`, `#bulkChangeShipOrgUnitByAdmin`, `HangarNotices`,
+`MemberHangarShipProxyController`, `hangar/member-hangar.html`, `hangar/member-hangar.js`,
+`V291__seed_admin_ship_org_unit_notification_rule.sql` · **Issues:** #2601 (epic #2595, #2581).
+
 ## Out of scope
 
 - The **squadron** hangar overview (`/hangar/squadron`) — REQ-HANGAR-001 — and the **admin per-user**
   hangar endpoint (`/api/v1/hangar/admin/users/{userId}/ships`), which keeps its existing `{name,
-  insurance, fitted, id}` sort whitelist (its page is REQ-HANGAR-011).
+  insurance, fitted, id}` sort whitelist (its page is REQ-HANGAR-011, its unit actions
+  REQ-HANGAR-012).
 - New user-facing sortable columns. The personal hangar keeps its fixed rich order; the `/my-ships`
   endpoint no longer accepts a `sort` parameter (the order is server-fixed).
 - The add / edit / delete / import / home-location flows themselves — this spec only governs the list

@@ -406,6 +406,7 @@ gets past the four public paths of §1. The tables carried an `Anonymous` column
 | Change an own ship's org unit to an own direct unit or none (`PUT /hangar/ships/{id}/org-unit`, Owner, REQ-HANGAR-009) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Change the org unit of a selection of own ships (`POST /hangar/ships/bulk-org-unit`, `HANGAR_READ`/`HANGAR_WRITE` + Owner of every ship, REQ-HANGAR-010) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Manage other members' ships (`hasRole('ADMIN')`; page `/admin/members/{id}/hangar`, linked from the member edit page, REQ-HANGAR-011) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Change the org unit of one or several of a member's ships to one of the member's direct units or none (`PUT /hangar/admin/users/{userId}/ships/{shipId}/org-unit`, `POST /hangar/admin/users/{userId}/ships/bulk-org-unit`, `hasRole('ADMIN')`; the member is notified, REQ-HANGAR-012) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | `resetAllFittedStatus` (`hasAnyRole('ADMIN','OFFICER')`)                                           |   ❌    |  ❌   | ❌  |   ✅³    |   ✅   |
 | Read the unit tab „Org-Einheit" of the hangar (`/hangar/squadron`, `HANGAR_READ`)                  |   ✅²   |  ✅²  | ✅² |   ✅²    |   ✅   |
 | Personal inventory / personal blueprints (own) (`isAuthenticated()`)                               |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |

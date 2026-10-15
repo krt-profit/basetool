@@ -22,12 +22,19 @@ import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
+import {
+    createShipSelection,
+    formatMessage,
+    presetUnitSelect,
+    reportBulkUnitOutcome,
+} from '/js/hangar/ship-unit-change.js';
 
 const RESULTS = '#member-hangar-results';
 
 /**
- * Wires the admin member hangar (REQ-HANGAR-011): the add, edit and delete dialogs write through
- * the member's admin paths and swap the ship list in place.
+ * Wires the admin member hangar: the add, edit and delete dialogs (REQ-HANGAR-011) and the unit
+ * change of one ship or a selection (REQ-HANGAR-012) write through the member's admin paths and
+ * swap the ship list in place.
  */
 function initMemberHangar() {
     const root = document.getElementById('member-hangar');
@@ -173,6 +180,7 @@ function initMemberHangar() {
         const badge = document.getElementById('member-hangar-count');
         const total = stats ? stats.getAttribute('data-total') : null;
         if (badge && total !== null) badge.textContent = total;
+        renderSelection();
     });
 
     /**
@@ -303,6 +311,154 @@ function initMemberHangar() {
                 .filter((o) => !chosen || o.getAttribute('data-manufacturer-id') === chosen),
         );
     });
+
+    const conflict = {
+        title: message('conflictTitle'),
+        reloadDetailFallback: message('conflictDetail'),
+        reloadLabel: message('conflictReload'),
+        dismissLabel: message('conflictDismiss'),
+        reloadQuestion: message('conflictQuestion'),
+    };
+
+    const unitModal = document.getElementById('member-ship-unit-modal');
+    const unitForm = /** @type {HTMLFormElement | null} */ (
+        document.getElementById('member-ship-unit-form')
+    );
+    const unitSelect = /** @type {HTMLSelectElement | null} */ (
+        document.getElementById('member-ship-unit-select')
+    );
+    const unitBulkMessage = document.getElementById('member-ship-unit-bulk-message');
+    let unitVersion = '';
+    let unitCurrent = '';
+    /** @type {string[] | null} */
+    let bulkShipIds = null;
+
+    /**
+     * Opens the "Einheit ändern" dialog preset to the clicked ship's unit (REQ-HANGAR-012).
+     *
+     * @param {HTMLElement} btn the row's unit button
+     */
+    function openUnitModal(btn) {
+        if (!unitModal || !unitForm || !unitSelect) return;
+        assignFormAction(
+            unitForm,
+            safeSameOriginUrl(btn.getAttribute('data-action'), unitForm.action),
+        );
+        bulkShipIds = null;
+        if (unitBulkMessage) unitBulkMessage.hidden = true;
+        unitCurrent = btn.getAttribute('data-org-unit-id') || '';
+        unitVersion = btn.getAttribute('data-org-unit-version') || '';
+        presetUnitSelect(unitSelect, unitCurrent, btn.getAttribute('data-org-unit-name') || '');
+        krtModal.open(unitModal);
+    }
+
+    krtEvents.on('click', 'member-hangar-change-unit', openUnitModal);
+
+    const shipSelection = createShipSelection({
+        results: RESULTS,
+        selectAllId: 'member-hangar-select-all',
+        bar: document.getElementById('member-hangar-selection-bar'),
+        count: document.getElementById('member-hangar-selection-count'),
+    });
+    const selectedShips = shipSelection.selected;
+    const shipChecks = shipSelection.checks;
+    const renderSelection = shipSelection.render;
+
+    krtEvents.on('click', 'member-hangar-clear-selection', () => {
+        selectedShips.clear();
+        renderSelection();
+    });
+
+    /**
+     * Opens the "Einheit ändern" dialog for the selected ships, preset to their unit when they all
+     * share one and to "Keine Einheit" otherwise.
+     */
+    function openBulkUnitModal() {
+        if (!unitModal || !unitSelect || selectedShips.size === 0) return;
+        const picked = shipChecks().filter((c) => selectedShips.has(c.value));
+        bulkShipIds = picked.map((c) => c.value);
+        const units = new Set(picked.map((c) => c.getAttribute('data-org-unit-id') || ''));
+        const shared = units.size === 1 ? picked[0] : null;
+        unitCurrent = shared ? shared.getAttribute('data-org-unit-id') || '' : '';
+        unitVersion = '';
+        presetUnitSelect(
+            unitSelect,
+            unitCurrent,
+            shared ? shared.getAttribute('data-org-unit-name') || '' : '',
+        );
+        if (unitBulkMessage) {
+            unitBulkMessage.textContent = formatMessage(message('bulkUnitMessage'), [
+                bulkShipIds.length,
+            ]);
+            unitBulkMessage.hidden = false;
+        }
+        krtModal.open(unitModal);
+    }
+
+    krtEvents.on('click', 'member-hangar-open-bulk-unit', openBulkUnitModal);
+
+    if (unitModal) {
+        unitModal.querySelectorAll('.close-member-ship-unit').forEach((el) => {
+            el.addEventListener('click', () => krtModal.close(unitModal));
+        });
+    }
+
+    if (unitForm && unitSelect && unitModal) {
+        const modalEl = unitModal;
+        const formEl = unitForm;
+        const selectEl = unitSelect;
+        formEl.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const chosen = selectEl.value;
+            if (chosen === unitCurrent) {
+                krtModal.close(modalEl);
+                return;
+            }
+            const submitBtn = /** @type {HTMLButtonElement | null} */ (
+                formEl.querySelector('button[type="submit"]')
+            );
+            if (submitBtn) submitBtn.disabled = true;
+            const bulkAction = formEl.getAttribute('data-bulk-action') || '';
+            const request = bulkShipIds
+                ? krtFetch.write({
+                      method: 'POST',
+                      url: safeSameOriginUrl(bulkAction, bulkAction),
+                      payload: { shipIds: bulkShipIds, orgUnitId: chosen || null },
+                      toast: false,
+                      errorMessage: message('bulkUnitError'),
+                      conflict,
+                      onSuccess(body) {
+                          krtModal.close(modalEl);
+                          reportBulkUnitOutcome(body, {
+                              none: message('bulkUnitNone'),
+                              success: message('bulkUnitSuccess'),
+                              partial: message('bulkUnitSuccessPartial'),
+                          });
+                          selectedShips.clear();
+                          renderSelection();
+                          refreshList();
+                      },
+                  })
+                : krtFetch.write({
+                      method: 'POST',
+                      url: safeSameOriginUrl(formEl.getAttribute('action'), formEl.action),
+                      payload: {
+                          orgUnitId: chosen || null,
+                          owningOrgUnitVersion: unitVersion === '' ? null : Number(unitVersion),
+                      },
+                      successMessage: message('unitSuccess'),
+                      errorMessage: message('unitError'),
+                      conflict,
+                      onSuccess() {
+                          krtModal.close(modalEl);
+                          refreshList();
+                      },
+                  });
+            request.then(() => {
+                if (submitBtn) submitBtn.disabled = false;
+            });
+        });
+    }
 
     krtFetch.bindSwap({ container: RESULTS, history: true });
 }

@@ -17,7 +17,19 @@
       th:data-delete-success="#{notification.success.ship_delete}"
       th:data-add-error="#{error.hangar.ship.add}"
       th:data-update-error="#{error.hangar.ship.update}"
-      th:data-delete-error="#{error.hangar.ship.delete}">
+      th:data-delete-error="#{error.hangar.ship.delete}"
+      th:data-unit-success="#{notification.success.ship_unit_change}"
+      th:data-unit-error="#{error.hangar.ship.unit_change}"
+      th:data-bulk-unit-message="#{hangar.bulk.unit.message}"
+      th:data-bulk-unit-success="#{hangar.bulk.unit.success}"
+      th:data-bulk-unit-success-partial="#{hangar.bulk.unit.success.partial}"
+      th:data-bulk-unit-none="#{hangar.bulk.unit.none}"
+      th:data-bulk-unit-error="#{error.hangar.ship.bulk_unit_change}"
+      th:data-conflict-title="#{frontend.ajax.conflict.title}"
+      th:data-conflict-detail="#{frontend.ajax.conflict.detail}"
+      th:data-conflict-reload="#{frontend.ajax.conflict.reload}"
+      th:data-conflict-dismiss="#{frontend.ajax.conflict.dismiss}"
+      th:data-conflict-question="#{frontend.ajax.conflict.question}">
     <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.members', eyebrowHref=${backHref},
         titleText=${memberName != null ? #messages.msg('memberHangar.title', memberName) : #messages.msg('memberHangar.title.plain')},
         count=${shipsPage.totalElements()}, countId='member-hangar-count', actions=~{::member-hangar-actions})}">
@@ -39,7 +51,14 @@
                 <table class="data-table data-table--stack hangar-table">
                     <thead>
                         <tr>
-                            <th th:text="#{hangar.list.ship}">Schiff</th>
+                            <th>
+                                <div class="hangar-row__ship">
+                                    <span class="hangar-row__pick"><input type="checkbox" id="member-hangar-select-all" class="hangar-select-all"
+                                           data-testid="member-hangar-select-all"
+                                           th:title="#{hangar.bulk.selectAll}" th:aria-label="#{hangar.bulk.selectAll}"></span>
+                                    <span th:text="#{hangar.list.ship}">Schiff</span>
+                                </div>
+                            </th>
                             <th th:text="#{hangar.list.location}">Standort</th>
                             <th th:text="#{hangar.ship.insurance}">Versicherung</th>
                             <th class="cell-status" th:text="#{hangar.list.status}">Status</th>
@@ -57,11 +76,20 @@
                                      ins=${ship.insurance},
                                      locName=${ship.location != null ? ship.location.name : null}">
                             <td>
-                                <span class="hangar-row__name">
-                                    <span class="cell-title" th:text="${named ? ship.name : hull}">Iron Mule</span>
-                                    <span class="cell-sub"><span th:text="${named ? hull : #messages.msg('hangar.ship.unnamed')}">Drake Cutlass Black</span><span
-                                          class="hangar-row__loc" th:if="${locName != null}" th:text="' · ' + ${locName}"> · Area18</span></span>
-                                </span>
+                                <div class="hangar-row__ship">
+                                    <span class="hangar-row__pick"><input type="checkbox" class="hangar-ship-check"
+                                           data-testid="member-hangar-check"
+                                           th:value="${ship.id}"
+                                           th:data-org-unit-id="${ship.owningSquadron != null ? ship.owningSquadron.id() : ''}"
+                                           th:data-org-unit-name="${ship.owningSquadron != null ? ship.owningSquadron.name() : ''}"
+                                           th:title="#{hangar.bulk.select(${named ? ship.name : hull})}"
+                                           th:aria-label="#{hangar.bulk.select(${named ? ship.name : hull})}"></span>
+                                    <span class="hangar-row__name">
+                                        <span class="cell-title" th:text="${named ? ship.name : hull}">Iron Mule</span>
+                                        <span class="cell-sub"><span th:text="${named ? hull : #messages.msg('hangar.ship.unnamed')}">Drake Cutlass Black</span><span
+                                              class="hangar-row__loc" th:if="${locName != null}" th:text="' · ' + ${locName}"> · Area18</span></span>
+                                    </span>
+                                </div>
                             </td>
                             <td class="hangar-cell-loc" th:text="${locName != null ? locName : '–'}">Area18</td>
                             <td class="hangar-cell-ins">
@@ -76,13 +104,20 @@
                                       ><span class="status-dot" th:classappend="${ready} ? 'status-dot--on'" aria-hidden="true"></span><span
                                       class="hangar-fit__label" th:text="${ready} ? #{hangar.status.ready} : #{hangar.status.notReady}">Einsatzbereit</span></span>
                             </td>
-                            <td class="hangar-cell-unit" th:attr="data-label=#{hangar.ship.owning_unit}">
+                            <td class="hangar-cell-unit" data-testid="member-hangar-unit" th:attr="data-label=#{hangar.ship.owning_unit}">
                                 <span th:if="${ship.owningSquadron != null}" class="squadron-badge"
                                       th:title="${ship.owningSquadron.name()}"
                                       th:text="${ship.owningSquadron.shorthand() != null ? ship.owningSquadron.shorthand() : ship.owningSquadron.name()}">IRI</span>
                                 <span th:if="${ship.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
                             </td>
                             <td class="cell-actions">
+                                <button type="button" class="btn btn-ghost btn-icon"
+                                        data-trigger="member-hangar-change-unit" data-testid="member-hangar-change-unit"
+                                        th:data-action="@{/admin/members/{id}/hangar/{ship}/org-unit(id=${memberId},ship=${ship.id})}"
+                                        th:data-org-unit-id="${ship.owningSquadron != null ? ship.owningSquadron.id() : ''}"
+                                        th:data-org-unit-name="${ship.owningSquadron != null ? ship.owningSquadron.name() : ''}"
+                                        th:data-org-unit-version="${ship.owningOrgUnitVersion}"
+                                        th:title="#{hangar.ship.unit.change}" th:aria-label="#{hangar.ship.unit.change}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-users"/></svg></button>
                                 <button type="button" class="btn btn-ghost btn-icon"
                                         data-trigger="member-hangar-edit" data-testid="member-hangar-edit"
                                         th:data-action="@{/admin/members/{id}/hangar/{ship}/update(id=${memberId},ship=${ship.id})}"
@@ -108,6 +143,15 @@
         </th:block>
         </div>
     </section>
+
+    <div id="member-hangar-selection-bar" class="form-actions--sticky hangar-selection-bar" role="region"
+         th:aria-label="#{hangar.bulk.bar.label}" data-testid="member-hangar-selection-bar" hidden>
+        <span class="form-actions__summary" aria-live="polite"><strong id="member-hangar-selection-count">0</strong> <span th:text="#{filter.selected}">ausgew&auml;hlt</span></span>
+        <button type="button" class="btn btn-ghost" data-trigger="member-hangar-clear-selection"
+                data-testid="member-hangar-bulk-clear" th:text="#{hangar.bulk.clear}">Auswahl aufheben</button>
+        <button type="button" class="btn btn-outline" data-trigger="member-hangar-open-bulk-unit"
+                data-testid="member-hangar-bulk-unit-open"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-users"/></svg> <span th:text="#{hangar.ship.unit.change}">Einheit &auml;ndern</span></button>
+    </div>
 
     <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='member-ship-modal', titleKey='hangar.ship.modal_title', variant='krt-modal--wide', titleId='member-ship-modal-title', closeTrigger='', closeClass='close-member-ship-modal', body=~{::member-ship-modal-body})}">
         <th:block th:ref="member-ship-modal-body">
@@ -164,6 +208,31 @@
                 <div class="krt-modal-foot">
                     <button type="button" id="member-ship-delete-btn" class="btn btn-quiet-danger" data-testid="member-hangar-delete" hidden><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{hangar.ship.delete}">L&ouml;schen</span></button>
                     <button type="submit" class="btn btn--cta" data-testid="member-hangar-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{hangar.ship.save}">Speichern</span></button>
+                </div>
+            </form>
+        </th:block>
+    </th:block>
+
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='member-ship-unit-modal', titleKey='hangar.ship.unit.modal_title', closeTrigger='', closeClass='close-member-ship-unit', body=~{::member-ship-unit-body})}">
+        <th:block th:ref="member-ship-unit-body">
+            <form id="member-ship-unit-form" data-testid="member-hangar-unit-form" method="post"
+                  th:action="@{/admin/members/{id}/hangar(id=${memberId})}"
+                  th:data-bulk-action="@{/admin/members/{id}/hangar/bulk-org-unit(id=${memberId})}">
+                <div class="krt-modal-body">
+                    <p id="member-ship-unit-bulk-message" class="ship-unit-bulk-message" data-testid="member-hangar-unit-bulk-message" hidden></p>
+                    <div class="form-group">
+                        <label for="member-ship-unit-select" th:text="#{hangar.ship.owning_unit}">Einheit</label>
+                        <select id="member-ship-unit-select" name="orgUnitId" data-testid="member-hangar-unit-select">
+                            <option value="" th:text="#{hangar.ship.unit.none}">Keine Einheit</option>
+                            <option th:each="o : ${ownerOptions}" th:value="${o.orgUnitId()}"
+                                    th:text="${o.orgUnitShorthand() != null ? o.orgUnitName() + ' (' + o.orgUnitShorthand() + ')' : o.orgUnitName()}">Iridium (IRI)</option>
+                        </select>
+                    </div>
+                    <p class="form-hint m-0" th:text="#{memberHangar.unit.hint}">Zur Wahl stehen die Einheiten des Mitglieds. Das Mitglied wird benachrichtigt.</p>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost close-member-ship-unit" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta" data-testid="member-hangar-unit-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{hangar.ship.save}">Speichern</span></button>
                 </div>
             </form>
         </th:block>

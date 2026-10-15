@@ -40,15 +40,18 @@ rule notifies the owner and excludes the actor, so an officer resetting their ow
 
 ### REQ-HANGAR-008 — An admin changing a member's hangar or blueprints tells the member
 
-`HangarService#addShipByAdmin`, `#updateShipByAdmin` and `#deleteShipByAdmin` (the admin endpoints under
-`/hangar/admin/users/{userId}/ships`, used by the admin member hangar of REQ-HANGAR-011) publish
-`HANGAR_CHANGED_BY_ADMIN`; `PersonalBlueprintService#addForUser`,
+`HangarService#addShipByAdmin`, `#updateShipByAdmin`, `#deleteShipByAdmin` and
+`#changeShipOrgUnitByAdmin` (the admin endpoints under `/hangar/admin/users/{userId}/ships`, used by
+the admin member hangar of REQ-HANGAR-011 / -012) publish `HANGAR_CHANGED_BY_ADMIN`;
+`#bulkChangeShipOrgUnitByAdmin` publishes one notice per action — `HANGAR_CHANGED_BY_ADMIN` when one
+ship moved, `HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN` with the `count` when several did, nothing when
+none did; `PersonalBlueprintService#addForUser`,
 `#addBatchForUser`, `#updateForUser`, `#deleteForUser` and the admin import apply
 (`#announceImportByAdmin`) publish `BLUEPRINT_CHANGED_BY_ADMIN`; the global purge
 `#deleteAllForAllUsers` counts the removable blueprints per owner first and publishes
 `BLUEPRINT_PURGED_BY_ADMIN` to each member who lost some, with a hint to re-import or re-sync. The coded
-`changeCode` is `ADDED`, `UPDATED`, `DELETED` or `IMPORTED`. An admin changing their own data hears
-nothing.
+`changeCode` is `ADDED`, `UPDATED`, `DELETED`, `ORG_UNIT_CHANGED` or `IMPORTED`. An admin changing their
+own data hears nothing.
 
 **Acceptance**
 
@@ -56,14 +59,16 @@ nothing.
 - [x] Unassigning or swapping a ship clears the former owner's notice; keeping it announces nothing.
 - [x] A ship of a finished mission, a ship in no unit and an admin's own data announce nothing.
 - [x] One notice per member per reset or purge, with that member's count.
+- [x] An admin's unit change of one or several ships tells the member once per action.
 - [x] The default rules exist, are enabled, and use the intended selector kinds.
 
 **Enforced by:** `HangarNoticeIntegrationTest`, `MissionStructureShipNoticeTest`, `MissionUnitShipReleaseTest`,
-`HangarServiceTest`,
+`HangarServiceTest`, `HangarShipAdminOrgUnitChangeIntegrationTest`,
 `PersonalBlueprintServiceTest`, `SeededNotificationRulesIntegrationTest`,
 `NotificationPageControllerTest` (`targetOf_…`) · **Code:** `mission/api/events/MissionNotices`,
 `admin/api/events/HangarNotices`, `mission/internal/MissionNotificationPublisher`,
 `mission/internal/MissionStructureService`, `mission/internal/MissionUnitShipRelease`, `service/HangarService`, `blueprint/internal/PersonalBlueprintService`,
 `hangar/api/ShipRepository#countFittedByOwnerScoped`,
 `blueprint/api/PersonalBlueprintRepository#countRemovableByOwner`,
-`V280__seed_hangar_and_blueprint_notification_rules.sql` · **Issues:** #2414
+`V280__seed_hangar_and_blueprint_notification_rules.sql`,
+`V291__seed_admin_ship_org_unit_notification_rule.sql` · **Issues:** #2414, #2601

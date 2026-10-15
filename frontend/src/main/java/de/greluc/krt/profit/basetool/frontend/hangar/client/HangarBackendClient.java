@@ -306,6 +306,36 @@ public class HangarBackendClient {
   }
 
   /**
+   * Changes the owning org unit of a member's ship on an admin's behalf (REQ-HANGAR-012).
+   *
+   * @param memberId the ship's owner
+   * @param shipId the ship
+   * @param request the new org unit and the last-seen unit counter
+   * @return the changed ship, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public ShipDto changeMemberShipOrgUnit(
+      @NotNull UUID memberId, @NotNull UUID shipId, @NotNull ShipOrgUnitRequestDto request) {
+    return backendApiClient.put(
+        MEMBER_SHIP + "/org-unit", request, ShipDto.class, memberId, shipId);
+  }
+
+  /**
+   * Changes the owning org unit of a selection of a member's ships on an admin's behalf
+   * (REQ-HANGAR-012).
+   *
+   * @param memberId the ships' owner
+   * @param request the selected ships and the new org unit
+   * @return the changed and skipped counts, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public ShipBulkOrgUnitResultDto bulkChangeMemberShipOrgUnit(
+      @NotNull UUID memberId, @NotNull ShipBulkOrgUnitRequestDto request) {
+    return backendApiClient.post(
+        MEMBER_SHIPS + "/bulk-org-unit", request, ShipBulkOrgUnitResultDto.class, memberId);
+  }
+
+  /**
    * Imports a third-party ship export, whose format the backend detects.
    *
    * @param upload the uploaded file, streamed as the {@code file} part

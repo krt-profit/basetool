@@ -117,10 +117,10 @@ public final class HangarNotices {
   }
 
   /**
-   * An admin added, changed or deleted a ship in a member's hangar.
+   * An admin added, changed, deleted or changed the org unit of a ship in a member's hangar.
    *
    * @param memberId the hangar's owner, the single recipient
-   * @param changeCode {@code ADDED}, {@code UPDATED} or {@code DELETED}
+   * @param changeCode {@code ADDED}, {@code UPDATED}, {@code DELETED} or {@code ORG_UNIT_CHANGED}
    * @param shipType the ship's type name
    * @param actor the admin
    * @return the event
@@ -137,6 +137,29 @@ public final class HangarNotices {
     params.put("shipType", shipType);
     return builder(
             NotificationEventType.HANGAR_CHANGED_BY_ADMIN, HANGAR_ENTITY_TYPE, memberId, actor)
+        .renderParams(params)
+        .build();
+  }
+
+  /**
+   * An admin changed the org unit of several ships of a member in one action.
+   *
+   * @param memberId the ships' owner, the single recipient
+   * @param count how many of their ships moved
+   * @param actor the admin
+   * @return the event
+   */
+  @NotNull
+  public static NoticeEvent shipsOrgUnitChanged(
+      @NotNull UUID memberId, long count, @NotNull ActorRef actor) {
+    Map<String, String> params = new LinkedHashMap<>();
+    params.put("actor", actor.name());
+    params.put("count", Long.toString(count));
+    return builder(
+            NotificationEventType.HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN,
+            HANGAR_ENTITY_TYPE,
+            memberId,
+            actor)
         .renderParams(params)
         .build();
   }

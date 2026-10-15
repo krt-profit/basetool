@@ -41,12 +41,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.ManufacturerDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.ShipTypeDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOrgUnitRequestDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOrgUnitResultDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipOrgUnitRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipRequestDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import java.util.Collections;
 import java.util.List;
@@ -64,8 +68,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC tests for the admin member hangar (REQ-HANGAR-011): only an admin reaches the page and its
- * writes, the page lists the member's ships, and every write goes to the member's admin path.
+ * MVC tests for the admin member hangar (REQ-HANGAR-011, REQ-HANGAR-012): only an admin reaches the
+ * page and its writes, the page lists the member's ships with their unit actions, and every write
+ * goes to the member's admin path.
  */
 @SpringBootTest
 class MemberHangarPageControllerTest {
@@ -295,6 +300,195 @@ class MemberHangarPageControllerTest {
             eq(Void.class),
             eq(MEMBER),
             eq(SHIP));
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void unitActionsOfferTheMembersUnitsAndCarryTheUnitCounter() throws Exception {
+    UUID unit = UUID.randomUUID();
+    ShipDto ship =
+        new ShipDto(
+            SHIP,
+            "Iron Mule",
+            null,
+            "LTI",
+            null,
+            true,
+            null,
+            new SquadronReferenceDto(unit, "Sondereinheit", "SE"),
+            3L,
+            4L);
+    when(backendApiClient.get(eq(SHIPS_READ), anyTypeRef(), eq(MEMBER)))
+        .thenReturn(new PageResponse<>(List.of(ship), 0, 50, 1, 1, List.of()));
+    when(backendApiClient.get(
+            eq("/api/v1/org-units/members/{id}/memberships?allKinds=true"),
+            anyTypeRef(),
+            eq(MEMBER)))
+        .thenReturn(
+            List.of(
+                new OrgUnitMembershipOptionDto(
+                    unit, "Sondereinheit", "SE", "SPECIAL_COMMAND", Boolean.FALSE)));
+
+    mockMvc
+        .perform(get(BASE))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-testid=\"member-hangar-change-unit\"")))
+        .andExpect(
+            content().string(containsString("data-action=\"" + BASE + "/" + SHIP + "/org-unit\"")))
+        .andExpect(content().string(containsString("data-org-unit-version=\"4\"")))
+        .andExpect(content().string(containsString("id=\"member-hangar-select-all\"")))
+        .andExpect(content().string(containsString("data-testid=\"member-hangar-check\"")))
+        .andExpect(content().string(containsString("id=\"member-hangar-selection-bar\"")))
+        .andExpect(content().string(containsString("id=\"member-ship-unit-modal\"")))
+        .andExpect(
+            content().string(containsString("data-bulk-action=\"" + BASE + "/bulk-org-unit\"")))
+        .andExpect(
+            content()
+                .string(
+                    matchesPattern(
+                        "(?s).*<select id=\"member-ship-unit-select\".*?<option value=\""
+                            + unit
+                            + "\">Sondereinheit \\(SE\\)</option>.*")));
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void unitChangeGoesToTheMembersShipWithTheCounter() throws Exception {
+    UUID unit = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            post(BASE + "/" + SHIP + "/org-unit")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"orgUnitId\":\"" + unit + "\",\"owningOrgUnitVersion\":2}"))
+        .andExpect(status().isNoContent());
+
+    verify(backendApiClient)
+        .put(
+            eq("/api/v1/hangar/admin/users/{userId}/ships/{shipId}/org-unit"),
+            argThat(
+                (ShipOrgUnitRequestDto r) ->
+                    unit.equals(r.orgUnitId())
+                        && Long.valueOf(2L).equals(r.owningOrgUnitVersion())),
+            eq(ShipDto.class),
+            eq(MEMBER),
+            eq(SHIP));
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void unitChangeWithoutCounterIsRefusedBeforeTheBackend() throws Exception {
+    mockMvc
+        .perform(
+            post(BASE + "/" + SHIP + "/org-unit")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"orgUnitId\":null}"))
+        .andExpect(status().is(422))
+        .andExpect(jsonPath("$.code").value("VALIDATION"));
+
+    verify(backendApiClient, never()).put(anyString(), any(), eq(ShipDto.class), any(), any());
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void unitChangeConflictIsRelayedAsProblemJson() throws Exception {
+    when(backendApiClient.put(
+            eq("/api/v1/hangar/admin/users/{userId}/ships/{shipId}/org-unit"),
+            any(),
+            eq(ShipDto.class),
+            eq(MEMBER),
+            eq(SHIP)))
+        .thenThrow(
+            new BackendServiceException(
+                "conflict", null, 409, "OPTIMISTIC_LOCK", null, Collections.emptyList(), null));
+
+    mockMvc
+        .perform(
+            post(BASE + "/" + SHIP + "/org-unit")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"orgUnitId\":null,\"owningOrgUnitVersion\":0}"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("OPTIMISTIC_LOCK"));
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void bulkUnitChangeGoesToTheMembersShipsAndAnswersTheCounts() throws Exception {
+    UUID other = UUID.randomUUID();
+    when(backendApiClient.post(
+            eq("/api/v1/hangar/admin/users/{userId}/ships/bulk-org-unit"),
+            any(),
+            eq(ShipBulkOrgUnitResultDto.class),
+            eq(MEMBER)))
+        .thenReturn(new ShipBulkOrgUnitResultDto(1, 1));
+
+    mockMvc
+        .perform(
+            post(BASE + "/bulk-org-unit")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"shipIds\":[\"" + SHIP + "\",\"" + other + "\"],\"orgUnitId\":null}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.changed").value(1))
+        .andExpect(jsonPath("$.skipped").value(1));
+
+    verify(backendApiClient)
+        .post(
+            eq("/api/v1/hangar/admin/users/{userId}/ships/bulk-org-unit"),
+            argThat(
+                (ShipBulkOrgUnitRequestDto r) ->
+                    r.shipIds().equals(List.of(SHIP, other)) && r.orgUnitId() == null),
+            eq(ShipBulkOrgUnitResultDto.class),
+            eq(MEMBER));
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void bulkUnitChangeOfAnEmptySelectionIsRefusedBeforeTheBackend() throws Exception {
+    mockMvc
+        .perform(
+            post(BASE + "/bulk-org-unit")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"shipIds\":[],\"orgUnitId\":null}"))
+        .andExpect(status().is(422))
+        .andExpect(jsonPath("$.code").value("VALIDATION"));
+
+    verify(backendApiClient, never())
+        .post(anyString(), any(), eq(ShipBulkOrgUnitResultDto.class), any());
+  }
+
+  @Test
+  @WithMockUser
+  void nonAdminIsRefusedTheUnitChanges() throws Exception {
+    mockMvc
+        .perform(
+            post(BASE + "/" + SHIP + "/org-unit")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"orgUnitId\":null,\"owningOrgUnitVersion\":0}"))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(
+            post(BASE + "/bulk-org-unit")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"shipIds\":[\"" + SHIP + "\"],\"orgUnitId\":null}"))
+        .andExpect(status().isForbidden());
+
+    verify(backendApiClient, never()).put(anyString(), any(), eq(ShipDto.class), any(), any());
+    verify(backendApiClient, never())
+        .post(anyString(), any(), eq(ShipBulkOrgUnitResultDto.class), any());
   }
 
   /**
