@@ -3,6 +3,14 @@
 Changes to the Exchange API contract, newest first. Every change within `v1` is additive
 ([versioning](versioning.md)).
 
+## 2026-10-15
+
+- **New: the member's org units.** `GET /exchange/v1/me/org-units` under the new scope
+  `exchange.orgunits.read` lists the units the member directly belongs to, with id, name,
+  shorthand and kind, so a client can offer them as a choice ([org units](resources/org-units.md)).
+  New schemas `org-unit.schema.json` and `org-unit-list.schema.json`; the service document lists
+  the scope once the registry grants it. Nothing else changes.
+
 ## 2026-10-03
 
 - **Corrected: a refinery draft carries at least one order.** `refinery-draft.schema.json` now

@@ -38,6 +38,8 @@
       path: resources/ships.md
     - title: Org demand
       path: resources/org-demand.md
+    - title: Org units
+      path: resources/org-units.md
     - title: Drafts
       path: resources/drafts.md
 - section: Reference

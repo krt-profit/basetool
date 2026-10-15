@@ -297,6 +297,11 @@
           },
           {
             "memberToken": [
+              "exchange.orgunits.read"
+            ]
+          },
+          {
+            "memberToken": [
               "exchange.drafts.blueprints"
             ]
           },
@@ -392,6 +397,11 @@
           {
             "memberToken": [
               "exchange.demand.read"
+            ]
+          },
+          {
+            "memberToken": [
+              "exchange.orgunits.read"
             ]
           },
           {
@@ -816,6 +826,49 @@
               "application/json": {
                 "schema": {
                   "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/org-demand.schema.json"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          }
+        ]
+      }
+    },
+    "/exchange/v1/me/org-units": {
+      "get": {
+        "operationId": "orgunits_read",
+        "summary": "The org units the member directly belongs to.",
+        "tags": [
+          "orgunits"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.orgunits.read"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/org-unit-list.schema.json"
                 }
               }
             }

@@ -9,6 +9,7 @@ T0 POST /api/v1/exchange/me/drafts/refinery-orders
 T0 GET /api/v1/exchange/me/installation
 T0 POST /api/v1/exchange/me/installation
 T0 GET /api/v1/exchange/me/org-demand
+T0 GET /api/v1/exchange/me/org-units
 T0 GET /api/v1/exchange/me/ships
 T0 POST /api/v1/exchange/me/ships/changes
 T0 GET /api/v1/exchange/me/stock

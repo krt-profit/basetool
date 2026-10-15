@@ -50,7 +50,7 @@ public final class ExchangeSeam {
   public static final String CONNECT = "exchange.connect";
 
   /**
-   * The 14 relay operations on 13 backend paths, each with the gateway route that relays it, the
+   * The 15 relay operations on 14 backend paths, each with the gateway route that relays it, the
    * capability both sides demand and the published schemas of its body and answer.
    */
   public static final @Unmodifiable List<RelayOperation> OPERATIONS =
@@ -153,6 +153,14 @@ public final class ExchangeSeam {
               null,
               "org-demand.schema.json"),
           new RelayOperation(
+              "GET",
+              "/me/org-units",
+              "/me/org-units",
+              "exchange.orgunits.read",
+              false,
+              null,
+              "org-unit-list.schema.json"),
+          new RelayOperation(
               "POST",
               "/me/drafts/blueprints",
               "/me/drafts/blueprints",
@@ -196,7 +204,7 @@ public final class ExchangeSeam {
           INSTALLATION_HEADER,
           CONNECTED_AT_HEADER);
 
-  /** The ten capability scopes. */
+  /** The eleven capability scopes. */
   public static final @Unmodifiable Set<String> CAPABILITY_SCOPES =
       Set.of(
           CONNECT,
@@ -207,6 +215,7 @@ public final class ExchangeSeam {
           "exchange.hangar.read",
           "exchange.hangar.write",
           "exchange.demand.read",
+          "exchange.orgunits.read",
           "exchange.drafts.blueprints",
           "exchange.drafts.refinery");
 
@@ -348,7 +357,7 @@ public final class ExchangeSeam {
   /**
    * Returns every relay operation as {@code METHOD /api/v1/exchange/...}.
    *
-   * @return the 14 operations, sorted
+   * @return the 15 operations, sorted
    */
   public static @NotNull @Unmodifiable Set<String> relayOperations() {
     Set<String> operations = new TreeSet<>();
@@ -359,7 +368,7 @@ public final class ExchangeSeam {
   /**
    * Returns every backend path the relay targets.
    *
-   * @return the 13 paths, sorted
+   * @return the 14 paths, sorted
    */
   public static @NotNull @Unmodifiable Set<String> relayPaths() {
     Set<String> paths = new TreeSet<>();

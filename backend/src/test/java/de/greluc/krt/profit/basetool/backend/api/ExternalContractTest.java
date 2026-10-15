@@ -44,6 +44,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Guards the external contract set (REQ-API-009, ADR-0136): operations a shipped client depends on,
@@ -2092,7 +2093,7 @@ class ExternalContractTest {
   private static final int FROZEN_OPERATIONS_FLOOR = 246;
 
   /**
-   * The record of tier {@code T0}, which never changes (ADR-0234): the version gate, the 14
+   * The record of tier {@code T0}, which never changes (ADR-0234): the version gate, the 15
    * exchange relay operations, the two streams and the live-sync signal. The SPI endpoint {@code
    * POST /internal/discord/account-existence} is T0 too but is not in the document.
    */
@@ -2112,10 +2113,18 @@ class ExternalContractTest {
           "GET /api/v1/exchange/me/installation",
           "POST /api/v1/exchange/me/installation",
           "GET /api/v1/exchange/me/org-demand",
+          "GET /api/v1/exchange/me/org-units",
           "GET /api/v1/exchange/me/ships",
           "POST /api/v1/exchange/me/ships/changes",
           "GET /api/v1/exchange/me/stock",
           "POST /api/v1/exchange/me/stock/changes");
+
+  /**
+   * The {@code T0} operations added after the latest release, which its baseline cannot document
+   * yet; an entry is removed once a release ships it (REQ-API-017).
+   */
+  private static final Set<String> TIER_ZERO_NEWER_THAN_THE_LATEST_RELEASE =
+      Set.of("GET /api/v1/exchange/me/org-units");
 
   /**
    * Verifies that no field reachable from the contract changed its type, format or {@code required}
@@ -2266,6 +2275,15 @@ class ExternalContractTest {
     assertThatThrownBy(() -> previousRelease(mapper.readTree("{\"paths\":{}}"), split.relay()))
         .isInstanceOf(AssertionError.class)
         .hasMessageContaining("GET /api/v1/live-sync/stream");
+
+    assertThat(TIER_ZERO).containsAll(TIER_ZERO_NEWER_THAN_THE_LATEST_RELEASE);
+    ObjectNode olderRelay = split.relay().deepCopy();
+    TIER_ZERO_NEWER_THAN_THE_LATEST_RELEASE.forEach(
+        operation -> ((ObjectNode) olderRelay.path("paths")).remove(operation.split(" ", 2)[1]));
+    assertThat(previousRelease(split.published(), olderRelay).path("paths").propertyNames())
+        .as("a release before a newer T0 operation is still a complete baseline")
+        .contains("/api/v1/exchange/me/stock")
+        .doesNotContain("/api/v1/exchange/me/org-units");
   }
 
   /**
@@ -2283,7 +2301,8 @@ class ExternalContractTest {
     Set<String> missing = new TreeSet<>();
     for (String operation : TIER_ZERO) {
       String[] parts = operation.split(" ", 2);
-      if (OpenApiWalk.operation(previous, parts[1], parts[0]).isMissingNode()) {
+      if (!TIER_ZERO_NEWER_THAN_THE_LATEST_RELEASE.contains(operation)
+          && OpenApiWalk.operation(previous, parts[1], parts[0]).isMissingNode()) {
         missing.add(operation);
       }
     }

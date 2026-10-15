@@ -1,0 +1,30 @@
+=== request
+GET /exchange/v1/me/org-units
+=== relayed
+GET /api/v1/exchange/me/org-units
+accept: application/json, application/problem+json
+accept-encoding: gzip, deflate
+authorization: Bearer gateway-service-token
+traceparent: <trace>
+x-correlation-id: <correlation-id>
+x-exchange-capabilities: exchange.blueprints.read,exchange.blueprints.write,exchange.connect,exchange.demand.read,exchange.drafts.blueprints,exchange.drafts.refinery,exchange.hangar.read,exchange.hangar.write,exchange.orgunits.read,exchange.stock.read,exchange.stock.write
+x-exchange-client: versekit
+x-exchange-connected-at: <connected-at>
+x-exchange-installation: <thumbprint>
+x-ingest-on-behalf-of: 6f1c2e7a-3b4d-4c5e-8f60-718293a4b5c6
+=== response
+200
+cache-control: no-cache, no-store, max-age=0, must-revalidate
+content-security-policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'
+content-type: application/json
+dpop-nonce: <dpop-nonce>
+expires: 0
+pragma: no-cache
+ratelimit: limit=1000, remaining=<remaining>, reset=<reset>
+ratelimit-policy: 1000;w=60
+vary: Origin, Access-Control-Request-Method, Access-Control-Request-Headers
+x-content-type-options: nosniff
+x-correlation-id: <correlation-id>
+x-frame-options: DENY
+x-xss-protection: 0
+{"items":[{"id":"0b6f2d1e-4c1a-4e8e-9a51-3f0c5d7a9b10","name":"Organisationsleitung","shorthand":"OL","kind":"ORGANISATIONSLEITUNG"},{"id":"1c7a3e2f-5d2b-4f9f-8b62-4a1d6e8b0c21","name":"Bereich Logistik","shorthand":"LOG","kind":"BEREICH"},{"id":"2d8b4f30-6e3c-4a0a-9c73-5b2e7f9c1d32","name":"Staffel Iridium","shorthand":"IRI","kind":"SQUADRON"},{"id":"3e9c5041-7f4d-4b1b-8d84-6c3f80ad2e43","name":"Spezialkommando Bergbau","shorthand":"SKB","kind":"SPECIAL_COMMAND"}]}

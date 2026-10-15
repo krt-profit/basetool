@@ -86,6 +86,7 @@ class Smoke:
             ("the stock", "GET", "/exchange/v1/me/stock", None),
             ("the ships", "GET", "/exchange/v1/me/ships", None),
             ("the org demand", "GET", "/exchange/v1/me/org-demand", None),
+            ("the org units", "GET", "/exchange/v1/me/org-units", None),
             ("the locations", "GET", "/exchange/v1/catalog/locations", None),
         ]:
             status, answer = self.call(method, path, body)

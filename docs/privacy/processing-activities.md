@@ -200,7 +200,7 @@ requires it and duplicating it into further files spreads personal data for no g
 
 - **Purpose:** let an approved client on the member's own device read and write the member's own
   blueprints, warehouse stock (personal and shared) and ships and read the anonymised open demand of the
-  member's units, at the member's request; let the member see, disconnect and undo every
+  member's units and the units the member directly belongs to, at the member's request; let the member see, disconnect and undo every
   connection; detect and reverse a faulty or malicious client (REQ-XCH-*,
   [`external-exchange.md`](../specs/external-exchange.md)).
 - **Data held by the tool:** per installation the client, the DPoP key thumbprint, the
@@ -215,8 +215,9 @@ requires it and duplicating it into further files spreads personal data for no g
   Keycloak the member's consent per client and the client's offline session. The account check
   compares a sent RSI handle with the stored one and keeps neither (REQ-XCH-031).
 - **Disclosed to the client:** only the member's own data within the capabilities the member
-  consented to, the anonymised org demand and catalogue data — never the e-mail address, the
-  display name or another member's data (REQ-XCH-009, REQ-XCH-018).
+  consented to, the anonymised org demand, the member's direct org units (name, shorthand, kind)
+  and catalogue data — never the e-mail address, the display name or another member's data
+  (REQ-XCH-009, REQ-XCH-018, REQ-XCH-048).
 - **Legal basis:** Art. 6(1)(b) for the transfer the member asked for and the connection records;
   Art. 6(1)(f) for the journal and the audit attribution (detecting misuse, undoing it). The
   Keycloak consent is an OAuth authorisation of the client, not a consent under Art. 6(1)(a) (owner
