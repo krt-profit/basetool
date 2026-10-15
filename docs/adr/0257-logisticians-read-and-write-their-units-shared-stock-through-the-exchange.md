@@ -49,7 +49,7 @@ role (REQ-XCH-009), so a web role cannot decide anything there by itself.
    orders whose responsible unit is one of the member's Logistician units, a per-order breakdown with
    the order's number, requesting unit, Auftraggeber (`handle`) and comment; assignees stay unnamed.
    Without it the feed stays as anonymised as ADR-0220 made it.
-5. **Members can withhold their name.** A profile setting, on by default, lets a member keep their
+5. **Members can withhold their name.** A profile setting, off by default, lets a member keep their
    name away from connected applications. Their entries then carry no holder and no note and they
    are left out of the member roster a client books for; their entries stay writable by id. An
    order's `handle` and comment are free text, not a member account, and are not covered.
