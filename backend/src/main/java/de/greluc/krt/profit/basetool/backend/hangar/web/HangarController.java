@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarImportService
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarService;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.SetHomeLocationRequestDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.SetHomeLocationResponseDto;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.ShipOrgUnitRequestDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.SquadronShipOverviewDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
@@ -200,6 +201,41 @@ public class HangarController {
       @RequestBody @Valid @NotNull ShipRequestDto shipRequest) {
     return shipMapper.toDto(
         hangarService.updateShip(userService.getUserIdFromJwt(jwt), id, shipRequest));
+  }
+
+  /**
+   * Changes the owning org unit of one of the calling user's ships to one of their direct
+   * memberships or none (REQ-HANGAR-009).
+   *
+   * @param jwt caller's JWT; its {@code sub} claim must own the ship
+   * @param id ship id
+   * @param request the new org unit and the unit counter the caller last saw
+   * @return the ship as it is after the change
+   */
+  @Operation(
+      summary = "Change a ship's org unit",
+      description =
+          "Moves one of the caller's ships into one of the caller's direct org units, or out of"
+              + " every unit. Guarded by the ship's owningOrgUnitVersion only.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Ship as it is after the change"),
+    @ApiResponse(responseCode = "400", description = "Target is not a direct membership"),
+    @ApiResponse(responseCode = "403", description = "Ship belongs to someone else"),
+    @ApiResponse(responseCode = "409", description = "Stale owningOrgUnitVersion")
+  })
+  @PutMapping("/ships/{id}/org-unit")
+  @PreAuthorize("isAuthenticated() and @hangarAccessPolicy.canEditShip(#id)")
+  @Transactional
+  public ShipDto changeMyShipOrgUnit(
+      @AuthenticationPrincipal Jwt jwt,
+      @PathVariable @NotNull UUID id,
+      @RequestBody @Valid @NotNull ShipOrgUnitRequestDto request) {
+    return shipMapper.toDto(
+        hangarService.changeShipOrgUnit(
+            userService.getUserIdFromJwt(jwt),
+            id,
+            request.orgUnitId(),
+            request.owningOrgUnitVersion()));
   }
 
   /**

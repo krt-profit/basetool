@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Hangar: Einheit eines Schiffs nachträglich ändern.** Die neue Zeilenaktion „Einheit ändern" in „Meine Schiffe" ordnet ein eigenes Schiff einer der eigenen Einheiten zu oder nimmt es mit „Keine Einheit" heraus, etwa ein Schiff, das eine verbundene Anwendung ohne Einheit angelegt hat. Jede Zeile zeigt ihre Einheit; der Bearbeiten-Dialog zeigt „Zuordnen zu" nicht mehr (REQ-HANGAR-009, ADR-0258, Migration V290).
+
 ## [v1.16.3](https://github.com/krt-profit/basetool/releases/tag/v1.16.3) - 2026-10-14
 
 ### Fixed

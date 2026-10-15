@@ -60,6 +60,7 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -289,12 +290,7 @@ public class HangarService {
     Ship ship = Entities.require(shipRepository.findById(shipId), "Ship not found");
 
     OptimisticLock.checkOptionalClient(ship.getVersion(), dto.version(), Ship.class, shipId);
-
-    if (ship.getOwner() == null
-        || ship.getOwner().getId() == null
-        || !ship.getOwner().getId().equals(userId)) {
-      throw new AccessDeniedException("Access denied: You do not own this ship");
-    }
+    requireOwner(ship, userId);
 
     List<String> changed = new ArrayList<>();
     if (!Objects.equals(ship.getName(), dto.name())) {
@@ -346,6 +342,75 @@ public class HangarService {
   }
 
   /**
+   * Changes the owning org unit of a ship owned by {@code userId} to one of the owner's direct
+   * memberships or none (REQ-HANGAR-009). Guarded by the ship's unit counter alone, so it never
+   * conflicts with an edit of the other fields (ADR-0258). An unchanged unit writes and records
+   * nothing.
+   *
+   * @param userId calling user's id
+   * @param shipId ship primary key
+   * @param orgUnitId the new org unit, or {@code null} for none
+   * @param owningOrgUnitVersion the unit counter the caller last saw
+   * @return the ship as it is after the change
+   * @throws NotFoundException when the ship does not exist
+   * @throws AccessDeniedException when the calling user is not the owner
+   * @throws BadRequestException when the target is not a direct membership of the owner
+   * @throws ObjectOptimisticLockingFailureException when the unit counter is stale
+   */
+  @Transactional
+  public Ship changeShipOrgUnit(
+      @NotNull UUID userId,
+      @NotNull UUID shipId,
+      @Nullable UUID orgUnitId,
+      long owningOrgUnitVersion) {
+    Ship ship = Entities.require(shipRepository.findById(shipId), "Ship not found");
+    requireOwner(ship, userId);
+    OrgUnit current = ship.getOwningOrgUnit();
+    if (Objects.equals(current == null ? null : current.getId(), orgUnitId)) {
+      return ship;
+    }
+    OrgUnit target = ownerScopeService.resolveOwnerMembershipTarget(ship.getOwner(), orgUnitId);
+    String from = orgUnitRef(current);
+    String shipTypeName = ship.getShipType().getName();
+    if (shipRepository.changeOwningOrgUnitIfVersionMatches(shipId, target, owningOrgUnitVersion)
+        == 0) {
+      throw new ObjectOptimisticLockingFailureException(Ship.class, shipId);
+    }
+    auditRecorder.record(
+        AuditEventType.HANGAR_SHIP_ORG_UNIT_CHANGED,
+        shipId,
+        shipTypeName,
+        userId,
+        AuditDetails.of("from", from).with("to", orgUnitRef(target)));
+    return Entities.require(shipRepository.findById(shipId), "Ship not found");
+  }
+
+  /**
+   * Renders an org unit for an audit detail as {@code kind:id}, or {@code none}.
+   *
+   * @param orgUnit the org unit, or {@code null}
+   * @return the reference, free of names
+   */
+  private static @NotNull String orgUnitRef(@Nullable OrgUnit orgUnit) {
+    return orgUnit == null ? "none" : orgUnit.getKind().name() + ":" + orgUnit.getId();
+  }
+
+  /**
+   * Refuses a ship the calling user does not own.
+   *
+   * @param ship the ship
+   * @param userId calling user's id
+   * @throws AccessDeniedException when the calling user is not the owner
+   */
+  private static void requireOwner(@NotNull Ship ship, @NotNull UUID userId) {
+    if (ship.getOwner() == null
+        || ship.getOwner().getId() == null
+        || !ship.getOwner().getId().equals(userId)) {
+      throw new AccessDeniedException("Access denied: You do not own this ship");
+    }
+  }
+
+  /**
    * Deletes a ship owned by {@code userId} after detaching it from any mission units.
    *
    * @param userId calling user's id
@@ -357,12 +422,7 @@ public class HangarService {
   @Transactional
   public int deleteShip(@NotNull UUID userId, @NotNull UUID shipId) {
     Ship ship = Entities.require(shipRepository.findById(shipId), "Ship not found");
-
-    if (ship.getOwner() == null
-        || ship.getOwner().getId() == null
-        || !ship.getOwner().getId().equals(userId)) {
-      throw new AccessDeniedException("Access denied: You do not own this ship");
-    }
+    requireOwner(ship, userId);
 
     int detached = shipDeletionObserver.beforeShipDelete(shipId);
 

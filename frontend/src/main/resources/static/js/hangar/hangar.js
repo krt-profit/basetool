@@ -231,6 +231,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const modalDeleteBtn = /** @type {HTMLElement} */ (document.getElementById('modal-delete-btn'));
+    const ownerPickerSlot = document.getElementById('ship-owner-picker-slot');
+
+    /**
+     * Shows the "Zuordnen zu" picker in the create dialog only; the unit of an existing ship is
+     * changed through its own row action (REQ-HANGAR-009).
+     *
+     * @param {boolean} visible whether the dialog creates a ship
+     */
+    function showOwnerPicker(visible) {
+        if (!ownerPickerSlot) return;
+        ownerPickerSlot.hidden = !visible;
+        const select = /** @type {HTMLSelectElement | null} */ (
+            ownerPickerSlot.querySelector('select')
+        );
+        if (select) select.disabled = !visible;
+    }
 
     /**
      * Opens the ship dialog blank, posting to the clicked button's action.
@@ -247,6 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
         shipField('ship-fitted').checked = false;
         shipField('ship-version').value = '';
         modalDeleteBtn.hidden = true;
+        showOwnerPicker(true);
         openModal();
     }
 
@@ -267,11 +284,92 @@ document.addEventListener('DOMContentLoaded', () => {
         const action = /** @type {string} */ (btn.getAttribute('data-action'));
         modalDeleteBtn.setAttribute('data-action', action.replace('/update', '/delete'));
         modalDeleteBtn.hidden = false;
+        showOwnerPicker(false);
         openModal();
     }
 
     krtEvents.on('click', 'hangar-add-ship', openAddModal);
     krtEvents.on('click', 'hangar-edit-ship', openEditModal);
+
+    const unitModal = document.getElementById('ship-unit-modal');
+    const unitForm = /** @type {HTMLFormElement | null} */ (
+        document.getElementById('ship-unit-form')
+    );
+    const unitSelect = /** @type {HTMLSelectElement | null} */ (
+        document.getElementById('ship-unit-select')
+    );
+    let unitVersion = '';
+    let unitCurrent = '';
+
+    /**
+     * Opens the "Einheit ändern" dialog preset to the clicked ship's unit (REQ-HANGAR-009).
+     *
+     * @param {HTMLElement} btn the row's unit button
+     */
+    function openUnitModal(btn) {
+        if (!unitModal || !unitForm || !unitSelect) return;
+        assignFormAction(
+            unitForm,
+            safeSameOriginUrl(btn.getAttribute('data-action'), unitForm.action),
+        );
+        unitCurrent = btn.getAttribute('data-org-unit-id') || '';
+        unitVersion = btn.getAttribute('data-org-unit-version') || '';
+        unitSelect.querySelectorAll('option[data-former-unit]').forEach((o) => o.remove());
+        const known = Array.from(unitSelect.options).some((o) => o.value === unitCurrent);
+        if (!known && unitCurrent) {
+            const former = document.createElement('option');
+            former.value = unitCurrent;
+            former.textContent = btn.getAttribute('data-org-unit-name') || unitCurrent;
+            former.setAttribute('data-former-unit', '');
+            unitSelect.appendChild(former);
+        }
+        unitSelect.value = unitCurrent;
+        krtModal.open(unitModal);
+    }
+
+    krtEvents.on('click', 'hangar-change-unit', openUnitModal);
+
+    if (unitModal) {
+        unitModal.querySelectorAll('.close-unit-modal').forEach((el) => {
+            el.addEventListener('click', () => {
+                krtModal.close(unitModal);
+            });
+        });
+    }
+
+    if (unitForm && unitSelect && unitModal) {
+        unitForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const chosen = unitSelect.value;
+            if (chosen === unitCurrent) {
+                krtModal.close(unitModal);
+                return;
+            }
+            const submitBtn = /** @type {HTMLButtonElement | null} */ (
+                unitForm.querySelector('button[type="submit"]')
+            );
+            if (submitBtn) submitBtn.disabled = true;
+            krtFetch
+                .write({
+                    method: 'POST',
+                    url: safeSameOriginUrl(unitForm.getAttribute('action'), unitForm.action),
+                    payload: {
+                        orgUnitId: chosen || null,
+                        owningOrgUnitVersion: unitVersion === '' ? null : Number(unitVersion),
+                    },
+                    successMessage: hangarI18n.unitSuccess,
+                    errorMessage: hangarI18n.unitError,
+                    conflict: hangarConflict,
+                    onSuccess() {
+                        krtModal.close(unitModal);
+                        afterHangarWrite();
+                    },
+                })
+                .then(() => {
+                    if (submitBtn) submitBtn.disabled = false;
+                });
+        });
+    }
 
     modalDeleteBtn.addEventListener('click', () => {
         if (!deleteForm) return;

@@ -2024,10 +2024,19 @@ class MissionPageControllerMvcTest {
             shipTypeId, "Fighter", null, null, null, false);
     de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto participantShip =
         new de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto(
-            participantShipId, "P-Ship", shipType, "10", null, false, participantUser, null, 1L);
+            participantShipId,
+            "P-Ship",
+            shipType,
+            "10",
+            null,
+            false,
+            participantUser,
+            null,
+            1L,
+            0L);
     de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto outsiderShip =
         new de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto(
-            outsiderShipId, "O-Ship", shipType, "10", null, false, outsiderUser, null, 1L);
+            outsiderShipId, "O-Ship", shipType, "10", null, false, outsiderUser, null, 1L, 0L);
 
     MissionDto mission =
         new MissionDto(
@@ -2170,13 +2179,22 @@ class MissionPageControllerMvcTest {
             shipTypeId, "Fighter", null, null, null, false);
     de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto participantShip =
         new de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto(
-            participantShipId, "P-Ship", shipType, "10", null, false, participantUser, null, 1L);
+            participantShipId,
+            "P-Ship",
+            shipType,
+            "10",
+            null,
+            false,
+            participantUser,
+            null,
+            1L,
+            0L);
     de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto assignedShip =
         new de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto(
-            assignedShipId, "A-Ship", shipType, "10", null, false, outsiderUser, null, 1L);
+            assignedShipId, "A-Ship", shipType, "10", null, false, outsiderUser, null, 1L, 0L);
     de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto strayShip =
         new de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto(
-            strayShipId, "S-Ship", shipType, "10", null, false, outsiderUser, null, 1L);
+            strayShipId, "S-Ship", shipType, "10", null, false, outsiderUser, null, 1L, 0L);
 
     de.greluc.krt.profit.basetool.frontend.mission.model.MissionUnitDto assignedUnit =
         new de.greluc.krt.profit.basetool.frontend.mission.model.MissionUnitDto(

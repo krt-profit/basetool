@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.LocationDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.FleetviewImportResponseDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.SetHomeLocationRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipOrgUnitRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.SquadronShipOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
@@ -134,6 +135,30 @@ public class HangarBackendClient {
   @Nullable
   public List<OrgUnitMembershipOptionDto> pickableOrgUnits() {
     return backendApiClient.get("/api/v1/org-units/me/pickable", MEMBERSHIP_OPTION_LIST);
+  }
+
+  /**
+   * Lists the org units the caller is a direct member of, all four kinds: the targets of a ship's
+   * org-unit change (REQ-HANGAR-009).
+   *
+   * @return the options, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public List<OrgUnitMembershipOptionDto> directOrgUnits() {
+    return backendApiClient.get(
+        "/api/v1/org-units/me/memberships?allKinds=true", MEMBERSHIP_OPTION_LIST);
+  }
+
+  /**
+   * Changes the owning org unit of one of the caller's ships (REQ-HANGAR-009).
+   *
+   * @param id the ship
+   * @param request the new org unit and the last-seen unit counter
+   * @return the changed ship, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public ShipDto changeShipOrgUnit(@NotNull UUID id, @NotNull ShipOrgUnitRequestDto request) {
+    return backendApiClient.put("/api/v1/hangar/ships/{id}/org-unit", request, ShipDto.class, id);
   }
 
   /**

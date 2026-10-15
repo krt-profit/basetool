@@ -155,6 +155,7 @@ POST /api/v1/hangar/ships/home-location | HangarController#setHomeLocationForMyS
 POST /api/v1/hangar/ships/reset-fitted | HangarController#resetAllFittedStatus | pre=hasAnyRole('ADMIN','OFFICER') | url=/api/v1/hangar/** -> hasAnyAuthority(HANGAR_READ,HANGAR_WRITE,ROLE_ADMIN)
 DELETE /api/v1/hangar/ships/{id} | HangarController#deleteMyShip | pre=isAuthenticated() and @hangarAccessPolicy.canEditShip(#id) | url=DELETE /api/v1/hangar/ships/* -> authenticated
 PUT /api/v1/hangar/ships/{id} | HangarController#updateMyShip | pre=isAuthenticated() and @hangarAccessPolicy.canEditShip(#id) | url=PUT /api/v1/hangar/ships/* -> authenticated
+PUT /api/v1/hangar/ships/{id}/org-unit | HangarController#changeMyShipOrgUnit | pre=isAuthenticated() and @hangarAccessPolicy.canEditShip(#id) | url=/api/v1/hangar/** -> hasAnyAuthority(HANGAR_READ,HANGAR_WRITE,ROLE_ADMIN)
 GET /api/v1/hangar/squadron-overview | HangarController#getSquadronOverview | pre=hasAnyAuthority('HANGAR_READ','HANGAR_WRITE','ROLE_ADMIN') | url=/api/v1/hangar/** -> hasAnyAuthority(HANGAR_READ,HANGAR_WRITE,ROLE_ADMIN)
 POST /api/v1/inventory | InventoryItemController#createInventoryItem | pre=hasAnyRole('ADMIN','OFFICER','LOGISTICIAN','KRT_MEMBER') | url=/api/v1/inventory -> hasAnyAuthority(ROLE_ADMIN,ROLE_KRT_MEMBER,ROLE_LOGISTICIAN,ROLE_OFFICER)
 GET /api/v1/inventory/aggregated | InventoryItemController#getAggregatedInventory | pre=hasAnyRole('ADMIN','OFFICER','LOGISTICIAN','KRT_MEMBER') | url=/api/v1/inventory/** -> hasAnyAuthority(ROLE_ADMIN,ROLE_KRT_MEMBER,ROLE_LOGISTICIAN,ROLE_OFFICER)

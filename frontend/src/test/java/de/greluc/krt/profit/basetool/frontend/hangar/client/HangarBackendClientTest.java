@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.frontend.hangar.model.FleetviewImportResponseDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.SetHomeLocationRequestDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipOrgUnitRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipRequestDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
 import java.nio.charset.StandardCharsets;
@@ -89,6 +90,27 @@ class HangarBackendClientTest {
     backend.expect("GET", "/api/v1/hangar/squadron-overview?page=0&size=1");
     backend.expect("GET", "/api/v1/locations/home-locations");
     backend.expect("GET", "/api/v1/org-units/me/pickable");
+  }
+
+  @Test
+  void unitChangeReadsTheDirectUnitsAndPutsTheUnitWithItsCounter() {
+    backend.answerJson("[]");
+    backend.answerJson("{}");
+    backend.answerJson("{}");
+
+    assertThat(client.directOrgUnits()).isEmpty();
+    client.changeShipOrgUnit(SHIP, new ShipOrgUnitRequestDto(UNIT, 2L));
+    client.changeShipOrgUnit(SHIP, new ShipOrgUnitRequestDto(null, 3L));
+
+    backend.expect("GET", "/api/v1/org-units/me/memberships?allKinds=true");
+    backend.expect(
+        "PUT",
+        "/api/v1/hangar/ships/" + SHIP + "/org-unit",
+        "{\"orgUnitId\":\"" + UNIT + "\",\"owningOrgUnitVersion\":2}");
+    backend.expect(
+        "PUT",
+        "/api/v1/hangar/ships/" + SHIP + "/org-unit",
+        "{\"orgUnitId\":null,\"owningOrgUnitVersion\":3}");
   }
 
   @Test

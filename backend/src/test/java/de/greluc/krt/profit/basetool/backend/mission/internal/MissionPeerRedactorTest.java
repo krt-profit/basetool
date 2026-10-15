@@ -187,7 +187,8 @@ class MissionPeerRedactorTest {
             true,
             owner,
             new SquadronReferenceDto(UUID.randomUUID(), "Squadron", "SQ"),
-            1L);
+            1L,
+            0L);
     return new MissionUnitDto(
         UUID.randomUUID(), "Alpha", null, ship, 8.5, true, null, "note", 1L, List.of());
   }

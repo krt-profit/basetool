@@ -332,6 +332,21 @@ public class OwnerScopeService implements SquadronVisibility {
   }
 
   /**
+   * Delegates to {@link OrgUnitStampingService#resolveOwnerMembershipTarget(User, UUID)}: the
+   * target of a later org-unit change of an owner's aggregate (REQ-HANGAR-009).
+   *
+   * @param owner the aggregate's owner
+   * @param targetOrgUnitId the chosen org unit, or {@code null} for none
+   * @return the chosen org unit, or {@code null} for none
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when the target is not
+   *     a direct membership of the owner
+   */
+  @Nullable
+  public OrgUnit resolveOwnerMembershipTarget(@NotNull User owner, @Nullable UUID targetOrgUnitId) {
+    return orgUnitStampingService.resolveOwnerMembershipTarget(owner, targetOrgUnitId);
+  }
+
+  /**
    * Delegates to {@link OrgUnitStampingService#resolveReassignTargetOrgUnit(UUID)}: validates and
    * resolves an explicit owning-org-unit reassignment (REQ-ORG-018).
    *

@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.platform.api.TenantScoped;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -40,11 +41,17 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.DynamicUpdate;
+import org.hibernate.annotations.OptimisticLock;
 import org.jetbrains.annotations.Nullable;
 
-/** Ship JPA entity. */
+/**
+ * Ship JPA entity. Updates write only the changed columns, so an edit of the ship's fields never
+ * overwrites a concurrent change of its org unit (ADR-0258).
+ */
 @TenantScoped("owningOrgUnit")
 @Entity
+@DynamicUpdate
 @Getter
 @Setter
 @ToString
@@ -84,13 +91,23 @@ public class Ship extends AbstractEntity<UUID> {
   private User owner;
 
   /**
-   * Org-unit owner of this ship, or {@code null} for an ownerless personal ship added by a user in
-   * no Staffel/SK. Such a ship is visible and editable only by its {@link #owner} (plus admins in
-   * all-scopes mode) and never appears in an org unit's hangar. Stamped via {@code
-   * OwnerScopeService.resolveOrgUnitForPickerOutputNullable}.
+   * Org-unit owner of this ship, or {@code null} for an ownerless personal ship. Such a ship is
+   * visible and editable only by its {@link #owner} (plus admins in all-scopes mode) and never
+   * appears in an org unit's hangar. Stamped at creation; changed afterwards only through {@link
+   * ShipRepository#changeOwningOrgUnitIfVersionMatches}, guarded by {@link #owningOrgUnitVersion}
+   * (REQ-HANGAR-009, ADR-0258).
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owning_org_unit_id", nullable = true)
+  @OptimisticLock(excluded = true)
   @Nullable
   private OrgUnit owningOrgUnit;
+
+  /**
+   * Optimistic counter of {@link #owningOrgUnit}, independent of the row {@code @Version}: a unit
+   * change bumps only this counter and an edit of the other fields never bumps it (ADR-0258).
+   */
+  @Column(name = "owning_org_unit_version", nullable = false)
+  @OptimisticLock(excluded = true)
+  private long owningOrgUnitVersion;
 }

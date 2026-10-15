@@ -198,7 +198,9 @@ web, naming its client (REQ-AUDIT-005):
   body, the requester/supplier handle, or any location.
 - **Hangar** (`Ship`, `AuditDomain.HANGAR`, every channel — web, app and the exchange) — ship
   create (`HANGAR_SHIP_CREATED`), edit (`HANGAR_SHIP_UPDATED`, only when a field changed; the
-  details name the changed fields, never their values), delete (`HANGAR_SHIP_DELETED`, with the
+  details name the changed fields, never their values), org-unit change
+  (`HANGAR_SHIP_ORG_UNIT_CHANGED`, REQ-HANGAR-009, only when the unit changed; `from` / `to` as
+  `kind:id` or `none`, never a name), delete (`HANGAR_SHIP_DELETED`, with the
   number of mission units detached), empty own hangar (`HANGAR_EMPTIED`), import of a hangar or
   Fleetview export (`HANGAR_IMPORTED`, only when it created ships; created / already present /
   unmatched counts), the officer's fitted reset (`HANGAR_FITTED_RESET`, only when it cleared a

@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
-> **Owner area:** HANGAR/UI · **Related ADRs:** none
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-15.
+> **Owner area:** HANGAR/UI · **Related ADRs:** [ADR-0258](../adr/0258-a-ships-org-unit-has-its-own-optimistic-counter.md)
 
 # Personal hangar overview — pagination & server-side sort/filter
 
@@ -126,9 +126,53 @@ names, never values. Deleting a ship first detaches it from mission units and re
 
 **Enforced by:** `HangarServiceTest`, `HangarImportServiceTest`, `AuditReportServiceTest`,
 `AdminAuditLogPageControllerTest`, `AuditReportProxyControllerTest`, `AuditPdfTitleKeysTest`,
-`ExchangeShipWriteControllerTest`, `HangarModuleContractTest` ·
+`ExchangeShipWriteControllerTest`, `HangarModuleContractTest`,
+`HangarShipOrgUnitChangeIntegrationTest` ·
 **Code:** `HangarService`, `HangarImportService`, `AuditEventType.HANGAR_*` · **Issues:** #2098
 (epic #2078).
+
+### REQ-HANGAR-009 — The owner changes a ship's org unit afterwards
+
+The owner of a ship MUST be able to change its owning org unit after creation, from the row action
+„Einheit ändern" in „Meine Schiffe". The choice is one of the owner's **direct** memberships, of
+any of the four kinds, or „Keine Einheit"; neither the caller's leadership scope nor an
+active-context pin widens it. The ship then appears in, or leaves, that unit's hangar overview
+(REQ-HANGAR-001/003), and every row of „Meine Schiffe" shows its unit.
+
+The change has its own endpoint, `PUT /api/v1/hangar/ships/{id}/org-unit` with `orgUnitId` (or
+`null`) and the ship's `owningOrgUnitVersion`, and its own optimistic counter (ADR-0258): it never
+bumps the ship's `version`, and an edit of name, type, insurance, location or fitted never bumps the
+counter, so neither 409s nor overwrites the other. Leaving the unit unchanged writes nothing and
+records nothing, even when the stored unit is one the owner has since left; the dialog then offers
+that unit as the current choice instead of silently clearing it. A change records `HANGAR_SHIP_ORG_UNIT_CHANGED` (REQ-HANGAR-004) with `from` and
+`to` as `kind:id` or `none`, no names.
+
+The table swaps in place and the owner's other open hangar pages refresh through the live-sync room
+`hangar:{owner}` (REQ-FE-001/010). The unit tab has no live-sync room; another member's open unit
+overview shows the change on its next load. The create dialog keeps the „Zuordnen zu" picker; the edit dialog
+does not show it.
+
+**Acceptance**
+
+- [x] A ship without a unit is assigned to one of the owner's units from the row action and shows
+  it in place; „Keine Einheit" removes it again.
+- [x] Another member's ship → 403; a target outside the owner's direct memberships → 400; a stale
+  or missing `owningOrgUnitVersion` → 409 / 400.
+- [x] A field edit with the old ship `version` succeeds after a unit change and keeps the unit, and
+  a unit change with the old counter succeeds after a field edit; an edit flushed from a stale
+  entity never overwrites a concurrent unit change.
+- [x] An unchanged unit writes nothing and records no audit event.
+- [x] A change is audited with `from` / `to` as `kind:id` or `none`; the Hangar filter of the audit
+  viewer lists it in DE and EN.
+- [x] The edit dialog hides the unit picker; the create dialog keeps it.
+
+**Enforced by:** `HangarShipOrgUnitChangeIntegrationTest`, `HangarWriteAjaxControllerTest`,
+`HangarBackendClientTest`, `HangarPagePatternRenderTest` · **Code:**
+`HangarController#changeMyShipOrgUnit`, `HangarService#changeShipOrgUnit`,
+`ShipRepository#changeOwningOrgUnitIfVersionMatches`,
+`OrgUnitStampingService#resolveOwnerMembershipTarget`,
+`HangarShipOrgUnitProxyController`, `hangar/hangar.html`, `hangar/hangar.js` ·
+**Issues:** #2596 (epic #2595, #2581).
 
 ## Out of scope
 

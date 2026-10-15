@@ -33,6 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipOrgUnitRequestDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import java.util.Collections;
@@ -166,6 +167,66 @@ class HangarWriteAjaxControllerTest {
         .andExpect(status().isNoContent());
 
     verify(backendApiClient).post(eq("/api/v1/hangar/ships/home-location"), any(), eq(Void.class));
+  }
+
+  @Test
+  @WithMockUser
+  void changeShipOrgUnitAjax_valid_forwardsTheUnitAndCounterAndReturnsNoContent() throws Exception {
+    UUID id = UUID.randomUUID();
+    UUID unit = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            post("/hangar/" + id + "/org-unit")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"orgUnitId\":\"" + unit + "\",\"owningOrgUnitVersion\":3}"))
+        .andExpect(status().isNoContent());
+
+    verify(backendApiClient)
+        .put(
+            eq("/api/v1/hangar/ships/{id}/org-unit"),
+            eq(new ShipOrgUnitRequestDto(unit, 3L)),
+            eq(ShipDto.class),
+            eq(id));
+  }
+
+  @Test
+  @WithMockUser
+  void changeShipOrgUnitAjax_withoutCounter_returns422AndDoesNotCallBackend() throws Exception {
+    mockMvc
+        .perform(
+            post("/hangar/" + UUID.randomUUID() + "/org-unit")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"orgUnitId\":null}"))
+        .andExpect(status().is(422))
+        .andExpect(jsonPath("$.code").value("VALIDATION"));
+
+    verify(backendApiClient, never()).put(anyString(), any(), eq(ShipDto.class), any());
+  }
+
+  @Test
+  @WithMockUser
+  void changeShipOrgUnitAjax_backendConflict_isRelayedAs409() throws Exception {
+    UUID id = UUID.randomUUID();
+    when(backendApiClient.put(
+            eq("/api/v1/hangar/ships/{id}/org-unit"), any(), eq(ShipDto.class), eq(id)))
+        .thenThrow(
+            new BackendServiceException(
+                "conflict", null, 409, "OPTIMISTIC_LOCK", null, Collections.emptyList(), null));
+
+    mockMvc
+        .perform(
+            post("/hangar/" + id + "/org-unit")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"orgUnitId\":null,\"owningOrgUnitVersion\":0}"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("OPTIMISTIC_LOCK"));
   }
 
   @Test
