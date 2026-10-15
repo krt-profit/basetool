@@ -15,12 +15,19 @@ The ships the member owns in the Hangar. Reading needs `exchange.hangar.read`, c
 | `insurance` | `{kind: LTI}` or `{kind: MONTHS, months}` with 0 to 120 months. |
 | `location` | `{name, uex?}` of the warehouse location, when the ship has one. |
 | `fitted` | Whether the ship is fitted. |
+| `orgUnit` | `{id, name, shorthand, kind}` of the [org unit](org-units.md) the ship belongs to; absent when it belongs to none. |
+| `orgUnitVersion` | The counter of the ship's org unit. It moves only when the unit changes, and `version` does not move with it. |
 
 ## Reading the ships — `GET /exchange/v1/me/ships`
 
 A snapshot without `cursor`, the changes since it with one: the same `cursor`, `limit`, paging and
 tombstones as [blueprints](blueprints.md#reading-the-set--get-exchangev1meblueprints). Only the
 member's own ships are in it; a ship given to another member arrives as a tombstone.
+
+A ship is in the feed again when its unit changes, and when its unit is renamed or gets a new
+shorthand; so the `orgUnit` you hold is never stale. Read `orgUnit` as the ship's unit
+as it is now: it need not be one of the units `GET /exchange/v1/me/org-units` lists, for example
+after the member left that unit.
 
 ## Links
 

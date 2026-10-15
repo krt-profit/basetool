@@ -1,6 +1,6 @@
 # ADR-0258 — A ship's org unit has its own optimistic counter
 
-- **Status:** Accepted
+- **Status:** Accepted — **amended by [ADR-0261](0261-a-unit-rename-re-announces-its-ships-in-the-exchange-feed.md)** (a unit change and a unit rename move the ship in the Exchange feed)
 - **Date:** 2026-10-15
 - **Deciders:** @greluc
 - **Related:** spec [`personal-hangar-overview.md`](../specs/personal-hangar-overview.md)

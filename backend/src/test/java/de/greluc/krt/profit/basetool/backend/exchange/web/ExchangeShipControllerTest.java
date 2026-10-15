@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.exchange.web;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -51,7 +52,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.web.FilterChainProxy;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -84,6 +87,7 @@ class ExchangeShipControllerTest {
   private boolean wasEnabled;
   private final List<UUID> shipTypes = new ArrayList<>();
   private final List<UUID> locations = new ArrayList<>();
+  private final List<UUID> orgUnits = new ArrayList<>();
 
   @BeforeEach
   void setUp() {
@@ -113,11 +117,13 @@ class ExchangeShipControllerTest {
     jdbc.update("DELETE FROM exchange_client WHERE client_id = ?", client);
     for (UUID id : List.of(member, other)) {
       jdbc.update("DELETE FROM ship WHERE owner_id = ?", id);
+      jdbc.update("DELETE FROM org_unit_membership WHERE user_id = ?", id);
       jdbc.update("DELETE FROM user_roles WHERE user_id = ?", id);
       jdbc.update("DELETE FROM app_user WHERE id = ?", id);
     }
     shipTypes.forEach(id -> jdbc.update("DELETE FROM ship_type WHERE id = ?", id));
     locations.forEach(id -> jdbc.update("DELETE FROM location WHERE id = ?", id));
+    orgUnits.forEach(id -> jdbc.update("DELETE FROM org_unit WHERE id = ?", id));
     ExchangeSettings settings =
         settingsRepository.findById(ExchangeSettings.SINGLETON_ID).orElseThrow();
     settings.setEnabled(wasEnabled);
@@ -208,6 +214,127 @@ class ExchangeShipControllerTest {
   }
 
   @Test
+  void aShipCarriesItsOrgUnitAndItsCounterAndAShipWithoutOneCarriesNoUnit() throws Exception {
+    UUID cutlass = shipType("Cutlass Black");
+    UUID unit = orgUnit("SPECIAL_COMMAND");
+    UUID assigned = ship(member, "Assigned", cutlass, "LTI", null, false);
+    UUID unassigned = ship(member, "Unassigned", cutlass, "LTI", null, false);
+    jdbc.update(
+        "UPDATE ship SET owning_org_unit_id = ?, owning_org_unit_version = 2 WHERE id = ?",
+        unit,
+        assigned);
+
+    String body =
+        read(relayed(get(PATH)))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    String first = "$.items[?(@.shipId == '" + assigned + "')]";
+    assertThat(JsonPath.<List<String>>read(body, first + ".orgUnit.id"))
+        .containsExactly(unit.toString());
+    assertThat(JsonPath.<List<String>>read(body, first + ".orgUnit.name"))
+        .containsExactly("Unit " + unit);
+    assertThat(JsonPath.<List<String>>read(body, first + ".orgUnit.shorthand"))
+        .containsExactly(shorthand(unit));
+    assertThat(JsonPath.<List<String>>read(body, first + ".orgUnit.kind"))
+        .containsExactly("SPECIAL_COMMAND");
+    assertThat(JsonPath.<List<Integer>>read(body, first + ".orgUnitVersion")).containsExactly(2);
+
+    String second = "$.items[?(@.shipId == '" + unassigned + "')]";
+    assertThat(JsonPath.<List<Object>>read(body, second + ".orgUnit")).isEmpty();
+    assertThat(JsonPath.<List<Integer>>read(body, second + ".orgUnitVersion")).containsExactly(0);
+  }
+
+  @Test
+  void aUnitChangeInTheWebBringsTheShipIntoTheFeedWithTheNewUnitAndCounter() throws Exception {
+    UUID cutlass = shipType("Cutlass Black");
+    UUID unit = orgUnit("SQUADRON");
+    jdbc.update(
+        "INSERT INTO org_unit_membership (user_id, org_unit_id) VALUES (?, ?)", member, unit);
+    UUID moved = ship(member, "Moved", cutlass, "LTI", null, false);
+    ship(member, "Untouched", cutlass, "LTI", null, false);
+    String cursor = snapshotEnd();
+
+    mockMvc
+        .perform(
+            put("/api/v1/hangar/ships/" + moved + "/org-unit")
+                .with(
+                    jwt()
+                        .jwt(t -> t.subject(member.toString()))
+                        .authorities(new SimpleGrantedAuthority("HANGAR_WRITE")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"orgUnitId\":\"" + unit + "\",\"owningOrgUnitVersion\":0}"))
+        .andExpect(status().isOk());
+
+    read(relayed(get(PATH).param("cursor", cursor)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items.length()").value(1))
+        .andExpect(jsonPath("$.items[0].shipId").value(moved.toString()))
+        .andExpect(jsonPath("$.items[0].version").value(0))
+        .andExpect(jsonPath("$.items[0].orgUnit.id").value(unit.toString()))
+        .andExpect(jsonPath("$.items[0].orgUnit.kind").value("SQUADRON"))
+        .andExpect(jsonPath("$.items[0].orgUnitVersion").value(1));
+  }
+
+  @Test
+  void renamingAUnitReannouncesItsShipsAndNoOthers() throws Exception {
+    UUID cutlass = shipType("Cutlass Black");
+    UUID renamed = orgUnit("SQUADRON");
+    UUID kept = orgUnit("BEREICH");
+    UUID first = ship(member, "First", cutlass, "LTI", null, false);
+    UUID second = ship(member, "Second", cutlass, "LTI", null, false);
+    UUID elsewhere = ship(member, "Elsewhere", cutlass, "LTI", null, false);
+    UUID foreign = ship(other, "Foreign", cutlass, "LTI", null, false);
+    jdbc.update(
+        "UPDATE ship SET owning_org_unit_id = ? WHERE id IN (?, ?, ?)",
+        renamed,
+        first,
+        second,
+        foreign);
+    jdbc.update("UPDATE ship SET owning_org_unit_id = ? WHERE id = ?", kept, elsewhere);
+    String cursor = snapshotEnd();
+
+    jdbc.update("UPDATE org_unit SET description = 'Unrelated' WHERE id = ?", renamed);
+    jdbc.update(
+        "UPDATE org_unit SET name = ?, shorthand = ? WHERE id = ?",
+        "Renamed " + renamed,
+        "R" + renamed.toString().substring(0, 8),
+        renamed);
+
+    String body =
+        read(relayed(get(PATH).param("cursor", cursor)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.removed.length()").value(0))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(JsonPath.<List<String>>read(body, "$.items[*].shipId"))
+        .containsExactlyInAnyOrder(first.toString(), second.toString());
+    assertThat(JsonPath.<List<String>>read(body, "$.items[*].orgUnit.name"))
+        .containsOnly("Renamed " + renamed);
+    assertThat(JsonPath.<List<String>>read(body, "$.items[*].orgUnit.shorthand"))
+        .containsOnly("R" + renamed.toString().substring(0, 8));
+  }
+
+  @Test
+  void anEditOfAUnitThatChangesNeitherNameNorShorthandAnnouncesNoShip() throws Exception {
+    UUID cutlass = shipType("Cutlass Black");
+    UUID unit = orgUnit("SQUADRON");
+    UUID ship = ship(member, "Assigned", cutlass, "LTI", null, false);
+    jdbc.update("UPDATE ship SET owning_org_unit_id = ? WHERE id = ?", unit, ship);
+    String cursor = snapshotEnd();
+
+    jdbc.update("UPDATE org_unit SET description = 'Unrelated', name = name WHERE id = ?", unit);
+
+    read(relayed(get(PATH).param("cursor", cursor)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items.length()").value(0))
+        .andExpect(jsonPath("$.removed.length()").value(0));
+  }
+
+  @Test
   void withoutTheReadCapabilityTheFeedIsRefused() throws Exception {
     read(relayedWith(get(PATH), "exchange.connect")).andExpect(status().isForbidden());
   }
@@ -266,6 +393,35 @@ class ExchangeShipControllerTest {
         fitted,
         owner);
     return id;
+  }
+
+  /**
+   * Seeds an org unit named {@code Unit <id>} with the shorthand {@link #shorthand(UUID)}.
+   *
+   * @param kind the unit's kind
+   * @return its id
+   */
+  private @NotNull UUID orgUnit(@NotNull String kind) {
+    UUID id = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO org_unit (id, kind, name, shorthand, active, is_promotion_enabled,"
+            + " is_profit_eligible) VALUES (?, ?, ?, ?, TRUE, FALSE, FALSE)",
+        id,
+        kind,
+        "Unit " + id,
+        shorthand(id));
+    orgUnits.add(id);
+    return id;
+  }
+
+  /**
+   * Returns the shorthand {@link #orgUnit(String)} gives a unit.
+   *
+   * @param id the unit's id
+   * @return the shorthand
+   */
+  private static @NotNull String shorthand(@NotNull UUID id) {
+    return "U" + id.toString().substring(0, 8);
   }
 
   /**

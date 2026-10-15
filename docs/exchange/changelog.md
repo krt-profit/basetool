@@ -5,6 +5,10 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
 
 ## 2026-10-15
 
+- **New: a ship's org unit.** A ship in `GET /exchange/v1/me/ships` carries `orgUnit`, its unit's
+  `{id, name, shorthand, kind}` (absent when it has none), and `orgUnitVersion`, the unit's own
+  counter. A change of the unit, or a rename of it, brings the ship back into the feed
+  ([ships](resources/ships.md)). `ship.schema.json` gains both fields, optional.
 - **New: the member's org units.** `GET /exchange/v1/me/org-units` under the new scope
   `exchange.orgunits.read` lists the units the member directly belongs to, with id, name,
   shorthand and kind, so a client can offer them as a choice ([org units](resources/org-units.md)).

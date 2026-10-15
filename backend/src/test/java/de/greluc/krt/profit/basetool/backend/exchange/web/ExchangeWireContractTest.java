@@ -374,8 +374,8 @@ class ExchangeWireContractTest {
   }
 
   /**
-   * Seeds one owned blueprint, one stock lot at a UEX city, one ship and one Staffel membership for
-   * the member.
+   * Seeds one owned blueprint, one stock lot at a UEX city, one Staffel membership and one ship in
+   * that Staffel for the member.
    */
   private void seed() {
     Blueprint blueprint = new Blueprint();
@@ -423,18 +423,6 @@ class ExchangeWireContractTest {
         location,
         Timestamp.from(Instant.now().minusSeconds(10)));
 
-    UUID shipType = UUID.randomUUID();
-    jdbc.update(
-        "INSERT INTO ship_type (id, name) VALUES (?, ?)", shipType, "Wire hull " + shipType);
-    shipTypes.add(shipType);
-    jdbc.update(
-        "INSERT INTO ship (id, version, name, ship_type_id, insurance, fitted, owner_id)"
-            + " VALUES (?, 0, ?, ?, 'LTI', false, ?)",
-        UUID.randomUUID(),
-        "Wire ship",
-        shipType,
-        member);
-
     UUID orgUnit = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO org_unit (id, kind, name, shorthand, active, is_promotion_enabled,"
@@ -445,6 +433,19 @@ class ExchangeWireContractTest {
     orgUnits.add(orgUnit);
     jdbc.update(
         "INSERT INTO org_unit_membership (user_id, org_unit_id) VALUES (?, ?)", member, orgUnit);
+
+    UUID shipType = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO ship_type (id, name) VALUES (?, ?)", shipType, "Wire hull " + shipType);
+    shipTypes.add(shipType);
+    jdbc.update(
+        "INSERT INTO ship (id, version, name, ship_type_id, insurance, fitted, owner_id,"
+            + " owning_org_unit_id) VALUES (?, 0, ?, ?, 'LTI', false, ?, ?)",
+        UUID.randomUUID(),
+        "Wire ship",
+        shipType,
+        member,
+        orgUnit);
   }
 
   /**

@@ -215,9 +215,9 @@ requires it and duplicating it into further files spreads personal data for no g
   Keycloak the member's consent per client and the client's offline session. The account check
   compares a sent RSI handle with the stored one and keeps neither (REQ-XCH-031).
 - **Disclosed to the client:** only the member's own data within the capabilities the member
-  consented to, the anonymised org demand, the member's direct org units (name, shorthand, kind)
-  and catalogue data — never the e-mail address, the display name or another member's data
-  (REQ-XCH-009, REQ-XCH-018, REQ-XCH-048).
+  consented to, the anonymised org demand, the member's direct org units and the org unit of each
+  of the member's ships (name, shorthand, kind) and catalogue data — never the e-mail address, the
+  display name or another member's data (REQ-XCH-009, REQ-XCH-017, REQ-XCH-018, REQ-XCH-048).
 - **Legal basis:** Art. 6(1)(b) for the transfer the member asked for and the connection records;
   Art. 6(1)(f) for the journal and the audit attribution (detecting misuse, undoing it). The
   Keycloak consent is an OAuth authorisation of the client, not a consent under Art. 6(1)(a) (owner

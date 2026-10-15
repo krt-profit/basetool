@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ingest.profit-base.online/exchange/v1/schemas/org-unit.schema.json",
   "title": "Org unit",
-  "description": "An org unit of the organisation the member directly belongs to.",
+  "description": "An org unit of the organisation: one the member directly belongs to, or the one a ship belongs to.",
   "type": "object",
   "properties": {
     "id": {

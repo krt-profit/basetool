@@ -2672,6 +2672,13 @@
           "name" : {
             "type" : "string"
           },
+          "orgUnit" : {
+            "$ref" : "#/components/schemas/ExchangeOrgUnitDto"
+          },
+          "orgUnitVersion" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
           "shipId" : {
             "type" : "string"
           },

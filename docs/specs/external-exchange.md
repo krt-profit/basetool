@@ -826,11 +826,11 @@ purged position as the horizon, below which a cursor has expired.
 
 - [x] A test fails for any write path to the synced tables that bypasses the sequence.
   *`ExchangeChangeFeedTriggerIntegrationTest` pins the synced tables — `personal_blueprint`,
-  `default_blueprint`, `inventory_item` (the member's rows, personal and shared, keyed by lot) and
-  `ship` — to their triggers and runs bulk deletes, owner reassignment, a move to another place, a
-  rebooking between personal and shared that leaves the lot unchanged, and user deletion through
-  them. `V260` announced every lot holding shared rows once, as a `system` change, so a cursor
-  taken before it still sees them (ADR-0230).*
+  `default_blueprint`, `inventory_item` (the member's rows, personal and shared, keyed by lot),
+  `ship` and `org_unit` (the ships of a renamed unit) — to their triggers and runs bulk deletes,
+  owner reassignment, a move to another place, a rebooking between personal and shared that leaves
+  the lot unchanged, and user deletion through them. `V260` announced every lot holding shared rows
+  once, as a `system` change, so a cursor taken before it still sees them (ADR-0230).*
 - [x] A default-set change emits entries for every affected member.
   *`ExchangeChangeFeedTriggerIntegrationTest`.*
 - [x] Every writing transaction is attributed to its channel. *`ChangeSourceTransactionManagerIntegrationTest`.*
@@ -1028,10 +1028,19 @@ later in the web with „Einheit ändern" (REQ-HANGAR-009, ADR-0258; owner decis
   hold it up. *`ExchangeShipWriteControllerTest`.*
 - [x] The feed carries the member's own ships only, without purchase data, and answers a ship given
   to another member as a tombstone. *`ExchangeShipControllerTest`.*
+- [x] A ship carries its org unit and `orgUnitVersion`, a ship without one no `orgUnit`; a change
+  of a ship's unit, and a rename of a unit, bring its ships into the next delta pull and no other
+  ship. *`ExchangeShipControllerTest`, `ExchangeWireContractTest`.*
 
 The ship feed keys a ship by its id and sends its `version`, the ship type's id as `shipType.bt`,
 insurance as `LTI` or a number of months, and the location when it has one. A ship stored without
-insurance, which the web's validation does not allow, reads as zero months.
+insurance, which the web's validation does not allow, reads as zero months. It sends the ship's org
+unit as `orgUnit` `{id, name, shorthand, kind}`, absent when the ship has none, and always the
+unit's own counter as `orgUnitVersion` (ADR-0258), which a unit change moves and `version` does
+not. A change of the ship's unit is a ship change in the feed; a change of a unit's name or
+shorthand re-announces every ship of that unit, attributed to whoever renamed it (trigger
+`trg_org_unit_exchange_change`, V293, ADR-0261), so a client never keeps a stale unit. The unit is
+the ship's as it is now, not necessarily one of the member's memberships (REQ-XCH-048).
 
 The backend applies a change set at `POST /api/v1/exchange/me/ships/changes`
 (`exchange.hangar.write`) in one transaction; the feed carries each ship's `externalId` for the
