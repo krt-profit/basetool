@@ -415,6 +415,32 @@ public class ExchangeController {
   }
 
   /**
+   * Returns a snapshot page of the shared stock of the member's direct units.
+   *
+   * @param cursor the cursor of the last page, or {@code null} for a new snapshot
+   * @param limit the page size, 1 to 1000, or {@code null} for the default
+   * @param request the admitted request
+   * @param acceptLanguage the caller's language
+   * @return the page or a problem
+   */
+  @GetMapping("/org-stock")
+  @PreAuthorize("isAuthenticated()")
+  public @NotNull ResponseEntity<?> orgStock(
+      @Nullable @RequestParam(required = false) String cursor,
+      @Nullable @RequestParam(required = false) String limit,
+      @NotNull HttpServletRequest request,
+      @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
+          String acceptLanguage) {
+    return page(
+        "/org-stock",
+        "page.schema.json#/$defs/orgStockPage",
+        cursor,
+        limit,
+        request,
+        acceptLanguage);
+  }
+
+  /**
    * Adds or removes blueprints.
    *
    * @param body the change set

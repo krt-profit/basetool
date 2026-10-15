@@ -830,6 +830,12 @@ public final class MetricNames {
   public static final String EXCHANGE_WRITES = "basetool.exchange.writes";
 
   /**
+   * Counter {@code basetool_exchange_org_stock_pages_total{client_id}} — org-stock snapshot pages
+   * served, by registered client (REQ-XCH-042).
+   */
+  public static final String EXCHANGE_ORG_STOCK_PAGES = "basetool.exchange.org.stock.pages";
+
+  /**
    * Counter of the entries a member's undo of a client's writes restored or skipped, tagged by
    * client, resource ({@code blueprint} / {@code stock} / {@code ship}) and outcome ({@code
    * restored} / {@code skipped}) (REQ-XCH-022).

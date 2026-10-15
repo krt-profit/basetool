@@ -247,7 +247,7 @@
       "id": 20,
       "gridPos": {
         "h": 8,
-        "w": 24,
+        "w": 12,
         "x": 0,
         "y": 17
       },
@@ -285,6 +285,55 @@
           "expr": "sum by (path_scope, reason) (increase(basetool_ingest_dpop_replay_refused_total[1h]))",
           "refId": "A",
           "legendFormat": "{{path_scope}} {{reason}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 17
+      },
+      "type": "timeseries",
+      "title": "Org stock pages/hour per client",
+      "description": "Org-stock snapshot pages the backend served (GET /exchange/v1/org-stock), per registry client: the shared stock of the units the reading member directly belongs to. A client re-reads the whole snapshot to refresh until the org-stock feed ships, so a steep rise is a client polling too often. REQ-XCH-042, ADR-0257.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (client_id) (increase(basetool_exchange_org_stock_pages_total{client_id=~\"$client_id\"}[1h]))",
+          "refId": "A",
+          "legendFormat": "{{client_id}}",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"

@@ -46,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChang
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeInstallationDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeLocationListDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgDemandDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitListDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeShipPageDto;
@@ -126,19 +127,23 @@ class ExchangeWireContractTest {
               "warnings", "the gateway adds the UNKNOWN_FIELD warnings",
               "cursor", "reserved; not sent in v1"));
 
+  /** The paged relay paths that serve a snapshot but answer their feed cursor as expired. */
+  private static final Set<String> SNAPSHOT_ONLY = Set.of("/org-stock");
+
   /** The backend's answer type of every published answer schema it produces. */
   private static final Map<String, Class<?>> ANSWER_TYPES =
-      Map.of(
-          "installation", ExchangeInstallationDto.class,
-          "account-check-response", ExchangeAccountCheckDto.class,
-          "resolve-response", ExchangeResolveResponse.class,
-          "location-list", ExchangeLocationListDto.class,
-          "page--blueprintPage", ExchangeBlueprintPageDto.class,
-          "page--stockPage", ExchangeStockPageDto.class,
-          "page--shipPage", ExchangeShipPageDto.class,
-          "change-result", ExchangeChangeResultDto.class,
-          "org-demand", ExchangeOrgDemandDto.class,
-          "org-unit-list", ExchangeOrgUnitListDto.class);
+      Map.ofEntries(
+          Map.entry("installation", ExchangeInstallationDto.class),
+          Map.entry("account-check-response", ExchangeAccountCheckDto.class),
+          Map.entry("resolve-response", ExchangeResolveResponse.class),
+          Map.entry("location-list", ExchangeLocationListDto.class),
+          Map.entry("page--blueprintPage", ExchangeBlueprintPageDto.class),
+          Map.entry("page--stockPage", ExchangeStockPageDto.class),
+          Map.entry("page--shipPage", ExchangeShipPageDto.class),
+          Map.entry("page--orgStockPage", ExchangeOrgStockPageDto.class),
+          Map.entry("change-result", ExchangeChangeResultDto.class),
+          Map.entry("org-demand", ExchangeOrgDemandDto.class),
+          Map.entry("org-unit-list", ExchangeOrgUnitListDto.class));
 
   private final SchemaRegistry registry =
       SchemaRegistry.withDefaultDialect(
@@ -297,8 +302,8 @@ class ExchangeWireContractTest {
       items.put(operation.relayPath(), seen);
     }
     assertThat(items)
-        .as("every feed shows its seeded entry")
-        .hasSize(3)
+        .as("every paged resource shows its seeded entry")
+        .hasSize(4)
         .allSatisfy((path, seen) -> assertThat(seen).as(path).isPositive());
     assertThat(
             mapper.readTree(read(ExchangeSeam.RELAY_PREFIX + "/me/org-units")).path("items").size())
@@ -315,7 +320,9 @@ class ExchangeWireContractTest {
         JsonNode snapshot =
             mapper.readTree(read(ExchangeSeam.RELAY_PREFIX + operation.relayPath()));
         assertThat(snapshot.path("hasMore").asBoolean()).isFalse();
-        cursors.put(operation.relayPath(), snapshot.path("nextCursor").asString());
+        if (!SNAPSHOT_ONLY.contains(operation.relayPath())) {
+          cursors.put(operation.relayPath(), snapshot.path("nextCursor").asString());
+        }
       }
     }
     jdbc.update("DELETE FROM personal_blueprint WHERE owner_user_id = ?", member);
@@ -323,7 +330,7 @@ class ExchangeWireContractTest {
     jdbc.update("DELETE FROM ship WHERE owner_id = ?", member);
     Map<String, Integer> removed = new TreeMap<>();
     for (ExchangeSeam.RelayOperation operation : ExchangeSeam.OPERATIONS) {
-      if (operation.paged()) {
+      if (cursors.containsKey(operation.relayPath())) {
         String feed =
             read(
                 ExchangeSeam.RELAY_PREFIX
@@ -357,7 +364,7 @@ class ExchangeWireContractTest {
         checked++;
       }
     }
-    assertThat(checked).as("answer fixtures").isGreaterThanOrEqualTo(16);
+    assertThat(checked).as("answer fixtures").isGreaterThanOrEqualTo(18);
   }
 
   @Test
@@ -374,8 +381,8 @@ class ExchangeWireContractTest {
   }
 
   /**
-   * Seeds one owned blueprint, one stock lot at a UEX city, one Staffel membership and one ship in
-   * that Staffel for the member.
+   * Seeds one owned blueprint, one stock lot at a UEX city, one Staffel membership, one shared lot
+   * in that Staffel's pool and one ship in that Staffel for the member.
    */
   private void seed() {
     Blueprint blueprint = new Blueprint();
@@ -433,6 +440,16 @@ class ExchangeWireContractTest {
     orgUnits.add(orgUnit);
     jdbc.update(
         "INSERT INTO org_unit_membership (user_id, org_unit_id) VALUES (?, ?)", member, orgUnit);
+    jdbc.update(
+        "INSERT INTO inventory_item (id, user_id, material_id, location_id, quality, amount,"
+            + " personal, stolen, owning_org_unit_id, created_at, version)"
+            + " VALUES (?, ?, ?, ?, 500, 4, false, false, ?, ?, 0)",
+        UUID.randomUUID(),
+        member,
+        material,
+        location,
+        orgUnit,
+        Timestamp.from(Instant.now().minusSeconds(10)));
 
     UUID shipType = UUID.randomUUID();
     jdbc.update(

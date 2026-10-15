@@ -136,6 +136,7 @@ GET /api/v1/exchange/me/ships | ExchangeShipController#ships | pre=@exchangeGate
 POST /api/v1/exchange/me/ships/changes | ExchangeShipController#shipChanges | pre=@exchangeGate.allows('exchange.hangar.write', authentication) | url=anyRequest -> authenticated
 GET /api/v1/exchange/me/stock | ExchangeStockController#stock | pre=@exchangeGate.allows('exchange.stock.read', authentication) | url=anyRequest -> authenticated
 POST /api/v1/exchange/me/stock/changes | ExchangeStockController#stockChanges | pre=@exchangeGate.allows('exchange.stock.write', authentication) | url=anyRequest -> authenticated
+GET /api/v1/exchange/org-stock | ExchangeOrgStockController#orgStock | pre=@exchangeGate.allows('exchange.orgstock.read', authentication) | url=anyRequest -> authenticated
 GET /api/v1/frequency-types | FrequencyTypeController#getAllFrequencyTypes | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/frequency-types | FrequencyTypeController#createFrequencyType | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 POST /api/v1/frequency-types/reorder | FrequencyTypeController#reorderFrequencyTypes | pre=hasRole('ADMIN') | url=anyRequest -> authenticated

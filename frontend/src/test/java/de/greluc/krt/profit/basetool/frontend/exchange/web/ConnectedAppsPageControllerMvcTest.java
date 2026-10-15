@@ -176,6 +176,34 @@ class ConnectedAppsPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
+  void theOrgStockCapabilityIsNamedInGermanAndEnglish() throws Exception {
+    ConnectedAppDto app =
+        new ConnectedAppDto(
+            "versekit",
+            "VerseKit",
+            List.of("exchange.connect", "exchange.orgstock.read"),
+            List.of(new ConnectedInstallationDto(INSTALLATION, "Desktop", null, null, false)),
+            List.of());
+    when(backendApiClient.get(eq("/api/v1/connected-apps"), anyTypeRef())).thenReturn(List.of(app));
+
+    mockMvc
+        .perform(get("/connected-apps").locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(containsString("Gemeinsamen Lagerbestand der eigenen Einheiten lesen")))
+        .andExpect(content().string(not(containsString("??"))));
+    mockMvc
+        .perform(get("/connected-apps").param("lang", "en"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(containsString("Read the shared warehouse stock of your own org units")))
+        .andExpect(content().string(not(containsString("??"))));
+  }
+
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
   void withoutANewInstallationThereIsNoNoticeAndNoSeenControl() throws Exception {
     ConnectedAppDto app =
         new ConnectedAppDto(

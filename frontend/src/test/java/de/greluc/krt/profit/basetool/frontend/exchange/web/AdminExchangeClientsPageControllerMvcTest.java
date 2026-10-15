@@ -135,6 +135,10 @@ class AdminExchangeClientsPageControllerMvcTest {
         .andExpect(content().string(containsString("value=\"exchange.drafts.refinery\"")))
         .andExpect(content().string(containsString("value=\"exchange.orgunits.read\"")))
         .andExpect(content().string(containsString("Eigene Einheiten lesen")))
+        .andExpect(content().string(containsString("value=\"exchange.orgstock.read\"")))
+        .andExpect(
+            content()
+                .string(containsString("Gemeinsamen Lagerbestand der eigenen Einheiten lesen")))
         .andExpect(
             content().string(containsString("id=\"xc-requestsPerMinute\" min=\"1\" max=\"1200\"")))
         .andExpect(

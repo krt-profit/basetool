@@ -1829,6 +1829,147 @@
         "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
+    },
+    "/api/v1/exchange/org-stock" : {
+      "get" : {
+        "description" : "Gateway-only. A snapshot of the pools of the member's direct units.",
+        "operationId" : "orgStock",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "cursor",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 500
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeOrgStockPageDto"
+                }
+              }
+            },
+            "description" : "The page",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "410" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeOrgStockPageDto"
+                }
+              }
+            },
+            "description" : "The cursor has expired (CURSOR_EXPIRED)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: the shared stock of my units",
+        "tags" : [ "exchange" ],
+        "x-contract-tier" : "T0",
+        "x-domain" : "exchange"
+      }
     }
   },
   "components" : {
@@ -2178,6 +2319,17 @@
           }
         }
       },
+      "ExchangeEarmarkedDto" : {
+        "type" : "object",
+        "properties" : {
+          "jobOrders" : {
+            "$ref" : "#/components/schemas/ExchangeQuantityDto"
+          },
+          "missions" : {
+            "$ref" : "#/components/schemas/ExchangeQuantityDto"
+          }
+        }
+      },
       "ExchangeInstallationDto" : {
         "type" : "object",
         "properties" : {
@@ -2356,6 +2508,80 @@
           "updatedAt" : {
             "type" : "string",
             "format" : "date-time"
+          }
+        }
+      },
+      "ExchangeOrgStockLotDto" : {
+        "type" : "object",
+        "properties" : {
+          "earmarked" : {
+            "$ref" : "#/components/schemas/ExchangeEarmarkedDto"
+          },
+          "key" : {
+            "type" : "string"
+          },
+          "location" : {
+            "$ref" : "#/components/schemas/ExchangeLocationDto"
+          },
+          "material" : {
+            "$ref" : "#/components/schemas/ExchangeItemRefDto"
+          },
+          "materialKind" : {
+            "$ref" : "#/components/schemas/ExchangeMaterialKindDto"
+          },
+          "quality" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "quantity" : {
+            "$ref" : "#/components/schemas/ExchangeQuantityDto"
+          },
+          "stolen" : {
+            "type" : "boolean"
+          },
+          "unit" : {
+            "$ref" : "#/components/schemas/ExchangeOrgStockUnitDto"
+          }
+        }
+      },
+      "ExchangeOrgStockPageDto" : {
+        "type" : "object",
+        "properties" : {
+          "hasMore" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeOrgStockLotDto"
+            }
+          },
+          "nextCursor" : {
+            "type" : "string"
+          },
+          "removed" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeTombstoneDto"
+            }
+          },
+          "units" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeOrgUnitDto"
+            }
+          }
+        }
+      },
+      "ExchangeOrgStockUnitDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
           }
         }
       },

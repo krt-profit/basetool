@@ -74,6 +74,7 @@ public class AdminExchangeClientsPageController {
           "exchange.hangar.write",
           "exchange.demand.read",
           "exchange.orgunits.read",
+          "exchange.orgstock.read",
           "exchange.drafts.blueprints",
           "exchange.drafts.refinery");
 

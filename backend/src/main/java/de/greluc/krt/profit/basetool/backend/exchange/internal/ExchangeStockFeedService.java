@@ -152,7 +152,7 @@ public class ExchangeStockFeedService {
    * @param lot the lot
    * @return the feed entry
    */
-  private static @NotNull ExchangeStockLotDto toDto(@NotNull ExchangeStockLotRow lot) {
+  static @NotNull ExchangeStockLotDto toDto(@NotNull ExchangeStockLotRow lot) {
     boolean material = lot.getMaterialId() != null;
     ExchangeItemRefDto ref =
         material

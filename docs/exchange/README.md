@@ -30,6 +30,7 @@ the registry grants it to the client.
 | `exchange.hangar.read` / `.write` | reading and changing the member's own ships |
 | `exchange.demand.read` | the anonymous open demand of the member's units |
 | `exchange.orgunits.read` | the org units the member directly belongs to |
+| `exchange.orgstock.read` | the shared warehouse stock of those units, one pool per unit |
 | `exchange.drafts.blueprints` / `.refinery` | staging blueprints or refinery orders for review in the browser |
 
 `catalog/resolve` and `catalog/locations` are open to any exchange scope.
@@ -63,6 +64,7 @@ the registry grants it to the client.
 - [Ships](resources/ships.md) — the ship feed, links, upserts and removals.
 - [Org demand](resources/org-demand.md) — the anonymous open demand of the member's units.
 - [Org units](resources/org-units.md) — the org units the member directly belongs to.
+- [Org stock](resources/org-stock.md) — the shared warehouse stock of the member's units.
 - [Drafts](resources/drafts.md) — blueprint and refinery drafts reviewed in the browser.
 
 ## Support

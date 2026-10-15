@@ -90,6 +90,7 @@ body:
         - label: exchange.hangar.write
         - label: exchange.demand.read
         - label: exchange.orgunits.read
+        - label: exchange.orgstock.read
         - label: exchange.drafts.blueprints
         - label: exchange.drafts.refinery
 
