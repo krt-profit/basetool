@@ -57,3 +57,10 @@ docker/sandbox/** text eol=lf
 *.golden text eol=lf
 backend/src/test/resources/architecture/** text eol=lf
 scripts/host-scripts.list text eol=lf
+
+* linguist-detectable=false
+*.java linguist-detectable
+*.js linguist-detectable
+*.mjs linguist-detectable
+*.html linguist-detectable
+*.css linguist-detectable
