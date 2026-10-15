@@ -2722,6 +2722,17 @@
             "maxLength" : 64,
             "minLength" : 1
           },
+          "orgUnit" : {
+            "type" : [ "string", "null" ],
+            "description" : "The ship's org unit; null for none, absent to keep it",
+            "maxLength" : 128,
+            "minLength" : 1
+          },
+          "orgUnitVersion" : {
+            "type" : "integer",
+            "format" : "int64",
+            "minimum" : 0
+          },
           "override" : {
             "type" : "boolean"
           },

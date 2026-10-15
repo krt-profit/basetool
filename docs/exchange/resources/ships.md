@@ -65,8 +65,8 @@ Send an `Idempotency-Key` and a change set of 1 to 500 ops, `dryRun` optional:
 | Op | Fields | Does |
 | --- | --- | --- |
 | `link` | `externalId`, `shipId` | Links your id to one of the member's ships. Re-linking an id moves it off its old ship. |
-| `upsert` without `shipId` | `externalId`, `shipType`, `insurance`, optional `name`, `location`, `fitted` | Creates a ship and links it. |
-| `upsert` with `shipId` | the same, plus `version` | Updates the ship and links it, if it is not linked yet. |
+| `upsert` without `shipId` | `externalId`, `shipType`, `insurance`, optional `name`, `location`, `fitted`, `orgUnit` | Creates a ship and links it. |
+| `upsert` with `shipId` | the same, plus `version`, and `orgUnitVersion` to change the unit | Updates the ship and links it, if it is not linked yet. |
 | `remove` | `shipId`, `version` | Deletes the ship. |
 
 An `upsert` writes `shipType`, `name`, `insurance` and `location` as sent: leaving out `name` or
@@ -74,6 +74,14 @@ An `upsert` writes `shipType`, `name`, `insurance` and `location` as sent: leavi
 them — with every `upsert`. Only an absent `fitted` keeps the ship's value, and a new ship without
 it is not fitted. `shipType` resolves as a `SHIP_TYPE` reference, `location` as in
 [the catalogue](catalog.md#warehouse-locations--get-exchangev1cataloglocations).
+
+**Org unit.** `orgUnit` works differently: leaving it out never changes the ship's unit. Send it to
+choose one: the `id` of one of the units [`GET /exchange/v1/me/org-units`](org-units.md) lists, or
+`null` for none. A new ship without `orgUnit` belongs to the member's only unit, or to none when
+the member has none or several. To change the unit of an existing ship, send the ship's
+`orgUnitVersion` with it; the change does not move the ship's `version`, so an `upsert` you built
+before it still applies. Sending the unit the ship already has changes nothing, even when the
+member has left that unit, and needs no `orgUnitVersion`.
 
 The server decides the ops in order, as if the earlier ones had already run, in one transaction; a
 batch may update or remove a ship only once. How an op that is not applied is reported:
@@ -90,12 +98,16 @@ batch may update or remove a ship only once. How an op that is not applied is re
 | `upsert` or `remove` with a `version` the ship no longer has, or of a ship an earlier op of the batch changed | `rejected` | `VERSION_CONFLICT` |
 | `upsert` without `shipId` for an id this installation already linked | `rejected` | `VERSION_CONFLICT` |
 | `upsert` of a ship the web, the app, the system, another client or another installation removed | `rejected` | `REMOVED_ELSEWHERE` |
+| `upsert` naming an `orgUnit` the member does not directly belong to | `rejected` | `ORG_UNIT_NOT_ALLOWED` |
+| `upsert` changing the unit without `orgUnitVersion`, or with one the ship no longer has | `rejected` | `ORG_UNIT_VERSION_CONFLICT` |
 
 On `VERSION_CONFLICT`, pull the feed, merge, and send the op again under a new `Idempotency-Key`; an
 id already linked means the ship exists — update it by its `shipId`. On `LINK_TARGET_TAKEN`, pull and
-re-link. An `upsert` naming a ship the server no longer has brings it back only when this
-installation removed it, or with `override: true` after the member agreed. It comes back as a **new
-ship with a new `shipId`**, linked to your id.
+re-link. On `ORG_UNIT_VERSION_CONFLICT`, pull the feed and ask again with the unit and counter it
+shows; on `ORG_UNIT_NOT_ALLOWED`, read the member's units again. An `upsert` naming a ship the
+server no longer has brings it back only when this installation removed it, or with
+`override: true` after the member agreed. It comes back as a **new ship with a new `shipId`**,
+linked to your id.
 
 **Missions.** Removing a ship detaches it from the mission units it was assigned to, and the member
 sees that audited. The result counts the detached units in `detachedFromMissions`:

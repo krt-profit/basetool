@@ -298,6 +298,20 @@
             "override": {
               "type": "boolean",
               "description": "Bring back a ship removed elsewhere; only after asking the member."
+            },
+            "orgUnit": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The org unit the ship belongs to: one of the member's own units, or null for none. Absent keeps the ship's unit, and on create puts it in the member's only unit."
+            },
+            "orgUnitVersion": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "The ship's orgUnitVersion the client last saw; needed with shipId to change the unit. A difference answers ORG_UNIT_VERSION_CONFLICT."
             }
           },
           "required": [

@@ -132,9 +132,9 @@ public class HangarService {
   }
 
   /**
-   * Adds a ship a connected application creates for the member (REQ-XCH-017): stamped with the
-   * member's only org unit, or none when the member has none or several, since a client names no
-   * unit; otherwise as {@link #addShip(UUID, ShipRequestDto)}.
+   * Adds a ship a connected application creates for the member without naming a unit (REQ-XCH-017):
+   * stamped with the member's only org unit, or none when the member has none or several; otherwise
+   * as {@link #addShip(UUID, ShipRequestDto)}.
    *
    * @param userId owning user's id
    * @param dto ship payload (name, type, insurance, fitted, location); its org unit is ignored
@@ -146,6 +146,25 @@ public class HangarService {
   public Ship addShipForClient(@NotNull UUID userId, @NotNull ShipRequestDto dto) {
     User user = Entities.require(userRepository.findPlainById(userId), "User not found");
     return create(user, dto, ownerScopeService.resolveOrgUnitForClientCreate(user));
+  }
+
+  /**
+   * Adds a ship a connected application creates for the member in the org unit it names
+   * (REQ-XCH-017); otherwise as {@link #addShip(UUID, ShipRequestDto)}.
+   *
+   * @param userId owning user's id
+   * @param dto ship payload (name, type, insurance, fitted, location); its org unit is ignored
+   * @param orgUnitId one of the user's direct memberships, or {@code null} for none
+   * @return the persisted ship
+   * @throws NotFoundException when the user id does not resolve
+   * @throws BadRequestException when the unit is not a direct membership of the user, or the ship
+   *     type or location id is missing or invalid
+   */
+  @Transactional
+  public Ship addShipForClientInOrgUnit(
+      @NotNull UUID userId, @NotNull ShipRequestDto dto, @Nullable UUID orgUnitId) {
+    User user = Entities.require(userRepository.findPlainById(userId), "User not found");
+    return create(user, dto, ownerScopeService.resolveOwnerMembershipTarget(user, orgUnitId));
   }
 
   /**

@@ -12,6 +12,10 @@
 - **Datenaustausch: eigene Einheiten lesen.** Verbundene Anwendungen mit der neuen Berechtigung `exchange.orgunits.read` lesen über `GET /exchange/v1/me/org-units` die Einheiten, denen das Mitglied direkt angehört (Name, Kürzel, Art), etwa um sie zur Auswahl anzubieten. Einwilligungsseite, „Verbundene Anwendungen" und Datenschutzerklärung nennen die Berechtigung (REQ-XCH-048, Migration V292).
 - **Datenaustausch: Schiffe nennen ihre Einheit.** Der Schiffs-Feed `GET /exchange/v1/me/ships` liefert je Schiff `orgUnit` (ID, Name, Kürzel, Art; fehlt ohne Einheit) und den Zähler `orgUnitVersion`. Ein Einheitenwechsel und das Umbenennen einer Einheit bringen die betroffenen Schiffe in den nächsten Abruf, damit Anwendungen keinen veralteten Namen behalten (REQ-XCH-017, Migration V293).
 
+### Fixed
+
+- **Datenaustausch: Anwendungen setzen die Einheit eines Schiffs.** Ein `upsert` in `POST /exchange/v1/me/ships/changes` kann mit `orgUnit` eine eigene Einheit oder `null` für keine wählen; zum Ändern sendet er `orgUnitVersion` mit. Ohne `orgUnit` bleibt alles wie bisher: Ein neues Schiff erhält die einzige Einheit des Mitglieds, ein bestehendes behält seine. Eine fremde Einheit (`ORG_UNIT_NOT_ALLOWED`) oder ein veralteter Zähler (`ORG_UNIT_VERSION_CONFLICT`) lehnt nur diese Operation ab (REQ-XCH-017).
+
 ## [v1.16.3](https://github.com/krt-profit/basetool/releases/tag/v1.16.3) - 2026-10-14
 
 ### Fixed

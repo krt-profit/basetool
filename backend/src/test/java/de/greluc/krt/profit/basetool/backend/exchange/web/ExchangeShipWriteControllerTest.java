@@ -225,6 +225,175 @@ class ExchangeShipWriteControllerTest {
         .isEqualTo(squadron);
   }
 
+  @Test
+  void aMemberOfTwoUnitsCreatesAShipInTheUnitTheUpsertNames() throws Exception {
+    UUID cutlass = shipType("Cutlass Black");
+    UUID squadron = orgUnit("SQUADRON");
+    UUID command = orgUnit("SPECIAL_COMMAND");
+    joins(squadron);
+    joins(command);
+
+    change(
+            ops(
+                inUnit(
+                    upsert("vk-11", null, null, cutlass, "Named", "{\"kind\":\"LTI\"}", null),
+                    "\"" + command + "\"",
+                    null)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(1));
+
+    UUID created =
+        jdbc.queryForObject(
+            "SELECT id FROM ship WHERE owner_id = ? AND name = 'Named'", UUID.class, member);
+    assertThat(unitOf(created)).isEqualTo(command);
+    assertThat(audit("HANGAR_SHIP_CREATED", created)).isEqualTo(1);
+  }
+
+  @Test
+  void anUpdateWithoutAnOrgUnitKeepsTheUnitSetInTheWeb() throws Exception {
+    UUID cutlass = shipType("Cutlass Black");
+    UUID squadron = orgUnit("SQUADRON");
+    joins(squadron);
+    UUID first = ship(member, "Blackbird", cutlass, "LTI");
+    jdbc.update("UPDATE ship SET owning_org_unit_id = ? WHERE id = ?", squadron, first);
+
+    change(ops(upsert("vk-1", first, 0L, cutlass, "Renamed", "{\"kind\":\"LTI\"}", null)))
+        .andExpect(jsonPath("$.applied").value(1));
+
+    assertThat(unitOf(first)).isEqualTo(squadron);
+    assertThat(jdbc.queryForObject("SELECT name FROM ship WHERE id = ?", String.class, first))
+        .isEqualTo("Renamed");
+  }
+
+  @Test
+  void anExplicitNullClearsTheUnitWithoutMovingTheShipsVersion() throws Exception {
+    UUID cutlass = shipType("Cutlass Black");
+    UUID squadron = orgUnit("SQUADRON");
+    joins(squadron);
+    UUID first = ship(member, "Blackbird", cutlass, "LTI");
+    jdbc.update(
+        "UPDATE ship SET owning_org_unit_id = ?, owning_org_unit_version = 4 WHERE id = ?",
+        squadron,
+        first);
+    change(ops(link("vk-1", first))).andExpect(jsonPath("$.applied").value(1));
+
+    change(
+            ops(
+                inUnit(
+                    upsert("vk-1", first, 0L, cutlass, "Blackbird", "{\"kind\":\"LTI\"}", null),
+                    "null",
+                    4L)))
+        .andExpect(jsonPath("$.applied").value(1));
+
+    assertThat(unitOf(first)).isNull();
+    assertThat(column("owning_org_unit_version", first)).isEqualTo(5L);
+    assertThat(column("version", first)).isZero();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT client_id FROM audit_event WHERE event_type ="
+                    + " 'HANGAR_SHIP_ORG_UNIT_CHANGED' AND subject_id = ?",
+                String.class,
+                first))
+        .isEqualTo(client);
+
+    change(ops(upsert("vk-1", first, 0L, cutlass, "Renamed", "{\"kind\":\"LTI\"}", null)))
+        .andExpect(jsonPath("$.applied").value(1));
+    assertThat(jdbc.queryForObject("SELECT name FROM ship WHERE id = ?", String.class, first))
+        .isEqualTo("Renamed");
+  }
+
+  @Test
+  void aMoveToAMembershipAppliesAndAnUnchangedUnitWritesNothing() throws Exception {
+    UUID cutlass = shipType("Cutlass Black");
+    UUID squadron = orgUnit("SQUADRON");
+    UUID command = orgUnit("SPECIAL_COMMAND");
+    joins(squadron);
+    joins(command);
+    UUID first = ship(member, "Blackbird", cutlass, "LTI");
+    jdbc.update("UPDATE ship SET owning_org_unit_id = ? WHERE id = ?", squadron, first);
+    change(ops(link("vk-1", first))).andExpect(jsonPath("$.applied").value(1));
+    String op = upsert("vk-1", first, 0L, cutlass, "Blackbird", "{\"kind\":\"LTI\"}", null);
+
+    change(ops(inUnit(op, "\"" + command + "\"", 0L))).andExpect(jsonPath("$.applied").value(1));
+    assertThat(unitOf(first)).isEqualTo(command);
+    assertThat(column("owning_org_unit_version", first)).isEqualTo(1L);
+
+    change(ops(inUnit(op, "\"" + command + "\"", 0L))).andExpect(jsonPath("$.unchanged").value(1));
+    assertThat(column("owning_org_unit_version", first)).isEqualTo(1L);
+  }
+
+  @Test
+  void aForeignUnitOrAStaleCounterRejectsOnlyItsOwnOp() throws Exception {
+    UUID cutlass = shipType("Cutlass Black");
+    UUID squadron = orgUnit("SQUADRON");
+    UUID foreign = orgUnit("SQUADRON");
+    joins(squadron);
+    UUID first = ship(member, "Blackbird", cutlass, "LTI");
+    UUID second = ship(member, "Owl", cutlass, "LTI");
+    jdbc.update("UPDATE ship SET owning_org_unit_version = 2 WHERE id = ?", second);
+
+    change(
+            ops(
+                inUnit(
+                    upsert("vk-1", first, 0L, cutlass, "Blackbird", "{\"kind\":\"LTI\"}", null),
+                    "\"" + foreign + "\"",
+                    0L),
+                inUnit(
+                    upsert("vk-2", second, 0L, cutlass, "Owl", "{\"kind\":\"LTI\"}", null),
+                    "\"" + squadron + "\"",
+                    1L),
+                inUnit(
+                    upsert("vk-3", null, null, cutlass, "New", "{\"kind\":\"LTI\"}", null),
+                    "\"" + foreign + "\"",
+                    null),
+                inUnit(
+                    upsert("vk-4", null, null, cutlass, "Odd", "{\"kind\":\"LTI\"}", null),
+                    "\"not-a-unit\"",
+                    null),
+                inUnit(
+                    upsert("vk-6", first, 0L, cutlass, "Blackbird", "{\"kind\":\"LTI\"}", null),
+                    "\"not-a-unit\"",
+                    0L),
+                upsert("vk-5", null, null, cutlass, "Fine", "{\"kind\":\"LTI\"}", null)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(1))
+        .andExpect(jsonPath("$.results[0].reason").value("ORG_UNIT_NOT_ALLOWED"))
+        .andExpect(jsonPath("$.results[1].reason").value("ORG_UNIT_VERSION_CONFLICT"))
+        .andExpect(jsonPath("$.results[2].reason").value("ORG_UNIT_NOT_ALLOWED"))
+        .andExpect(jsonPath("$.results[3].reason").value("ORG_UNIT_NOT_ALLOWED"))
+        .andExpect(jsonPath("$.results[4].reason").value("ORG_UNIT_NOT_ALLOWED"));
+
+    assertThat(unitOf(first)).isNull();
+    assertThat(unitOf(second)).isNull();
+    assertThat(ships(member)).isEqualTo(3);
+  }
+
+  /**
+   * Adds an org unit and optionally its counter to an upsert op.
+   *
+   * @param op the upsert as JSON
+   * @param orgUnit the unit as JSON, {@code null} included
+   * @param orgUnitVersion the counter, or {@code null} to leave it out
+   * @return the op as JSON
+   */
+  private static @NotNull String inUnit(
+      @NotNull String op, @NotNull String orgUnit, @Nullable Long orgUnitVersion) {
+    String fields =
+        ",\"orgUnit\":"
+            + orgUnit
+            + (orgUnitVersion == null ? "" : ",\"orgUnitVersion\":" + orgUnitVersion);
+    return op.substring(0, op.length() - 1) + fields + "}";
+  }
+
+  private @Nullable UUID unitOf(@NotNull UUID ship) {
+    return jdbc.queryForObject(
+        "SELECT owning_org_unit_id FROM ship WHERE id = ?", UUID.class, ship);
+  }
+
+  private long column(@NotNull String name, @NotNull UUID ship) {
+    return jdbc.queryForObject("SELECT " + name + " FROM ship WHERE id = ?", Long.class, ship);
+  }
+
   /**
    * Seeds an active org unit.
    *
