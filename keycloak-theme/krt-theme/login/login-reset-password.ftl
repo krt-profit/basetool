@@ -6,12 +6,13 @@
         <div class="login-container">
             <h1>${msg("emailForgotTitle")}</h1>
             <div class="krt-info-text-center">
-                ${msg("emailInstruction")}
+                ${msg("krtResetPasswordInstruction")}
             </div>
             <form id="kc-reset-password-form" action="${url.loginAction}" method="post">
                 <div class="form-group">
-                    <label for="username" class="krt-label"><#if !realm.loginWithEmailAllowed>${msg("username")}<#elseif !realm.registrationEmailAsUsername>${msg("usernameOrEmail")}<#else>${msg("email")}</#if></label>
-                    <input tabindex="1" type="text" id="username" name="username" class="krt-input" autofocus value="${(auth.attemptedUsername!'')}" aria-invalid="<#if messagesPerField.existsError('username')>true</#if>"/>
+                    <label for="username" class="krt-label"><#if !realm.loginWithEmailAllowed>${msg("username")}<#elseif !realm.registrationEmailAsUsername>${msg("krtResetPasswordLabel")}<#else>${msg("email")}</#if></label>
+                    <input tabindex="1" type="text" id="username" name="username" class="krt-input" autofocus value="${(auth.attemptedUsername!'')}" aria-describedby="krt-reset-password-hint" aria-invalid="<#if messagesPerField.existsError('username')>true</#if>"/>
+                    <p id="krt-reset-password-hint" class="krt-info-text">${msg("krtResetPasswordHint")}</p>
                     <#if messagesPerField.existsError('username')>
                         <span id="input-error-username" class="kc-error-message krt-error-message" aria-live="polite">
                             ${kcSanitize(messagesPerField.get('username'))?no_esc}
