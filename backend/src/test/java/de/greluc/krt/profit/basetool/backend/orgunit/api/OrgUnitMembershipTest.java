@@ -73,7 +73,7 @@ class OrgUnitMembershipTest {
    */
   @ParameterizedTest(name = "{0}, is_logistician={1}")
   @MethodSource("everyRankWithAndWithoutFlag")
-  void classifiesEveryRankWithAndWithoutTheFlag(@NotNull MembershipRole role, boolean flag) {
+  void classifiesEveryRankWithAndWithoutTheFlag(MembershipRole role, boolean flag) {
     OrgUnitMembership membership = new OrgUnitMembership();
     membership.setRole(role);
     membership.setLogistician(flag);
