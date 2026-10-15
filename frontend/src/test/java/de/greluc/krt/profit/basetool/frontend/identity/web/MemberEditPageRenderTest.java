@@ -159,6 +159,11 @@ class MemberEditPageRenderTest {
         .containsPattern("class=\"page-eyebrow\" href=\"/members\"")
         .contains("<span>Mitgliederverwaltung</span>")
         .contains("<h1>Pilot</h1>")
+        .containsPattern(
+            "href=\"/admin/members/"
+                + id
+                + "/hangar\" class=\"btn btn-ghost\"\\s+"
+                + "data-testid=\"member-edit-hangar\"")
         .doesNotContain("class=\"greeting")
         .doesNotContain("hud-box")
         .doesNotContain("krtm-");

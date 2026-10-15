@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipOrgUnitRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.SquadronShipOverviewDto;
+import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
@@ -61,6 +62,12 @@ public class HangarBackendClient {
 
   /** The ship-export import path, whose format the backend detects. */
   private static final String IMPORT_SHIPS = "/api/v1/hangar/import/ships";
+
+  /** A member's ship collection on the admin path, keyed by the member's id. */
+  private static final String MEMBER_SHIPS = "/api/v1/hangar/admin/users/{userId}/ships";
+
+  /** One ship of a member on the admin path, keyed by the member's and the ship's id. */
+  private static final String MEMBER_SHIP = "/api/v1/hangar/admin/users/{userId}/ships/{shipId}";
 
   private static final ParameterizedTypeReference<PageResponse<ShipDto>> SHIP_PAGE =
       new ParameterizedTypeReference<PageResponse<ShipDto>>() {};
@@ -215,6 +222,87 @@ public class HangarBackendClient {
    */
   public void setHomeLocation(@NotNull SetHomeLocationRequestDto request) {
     backendApiClient.post("/api/v1/hangar/ships/home-location", request, Void.class);
+  }
+
+  /**
+   * Reads one page of a member's ships for the admin member hangar (REQ-HANGAR-011).
+   *
+   * @param memberId the hangar's owner
+   * @param page zero-based page index
+   * @param size page size
+   * @return the page, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public PageResponse<ShipDto> memberShips(@NotNull UUID memberId, int page, int size) {
+    String uri =
+        UriComponentsBuilder.fromPath(MEMBER_SHIPS)
+            .queryParam("page", page)
+            .queryParam("size", size)
+            .build()
+            .toUriString();
+    return backendApiClient.get(uri, SHIP_PAGE, memberId);
+  }
+
+  /**
+   * Reads the member whose hangar the admin member hangar shows.
+   *
+   * @param memberId the member
+   * @return the member, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public UserDto member(@NotNull UUID memberId) {
+    return backendApiClient.get("/api/v1/users/{id}", UserDto.class, memberId);
+  }
+
+  /**
+   * Lists every direct org-unit membership of a member as owner-picker options for a ship an admin
+   * adds to that member's hangar.
+   *
+   * @param memberId the member
+   * @return the options, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public List<OrgUnitMembershipOptionDto> memberOrgUnits(@NotNull UUID memberId) {
+    return backendApiClient.get(
+        "/api/v1/org-units/members/{id}/memberships?allKinds=true",
+        MEMBERSHIP_OPTION_LIST,
+        memberId);
+  }
+
+  /**
+   * Adds a ship to a member's hangar on an admin's behalf (REQ-HANGAR-008).
+   *
+   * @param memberId the hangar's owner
+   * @param request the new ship
+   * @return the created ship, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public ShipDto createMemberShip(@NotNull UUID memberId, @NotNull ShipRequestDto request) {
+    return backendApiClient.post(MEMBER_SHIPS, request, ShipDto.class, memberId);
+  }
+
+  /**
+   * Updates a ship of a member's hangar on an admin's behalf, carrying the optimistic-lock version.
+   *
+   * @param memberId the hangar's owner
+   * @param shipId the ship
+   * @param request the edited ship
+   * @return the updated ship, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public ShipDto updateMemberShip(
+      @NotNull UUID memberId, @NotNull UUID shipId, @NotNull ShipRequestDto request) {
+    return backendApiClient.put(MEMBER_SHIP, request, ShipDto.class, memberId, shipId);
+  }
+
+  /**
+   * Deletes a ship of a member's hangar on an admin's behalf.
+   *
+   * @param memberId the hangar's owner
+   * @param shipId the ship
+   */
+  public void deleteMemberShip(@NotNull UUID memberId, @NotNull UUID shipId) {
+    backendApiClient.delete(MEMBER_SHIP, Void.class, memberId, shipId);
   }
 
   /**

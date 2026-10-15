@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<head>
+    <title th:text="#{memberHangar.title.plain} + ' - ' + ${appTitle}">Hangar des Mitglieds - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+<link rel="stylesheet" th:href="@{/css/hangar/hangar-ships.css}">
+<link rel="stylesheet" th:href="@{/css/pages/hangar/member-hangar.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:fragment="pageContent">
+<main id="member-hangar" data-testid="member-hangar"
+      th:with="backHref=@{/members/{id}/edit(id=${memberId})}"
+      th:data-base-url="@{/admin/members/{id}/hangar(id=${memberId})}"
+      th:data-add-success="#{notification.success.ship_add}"
+      th:data-update-success="#{notification.success.ship_update}"
+      th:data-delete-success="#{notification.success.ship_delete}"
+      th:data-add-error="#{error.hangar.ship.add}"
+      th:data-update-error="#{error.hangar.ship.update}"
+      th:data-delete-error="#{error.hangar.ship.delete}">
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.members', eyebrowHref=${backHref},
+        titleText=${memberName != null ? #messages.msg('memberHangar.title', memberName) : #messages.msg('memberHangar.title.plain')},
+        count=${shipsPage.totalElements()}, countId='member-hangar-count', actions=~{::member-hangar-actions})}">
+        <th:block th:ref="member-hangar-actions">
+            <button type="button" class="btn btn--cta" data-testid="member-hangar-add"
+                    data-trigger="member-hangar-add" th:data-action="@{/admin/members/{id}/hangar/add(id=${memberId})}"
+                    ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{hangar.ship.add}">Schiff hinzuf&uuml;gen</span></button>
+        </th:block>
+    </th:block>
+
+    <div class="alert alert-info" data-testid="member-hangar-hint" th:text="#{memberHangar.hint}">Jede &Auml;nderung wird dem Mitglied mitgeteilt.</div>
+    <div th:if="${error}" class="alert alert-danger" th:text="#{__${error}__}">Fehler</div>
+
+    <section class="list-panel">
+        <div id="member-hangar-results" class="card card--flush">
+        <th:block th:fragment="memberHangarResults">
+            <div hidden id="member-hangar-stats" th:data-total="${shipsPage.totalElements()}"></div>
+            <div class="table-responsive" th:if="${!#lists.isEmpty(ships)}">
+                <table class="data-table data-table--stack hangar-table">
+                    <thead>
+                        <tr>
+                            <th th:text="#{hangar.list.ship}">Schiff</th>
+                            <th th:text="#{hangar.list.location}">Standort</th>
+                            <th th:text="#{hangar.ship.insurance}">Versicherung</th>
+                            <th class="cell-status" th:text="#{hangar.list.status}">Status</th>
+                            <th th:text="#{hangar.ship.owning_unit}">Einheit</th>
+                            <th class="cell-actions"><span class="visually-hidden" th:text="#{hangar.ship.action}">Aktion</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="ship : ${ships}" data-testid="member-hangar-row"
+                            th:with="typeName=${ship.shipType != null and ship.shipType.name != null ? ship.shipType.name : ''},
+                                     makerName=${ship.shipType != null and ship.shipType.manufacturer != null and ship.shipType.manufacturer.name != null ? ship.shipType.manufacturer.name : ''},
+                                     hull=${#strings.trim(makerName + ' ' + typeName)},
+                                     named=${ship.name != null and !#strings.isEmpty(#strings.trim(ship.name))},
+                                     ready=${ship.fitted == true},
+                                     ins=${ship.insurance},
+                                     locName=${ship.location != null ? ship.location.name : null}">
+                            <td>
+                                <span class="hangar-row__name">
+                                    <span class="cell-title" th:text="${named ? ship.name : hull}">Iron Mule</span>
+                                    <span class="cell-sub"><span th:text="${named ? hull : #messages.msg('hangar.ship.unnamed')}">Drake Cutlass Black</span><span
+                                          class="hangar-row__loc" th:if="${locName != null}" th:text="' · ' + ${locName}"> · Area18</span></span>
+                                </span>
+                            </td>
+                            <td class="hangar-cell-loc" th:text="${locName != null ? locName : '–'}">Area18</td>
+                            <td class="hangar-cell-ins">
+                                <span th:if="${ins == 'LTI'}" class="chip chip--primary" th:text="#{hangar.ship.insurance.lti}">LTI</span>
+                                <span th:if="${ins == '0'}" class="chip chip--muted" th:text="#{hangar.ship.insurance.none}">Keine</span>
+                                <span th:if="${ins != null and ins != 'LTI' and ins != '0' and !#strings.isEmpty(ins)}" class="chip"
+                                      th:text="#{hangar.ship.insurance.short(${ins})}">3 Mon.</span>
+                                <span th:if="${ins == null or #strings.isEmpty(ins)}" class="hangar-ins-unset">&ndash;</span>
+                            </td>
+                            <td class="cell-status">
+                                <span class="hangar-fit" th:classappend="${ready} ? 'hangar-fit--ready'"
+                                      ><span class="status-dot" th:classappend="${ready} ? 'status-dot--on'" aria-hidden="true"></span><span
+                                      class="hangar-fit__label" th:text="${ready} ? #{hangar.status.ready} : #{hangar.status.notReady}">Einsatzbereit</span></span>
+                            </td>
+                            <td class="hangar-cell-unit" th:attr="data-label=#{hangar.ship.owning_unit}">
+                                <span th:if="${ship.owningSquadron != null}" class="squadron-badge"
+                                      th:title="${ship.owningSquadron.name()}"
+                                      th:text="${ship.owningSquadron.shorthand() != null ? ship.owningSquadron.shorthand() : ship.owningSquadron.name()}">IRI</span>
+                                <span th:if="${ship.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
+                            </td>
+                            <td class="cell-actions">
+                                <button type="button" class="btn btn-ghost btn-icon"
+                                        data-trigger="member-hangar-edit" data-testid="member-hangar-edit"
+                                        th:data-action="@{/admin/members/{id}/hangar/{ship}/update(id=${memberId},ship=${ship.id})}"
+                                        th:data-name="${ship.name}"
+                                        th:data-type="${ship.shipType != null ? ship.shipType.id : ''}"
+                                        th:data-ins="${ship.insurance}"
+                                        th:data-loc="${ship.location != null ? ship.location.id : ''}"
+                                        th:data-fitted="${ship.fitted}"
+                                        th:data-version="${ship.version}"
+                                        th:title="#{hangar.ship.edit}" th:aria-label="#{hangar.ship.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <th:block th:if="${#lists.isEmpty(ships) and error == null}">
+                <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='memberHangar.empty', textKey='memberHangar.empty.text')}"></th:block>
+            </th:block>
+
+            <th:block th:replace="~{kernel/fragments/components :: listFoot(pageResponse=${shipsPage}, baseUrl=${paginationBaseUrl})}"></th:block>
+            <nav th:replace="~{kernel/fragments/pagination :: pageSizePicker(pageResponse=${shipsPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
+        </th:block>
+        </div>
+    </section>
+
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='member-ship-modal', titleKey='hangar.ship.modal_title', variant='krt-modal--wide', titleId='member-ship-modal-title', closeTrigger='', closeClass='close-member-ship-modal', body=~{::member-ship-modal-body})}">
+        <th:block th:ref="member-ship-modal-body">
+            <form id="member-ship-form" data-testid="member-hangar-form" method="post" th:object="${shipForm}"
+                  th:data-title-add="#{hangar.ship.add}" th:data-title-edit="#{hangar.ship.edit}"
+                  th:action="@{/admin/members/{id}/hangar/add(id=${memberId})}">
+                <input type="hidden" id="member-ship-version" name="version">
+                <div class="krt-modal-body">
+                <div class="form-group">
+                    <label for="member-ship-manufacturer" th:text="#{hangar.ship.manufacturer}">Hersteller</label>
+                    <select id="member-ship-manufacturer" name="manufacturerId">
+                        <option value="" th:text="#{hangar.ship.select_manufacturer}">Alle Hersteller</option>
+                        <option th:each="man : ${manufacturers}" th:value="${man.id}" th:text="${man.name}"></option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="member-ship-type" th:text="#{hangar.ship.type}">Schiffstyp</label>
+                    <select id="member-ship-type" name="shipTypeId" required data-testid="member-hangar-type">
+                        <option value="" disabled selected th:text="#{hangar.ship.select_type}">Bitte w&auml;hlen...</option>
+                        <option th:each="st : ${shipTypes}" th:value="${st.id}" th:text="${st.name}" th:data-manufacturer-id="${st.manufacturer != null ? st.manufacturer.id : ''}"></option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="member-ship-name" th:text="#{hangar.ship.name}">Name</label>
+                    <input type="text" id="member-ship-name" name="name" data-testid="member-hangar-name">
+                </div>
+                <fieldset class="form-group ship-insurance" data-testid="member-ship-insurance">
+                    <legend th:text="#{hangar.ship.insurance}">Versicherung</legend>
+                    <th:block th:replace="~{kernel/fragments/components :: segmented(name='insuranceKind', labelKey='hangar.ship.insurance',
+                        selected=null, variant='krt-segmented--block',
+                        options=${ {{value: 'NONE', labelKey: 'hangar.ship.insurance.none'},
+                                    {value: 'MONTHS', labelKey: 'hangar.ship.insurance.kind.months'},
+                                    {value: 'LTI', labelKey: 'hangar.ship.insurance.lti'}} })}"></th:block>
+                    <div class="ship-insurance-months" id="member-ship-insurance-months-row" hidden>
+                        <label for="member-ship-insurance-months" th:text="#{hangar.ship.insurance.monthsField}">Laufzeit in Monaten (1&ndash;120)</label>
+                        <input type="number" id="member-ship-insurance-months" min="1" max="120" step="1" inputmode="numeric">
+                    </div>
+                </fieldset>
+                <div class="form-group">
+                    <label for="member-ship-location" th:text="#{hangar.ship.location}">Ort</label>
+                    <select id="member-ship-location" name="locationId">
+                        <option value="" th:text="#{hangar.ship.select_location}">Bitte w&auml;hlen...</option>
+                        <option th:each="loc : ${locations}" th:value="${loc.id}" th:text="${loc.name}"></option>
+                    </select>
+                </div>
+                <div class="form-group flex-gap-sm">
+                    <input type="checkbox" id="member-ship-fitted" name="fitted">
+                    <label for="member-ship-fitted" class="ship-fitted-label" th:text="#{hangar.ship.fitted.label}">Fitted (Einsatzbereit)</label>
+                </div>
+                <div id="member-ship-owner-picker-slot">
+                <th:block th:replace="~{kernel/fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=null, required=false)}"></th:block>
+                </div>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" id="member-ship-delete-btn" class="btn btn-quiet-danger" data-testid="member-hangar-delete" hidden><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{hangar.ship.delete}">L&ouml;schen</span></button>
+                    <button type="submit" class="btn btn--cta" data-testid="member-hangar-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{hangar.ship.save}">Speichern</span></button>
+                </div>
+            </form>
+        </th:block>
+    </th:block>
+
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='member-ship-delete-modal', titleKey='info.delete.confirm.title', variant='krt-modal--danger', closeTrigger='', closeClass='close-member-ship-delete', body=~{::member-ship-delete-body})}">
+        <th:block th:ref="member-ship-delete-body">
+            <div class="krt-modal-body">
+                <p class="m-0" th:text="#{memberHangar.delete.confirm}">Schiff wirklich l&ouml;schen? Das Mitglied wird benachrichtigt.</p>
+            </div>
+            <div class="krt-modal-foot">
+                <button type="button" class="btn btn-ghost close-member-ship-delete" th:text="#{general.cancel}">Abbrechen</button>
+                <button type="button" id="member-ship-delete-confirm" class="btn btn-danger" data-testid="member-hangar-delete-confirm" th:text="#{hangar.ship.delete}">L&ouml;schen</button>
+            </div>
+        </th:block>
+    </th:block>
+</main>
+</th:block>
+<th:block th:fragment="pageTail"><script type="module" th:src="@{/js/hangar/member-hangar.js}" th:attr="nonce=${cspNonce}"></script></th:block>
+</body>
+</html>

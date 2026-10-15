@@ -6,6 +6,7 @@
 
 - **Hangar: Einheit eines Schiffs nachträglich ändern.** Die neue Zeilenaktion „Einheit ändern" in „Meine Schiffe" ordnet ein eigenes Schiff einer der eigenen Einheiten zu oder nimmt es mit „Keine Einheit" heraus, etwa ein Schiff, das eine verbundene Anwendung ohne Einheit angelegt hat. Jede Zeile zeigt ihre Einheit; der Bearbeiten-Dialog zeigt „Zuordnen zu" nicht mehr (REQ-HANGAR-009, ADR-0258, Migration V290).
 - **Hangar: Einheit mehrerer Schiffe auf einmal ändern.** In „Meine Schiffe" lassen sich Schiffe per Checkbox markieren; die Auswahlleiste ordnet alle markierten Schiffe mit einer Aktion einer eigenen Einheit zu oder setzt „Keine Einheit". Schiffe, die schon dort sind, werden übersprungen; ein fremdes Schiff in der Auswahl bricht die ganze Aktion ab (REQ-HANGAR-010).
+- **Admin: Hangar eines Mitglieds.** Die neue Seite `/admin/members/{id}/hangar`, verlinkt in „Mitglied bearbeiten", zeigt Admins die Schiffe eines Mitglieds und lässt sie dort hinzufügen, bearbeiten und löschen; das Mitglied wird über jede Änderung benachrichtigt (REQ-HANGAR-011).
 
 ## [v1.16.3](https://github.com/krt-profit/basetool/releases/tag/v1.16.3) - 2026-10-14
 

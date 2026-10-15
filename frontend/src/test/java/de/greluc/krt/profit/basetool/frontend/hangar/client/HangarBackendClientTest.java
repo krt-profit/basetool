@@ -48,6 +48,7 @@ class HangarBackendClientTest {
   private static final UUID SHIP_TYPE = UUID.fromString("1b2c3d4e-5f6a-4b7c-9d8e-0f1a2b3c4d5e");
   private static final UUID LOCATION = UUID.fromString("2c3d4e5f-6a7b-4c8d-8e9f-1a2b3c4d5e6f");
   private static final UUID UNIT = UUID.fromString("3d4e5f6a-7b8c-4d9e-9f0a-2b3c4d5e6f7a");
+  private static final UUID MEMBER = UUID.fromString("4e5f6a7b-8c9d-4e0f-8a1b-3c4d5e6f7a8b");
   private static final String EMPTY_PAGE =
       "{\"content\":[],\"page\":0,\"size\":50,\"totalElements\":0,\"totalPages\":0}";
   private static final String IMPORT_RESULT =
@@ -164,6 +165,47 @@ class HangarBackendClientTest {
     backend.expect(
         "POST", "/api/v1/hangar/ships/home-location", "{\"locationId\":\"" + LOCATION + "\"}");
     backend.expect("DELETE", "/api/v1/hangar/ships", null);
+  }
+
+  @Test
+  void memberHangarReadsAndWritesGoThroughTheAdminPathsOfThatMember() {
+    backend.answerJson(EMPTY_PAGE);
+    backend.answerJson("{\"id\":\"" + MEMBER + "\"}");
+    backend.answerJson("[]");
+    backend.answerJson("{}");
+    backend.answerJson("{}");
+    backend.answerEmpty();
+
+    client.memberShips(MEMBER, 1, 10);
+    client.member(MEMBER);
+    assertThat(client.memberOrgUnits(MEMBER)).isEmpty();
+    client.createMemberShip(
+        MEMBER, new ShipRequestDto(null, SHIP_TYPE, "LTI", null, false, null, UNIT));
+    client.updateMemberShip(
+        MEMBER, SHIP, new ShipRequestDto("Kestrel", SHIP_TYPE, "0", LOCATION, true, 4L, null));
+    client.deleteMemberShip(MEMBER, SHIP);
+
+    backend.expect("GET", "/api/v1/hangar/admin/users/" + MEMBER + "/ships?page=1&size=10");
+    backend.expect("GET", "/api/v1/users/" + MEMBER);
+    backend.expect("GET", "/api/v1/org-units/members/" + MEMBER + "/memberships?allKinds=true");
+    backend.expect(
+        "POST",
+        "/api/v1/hangar/admin/users/" + MEMBER + "/ships",
+        "{\"name\":null,\"shipTypeId\":\""
+            + SHIP_TYPE
+            + "\",\"insurance\":\"LTI\",\"locationId\":null,\"fitted\":false,\"version\":null,"
+            + "\"owningOrgUnitId\":\""
+            + UNIT
+            + "\"}");
+    backend.expect(
+        "PUT",
+        "/api/v1/hangar/admin/users/" + MEMBER + "/ships/" + SHIP,
+        "{\"name\":\"Kestrel\",\"shipTypeId\":\""
+            + SHIP_TYPE
+            + "\",\"insurance\":\"0\",\"locationId\":\""
+            + LOCATION
+            + "\",\"fitted\":true,\"version\":4,\"owningOrgUnitId\":null}");
+    backend.expect("DELETE", "/api/v1/hangar/admin/users/" + MEMBER + "/ships/" + SHIP, null);
   }
 
   @Test

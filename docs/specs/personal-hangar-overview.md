@@ -219,11 +219,43 @@ is the repair after a connected application created many ships without a unit.
 `ShipRepository#lockAllByIdOrderById`, `HangarShipOrgUnitProxyController`, `hangar/hangar.html`,
 `hangar/hangar.js` · **Issues:** #2599 (epic #2595, #2581).
 
+### REQ-HANGAR-011 — An admin keeps a member's hangar on its own page
+
+An admin MUST be able to list, add, edit and delete the ships of one member on
+`/admin/members/{id}/hangar`, through the admin endpoints of REQ-HANGAR-008
+(`/api/v1/hangar/admin/users/{userId}/ships`), so the member is told about each change.
+
+- **Access.** The page and its writes are `ROLE_ADMIN` only (frontend class gate, backend
+  `hasRole('ADMIN')`); anyone else gets 403. The member edit page links to it in its page head, and
+  only for an admin.
+- **List.** The member's ships, ordered by name and paginated (10 / 50 / 100), with the same columns as
+  „Meine Schiffe" and the unit read-only. A hint says that every change notifies the member.
+- **Writes.** Add, edit and delete use the ship dialog of „Meine Schiffe" (design system: one CTA in
+  the page head and one in the dialog, icon-only edit per row, quiet-danger delete behind a danger
+  confirm). An added ship takes the unit picked from the member's direct memberships, or is stamped as
+  for the member's own add when the member has one or none. An edit echoes the ship's `version` and
+  never changes the unit; a stale version is a 409 with the conflict dialog.
+- **Live update.** Every write swaps the list and the count in place (REQ-FE-001). Peer sync between
+  this page and the member's own hangar is not part of this requirement (#2606).
+
+**Acceptance**
+
+- [x] An admin reaches the page from the member edit page; a non-admin gets 403 on the page and its
+  writes.
+- [x] Add, edit and delete go to the member's admin paths and update the list in place.
+- [x] An edit carries the version and no unit; an add carries the picked unit and no version.
+
+**Enforced by:** `MemberHangarPageControllerTest`, `HangarBackendClientTest`,
+`MemberEditPageRenderTest`, `RouteGateSnapshotTest`, `HangarIntegrationTest`,
+`HangarNoticeIntegrationTest` · **Code:** `MemberHangarPageController`, `HangarBackendClient`,
+`hangar/member-hangar.html`, `hangar/member-hangar.js`, `identity/member-edit.html` · **Issues:**
+#2597 (epic #2595, #2581).
+
 ## Out of scope
 
 - The **squadron** hangar overview (`/hangar/squadron`) — REQ-HANGAR-001 — and the **admin per-user**
-  hangar (`/api/v1/hangar/admin/users/{userId}/ships`), which keeps its existing `{name, insurance, fitted,
-  id}` sort whitelist.
+  hangar endpoint (`/api/v1/hangar/admin/users/{userId}/ships`), which keeps its existing `{name,
+  insurance, fitted, id}` sort whitelist (its page is REQ-HANGAR-011).
 - New user-facing sortable columns. The personal hangar keeps its fixed rich order; the `/my-ships`
   endpoint no longer accepts a `sort` parameter (the order is server-fixed).
 - The add / edit / delete / import / home-location flows themselves — this spec only governs the list

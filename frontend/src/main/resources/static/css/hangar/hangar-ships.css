@@ -1,0 +1,131 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+
+@layer base, components, page, utilities;
+
+@layer page {
+    .hangar-table .cell-title {
+        overflow-wrap: anywhere;
+    }
+    .hangar-row__name {
+        min-width: 0;
+    }
+    .hangar-table .hangar-row__loc {
+        display: none;
+    }
+    .hangar-table .hangar-cell-ins {
+        width: 1%;
+        white-space: nowrap;
+    }
+    .hangar-ins-unset {
+        color: var(--color-gray-2-text);
+    }
+    .hangar-fit {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        color: var(--color-gray-2-text);
+        font-size: var(--fs-2xs);
+        font-weight: var(--fw-bold);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+    .hangar-fit--ready {
+        color: var(--color-success);
+    }
+    @media (width <= 768px) {
+        .hangar-table tr {
+            flex-wrap: wrap;
+        }
+        .hangar-table td.hangar-cell-unit {
+            order: 2;
+            flex: 1 0 100%;
+            margin-right: 0;
+        }
+        .hangar-table tr::after {
+            display: none;
+        }
+        .hangar-table td.cell-status {
+            order: -1;
+            align-self: center;
+        }
+        .hangar-table .hangar-fit__label {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip-path: inset(50%);
+            white-space: nowrap;
+        }
+        .hangar-table td.hangar-cell-loc {
+            display: none;
+        }
+        .hangar-table td.hangar-cell-ins {
+            order: 1;
+            flex: 0 0 auto;
+            align-self: flex-start;
+            width: auto;
+            margin-right: 0;
+        }
+        .hangar-table td.hangar-cell-ins::after {
+            content: none;
+        }
+        .hangar-table td.cell-actions {
+            order: 1;
+            margin-left: 0;
+        }
+        .hangar-table .cell-title,
+        .hangar-table .cell-sub {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .hangar-table .hangar-row__loc {
+            display: inline;
+        }
+    }
+    .form-group label:not(.krt-segmented__item),
+    .ship-insurance > legend {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-family: var(--font-body);
+        font-size: 0.9rem;
+        font-weight: 700;
+    }
+    .form-group label.ship-fitted-label {
+        margin-bottom: 0;
+    }
+    .ship-insurance {
+        min-width: 0;
+        padding: 0;
+        border: 0;
+    }
+    .ship-insurance > legend {
+        padding: 0;
+    }
+    .ship-insurance > legend::after {
+        content: ' *';
+        color: var(--color-primary);
+    }
+    .ship-insurance-months {
+        margin-top: var(--space-4);
+    }
+    .ship-insurance-months[hidden] {
+        display: none;
+    }
+    .form-group input:where(:not([type='checkbox'], [type='radio'])),
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 0.5rem;
+        background-color: var(--color-surface-input);
+        border: 1px solid var(--color-gray-3);
+        color: var(--color-gray-1);
+        font-family: var(--font-body);
+        box-sizing: border-box;
+    }
+}

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.hangar.web;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -38,8 +39,10 @@ import de.greluc.krt.profit.basetool.frontend.hangar.model.SquadronShipOverviewD
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -106,12 +109,14 @@ class HangarPageControllerMvcTest {
     mockMvc
         .perform(get("/hangar"))
         .andExpect(status().isOk())
-        .andExpect(
-            PageStylesheets.content(
-                containsString(".form-group input:where(:not([type='checkbox'], [type='radio']))")))
-        .andExpect(
-            PageStylesheets.content(
-                org.hamcrest.Matchers.not(containsString(".form-group input[type="))));
+        .andExpect(content().string(containsString("/css/hangar/hangar-ships")));
+    String shipsCss;
+    try (InputStream in = getClass().getResourceAsStream("/static/css/hangar/hangar-ships.css")) {
+      shipsCss = new String(Objects.requireNonNull(in).readAllBytes(), StandardCharsets.UTF_8);
+    }
+    assertThat(shipsCss)
+        .contains(".form-group input:where(:not([type='checkbox'], [type='radio']))")
+        .doesNotContain(".form-group input[type=");
   }
 
   @Test
