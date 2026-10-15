@@ -51,6 +51,7 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -102,6 +103,7 @@ public class HangarController {
   private final ShipMapper shipMapper;
   private final UserMapper userMapper;
   private final AuthHelperService authHelperService;
+  private final HangarAccessPolicy hangarAccessPolicy;
 
   /**
    * Returns one page of the calling user's own ships in the fixed personal-hangar order, with the
@@ -189,9 +191,11 @@ public class HangarController {
     @ApiResponse(responseCode = "403", description = "It does not")
   })
   @GetMapping("/units/{orgUnitId}/overview-access")
-  @PreAuthorize(
-      HANGAR_ACCESS + " and @" + HangarAccessPolicy.BEAN_NAME + ".canSeeUnitHangar(#orgUnitId)")
+  @PreAuthorize(HANGAR_ACCESS)
   public ResponseEntity<Void> unitOverviewAccess(@PathVariable @NotNull UUID orgUnitId) {
+    if (!hangarAccessPolicy.canSeeUnitHangar(orgUnitId)) {
+      throw new AccessDeniedException("The unit overview does not show this org unit");
+    }
     return ResponseEntity.noContent().build();
   }
 
