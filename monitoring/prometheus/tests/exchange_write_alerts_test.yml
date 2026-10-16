@@ -74,7 +74,7 @@ tests:
               client_id: versekit
             exp_annotations:
               summary: "An exchange client keeps sending org-stock writes the Basetool refuses"
-              description: "More than 50 org-stock ops of one registered client (client_id) were rejected in the last hour: writes to pools the member is no Logistician of, to personal or foreign entries, with stale versions, unknown holders or earmarked or offered stock. A client that ignores the per-op reasons, or one probing other units' pools, looks like this. Check the client's recent org-stock writes and consider suspending it (REQ-XCH-045, REQ-XCH-028)."
+              description: "More than 50 org-stock ops of one registered client (client_id) were rejected in the last hour: writes to pools the member is no Logistician of, to personal or foreign entries, with stale versions, unknown holders, earmarked or offered stock, or earmarks to wrong targets or beyond the entry. A client that ignores the per-op reasons, or one probing other units' pools, looks like this. Check the client's recent org-stock writes and consider suspending it (REQ-XCH-045, REQ-XCH-028)."
 
   - name: silent - rejected stock writes and a few refused org-stock ops
     interval: 1m

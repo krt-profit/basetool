@@ -29,10 +29,14 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChang
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemRef;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockChangeSet;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockMembersDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockTargetsDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockUnitDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStockChangeSet;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands;
+import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.EarmarkChange;
+import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.EarmarkDimension;
+import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolAllocation;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolBookIn;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolBookOut;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolChange;
@@ -71,9 +75,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Applies a Logistician's org-stock writes to the shared entries of their units' pools through the
- * Lager's own create, book-out, sale, transfer, note edit and stolen marking, each op on its own,
- * journaled under the writer (REQ-XCH-045, REQ-XCH-046, ADR-0257); and lists the roster a book-in
- * or a {@code move-holder} names its holder from.
+ * Lager's own create, book-out, sale, transfer, note edit, stolen marking and allocation writes,
+ * each op on its own, journaled under the writer (REQ-XCH-045, REQ-XCH-046, ADR-0257); and lists
+ * the roster a book-in or a {@code move-holder} names its holder from and the targets an earmark
+ * names.
  *
  * <p>An op on a pool whose unit the writer is not a Logistician and direct member of is refused
  * {@code NOT_PERMITTED}, and so is a {@code move-holder} into such a pool and an op on an entry
@@ -98,6 +103,7 @@ public class ExchangeOrgStockWriteService {
 
   private final ExchangeOrgUnitService orgUnitService;
   private final ExchangeOrgStockRoster roster;
+  private final ExchangeOrgStockTargets targets;
   private final ExchangeLotCatalogue lotCatalogue;
   private final ExchangeLocationResolver locationResolver;
   private final PoolEntryCommands poolEntryCommands;
@@ -137,6 +143,12 @@ public class ExchangeOrgStockWriteService {
             case ExchangeOrgStockChangeSet.NOTE -> planNote(caller, op, pools);
             case ExchangeOrgStockChangeSet.STOLEN -> planStolen(caller, op, pools);
             case ExchangeOrgStockChangeSet.BOOK_OUT -> planBookOut(caller, op, pools);
+            case ExchangeOrgStockChangeSet.ALLOCATION_ADD ->
+                planAllocation(op, pools, EarmarkChange.ADD);
+            case ExchangeOrgStockChangeSet.ALLOCATION_CHANGE ->
+                planAllocation(op, pools, EarmarkChange.CHANGE);
+            case ExchangeOrgStockChangeSet.ALLOCATION_REMOVE ->
+                planAllocation(op, pools, EarmarkChange.REMOVE);
             default -> throw new BadRequestException("Unknown org-stock op");
           });
     }
@@ -206,6 +218,43 @@ public class ExchangeOrgStockWriteService {
   @Transactional(readOnly = true)
   public @NotNull ExchangeOrgStockMembersDto members(
       @NotNull ExchangeCaller caller, @NotNull UUID unit) {
+    return new ExchangeOrgStockMembersDto(
+        logisticianUnit(caller, unit),
+        roster.of(caller.clientId(), unit).stream()
+            .map(holder -> new ExchangeOrgStockMembersDto.Member(holder.ref(), holder.name()))
+            .toList());
+  }
+
+  /**
+   * Lists the job orders and missions an entry of one of the writer's Logistician units may be
+   * earmarked to, as the web's picker offers them for that unit.
+   *
+   * @param caller the writer
+   * @param unit the unit
+   * @param material the material or item, as the org stock's lots name it
+   * @return the unit and its targets; no targets for an id that names no material or item
+   * @throws AccessDeniedException when the writer is not a Logistician and direct member of the
+   *     unit
+   */
+  @Transactional(readOnly = true)
+  public @NotNull ExchangeOrgStockTargetsDto targets(
+      @NotNull ExchangeCaller caller, @NotNull UUID unit, @NotNull UUID material) {
+    ExchangeOrgStockUnitDto named = logisticianUnit(caller, unit);
+    ExchangeOrgStockTargets.Targets found = targets.of(unit, material);
+    return new ExchangeOrgStockTargetsDto(named, found.jobOrders(), found.missions());
+  }
+
+  /**
+   * Names one of the writer's Logistician units.
+   *
+   * @param caller the writer
+   * @param unit the unit
+   * @return the unit's id and name
+   * @throws AccessDeniedException when the writer is not a Logistician and direct member of the
+   *     unit
+   */
+  private @NotNull ExchangeOrgStockUnitDto logisticianUnit(
+      @NotNull ExchangeCaller caller, @NotNull UUID unit) {
     if (!orgUnitService.logisticianUnits(caller.member()).contains(unit)) {
       throw new AccessDeniedException("The member is not a Logistician of the unit");
     }
@@ -214,11 +263,7 @@ public class ExchangeOrgStockWriteService {
             .filter(candidate -> candidate.id().equals(unit))
             .findFirst()
             .orElseThrow(() -> new AccessDeniedException("The member does not belong to the unit"));
-    return new ExchangeOrgStockMembersDto(
-        new ExchangeOrgStockUnitDto(named.id(), named.name()),
-        roster.of(caller.clientId(), unit).stream()
-            .map(holder -> new ExchangeOrgStockMembersDto.Member(holder.ref(), holder.name()))
-            .toList());
+    return new ExchangeOrgStockUnitDto(named.id(), named.name());
   }
 
   /**
@@ -253,11 +298,25 @@ public class ExchangeOrgStockWriteService {
           case ExchangeOrgStockChangeSet.NOTE -> entry;
           case ExchangeOrgStockChangeSet.STOLEN -> entry && op.stolen() != null;
           case ExchangeOrgStockChangeSet.BOOK_OUT -> entry && op.quantity() != null;
+          case ExchangeOrgStockChangeSet.ALLOCATION_ADD,
+              ExchangeOrgStockChangeSet.ALLOCATION_CHANGE ->
+              entry && op.quantity() != null && oneTarget(op);
+          case ExchangeOrgStockChangeSet.ALLOCATION_REMOVE -> entry && oneTarget(op);
           default -> false;
         };
     if (!complete) {
       throw new BadRequestException("An org-stock op lacks a field its kind needs");
     }
+  }
+
+  /**
+   * Whether an earmark op names exactly one target, a job order or a mission.
+   *
+   * @param op the op
+   * @return {@code true} when it names one
+   */
+  private static boolean oneTarget(@NotNull ExchangeOrgStockChangeSet.Op op) {
+    return (op.jobOrder() == null) != (op.mission() == null);
   }
 
   /**
@@ -539,6 +598,43 @@ public class ExchangeOrgStockWriteService {
   }
 
   /**
+   * Decides what an earmark write will do, before anything is locked.
+   *
+   * @param op the op
+   * @param pools the units the writer is a Logistician and direct member of
+   * @param change whether the earmark is added, changed or removed
+   * @return the plan
+   */
+  private static @NotNull Planned planAllocation(
+      @NotNull ExchangeOrgStockChangeSet.Op op,
+      @NotNull Set<UUID> pools,
+      @NotNull EarmarkChange change) {
+    if (!pools.contains(op.unit())) {
+      return new Skip(REJECTED, NOT_PERMITTED);
+    }
+    ExchangeStockChangeSet.Quantity quantity = op.quantity();
+    Double amount = null;
+    if (change != EarmarkChange.REMOVE) {
+      BigDecimal rounded = round(Objects.requireNonNull(quantity).amount(), quantity.unit());
+      if (rounded.signum() == 0) {
+        return new Skip(UNCHANGED, null);
+      }
+      amount = rounded.doubleValue();
+    }
+    UUID jobOrder = op.jobOrder();
+    return new Allocate(
+        new PoolAllocation(
+            Objects.requireNonNull(op.entry()),
+            op.unit(),
+            Objects.requireNonNull(op.version()),
+            change,
+            jobOrder != null ? EarmarkDimension.JOB_ORDER : EarmarkDimension.MISSION,
+            jobOrder != null ? jobOrder : Objects.requireNonNull(op.mission()),
+            amount,
+            change == EarmarkChange.REMOVE ? null : Objects.requireNonNull(quantity).unit()));
+  }
+
+  /**
    * Decides the part of a book-out, sale or move that needs no entry: the pool, the units of the
    * amount and the plans, and an amount that rounds to nothing.
    *
@@ -787,7 +883,7 @@ public class ExchangeOrgStockWriteService {
 
   /** An op the Lager decides: what it locks, runs and journals. */
   private sealed interface Write extends Planned
-      permits BookIn, BookOut, Sell, Move, MovePool, Note, Stolen {
+      permits BookIn, BookOut, Sell, Move, MovePool, Note, Stolen, Allocate {
 
     /**
      * Adds the lots and entries this op touches to the batch's locks.
@@ -1033,6 +1129,38 @@ public class ExchangeOrgStockWriteService {
     @Override
     public @NotNull ExchangeJournalAction action() {
       return ExchangeJournalAction.ORG_STOCK_STOLEN;
+    }
+
+    @Override
+    public @Nullable UUID removedFrom() {
+      return null;
+    }
+  }
+
+  /**
+   * An earmark write the Lager decides.
+   *
+   * @param request the earmark write
+   */
+  private record Allocate(@NotNull PoolAllocation request) implements Write {
+
+    @Override
+    public void lockInto(@NotNull Locks locks) {
+      locks.entries().add(request.entryId());
+    }
+
+    @Override
+    public @NotNull PoolOutcome run(@NotNull PoolEntryCommands commands, boolean dryRun) {
+      return commands.allocate(request, dryRun);
+    }
+
+    @Override
+    public @NotNull ExchangeJournalAction action() {
+      return switch (request.change()) {
+        case ADD -> ExchangeJournalAction.ORG_STOCK_EARMARK_ADD;
+        case CHANGE -> ExchangeJournalAction.ORG_STOCK_EARMARK_CHANGE;
+        case REMOVE -> ExchangeJournalAction.ORG_STOCK_EARMARK_REMOVE;
+      };
     }
 
     @Override

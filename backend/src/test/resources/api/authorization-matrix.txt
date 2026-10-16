@@ -139,6 +139,7 @@ POST /api/v1/exchange/me/stock/changes | ExchangeStockController#stockChanges | 
 GET /api/v1/exchange/org-stock | ExchangeOrgStockController#orgStock | pre=@exchangeGate.allows('exchange.orgstock.read', authentication) | url=anyRequest -> authenticated
 POST /api/v1/exchange/org-stock/changes | ExchangeOrgStockController#orgStockChanges | pre=@exchangeGate.allows('exchange.orgstock.write', authentication) | url=anyRequest -> authenticated
 GET /api/v1/exchange/org-stock/members | ExchangeOrgStockController#orgStockMembers | pre=@exchangeGate.allows('exchange.orgstock.write', authentication) | url=anyRequest -> authenticated
+GET /api/v1/exchange/org-stock/targets | ExchangeOrgStockController#orgStockTargets | pre=@exchangeGate.allows('exchange.orgstock.write', authentication) | url=anyRequest -> authenticated
 GET /api/v1/frequency-types | FrequencyTypeController#getAllFrequencyTypes | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/frequency-types | FrequencyTypeController#createFrequencyType | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 POST /api/v1/frequency-types/reorder | FrequencyTypeController#reorderFrequencyTypes | pre=hasRole('ADMIN') | url=anyRequest -> authenticated

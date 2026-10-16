@@ -67,6 +67,7 @@ class ExchangeOrgStockRouteTest {
   private static final String BACKEND = "/api/v1/exchange/org-stock";
   private static final JsonMapper MAPPER = JsonMapper.builder().build();
   private static final UUID UNIT = UUID.randomUUID();
+  private static final UUID MATERIAL = UUID.randomUUID();
   private static final String PAGE =
       """
       {"items":[{"key":"u:%1$s|m:x","unit":{"id":"%1$s","name":"Staffel Iridium"},
@@ -211,8 +212,73 @@ class ExchangeOrgStockRouteTest {
     call(STOCK_ONLY, PATH + "/members?unit=" + UNIT)
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value("SCOPE_MISSING"));
+    call(STOCK_ONLY, PATH + "/targets?unit=" + UNIT + "&material=" + MATERIAL)
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("SCOPE_MISSING"));
 
     verify(relay, never()).forward(any(), anyString(), any(), any(), any());
+  }
+
+  @Test
+  void theTargetsAreRelayedForTheNamedUnitAndMaterialAndCheckedAgainstTheirSchema()
+      throws Exception {
+    when(relay.forward(
+            eq(HttpMethod.GET),
+            eq(BACKEND + "/targets?unit=" + UNIT + "&material=" + MATERIAL),
+            isNull(),
+            any(),
+            any()))
+        .thenReturn(
+            ok(
+                """
+                {"unit":{"id":"%s","name":"Staffel Iridium"},
+                 "jobOrders":[{"id":"o1","number":412,"status":"OPEN"}],
+                 "missions":[{"id":"m1","name":"Laranite run","status":"PLANNED"}]}
+                """
+                    .formatted(UNIT)));
+
+    call(
+            TOKEN,
+            PATH
+                + "/targets?unit="
+                + UNIT.toString().toUpperCase(Locale.ROOT)
+                + "&material="
+                + MATERIAL.toString().toUpperCase(Locale.ROOT))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.jobOrders[0].number").value(412))
+        .andExpect(jsonPath("$.missions[0].status").value("PLANNED"));
+  }
+
+  @Test
+  void targetsWithoutAValidUnitOrMaterialAreRefusedBeforeTheRelay() throws Exception {
+    call(TOKEN, PATH + "/targets?unit=" + UNIT)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("SCHEMA_INVALID"))
+        .andExpect(jsonPath("$.errors[0].pointer").value("/material"));
+    call(TOKEN, PATH + "/targets?material=" + MATERIAL)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.errors[0].pointer").value("/unit"));
+    call(TOKEN, PATH + "/targets?unit=" + UNIT + "&material=..%2Fme%2Fstock")
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("SCHEMA_INVALID"));
+
+    verify(relay, never()).forward(any(), anyString(), any(), any(), any());
+  }
+
+  @Test
+  void aTargetsAnswerWithAnUnknownStatusIsARelayFailure() throws Exception {
+    when(relay.forward(any(), anyString(), any(), any(), any()))
+        .thenReturn(
+            ok(
+                """
+                {"unit":{"id":"%s","name":"Staffel Iridium"},
+                 "jobOrders":[{"id":"o1","status":"COMPLETED"}],"missions":[]}
+                """
+                    .formatted(UNIT)));
+
+    call(TOKEN, PATH + "/targets?unit=" + UNIT + "&material=" + MATERIAL)
+        .andExpect(status().isBadGateway())
+        .andExpect(jsonPath("$.code").value(ExchangeRelay.RELAY_FAILED));
   }
 
   /**

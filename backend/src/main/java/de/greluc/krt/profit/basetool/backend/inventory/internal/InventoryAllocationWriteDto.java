@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Write payload for adding, changing or removing one allocation slice of an inventory entry
@@ -35,5 +36,5 @@ import java.util.UUID;
 public record InventoryAllocationWriteDto(
     @NotNull InventoryAllocationDimension field,
     @NotNull UUID targetId,
-    Double amount,
+    @Nullable Double amount,
     Long version) {}

@@ -40,8 +40,10 @@ import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -139,7 +141,7 @@ public class ExchangeController {
 
   private static final Pattern LIMIT = Pattern.compile("^[0-9]{1,4}$");
 
-  private static final Pattern UNIT_ID =
+  private static final Pattern UUID_SHAPE =
       Pattern.compile(
           "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$");
 
@@ -473,7 +475,7 @@ public class ExchangeController {
     if (context == null) {
       return failed();
     }
-    if (unit == null || !UNIT_ID.matcher(unit).matches()) {
+    if (unit == null || !UUID_SHAPE.matcher(unit).matches()) {
       return schemaInvalid(List.of(new ExchangeSchemas.Violation("/unit", "must be a unit id")));
     }
     return relayed(
@@ -484,6 +486,53 @@ public class ExchangeController {
             context,
             acceptLanguage),
         "org-stock-members.schema.json",
+        List.of());
+  }
+
+  /**
+   * Lists the job orders and missions an entry of one of the member's Logistician units may be
+   * earmarked to, for one material or item.
+   *
+   * @param unit the unit's id
+   * @param material the material's or item's id, as the org stock's lots name it
+   * @param request the admitted request
+   * @param acceptLanguage the caller's language
+   * @return the targets or a problem
+   */
+  @GetMapping("/org-stock/targets")
+  @PreAuthorize("isAuthenticated()")
+  public @NotNull ResponseEntity<?> orgStockTargets(
+      @Nullable @RequestParam(required = false) String unit,
+      @Nullable @RequestParam(required = false) String material,
+      @NotNull HttpServletRequest request,
+      @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
+          String acceptLanguage) {
+    ExchangeRequestContext context = ExchangeRequestContext.of(request);
+    if (context == null) {
+      return failed();
+    }
+    List<ExchangeSchemas.Violation> violations = new ArrayList<>();
+    if (unit == null || !UUID_SHAPE.matcher(unit).matches()) {
+      violations.add(new ExchangeSchemas.Violation("/unit", "must be a unit id"));
+    }
+    if (material == null || !UUID_SHAPE.matcher(material).matches()) {
+      violations.add(new ExchangeSchemas.Violation("/material", "must be a material or item id"));
+    }
+    if (!violations.isEmpty()) {
+      return schemaInvalid(violations);
+    }
+    return relayed(
+        relay.forward(
+            HttpMethod.GET,
+            BACKEND
+                + "/org-stock/targets?unit="
+                + Objects.requireNonNull(unit).toLowerCase(Locale.ROOT)
+                + "&material="
+                + Objects.requireNonNull(material).toLowerCase(Locale.ROOT),
+            null,
+            context,
+            acceptLanguage),
+        "org-stock-targets.schema.json",
         List.of());
   }
 

@@ -607,6 +607,202 @@
             "version",
             "stolen"
           ]
+        },
+        {
+          "type": "object",
+          "description": "Earmarks part of one shared entry of the unit's pool to a job order or a mission it is not earmarked to yet.",
+          "properties": {
+            "opId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "Echoed in the result."
+            },
+            "op": {
+              "const": "allocation-add"
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The unit whose pool holds the entry."
+            },
+            "entry": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The entry's id from the org stock. Opaque identifier issued by the Basetool. Clients store and echo it, never parse it."
+            },
+            "version": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "The entry's version the client last saw. A difference answers VERSION_CONFLICT."
+            },
+            "jobOrder": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The job order of the earmark, from the targets. Opaque identifier issued by the Basetool."
+            },
+            "mission": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The mission of the earmark, from the targets; not for an item. Opaque identifier issued by the Basetool."
+            },
+            "quantity": {
+              "$ref": "quantity.schema.json",
+              "description": "The earmarked amount, in the entry's unit."
+            }
+          },
+          "required": [
+            "op",
+            "unit",
+            "entry",
+            "version",
+            "quantity"
+          ],
+          "oneOf": [
+            {
+              "required": [
+                "jobOrder"
+              ]
+            },
+            {
+              "required": [
+                "mission"
+              ]
+            }
+          ]
+        },
+        {
+          "type": "object",
+          "description": "Sets the amount of an earmark of one shared entry of the unit's pool.",
+          "properties": {
+            "opId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "Echoed in the result."
+            },
+            "op": {
+              "const": "allocation-change"
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The unit whose pool holds the entry."
+            },
+            "entry": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The entry's id from the org stock. Opaque identifier issued by the Basetool. Clients store and echo it, never parse it."
+            },
+            "version": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "The entry's version the client last saw. A difference answers VERSION_CONFLICT."
+            },
+            "jobOrder": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The job order of the earmark, from the targets. Opaque identifier issued by the Basetool."
+            },
+            "mission": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The mission of the earmark, from the targets; not for an item. Opaque identifier issued by the Basetool."
+            },
+            "quantity": {
+              "$ref": "quantity.schema.json",
+              "description": "The earmarked amount, in the entry's unit."
+            }
+          },
+          "required": [
+            "op",
+            "unit",
+            "entry",
+            "version",
+            "quantity"
+          ],
+          "oneOf": [
+            {
+              "required": [
+                "jobOrder"
+              ]
+            },
+            {
+              "required": [
+                "mission"
+              ]
+            }
+          ]
+        },
+        {
+          "type": "object",
+          "description": "Removes an earmark of one shared entry of the unit's pool.",
+          "properties": {
+            "opId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "Echoed in the result."
+            },
+            "op": {
+              "const": "allocation-remove"
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The unit whose pool holds the entry."
+            },
+            "entry": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The entry's id from the org stock. Opaque identifier issued by the Basetool. Clients store and echo it, never parse it."
+            },
+            "version": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "The entry's version the client last saw. A difference answers VERSION_CONFLICT."
+            },
+            "jobOrder": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The job order of the earmark, from the targets. Opaque identifier issued by the Basetool."
+            },
+            "mission": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The mission of the earmark, from the targets; not for an item. Opaque identifier issued by the Basetool."
+            }
+          },
+          "required": [
+            "op",
+            "unit",
+            "entry",
+            "version"
+          ],
+          "oneOf": [
+            {
+              "required": [
+                "jobOrder"
+              ]
+            },
+            {
+              "required": [
+                "mission"
+              ]
+            }
+          ]
         }
       ]
     },

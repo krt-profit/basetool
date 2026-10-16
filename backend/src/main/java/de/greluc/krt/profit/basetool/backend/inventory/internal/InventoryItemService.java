@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.kernel.AppException;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
@@ -50,6 +51,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -651,6 +653,51 @@ public class InventoryItemService {
   public InventoryItemDto addAllocation(
       UUID id, InventoryAllocationWriteDto dto, UUID currentUserId, boolean isLogistician) {
     InventoryItem item = loadForAllocationWrite(id, dto, currentUserId, isLogistician);
+    addAllocationTo(item, dto);
+    return mapWithForcedVersion(inventoryItemRepository.saveAndFlush(item));
+  }
+
+  /**
+   * Writes one earmark of a shared entry of a pool, already locked and checked by the caller, with
+   * the rules and the audit of {@link #addAllocation}, {@link #changeAllocation} and {@link
+   * #removeAllocation} (REQ-INV-027, REQ-XCH-045). The entry's {@code @Version} advances once, at
+   * the flush, so a later write of the same transaction can echo it.
+   *
+   * @param item the managed, locked entry
+   * @param dto dimension, target and amount; the version is not checked here
+   * @param change whether the earmark is added, changed or removed
+   * @throws NotFoundException when the target or, for a change or removal, the earmark is unknown
+   * @throws BadRequestException when the entry is personal, the target does not fit the entry or
+   *     the amount is invalid
+   * @throws OverAllocationException when the dimension total would exceed the entry's amount
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void writeAllocationForPool(
+      @NotNull InventoryItem item,
+      @NotNull InventoryAllocationWriteDto dto,
+      @NotNull PoolEntryCommands.EarmarkChange change) {
+    switch (change) {
+      case ADD -> addAllocationTo(item, dto);
+      case CHANGE -> changeAllocationOf(item, dto);
+      case REMOVE -> removeAllocationFrom(item, dto);
+      case null -> throw new NullPointerException("earmark change");
+    }
+    item.setUpdatedAt(Instant.now());
+    inventoryItemRepository.saveAndFlush(item);
+  }
+
+  /**
+   * Adds an earmark slice to a loaded entry and records its audit event.
+   *
+   * @param item the managed entry
+   * @param dto dimension, target and amount
+   * @throws NotFoundException when the job order or mission is unknown
+   * @throws BadRequestException when the entry is personal, the material is not required, the
+   *     amount is invalid, or the target is already allocated
+   * @throws OverAllocationException when the dimension total would exceed the entry's amount
+   */
+  private void addAllocationTo(
+      @NotNull InventoryItem item, @NotNull InventoryAllocationWriteDto dto) {
     assertNotPersonal(item);
     double amount = requireWriteAmount(dto, item);
     switch (dto.field()) {
@@ -696,7 +743,6 @@ public class InventoryItemService {
       }
       case null -> throw new NullPointerException("allocation dimension");
     }
-    return mapWithForcedVersion(inventoryItemRepository.saveAndFlush(item));
   }
 
   /**
@@ -719,6 +765,21 @@ public class InventoryItemService {
   public InventoryItemDto changeAllocation(
       UUID id, InventoryAllocationWriteDto dto, UUID currentUserId, boolean isLogistician) {
     InventoryItem item = loadForAllocationWrite(id, dto, currentUserId, isLogistician);
+    changeAllocationOf(item, dto);
+    return mapWithForcedVersion(inventoryItemRepository.saveAndFlush(item));
+  }
+
+  /**
+   * Sets the amount of an earmark slice of a loaded entry and records its audit event.
+   *
+   * @param item the managed entry
+   * @param dto dimension, target and new amount
+   * @throws NotFoundException when the target slice is unknown
+   * @throws BadRequestException when the entry is personal or the amount is invalid
+   * @throws OverAllocationException when the dimension total would exceed the entry's amount
+   */
+  private void changeAllocationOf(
+      @NotNull InventoryItem item, @NotNull InventoryAllocationWriteDto dto) {
     assertNotPersonal(item);
     double amount = requireWriteAmount(dto, item);
     switch (dto.field()) {
@@ -753,7 +814,6 @@ public class InventoryItemService {
       }
       case null -> throw new NullPointerException("allocation dimension");
     }
-    return mapWithForcedVersion(inventoryItemRepository.saveAndFlush(item));
   }
 
   /**
@@ -774,6 +834,19 @@ public class InventoryItemService {
   public InventoryItemDto removeAllocation(
       UUID id, InventoryAllocationWriteDto dto, UUID currentUserId, boolean isLogistician) {
     InventoryItem item = loadForAllocationWrite(id, dto, currentUserId, isLogistician);
+    removeAllocationFrom(item, dto);
+    return mapWithForcedVersion(inventoryItemRepository.saveAndFlush(item));
+  }
+
+  /**
+   * Removes an earmark slice of a loaded entry and records its audit event.
+   *
+   * @param item the managed entry
+   * @param dto dimension and target
+   * @throws NotFoundException when the target slice is unknown
+   */
+  private void removeAllocationFrom(
+      @NotNull InventoryItem item, @NotNull InventoryAllocationWriteDto dto) {
     switch (dto.field()) {
       case JOB_ORDER -> {
         InventoryJobOrderAllocation slice = findJobOrderSlice(item, dto.targetId());
@@ -797,7 +870,6 @@ public class InventoryItemService {
       }
       case null -> throw new NullPointerException("allocation dimension");
     }
-    return mapWithForcedVersion(inventoryItemRepository.saveAndFlush(item));
   }
 
   /**

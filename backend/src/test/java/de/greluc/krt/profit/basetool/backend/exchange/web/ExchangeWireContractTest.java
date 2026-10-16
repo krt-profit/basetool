@@ -48,6 +48,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeLocat
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgDemandDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockMembersDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockPageDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockTargetsDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitListDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeShipPageDto;
@@ -131,6 +132,9 @@ class ExchangeWireContractTest {
   /** The relay path of the org-stock roster, which names its unit in a query parameter. */
   private static final String ROSTER = "/org-stock/members";
 
+  /** The relay path of the earmark targets, which name their unit and material in parameters. */
+  private static final String TARGETS = "/org-stock/targets";
+
   /** The paged relay paths that serve a snapshot but answer their feed cursor as expired. */
   private static final Set<String> SNAPSHOT_ONLY = Set.of("/org-stock");
 
@@ -148,6 +152,7 @@ class ExchangeWireContractTest {
           Map.entry("change-result", ExchangeChangeResultDto.class),
           Map.entry("org-demand", ExchangeOrgDemandDto.class),
           Map.entry("org-stock-members", ExchangeOrgStockMembersDto.class),
+          Map.entry("org-stock-targets", ExchangeOrgStockTargetsDto.class),
           Map.entry("org-unit-list", ExchangeOrgUnitListDto.class));
 
   private final SchemaRegistry registry =
@@ -176,6 +181,8 @@ class ExchangeWireContractTest {
   private final List<UUID> cities = new ArrayList<>();
   private final List<UUID> shipTypes = new ArrayList<>();
   private final List<UUID> orgUnits = new ArrayList<>();
+  private final List<UUID> jobOrders = new ArrayList<>();
+  private final List<UUID> missions = new ArrayList<>();
 
   @BeforeEach
   void setUp() {
@@ -215,6 +222,8 @@ class ExchangeWireContractTest {
     jdbc.update("DELETE FROM org_unit_membership WHERE user_id = ?", member);
     jdbc.update("DELETE FROM user_roles WHERE user_id = ?", member);
     jdbc.update("DELETE FROM app_user WHERE id = ?", member);
+    jobOrders.forEach(id -> jdbc.update("DELETE FROM job_order WHERE id = ?", id));
+    missions.forEach(id -> jdbc.update("DELETE FROM mission WHERE id = ?", id));
     blueprints.forEach(id -> jdbc.update("DELETE FROM blueprint WHERE id = ?", id));
     materials.forEach(id -> jdbc.update("DELETE FROM material WHERE id = ?", id));
     shipTypes.forEach(id -> jdbc.update("DELETE FROM ship_type WHERE id = ?", id));
@@ -287,7 +296,12 @@ class ExchangeWireContractTest {
         String answer =
             read(
                 path
-                    + (ROSTER.equals(operation.relayPath()) ? "?unit=" + orgUnits.getFirst() : ""));
+                    + switch (operation.relayPath()) {
+                      case ROSTER -> "?unit=" + orgUnits.getFirst();
+                      case TARGETS ->
+                          "?unit=" + orgUnits.getFirst() + "&material=" + materials.getFirst();
+                      default -> "";
+                    });
         if (operation.answerMember() != null) {
           JsonNode member = mapper.readTree(answer).get(operation.answerMember());
           assertThat(member).as("%s carries %s", path, operation.answerMember()).isNotNull();
@@ -441,11 +455,35 @@ class ExchangeWireContractTest {
     UUID orgUnit = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO org_unit (id, kind, name, shorthand, active, is_promotion_enabled,"
-            + " is_profit_eligible) VALUES (?, 'SQUADRON', ?, ?, TRUE, FALSE, FALSE)",
+            + " is_profit_eligible) VALUES (?, 'SQUADRON', ?, ?, TRUE, FALSE, TRUE)",
         orgUnit,
         "Wire unit " + orgUnit,
         "W" + orgUnit.toString().substring(0, 8));
     orgUnits.add(orgUnit);
+    UUID jobOrder = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO job_order (id, priority, created_at, updated_at, version, status,"
+            + " requesting_org_unit_id, responsible_org_unit_id, type)"
+            + " VALUES (?, 2, now(), now(), 0, 'OPEN', ?, ?, 'MATERIAL')",
+        jobOrder,
+        orgUnit,
+        orgUnit);
+    jobOrders.add(jobOrder);
+    jdbc.update(
+        "INSERT INTO job_order_material (id, job_order_id, material_id, amount, created_at,"
+            + " updated_at, version, quality_tier_id)"
+            + " VALUES (?, ?, ?, 20, now(), now(), 0, '6b1f2e0a-3c1d-4f5e-9a10-000000000000')",
+        UUID.randomUUID(),
+        jobOrder,
+        material);
+    UUID mission = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO mission (id, name, version, owning_org_unit_id, is_internal, status,"
+            + " planned_start_time) VALUES (?, ?, 0, ?, true, 'PLANNED', now())",
+        mission,
+        "Wire mission " + mission,
+        orgUnit);
+    missions.add(mission);
     jdbc.update(
         "INSERT INTO org_unit_membership (user_id, org_unit_id, is_logistician) VALUES (?, ?,"
             + " true)",

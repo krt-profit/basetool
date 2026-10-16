@@ -50,7 +50,7 @@ public final class ExchangeSeam {
   public static final String CONNECT = "exchange.connect";
 
   /**
-   * The 18 relay operations on 17 backend paths, each with the gateway route that relays it, the
+   * The 19 relay operations on 18 backend paths, each with the gateway route that relays it, the
    * capability both sides demand and the published schemas of its body and answer.
    */
   public static final @Unmodifiable List<RelayOperation> OPERATIONS =
@@ -184,6 +184,14 @@ public final class ExchangeSeam {
               false,
               null,
               "org-stock-members.schema.json"),
+          new RelayOperation(
+              "GET",
+              "/org-stock/targets",
+              "/org-stock/targets",
+              "exchange.orgstock.write",
+              false,
+              null,
+              "org-stock-targets.schema.json"),
           new RelayOperation(
               "POST",
               "/me/drafts/blueprints",
@@ -391,7 +399,7 @@ public final class ExchangeSeam {
   /**
    * Returns every relay operation as {@code METHOD /api/v1/exchange/...}.
    *
-   * @return the 16 operations, sorted
+   * @return one entry per operation of {@link #OPERATIONS}
    */
   public static @NotNull @Unmodifiable Set<String> relayOperations() {
     Set<String> operations = new TreeSet<>();
@@ -402,7 +410,7 @@ public final class ExchangeSeam {
   /**
    * Returns every backend path the relay targets.
    *
-   * @return the 15 paths, sorted
+   * @return one entry per backend path of {@link #OPERATIONS}
    */
   public static @NotNull @Unmodifiable Set<String> relayPaths() {
     Set<String> paths = new TreeSet<>();

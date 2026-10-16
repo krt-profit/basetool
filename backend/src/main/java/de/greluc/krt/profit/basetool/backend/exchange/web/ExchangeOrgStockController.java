@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChang
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockChangeSet;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockMembersDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockPageDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockTargetsDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -61,7 +62,7 @@ public class ExchangeOrgStockController {
   /** Pages the shared lots of the acting member's direct units and counts each page. */
   private final ExchangeOrgStockService orgStockService;
 
-  /** Applies the writes and lists the rosters. */
+  /** Applies the writes and lists the rosters and the earmark targets. */
   private final ExchangeOrgStockWriteService writeService;
 
   /** Tells whether the admitted request also holds {@code exchange.orgstock.details}. */
@@ -143,5 +144,33 @@ public class ExchangeOrgStockController {
       @NotNull @RequestParam UUID unit, @NotNull Authentication authentication) {
     return ResponseEntity.ok(
         writeService.members(ExchangeCaller.of((SubjectAuthentication) authentication), unit));
+  }
+
+  /**
+   * Lists the job orders and missions an entry of a unit's pool may be earmarked to.
+   *
+   * @param unit the unit
+   * @param material the material or item, as the org stock's lots name it
+   * @param authentication the relayed acting member the gate admitted
+   * @return the unit and the targets the web's picker offers for it
+   */
+  @NotNull
+  @GetMapping("/targets")
+  @PreAuthorize("@exchangeGate.allows('exchange.orgstock.write', authentication)")
+  @Operation(
+      summary = "Exchange: the earmark targets of one of my Logistician units",
+      description =
+          "Gateway-only. The open job orders that need the material or item and the missions the"
+              + " web's picker offers for the unit; no missions for an item. 403 when the member"
+              + " is not a Logistician of the unit.")
+  @ApiResponse(responseCode = "200", description = "The targets")
+  @ApiResponse(responseCode = "403", description = "Not a Logistician of the unit")
+  public ResponseEntity<ExchangeOrgStockTargetsDto> orgStockTargets(
+      @NotNull @RequestParam UUID unit,
+      @NotNull @RequestParam UUID material,
+      @NotNull Authentication authentication) {
+    return ResponseEntity.ok(
+        writeService.targets(
+            ExchangeCaller.of((SubjectAuthentication) authentication), unit, material));
   }
 }

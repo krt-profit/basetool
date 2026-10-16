@@ -1097,6 +1097,70 @@
         ]
       }
     },
+    "/exchange/v1/org-stock/targets": {
+      "get": {
+        "operationId": "orgstock_targets",
+        "summary": "The job orders and missions an entry of a unit's pool may be earmarked to for one material or item, as the Basetool's warehouse offers them.",
+        "tags": [
+          "orgstock"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.orgstock.write"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/org-stock-targets.schema.json"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "description": "403 NOT_PERMITTED when the member is not a Logistician of the unit.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "name": "unit",
+            "in": "query",
+            "required": true,
+            "description": "The unit's id, as the org stock's lots name it.",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "material",
+            "in": "query",
+            "required": true,
+            "description": "The material's or item's id, as the org stock's lots name it in material.bt.",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ]
+      }
+    },
     "/exchange/v1/me/drafts/blueprints": {
       "post": {
         "operationId": "drafts_blueprints",

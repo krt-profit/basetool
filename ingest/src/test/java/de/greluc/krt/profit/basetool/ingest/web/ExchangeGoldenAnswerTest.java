@@ -379,6 +379,11 @@ class ExchangeGoldenAnswerTest {
         "route-get-org-stock-members",
         get("/org-stock/members?unit=0c2f8a51-7d3e-4b9a-9f10-5a6b7c8d9e01"));
     routes.put(
+        "route-get-org-stock-targets",
+        get(
+            "/org-stock/targets?unit=0c2f8a51-7d3e-4b9a-9f10-5a6b7c8d9e01"
+                + "&material=c3b1e0c2-8a4e-4f64-9a51-2b9f5c7e0a11"));
+    routes.put(
         "route-post-blueprint-draft",
         post("/me/drafts/blueprints", fixture("blueprint-draft/valid/corpus-slice.json")));
     routes.put(
@@ -413,6 +418,8 @@ class ExchangeGoldenAnswerTest {
         case "GET /api/v1/exchange/org-stock" -> fixture("page--orgStockPage/valid/snapshot.json");
         case "GET /api/v1/exchange/org-stock/members" ->
             fixture("org-stock-members/valid/roster.json");
+        case "GET /api/v1/exchange/org-stock/targets" ->
+            fixture("org-stock-targets/valid/targets.json");
         case "POST /api/v1/exchange/me/blueprints/changes",
             "POST /api/v1/exchange/me/stock/changes",
             "POST /api/v1/exchange/me/ships/changes",
