@@ -30,8 +30,9 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Asserts that the {@code ObservationPrivacyFilter} copies in {@code backend}, {@code frontend} and
- * {@code ingest} are byte-identical apart from their {@code package} line (ADR-0072), so an
- * unpropagated edit fails the build.
+ * {@code ingest}, and the {@code ScrubbedClientRequestObservationConvention} copies in {@code
+ * backend} and {@code ingest}, are identical apart from their {@code package} line (ADR-0072), so
+ * an unpropagated edit fails the build.
  */
 class ObservationPrivacyFilterMirrorParityTest {
 
@@ -69,6 +70,31 @@ class ObservationPrivacyFilterMirrorParityTest {
         .as(
             "ingest ObservationPrivacyFilter must mirror the backend copy verbatim (modulo the "
                 + "package line) — propagate the edit to all three modules")
+        .isEqualTo(backend);
+  }
+
+  /**
+   * Asserts the ingest copy of {@code ScrubbedClientRequestObservationConvention} matches the
+   * backend copy once the differing {@code package} line is removed.
+   *
+   * @throws IOException if either source file cannot be read
+   */
+  @Test
+  void scrubbedClientConventionIsIdenticalInBackendAndIngest() throws IOException {
+    Path repoRoot = findRepoRoot();
+    String backend =
+        normalise(
+            repoRoot.resolve(
+                "backend/src/main/java/de/greluc/krt/profit/basetool/backend/platform/api/"
+                    + "ScrubbedClientRequestObservationConvention.java"));
+    String ingest =
+        normalise(
+            repoRoot.resolve(
+                "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/observability/"
+                    + "ScrubbedClientRequestObservationConvention.java"));
+
+    assertThat(ingest)
+        .as("ingest ScrubbedClientRequestObservationConvention must mirror the backend copy")
         .isEqualTo(backend);
   }
 

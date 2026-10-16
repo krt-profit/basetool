@@ -12,7 +12,7 @@
 
 ### Fixed
 
-- **Monitoring: SC-Wiki-Sync sprengt das `uri`-Limit nicht mehr.** Der Backend-`RestClient` bereinigt den `uri`-Tag schon beim Start einer Anfrage; vorher legte der Laufzeit-Timer `http.client.requests.active` je abgerufener Wiki-Seite einen neuen Tag-Wert an, bis Micrometer weitere Werte verwarf (REQ-OBS-006).
+- **Monitoring: SC-Wiki-Sync sprengt das `uri`-Limit nicht mehr.** Backend und Ingest bereinigen den `uri`-Tag ausgehender Anfragen schon beim Start; vorher legte der Laufzeit-Timer `http.client.requests.active` je Wiki-Seite oder Feed-Cursor einen neuen Tag-Wert an, bis Micrometer weitere Werte verwarf (REQ-OBS-006).
 
 - **Passwort vergessen: klarer, was einzugeben ist.** Die Seite fragt nach E-Mail-Adresse oder Benutzername und erklärt, dass bei Discord-Konten der Discord-Benutzername gilt (nicht Server-Nickname oder Anzeigename), und zwar der von der ersten Anmeldung (Keycloak-Theme, REQ-SEC-082).
 

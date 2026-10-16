@@ -98,7 +98,10 @@ class ConcernPackageRulesTest {
           ROOT + ".assembly.SecurityConfig",
           "builds the resource server's JWKS decoder: Spring Security's NimbusJwtDecoder fetches"
               + " Keycloak's signing keys over a RestTemplate on relay's pinned"
-              + " KeycloakTrustSupport request factory");
+              + " KeycloakTrustSupport request factory",
+          ROOT + ".observability.ScrubbedClientRequestObservationConvention",
+          "names only Spring's client observation convention and context to scrub the uri tag;"
+              + " it holds no client and sends nothing");
 
   /** The fewest classes in {@code relay} that hold an outbound HTTP client type today. */
   private static final int RELAY_OUTBOUND_FLOOR = 6;
