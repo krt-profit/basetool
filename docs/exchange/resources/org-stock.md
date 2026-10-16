@@ -2,8 +2,8 @@
 
 `GET /exchange/v1/org-stock`, scope `exchange.orgstock.read`: the shared warehouse stock of the org
 units the member directly belongs to, one pool per unit. With `exchange.orgstock.write`, a
-Logistician of a unit also books, sells, moves and edits the stock of that unit's pool, see
-[Writing](#writing).
+Logistician of a unit also books, sells, moves, earmarks and edits the stock of that unit's
+pool, see [Writing](#writing).
 
 ## Which pools
 
@@ -159,8 +159,8 @@ show it to the member who connected your client, and do not pass it on.
 ## Writing
 
 With `exchange.orgstock.write`, a member who is a **Logistician of a unit** (see [Entries](#entries))
-books stock into that unit's pool for any member of the unit, and books out, sells, moves and edits
-any entry of the pool, as the Basetool's warehouse lets them. Send a change set to
+books stock into that unit's pool for any member of the unit, and books out, sells, moves, earmarks
+and edits any entry of the pool, as the Basetool's warehouse lets them. Send a change set to
 `POST /exchange/v1/org-stock/changes`
 with an `Idempotency-Key`, as for every write ([sync guide](../sync-guide.md)). The ops run one after
 the other in one request; **each op counts against the daily write quota** (a `dryRun` counts
@@ -187,6 +187,31 @@ A unit the member is not a Logistician of is answered `403 NOT_PERMITTED`.
   "unit": {"id": "7d1c2f4e-3b8a-4c55-9e21-6a0f3b2d9c10", "name": "Iridium"},
   "items": [
     {"ref": "q0Fh3kB9xV7m2LwP5nR8tY1cZ4dE6gJ0sU3aH7bK9fM", "name": "Hauler One"}
+  ]
+}
+```
+
+### The targets
+
+`GET /exchange/v1/org-stock/targets?unit=<unit id>&material=<bt>`, scope `exchange.orgstock.write`:
+the job orders and missions an entry of that unit's pool may be earmarked to, for the material or
+item that `material` names — the `material.bt` of a lot. These are the targets the Basetool's
+warehouse offers a Logistician of the unit: the open and in-progress job orders that need the
+material or item and that the unit, a special command or no unit is responsible for, each with its
+`id`, its `number` (shown as `#number`) and `status`; and the missions the warehouse lists for the
+unit, each with `id`, `name` and `status`. An item gets no missions. Job orders appear only when the
+member may see job orders at all, as for the [org demand](org-demand.md). A `material` that names
+nothing answers empty lists; a unit the member is not a Logistician of is answered
+`403 NOT_PERMITTED`.
+
+```json
+{
+  "unit": {"id": "7d1c2f4e-3b8a-4c55-9e21-6a0f3b2d9c10", "name": "Iridium"},
+  "jobOrders": [
+    {"id": "4b2d6f80-1a3c-4e57-9b0d-7c5e3a1f2d42", "number": 412, "status": "OPEN"}
+  ],
+  "missions": [
+    {"id": "2c4e6a81-9b3d-4f75-8e1a-0d2c4f6b8a93", "name": "Laranite run", "status": "PLANNED"}
   ]
 }
 ```
@@ -239,6 +264,19 @@ for the other moves. The holder is notified. Naming the entry's own pool is `unc
 `note` sets the entry's `note`; without `note`, or with a blank one, it clears it. `stolen` sets
 the marker in `stolen` on the whole entry or, with a `quantity`, on that part of it, which becomes
 an entry of its own. Either op is `unchanged` when the entry already is as asked.
+
+### `allocation-add`, `allocation-change` and `allocation-remove`
+
+Each names one earmark of the entry `entry` at the `version` you last read: by `jobOrder` or by
+`mission`, never both. `allocation-add` earmarks `quantity` of the entry to a target it is not
+earmarked to yet; `allocation-change` sets the `quantity` of an earmark the entry has;
+`allocation-remove` removes one and returns its amount to the free part. Take the targets from
+[the targets](#the-targets); a job order must need the entry's material or item, and an item cannot
+be earmarked to a mission. The earmarks of one kind add up to at most the entry's amount. Each op
+that changes the entry raises its version by one, so a second op on the same entry in the same
+change set names the next version. A change to the amount the earmark has, a removal of an earmark
+the entry does not have and an amount that rounds to nothing are `unchanged`; to drop an earmark,
+remove it.
 
 ### A change set
 
@@ -308,11 +346,11 @@ listed with its reason. The entries an op created or changed reach you through t
 | `NOT_PERMITTED` | all | The pool, or the `toUnit` of a `move-holder` or `move-pool`, is not one of the member's Logistician units; the entry is unknown, personal or in another pool; or a `move-holder` names the entry's own holder for another pool. |
 | `HOLDER_UNKNOWN` | `book-in`, `move-holder`, `move-pool` | `holder` is not on the roster of the receiving unit: not a direct member, withholding their name, or not a ref of your client; for `move-pool`, the entry's holder is not a direct member of `toUnit`. Read the roster again. |
 | `VERSION_CONFLICT` | all but `book-in` | The entry changed since you read it; an earlier op of the same change set counts. Pull the feed and retry. |
-| `INSUFFICIENT_STOCK` | all but `book-in`, `note` | The entry holds less than `quantity`. |
+| `INSUFFICIENT_STOCK` | `book-out`, `sell`, moves, `stolen` | The entry holds less than `quantity`. |
 | `STOCK_EARMARKED` | `book-out`, `sell`, moves, `stolen` | The part of `quantity` that `fromJobOrders` and `fromMissions` do not cover is earmarked, or pledged as a donation; for a partial `stolen` or `move-pool`, the rest of the entry would hold less than its earmarks; a whole `move-pool` of an entry pledged as a donation. |
 | `STOCK_OFFERED` | `stolen`, `move-pool` | The rest of the entry after a partial `stolen` or `move-pool` would hold less than it offers on the Basetool's material exchange. |
-| `OVER_ALLOCATION` | `book-in` | The earmarks of one kind add up to more than `quantity`. |
-| `EARMARK_TARGET_INVALID` | `book-in`, `book-out`, `sell`, moves | An earmark names a job order that does not need the material or item, an unknown mission, a mission for an item, a target twice, or — when taking from an entry — a target the entry is not earmarked to or more than it holds there. |
+| `OVER_ALLOCATION` | `book-in`, `allocation-add`, `allocation-change` | The earmarks of one kind add up to more than `quantity`, or, for an earmark op, to more than the entry holds. |
+| `EARMARK_TARGET_INVALID` | `book-in`, `book-out`, `sell`, moves, earmark ops | An earmark names a job order that does not need the material or item, an unknown mission, a mission for an item, a target twice, or — when taking from an entry — a target the entry is not earmarked to or more than it holds there; `allocation-add` names a target the entry is already earmarked to, `allocation-change` one it is not. |
 | `UNIT_MISMATCH`, `LOCATION_UNKNOWN`, `STOLEN_MARKING_DISABLED`, `UNMATCHED`, `AMBIGUOUS` | as for [stock](stock.md) | |
 
 An undo of org-stock writes under *Connected applications* is not offered yet; the journal keeps

@@ -17,6 +17,7 @@ T0 POST /api/v1/exchange/me/stock/changes
 T0 GET /api/v1/exchange/org-stock
 T0 POST /api/v1/exchange/org-stock/changes
 T0 GET /api/v1/exchange/org-stock/members
+T0 GET /api/v1/exchange/org-stock/targets
 T0 POST /api/v1/live-sync/changed
 T0 GET /api/v1/live-sync/stream
 T0 GET /api/v1/notifications/stream

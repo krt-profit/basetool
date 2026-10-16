@@ -113,7 +113,8 @@ public class ActingMemberFilter extends OncePerRequestFilter {
           "/api/v1/exchange/me/stock/changes",
           "/api/v1/exchange/org-stock",
           "/api/v1/exchange/org-stock/changes",
-          "/api/v1/exchange/org-stock/members");
+          "/api/v1/exchange/org-stock/members",
+          "/api/v1/exchange/org-stock/targets");
 
   /** {@link #ACTING_PATHS} parsed once, matched on the decoded path. */
   private static final List<PathPattern> EXCHANGE_PATHS =

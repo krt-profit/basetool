@@ -63,6 +63,7 @@ class IngestEndpointSurfaceTest {
           new Call(HttpMethod.GET, "/exchange/v1/me/org-units"),
           new Call(HttpMethod.GET, "/exchange/v1/org-stock"),
           new Call(HttpMethod.GET, "/exchange/v1/org-stock/members"),
+          new Call(HttpMethod.GET, "/exchange/v1/org-stock/targets"),
           new Call(HttpMethod.POST, "/exchange/v1/org-stock/changes"),
           new Call(HttpMethod.POST, "/exchange/v1/me/blueprints/changes"),
           new Call(HttpMethod.POST, "/exchange/v1/me/stock/changes"),

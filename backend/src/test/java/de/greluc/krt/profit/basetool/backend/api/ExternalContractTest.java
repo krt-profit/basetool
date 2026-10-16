@@ -2120,7 +2120,8 @@ class ExternalContractTest {
           "POST /api/v1/exchange/me/stock/changes",
           "GET /api/v1/exchange/org-stock",
           "POST /api/v1/exchange/org-stock/changes",
-          "GET /api/v1/exchange/org-stock/members");
+          "GET /api/v1/exchange/org-stock/members",
+          "GET /api/v1/exchange/org-stock/targets");
 
   /**
    * The {@code T0} operations added after the latest release, which its baseline cannot document
@@ -2131,7 +2132,8 @@ class ExternalContractTest {
           "GET /api/v1/exchange/me/org-units",
           "GET /api/v1/exchange/org-stock",
           "POST /api/v1/exchange/org-stock/changes",
-          "GET /api/v1/exchange/org-stock/members");
+          "GET /api/v1/exchange/org-stock/members",
+          "GET /api/v1/exchange/org-stock/targets");
 
   /**
    * Verifies that no field reachable from the contract changed its type, format or {@code required}

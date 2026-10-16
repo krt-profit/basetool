@@ -54,6 +54,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -81,6 +82,7 @@ class ExchangeOrgStockWriteControllerTest {
 
   private static final String CHANGES = "/api/v1/exchange/org-stock/changes";
   private static final String MEMBERS = "/api/v1/exchange/org-stock/members";
+  private static final String TARGETS = "/api/v1/exchange/org-stock/targets";
   private static final String GATEWAY = "55555555-5555-5555-5555-555555555555";
   private static final String KEY = "Kx9_" + "w".repeat(39);
   private static final String WRITE = "exchange.orgstock.write";
@@ -1111,6 +1113,497 @@ class ExchangeOrgStockWriteControllerTest {
     assertThat(amountOf(entry)).isEqualTo(5);
   }
 
+  @Test
+  void aLogisticianEarmarksAnotherMembersEntryAsTheWebDoesAndTheChangeIsAuditedJournaledAndFed()
+      throws Exception {
+    UUID staffel = orgUnit();
+    joins(member, staffel, true);
+    joins(holder, staffel, false);
+    UUID titanium = material("SCU");
+    UUID entry = stock(holder, titanium, location(), 10, staffel, false);
+    UUID order = jobOrder(staffel, titanium, "OPEN");
+    UUID mission = mission();
+    long feed = feedRowsOf(staffel);
+
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), WRITE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    ops(
+                        allocation("allocation-add", staffel, entry, 0, toJobOrder(order), "4"),
+                        allocation("allocation-add", staffel, entry, 1, toMission(mission), "3"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(2))
+        .andExpect(jsonPath("$.results.length()").value(0));
+
+    assertThat(jobOrderEarmark(entry, order)).isEqualTo(4);
+    assertThat(missionEarmark(entry, mission)).isEqualTo(3);
+    assertThat(versionOf(entry)).isEqualTo(2);
+    List<Map<String, Object>> audits =
+        jdbc.queryForList(
+            "SELECT * FROM audit_event WHERE subject_id = ? AND event_type ="
+                + " 'INVENTORY_ALLOCATION_ADDED' ORDER BY details",
+            entry);
+    assertThat(audits).hasSize(2);
+    assertThat(audits)
+        .allSatisfy(
+            audit -> {
+              assertThat(audit.get("actor_user_id")).isEqualTo(member);
+              assertThat(audit.get("target_user_id")).isEqualTo(holder);
+              assertThat(audit.get("client_id")).isEqualTo(client);
+            });
+    assertThat(audits.getFirst().get("details")).asString().contains("dim=JOB_ORDER");
+    assertThat(
+            jdbc.queryForList(
+                "SELECT action FROM exchange_journal WHERE entity_key = ? AND removal = false",
+                String.class,
+                entry.toString()))
+        .containsOnly("ORG_STOCK_EARMARK_ADD")
+        .hasSize(2);
+    assertThat(
+            jdbc.queryForList(
+                "SELECT after_state FROM exchange_journal WHERE entity_key = ?",
+                String.class,
+                entry.toString()))
+        .anySatisfy(after -> assertThat(after).contains(order.toString()).contains("4.0"));
+    assertThat(feedRowsOf(staffel)).isGreaterThan(feed);
+  }
+
+  @Test
+  void aLogisticianChangesAndRemovesEarmarksAndAnEditThatFindsTheEntryAsAskedIsUnchanged()
+      throws Exception {
+    UUID staffel = orgUnit();
+    joins(member, staffel, true);
+    UUID entry = stock(holder, material("SCU"), location(), 10, staffel, false);
+    UUID order = earmarkToJobOrder(entry, 6, staffel);
+    UUID mission = mission();
+    earmarkToMission(entry, mission, 2);
+    long feed = feedRowsOf(staffel);
+
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), WRITE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    ops(
+                        allocation("allocation-change", staffel, entry, 0, toJobOrder(order), "3"),
+                        allocation("allocation-change", staffel, entry, 1, toMission(mission), "2"),
+                        allocation(
+                            "allocation-remove", staffel, entry, 1, toMission(mission), null),
+                        allocation(
+                            "allocation-remove", staffel, entry, 2, toMission(mission), null))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(2))
+        .andExpect(jsonPath("$.unchanged").value(2))
+        .andExpect(jsonPath("$.results[0].index").value(1))
+        .andExpect(jsonPath("$.results[0].result").value("unchanged"))
+        .andExpect(jsonPath("$.results[1].index").value(3))
+        .andExpect(jsonPath("$.results[1].result").value("unchanged"));
+
+    assertThat(jobOrderEarmark(entry, order)).isEqualTo(3);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM inventory_item_mission_allocation WHERE inventory_item_id ="
+                    + " ?",
+                Long.class,
+                entry))
+        .isZero();
+    assertThat(
+            jdbc.queryForList(
+                "SELECT event_type FROM audit_event WHERE subject_id = ? AND event_type LIKE"
+                    + " 'INVENTORY_ALLOCATION_%'",
+                String.class, entry))
+        .containsExactlyInAnyOrder("INVENTORY_ALLOCATION_CHANGED", "INVENTORY_ALLOCATION_REMOVED");
+    assertThat(
+            jdbc.queryForList(
+                "SELECT action FROM exchange_journal WHERE entity_key = ?",
+                String.class,
+                entry.toString()))
+        .containsExactlyInAnyOrder("ORG_STOCK_EARMARK_CHANGE", "ORG_STOCK_EARMARK_REMOVE");
+    assertThat(feedRowsOf(staffel)).isGreaterThan(feed);
+  }
+
+  @Test
+  void aChangeToTheAmountAnEarmarkHasIsUnchangedEvenOnAnOverAllocatedEntry() throws Exception {
+    UUID staffel = orgUnit();
+    joins(member, staffel, true);
+    UUID entry = stock(holder, material("SCU"), location(), 4, staffel, false);
+    UUID order = earmarkToJobOrder(entry, 6, staffel);
+
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), WRITE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    ops(
+                        allocation("allocation-change", staffel, entry, 0, toJobOrder(order), "6"),
+                        allocation("allocation-change", staffel, entry, 0, toJobOrder(order), "5"),
+                        allocation(
+                            "allocation-change", staffel, entry, 0, toJobOrder(order), "3"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(1))
+        .andExpect(jsonPath("$.results[0].result").value("unchanged"))
+        .andExpect(jsonPath("$.results[1].reason").value("OVER_ALLOCATION"));
+
+    assertThat(jobOrderEarmark(entry, order)).isEqualTo(3);
+  }
+
+  @Test
+  void aMoveTakesTheEarmarksItsPlanNamesAlongAndAPlanOnAMissingEarmarkIsRefused() throws Exception {
+    UUID staffel = orgUnit();
+    joins(member, staffel, true);
+    UUID titanium = material("SCU");
+    UUID entry = stock(holder, titanium, location(), 10, staffel, false);
+    UUID order = earmarkToJobOrder(entry, 6, staffel);
+    UUID elsewhere = location();
+    String plan =
+        ",\"fromJobOrders\":[{\"jobOrder\":\"ORDER\",\"quantity\":{\"amount\":4,\"unit\":\"SCU\"}}]";
+    String move =
+        ",\"quantity\":{\"amount\":8,\"unit\":\"SCU\"},\"location\":{\"name\":\"Writes "
+            + elsewhere
+            + "\"}";
+
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), WRITE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    ops(
+                        entryOp(
+                            "move-location",
+                            staffel,
+                            entry,
+                            0,
+                            move + plan.replace("ORDER", UUID.randomUUID().toString())),
+                        entryOp(
+                            "move-location",
+                            staffel,
+                            entry,
+                            0,
+                            move + plan.replace("ORDER", order.toString())))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(1))
+        .andExpect(jsonPath("$.results[0].index").value(0))
+        .andExpect(jsonPath("$.results[0].reason").value("EARMARK_TARGET_INVALID"));
+
+    assertThat(amountOf(entry)).isEqualTo(2);
+    assertThat(jobOrderEarmark(entry, order)).isEqualTo(2);
+    UUID moved =
+        jdbc.queryForObject(
+            "SELECT id FROM inventory_item WHERE user_id = ? AND location_id = ?",
+            UUID.class,
+            holder,
+            elsewhere);
+    assertThat(amountOf(moved)).isEqualTo(8);
+    assertThat(jobOrderEarmark(moved, order)).isEqualTo(4);
+  }
+
+  @Test
+  void anEarmarkThatOverAllocatesNamesAWrongOrDuplicateTargetOrAPersonalEntryIsRefused()
+      throws Exception {
+    UUID staffel = orgUnit();
+    UUID plain = orgUnit();
+    joins(member, staffel, true);
+    joins(member, plain, false);
+    UUID titanium = material("SCU");
+    UUID area18 = location();
+    UUID entry = stock(holder, titanium, area18, 10, staffel, false);
+    earmarkToJobOrder(entry, 6, staffel);
+    UUID order = jobOrder(staffel, titanium, "OPEN");
+    UUID unneeded = jobOrder(staffel, material("SCU"), "OPEN");
+    UUID personal = stock(holder, titanium, area18, 5, staffel, true);
+    UUID inPlain = stock(holder, titanium, area18, 5, plain, false);
+    UUID mission = mission();
+
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), WRITE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    ops(
+                        allocation("allocation-add", staffel, entry, 0, toJobOrder(order), "1"),
+                        allocation("allocation-add", staffel, entry, 1, toJobOrder(order), "1"),
+                        allocation("allocation-add", staffel, entry, 1, toMission(mission), "11"),
+                        allocation("allocation-change", staffel, entry, 1, toJobOrder(order), "5"),
+                        allocation("allocation-add", staffel, entry, 1, toJobOrder(unneeded), "1"),
+                        allocation(
+                            "allocation-add", staffel, entry, 1, toMission(UUID.randomUUID()), "1"),
+                        allocation("allocation-change", staffel, entry, 1, toMission(mission), "1"),
+                        allocation("allocation-add", staffel, personal, 0, toJobOrder(order), "1"),
+                        allocation("allocation-add", plain, inPlain, 0, toJobOrder(order), "1"),
+                        allocation("allocation-add", staffel, entry, 0, toMission(mission), "1"),
+                        withSuffix(
+                            entryOp("allocation-add", staffel, entry, 1, toMission(mission)),
+                            ",\"quantity\":{\"amount\":1,\"unit\":\"PIECE\"}}"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(1))
+        .andExpect(jsonPath("$.results.length()").value(10))
+        .andExpect(jsonPath("$.results[0].reason").value("EARMARK_TARGET_INVALID"))
+        .andExpect(jsonPath("$.results[1].reason").value("OVER_ALLOCATION"))
+        .andExpect(jsonPath("$.results[2].reason").value("OVER_ALLOCATION"))
+        .andExpect(jsonPath("$.results[3].reason").value("EARMARK_TARGET_INVALID"))
+        .andExpect(jsonPath("$.results[4].reason").value("EARMARK_TARGET_INVALID"))
+        .andExpect(jsonPath("$.results[5].reason").value("EARMARK_TARGET_INVALID"))
+        .andExpect(jsonPath("$.results[6].reason").value("NOT_PERMITTED"))
+        .andExpect(jsonPath("$.results[7].reason").value("NOT_PERMITTED"))
+        .andExpect(jsonPath("$.results[8].reason").value("VERSION_CONFLICT"))
+        .andExpect(jsonPath("$.results[9].reason").value("UNIT_MISMATCH"));
+
+    assertThat(jobOrderEarmark(entry, order)).isEqualTo(1);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM inventory_item_mission_allocation WHERE inventory_item_id ="
+                    + " ?",
+                Long.class,
+                entry))
+        .isZero();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM inventory_item_job_order_allocation WHERE inventory_item_id"
+                    + " IN (?, ?)",
+                Long.class,
+                personal,
+                inPlain))
+        .isZero();
+  }
+
+  @Test
+  void theTargetsAreTheOrdersAndMissionsTheWebPickerOffersForThePoolAndMaterial() throws Exception {
+    UUID staffel = orgUnit();
+    UUID other = orgUnit("SQUADRON");
+    jdbc.update("UPDATE org_unit SET is_profit_eligible = TRUE WHERE id = ?", staffel);
+    joins(member, staffel, true);
+    UUID titanium = material("SCU");
+    UUID open = jobOrder(staffel, titanium, "OPEN");
+    UUID inProgress = jobOrder(staffel, titanium, "IN_PROGRESS");
+    jobOrder(staffel, titanium, "COMPLETED");
+    jobOrder(staffel, material("SCU"), "OPEN");
+    jobOrder(other, titanium, "OPEN");
+    UUID own = mission(staffel, true, "PLANNED");
+    UUID open2 = mission(other, false, "ACTIVE");
+    mission(other, true, "PLANNED");
+
+    String body =
+        mockMvc
+            .perform(
+                relayed(
+                    get(TARGETS)
+                        .param("unit", staffel.toString())
+                        .param("material", titanium.toString()),
+                    WRITE))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(JsonPath.<String>read(body, "$.unit.id")).isEqualTo(staffel.toString());
+    assertThat(JsonPath.<List<String>>read(body, "$.jobOrders[*].id"))
+        .containsExactlyInAnyOrder(open.toString(), inProgress.toString());
+    assertThat(JsonPath.<List<String>>read(body, "$.jobOrders[*].status"))
+        .containsExactlyInAnyOrder("OPEN", "IN_PROGRESS");
+    assertThat(JsonPath.<List<Integer>>read(body, "$.jobOrders[*].number"))
+        .allSatisfy(number -> assertThat(number).isPositive());
+    assertThat(JsonPath.<List<String>>read(body, "$.missions[*].id"))
+        .contains(own.toString(), open2.toString())
+        .doesNotContainAnyElementsOf(
+            jdbc.queryForList(
+                "SELECT CAST(id AS varchar) FROM mission WHERE owning_org_unit_id = ? AND"
+                    + " is_internal = TRUE",
+                String.class,
+                other));
+    assertThat(JsonPath.<List<String>>read(body, "$.missions[?(@.id == '" + own + "')].name"))
+        .containsExactly("Op " + own);
+    assertThat(JsonPath.<List<String>>read(body, "$.missions[?(@.id == '" + own + "')].status"))
+        .containsExactly("PLANNED");
+  }
+
+  @Test
+  void theTargetsOfAUnitTheWriterIsNoLogisticianOfAreRefused() throws Exception {
+    UUID plain = orgUnit();
+    joins(member, plain, false);
+    UUID titanium = material("SCU");
+
+    mockMvc
+        .perform(
+            relayed(
+                get(TARGETS).param("unit", plain.toString()).param("material", titanium.toString()),
+                WRITE))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(
+            relayed(
+                get(TARGETS).param("unit", plain.toString()).param("material", titanium.toString()),
+                "exchange.orgstock.read"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("SCOPE_MISSING"));
+  }
+
+  @Test
+  void anUnknownMaterialHasNoTargets() throws Exception {
+    UUID staffel = orgUnit();
+    joins(member, staffel, true);
+    mission(staffel, true, "PLANNED");
+
+    mockMvc
+        .perform(
+            relayed(
+                get(TARGETS)
+                    .param("unit", staffel.toString())
+                    .param("material", UUID.randomUUID().toString()),
+                WRITE))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.jobOrders.length()").value(0))
+        .andExpect(jsonPath("$.missions.length()").value(0));
+  }
+
+  /**
+   * Builds an earmark op on an entry.
+   *
+   * @param kind {@code allocation-add}, {@code allocation-change} or {@code allocation-remove}
+   * @param unit the pool the op names
+   * @param entry the entry
+   * @param version the version the client read
+   * @param target the target member, starting with a comma
+   * @param amount the SCU amount, or {@code null} for none
+   * @return the op
+   */
+  private static @NotNull String allocation(
+      @NotNull String kind,
+      @NotNull UUID unit,
+      @NotNull UUID entry,
+      long version,
+      @NotNull String target,
+      @Nullable String amount) {
+    return entryOp(
+        kind,
+        unit,
+        entry,
+        version,
+        target
+            + (amount == null ? "" : ",\"quantity\":{\"amount\":" + amount + ",\"unit\":\"SCU\"}"));
+  }
+
+  /**
+   * Names a job order as an earmark's target.
+   *
+   * @param order the job order
+   * @return the member, starting with a comma
+   */
+  private static @NotNull String toJobOrder(@NotNull UUID order) {
+    return ",\"jobOrder\":\"" + order + "\"";
+  }
+
+  /**
+   * Names a mission as an earmark's target.
+   *
+   * @param mission the mission
+   * @return the member, starting with a comma
+   */
+  private static @NotNull String toMission(@NotNull UUID mission) {
+    return ",\"mission\":\"" + mission + "\"";
+  }
+
+  /**
+   * Reads an entry's earmark to a job order.
+   *
+   * @param entry the entry
+   * @param order the job order
+   * @return the amount
+   */
+  private double jobOrderEarmark(@NotNull UUID entry, @NotNull UUID order) {
+    Double amount =
+        jdbc.queryForObject(
+            "SELECT amount FROM inventory_item_job_order_allocation WHERE inventory_item_id = ?"
+                + " AND job_order_id = ?",
+            Double.class,
+            entry,
+            order);
+    return amount == null ? 0 : amount;
+  }
+
+  /**
+   * Reads an entry's earmark to a mission.
+   *
+   * @param entry the entry
+   * @param mission the mission
+   * @return the amount
+   */
+  private double missionEarmark(@NotNull UUID entry, @NotNull UUID mission) {
+    Double amount =
+        jdbc.queryForObject(
+            "SELECT amount FROM inventory_item_mission_allocation WHERE inventory_item_id = ? AND"
+                + " mission_id = ?",
+            Double.class,
+            entry,
+            mission);
+    return amount == null ? 0 : amount;
+  }
+
+  /**
+   * Reads an entry's version.
+   *
+   * @param entry the entry
+   * @return its version
+   */
+  private long versionOf(@NotNull UUID entry) {
+    Long version =
+        jdbc.queryForObject("SELECT version FROM inventory_item WHERE id = ?", Long.class, entry);
+    return version == null ? -1 : version;
+  }
+
+  /**
+   * Seeds a job order of a unit that needs a material.
+   *
+   * @param unit the requesting and responsible unit
+   * @param material the material it needs
+   * @param status its status
+   * @return the order id
+   */
+  private @NotNull UUID jobOrder(
+      @NotNull UUID unit, @NotNull UUID material, @NotNull String status) {
+    UUID order = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO job_order (id, priority, created_at, updated_at, version, status,"
+            + " requesting_org_unit_id, responsible_org_unit_id, type)"
+            + " VALUES (?, 2, now(), now(), 0, ?, ?, ?, 'MATERIAL')",
+        order,
+        status,
+        unit,
+        unit);
+    jobOrders.add(order);
+    jdbc.update(
+        """
+        INSERT INTO job_order_material (id, job_order_id, material_id, amount, created_at,
+                                        updated_at, version, quality_tier_id)
+        VALUES (?, ?, ?, 20, now(), now(), 0, '6b1f2e0a-3c1d-4f5e-9a10-000000000000')
+        """,
+        UUID.randomUUID(),
+        order,
+        material);
+    return order;
+  }
+
+  /**
+   * Seeds a mission of a unit.
+   *
+   * @param unit the owning unit
+   * @param internal whether only the unit sees it
+   * @param status its status
+   * @return its id
+   */
+  private @NotNull UUID mission(@NotNull UUID unit, boolean internal, @NotNull String status) {
+    UUID mission = mission();
+    jdbc.update(
+        "UPDATE mission SET owning_org_unit_id = ?, is_internal = ?, status = ?,"
+            + " planned_start_time = now() WHERE id = ?",
+        unit,
+        internal,
+        status,
+        mission);
+    return mission;
+  }
+
   /**
    * Builds an op on an entry.
    *
@@ -1545,11 +2038,22 @@ class ExchangeOrgStockWriteControllerTest {
    * @return its id
    */
   private @NotNull UUID orgUnit() {
+    return orgUnit("SPECIAL_COMMAND");
+  }
+
+  /**
+   * Seeds an active org unit of a kind.
+   *
+   * @param kind the kind
+   * @return its id
+   */
+  private @NotNull UUID orgUnit(@NotNull String kind) {
     UUID id = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO org_unit (id, kind, name, shorthand, active, is_promotion_enabled,"
-            + " is_profit_eligible) VALUES (?, 'SPECIAL_COMMAND', ?, ?, TRUE, FALSE, FALSE)",
+            + " is_profit_eligible) VALUES (?, ?, ?, ?, TRUE, FALSE, FALSE)",
         id,
+        kind,
         "Pool " + id,
         "W" + id.toString().substring(0, 8));
     orgUnits.add(id);

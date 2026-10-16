@@ -40,7 +40,10 @@ public enum ExchangeJournalAction {
   ORG_STOCK_MOVE_HOLDER(ExchangeResource.ORG_STOCK),
   ORG_STOCK_MOVE_POOL(ExchangeResource.ORG_STOCK),
   ORG_STOCK_NOTE(ExchangeResource.ORG_STOCK),
-  ORG_STOCK_STOLEN(ExchangeResource.ORG_STOCK);
+  ORG_STOCK_STOLEN(ExchangeResource.ORG_STOCK),
+  ORG_STOCK_EARMARK_ADD(ExchangeResource.ORG_STOCK),
+  ORG_STOCK_EARMARK_CHANGE(ExchangeResource.ORG_STOCK),
+  ORG_STOCK_EARMARK_REMOVE(ExchangeResource.ORG_STOCK);
 
   /** The resource the action belongs to. */
   @NotNull private final ExchangeResource resource;

@@ -83,8 +83,8 @@ codes, whichever side refuses it.
 | `HOLDER_UNKNOWN` | An org-stock `book-in` or `move-holder` names a holder who is not on the receiving unit's roster. | Read the roster again and let the member pick. |
 | `INSUFFICIENT_STOCK` | An org-stock op takes or marks more than the entry holds. | Pull and retry with the entry's amount. |
 | `STOCK_OFFERED` | A partial org-stock `stolen` or `move-pool` would leave the entry below what it offers on the Basetool's material exchange. | Take less, or ask the holder to lower the offer in the web. |
-| `OVER_ALLOCATION` | The earmarks of one kind of an org-stock `book-in` add up to more than its amount. | Lower the earmarks. |
-| `EARMARK_TARGET_INVALID` | An org-stock earmark names a job order that does not need the material or item, an unknown mission, a target twice, or one the entry is not earmarked to. | Fix the earmarks. |
+| `OVER_ALLOCATION` | The earmarks of one kind of an org-stock `book-in` add up to more than its amount, or an earmark op would earmark more of one kind than the entry holds. | Lower the earmarks. |
+| `EARMARK_TARGET_INVALID` | An org-stock earmark names a job order that does not need the material or item, an unknown mission, a mission for an item, a target twice, one the entry is not earmarked to, or, for `allocation-add`, one it already is. | Read the [targets](resources/org-stock.md#the-targets) and the entry again. |
 
 ## Warnings
 

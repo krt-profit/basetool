@@ -55,8 +55,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The Lager's pool-entry commands: the Einbuchen, the book-out, the sale, the transfer, the note
- * edit and the stolen marking of the web, checked by the Lager's own rules first so a refusal is
- * answered instead of thrown (REQ-XCH-045).
+ * edit, the stolen marking and the allocation writes of the web, checked by the Lager's own rules
+ * first so a refusal is answered instead of thrown (REQ-XCH-045).
  */
 @Service
 @RequiredArgsConstructor
@@ -480,6 +480,135 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
                 true)
             .id();
     return PoolOutcome.applied(changes(before, result), StockChangeEffects.NONE);
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public @NotNull PoolOutcome allocate(@NotNull PoolAllocation allocation, boolean dryRun) {
+    Optional<InventoryItem> locked = inventoryRepository.findByIdForUpdate(allocation.entryId());
+    if (locked.isEmpty()) {
+      return PoolOutcome.refused(PoolRefusal.NOT_PERMITTED);
+    }
+    InventoryItem row = locked.get();
+    PoolRefusal refusal = checkEntry(row, allocation.poolUnitId(), allocation.version());
+    if (refusal != null) {
+      return PoolOutcome.refused(refusal);
+    }
+    boolean jobOrder = allocation.dimension() == EarmarkDimension.JOB_ORDER;
+    boolean present = hasSlice(row, allocation.targetId(), jobOrder);
+    double current = sliceAmount(row, allocation.targetId(), jobOrder);
+    if (allocation.change() == EarmarkChange.REMOVE) {
+      if (!present) {
+        return PoolOutcome.alreadyDone();
+      }
+    } else {
+      if (allocation.change() == EarmarkChange.CHANGE
+          && present
+          && unitOf(row).equals(allocation.unit())
+          && Math.abs(Objects.requireNonNull(allocation.amount()) - current) <= EPSILON) {
+        return PoolOutcome.alreadyDone();
+      }
+      refusal = checkAllocation(row, allocation, present, current);
+      if (refusal != null) {
+        return PoolOutcome.refused(refusal);
+      }
+    }
+    if (dryRun) {
+      return PoolOutcome.checked();
+    }
+    PoolEntryState before = stateOf(row);
+    InventoryAllocationWriteDto write =
+        new InventoryAllocationWriteDto(
+            jobOrder
+                ? InventoryAllocationDimension.JOB_ORDER
+                : InventoryAllocationDimension.MISSION,
+            allocation.targetId(),
+            allocation.amount(),
+            row.getVersion());
+    itemService.writeAllocationForPool(row, write, allocation.change());
+    return PoolOutcome.applied(
+        List.of(new PoolEntryChange(before, stateOf(row))), StockChangeEffects.NONE);
+  }
+
+  /**
+   * Checks an earmark that is added or changed as the Lager's allocation writes do: the entry's
+   * unit, a job order that needs the material or item or an existing mission, no mission on item
+   * stock, no second earmark to the same target, an existing earmark to change, and no more
+   * earmarked per dimension than the entry holds.
+   *
+   * @param row the locked entry
+   * @param allocation the earmark write
+   * @param present whether the entry has an earmark to the target
+   * @param current the amount of that earmark, {@code 0} when it has none
+   * @return the refusal, or {@code null} when the earmark may be written
+   */
+  private @Nullable PoolRefusal checkAllocation(
+      @NotNull InventoryItem row,
+      @NotNull PoolAllocation allocation,
+      boolean present,
+      double current) {
+    if (!unitOf(row).equals(allocation.unit())) {
+      return PoolRefusal.UNIT_MISMATCH;
+    }
+    boolean jobOrder = allocation.dimension() == EarmarkDimension.JOB_ORDER;
+    if (!jobOrder && row.getGameItem() != null) {
+      return PoolRefusal.EARMARK_TARGET_INVALID;
+    }
+    if (allocation.change() == EarmarkChange.ADD) {
+      if (present || !targetExists(row, allocation.targetId(), jobOrder)) {
+        return PoolRefusal.EARMARK_TARGET_INVALID;
+      }
+    } else if (!present) {
+      return PoolRefusal.EARMARK_TARGET_INVALID;
+    }
+    double others =
+        (jobOrder ? InventoryAllocations.sumJobOrder(row) : InventoryAllocations.sumMission(row))
+            - current;
+    double proposed =
+        ScuAmounts.roundToScuScale(others + Objects.requireNonNull(allocation.amount()));
+    if (proposed > held(row) + EPSILON) {
+      return PoolRefusal.OVER_ALLOCATION;
+    }
+    return null;
+  }
+
+  /**
+   * Whether an entry has an earmark slice to one target, whatever its amount.
+   *
+   * @param row the entry
+   * @param targetId the job order or mission
+   * @param jobOrder {@code true} for a job order, {@code false} for a mission
+   * @return {@code true} when the entry holds such a slice
+   */
+  private static boolean hasSlice(
+      @NotNull InventoryItem row, @NotNull UUID targetId, boolean jobOrder) {
+    return jobOrder
+        ? InventoryAllocations.jobOrderSlice(row, targetId) != null
+        : InventoryAllocations.missionSlice(row, targetId) != null;
+  }
+
+  /**
+   * Whether an earmark's target exists and, for a job order, needs the entry's material or item.
+   *
+   * @param row the entry
+   * @param targetId the job order or mission
+   * @param jobOrder {@code true} for a job order, {@code false} for a mission
+   * @return {@code true} when the entry may be earmarked to it
+   */
+  private boolean targetExists(
+      @NotNull InventoryItem row, @NotNull UUID targetId, boolean jobOrder) {
+    if (!jobOrder) {
+      return earmarkLookup.mission(targetId) != null;
+    }
+    Set<UUID> needed =
+        row.getMaterial() != null
+            ? jobOrders.requiredMaterialIds(targetId)
+            : jobOrders.requiredGameItemIds(targetId);
+    UUID catalogueId =
+        row.getMaterial() != null
+            ? row.getMaterial().getId()
+            : Objects.requireNonNull(row.getGameItem()).getId();
+    return needed != null && needed.contains(catalogueId);
   }
 
   /**

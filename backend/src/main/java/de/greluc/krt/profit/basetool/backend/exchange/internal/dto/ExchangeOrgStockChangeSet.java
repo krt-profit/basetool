@@ -67,12 +67,22 @@ public record ExchangeOrgStockChangeSet(
   /** The op that sets or removes the stolen marker of an entry or a part of it. */
   public static final String STOLEN = "stolen";
 
+  /** The op that earmarks part of an entry to a job order or mission. */
+  public static final String ALLOCATION_ADD = "allocation-add";
+
+  /** The op that sets the amount of an entry's earmark. */
+  public static final String ALLOCATION_CHANGE = "allocation-change";
+
+  /** The op that removes an entry's earmark. */
+  public static final String ALLOCATION_REMOVE = "allocation-remove";
+
   /**
    * One write on a pool; the gateway's schema decides which fields each op carries.
    *
    * @param opId the client's id for the op, echoed in the result, or {@code null}
    * @param op {@code book-in}, {@code book-out}, {@code sell}, {@code move-location}, {@code
-   *     move-holder}, {@code move-pool}, {@code note} or {@code stolen}
+   *     move-holder}, {@code move-pool}, {@code note}, {@code stolen}, {@code allocation-add},
+   *     {@code allocation-change} or {@code allocation-remove}
    * @param unit the org unit whose pool the op writes
    * @param holder a {@code book-in}'s holder or a {@code move-holder}'s new holder, a {@code ref}
    *     from the roster of the receiving unit
@@ -81,8 +91,8 @@ public record ExchangeOrgStockChangeSet(
    * @param quality a {@code book-in}'s quality, ignored for an item
    * @param stolen whether a {@code book-in}'s stock is marked stolen, or the marker a {@code
    *     stolen} op sets
-   * @param quantity the amount the op books, sells, moves or marks; absent on a {@code note} and on
-   *     a {@code stolen} op that marks the whole entry
+   * @param quantity the amount the op books, sells, moves, marks or earmarks; absent on a {@code
+   *     note}, an {@code allocation-remove} and a {@code stolen} op that marks the whole entry
    * @param note a {@code book-in}'s note, or a {@code note} op's new note; {@code null} for none
    * @param mergeScu whether a {@code book-in} or a move of an SCU material merges into the
    *     receiving holder's entry
@@ -95,13 +105,17 @@ public record ExchangeOrgStockChangeSet(
    * @param terminal a {@code sell}'s terminal
    * @param proceeds the aUEC a {@code sell} brought in
    * @param toUnit the unit whose pool a {@code move-holder} or {@code move-pool} moves into
+   * @param jobOrder the job order an earmark op writes the earmark to, or {@code null}
+   * @param mission the mission an earmark op writes the earmark to, or {@code null}
    */
   @Schema(name = "OrgStockOp")
   public record Op(
       @Nullable @Size(min = 1, max = 64) String opId,
       @NotNull
           @Pattern(
-              regexp = "^(book-in|book-out|sell|move-location|move-holder|move-pool|note|stolen)$")
+              regexp =
+                  "^(book-in|book-out|sell|move-location|move-holder|move-pool|note|stolen"
+                      + "|allocation-add|allocation-change|allocation-remove)$")
           String op,
       @NotNull UUID unit,
       @Nullable @Size(min = 1, max = 128) String holder,
@@ -120,7 +134,9 @@ public record ExchangeOrgStockChangeSet(
       @Nullable @Size(max = 100) List<@NotNull @Valid MissionLine> fromMissions,
       @Nullable @Size(min = 1, max = 120) String terminal,
       @Nullable @DecimalMin("0") @DecimalMax("999999999999999") BigDecimal proceeds,
-      @Nullable UUID toUnit) {}
+      @Nullable UUID toUnit,
+      @Nullable UUID jobOrder,
+      @Nullable UUID mission) {}
 
   /**
    * An amount for one job order.

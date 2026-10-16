@@ -31,10 +31,10 @@ import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * The writes on the shared entries of one org unit's pool that a connected application makes for a
- * Logistician of that pool, through the Lager's own create, book-out, sale, transfer, note edit and
- * stolen marking (REQ-XCH-045, ADR-0257). Every command joins the caller's transaction ({@code
- * MANDATORY}); the caller decides who may write the pool, the commands decide what the Lager
- * allows.
+ * Logistician of that pool, through the Lager's own create, book-out, sale, transfer, note edit,
+ * stolen marking and allocation writes (REQ-XCH-045, ADR-0257). Every command joins the caller's
+ * transaction ({@code MANDATORY}); the caller decides who may write the pool, the commands decide
+ * what the Lager allows.
  *
  * <p>A command answers a refusal instead of throwing for what the Lager refuses by its rules, so
  * the caller can report it per op and go on; it throws only for what should not happen.
@@ -142,6 +142,19 @@ public interface PoolEntryCommands {
    */
   @NotNull
   PoolOutcome markStolen(@NotNull PoolStolen stolen, boolean dryRun);
+
+  /**
+   * Adds, changes or removes an earmark of a shared entry of the pool to a job order or mission
+   * through the Lager's own allocation writes (REQ-INV-027), which audit it as {@code
+   * INVENTORY_ALLOCATION_ADDED}, {@code INVENTORY_ALLOCATION_CHANGED} or {@code
+   * INVENTORY_ALLOCATION_REMOVED}.
+   *
+   * @param allocation the earmark write
+   * @param dryRun whether to check it only
+   * @return the refusal, the result of a write that would change nothing, or the entry's change
+   */
+  @NotNull
+  PoolOutcome allocate(@NotNull PoolAllocation allocation, boolean dryRun);
 
   /**
    * A book-in into a pool, recorded under the current request's acting member.
@@ -277,6 +290,50 @@ public interface PoolEntryCommands {
       @Nullable String unit) {}
 
   /**
+   * An earmark write on one entry of a pool, audited under the current request's acting member.
+   *
+   * @param entryId the entry
+   * @param poolUnitId the org unit whose pool the writer names
+   * @param version the entry's version the writer last read
+   * @param change whether the earmark is added, changed or removed
+   * @param dimension whether it earmarks to a job order or a mission
+   * @param targetId the job order or mission
+   * @param amount the earmarked amount, rounded to the entry's unit; {@code null} for a removal
+   * @param unit the amount's unit, {@code SCU} or {@code PIECE}, which must be the entry's; {@code
+   *     null} for a removal
+   */
+  record PoolAllocation(
+      @NotNull UUID entryId,
+      @NotNull UUID poolUnitId,
+      long version,
+      @NotNull EarmarkChange change,
+      @NotNull EarmarkDimension dimension,
+      @NotNull UUID targetId,
+      @Nullable Double amount,
+      @Nullable String unit) {}
+
+  /** What an earmark write does to the earmark. */
+  enum EarmarkChange {
+    /** Earmarks an amount to a target the entry is not earmarked to yet. */
+    ADD,
+
+    /** Sets the amount of an existing earmark. */
+    CHANGE,
+
+    /** Removes an earmark. */
+    REMOVE
+  }
+
+  /** The kind of target an earmark reserves stock for. */
+  enum EarmarkDimension {
+    /** A job order that needs the material or item. */
+    JOB_ORDER,
+
+    /** A mission; not for an item. */
+    MISSION
+  }
+
+  /**
    * The lot an entry of a batch is moved or remarked into, for {@link #lockLots}.
    *
    * @param entryId the entry
@@ -330,7 +387,8 @@ public interface PoolEntryCommands {
 
     /**
      * An earmark names a target that does not exist, does not need the material or item, appears
-     * twice, or is not on the entry, or takes more from a target than it holds.
+     * twice, is not on the entry or, for a new earmark, is on it already, or takes more from a
+     * target than it holds.
      */
     EARMARK_TARGET_INVALID,
 

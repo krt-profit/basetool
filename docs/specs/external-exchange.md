@@ -56,13 +56,13 @@ The exchange API is served by the ingest gateway at `/exchange/v1/**`
 | `GET /exchange/v1/me/org-units` | `exchange.orgunits.read` | REQ-XCH-048 |
 | `GET /exchange/v1/org-stock` | `exchange.orgstock.read` (+ `exchange.orgstock.details`) | REQ-XCH-042, REQ-XCH-043 |
 | `POST /exchange/v1/org-stock/changes` | `exchange.orgstock.write` | REQ-XCH-045 |
-| `GET /exchange/v1/org-stock/members?unit=` · `…/targets?unit=` | `exchange.orgstock.write` | REQ-XCH-045 |
+| `GET /exchange/v1/org-stock/members?unit=` · `…/targets?unit=&material=` | `exchange.orgstock.write` | REQ-XCH-045 |
 
-Of the three `org-stock` rows the read is built, as a snapshot and a feed (REQ-XCH-042), with
-`exchange.orgstock.details` (REQ-XCH-043), and so are the writes `book-in`, `book-out`, `sell`,
-`move-location`, `move-holder`, `move-pool`, `note` and `stolen` and the roster (REQ-XCH-045); the earmark ops,
-the targets and `exchange.demand.details` are planned (ADR-0257), and until they are built the
-gateway serves none of them.
+The three `org-stock` rows are built: the read, as a snapshot and a feed (REQ-XCH-042), with
+`exchange.orgstock.details` (REQ-XCH-043), the writes `book-in`, `book-out`, `sell`,
+`move-location`, `move-holder`, `move-pool`, `note`, `stolen` and the earmark ops, the roster and
+the targets (REQ-XCH-045). `exchange.demand.details` is planned (ADR-0257), and until it is built
+the gateway serves no order details.
 | `POST /exchange/v1/me/drafts/blueprints` · `…/drafts/refinery-orders` | `exchange.drafts.blueprints` / `.refinery` | REQ-XCH-019 |
 
 Every route is deny-by-default, uses only `GET` or `POST` (the ingest bot filter admits nothing
@@ -2135,7 +2135,7 @@ succeeding, never succeeded).
 ### REQ-XCH-036 — The frozen exchange is pinned at build time
 
 The exchange contract and the backend surface the gateway relays to keep their behaviour
-byte-identical (D-05 of the domain modularisation plan): the 18 relay operations on 17 backend
+byte-identical (D-05 of the domain modularisation plan): the 19 relay operations on 18 backend
 paths, their parameters, request and answer shapes, the relayed codes and statuses, and the
 gateway's security filters. Four build-time guards hold it, so a drift fails a build instead of
 surfacing in production as a `502 BACKEND_RELAY_FAILED` or a `400 SCHEMA_INVALID` for a body the
@@ -2160,7 +2160,7 @@ contract allows.
   key thumbprint, connection time, correlation id, DPoP nonce, idempotency key, trace context,
   the rate-limit counters). A difference writes the observed answer under
   `ingest/build/exchange-golden/` for review; a deliberate change replaces the golden in the same
-  pull request. The test also asserts that the backend stub received exactly the 18 relay
+  pull request. The test also asserts that the backend stub received exactly the 19 relay
   operations.
 - **Security filter order.** `SecurityFilterChainOrderTest` and
   `SecurityFilterChainProductionShapeTest` pin, through `FilterChainProxy`, the gateway's chains in
@@ -2185,7 +2185,7 @@ Every guard is proven able to fail by a planted violation in its own test.
   answer validates against its published schema.
   *`ExchangeWireContractTest`.*
 - [x] Every `/exchange/v1` route answers byte for byte as recorded, and the relay sends exactly the
-  seam's 18 operations. *`ExchangeGoldenAnswerTest`.*
+  seam's 19 operations. *`ExchangeGoldenAnswerTest`.*
 - [x] The gateway's security filter chains hold exactly the pinned filters in order.
   *`SecurityFilterChainOrderTest`, `SecurityFilterChainProductionShapeTest`.*
 - [x] A pull request touching the exchange path without the `e2e` label fails.
@@ -2199,9 +2199,9 @@ Every identifier the modules exchange on the relay seam is declared once, in
 `test-support`'s `ExchangeSeam`, and each module's parity test asserts its own declarations against
 it, so a rename on one side alone fails that side's build:
 
-- the 18 relay operations with their gateway route, backend path, capability, paging and published
+- the 19 relay operations with their gateway route, backend path, capability, paging and published
   schemas — against the backend's ten exchange controllers and their `@exchangeGate`
-  expressions, `ActingMemberFilter`'s 17 exact paths, the gateway's `ExchangeRoutes` and its relay
+  expressions, `ActingMemberFilter`'s 18 exact paths, the gateway's `ExchangeRoutes` and its relay
   prefix (`ExchangeRelaySeamParityTest` in both modules), and the paths the relay actually calls
   (`ExchangeGoldenAnswerTest`);
 - the five relay headers, the fourteen capability scopes (`exchange.orgstock.details` the one that
@@ -2245,7 +2245,7 @@ G-18)
 
 ### REQ-XCH-039 — The relay surface has its own internal OpenAPI document
 
-The backend operations the gateway relays to — the 18 operations under `/api/v1/exchange/**` —
+The backend operations the gateway relays to — the 19 operations under `/api/v1/exchange/**` —
 are described in their own committed document,
 `backend/src/main/resources/api/exchange-relay.openapi.json`, and in no other (ADR-0216, amendment
 of 2026-10-02). The published `openapi.json`, which the app vendors and the frontend generates its
@@ -2260,7 +2260,7 @@ never served to a client. The external contract stays the gateway's `exchange-v1
   reach. A component both reach is in both, identical. The runtime `/v3/api-docs` is unchanged: it
   still describes the full model, ADMIN-only, and is switched off in production.
 - **Its own assertions.** Before writing, the generator requires of the relay document exactly the
-  18 relay operations, all of the `exchange` domain and tier `T0`, none anonymous, the `bearer-jwt`
+  19 relay operations, all of the `exchange` domain and tier `T0`, none anonymous, the `bearer-jwt`
   scheme and requirement, and no dangling reference; of `openapi.json` no relay path and no dangling
   reference (REQ-API-018).
 - **Its own staleness check.** Each document is compared with its committed file, line ends
@@ -2274,7 +2274,7 @@ never served to a client. The external contract stays the gateway's `exchange-v1
 
 **Acceptance**
 
-- [x] The relay document holds exactly the 18 relay operations and 80 schemas; `openapi.json` holds
+- [x] The relay document holds exactly the 19 relay operations and 83 schemas; `openapi.json` holds
   none of them and the 64 schemas only they reach left it; the union of both is the generated
   model. *`ExchangeFenceTest`, `OpenApiDocumentAssertionsTest`.*
 - [x] A stale relay document fails the generator in CI and is rewritten outside it — proven by
@@ -2471,7 +2471,14 @@ a stale one is refused `VERSION_CONFLICT` for that op (see *Per op* below). Only
     the writer that the holder directly belongs to (`HOLDER_UNKNOWN` otherwise) — the whole entry
     with its earmarks (`STOCK_EARMARKED` with a donation pledge), or a `quantity` from its free stock;
     its own pool is `unchanged`;
-  - `allocation-add`, `allocation-change`, `allocation-remove` on an entry;
+  - `allocation-add`, `allocation-change`, `allocation-remove` on an entry, naming one `jobOrder`
+    or one `mission` and, to add or change, a `quantity`: the Lager's allocation writes of
+    REQ-INV-027 with their rules — a job order that needs the material or item, an existing
+    mission and none for an item, no second earmark to the same target and one to change
+    (`EARMARK_TARGET_INVALID`), per dimension no more than the entry holds (`OVER_ALLOCATION`).
+    Each op advances the entry's version by one, so a later op of the batch names the next one; a
+    change to the amount it has, a removal of an earmark it does not have and an amount that rounds to
+    nothing are `unchanged`;
   - `note` and `stolen` on an entry: `note` sets or, absent or blank, clears the note; `stolen` sets
     or removes the marker of the whole entry or, with a `quantity`, of a part that becomes an entry
     of its own (REQ-INV-053). A `note`, `stolen` or move that finds the entry as it asks is
@@ -2481,9 +2488,16 @@ a stale one is refused `VERSION_CONFLICT` for that op (see *Per op* below). Only
   ordered by name, without those who withhold their name, as `org-stock-members.schema.json`; a unit
   the member is not a Logistician and direct member of is `403 NOT_PERMITTED`. The unit is a query
   parameter so that every acting path stays literal (REQ-SEC-080).
-- **Targets.** `GET /exchange/v1/org-stock/targets?unit=<unit>&material=…|item=…` lists the job
-  orders and missions the web's „+ Zuordnen" picker offers for that unit and that material or item,
-  with id, the order's number or the mission's name, and status.
+- **Targets.** `GET /exchange/v1/org-stock/targets?unit=<unit>&material=<bt>` (backend
+  `GET /api/v1/exchange/org-stock/targets`) lists the job orders and missions the web's
+  „+ Zuordnen" picker offers for that unit, as the web shows them with the unit as the active one,
+  for the material or item `material` names — the `material.bt` of the org stock's lots, which
+  names a material or a game item. Job orders are the open and in-progress ones that need it and
+  that the unit, a Spezialkommando or no unit is responsible for, only for a member who passes the
+  web's job-order gate (REQ-XCH-018), with id, `number` and status; missions are those of the
+  Lager's mission picker for the unit, with id, name and status, and none for an item. An id that
+  names neither answers empty lists; a unit the member is not a Logistician and direct member of is
+  `403 NOT_PERMITTED`. The answer is `org-stock-targets.schema.json`.
 - **Side effects as in the web.** Reservations are protected (`STOCK_EARMARKED`, `OVER_ALLOCATION`),
   Materialbörse offers follow, the web's notifications are sent, peers see the change live
   (REQ-XCH-030), and the Lager audit records each op with the writer and the external client.
@@ -2522,7 +2536,12 @@ their rows are locked in ascending id order (ADR-0229). `dryRun`
   `INVENTORY_POOL_CHANGED`, `INVENTORY_ITEM_NOTE_UPDATED`, `INVENTORY_STOLEN_MARKED`, naming the
   writer and the client), the holders' notifications and the org-stock feed are those of the web's
   action. *`ExchangeOrgStockWriteControllerTest`.*
-- [ ] A Logistician edits earmarks (#2591).
+- [x] A Logistician adds, changes and removes earmarks of another member's entry, several ops on
+  the same entry in one batch; the slices, the Lager audit events (`INVENTORY_ALLOCATION_ADDED`,
+  `_CHANGED`, `_REMOVED`, naming the writer and the client), the journal and the org-stock feed are
+  those of the web's action; an over-allocation is `OVER_ALLOCATION`, a duplicate, wrong or unknown
+  target `EARMARK_TARGET_INVALID`, a personal entry `NOT_PERMITTED`.
+  *`ExchangeOrgStockWriteControllerTest`.*
 - [x] An op on a pool where the writer is not a Logistician, on a personal row or on a row of
   another pool is refused `NOT_PERMITTED` and changes nothing. *`ExchangeOrgStockWriteControllerTest`.*
 - [x] A `book-in` naming a member who withholds their name, or who is not a member of the unit, is
@@ -2534,15 +2553,19 @@ their rows are locked in ascending id order (ADR-0229). `dryRun`
 - [x] Every op counts toward the writes per day, a dry run once; a change set over the quota is
   refused with its further ops given back. *`ExchangeChangeRouteTest`, `ExchangeStoreRedisIntegrationTest`.*
 - [x] The roster leaves out members who withhold their name and refuses a unit the writer is not a
-  Logistician of. *`ExchangeOrgStockWriteControllerTest`, `ExchangeOrgStockRouteTest`.* The targets
-  follow with #2591.
+  Logistician of. *`ExchangeOrgStockWriteControllerTest`, `ExchangeOrgStockRouteTest`.*
+- [x] The targets are the open job orders that need the material and the missions the web's picker
+  offers for the unit, leave out other units' orders and internal missions, and refuse a unit the
+  writer is not a Logistician of. *`ExchangeOrgStockWriteControllerTest`,
+  `ExchangeOrgStockRouteTest`, `ExchangeWireContractTest`.*
 
-**Code:** `ExchangeOrgStockWriteService`, `ExchangeOrgStockRoster`, `ExchangeLotCatalogue`,
-`PoolEntryCommands` / `InventoryPoolEntryCommands`, `ExchangeOrgStockController#orgStockChanges` /
-`#orgStockMembers`, `ExchangeController#orgStockChanges` / `#orgStockMembers`,
-`ExchangeQuotas#countFurtherOps`, `V298`, `V299` · **Status:** the capability, the roster,
-`book-in` and `book-out` built (#2589); `sell`, the moves, `note` and `stolen` built (#2590); the
-earmark ops and targets (#2591) planned
+**Code:** `ExchangeOrgStockWriteService`, `ExchangeOrgStockRoster`, `ExchangeOrgStockTargets`,
+`ExchangeLotCatalogue`, `PoolEntryCommands` / `InventoryPoolEntryCommands`,
+`InventoryItemService#writeAllocationForPool`, `ExchangeOrgStockController#orgStockChanges` /
+`#orgStockMembers` / `#orgStockTargets`, `ExchangeController#orgStockChanges` / `#orgStockMembers`
+/ `#orgStockTargets`, `ExchangeQuotas#countFurtherOps`, `V298`, `V299`, `V301` · **Status:** the
+capability, the roster, `book-in` and `book-out` built (#2589); `sell`, the moves, `note` and
+`stolen` built (#2590); the earmark ops and the targets built (#2591)
 
 ### REQ-XCH-046 — Org-stock writes are journaled, undoable and guarded per writer and pool
 
@@ -2554,10 +2577,11 @@ as in the web and cannot undo the writer's changes. The mass-change guard (REQ-X
 book-outs, sales and moves out of a pool per writer and pool with its own window rules; a batch over
 the threshold is held for confirmation in the writer's browser.
 
-*Journal (#2589, #2590).* Every applied op writes one `exchange_journal` row per Lager entry it
+*Journal (#2589, #2590, #2591).* Every applied op writes one `exchange_journal` row per Lager entry it
 changed (`resource = ORG_STOCK`, actions `ORG_STOCK_BOOK_IN`, `ORG_STOCK_BOOK_OUT`,
 `ORG_STOCK_SELL`, `ORG_STOCK_MOVE_LOCATION`, `ORG_STOCK_MOVE_HOLDER`, `ORG_STOCK_MOVE_POOL`,
-`ORG_STOCK_NOTE`, `ORG_STOCK_STOLEN`, keyed by the entry id) under the writer, with the entry's
+`ORG_STOCK_NOTE`, `ORG_STOCK_STOLEN`, `ORG_STOCK_EARMARK_ADD`, `ORG_STOCK_EARMARK_CHANGE`,
+`ORG_STOCK_EARMARK_REMOVE`, keyed by the entry id) under the writer, with the entry's
 holder, pool, lot key, amount, version and earmarks before and after — not the holder's note; the
 writer's data export shows these rows without the holder; a move or a stolen split also journals the
 entry it created, and a merge each entry it folded away. The entry a book-out, a sale, a
