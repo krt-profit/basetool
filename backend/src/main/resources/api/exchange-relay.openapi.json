@@ -1832,7 +1832,7 @@
     },
     "/api/v1/exchange/org-stock" : {
       "get" : {
-        "description" : "Gateway-only. A snapshot of the pools of the member's direct units or, with a feed cursor, their changes.",
+        "description" : "Gateway-only. A snapshot of the pools of the member's direct units or, with a feed cursor, their changes. With exchange.orgstock.details, the lots of a pool in which the member is a Logistician of the unit carry their single entries.",
         "operationId" : "orgStock",
         "parameters" : [ {
           "in" : "query",
@@ -2511,11 +2511,53 @@
           }
         }
       },
+      "ExchangeOrgStockEntryDto" : {
+        "type" : "object",
+        "properties" : {
+          "free" : {
+            "$ref" : "#/components/schemas/ExchangeEarmarkedDto"
+          },
+          "holder" : {
+            "$ref" : "#/components/schemas/Holder"
+          },
+          "id" : {
+            "type" : "string"
+          },
+          "jobOrders" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/JobOrderEarmark"
+            }
+          },
+          "missions" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/MissionEarmark"
+            }
+          },
+          "note" : {
+            "type" : "string"
+          },
+          "quantity" : {
+            "$ref" : "#/components/schemas/ExchangeQuantityDto"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
       "ExchangeOrgStockLotDto" : {
         "type" : "object",
         "properties" : {
           "earmarked" : {
             "$ref" : "#/components/schemas/ExchangeEarmarkedDto"
+          },
+          "entries" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeOrgStockEntryDto"
+            }
           },
           "key" : {
             "type" : "string"
@@ -3083,6 +3125,20 @@
           }
         }
       },
+      "Holder" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "ref" : {
+            "type" : "string"
+          },
+          "withheld" : {
+            "type" : "boolean"
+          }
+        }
+      },
       "ImportIssueDto" : {
         "type" : "object",
         "properties" : {
@@ -3156,6 +3212,24 @@
           }
         },
         "required" : [ "ref" ]
+      },
+      "JobOrderEarmark" : {
+        "type" : "object",
+        "properties" : {
+          "delivered" : {
+            "type" : "boolean"
+          },
+          "id" : {
+            "type" : "string"
+          },
+          "number" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "quantity" : {
+            "$ref" : "#/components/schemas/ExchangeQuantityDto"
+          }
+        }
       },
       "LocationDto" : {
         "type" : "object",
@@ -3247,6 +3321,20 @@
           "version" : {
             "type" : "integer",
             "format" : "int64"
+          }
+        }
+      },
+      "MissionEarmark" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "quantity" : {
+            "$ref" : "#/components/schemas/ExchangeQuantityDto"
           }
         }
       },

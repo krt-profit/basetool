@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitListDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -55,5 +56,17 @@ public class ExchangeOrgUnitService {
                         option.orgUnitShorthand(),
                         option.kind()))
             .toList());
+  }
+
+  /**
+   * Returns the units whose membership makes the member a Logistician of that unit, without the
+   * cascade (REQ-XCH-043).
+   *
+   * @param member the member the current request acts for
+   * @return the unit ids, possibly empty
+   */
+  @Transactional(readOnly = true)
+  public @NotNull Set<UUID> logisticianUnits(@NotNull UUID member) {
+    return membershipQueryService.findLogisticianOrgUnitIds(member);
   }
 }

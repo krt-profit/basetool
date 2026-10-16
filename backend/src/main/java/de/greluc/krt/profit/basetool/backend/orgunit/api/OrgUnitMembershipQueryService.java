@@ -200,6 +200,24 @@ public class OrgUnitMembershipQueryService {
   }
 
   /**
+   * Returns the org-unit ids whose membership makes the user a Logistician of that unit, by {@link
+   * OrgUnitMembership#isLogisticianOfOwnUnit()} and without the leadership cascade (REQ-XCH-043).
+   *
+   * @param userId the user whose direct memberships to read; never {@code null}.
+   * @return the org-unit ids; never {@code null}, possibly empty.
+   */
+  @NotNull
+  public Set<UUID> findLogisticianOrgUnitIds(@NotNull UUID userId) {
+    Set<UUID> ids = new LinkedHashSet<>();
+    for (OrgUnitMembership row : membershipRepository.findAllByIdUserId(userId)) {
+      if (row.isLogisticianOfOwnUnit()) {
+        ids.add(row.getId().getOrgUnitId());
+      }
+    }
+    return ids;
+  }
+
+  /**
    * Lists the user's direct memberships across all four kinds as named picker options, ordered OL,
    * Bereich, Staffel, SK and then by name, so the first element is the primary unit. Backs the bank
    * counterparty org-unit picker (REQ-BANK-044).

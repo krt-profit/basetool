@@ -222,9 +222,10 @@ requires it and duplicating it into further files spreads personal data for no g
   (REQ-XCH-009, REQ-XCH-017, REQ-XCH-018, REQ-XCH-048). The one exception for other members' data
   is the shared stock of a unit (ADR-0257, REQ-XCH-042…045): a client approved for it receives the
   shared stock of each unit the member directly belongs to, summed per lot over every holder and
-  naming none (REQ-XCH-042, built); a client approved for its details (planned)
-  shows a Logistician or leader of that unit the name as the web shows it, a per-client pseudonym
-  and the note of each member's shared entries in that unit, and the unit's member roster. A member
+  naming none (REQ-XCH-042, built); a client approved for its details (`exchange.orgstock.details`,
+  REQ-XCH-043, built) shows a Logistician or leader of that unit the name as the web shows it, a
+  per-client pseudonym and the note of each member's shared entries in that unit, and (planned,
+  REQ-XCH-045) the unit's member roster. A member
   who withholds their name is left out of both; their entries stay, without name, pseudonym or
   note. The privacy notice („Verbundene Anwendungen") names this and the setting; the legal basis
   is Art. 6(1)(f), coordinating the shared stock, and the setting is the member's objection.

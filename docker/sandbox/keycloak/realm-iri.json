@@ -958,6 +958,32 @@
           "protocolMapper": "oidc-audience-mapper"
         }
       ]
+    },
+    {
+      "attributes": {
+        "consent.screen.text": "${xchConsentOrgStockDetails}",
+        "display.on.consent.screen": "true",
+        "gui.order": "13",
+        "include.in.openid.provider.metadata": "true",
+        "include.in.token.scope": "true"
+      },
+      "name": "exchange.orgstock.details",
+      "protocol": "openid-connect",
+      "protocolMappers": [
+        {
+          "config": {
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "included.custom.audience": "basetool-ingest",
+            "introspection.token.claim": "true",
+            "lightweight.claim": "false"
+          },
+          "consentRequired": false,
+          "name": "aud-basetool-ingest",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper"
+        }
+      ]
     }
   ],
   "clientSessionIdleTimeout": 0,
@@ -1148,6 +1174,7 @@
         "exchange.drafts.refinery",
         "exchange.orgunits.read",
         "exchange.orgstock.read",
+        "exchange.orgstock.details",
         "offline_access"
       ],
       "protocol": "openid-connect",
@@ -1203,6 +1230,7 @@
         "exchange.drafts.refinery",
         "exchange.orgunits.read",
         "exchange.orgstock.read",
+        "exchange.orgstock.details",
         "offline_access"
       ],
       "protocol": "openid-connect",

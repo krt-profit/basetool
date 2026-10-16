@@ -251,7 +251,7 @@ class ExchangeRelaySeamParityTest {
 
   /**
    * Asserts that the gateway's route table holds exactly the given routes with their capabilities
-   * and that every capability scope appears.
+   * and that every capability scope but the additive ones gates a route.
    *
    * @param expected {@code METHOD path} to capability, {@link ExchangeSeam#ANY_CAPABILITY} for any
    */
@@ -267,6 +267,8 @@ class ExchangeRelaySeamParityTest {
       }
     }
     assertThat(routes).hasSize(16).isEqualTo(new TreeMap<>(expected));
+    assertThat(scopes).doesNotContainAnyElementsOf(ExchangeSeam.ADDITIVE_SCOPES);
+    scopes.addAll(ExchangeSeam.ADDITIVE_SCOPES);
     assertThat(scopes).isEqualTo(new TreeSet<>(ExchangeSeam.CAPABILITY_SCOPES));
   }
 

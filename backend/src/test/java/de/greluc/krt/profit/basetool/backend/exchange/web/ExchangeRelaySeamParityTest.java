@@ -282,7 +282,7 @@ class ExchangeRelaySeamParityTest {
         Arrays.stream(ExchangeCapability.values())
             .map(ExchangeCapability::getScope)
             .collect(Collectors.toCollection(TreeSet::new));
-    assertThat(scopes).hasSize(12).isEqualTo(new TreeSet<>(expected));
+    assertThat(scopes).hasSize(13).isEqualTo(new TreeSet<>(expected));
   }
 
   /**

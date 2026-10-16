@@ -71,6 +71,18 @@ public interface StockReads {
       @NotNull Collection<UUID> units, @NotNull Collection<String> keys);
 
   /**
+   * Returns the shared rows of the given lots of the given units' pools with their holders and
+   * earmarks, ordered by lot key and row id (REQ-XCH-043).
+   *
+   * @param units the units whose pools are read; an empty collection yields an empty list
+   * @param keys the org-stock lot keys; an empty collection yields an empty list
+   * @return one row per shared Lager row of those lots
+   */
+  @NotNull
+  List<ExchangeOrgStockEntryRow> exchangeOrgEntries(
+      @NotNull Collection<UUID> units, @NotNull Collection<String> keys);
+
+  /**
    * Returns the member's lots with the given keys, as they are now.
    *
    * @param member the member

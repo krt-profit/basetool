@@ -91,6 +91,7 @@ body:
         - label: exchange.demand.read
         - label: exchange.orgunits.read
         - label: exchange.orgstock.read
+        - label: exchange.orgstock.details
         - label: exchange.drafts.blueprints
         - label: exchange.drafts.refinery
 

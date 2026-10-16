@@ -5,6 +5,13 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
 
 ## 2026-10-16
 
+- **New: org-stock entries.** Under the new scope `exchange.orgstock.details`, in addition to
+  `exchange.orgstock.read`, every lot of a pool in which the member is a Logistician of the unit
+  carries `entries`: holder name and a per-client `ref`, amount, note and the job-order and mission
+  earmarks of each single entry. A holder who withholds their name is `{withheld: true}` without
+  name, `ref` or note. Name, withholding and mission-name changes reach the feed
+  ([org stock](resources/org-stock.md#entries)). `org-stock-lot.schema.json` gains the optional
+  `entries`.
 - **New: the org-stock feed.** The feed cursor on the last page of `GET /exchange/v1/org-stock`
   now resumes a change feed instead of answering `410 CURSOR_EXPIRED`: each changed lot once, its
   current state or a tombstone, with the units the member reads on every page. A member who joins a

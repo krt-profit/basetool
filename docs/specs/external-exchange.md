@@ -58,9 +58,10 @@ The exchange API is served by the ingest gateway at `/exchange/v1/**`
 | `POST /exchange/v1/org-stock/changes` | `exchange.orgstock.write` | REQ-XCH-045 |
 | `GET /exchange/v1/org-stock/units/{unit}/members` · `…/targets` | `exchange.orgstock.write` | REQ-XCH-045 |
 
-Of the three `org-stock` rows the read is built, as a snapshot and a feed (REQ-XCH-042); the writes, the
-roster, the targets and the two `.details` capabilities are planned (ADR-0257), and until they are
-built the gateway serves none of them.
+Of the three `org-stock` rows the read is built, as a snapshot and a feed (REQ-XCH-042), with
+`exchange.orgstock.details` (REQ-XCH-043); the writes, the roster, the targets and
+`exchange.demand.details` are planned (ADR-0257), and until they are built the gateway serves none
+of them.
 | `POST /exchange/v1/me/drafts/blueprints` · `…/drafts/refinery-orders` | `exchange.drafts.blueprints` / `.refinery` | REQ-XCH-019 |
 
 Every route is deny-by-default, uses only `GET` or `POST` (the ingest bot filter admits nothing
@@ -829,8 +830,9 @@ purged position as the horizon, below which a cursor has expired.
   *`ExchangeChangeFeedTriggerIntegrationTest` pins the synced tables — `personal_blueprint`,
   `default_blueprint`, `inventory_item` (the member's rows, personal and shared, keyed by lot, and
   the shared rows of a pool, keyed by unit lot), both allocation tables and `org_unit_membership`
-  (the org stock of REQ-XCH-042), `ship` and `org_unit` (the ships and lots of a renamed unit) — to
-  their triggers and runs bulk deletes,
+  (the org stock of REQ-XCH-042), `app_user`, `exchange_name_withholding` and `mission` (a holder's
+  name, its withholding and an earmarked mission's name in the details of REQ-XCH-043), `ship` and
+  `org_unit` (the ships and lots of a renamed unit) — to their triggers and runs bulk deletes,
   owner reassignment, a move to another place, a rebooking between personal and shared that leaves
   the lot unchanged, and user deletion through them. `V260` announced every lot holding shared rows
   once, as a `system` change, so a cursor taken before it still sees them (ADR-0230).*
@@ -2195,7 +2197,8 @@ it, so a rename on one side alone fails that side's build:
   expressions, `ActingMemberFilter`'s 15 exact paths, the gateway's `ExchangeRoutes` and its relay
   prefix (`ExchangeRelaySeamParityTest` in both modules), and the paths the relay actually calls
   (`ExchangeGoldenAnswerTest`);
-- the five relay headers, the twelve capability scopes, the seven gate codes with their statuses, the
+- the five relay headers, the thirteen capability scopes (`exchange.orgstock.details` the one that
+  gates no route of its own), the seven gate codes with their statuses, the
   codes the gateway passes through and the four backend codes it translates;
 - the registry mirror document: the backend's writer must produce the seam's sample document, and
   the gateway's reader must read every member of it — renaming any member it reads changes what it
@@ -2305,8 +2308,9 @@ other units never appear; the admin all-scope and pin never apply.
   never reach it. The entries are written by triggers on every change that alters a lot or the
   details of REQ-XCH-043: an `inventory_item` insert or delete, a change of its amount, holder,
   material, item, location, quality, „gestohlen", personal flag, owning org unit or note, an insert,
-  update or delete on either allocation table, and a holder's name change or name withholding
-  (REQ-XCH-044), which announces every lot the holder has an entry in. A rebooking between personal
+  update or delete on either allocation table, a holder's name change or name withholding
+  (REQ-XCH-044), which announces every lot the holder has an entry in, and the rename of a mission
+  an entry is earmarked to, which announces those entries' lots (`V297`). A rebooking between personal
   and shared therefore shows up here although it changes no `/me/stock` lot. Joining a unit
   announces every lot of its pool, so a member whose cursor predates the join receives the pool
   through the feed, and a rename of the unit announces them for the lots' `unit.name`. `V296`
@@ -2342,13 +2346,14 @@ other units never appear; the admin all-scope and pin never apply.
   *`ExchangeChangeFeedTriggerIntegrationTest`, `ExchangeOrgStockControllerTest`.*
 - [x] After the member leaves a unit, the next page no longer lists the unit or its lots; after
   joining one, the feed delivers its pool. *`ExchangeOrgStockControllerTest`.*
-- [ ] A holder's name change or name withholding announces their lots (with REQ-XCH-043/-044).
+- [x] A holder's name change or name withholding announces their lots (with REQ-XCH-043/-044).
+  *`ExchangeOrgStockDetailsControllerTest`.*
 
 **Code:** `ExchangeOrgStockController`, `ExchangeOrgStockService`, `StockReads#exchangeOrgLots` /
-`#exchangeOrgLotsByKeys`, `ExchangeFeedReader#orgChanges`, the `V296` triggers,
-`ExchangeController#orgStock` · **Status:** the snapshot, the capability (`V295`, the provisioner's
-`xchConsentOrgStockRead`), the schemas, the docs and the page counter built (#2586); the feed
-built (#2587); the name announcements follow with the details (#2588)
+`#exchangeOrgLotsByKeys`, `ExchangeFeedReader#orgChanges`, the `V296` and `V297` triggers,
+`ExchangeController#orgStock` · **Status:** implemented — the snapshot, the capability (`V295`, the
+provisioner's `xchConsentOrgStockRead`), the schemas, the docs and the page counter (#2586), the
+feed (#2587), the name and mission-name announcements (#2588)
 
 ### REQ-XCH-043 — A Logistician of the pool sees the single entries by name
 
@@ -2362,29 +2367,44 @@ a **Logistician of the unit** carries `entries[]`; in any other pool a lot carri
   for its own-unit contextual `LOGISTICIAN` authority too; the exchange omits the converter's
   cascade, and the `OFFICER` realm role plays no part.
 - **An entry** carries its id and `version`, the holder, the amount, the note, the job-order
-  earmarks (order id, number `#displayId`, amount, delivered) and the mission earmarks (mission id,
-  name, amount)
-  with the unearmarked rest per dimension — what the web's entry row shows.
-- **The holder** is the name the web shows (`effectiveName`) and a `ref`: an HMAC-SHA256 of the
-  user id under a 32-byte random salt the backend stores with the client in `exchange_client`. The
-  salt is created when the client is registered, never leaves the backend and is never mirrored, so
-  the same member has a different `ref` at every client and the same `ref` at every request of one.
+  earmarks (order id, `number` = `displayId`, amount, delivered) and the mission earmarks (mission
+  id, name, amount) with the unearmarked rest per dimension (`free`) — what the web's entry row
+  shows. Amounts are quantities in the lot's unit; entries are ordered by row id. Donation earmarks
+  are not served.
+- **The holder** is the name the web shows (`effectiveName`) and a `ref`: the unpadded base64url
+  HMAC-SHA256 of the user id's 16 bytes under a 32-byte random salt the backend stores with the
+  client in `exchange_client.holder_ref_salt`. The salt is created with the client's row (`V297`
+  gave every existing client one), is not mapped by the entity, never leaves the backend and is
+  never mirrored, so the same member has a different `ref` at every client and the same `ref` at
+  every request of one.
 - A holder who withholds their name (REQ-XCH-044) appears with `withheld: true` and neither name,
   `ref` nor note.
+- **The capability** gates no route of its own: a request without it is answered without entries,
+  never refused. Like every capability it admits the routes any capability serves. A membership that
+  starts or stops making its member a Logistician of the unit (the flag or the rank changes)
+  announces the unit's pool in the feed (`V297`), so the entries appear or vanish without a new
+  snapshot. The capability itself is the client's: a client whose token gains it reads a new
+  snapshot, and one whose token loses it drops the entries it kept.
 
 **Acceptance**
 
-- [ ] A member with `is_logistician` in a unit, and one holding any leadership rank there without
+- [x] A member with `is_logistician` in a unit, and one holding any leadership rank there without
   the flag, get entries for that unit's pool; a plain member gets none; a Bereich rank gets none
-  for a child unit's pool they are not a member of.
-- [ ] Without `exchange.orgstock.details` granted and consented, no lot carries entries.
-- [ ] The converter and the exchange answer "Logistician of this unit" through the same method; a
-  test pins every `MembershipRole` against it.
-- [ ] One member's `ref` is stable across requests of one client and differs between two clients.
+  for a child unit's pool they are not a member of. *`ExchangeOrgStockDetailsControllerTest`.*
+- [x] Without `exchange.orgstock.details` granted and consented, no lot carries entries.
+  *`ExchangeOrgStockDetailsControllerTest`.*
+- [x] The converter and the exchange answer "Logistician of this unit" through the same method; a
+  test pins every `MembershipRole` against it. *`OrgUnitMembershipTest`;
+  `OrgUnitMembershipQueryService#findLogisticianOrgUnitIds` reads it for the exchange.*
+- [x] One member's `ref` is stable across requests of one client and differs between two clients;
+  every client holds its own 32-byte salt. *`ExchangeOrgStockDetailsControllerTest`,
+  `ExchangeHolderRefsTest`.*
+- [x] Editing a note, adding an earmark, renaming a holder and renaming an earmarked mission each
+  produce a feed entry whose lot carries the new details. *`ExchangeOrgStockDetailsControllerTest`.*
 
-**Status:** planned — PR 2 of ADR-0257. Built: the rule `OrgUnitMembership#isLogisticianOfOwnUnit`,
-which the converter uses for its own-unit contextual `LOGISTICIAN` (#2584), pinned against every
-`MembershipRole` by `OrgUnitMembershipTest`; the exchange's use of it remains.
+**Code:** `ExchangeOrgStockService`, `ExchangeHolderRefs`, `ExchangeGate#holds`,
+`StockReads#exchangeOrgEntries`, `org-stock-lot.schema.json#/$defs/entry`, `V297` ·
+**Status:** implemented (#2588); the rule `OrgUnitMembership#isLogisticianOfOwnUnit` (#2584)
 
 ### REQ-XCH-044 — A member can withhold their name from connected applications
 
@@ -2409,12 +2429,14 @@ like the other connected-apps controls), saved in place from the profile and aud
   it (`ExchangeNameWithholdingsTest`, `ExchangeNameWithholdingControllerTest`,
   `ProfileNameWithholdingInPlaceE2eTest`, `DataExportEndStateTest`).
 - [ ] With the setting on, no org-stock entry or roster answer carries the member's name, `ref` or
-  note; with it off, they do.
-- [ ] Switching it produces feed entries for every lot the member has an entry in.
+  note; with it off, they do. *The org-stock entries do (`ExchangeOrgStockDetailsControllerTest`);
+  the roster follows with REQ-XCH-045.*
+- [x] Switching it produces feed entries for every lot the member has an entry in.
+  *`ExchangeOrgStockDetailsControllerTest`.*
 - [x] The privacy notice section „Verbundene Anwendungen" states the named data and the setting.
 
-**Status:** the setting, its export, audit and privacy text built; the org stock honours it with
-REQ-XCH-042…045 (PR 2 of ADR-0257)
+**Status:** the setting, its export, audit and privacy text built; the org stock's entries honour
+it (#2588); the roster follows with REQ-XCH-045 (PR 3 of ADR-0257)
 
 ### REQ-XCH-045 — A Logistician of the pool writes the org stock as in the web
 

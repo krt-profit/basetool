@@ -25,7 +25,10 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import java.util.Collection;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -65,6 +68,23 @@ public class ExchangeNameWithholdings {
         .findById(userId)
         .map(s -> new Snapshot(s.isWithholdName(), versionOf(s)))
         .orElseGet(() -> new Snapshot(false, 0L));
+  }
+
+  /**
+   * Returns which of the given members withhold their name.
+   *
+   * @param userIds the members
+   * @return those among them whose stored choice is to withhold their name
+   */
+  @Transactional(readOnly = true)
+  public @NotNull Set<UUID> withholding(@NotNull Collection<UUID> userIds) {
+    if (userIds.isEmpty()) {
+      return Set.of();
+    }
+    return repository.findAllById(userIds).stream()
+        .filter(ExchangeNameWithholding::isWithholdName)
+        .map(ExchangeNameWithholding::getId)
+        .collect(Collectors.toUnmodifiableSet());
   }
 
   /**

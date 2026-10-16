@@ -15,7 +15,8 @@ member and shared stock booked to no unit never appear.
 
 An [`org-stock-lot`](../schemas/) is one pool's stock of one material or item at one warehouse
 location, quality and stolen state, **summed over every member** who holds stock there. The same
-material at the same place in two of the member's units is two lots. A lot names no holder.
+material at the same place in two of the member's units is two lots. A lot names no holder; the
+single entries are an extra, see [Entries](#entries).
 
 | Field | Meaning |
 | --- | --- |
@@ -28,6 +29,7 @@ material at the same place in two of the member's units is two lots. A lot names
 | `stolen` | Whether the stock is marked stolen. |
 | `quantity` | `{amount, unit}`, the summed amount in the material's own unit. |
 | `earmarked` | `{jobOrders, missions}`: how much of `quantity` is reserved for job orders and for missions, each a `{amount, unit}` in the lot's unit; `0` when nothing is. |
+| `entries` | Only with `exchange.orgstock.details`, in a pool where the member is a Logistician: the single entries, see [Entries](#entries). Absent otherwise. |
 
 ```json
 {
@@ -44,6 +46,52 @@ material at the same place in two of the member's units is two lots. A lot names
     "missions": {"amount": 0, "unit": "SCU"}
   }
 }
+```
+
+## Entries
+
+With the additional scope `exchange.orgstock.details`, every lot of a pool in which the member is a
+**Logistician of that unit** carries `entries`: one per holder's stock, as the Basetool shows a
+Logistician in its warehouse. The member is a Logistician of a unit when their membership in exactly
+that unit carries the Logistician flag or a leadership rank; leading an area does not make them one
+of the squadrons below it. In every other pool, and without the scope, lots carry no `entries`. The
+scope asks nothing of its own: a request without it is answered without entries, not refused.
+When the member becomes or stops being a Logistician of a unit, the feed delivers that unit's lots
+again, with or without `entries`. When your token gains the scope, read a new snapshot; when it
+loses it, drop the entries you kept.
+
+| Field | Meaning |
+| --- | --- |
+| `id`, `version` | The entry and its version. |
+| `holder` | `{withheld: false, name, ref}`: the name the Basetool shows and `ref`, a pseudonym of the member that stays the same at your client and differs at every other client. Use `ref`, not the name, to recognise a holder. `{withheld: true}` alone when the member keeps their name away from connected applications. |
+| `quantity` | The entry's amount, in the lot's unit. |
+| `note` | The entry's note, when it has one and the holder is not withheld. |
+| `jobOrders` | `[{id, number?, quantity, delivered}]`: the job orders it is earmarked to, `number` shown as `#number`. |
+| `missions` | `[{id, name?, quantity}]`: the missions it is earmarked to. |
+| `free` | `{jobOrders, missions}`: the part not earmarked, per dimension. |
+
+```json
+"entries": [
+  {
+    "id": "9a7c2e10-4f3b-4d21-8c6e-2b1a0f9d8e31",
+    "version": 3,
+    "holder": {"withheld": false, "name": "Hauler One", "ref": "q0Fh3kB9xV7m2LwP5nR8tY1cZ4dE6gJ0sU3aH7bK9fM"},
+    "quantity": {"amount": 30, "unit": "SCU"},
+    "note": "Hangar 3",
+    "jobOrders": [{"id": "4b2d6f80-1a3c-4e57-9b0d-7c5e3a1f2d42", "number": 412, "quantity": {"amount": 12, "unit": "SCU"}, "delivered": false}],
+    "missions": [],
+    "free": {"jobOrders": {"amount": 18, "unit": "SCU"}, "missions": {"amount": 30, "unit": "SCU"}}
+  },
+  {
+    "id": "1f3e5a7c-9b2d-4c64-8e0a-3d5f7b9c1e75",
+    "version": 0,
+    "holder": {"withheld": true},
+    "quantity": {"amount": 18.25, "unit": "SCU"},
+    "jobOrders": [],
+    "missions": [],
+    "free": {"jobOrders": {"amount": 18.25, "unit": "SCU"}, "missions": {"amount": 18.25, "unit": "SCU"}}
+  }
+]
 ```
 
 ## The answer
@@ -77,9 +125,10 @@ lot when the pool no longer holds any of it. Store the new `nextCursor` after ev
 
 A lot changes when someone books stock into or out of the pool, moves it to another place, holder or
 unit, changes its quality, its stolen marker or its note, rebooks it between personal and shared,
-or earmarks it for a job order or a mission. A tombstone names the channel that removed the lot and,
-for a client, its `clientId`; `installationId` is set only when one of the member's own
-installations removed it.
+or earmarks it for a job order or a mission. For the entries it also changes when a holder's name
+changes or they start or stop withholding it, and when an earmarked mission is renamed. A
+tombstone names the channel that removed the lot and, for a client, its `clientId`;
+`installationId` is set only when one of the member's own installations removed it.
 
 Every feed page lists `units` too. Drop the lots of a unit that is no longer listed. When the
 member joins a unit, the feed delivers every lot of its pool, so you never need a new snapshot for
@@ -102,5 +151,5 @@ without `cursor`.
 }
 ```
 
-You may keep org stock for up to 7 days. It is other members' stock: show it to the member who
-connected your client, and do not pass it on.
+You may keep org stock for up to 7 days. It is other members' stock, and the entries name them:
+show it to the member who connected your client, and do not pass it on.

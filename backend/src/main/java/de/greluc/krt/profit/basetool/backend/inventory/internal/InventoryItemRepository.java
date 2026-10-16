@@ -162,6 +162,59 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   List<ExchangeOrgStockLotRow> findExchangeOrgLotsByKeys(
       @Param("units") Collection<UUID> units, @Param("keys") Collection<String> keys);
 
+  /** A shared Lager row of an org-stock lot, by id and lot key (REQ-XCH-043). */
+  interface ExchangeOrgEntryKey {
+
+    /**
+     * The row id.
+     *
+     * @return the id of the {@code inventory_item} row
+     */
+    UUID getId();
+
+    /**
+     * The org-stock lot key of the lot the row belongs to.
+     *
+     * @return {@code u:<unit>|} followed by the stock lot key
+     */
+    String getLotKey();
+  }
+
+  /**
+   * Returns the shared rows of the given lots of the given units' pools by id and lot key
+   * (REQ-XCH-043).
+   *
+   * @param units the units whose pools are read; never empty
+   * @param keys the org-stock lot keys; never empty
+   * @return the rows, ordered by lot key and row id
+   */
+  @Query(
+      value =
+          """
+          SELECT entries.id AS id, entries.lot_key AS lotKey
+          FROM (SELECT i.id,
+                       exchange_org_stock_lot_key(i.owning_org_unit_id, i.material_id,
+                                                  i.game_item_id, i.location_id, i.quality,
+                                                  i.stolen) AS lot_key
+                FROM inventory_item i
+                WHERE NOT i.personal AND i.owning_org_unit_id IN (:units)) entries
+          WHERE entries.lot_key IN (:keys)
+          ORDER BY entries.lot_key, entries.id
+          """,
+      nativeQuery = true)
+  List<ExchangeOrgEntryKey> findExchangeOrgEntryKeys(
+      @Param("units") Collection<UUID> units, @Param("keys") Collection<String> keys);
+
+  /**
+   * Loads the given rows with their holder; the earmark collections load in batches.
+   *
+   * @param ids the row ids
+   * @return the existing rows, in no particular order
+   */
+  @EntityGraph(attributePaths = {"user"})
+  @Query("SELECT i FROM InventoryItem i WHERE i.id IN :ids")
+  List<InventoryItem> findAllWithUserByIdIn(@Param("ids") Collection<UUID> ids);
+
   /**
    * Returns the member's lots with the given keys, as they are now.
    *

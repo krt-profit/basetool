@@ -104,3 +104,22 @@ role (REQ-XCH-009), so a web role cannot decide anything there by itself.
 
 Rejected: a cursor that encodes the units it covered — it would change the cursor format clients
 already store, and the snapshot cursors issued before the feed existed would not carry it.
+
+## Amendment 2 (2026-10-16) — how the named details are served
+
+1. **An additive capability.** `exchange.orgstock.details` gates no route: the org-stock route
+   checks it after the gate admitted `.read` and answers without entries when it is missing, never
+   with `403`. Like every capability it opens the routes any capability serves.
+2. **The salt lives only in the database.** `exchange_client.holder_ref_salt` is filled by a column
+   default when the row is inserted (and `V297` gave every existing client one); the entity does not
+   map it, so neither the registry DTOs, the mirror nor a log line can carry it. The `ref` is the
+   unpadded base64url HMAC-SHA256 of the user id's 16 bytes.
+3. **Details reach the feed through triggers too.** A holder's rename, a change of their name
+   withholding and the rename of an earmarked mission announce the affected lots, like every other
+   org-stock change; so does a membership that starts or stops making its member a Logistician of
+   the unit, for the whole pool. The client never has to re-read a snapshot to see them; only a
+   change of the client's own scope needs one.
+
+Rejected: a salt column on the entity with `@ToString.Exclude` — one forgotten mapping or log
+statement would leak it; a separate `/entries` route — the client would need a second request per
+lot and a second cursor.

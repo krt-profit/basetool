@@ -20,7 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.exchange.web;
 
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCaller;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeFeedReader;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeGate;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOrgStockService;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockPageDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
@@ -51,6 +53,9 @@ public class ExchangeOrgStockController {
   /** Pages the shared lots of the acting member's direct units and counts each page. */
   private final ExchangeOrgStockService orgStockService;
 
+  /** Tells whether the admitted request also holds {@code exchange.orgstock.details}. */
+  private final ExchangeGate exchangeGate;
+
   /**
    * Returns a snapshot or feed page of the org stock.
    *
@@ -66,7 +71,8 @@ public class ExchangeOrgStockController {
       summary = "Exchange: the shared stock of my units",
       description =
           "Gateway-only. A snapshot of the pools of the member's direct units or, with a feed"
-              + " cursor, their changes.")
+              + " cursor, their changes. With exchange.orgstock.details, the lots of a pool in"
+              + " which the member is a Logistician of the unit carry their single entries.")
   @ApiResponse(responseCode = "200", description = "The page")
   @ApiResponse(responseCode = "410", description = "The cursor has expired (CURSOR_EXPIRED)")
   public ResponseEntity<ExchangeOrgStockPageDto> orgStock(
@@ -75,6 +81,9 @@ public class ExchangeOrgStockController {
       @NotNull Authentication authentication) {
     return ResponseEntity.ok(
         orgStockService.page(
-            ExchangeCaller.of((SubjectAuthentication) authentication), cursor, limit));
+            ExchangeCaller.of((SubjectAuthentication) authentication),
+            cursor,
+            limit,
+            exchangeGate.holds(ExchangeCapability.ORGSTOCK_DETAILS, authentication)));
   }
 }

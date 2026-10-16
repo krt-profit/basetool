@@ -20,23 +20,29 @@
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.inventory.api.ExchangeOrgStockEntryRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.ExchangeOrgStockLotRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.ExchangeStockLotRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderAllocationDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderMaterialStockRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.LinkedStockRow;
+import de.greluc.krt.profit.basetool.backend.inventory.api.MissionAllocationDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockRows;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -77,6 +83,89 @@ public class InventoryStockReads implements StockReads, OrderLinkedStockRows {
     return units.isEmpty() || keys.isEmpty()
         ? List.of()
         : inventoryRepository.findExchangeOrgLotsByKeys(units, keys);
+  }
+
+  @Override
+  public @NotNull List<ExchangeOrgStockEntryRow> exchangeOrgEntries(
+      @NotNull Collection<UUID> units, @NotNull Collection<String> keys) {
+    if (units.isEmpty() || keys.isEmpty()) {
+      return List.of();
+    }
+    List<InventoryItemRepository.ExchangeOrgEntryKey> entryKeys =
+        inventoryRepository.findExchangeOrgEntryKeys(units, keys);
+    if (entryKeys.isEmpty()) {
+      return List.of();
+    }
+    Map<UUID, InventoryItem> rows =
+        inventoryRepository
+            .findAllWithUserByIdIn(
+                entryKeys.stream().map(InventoryItemRepository.ExchangeOrgEntryKey::getId).toList())
+            .stream()
+            .collect(Collectors.toMap(InventoryItem::getId, Function.identity()));
+    List<ExchangeOrgStockEntryRow> entries = new ArrayList<>(entryKeys.size());
+    for (InventoryItemRepository.ExchangeOrgEntryKey key : entryKeys) {
+      InventoryItem row = rows.get(key.getId());
+      if (row != null) {
+        entries.add(entryOf(key.getLotKey(), row));
+      }
+    }
+    return entries;
+  }
+
+  /**
+   * Builds the entry of one shared row with its holder's shown name and its earmarks.
+   *
+   * @param lotKey the org-stock lot key of the row's lot
+   * @param row the row, its holder loaded
+   * @return the entry
+   */
+  private @NotNull ExchangeOrgStockEntryRow entryOf(
+      @NotNull String lotKey, @NotNull InventoryItem row) {
+    User holder = row.getUser();
+    List<ExchangeOrgStockEntryRow.JobOrder> jobOrders =
+        row.getJobOrderAllocations().stream()
+            .map(
+                slice -> {
+                  JobOrderAllocationDto dto = inventoryItemMapper.jobOrderAllocationToDto(slice);
+                  return new ExchangeOrgStockEntryRow.JobOrder(
+                      slice.getJobOrderId(),
+                      dto == null ? null : dto.jobOrderDisplayId(),
+                      amountOf(slice.getAmount()),
+                      Boolean.TRUE.equals(slice.getDelivered()));
+                })
+            .toList();
+    List<ExchangeOrgStockEntryRow.Mission> missions =
+        row.getMissionAllocations().stream()
+            .map(
+                slice -> {
+                  MissionAllocationDto dto = inventoryItemMapper.missionAllocationToDto(slice);
+                  return new ExchangeOrgStockEntryRow.Mission(
+                      slice.getMissionId(),
+                      dto == null ? null : dto.missionName(),
+                      amountOf(slice.getAmount()));
+                })
+            .toList();
+    Long version = row.getVersion();
+    return new ExchangeOrgStockEntryRow(
+        lotKey,
+        row.getId(),
+        version == null ? 0L : version,
+        holder.getId(),
+        holder.getEffectiveName(),
+        amountOf(row.getAmount()),
+        row.getNote(),
+        jobOrders,
+        missions);
+  }
+
+  /**
+   * Reads a stored amount, an absent one as zero.
+   *
+   * @param amount the stored amount, or {@code null}
+   * @return the amount
+   */
+  private static double amountOf(@Nullable Double amount) {
+    return amount == null ? 0 : amount;
   }
 
   @Override

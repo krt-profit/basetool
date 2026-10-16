@@ -98,6 +98,7 @@ EXCHANGE_SCOPES: list[tuple[str, str]] = [
     ("exchange.drafts.refinery", "xchConsentDraftsRefinery"),
     ("exchange.orgunits.read", "xchConsentOrgUnitsRead"),
     ("exchange.orgstock.read", "xchConsentOrgStockRead"),
+    ("exchange.orgstock.details", "xchConsentOrgStockDetails"),
 ]
 EXCHANGE_SCOPE_NAMES = [name for name, _ in EXCHANGE_SCOPES]
 

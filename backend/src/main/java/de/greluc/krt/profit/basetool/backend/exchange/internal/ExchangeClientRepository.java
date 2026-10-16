@@ -78,6 +78,17 @@ public interface ExchangeClientRepository extends JpaRepository<ExchangeClient, 
   Optional<ExchangeClient> findWithCapabilitiesByClientId(@Param("clientId") String clientId);
 
   /**
+   * Reads the salt of a client's holder pseudonyms, which the entity does not map (REQ-XCH-043).
+   *
+   * @param clientId the Keycloak client id
+   * @return the 32-byte salt, or empty when no row carries the id
+   */
+  @Query(
+      value = "SELECT holder_ref_salt FROM exchange_client WHERE client_id = :clientId",
+      nativeQuery = true)
+  Optional<byte[]> findHolderRefSalt(@Param("clientId") String clientId);
+
+  /**
    * Lists every registered client id, whatever its status.
    *
    * @return the client ids

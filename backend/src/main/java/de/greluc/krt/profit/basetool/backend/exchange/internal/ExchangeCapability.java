@@ -65,6 +65,9 @@ public enum ExchangeCapability {
   /** Reading the shared stock of the member's direct org units. */
   ORGSTOCK_READ("exchange.orgstock.read"),
 
+  /** Adding the named single entries to the org-stock lots of the member's Logistician units. */
+  ORGSTOCK_DETAILS("exchange.orgstock.details"),
+
   /** Submitting blueprint drafts for review in the browser. */
   DRAFTS_BLUEPRINTS("exchange.drafts.blueprints"),
 
