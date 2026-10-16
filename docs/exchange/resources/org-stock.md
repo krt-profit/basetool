@@ -71,9 +71,9 @@ while `hasMore` is `true`. A lot whose stock changes while you page may move to 
 ## Following changes
 
 As for every resource, the last snapshot page carries a feed cursor: store it, and read with it
-later to get only what changed since ([sync guide](../sync-guide.md)). A feed page holds each changed lot
-once, in `items` with its current state or in `removed` as a tombstone keyed like the lot when the
-pool no longer holds any of it. Store the new `nextCursor` after every page.
+later to get only what changed since ([sync guide](../sync-guide.md)). A feed page holds each
+changed lot once, in `items` with its current state or in `removed` as a tombstone keyed like the
+lot when the pool no longer holds any of it. Store the new `nextCursor` after every page.
 
 A lot changes when someone books stock into or out of the pool, moves it to another place, holder or
 unit, changes its quality, its stolen marker or its note, rebooks it between personal and shared,
