@@ -187,11 +187,16 @@ class Smoke:
     def conformance(self) -> None:
         """Sends the change-set fixtures: valid ones as dry runs, invalid ones to be refused."""
         examples = ROOT / "docs" / "exchange" / "examples" / "v1"
-        routes = {"blueprintChangeSet": "blueprints", "stockChangeSet": "stock",
-                  "shipChangeSet": "ships"}
+        routes = {"blueprintChangeSet": "/exchange/v1/me/blueprints/changes",
+                  "stockChangeSet": "/exchange/v1/me/stock/changes",
+                  "shipChangeSet": "/exchange/v1/me/ships/changes",
+                  "orgStockChangeSet": "/exchange/v1/org-stock/changes"}
         for folder in sorted(examples.glob("change-set--*")):
-            resource = routes[folder.name.split("--", 1)[1]]
-            path = f"/exchange/v1/me/{resource}/changes"
+            kind = folder.name.split("--", 1)[1]
+            if kind not in routes:
+                self.step(f"fixture folder {folder.name} has a route", False,
+                          f"add {kind} to the routes of scripts/sandbox-smoke.py")
+            path = routes[kind]
             for fixture in sorted((folder / "valid").glob("*.json")):
                 body = json.loads(fixture.read_text(encoding="utf-8"))
                 body["dryRun"] = True
