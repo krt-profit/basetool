@@ -60,7 +60,7 @@ The exchange API is served by the ingest gateway at `/exchange/v1/**`
 
 Of the three `org-stock` rows the read is built, as a snapshot and a feed (REQ-XCH-042), with
 `exchange.orgstock.details` (REQ-XCH-043), and so are the writes `book-in`, `book-out`, `sell`,
-`move-location`, `move-holder`, `note` and `stolen` and the roster (REQ-XCH-045); the earmark ops,
+`move-location`, `move-holder`, `move-pool`, `note` and `stolen` and the roster (REQ-XCH-045); the earmark ops,
 the targets and `exchange.demand.details` are planned (ADR-0257), and until they are built the
 gateway serves none of them.
 | `POST /exchange/v1/me/drafts/blueprints` · `…/drafts/refinery-orders` | `exchange.drafts.blueprints` / `.refinery` | REQ-XCH-019 |
@@ -2464,8 +2464,13 @@ a stale one is refused `VERSION_CONFLICT` for that op (see *Per op* below). Only
   - `move-holder`: a transfer to a holder who is a direct member of one of the writer's Logistician
     units and does not withhold their name, into that unit's pool (`toUnit`, the holder by `ref`
     from its roster); a move to the entry's own holder at its own place is `unchanged`, one into
-    another pool of the same holder is `NOT_PERMITTED`. Both moves carry the earmarks the plan takes
-    along and merge as the web's transfer does (`mergeScu` for an SCU material);
+    another pool of the same holder is `NOT_PERMITTED` (that is `move-pool`). Both moves carry the
+    earmarks the plan takes along and merge as the web's transfer does (`mergeScu` for an SCU
+    material);
+  - `move-pool`: the Lager's pool change of REQ-INV-059 into `toUnit`, another Logistician unit of
+    the writer that the holder directly belongs to (`HOLDER_UNKNOWN` otherwise) — the whole entry
+    with its earmarks (`STOCK_EARMARKED` with a donation pledge), or a `quantity` from its free stock;
+    its own pool is `unchanged`;
   - `allocation-add`, `allocation-change`, `allocation-remove` on an entry;
   - `note` and `stolen` on an entry: `note` sets or, absent or blank, clears the note; `stolen` sets
     or removes the marker of the whole entry or, with a `quantity`, of a part that becomes an entry
@@ -2492,8 +2497,9 @@ a stale one is refused `VERSION_CONFLICT` for that op (see *Per op* below). Only
   the unit's roster, and a `move-holder` holder not on the roster of `toUnit`), `VERSION_CONFLICT`,
   `INSUFFICIENT_STOCK`, `STOCK_EARMARKED` (what the deduct-from plan does not cover lies in an
   earmark or a donation pledge; without a plan only the free part can be booked out, sold or moved;
-  a partial `stolen` would leave less than the entry's earmarks), `STOCK_OFFERED` (a partial
-  `stolen` would leave less than the entry offers on the Materialbörse), `OVER_ALLOCATION`,
+  a partial `stolen` or `move-pool` would leave less than the entry's earmarks; a whole `move-pool`
+  of a pledged entry), `STOCK_OFFERED` (a partial `stolen` or `move-pool` would leave less than the
+  entry offers on the Materialbörse), `OVER_ALLOCATION`,
   `EARMARK_TARGET_INVALID`, and those of
   REQ-XCH-016 for the material, the place and the unit. The Lager decides its own refusals
   (`PoolEntryCommands`); every holder lot the batch touches takes its advisory lock first, then all
@@ -2511,10 +2517,11 @@ their rows are locked in ascending id order (ADR-0229). `dryRun`
   holder's notification are those of the web's action. *`ExchangeOrgStockWriteControllerTest`.*
 - [x] A Logistician sells another member's entry — the mission's share of the proceeds booked as
   in the web —, moves an entry to another location and to a member of another of their Logistician
-  units, edits the note and „gestohlen" of the whole entry or a part; the rows, the Lager audit
-  events (`INVENTORY_ITEM_SOLD`, `INVENTORY_ITEM_TRANSFERRED`, `INVENTORY_ITEM_NOTE_UPDATED`,
-  `INVENTORY_STOLEN_MARKED`, naming the writer and the client), the holders' notifications and the
-  org-stock feed are those of the web's action. *`ExchangeOrgStockWriteControllerTest`.*
+  units, moves it into another pool of its holder, edits the note and „gestohlen" of the whole entry
+  or a part; the rows, the Lager audit events (`INVENTORY_ITEM_SOLD`, `INVENTORY_ITEM_TRANSFERRED`,
+  `INVENTORY_POOL_CHANGED`, `INVENTORY_ITEM_NOTE_UPDATED`, `INVENTORY_STOLEN_MARKED`, naming the
+  writer and the client), the holders' notifications and the org-stock feed are those of the web's
+  action. *`ExchangeOrgStockWriteControllerTest`.*
 - [ ] A Logistician edits earmarks (#2591).
 - [x] An op on a pool where the writer is not a Logistician, on a personal row or on a row of
   another pool is refused `NOT_PERMITTED` and changes nothing. *`ExchangeOrgStockWriteControllerTest`.*
@@ -2549,12 +2556,12 @@ the threshold is held for confirmation in the writer's browser.
 
 *Journal (#2589, #2590).* Every applied op writes one `exchange_journal` row per Lager entry it
 changed (`resource = ORG_STOCK`, actions `ORG_STOCK_BOOK_IN`, `ORG_STOCK_BOOK_OUT`,
-`ORG_STOCK_SELL`, `ORG_STOCK_MOVE_LOCATION`, `ORG_STOCK_MOVE_HOLDER`, `ORG_STOCK_NOTE`,
-`ORG_STOCK_STOLEN`, keyed by the entry id) under the writer, with the entry's holder, pool, lot key,
-amount, version and earmarks before and after — not the holder's note; the writer's data export
-shows these rows without the holder; a move or a stolen split also journals the entry it created,
-and a merge each entry it folded away. The entry a book-out, a sale or a `move-holder` into another
-pool takes stock from counts as a removal
+`ORG_STOCK_SELL`, `ORG_STOCK_MOVE_LOCATION`, `ORG_STOCK_MOVE_HOLDER`, `ORG_STOCK_MOVE_POOL`,
+`ORG_STOCK_NOTE`, `ORG_STOCK_STOLEN`, keyed by the entry id) under the writer, with the entry's
+holder, pool, lot key, amount, version and earmarks before and after — not the holder's note; the
+writer's data export shows these rows without the holder; a move or a stolen split also journals the
+entry it created, and a merge each entry it folded away. The entry a book-out, a sale, a
+`move-pool` or a `move-holder` into another pool takes stock from counts as a removal
 (`basetool_exchange_removals_total{resource="org_stock"}`). Until the undo
 below is built, the member's undo and the admin's bulk undo leave org-stock rows untouched and do
 not count them.

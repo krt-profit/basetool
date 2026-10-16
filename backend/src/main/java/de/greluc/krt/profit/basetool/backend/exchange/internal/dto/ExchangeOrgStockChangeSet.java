@@ -58,6 +58,9 @@ public record ExchangeOrgStockChangeSet(
   /** The op that moves stock of an entry to another holder. */
   public static final String MOVE_HOLDER = "move-holder";
 
+  /** The op that moves stock of an entry into another pool of its holder. */
+  public static final String MOVE_POOL = "move-pool";
+
   /** The op that sets or clears an entry's note. */
   public static final String NOTE = "note";
 
@@ -69,7 +72,7 @@ public record ExchangeOrgStockChangeSet(
    *
    * @param opId the client's id for the op, echoed in the result, or {@code null}
    * @param op {@code book-in}, {@code book-out}, {@code sell}, {@code move-location}, {@code
-   *     move-holder}, {@code note} or {@code stolen}
+   *     move-holder}, {@code move-pool}, {@code note} or {@code stolen}
    * @param unit the org unit whose pool the op writes
    * @param holder a {@code book-in}'s holder or a {@code move-holder}'s new holder, a {@code ref}
    *     from the roster of the receiving unit
@@ -91,12 +94,14 @@ public record ExchangeOrgStockChangeSet(
    * @param fromMissions how much of a book-out, sale or move comes out of each mission earmark
    * @param terminal a {@code sell}'s terminal
    * @param proceeds the aUEC a {@code sell} brought in
-   * @param toUnit the unit whose pool a {@code move-holder} moves into
+   * @param toUnit the unit whose pool a {@code move-holder} or {@code move-pool} moves into
    */
   @Schema(name = "OrgStockOp")
   public record Op(
       @Nullable @Size(min = 1, max = 64) String opId,
-      @NotNull @Pattern(regexp = "^(book-in|book-out|sell|move-location|move-holder|note|stolen)$")
+      @NotNull
+          @Pattern(
+              regexp = "^(book-in|book-out|sell|move-location|move-holder|move-pool|note|stolen)$")
           String op,
       @NotNull UUID unit,
       @Nullable @Size(min = 1, max = 128) String holder,

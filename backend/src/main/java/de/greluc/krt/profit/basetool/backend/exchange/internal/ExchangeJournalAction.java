@@ -38,6 +38,7 @@ public enum ExchangeJournalAction {
   ORG_STOCK_SELL(ExchangeResource.ORG_STOCK),
   ORG_STOCK_MOVE_LOCATION(ExchangeResource.ORG_STOCK),
   ORG_STOCK_MOVE_HOLDER(ExchangeResource.ORG_STOCK),
+  ORG_STOCK_MOVE_POOL(ExchangeResource.ORG_STOCK),
   ORG_STOCK_NOTE(ExchangeResource.ORG_STOCK),
   ORG_STOCK_STOLEN(ExchangeResource.ORG_STOCK);
 

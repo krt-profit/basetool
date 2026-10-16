@@ -101,6 +101,8 @@ declare const inventoryConflictI18n: KrtI18nDict;
 declare const stackEntriesI18n: KrtI18nDict;
 /** Injected by the page bootstrap (declared in inventory-admin.html). */
 declare const umbuchenI18n: KrtI18nDict;
+/** Injected by the page bootstrap (declared in inventory-admin.html). */
+declare const poolChangeI18n: KrtI18nDict;
 
 /** Injected by the page bootstrap (declared in inventory-input.html). */
 declare const INV_ADD_MSG: KrtI18nDict;

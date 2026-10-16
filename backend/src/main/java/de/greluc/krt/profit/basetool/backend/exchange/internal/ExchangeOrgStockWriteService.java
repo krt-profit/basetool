@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStock
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolBookIn;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolBookOut;
+import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolChange;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolMove;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolNote;
@@ -132,6 +133,7 @@ public class ExchangeOrgStockWriteService {
             case ExchangeOrgStockChangeSet.MOVE_LOCATION -> planMoveLocation(caller, op, pools);
             case ExchangeOrgStockChangeSet.MOVE_HOLDER ->
                 planMoveHolder(caller, op, pools, rosters);
+            case ExchangeOrgStockChangeSet.MOVE_POOL -> planMovePool(caller, op, pools);
             case ExchangeOrgStockChangeSet.NOTE -> planNote(caller, op, pools);
             case ExchangeOrgStockChangeSet.STOLEN -> planStolen(caller, op, pools);
             case ExchangeOrgStockChangeSet.BOOK_OUT -> planBookOut(caller, op, pools);
@@ -247,6 +249,7 @@ public class ExchangeOrgStockWriteService {
               entry && op.quantity() != null && op.location() != null;
           case ExchangeOrgStockChangeSet.MOVE_HOLDER ->
               entry && op.quantity() != null && op.holder() != null && op.toUnit() != null;
+          case ExchangeOrgStockChangeSet.MOVE_POOL -> entry && op.toUnit() != null;
           case ExchangeOrgStockChangeSet.NOTE -> entry;
           case ExchangeOrgStockChangeSet.STOLEN -> entry && op.stolen() != null;
           case ExchangeOrgStockChangeSet.BOOK_OUT -> entry && op.quantity() != null;
@@ -440,6 +443,43 @@ public class ExchangeOrgStockWriteService {
   }
 
   /**
+   * Decides what a move into another pool of the holder will do, before anything is locked.
+   *
+   * @param caller the writer
+   * @param op the op
+   * @param pools the units the writer is a Logistician and direct member of
+   * @return the plan
+   */
+  private static @NotNull Planned planMovePool(
+      @NotNull ExchangeCaller caller,
+      @NotNull ExchangeOrgStockChangeSet.Op op,
+      @NotNull Set<UUID> pools) {
+    UUID toUnit = Objects.requireNonNull(op.toUnit());
+    if (!pools.contains(op.unit()) || !pools.contains(toUnit)) {
+      return new Skip(REJECTED, NOT_PERMITTED);
+    }
+    ExchangeStockChangeSet.Quantity quantity = op.quantity();
+    Double amount = null;
+    if (quantity != null) {
+      BigDecimal rounded = round(quantity.amount(), quantity.unit());
+      if (rounded.signum() == 0) {
+        return new Skip(UNCHANGED, null);
+      }
+      amount = rounded.doubleValue();
+    }
+    return new MovePool(
+        new PoolChange(
+            caller.member(),
+            Objects.requireNonNull(op.entry()),
+            op.unit(),
+            Objects.requireNonNull(op.version()),
+            toUnit,
+            amount,
+            quantity == null ? null : quantity.unit(),
+            Boolean.TRUE.equals(op.mergeScu())));
+  }
+
+  /**
    * Decides what a note edit will do, before anything is locked.
    *
    * @param caller the writer
@@ -605,6 +645,7 @@ public class ExchangeOrgStockWriteService {
                   request.targetLocation() == null ? null : request.targetLocation().getId(),
                   null));
         }
+        case MovePool movePool -> entries.add(movePool.request().entryId());
         case Note note -> entries.add(note.request().entryId());
         case Stolen stolen ->
             relocations.add(
@@ -631,6 +672,7 @@ public class ExchangeOrgStockWriteService {
       case BookOut bookOut -> poolEntryCommands.bookOut(bookOut.request(), dryRun);
       case Sell sell -> poolEntryCommands.sell(sell.request(), dryRun);
       case Move move -> poolEntryCommands.move(move.request(), dryRun);
+      case MovePool movePool -> poolEntryCommands.movePool(movePool.request(), dryRun);
       case Note note -> poolEntryCommands.setNote(note.request(), dryRun);
       case Stolen stolen -> poolEntryCommands.markStolen(stolen.request(), dryRun);
       case Skip _ -> throw new IllegalStateException("A skipped op reaches no Lager command");
@@ -680,6 +722,7 @@ public class ExchangeOrgStockWriteService {
       case BookOut _ -> ExchangeJournalAction.ORG_STOCK_BOOK_OUT;
       case Sell _ -> ExchangeJournalAction.ORG_STOCK_SELL;
       case Move move -> move.action();
+      case MovePool _ -> ExchangeJournalAction.ORG_STOCK_MOVE_POOL;
       case Note _ -> ExchangeJournalAction.ORG_STOCK_NOTE;
       case Stolen _ -> ExchangeJournalAction.ORG_STOCK_STOLEN;
       case Skip _ -> throw new IllegalStateException("A skipped op is not journaled");
@@ -701,6 +744,7 @@ public class ExchangeOrgStockWriteService {
           move.request().targetPoolUnitId().equals(move.request().take().poolUnitId())
               ? null
               : move.request().take().entryId();
+      case MovePool movePool -> movePool.request().entryId();
       case BookIn _, Note _, Stolen _, Skip _ -> null;
     };
   }
@@ -811,7 +855,8 @@ public class ExchangeOrgStockWriteService {
   }
 
   /** What one op of a change set will do. */
-  private sealed interface Planned permits Skip, BookIn, BookOut, Sell, Move, Note, Stolen {}
+  private sealed interface Planned
+      permits Skip, BookIn, BookOut, Sell, Move, MovePool, Note, Stolen {}
 
   /**
    * An op that is decided without the Lager.
@@ -857,6 +902,13 @@ public class ExchangeOrgStockWriteService {
    * @param request the note edit
    */
   private record Note(@NotNull PoolNote request) implements Planned {}
+
+  /**
+   * A move into another pool of the holder the Lager decides.
+   *
+   * @param request the pool change
+   */
+  private record MovePool(@NotNull PoolChange request) implements Planned {}
 
   /**
    * A stolen marking the Lager decides.

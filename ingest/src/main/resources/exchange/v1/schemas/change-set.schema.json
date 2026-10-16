@@ -467,6 +467,59 @@
         },
         {
           "type": "object",
+          "description": "Moves one shared entry of the unit's pool, or a part of its free stock, into the pool of another unit its holder directly belongs to and the member is a Logistician of.",
+          "properties": {
+            "opId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "Echoed in the result."
+            },
+            "op": {
+              "const": "move-pool"
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The unit whose pool holds the entry."
+            },
+            "entry": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The entry's id from the org stock. Opaque identifier issued by the Basetool. Clients store and echo it, never parse it."
+            },
+            "version": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "The entry's version the client last saw. A difference answers VERSION_CONFLICT."
+            },
+            "toUnit": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The unit whose pool receives the stock."
+            },
+            "quantity": {
+              "$ref": "quantity.schema.json",
+              "description": "The part to move, taken from the free stock; absent moves the whole entry with its earmarks."
+            },
+            "mergeScu": {
+              "type": "boolean",
+              "description": "Merge an SCU material into the holder's entry of the same lot in the receiving pool. Piece-counted stock always merges."
+            }
+          },
+          "required": [
+            "op",
+            "unit",
+            "entry",
+            "version",
+            "toUnit"
+          ]
+        },
+        {
+          "type": "object",
           "description": "Sets or clears the note of one shared entry of the unit's pool.",
           "properties": {
             "opId": {

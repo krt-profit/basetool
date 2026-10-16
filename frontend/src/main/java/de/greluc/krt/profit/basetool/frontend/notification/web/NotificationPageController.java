@@ -129,6 +129,7 @@ public class NotificationPageController {
           Map.entry("INVENTORY_TRANSFERRED_TO_USER", "/inventory/my"),
           Map.entry("INVENTORY_TRANSFERRED_FROM_USER", "/inventory/my"),
           Map.entry("INVENTORY_BOOKED_OUT_BY_OTHER", "/inventory/my"),
+          Map.entry("INVENTORY_POOL_CHANGED_BY_OTHER", "/inventory/my"),
           Map.entry("BANK_BOOKING_REQUEST_APPROVED", "/bank/requests"),
           Map.entry("EXCHANGE_CLIENT_SUSPENDED", "/connected-apps"),
           Map.entry("EXCHANGE_CLIENT_ACTIVATED", "/connected-apps"),

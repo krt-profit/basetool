@@ -29,8 +29,9 @@ import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * The notice that tells a member somebody else booked out or sold part of their Lager stock
- * (REQ-INV-056), built from scalars so it can be delivered after the commit.
+ * The notices that tell a member somebody else booked out or sold part of their Lager stock
+ * (REQ-INV-056) or moved it into another pool (REQ-INV-059), built from scalars so they can be
+ * delivered after the commit.
  */
 public final class InventoryNotices {
 
@@ -67,6 +68,40 @@ public final class InventoryNotices {
         .entityType(ENTITY_TYPE)
         .entityId(rowId)
         .contextRecipientUserId(ownerId)
+        .renderParams(params)
+        .build();
+  }
+
+  /**
+   * Somebody other than the holder moved a member's shared stock into another pool (REQ-INV-059).
+   *
+   * @param holderId the member who holds the stock, the single recipient
+   * @param rowId the moved source row, the notification's loose entity id
+   * @param actor who did it
+   * @param fromUnit the name of the unit whose pool the stock left
+   * @param toUnit the name of the unit whose pool it entered
+   * @param lot the moved lot
+   * @return the event
+   */
+  @NotNull
+  public static NoticeEvent poolChangedByOther(
+      @NotNull UUID holderId,
+      @NotNull UUID rowId,
+      @NotNull ActorRef actor,
+      @NotNull String fromUnit,
+      @NotNull String toUnit,
+      @NotNull TransferredLot lot) {
+    Map<String, String> params = new LinkedHashMap<>();
+    params.put("actor", actor.name());
+    params.put("fromUnit", fromUnit);
+    params.put("toUnit", toUnit);
+    params.put("lots", TransferredLot.formatAll(List.of(lot)));
+    return NoticeEvent.builder()
+        .eventType(NotificationEventType.INVENTORY_POOL_CHANGED_BY_OTHER)
+        .actorSub(actor.id())
+        .entityType(ENTITY_TYPE)
+        .entityId(rowId)
+        .contextRecipientUserId(holderId)
         .renderParams(params)
         .build();
   }

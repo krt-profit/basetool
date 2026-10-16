@@ -318,6 +318,12 @@ public enum NotificationEventType {
   INVENTORY_BOOKED_OUT_BY_OTHER,
 
   /**
+   * Somebody other than the holder moved a member's shared Lager stock into another pool
+   * (REQ-INV-059). The default rule notifies the holder.
+   */
+  INVENTORY_POOL_CHANGED_BY_OTHER,
+
+  /**
    * The responsible holder approved an over-limit booking request, so it is ready to be confirmed
    * (REQ-BANK-057). The default rule notifies the bank employees granted on the account, the bank
    * management and the requester.

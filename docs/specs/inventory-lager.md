@@ -1340,8 +1340,9 @@ versions, like REQ-INV-036). Stock booked in through the exchange carries no uni
 this is how it gets one; before, a personal row's unit changed only as a side effect of a rebooking,
 and a `TRANSFER` may not change it alone (REQ-INV-025).
 
-- **Personal rows of the caller only.** A shared row's unit is its pool and moves by rebooking; a
-  selection that contains a shared or a foreign row is refused as a whole.
+- **Personal rows of the caller only.** A shared row's unit is its pool; it moves into another
+  pool through the pool change of REQ-INV-059 or by rebooking. A selection that contains a shared or
+  a foreign row is refused as a whole.
 - **The unit decides who else may see and edit the row** (REQ-ORG-004): without a unit only the owner
   (and an unpinned admin) reaches it; with a unit that unit's editors do too. The dialog says so
   before the member confirms.
@@ -1548,6 +1549,51 @@ the row's `@Version` guards the write.
 `InventorySupplyRenderTest` · **Code:** `inventory/internal/InventoryAllocations`,
 `inventory/internal/InventoryCheckoutService`, `inventory/internal/InventoryDonationAllocation`,
 `exchange/internal/ExchangeStockWriteService`
+
+### REQ-INV-059 — A Logistician moves a shared entry into another pool of its holder
+
+A Logistician moves a shared entry, or a part of it, from its pool into the pool of another org unit
+its holder directly belongs to (`POST /api/v1/inventory/{id}/pool`, optimistic `version`;
+ADR-0263). In the Globales Lager each shared entry the caller may edit carries „Pool wechseln"; the
+dialog offers the units of `GET /api/v1/inventory/{id}/pool-targets`, the amount (the whole entry by
+default) and the merge opt-in.
+
+- **A Logistician of both units.** The caller holds the Logistician authority of the entry's unit and
+  of the receiving unit (contextual, `hasRoleInOrgUnit`; an admin passes); otherwise `403`. The
+  receiving unit must be a direct membership of the holder (`400`). Naming the entry's own pool
+  writes nothing.
+- **The whole entry** changes only its unit and keeps its job-order and mission earmarks and its
+  Materialbörse offers; an entry with a donation pledge is not moved in full (REQ-INV-058, `422`).
+- **A part** is split off the free stock as a new shared entry of the receiving pool, with the
+  source's material or item, location, quality and „gestohlen" marker and no note or earmark; the
+  source keeps the rest, every earmark and pledge (`422` when the rest cannot carry them) and may not
+  fall below its offer (`409`). Fractional parts of piece stock are refused (`400`).
+- The result merges by the write-time rules (REQ-INV-026).
+- **Audit and notice.** `INVENTORY_POOL_CHANGED` on the entry (from / to as `kind:id`, the amount,
+  whether it split and the new row; REQ-AUDIT-001). When somebody other than the holder moved it,
+  the holder gets `INVENTORY_POOL_CHANGED_BY_OTHER` (actor, both unit names, the lot; V300).
+- The page re-renders in place and tells peers through live sync (`inventory` / `stock`, the
+  Materialbörse board; REQ-FE-001).
+- A connected application does the same through the org-stock op `move-pool` (REQ-XCH-045).
+
+**Acceptance**
+
+- [x] A Logistician of both units moves a whole entry and a part; the part leaves the earmarks on the
+  source; the holder is told, and moving one's own entry tells nobody.
+  *`InventoryPoolChangeIntegrationTest`.*
+- [x] A caller who is no Logistician of the receiving unit, a unit the holder does not belong to, and
+  a part the rest cannot carry the earmarks for are refused and change nothing.
+  *`InventoryPoolChangeIntegrationTest`.*
+- [x] The picker lists only the holder's other units the caller is a Logistician of.
+  *`InventoryPoolChangeIntegrationTest`.*
+- [x] The proxies forward the request and relay the targets and the backend's refusal.
+  *`InventoryPoolChangeAjaxControllerTest`.*
+
+**Enforced by:** `InventoryPoolChangeIntegrationTest`, `InventoryPoolChangeAjaxControllerTest`,
+`ExchangeOrgStockWriteControllerTest`, `AuthorizationMatrixTest`, `RouteGateSnapshotTest`,
+`MassAssignmentGuardTest` · **Code:** `inventory/internal/InventoryPoolChangeService`,
+`InventoryItemController#changePool` / `#poolTargets`, `InventoryPoolChangeProxyController`,
+`inventory-pool-change.js`, `V300` · **Issues:** #2590
 
 ## Out of scope
 

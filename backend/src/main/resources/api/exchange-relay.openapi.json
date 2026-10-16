@@ -3781,7 +3781,7 @@
           },
           "op" : {
             "type" : "string",
-            "pattern" : "^(book-in|book-out|sell|move-location|move-holder|note|stolen)$"
+            "pattern" : "^(book-in|book-out|sell|move-location|move-holder|move-pool|note|stolen)$"
           },
           "opId" : {
             "type" : "string",

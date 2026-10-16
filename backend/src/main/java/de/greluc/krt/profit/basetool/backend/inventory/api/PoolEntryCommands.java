@@ -107,6 +107,19 @@ public interface PoolEntryCommands {
   PoolOutcome move(@NotNull PoolMove move, boolean dryRun);
 
   /**
+   * Moves a shared entry of the pool, or a part of its free stock, into the pool of another org
+   * unit its holder directly belongs to through the Lager's pool change (REQ-INV-059), which audits
+   * it as {@code INVENTORY_POOL_CHANGED}, merges and tells the holder.
+   *
+   * @param move the pool change
+   * @param dryRun whether to check it only
+   * @return the refusal, the result of a change into the entry's own pool, or every entry the
+   *     change created, changed or merged away
+   */
+  @NotNull
+  PoolOutcome movePool(@NotNull PoolChange move, boolean dryRun);
+
+  /**
    * Sets or clears the note of a shared entry of the pool through the Lager's own note edit, which
    * audits it as {@code INVENTORY_ITEM_NOTE_UPDATED}.
    *
@@ -199,6 +212,30 @@ public interface PoolEntryCommands {
       @Nullable UUID targetHolder,
       @Nullable Location targetLocation,
       @NotNull UUID targetPoolUnitId,
+      boolean mergeStock) {}
+
+  /**
+   * A move of one entry of a pool, or a part of it, into another pool of its holder.
+   *
+   * @param actor the writer, recorded as the actor
+   * @param entryId the entry
+   * @param poolUnitId the org unit whose pool the writer names
+   * @param version the entry's version the writer last read
+   * @param targetPoolUnitId the org unit whose pool receives the stock
+   * @param amount the part to move, rounded to the entry's unit, or {@code null} for the whole
+   *     entry
+   * @param unit the amount's unit, {@code SCU} or {@code PIECE}, which must be the entry's; {@code
+   *     null} with the whole entry
+   * @param mergeStock the merge opt-in of an SCU material (REQ-INV-026)
+   */
+  record PoolChange(
+      @NotNull UUID actor,
+      @NotNull UUID entryId,
+      @NotNull UUID poolUnitId,
+      long version,
+      @NotNull UUID targetPoolUnitId,
+      @Nullable Double amount,
+      @Nullable String unit,
       boolean mergeStock) {}
 
   /**

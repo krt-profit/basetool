@@ -1,7 +1,7 @@
 # ADR-0257 — Logisticians read and write their units' shared stock through the exchange, by name
 
 - **Status:** Accepted — the read, the details, the roster and the ops `book-in`, `book-out`, `sell`,
-  the moves, `note` and `stolen` built; the earmark ops, the undo, the guard and the demand details
+  the moves (`move-location`, `move-holder`, `move-pool`), `note` and `stolen` built; the earmark ops, the undo, the guard and the demand details
   pending (REQ-XCH-042…047).
   Amends [ADR-0220](0220-external-clients-see-only-anonymised-org-demand-and-the-location-list.md)
   (decision 1, "no requester, no order title, no free text") and narrows the own-data-only rule of
@@ -172,12 +172,13 @@ path template on the acting list — it would loosen REQ-SEC-080 and every seam 
    receiving pool directly — the entry's for `move-location`, `toUnit` for `move-holder` — instead
    of the web's org-unit picker, which reads the web caller's own memberships. The new holder must
    be on the roster of `toUnit`, a unit the writer is a Logistician of.
-3. **A pool change of one holder is not a move.** A `move-holder` to the entry's own holder into
-   another pool is refused `NOT_PERMITTED`: the web does that as an org-unit change with its own
-   audit event, which is not one of these ops. The same holder at the same place is `unchanged`, as
-   are a `note` and a `stolen` that find the entry as asked; they write nothing.
+3. **A pool change of one holder is its own op.** A `move-holder` to the entry's own holder into
+   another pool is refused `NOT_PERMITTED`; that change is `move-pool`, the Lager's pool change of
+   ADR-0263 with its own audit event and notification. The same holder at the same place is
+   `unchanged`, as are a `note`, a `stolen` and a `move-pool` that find the entry as asked; they
+   write nothing.
 4. **Relocations lock their target lot.** A move or stolen marking names the lot the stock lands
    in by the entry's lot with holder, location or marker replaced; its advisory lock and rows join
    the batch's single ascending pass (ADR-0229).
-5. **What counts as a removal.** The source entry of a book-out, a sale and a `move-holder` into
-   another pool; a move within the pool, a note and a marking do not.
+5. **What counts as a removal.** The source entry of a book-out, a sale, a `move-pool` and a
+   `move-holder` into another pool; a move within the pool, a note and a marking do not.

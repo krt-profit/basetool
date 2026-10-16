@@ -81,6 +81,9 @@ web, naming its client (REQ-AUDIT-005):
   a personal row's org-unit change (`INVENTORY_ORG_UNIT_CHANGED`, from / to as `kind:id` or `none`;
   a selection writes one `INVENTORY_BULK_ORG_UNIT_CHANGED` summary; an unchanged unit records
   nothing, REQ-INV-052) /
+  a shared row's pool change by a Logistician of both units (`INVENTORY_POOL_CHANGED`, from / to as
+  `kind:id`, the amount and whether it split; naming the row's own pool records nothing,
+  REQ-INV-059) /
   the „gestohlen“ marker (`INVENTORY_STOLEN_MARKED` / `INVENTORY_STOLEN_UNMARKED` per row or split,
   with the amount and whether it split; a selection writes one `INVENTORY_BULK_STOLEN_CHANGED`
   summary; an unchanged row records nothing, REQ-INV-053) /

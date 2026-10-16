@@ -69,6 +69,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   private final InventoryItemService itemService;
   private final InventoryCheckoutService checkoutService;
   private final InventoryStolenMarkService stolenMarkService;
+  private final InventoryPoolChangeService poolChangeService;
   private final OrgUnitMembershipQueryService membershipQueryService;
   private final OrgUnitRepository orgUnitRepository;
   private final EarmarkTargets.JobOrders jobOrders;
@@ -329,6 +330,65 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
             take.actor(),
             pool.get());
     return PoolOutcome.applied(changes(before, done.targetId()), done.offers());
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public @NotNull PoolOutcome movePool(@NotNull PoolChange move, boolean dryRun) {
+    Optional<InventoryItem> locked = inventoryRepository.findByIdForUpdate(move.entryId());
+    if (locked.isEmpty()) {
+      return PoolOutcome.refused(PoolRefusal.NOT_PERMITTED);
+    }
+    InventoryItem row = locked.get();
+    PoolRefusal refusal = checkEntry(row, move.poolUnitId(), move.version());
+    if (refusal != null) {
+      return PoolOutcome.refused(refusal);
+    }
+    if (move.targetPoolUnitId().equals(move.poolUnitId())) {
+      return PoolOutcome.alreadyDone();
+    }
+    if (!isDirectMember(row.getUser().getId(), move.targetPoolUnitId())) {
+      return PoolOutcome.refused(PoolRefusal.HOLDER_UNKNOWN);
+    }
+    Double part = move.amount();
+    if (part != null) {
+      double held = held(row);
+      if (!unitOf(row).equals(move.unit())) {
+        return PoolOutcome.refused(PoolRefusal.UNIT_MISMATCH);
+      }
+      if (part > held + EPSILON) {
+        return PoolOutcome.refused(PoolRefusal.INSUFFICIENT_STOCK);
+      }
+      if (Math.abs(part - held) <= EPSILON) {
+        part = null;
+      } else {
+        refusal = checkSplit(row, ScuAmounts.roundToScuScale(held - part));
+        if (refusal != null) {
+          return PoolOutcome.refused(refusal);
+        }
+      }
+    }
+    if (part == null && InventoryAllocations.sumDonation(row) > EPSILON) {
+      return PoolOutcome.refused(PoolRefusal.STOCK_EARMARKED);
+    }
+    if (dryRun) {
+      return PoolOutcome.checked();
+    }
+    Map<UUID, PoolEntryState> before =
+        poolRows(
+            row.getUser().getId(),
+            new StockLot(
+                row.getMaterial(),
+                row.getGameItem(),
+                row.getLocation(),
+                row.getQuality(),
+                Boolean.TRUE.equals(row.getStolen())),
+            move.targetPoolUnitId());
+    before.put(row.getId(), stateOf(row));
+    InventoryItem result =
+        poolChangeService.movePool(
+            row, move.targetPoolUnitId(), part, move.mergeStock(), move.actor());
+    return PoolOutcome.applied(changes(before, result.getId()), StockChangeEffects.NONE);
   }
 
   @Override

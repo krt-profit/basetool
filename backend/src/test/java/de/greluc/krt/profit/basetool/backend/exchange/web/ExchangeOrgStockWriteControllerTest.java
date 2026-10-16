@@ -847,6 +847,100 @@ class ExchangeOrgStockWriteControllerTest {
   }
 
   @Test
+  void aMovePoolMovesTheEntryIntoAnotherPoolOfItsHolderAndTellsThem() throws Exception {
+    UUID staffel = orgUnit();
+    UUID other = orgUnit();
+    joins(member, staffel, true);
+    joins(member, other, true);
+    joins(holder, staffel, false);
+    joins(holder, other, false);
+    UUID whole = stock(holder, material("SCU"), location(), 10, staffel, false);
+    UUID split = stock(holder, material("SCU"), location(), 10, staffel, false);
+
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), WRITE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    ops(
+                        entryOp("move-pool", staffel, whole, 0, ",\"toUnit\":\"" + other + "\""),
+                        entryOp(
+                            "move-pool",
+                            staffel,
+                            split,
+                            0,
+                            ",\"toUnit\":\""
+                                + other
+                                + "\",\"quantity\":{\"amount\":4,\"unit\":\"SCU\"}"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(2));
+
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT owning_org_unit_id FROM inventory_item WHERE id = ?", UUID.class, whole))
+        .isEqualTo(other);
+    assertThat(amountOf(split)).isEqualTo(6);
+    assertThat(
+            jdbc.queryForList(
+                "SELECT amount FROM inventory_item WHERE user_id = ? AND owning_org_unit_id = ?"
+                    + " AND id <> ?",
+                Double.class,
+                holder,
+                other,
+                whole))
+        .containsExactly(4.0);
+    Map<String, Object> audit =
+        jdbc.queryForMap(
+            "SELECT * FROM audit_event WHERE subject_id = ? AND event_type ="
+                + " 'INVENTORY_POOL_CHANGED'",
+            whole);
+    assertThat(audit.get("actor_user_id")).isEqualTo(member);
+    assertThat(audit.get("client_id")).isEqualTo(client);
+    assertThat(notificationsOf(holder)).isPositive();
+    Map<String, Object> journal =
+        jdbc.queryForMap("SELECT * FROM exchange_journal WHERE entity_key = ?", whole.toString());
+    assertThat(journal.get("action")).isEqualTo("ORG_STOCK_MOVE_POOL");
+    assertThat(journal.get("removal")).isEqualTo(true);
+    assertThat((String) journal.get("after_state")).contains(other.toString());
+  }
+
+  @Test
+  void aMovePoolOutsideTheWritersUnitsOrTheHoldersUnitsIsRefused() throws Exception {
+    UUID staffel = orgUnit();
+    UUID plain = orgUnit();
+    UUID foreign = orgUnit();
+    joins(member, staffel, true);
+    joins(member, plain, false);
+    joins(member, foreign, true);
+    joins(holder, staffel, false);
+    joins(holder, plain, false);
+    UUID entry = stock(holder, material("SCU"), location(), 10, staffel, false);
+
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), WRITE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    ops(
+                        entryOp("move-pool", staffel, entry, 0, ",\"toUnit\":\"" + plain + "\""),
+                        entryOp("move-pool", staffel, entry, 0, ",\"toUnit\":\"" + foreign + "\""),
+                        entryOp("move-pool", staffel, entry, 0, ",\"toUnit\":\"" + staffel + "\""),
+                        moveHolder(staffel, entry, "1", foreign, ref(staffel, holder)))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(0))
+        .andExpect(jsonPath("$.unchanged").value(1))
+        .andExpect(jsonPath("$.results[0].reason").value("NOT_PERMITTED"))
+        .andExpect(jsonPath("$.results[1].reason").value("HOLDER_UNKNOWN"))
+        .andExpect(jsonPath("$.results[2].result").value("unchanged"))
+        .andExpect(jsonPath("$.results[3].reason").value("HOLDER_UNKNOWN"));
+
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT owning_org_unit_id FROM inventory_item WHERE id = ?", UUID.class, entry))
+        .isEqualTo(staffel);
+  }
+
+  @Test
   void aNoteEditIsAuditedAndTheSameNoteAgainIsUnchanged() throws Exception {
     UUID staffel = orgUnit();
     joins(member, staffel, true);

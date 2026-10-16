@@ -223,7 +223,16 @@ member is a Logistician of. The earmarks named in `fromJobOrders` and `fromMissi
 everything else must come from the free part, as for a `book-out`. Piece-counted stock joins the
 receiving holder's entry of the same lot; for an SCU material set `mergeScu: true` to do the same.
 The previous and the new holder are notified. A move to the entry's own holder and place is
-`unchanged`; a `move-holder` to the entry's own holder into another pool is `NOT_PERMITTED`.
+`unchanged`; a `move-holder` to the entry's own holder into another pool is `NOT_PERMITTED`, use
+`move-pool` for that.
+
+### `move-pool`
+
+Moves the entry `entry` into the pool of `toUnit`, another unit the member is a Logistician of and
+the entry's holder directly belongs to; holder and location stay. Without `quantity` the whole entry
+moves with its earmarks; an entry pledged as a donation cannot move whole. With `quantity` that part
+is split off the free stock as a new entry, and the earmarks stay on the rest. `mergeScu` works as
+for the other moves. The holder is notified. Naming the entry's own pool is `unchanged`.
 
 ### `note` and `stolen`
 
@@ -296,12 +305,12 @@ listed with its reason. The entries an op created or changed reach you through t
 
 | Reason | Op | Meaning |
 | --- | --- | --- |
-| `NOT_PERMITTED` | all | The pool, or the `toUnit` of a `move-holder`, is not one of the member's Logistician units; the entry is unknown, personal or in another pool; or a `move-holder` names the entry's own holder for another pool. |
-| `HOLDER_UNKNOWN` | `book-in`, `move-holder` | `holder` is not on the roster of the receiving unit: not a direct member, withholding their name, or not a ref of your client. Read the roster again. |
+| `NOT_PERMITTED` | all | The pool, or the `toUnit` of a `move-holder` or `move-pool`, is not one of the member's Logistician units; the entry is unknown, personal or in another pool; or a `move-holder` names the entry's own holder for another pool. |
+| `HOLDER_UNKNOWN` | `book-in`, `move-holder`, `move-pool` | `holder` is not on the roster of the receiving unit: not a direct member, withholding their name, or not a ref of your client; for `move-pool`, the entry's holder is not a direct member of `toUnit`. Read the roster again. |
 | `VERSION_CONFLICT` | all but `book-in` | The entry changed since you read it; an earlier op of the same change set counts. Pull the feed and retry. |
 | `INSUFFICIENT_STOCK` | all but `book-in`, `note` | The entry holds less than `quantity`. |
-| `STOCK_EARMARKED` | `book-out`, `sell`, moves, `stolen` | The part of `quantity` that `fromJobOrders` and `fromMissions` do not cover is earmarked, or pledged as a donation; for a partial `stolen`, the rest of the entry would hold less than its earmarks. |
-| `STOCK_OFFERED` | `stolen` | The rest of the entry after a partial `stolen` would hold less than it offers on the Basetool's material exchange. |
+| `STOCK_EARMARKED` | `book-out`, `sell`, moves, `stolen` | The part of `quantity` that `fromJobOrders` and `fromMissions` do not cover is earmarked, or pledged as a donation; for a partial `stolen` or `move-pool`, the rest of the entry would hold less than its earmarks; a whole `move-pool` of an entry pledged as a donation. |
+| `STOCK_OFFERED` | `stolen`, `move-pool` | The rest of the entry after a partial `stolen` or `move-pool` would hold less than it offers on the Basetool's material exchange. |
 | `OVER_ALLOCATION` | `book-in` | The earmarks of one kind add up to more than `quantity`. |
 | `EARMARK_TARGET_INVALID` | `book-in`, `book-out`, `sell`, moves | An earmark names a job order that does not need the material or item, an unknown mission, a mission for an item, a target twice, or — when taking from an entry — a target the entry is not earmarked to or more than it holds there. |
 | `UNIT_MISMATCH`, `LOCATION_UNKNOWN`, `STOLEN_MARKING_DISABLED`, `UNMATCHED`, `AMBIGUOUS` | as for [stock](stock.md) | |
