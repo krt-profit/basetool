@@ -5,6 +5,7 @@
 ### Added
 
 - **Datenaustausch: gemeinsamer Lagerbestand der eigenen Einheiten.** Verbundene Anwendungen mit der neuen Berechtigung `exchange.orgstock.read` lesen über `GET /exchange/v1/org-stock` den gemeinsamen Lagerbestand jeder Einheit, der das Mitglied direkt angehört – je Einheit summiert, ohne Namen, mit den für Aufträge und Missionen reservierten Mengen. Einwilligungsseite, „Verbundene Anwendungen" und Datenschutzerklärung nennen die Berechtigung (REQ-XCH-042, ADR-0257, Migration V295).
+- **Datenaustausch: Änderungs-Feed für den Einheitsbestand.** Eine Anwendung liest nach dem ersten Abruf nur noch die geänderten Bestände der eigenen Einheiten statt jedes Mal alles neu; Umbuchungen zwischen persönlich und gemeinsam, ein Wechsel der Einheit und Reservierungen erscheinen darin, Bestände fremder Einheiten nicht (REQ-XCH-042, Migration V296).
 - **Profil: Namen von verbundenen Anwendungen zurückhalten.** Der neue Schalter „Meinen Namen nicht an verbundene Anwendungen weitergeben" im Profil (standardmäßig aus) speichert in place, ist Teil des Datenexports und wird im Bereich „Verbundene Anwendungen" protokolliert; die Datenschutzerklärung nennt, welche Namen eine Anwendung erhält. Wirksam wird er mit dem Einheitsbestand für Logistiker (REQ-XCH-044, ADR-0257, Migration V294).
 
 ### Fixed

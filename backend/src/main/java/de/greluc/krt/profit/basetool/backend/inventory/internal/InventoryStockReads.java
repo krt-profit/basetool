@@ -72,6 +72,14 @@ public class InventoryStockReads implements StockReads, OrderLinkedStockRows {
   }
 
   @Override
+  public @NotNull List<ExchangeOrgStockLotRow> exchangeOrgLotsByKeys(
+      @NotNull Collection<UUID> units, @NotNull Collection<String> keys) {
+    return units.isEmpty() || keys.isEmpty()
+        ? List.of()
+        : inventoryRepository.findExchangeOrgLotsByKeys(units, keys);
+  }
+
+  @Override
   public @NotNull List<ExchangeStockLotRow> exchangeLotsByKeys(
       @NotNull UUID member, @NotNull Collection<String> keys) {
     return inventoryRepository.findExchangeLotsByKeys(member, keys);

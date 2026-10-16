@@ -303,13 +303,171 @@ class ExchangeOrgStockControllerTest {
   }
 
   @Test
-  void theFeedCursorASnapshotEndsWithIsAnsweredAsExpired() throws Exception {
-    String body = read(relayed(get(PATH))).andReturn().getResponse().getContentAsString();
-    String feed = JsonPath.read(body, "$.nextCursor");
+  void theFeedAnswersAChangedLotAndATombstoneForAnEmptiedOne() throws Exception {
+    UUID staffel = orgUnit("SQUADRON", null);
+    joins(member, staffel, "MEMBER");
+    UUID titanium = material();
+    UUID area18 = location();
+    UUID lorville = location();
+    UUID kept = stock(other, titanium, area18, 1, 4, false, staffel);
+    UUID gone = stock(other, titanium, lorville, 1, 5, false, staffel);
+    String cursor = snapshotEnd();
 
-    read(relayed(get(PATH).param("cursor", feed)))
+    jdbc.update("UPDATE inventory_item SET amount = 6 WHERE id = ?", kept);
+    jdbc.update("DELETE FROM inventory_item WHERE id = ?", gone);
+
+    read(relayed(get(PATH).param("cursor", cursor)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items.length()").value(1))
+        .andExpect(jsonPath("$.items[0].unit.id").value(staffel.toString()))
+        .andExpect(jsonPath("$.items[0].quantity.amount").value(6))
+        .andExpect(jsonPath("$.removed.length()").value(1))
+        .andExpect(
+            jsonPath("$.removed[0].key")
+                .value("u:" + staffel + "|m:" + titanium + "|l:" + lorville + "|q:1|s:0"))
+        .andExpect(jsonPath("$.removed[0].removedBy.channel").value("system"))
+        .andExpect(jsonPath("$.units.length()").value(1))
+        .andExpect(jsonPath("$.hasMore").value(false))
+        .andExpect(jsonPath("$.nextCursor").value(org.hamcrest.Matchers.startsWith("f1.")));
+  }
+
+  @Test
+  void rebookingToSharedChangingTheUnitAndEarmarkingEachReachTheFeed() throws Exception {
+    UUID staffel = orgUnit("SQUADRON", null);
+    UUID kommando = orgUnit("SPECIAL_COMMAND", null);
+    joins(member, staffel, "MEMBER");
+    joins(member, kommando, "MEMBER");
+    UUID titanium = material();
+    UUID area18 = location();
+    UUID rebooked = stock(other, titanium, area18, 1, 4, true, staffel);
+    UUID moved = stock(other, material(), area18, 1, 3, false, staffel);
+    UUID earmarked = stock(other, material(), area18, 1, 10, false, kommando);
+    String cursor = snapshotEnd();
+
+    jdbc.update("UPDATE inventory_item SET personal = false WHERE id = ?", rebooked);
+    jdbc.update("UPDATE inventory_item SET owning_org_unit_id = ? WHERE id = ?", kommando, moved);
+    earmarkToMission(earmarked, 2);
+
+    String body =
+        read(relayed(get(PATH).param("cursor", cursor)))
+            .andExpect(jsonPath("$.items.length()").value(3))
+            .andExpect(jsonPath("$.removed.length()").value(1))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(JsonPath.<List<String>>read(body, "$.items[*].key"))
+        .containsExactlyInAnyOrder(
+            "u:" + staffel + "|m:" + titanium + "|l:" + area18 + "|q:1|s:0",
+            keyOf(kommando, moved),
+            keyOf(kommando, earmarked));
+    assertThat(JsonPath.<List<Number>>read(body, "$.items[*].earmarked.missions.amount"))
+        .extracting(Number::intValue)
+        .containsExactlyInAnyOrder(0, 0, 2);
+    assertThat(JsonPath.<String>read(body, "$.removed[0].key")).startsWith("u:" + staffel + "|");
+  }
+
+  @Test
+  void changesOfAnotherUnitsRowsDoNotReachTheMembersFeed() throws Exception {
+    UUID staffel = orgUnit("SQUADRON", null);
+    UUID foreign = orgUnit("SQUADRON", null);
+    joins(member, staffel, "MEMBER");
+    UUID titanium = material();
+    UUID area18 = location();
+    UUID theirs = stock(other, titanium, area18, 1, 4, false, foreign);
+    String cursor = snapshotEnd();
+
+    jdbc.update("UPDATE inventory_item SET amount = 9 WHERE id = ?", theirs);
+    stock(other, titanium, area18, 1, 1, false, foreign);
+    stock(other, titanium, area18, 1, 1, true, staffel);
+
+    read(relayed(get(PATH).param("cursor", cursor)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items.length()").value(0))
+        .andExpect(jsonPath("$.removed.length()").value(0));
+  }
+
+  @Test
+  void afterLeavingAUnitTheNextFeedPageNoLongerListsItOrItsLots() throws Exception {
+    UUID staffel = orgUnit("SQUADRON", null);
+    UUID kommando = orgUnit("SPECIAL_COMMAND", null);
+    joins(member, staffel, "MEMBER");
+    joins(member, kommando, "MEMBER");
+    UUID titanium = material();
+    UUID area18 = location();
+    UUID row = stock(other, titanium, area18, 1, 6, false, kommando);
+    String cursor = snapshotEnd();
+
+    jdbc.update(
+        "DELETE FROM org_unit_membership WHERE user_id = ? AND org_unit_id = ?", member, kommando);
+    jdbc.update("UPDATE inventory_item SET amount = 8 WHERE id = ?", row);
+
+    read(relayed(get(PATH).param("cursor", cursor)))
+        .andExpect(jsonPath("$.units.length()").value(1))
+        .andExpect(jsonPath("$.units[0].id").value(staffel.toString()))
+        .andExpect(jsonPath("$.items.length()").value(0))
+        .andExpect(jsonPath("$.removed.length()").value(0));
+  }
+
+  @Test
+  void joiningAUnitAfterTheCursorBringsItsPoolIntoTheFeed() throws Exception {
+    UUID staffel = orgUnit("SQUADRON", null);
+    joins(other, staffel, "MEMBER");
+    UUID titanium = material();
+    UUID area18 = location();
+    stock(other, titanium, area18, 1, 6, false, staffel);
+    String cursor = snapshotEnd();
+
+    joins(member, staffel, "MEMBER");
+
+    read(relayed(get(PATH).param("cursor", cursor)))
+        .andExpect(jsonPath("$.units.length()").value(1))
+        .andExpect(jsonPath("$.items.length()").value(1))
+        .andExpect(jsonPath("$.items[0].unit.id").value(staffel.toString()))
+        .andExpect(jsonPath("$.items[0].quantity.amount").value(6));
+  }
+
+  @Test
+  void aFeedPageCountsAndACursorTheServerDidNotIssueIsExpired() throws Exception {
+    String cursor = snapshotEnd();
+
+    read(relayed(get(PATH).param("cursor", cursor))).andExpect(status().isOk());
+    read(relayed(get(PATH).param("cursor", "f1.x")))
         .andExpect(status().isGone())
         .andExpect(jsonPath("$.code").value("CURSOR_EXPIRED"));
+    assertThat(
+            meterRegistry
+                .counter(MetricNames.EXCHANGE_ORG_STOCK_PAGES, MetricNames.TAG_CLIENT_ID, client)
+                .count())
+        .isEqualTo(2.0);
+  }
+
+  /**
+   * Reads the snapshot to its end.
+   *
+   * @return the feed cursor it ends with
+   * @throws Exception if the request fails
+   */
+  private @NotNull String snapshotEnd() throws Exception {
+    String body = read(relayed(get(PATH))).andReturn().getResponse().getContentAsString();
+    String cursor = JsonPath.read(body, "$.nextCursor");
+    assertThat(cursor).startsWith("f1.");
+    return cursor;
+  }
+
+  /**
+   * Reads the org-stock key of a row's lot as the row stands now.
+   *
+   * @param unit the pool
+   * @param row the row
+   * @return the key
+   */
+  private @NotNull String keyOf(@NotNull UUID unit, @NotNull UUID row) {
+    return jdbc.queryForObject(
+        "SELECT 'u:' || ? || '|' || exchange_stock_lot_key(material_id, game_item_id,"
+            + " location_id, quality, stolen) FROM inventory_item WHERE id = ?",
+        String.class,
+        unit.toString(),
+        row);
   }
 
   @Test

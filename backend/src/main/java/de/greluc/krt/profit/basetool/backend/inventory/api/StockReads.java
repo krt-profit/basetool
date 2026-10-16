@@ -59,6 +59,18 @@ public interface StockReads {
       @NotNull Collection<UUID> units, @NotNull UUID after, int limit);
 
   /**
+   * Returns the shared lots of the given units' pools with the given keys, as they are now
+   * (REQ-XCH-042).
+   *
+   * @param units the units whose pools are read; an empty collection yields an empty list
+   * @param keys the org-stock lot keys; an empty collection yields an empty list
+   * @return the lots that still hold rows
+   */
+  @NotNull
+  List<ExchangeOrgStockLotRow> exchangeOrgLotsByKeys(
+      @NotNull Collection<UUID> units, @NotNull Collection<String> keys);
+
+  /**
    * Returns the member's lots with the given keys, as they are now.
    *
    * @param member the member

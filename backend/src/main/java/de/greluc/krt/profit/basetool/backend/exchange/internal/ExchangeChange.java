@@ -36,7 +36,8 @@ import org.hibernate.annotations.Immutable;
  * ADR-0224).
  *
  * <p>Written only by database triggers, so every write path is sequenced; the application reads and
- * purges it.
+ * purges it. The table also holds the org-stock entries keyed by unit (REQ-XCH-042), which this
+ * entity does not map; they are read through {@link ExchangeChangeRepository}'s native queries.
  */
 @Entity
 @Immutable

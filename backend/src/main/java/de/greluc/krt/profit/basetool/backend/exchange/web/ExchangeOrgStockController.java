@@ -52,7 +52,7 @@ public class ExchangeOrgStockController {
   private final ExchangeOrgStockService orgStockService;
 
   /**
-   * Returns a snapshot page of the org stock.
+   * Returns a snapshot or feed page of the org stock.
    *
    * @param cursor the cursor of the last page, or absent for a new snapshot
    * @param limit the page size, at most 1000
@@ -64,7 +64,9 @@ public class ExchangeOrgStockController {
   @PreAuthorize("@exchangeGate.allows('exchange.orgstock.read', authentication)")
   @Operation(
       summary = "Exchange: the shared stock of my units",
-      description = "Gateway-only. A snapshot of the pools of the member's direct units.")
+      description =
+          "Gateway-only. A snapshot of the pools of the member's direct units or, with a feed"
+              + " cursor, their changes.")
   @ApiResponse(responseCode = "200", description = "The page")
   @ApiResponse(responseCode = "410", description = "The cursor has expired (CURSOR_EXPIRED)")
   public ResponseEntity<ExchangeOrgStockPageDto> orgStock(

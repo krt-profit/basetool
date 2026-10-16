@@ -116,7 +116,7 @@ class TableOwnershipTest {
   private static final int TABLE_FLOOR = 127;
 
   /** Today's user-defined trigger count; the sweep must see at least this many. */
-  private static final int TRIGGER_FLOOR = 19;
+  private static final int TRIGGER_FLOOR = 22;
 
   /** Today's count of native statements in repositories and entity formulas. */
   private static final int NATIVE_STATEMENT_FLOOR = 30;
@@ -143,17 +143,32 @@ class TableOwnershipTest {
               "V252 change feed for every owner of a default blueprint's product (ADR-0224)."),
           "trg_inventory_item_exchange_change",
           new Crossing(
-              Set.of("exchange_change", "app_user"),
-              "V252/V260 change feed: one entry per stock lot a row leaves or joins (ADR-0224)."),
+              Set.of("exchange_change", "app_user", "org_unit"),
+              "V252/V260/V296 change feed: one entry per stock lot a row leaves or joins, and per"
+                  + " org-stock lot of the unit whose pool it changes (ADR-0224, REQ-XCH-042)."),
+          "trg_inventory_item_job_order_allocation_exchange_change",
+          new Crossing(
+              Set.of("exchange_change", "org_unit"),
+              "V296 org-stock feed: an earmark changes the lot of its shared row (REQ-XCH-042)."),
+          "trg_inventory_item_mission_allocation_exchange_change",
+          new Crossing(
+              Set.of("exchange_change", "org_unit"),
+              "V296 org-stock feed: an earmark changes the lot of its shared row (REQ-XCH-042)."),
+          "trg_org_unit_membership_exchange_change",
+          new Crossing(
+              Set.of("exchange_change", "inventory_item"),
+              "V296 org-stock feed: a member joining a unit receives its pool, read from"
+                  + " inventory_item (REQ-XCH-042)."),
           "trg_ship_exchange_change",
           new Crossing(
               Set.of("exchange_change", "app_user"),
               "V252 change feed: the ship id follows its owner (ADR-0224)."),
           "trg_org_unit_exchange_change",
           new Crossing(
-              Set.of("exchange_change", "app_user", "ship"),
-              "V293 change feed: a renamed unit re-announces its ships, read from ship, so a"
-                  + " client never keeps a stale unit (REQ-XCH-017)."),
+              Set.of("exchange_change", "app_user", "ship", "inventory_item"),
+              "V293/V296 change feed: a renamed unit re-announces its ships and the lots of its"
+                  + " pool, read from ship and inventory_item, so a client never keeps a stale unit"
+                  + " (REQ-XCH-017, REQ-XCH-042)."),
           "trg_guard_promotion_topic_owner_kind",
           new Crossing(
               Set.of("org_unit"),
@@ -184,6 +199,10 @@ class TableOwnershipTest {
           new Crossing(
               Set.of("city", "game_item", "location", "material", "space_station"),
               "The org-stock variant of findExchangeLots; the same downward read into catalogue."),
+          "InventoryItemRepository#findExchangeOrgLotsByKeys",
+          new Crossing(
+              Set.of("city", "game_item", "location", "material", "space_station"),
+              "The keyed variant of findExchangeOrgLots; the same downward read into catalogue."),
           "PersonalBlueprintRepository#grantDefaultBlueprintsToAllUsers",
           new Crossing(
               Set.of("app_user"),

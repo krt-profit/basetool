@@ -1832,7 +1832,7 @@
     },
     "/api/v1/exchange/org-stock" : {
       "get" : {
-        "description" : "Gateway-only. A snapshot of the pools of the member's direct units.",
+        "description" : "Gateway-only. A snapshot of the pools of the member's direct units or, with a feed cursor, their changes.",
         "operationId" : "orgStock",
         "parameters" : [ {
           "in" : "query",

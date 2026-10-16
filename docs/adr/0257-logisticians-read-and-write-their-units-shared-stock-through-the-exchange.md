@@ -85,3 +85,22 @@ role (REQ-XCH-009), so a web role cannot decide anything there by itself.
 - **Set the quantity of an org lot, as `/me/stock` does.** Rejected: the server would choose whose
   entries shrink, which the holders cannot follow.
 - **A snapshot with an ETag instead of a feed.** Rejected: every change would reload the whole pool.
+
+## Amendment 1 (2026-10-16) — how the org-stock feed is keyed and when it re-announces a pool
+
+1. **One log, keyed by unit.** The org-stock feed shares `exchange_change` with the member feeds of
+   ADR-0224. Its rows carry `resource = 'ORG_STOCK'` and the unit in `org_unit_id`, and no member;
+   a check constraint keeps the two kinds apart. Sequence, watermark, attribution, horizon and the
+   nightly purge stay one mechanism, so no second retention job and no second cursor format exist.
+   A feed page reads the units the member belongs to at that request.
+2. **A join re-announces the pool.** Entries are keyed by unit, so the feed cannot tell which units
+   a cursor already covered. Inserting a membership announces every lot of the unit's pool, and a
+   member whose cursor predates the join receives the pool through the feed instead of a 410 or a
+   new snapshot. The other members of the unit receive those lots once more, unchanged; joins are
+   rare, so the cost is accepted. A rename re-announces the pool the same way, for the lots'
+   `unit.name`.
+3. **A tombstone names only the reader's installations.** A removal by another member's client
+   carries the channel and the client id, never that member's installation id.
+
+Rejected: a cursor that encodes the units it covered — it would change the cursor format clients
+already store, and the snapshot cursors issued before the feed existed would not carry it.

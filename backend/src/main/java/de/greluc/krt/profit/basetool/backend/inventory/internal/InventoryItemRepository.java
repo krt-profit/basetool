@@ -151,6 +151,18 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("limit") int limit);
 
   /**
+   * Returns the shared lots of the given units' pools with the given keys, as they are now
+   * (REQ-XCH-042).
+   *
+   * @param units the units whose pools are read; never empty
+   * @param keys the org-stock lot keys
+   * @return the lots that still hold rows
+   */
+  @Query(value = EXCHANGE_ORG_LOTS + " WHERE lots.lot_key IN (:keys)", nativeQuery = true)
+  List<ExchangeOrgStockLotRow> findExchangeOrgLotsByKeys(
+      @Param("units") Collection<UUID> units, @Param("keys") Collection<String> keys);
+
+  /**
    * Returns the member's lots with the given keys, as they are now.
    *
    * @param member the member

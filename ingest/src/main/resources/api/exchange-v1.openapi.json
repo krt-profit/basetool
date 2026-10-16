@@ -904,7 +904,7 @@
     "/exchange/v1/org-stock": {
       "get": {
         "operationId": "orgstock_read",
-        "summary": "The shared stock of the units the member directly belongs to, one pool per unit: a snapshot.",
+        "summary": "The shared stock of the units the member directly belongs to, one pool per unit: snapshot or changes since a cursor.",
         "tags": [
           "orgstock"
         ],
@@ -945,7 +945,7 @@
             "name": "cursor",
             "in": "query",
             "required": false,
-            "description": "Opaque position from a previous page. Without it the response is a new snapshot. The last page carries a feed cursor; until the org-stock feed is served, reading with it answers 410 CURSOR_EXPIRED, and the client reads a new snapshot.",
+            "description": "Opaque feed position from a previous page. Without it the response is a snapshot. A cursor older than the tombstones answers 410 CURSOR_EXPIRED.",
             "schema": {
               "type": "string",
               "maxLength": 128
