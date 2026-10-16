@@ -989,7 +989,7 @@
       "attributes": {
         "consent.screen.text": "${xchConsentDemandDetails}",
         "display.on.consent.screen": "true",
-        "gui.order": "15",
+        "gui.order": "14",
         "include.in.openid.provider.metadata": "true",
         "include.in.token.scope": "true"
       },
@@ -1015,7 +1015,7 @@
       "attributes": {
         "consent.screen.text": "${xchConsentOrgStockWrite}",
         "display.on.consent.screen": "true",
-        "gui.order": "14",
+        "gui.order": "15",
         "include.in.openid.provider.metadata": "true",
         "include.in.token.scope": "true"
       },
@@ -1222,12 +1222,12 @@
         "exchange.hangar.read",
         "exchange.hangar.write",
         "exchange.demand.read",
-        "exchange.demand.details",
         "exchange.drafts.blueprints",
         "exchange.drafts.refinery",
         "exchange.orgunits.read",
         "exchange.orgstock.read",
         "exchange.orgstock.details",
+        "exchange.demand.details",
         "exchange.orgstock.write",
         "offline_access"
       ],
@@ -1280,12 +1280,12 @@
         "exchange.hangar.read",
         "exchange.hangar.write",
         "exchange.demand.read",
-        "exchange.demand.details",
         "exchange.drafts.blueprints",
         "exchange.drafts.refinery",
         "exchange.orgunits.read",
         "exchange.orgstock.read",
         "exchange.orgstock.details",
+        "exchange.demand.details",
         "exchange.orgstock.write",
         "offline_access"
       ],
