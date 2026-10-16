@@ -106,7 +106,8 @@ class ExchangeChangeRouteTest {
     key = ExchangeTestSupport.newKey();
     member = UUID.randomUUID().toString();
     String scopes =
-        "exchange.connect exchange.blueprints.write exchange.stock.write exchange.hangar.write";
+        "exchange.connect exchange.blueprints.write exchange.stock.write exchange.hangar.write"
+            + " exchange.orgstock.write";
     when(jwtDecoder.decode(TOKEN))
         .thenReturn(
             ExchangeTestSupport.token(
@@ -152,6 +153,57 @@ class ExchangeChangeRouteTest {
         .forward(eq(HttpMethod.POST), eq("/api/v1/exchange/me/stock/changes"), any(), any(), any());
     verify(relay)
         .forward(eq(HttpMethod.POST), eq("/api/v1/exchange/me/ships/changes"), any(), any(), any());
+  }
+
+  @Test
+  void anOrgStockChangeSetIsRelayedAndEveryFurtherOpCountsAgainstTheQuota() throws Exception {
+    when(relay.forward(any(), anyString(), any(), any(), any())).thenReturn(ok(RESULT));
+    when(quotas.countFurtherOps(any(), eq(2L))).thenReturn(3L);
+
+    post("/exchange/v1/org-stock/changes", bookOuts(3)).andExpect(status().isOk());
+
+    verify(quotas).countFurtherOps(any(), eq(2L));
+    verify(quotas, never()).refundFurtherOps(any());
+    verify(relay)
+        .forward(
+            eq(HttpMethod.POST), eq("/api/v1/exchange/org-stock/changes"), any(), any(), any());
+  }
+
+  @Test
+  void anOrgStockChangeSetOfOneOpCountsNoFurtherOp() throws Exception {
+    when(relay.forward(any(), anyString(), any(), any(), any())).thenReturn(ok(RESULT));
+
+    post(
+            "/exchange/v1/org-stock/changes",
+            example("change-set--orgStockChangeSet/valid/book-in.json"))
+        .andExpect(status().isOk());
+
+    verify(quotas, never()).countFurtherOps(any(), anyLong());
+  }
+
+  @Test
+  void anOrgStockChangeSetOverTheQuotaIsRefusedWithItsFurtherOpsGivenBack() throws Exception {
+    when(quotas.countFurtherOps(any(), eq(4L))).thenReturn(100_000L);
+
+    post("/exchange/v1/org-stock/changes", bookOuts(5))
+        .andExpect(status().isTooManyRequests())
+        .andExpect(header().exists("Retry-After"))
+        .andExpect(jsonPath("$.code").value("QUOTA_EXCEEDED"));
+
+    verify(quotas).refundFurtherOps(any());
+    verify(relay, never()).forward(any(), anyString(), any(), any(), any());
+  }
+
+  @Test
+  void anOrgStockChangeSetOutsideTheSchemaCountsNoFurtherOp() throws Exception {
+    post(
+            "/exchange/v1/org-stock/changes",
+            example("change-set--orgStockChangeSet/invalid/book-out-without-version.json"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("SCHEMA_INVALID"));
+
+    verify(quotas, never()).countFurtherOps(any(), anyLong());
+    verify(relay, never()).forward(any(), anyString(), any(), any(), any());
   }
 
   @Test
@@ -413,6 +465,23 @@ class ExchangeChangeRouteTest {
    */
   private static @NotNull String example(@NotNull String name) throws Exception {
     return Files.readString(EXAMPLES.resolve(name));
+  }
+
+  /**
+   * Builds an org-stock change set of book-outs.
+   *
+   * @param count the number of ops
+   * @return the body
+   */
+  private static @NotNull String bookOuts(int count) {
+    StringBuilder body = new StringBuilder("{\"ops\":[");
+    for (int i = 0; i < count; i++) {
+      body.append(i == 0 ? "" : ",")
+          .append("{\"op\":\"book-out\",\"unit\":\"u\",\"entry\":\"e")
+          .append(i)
+          .append("\",\"version\":0,\"quantity\":{\"amount\":1,\"unit\":\"SCU\"}}");
+    }
+    return body.append("]}").toString();
   }
 
   /**

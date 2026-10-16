@@ -181,7 +181,11 @@ class ConnectedAppsPageControllerMvcTest {
         new ConnectedAppDto(
             "versekit",
             "VerseKit",
-            List.of("exchange.connect", "exchange.orgstock.read", "exchange.orgstock.details"),
+            List.of(
+                "exchange.connect",
+                "exchange.orgstock.read",
+                "exchange.orgstock.details",
+                "exchange.orgstock.write"),
             List.of(new ConnectedInstallationDto(INSTALLATION, "Desktop", null, null, false)),
             List.of());
     when(backendApiClient.get(eq("/api/v1/connected-apps"), anyTypeRef())).thenReturn(List.of(app));
@@ -198,6 +202,11 @@ class ConnectedAppsPageControllerMvcTest {
                     containsString(
                         "mit Namen im gemeinsamen Lagerbestand der Einheiten lesen, in denen du"
                             + " Logistiker bist")))
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "Lagerbestand in die gemeinsamen Lager der Einheiten ein- und ausbuchen")))
         .andExpect(content().string(not(containsString("??"))));
     mockMvc
         .perform(get("/connected-apps").param("lang", "en"))
@@ -211,6 +220,11 @@ class ConnectedAppsPageControllerMvcTest {
                     containsString(
                         "Read single entries with names in the shared warehouse stock of the org"
                             + " units in which you are a logistician")))
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "Book stock into and out of the shared warehouse stock of the org units")))
         .andExpect(content().string(not(containsString("??"))));
   }
 

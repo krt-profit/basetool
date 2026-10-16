@@ -461,6 +461,27 @@ class ExchangeStoreRedisIntegrationTest {
   }
 
   @Test
+  void furtherOpsCountOnTheWritesCounterAndARefundGivesThemAllBack() {
+    ExchangeQuotas quotas = new ExchangeQuotas(template, budget, clock);
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    String key = quotas.countWrite("a", "m1").key();
+    request.setAttribute(ExchangeQuotas.COUNTED, key);
+    long ttl = observer.getExpire(key, TimeUnit.SECONDS);
+
+    assertThat(quotas.countFurtherOps(request, 4)).isEqualTo(5);
+    assertThat(observer.getExpire(key, TimeUnit.SECONDS)).isBetween(ttl - 2L, ttl);
+    quotas.refundFurtherOps(request);
+    assertThat(template.opsForValue().get(key)).as("the write itself stays counted").isEqualTo("1");
+
+    quotas.countFurtherOps(request, 2);
+    quotas.refundCounted(request);
+    assertThat(template.opsForValue().get(key)).isEqualTo("0");
+    assertThat(quotas.countFurtherOps(new MockHttpServletRequest(), 3))
+        .as("an uncounted write counts no further op")
+        .isEqualTo(-1);
+  }
+
+  @Test
   void aBudgetRefusalGivesTheQuotaCountBackAndWaitsUntilEnoughExpires() throws Exception {
     ExchangeBudget defaults =
         new ExchangeBudget(template, DEFAULTS, new SimpleMeterRegistry(), clock);

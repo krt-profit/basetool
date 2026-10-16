@@ -1842,11 +1842,12 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   (`match` / `mismatch` / `unknown`), registered at zero and shown per day beside the disconnects;
   a rising `mismatch` share means clients see alt accounts (REQ-XCH-031).
 - `basetool_exchange_writes_total{client_id,resource,outcome}` counter — ops external clients sent to
-  the member's synced data, by registered client, resource (`blueprint` / `stock` / `ship`) and outcome (`applied` /
-  `unchanged` / `unmatched` / `ambiguous` / `rejected`), plus `held` per change set the mass-change
-  guard held back; shown per day on panel 80 of the operations dashboard (REQ-XCH-015…-017,
-  REQ-XCH-021). `ExchangeGuardStorm` fires when one client's batches are held more than 10 times an
-  hour.
+  the member's synced data and to the org stock, by registered client, resource (`blueprint` /
+  `stock` / `ship` / `org_stock`) and outcome (`applied` / `unchanged` / `unmatched` / `ambiguous` /
+  `rejected`), plus `held` per change set the mass-change guard held back; shown per day on panel 80
+  of the operations dashboard (REQ-XCH-015…-017, REQ-XCH-021, REQ-XCH-045). `ExchangeGuardStorm`
+  fires when one client's batches are held more than 10 times an hour, `ExchangeOrgStockRejectionSpike`
+  when more than 50 of one client's org-stock ops are rejected in an hour.
 - `basetool_exchange_org_stock_pages_total{client_id}` counter — org-stock snapshot and feed pages
   the backend served, by registered client; shown per hour on the „Exchange" dashboard beside the
   DPoP replay refusals. A steep rise is a client polling too often or re-reading the snapshot
@@ -1860,7 +1861,8 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   sets members confirmed, by client and resource; shown on panel 80 beside the gateway's staged count
   (REQ-XCH-021).
 - `basetool_exchange_removals_total{client_id,resource}` counter — removals clients committed to
-  members' entries, counted by the journal after commit; `ExchangeRemoveSpike` fires above 100 an hour
+  members' entries, every org-stock book-out included (`org_stock`), counted by the journal after
+  commit; `ExchangeRemoveSpike` fires above 100 an hour
   for one client (REQ-XCH-028).
 - `basetool_exchange_installations_created_total{client_id}` counter — installations seen for the
   first time; `ExchangeInstallationSurge` fires above 20 an hour for one client (REQ-XCH-007,

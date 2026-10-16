@@ -425,7 +425,33 @@ public class InventoryItemService {
         false,
         Boolean.TRUE.equals(dto.personal()),
         BookInRule.lager());
+    return inventoryItemMapper.toDto(create(dto, targetUserId, null));
+  }
 
+  /**
+   * Creates an entry for {@code dto.userId()} with a note, exactly as {@link #createInventoryItem}
+   * does but without its book-in check, for a pool write whose caller decided who may book
+   * (REQ-XCH-045).
+   *
+   * @param dto the entry, naming its holder
+   * @param note the note, or {@code null} for none
+   * @return the entry that holds the stock afterwards, merged or new
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  InventoryItem createInPool(@NotNull InventoryItemCreateDto dto, @Nullable String note) {
+    return create(dto, Objects.requireNonNull(dto.userId()), note);
+  }
+
+  /**
+   * Validates, saves, audits and merges a new entry.
+   *
+   * @param dto the entry
+   * @param targetUserId the member who holds it
+   * @param note the note, or {@code null} for none
+   * @return the entry that holds the stock afterwards, merged or new
+   */
+  private @NotNull InventoryItem create(
+      @NotNull InventoryItemCreateDto dto, @NotNull UUID targetUserId, @Nullable String note) {
     final User user = Entities.require(userRepository.findById(targetUserId), "User not found");
     final Material material =
         dto.materialId() != null
@@ -472,6 +498,7 @@ public class InventoryItemService {
     item.setAmount(ScuAmounts.roundToScuScale(dto.amount().doubleValue()));
     item.setPersonal(isPersonal);
     item.setStolen(isStolen);
+    item.setNote(StringNormalization.trimToNull(note));
     List<InventoryAllocationInput> jobAllocations =
         effectiveAllocations(dto.jobOrderAllocations(), dto.jobOrderId(), item.getAmount());
     List<InventoryAllocationInput> missionAllocations =
@@ -527,10 +554,8 @@ public class InventoryItemService {
             .with("personal", item.getPersonal())
             .with("jobOrder", InventoryAuditLabels.jobOrderRef(item, this::jobOrderDisplayIdOf))
             .with("mission", InventoryAuditLabels.missionName(item, this::missionNameOf)));
-    InventoryItem merged =
-        inventoryCheckoutService.mergeStockIfRequested(
-            saved, Boolean.TRUE.equals(dto.mergeStock()));
-    return inventoryItemMapper.toDto(merged);
+    return inventoryCheckoutService.mergeStockIfRequested(
+        saved, Boolean.TRUE.equals(dto.mergeStock()));
   }
 
   /**
@@ -1054,7 +1079,9 @@ public class InventoryItemService {
    * @return the allocations to write; never {@code null}
    */
   private static List<InventoryAllocationInput> effectiveAllocations(
-      List<InventoryAllocationInput> explicit, UUID singleId, double fullAmount) {
+      @Nullable List<InventoryAllocationInput> explicit,
+      @Nullable UUID singleId,
+      double fullAmount) {
     if (explicit != null && !explicit.isEmpty()) {
       return explicit;
     }

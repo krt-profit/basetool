@@ -93,7 +93,8 @@ class ExchangeRoutesContractTest {
             "/exchange/v1/me/drafts/blueprints",
             "/exchange/v1/me/drafts/refinery-orders",
             "/exchange/v1/me/ships/changes",
-            "/exchange/v1/me/stock/changes");
+            "/exchange/v1/me/stock/changes",
+            "/exchange/v1/org-stock/changes");
     assertThat(
             ExchangeRoutes.find("POST", "/exchange/v1/me/account-check")
                 .orElseThrow()

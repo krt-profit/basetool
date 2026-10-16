@@ -48,7 +48,7 @@ public final class ExchangeFence {
   public static final String PREFIX = "/api/v1/exchange/";
 
   /** How many operations the relay document holds. */
-  public static final int RELAY_OPERATIONS = 16;
+  public static final int RELAY_OPERATIONS = 18;
 
   /** The relay document's title. */
   public static final String RELAY_TITLE = "KRT Basetool Backend exchange relay API (internal)";

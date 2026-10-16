@@ -312,6 +312,11 @@
           },
           {
             "memberToken": [
+              "exchange.orgstock.write"
+            ]
+          },
+          {
+            "memberToken": [
               "exchange.drafts.blueprints"
             ]
           },
@@ -422,6 +427,11 @@
           {
             "memberToken": [
               "exchange.orgstock.details"
+            ]
+          },
+          {
+            "memberToken": [
+              "exchange.orgstock.write"
             ]
           },
           {
@@ -971,6 +981,117 @@
               "minimum": 1,
               "maximum": 1000,
               "default": 500
+            }
+          }
+        ]
+      }
+    },
+    "/exchange/v1/org-stock/changes": {
+      "post": {
+        "operationId": "orgstock_write",
+        "summary": "Book stock into and out of the pools of the units in which the member is a Logistician, as in the web.",
+        "tags": [
+          "orgstock"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.orgstock.write"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/change-result.schema.json"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "description": "Each op names its pool; an op on a pool whose unit the member is not a Logistician of, on a personal entry or on an entry of another pool is rejected NOT_PERMITTED. Every op counts against the daily write quota.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/change-set.schema.json#/$defs/orgStockChangeSet"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exchange/v1/org-stock/members": {
+      "get": {
+        "operationId": "orgstock_members",
+        "summary": "The members a book-in into a unit's pool may name as holder: the unit's direct members, without those who withhold their name.",
+        "tags": [
+          "orgstock"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.orgstock.write"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/org-stock-members.schema.json"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "description": "403 NOT_PERMITTED when the member is not a Logistician of the unit.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "name": "unit",
+            "in": "query",
+            "required": true,
+            "description": "The unit's id, as the org stock's lots name it.",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
             }
           }
         ]

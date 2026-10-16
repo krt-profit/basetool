@@ -95,7 +95,8 @@ removed afterwards. The previous-release comparison still requires its baseline 
 T0 operation; an operation added after that release is named in
 `TIER_ZERO_NEWER_THAN_THE_LATEST_RELEASE` of `ExternalContractTest` until a release ships it
 (REQ-API-017). The first such operation is `GET /api/v1/exchange/me/org-units` (REQ-XCH-048), the
-second `GET /api/v1/exchange/org-stock` (REQ-XCH-042).
+second `GET /api/v1/exchange/org-stock` (REQ-XCH-042), then `POST /api/v1/exchange/org-stock/changes`
+and `GET /api/v1/exchange/org-stock/members` (REQ-XCH-045).
 
 ## Alternatives considered
 

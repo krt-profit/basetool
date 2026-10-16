@@ -24,7 +24,7 @@ import java.util.Optional;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-/** A member resource the exchange syncs, each with its own change feed (REQ-XCH-013). */
+/** A resource the exchange syncs, each with its own change feed (REQ-XCH-013, REQ-XCH-042). */
 public enum ExchangeResource {
   /** The member's personal blueprints, keyed by product. */
   BLUEPRINT,
@@ -33,12 +33,15 @@ public enum ExchangeResource {
   STOCK,
 
   /** The member's ships. */
-  SHIP;
+  SHIP,
+
+  /** The shared stock of the member's units, keyed by unit and lot; its writes by entry. */
+  ORG_STOCK;
 
   /**
    * The resource's name in a staged mass change ({@code ConnectedAppMassChangeRequestDto}).
    *
-   * @return {@code blueprints}, {@code stock} or {@code ships}
+   * @return {@code blueprints}, {@code stock}, {@code ships} or {@code org-stock}
    */
   @NotNull
   public String massChangeName() {
@@ -46,6 +49,7 @@ public enum ExchangeResource {
       case BLUEPRINT -> "blueprints";
       case STOCK -> "stock";
       case SHIP -> "ships";
+      case ORG_STOCK -> "org-stock";
     };
   }
 
@@ -60,13 +64,14 @@ public enum ExchangeResource {
       case BLUEPRINT -> ExchangeCapability.BLUEPRINTS_WRITE;
       case STOCK -> ExchangeCapability.STOCK_WRITE;
       case SHIP -> ExchangeCapability.HANGAR_WRITE;
+      case ORG_STOCK -> ExchangeCapability.ORGSTOCK_WRITE;
     };
   }
 
   /**
    * The value of the {@code resource} tag on the resource's mass-change metric.
    *
-   * @return {@code blueprint}, {@code stock} or {@code ship}
+   * @return {@code blueprint}, {@code stock}, {@code ship} or {@code org_stock}
    */
   @NotNull
   public String metricTag() {
@@ -74,17 +79,22 @@ public enum ExchangeResource {
       case BLUEPRINT -> "blueprint";
       case STOCK -> "stock";
       case SHIP -> "ship";
+      case ORG_STOCK -> "org_stock";
     };
   }
 
   /**
-   * Maps a staged mass change's resource name to its resource.
+   * Maps a staged mass change's resource name to its resource; the org stock has no staged mass
+   * change.
    *
    * @param name the name, as {@link #massChangeName()} spells it
    * @return the resource, or empty for any other value
    */
   @NotNull
   public static Optional<ExchangeResource> fromMassChangeName(@Nullable String name) {
-    return Arrays.stream(values()).filter(r -> r.massChangeName().equals(name)).findFirst();
+    return Arrays.stream(values())
+        .filter(r -> r != ORG_STOCK)
+        .filter(r -> r.massChangeName().equals(name))
+        .findFirst();
   }
 }

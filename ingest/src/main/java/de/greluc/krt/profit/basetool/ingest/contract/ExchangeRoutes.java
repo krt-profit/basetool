@@ -59,6 +59,8 @@ public final class ExchangeRoutes {
           route(HttpMethod.GET, "/exchange/v1/me/org-demand", "exchange.demand.read"),
           route(HttpMethod.GET, "/exchange/v1/me/org-units", "exchange.orgunits.read"),
           route(HttpMethod.GET, "/exchange/v1/org-stock", "exchange.orgstock.read"),
+          write(HttpMethod.POST, "/exchange/v1/org-stock/changes", "exchange.orgstock.write"),
+          route(HttpMethod.GET, "/exchange/v1/org-stock/members", "exchange.orgstock.write"),
           write(HttpMethod.POST, "/exchange/v1/me/drafts/blueprints", "exchange.drafts.blueprints"),
           write(
               HttpMethod.POST,

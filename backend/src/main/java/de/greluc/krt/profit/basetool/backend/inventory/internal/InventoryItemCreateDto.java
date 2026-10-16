@@ -28,6 +28,7 @@ import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Create payload for a new inventory entry, either a material row or a game-item row.
@@ -57,20 +58,20 @@ import java.util.UUID;
  */
 @ValidQuantityAmount
 public record InventoryItemCreateDto(
-    UUID userId,
-    UUID materialId,
-    UUID gameItemId,
+    @Nullable UUID userId,
+    @Nullable UUID materialId,
+    @Nullable UUID gameItemId,
     @NotNull UUID locationId,
-    @QualityValue Integer quality,
+    @Nullable @QualityValue Integer quality,
     @NotNull Double amount,
-    Boolean personal,
-    Boolean stolen,
-    UUID missionId,
-    UUID jobOrderId,
-    UUID owningOrgUnitId,
-    Boolean mergeStock,
-    List<@Valid InventoryAllocationInput> jobOrderAllocations,
-    List<@Valid InventoryAllocationInput> missionAllocations)
+    @Nullable Boolean personal,
+    @Nullable Boolean stolen,
+    @Nullable UUID missionId,
+    @Nullable UUID jobOrderId,
+    @Nullable UUID owningOrgUnitId,
+    @Nullable Boolean mergeStock,
+    @Nullable List<@Valid InventoryAllocationInput> jobOrderAllocations,
+    @Nullable List<@Valid InventoryAllocationInput> missionAllocations)
     implements QuantityAware {
 
   /**

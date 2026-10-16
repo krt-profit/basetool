@@ -1,6 +1,7 @@
 # ADR-0257 — Logisticians read and write their units' shared stock through the exchange, by name
 
-- **Status:** Accepted — implementation pending (PR 2–4 of the org-stock work, REQ-XCH-042…047).
+- **Status:** Accepted — the read, the details, `book-in`/`book-out` and the roster built; the other
+  write ops, the undo, the guard and the demand details pending (REQ-XCH-042…047).
   Amends [ADR-0220](0220-external-clients-see-only-anonymised-org-demand-and-the-location-list.md)
   (decision 1, "no requester, no order title, no free text") and narrows the own-data-only rule of
   REQ-XCH-009.
@@ -123,3 +124,35 @@ already store, and the snapshot cursors issued before the feed existed would not
 Rejected: a salt column on the entity with `@ToString.Exclude` — one forgotten mapping or log
 statement would leak it; a separate `/entries` route — the client would need a second request per
 lot and a second cursor.
+
+## Amendment 3 (2026-10-16) — how the writes are applied
+
+1. **Per op, like the ships.** An org-stock change set runs its ops in order, each on its own, in
+   one transaction: a refused op is reported `rejected` with its reason and changes nothing, the rest
+   applies. "A stale version answers `409 VERSION_CONFLICT`" is the per-op reason of that code, as
+   for stock and ships; only an optimistic-lock failure that slips past the checks answers the whole
+   request with it.
+2. **The Lager decides its own refusals.** The exchange checks what is its own — the writer is a
+   Logistician and direct member of the named pool, the holder is on the unit's roster, the material
+   and place resolve. The Lager's pool-entry commands (`PoolEntryCommands`) check the entry, its
+   pool and version, the amount, the earmarks and the deduct-from plan by the Lager's rules and
+   answer a refusal instead of throwing, then write through the web's own create and book-out. A
+   book-out without a plan takes only the free part: the exchange never lets the Lager pick whose
+   earmark shrinks.
+3. **Locks.** Every holder lot a batch touches — the book-ins' and the lot of every named entry, read
+   without a row lock — takes its advisory lock first, in one ascending pass, before any row is
+   locked (ADR-0229).
+4. **The roster is a query parameter.** `GET /exchange/v1/org-stock/members?unit=` instead of
+   `…/units/{unit}/members`, so every path of the acting-member filter stays a literal
+   (REQ-SEC-080); owner decision of the same day. The targets route follows the same shape.
+5. **Journal.** One row per Lager entry an op changed, keyed by the entry, under the writer; a
+   merge journals each entry it folded away too, so the change can be reversed. The holder's note is
+   not journaled: the journal is part of the writer's data export. Until the undo is built (#2592),
+   the member's and the admin's undo leave org-stock rows untouched and do not count them.
+6. **Every op counts.** The gateway counts an org-stock change set once at its limit filter and once
+   more for every further op after the schema check; a set that does not fit into the day's rest is
+   refused `429 QUOTA_EXCEEDED` with the further ops given back.
+
+Rejected: an all-or-nothing batch that answers the first refusal for the whole request — the client
+could not tell which op failed, and the existing change results already carry per-op reasons; a
+path template on the acting list — it would loosen REQ-SEC-080 and every seam test for one route.

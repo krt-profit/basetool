@@ -18,7 +18,7 @@ tests:
               client_id: versekit
             exp_annotations:
               summary: "An exchange client removed unusually many entries"
-              description: "One registered client (client_id) removed more than 100 blueprints, stock lots or ships across its members in the last hour. The mass-change guard stops one member losing much at once, but not a faulty release doing it to many members. Under Administration - Verbundene Anwendungen, undo the client's changes for every member since the faulty release, which suspends it first (REQ-XCH-021, REQ-XCH-028, REQ-XCH-034)."
+              description: "One registered client (client_id) removed more than 100 blueprints, stock lots, ships or org-stock entries across its members in the last hour. The mass-change guard stops one member losing much at once, but not a faulty release doing it to many members. Under Administration - Verbundene Anwendungen, undo the client's changes for every member since the faulty release, which suspends it first; org-stock writes are not undone yet and are corrected in the Globales Lager (REQ-XCH-021, REQ-XCH-028, REQ-XCH-034)."
 
   - name: silent - ordinary removals
     interval: 1m
@@ -58,6 +58,34 @@ tests:
     alert_rule_test:
       - eval_time: 60m
         alertname: ExchangeGuardStorm
+        exp_alerts: []
+
+  - name: fires - a client keeps sending refused org-stock writes
+    interval: 1m
+    input_series:
+      - series: 'basetool_exchange_writes_total{job="basetool-backend", instance="backend:11261", client_id="versekit", resource="org_stock", outcome="rejected"}'
+        values: "0+2x70"
+    alert_rule_test:
+      - eval_time: 60m
+        alertname: ExchangeOrgStockRejectionSpike
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              client_id: versekit
+            exp_annotations:
+              summary: "An exchange client keeps sending org-stock writes the Basetool refuses"
+              description: "More than 50 org-stock ops of one registered client (client_id) were rejected in the last hour: writes to pools the member is no Logistician of, to personal or foreign entries, with stale versions, unknown holders or earmarked stock. A client that ignores the per-op reasons, or one probing other units' pools, looks like this. Check the client's recent org-stock writes and consider suspending it (REQ-XCH-045, REQ-XCH-028)."
+
+  - name: silent - rejected stock writes and a few refused org-stock ops
+    interval: 1m
+    input_series:
+      - series: 'basetool_exchange_writes_total{job="basetool-backend", instance="backend:11261", client_id="versekit", resource="stock", outcome="rejected"}'
+        values: "0+5x70"
+      - series: 'basetool_exchange_writes_total{job="basetool-backend", instance="backend:11261", client_id="versekit", resource="org_stock", outcome="rejected"}'
+        values: "0x30 10x40"
+    alert_rule_test:
+      - eval_time: 60m
+        alertname: ExchangeOrgStockRejectionSpike
         exp_alerts: []
 
   - name: fires - a surge of new installations of one client

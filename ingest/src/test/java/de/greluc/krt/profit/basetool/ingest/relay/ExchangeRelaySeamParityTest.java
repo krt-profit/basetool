@@ -245,7 +245,7 @@ class ExchangeRelaySeamParityTest {
     Map<String, String> routes = new TreeMap<>();
     ExchangeSeam.OPERATIONS.forEach(
         operation -> routes.put(operation.gateway(), operation.capability()));
-    assertThat(routes).as("one gateway route per relay operation").hasSize(16);
+    assertThat(routes).as("one gateway route per relay operation").hasSize(18);
     return routes;
   }
 
@@ -266,7 +266,7 @@ class ExchangeRelaySeamParityTest {
         scopes.add(route.capability());
       }
     }
-    assertThat(routes).hasSize(16).isEqualTo(new TreeMap<>(expected));
+    assertThat(routes).hasSize(18).isEqualTo(new TreeMap<>(expected));
     assertThat(scopes).doesNotContainAnyElementsOf(ExchangeSeam.ADDITIVE_SCOPES);
     scopes.addAll(ExchangeSeam.ADDITIVE_SCOPES);
     assertThat(scopes).isEqualTo(new TreeSet<>(ExchangeSeam.CAPABILITY_SCOPES));

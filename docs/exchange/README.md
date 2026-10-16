@@ -32,6 +32,7 @@ the registry grants it to the client.
 | `exchange.orgunits.read` | the org units the member directly belongs to |
 | `exchange.orgstock.read` | the shared warehouse stock of those units, one pool per unit |
 | `exchange.orgstock.details` | with `.read`, the single named entries in the pools of units where the member is a Logistician |
+| `exchange.orgstock.write` | booking stock into and out of the pools of units where the member is a Logistician, and those units' rosters |
 | `exchange.drafts.blueprints` / `.refinery` | staging blueprints or refinery orders for review in the browser |
 
 `catalog/resolve` and `catalog/locations` are open to any exchange scope.
@@ -65,7 +66,8 @@ the registry grants it to the client.
 - [Ships](resources/ships.md) — the ship feed, links, upserts and removals.
 - [Org demand](resources/org-demand.md) — the anonymous open demand of the member's units.
 - [Org units](resources/org-units.md) — the org units the member directly belongs to.
-- [Org stock](resources/org-stock.md) — the shared warehouse stock of the member's units.
+- [Org stock](resources/org-stock.md) — the shared warehouse stock of the member's units, and
+  booking it in and out as a Logistician.
 - [Drafts](resources/drafts.md) — blueprint and refinery drafts reviewed in the browser.
 
 ## Support

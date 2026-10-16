@@ -78,7 +78,9 @@ class FilterExemptionSetsTest {
           "/api/v1/exchange/me/ships/changes",
           "/api/v1/exchange/me/stock",
           "/api/v1/exchange/me/stock/changes",
-          "/api/v1/exchange/org-stock");
+          "/api/v1/exchange/org-stock",
+          "/api/v1/exchange/org-stock/changes",
+          "/api/v1/exchange/org-stock/members");
 
   @Autowired private WebApplicationContext context;
 
@@ -99,7 +101,7 @@ class FilterExemptionSetsTest {
   }
 
   @Test
-  @DisplayName("the acting-member filter acts on exactly its thirteen paths")
+  @DisplayName("the acting-member filter acts on exactly its seventeen paths")
   void actingPathsAreExact() {
     assertThat(ActingMemberFilter.ACTING_PATHS).containsExactlyInAnyOrderElementsOf(ACTING_PATHS);
   }

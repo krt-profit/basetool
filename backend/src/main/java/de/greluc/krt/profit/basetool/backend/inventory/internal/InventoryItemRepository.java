@@ -1288,6 +1288,79 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   @Query(value = "SELECT 1 FROM pg_advisory_xact_lock(:key)", nativeQuery = true)
   int lockExchangeLot(@Param("key") long key);
 
+  /** The holder and lot of a Lager row, read without locking it (ADR-0229). */
+  interface RowLot {
+
+    /**
+     * The row id.
+     *
+     * @return the id of the {@code inventory_item} row
+     */
+    UUID getId();
+
+    /**
+     * The member who holds the row.
+     *
+     * @return the holder's user id
+     */
+    UUID getHolderId();
+
+    /**
+     * The row's material.
+     *
+     * @return the material id, or {@code null} on a game-item row
+     */
+    @Nullable
+    UUID getMaterialId();
+
+    /**
+     * The row's game item.
+     *
+     * @return the game item id, or {@code null} on a material row
+     */
+    @Nullable
+    UUID getGameItemId();
+
+    /**
+     * Where the row's stock lies.
+     *
+     * @return the location id
+     */
+    UUID getLocationId();
+
+    /**
+     * The row's quality.
+     *
+     * @return the quality, or {@code null} on a game-item row
+     */
+    @Nullable
+    Integer getQuality();
+
+    /**
+     * The row's stolen marker.
+     *
+     * @return whether the row is marked stolen
+     */
+    Boolean getStolen();
+  }
+
+  /**
+   * Reads the holder and lot of the given rows without locking them, so a writer can take the lots'
+   * advisory locks before it locks a row (ADR-0229).
+   *
+   * @param ids the rows
+   * @return one entry per existing row
+   */
+  @Query(
+      """
+      SELECT i.id AS id, u.id AS holderId, m.id AS materialId, g.id AS gameItemId,
+             l.id AS locationId, i.quality AS quality, i.stolen AS stolen
+        FROM InventoryItem i JOIN i.user u JOIN i.location l
+        LEFT JOIN i.material m LEFT JOIN i.gameItem g
+       WHERE i.id IN :ids
+      """)
+  List<RowLot> findRowLots(@Param("ids") Collection<UUID> ids);
+
   /**
    * Locks a member's rows of one item lot, personal and shared, for the exchange (REQ-XCH-016).
    *

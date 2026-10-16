@@ -232,6 +232,7 @@ public class ExchangeMassChangeService {
             ? shipWriteService.apply(caller, changeSet)
             : shipWriteService.applyConfirmed(caller, changeSet);
       }
+      case ORG_STOCK -> throw new BadRequestException("The org stock has no staged change set");
     };
   }
 

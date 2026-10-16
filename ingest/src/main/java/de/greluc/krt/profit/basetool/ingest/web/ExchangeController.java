@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.ingest.web;
 
 import de.greluc.krt.profit.basetool.ingest.config.ExchangeGatewayProperties;
+import de.greluc.krt.profit.basetool.ingest.config.ExchangeLimitProperties;
 import de.greluc.krt.profit.basetool.ingest.config.ExchangeStoreProperties;
 import de.greluc.krt.profit.basetool.ingest.config.IngestProperties;
 import de.greluc.krt.profit.basetool.ingest.config.LoggingProperties;
@@ -40,6 +41,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -137,6 +139,16 @@ public class ExchangeController {
 
   private static final Pattern LIMIT = Pattern.compile("^[0-9]{1,4}$");
 
+  private static final Pattern UNIT_ID =
+      Pattern.compile(
+          "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$");
+
+  /** The resource of the org stock's writes, which lie outside {@code /me}. */
+  private static final String ORG_STOCK = "org-stock";
+
+  /** Seconds a client waits when the daily write quota cannot be counted. */
+  private static final long QUOTA_UNAVAILABLE_RETRY_AFTER_SECONDS = 30;
+
   private final ExchangeRelay relay;
   private final ExchangeSchemas schemas;
   private final ExchangeGatewayProperties properties;
@@ -145,6 +157,8 @@ public class ExchangeController {
   private final HandoffStagingService stagingService;
   private final ExchangeBudget budget;
   private final ExchangeQuotas quotas;
+  private final ExchangeLimitProperties limitProperties;
+  private final ExchangeRefusals refusals;
   private final ExchangeStoreProperties storeProperties;
   private final IngestProperties ingestProperties;
   private final MeterRegistry meterRegistry;
@@ -441,6 +455,39 @@ public class ExchangeController {
   }
 
   /**
+   * Lists the members a book-in into one of the member's Logistician units may name as holder.
+   *
+   * @param unit the unit's id
+   * @param request the admitted request
+   * @param acceptLanguage the caller's language
+   * @return the roster or a problem
+   */
+  @GetMapping("/org-stock/members")
+  @PreAuthorize("isAuthenticated()")
+  public @NotNull ResponseEntity<?> orgStockMembers(
+      @Nullable @RequestParam(required = false) String unit,
+      @NotNull HttpServletRequest request,
+      @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
+          String acceptLanguage) {
+    ExchangeRequestContext context = ExchangeRequestContext.of(request);
+    if (context == null) {
+      return failed();
+    }
+    if (unit == null || !UNIT_ID.matcher(unit).matches()) {
+      return schemaInvalid(List.of(new ExchangeSchemas.Violation("/unit", "must be a unit id")));
+    }
+    return relayed(
+        relay.forward(
+            HttpMethod.GET,
+            BACKEND + "/org-stock/members?unit=" + unit.toLowerCase(Locale.ROOT),
+            null,
+            context,
+            acceptLanguage),
+        "org-stock-members.schema.json",
+        List.of());
+  }
+
+  /**
    * Adds or removes blueprints.
    *
    * @param body the change set
@@ -455,7 +502,7 @@ public class ExchangeController {
       @NotNull HttpServletRequest request,
       @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
           String acceptLanguage) {
-    return changes("blueprints", "blueprintChangeSet", body, request, acceptLanguage);
+    return changes("blueprints", "blueprintChangeSet", false, body, request, acceptLanguage);
   }
 
   /**
@@ -473,7 +520,7 @@ public class ExchangeController {
       @NotNull HttpServletRequest request,
       @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
           String acceptLanguage) {
-    return changes("stock", "stockChangeSet", body, request, acceptLanguage);
+    return changes("stock", "stockChangeSet", false, body, request, acceptLanguage);
   }
 
   /**
@@ -491,7 +538,26 @@ public class ExchangeController {
       @NotNull HttpServletRequest request,
       @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
           String acceptLanguage) {
-    return changes("ships", "shipChangeSet", body, request, acceptLanguage);
+    return changes("ships", "shipChangeSet", false, body, request, acceptLanguage);
+  }
+
+  /**
+   * Books stock into and out of the pools of the member's Logistician units; every op counts
+   * against the daily write quota.
+   *
+   * @param body the change set
+   * @param request the admitted request
+   * @param acceptLanguage the caller's language
+   * @return the change result or a problem
+   */
+  @PostMapping(value = "/org-stock/changes", consumes = MediaType.APPLICATION_JSON_VALUE)
+  @PreAuthorize("isAuthenticated()")
+  public @NotNull ResponseEntity<?> orgStockChanges(
+      @NotNull @RequestBody JsonNode body,
+      @NotNull HttpServletRequest request,
+      @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
+          String acceptLanguage) {
+    return changes(ORG_STOCK, "orgStockChangeSet", true, body, request, acceptLanguage);
   }
 
   /**
@@ -635,10 +701,14 @@ public class ExchangeController {
    * Checks a change set, relays it and checks the answer; a change set of more than {@value
    * #LARGE_CHANGE_SET_OPS} ops is relayed within the large-set bulkhead, whose {@code RELAY_BUSY}
    * refusal gives the write's quota count back, and one the backend's mass-change guard held back
-   * is staged for the member's confirmation.
+   * is staged for the member's confirmation. Where every op counts, the ops after the first are
+   * counted against the daily write quota once the change set matches its schema, and a change set
+   * over the quota is refused with them given back.
    *
-   * @param resource the resource's path segment
+   * @param resource the resource: {@code org-stock}, or the segment below {@code /me} of a member
+   *     resource
    * @param definition the change set's schema definition
+   * @param everyOpCounts whether every op counts against the daily write quota
    * @param body the change set
    * @param request the admitted request
    * @param acceptLanguage the caller's language
@@ -647,6 +717,7 @@ public class ExchangeController {
   private @NotNull ResponseEntity<?> changes(
       @NotNull String resource,
       @NotNull String definition,
+      boolean everyOpCounts,
       @NotNull JsonNode body,
       @NotNull HttpServletRequest request,
       @Nullable String acceptLanguage) {
@@ -670,7 +741,13 @@ public class ExchangeController {
     if (unreportable != null) {
       return unreportable;
     }
-    String target = BACKEND + "/me/" + resource + "/changes";
+    if (everyOpCounts && body.get("ops") instanceof ArrayNode ops && ops.size() > 1) {
+      ResponseEntity<?> overQuota = countFurtherOps(context, request, ops.size() - 1L);
+      if (overQuota != null) {
+        return overQuota;
+      }
+    }
+    String target = BACKEND + (ORG_STOCK.equals(resource) ? "/" : "/me/") + resource + "/changes";
     ExchangeRelay.Result result =
         body.get("ops") instanceof ArrayNode ops && ops.size() > LARGE_CHANGE_SET_OPS
             ? relay.forwardLarge(HttpMethod.POST, target, body, context, acceptLanguage)
@@ -682,6 +759,48 @@ public class ExchangeController {
       return staged(context, request, resource, body, result);
     }
     return relayed(result, "change-result.schema.json", unknown);
+  }
+
+  /**
+   * Counts the further ops of a change set whose every op counts against the member's daily write
+   * quota (REQ-XCH-045), and refuses it with those counts given back when the quota is exceeded.
+   *
+   * @param context the admitted request
+   * @param request the write, counted once by the limit filter
+   * @param ops how many further ops to count
+   * @return {@code 429 QUOTA_EXCEEDED} or {@code 503 SERVICE_UNAVAILABLE}, or {@code null} when the
+   *     change set is within the quota
+   */
+  private @Nullable ResponseEntity<?> countFurtherOps(
+      @NotNull ExchangeRequestContext context, @NotNull HttpServletRequest request, long ops) {
+    long count;
+    try {
+      count = quotas.countFurtherOps(request, ops);
+    } catch (ExchangeUnavailableException _) {
+      refusals.count(ExchangeRefusals.SERVICE_UNAVAILABLE, context.clientId());
+      return unavailable(
+          ExchangeRefusals.SERVICE_UNAVAILABLE,
+          "The write quota cannot be counted; try again later.",
+          QUOTA_UNAVAILABLE_RETRY_AFTER_SECONDS);
+    }
+    Integer override = context.client().writesPerDay();
+    int limit = override == null ? limitProperties.writesPerDay() : override;
+    if (count <= limit) {
+      return null;
+    }
+    quotas.refundFurtherOps(request);
+    refusals.count(ExchangeRefusals.QUOTA_EXCEEDED, context.clientId());
+    ProblemDetail problem =
+        Problems.of(
+            loggingProperties,
+            HttpStatus.TOO_MANY_REQUESTS,
+            "Refused",
+            ExchangeRefusals.QUOTA_EXCEEDED,
+            "The daily write quota is exhausted.");
+    return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+        .header(HttpHeaders.RETRY_AFTER, String.valueOf(quotas.secondsUntilTomorrow()))
+        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+        .body(problem);
   }
 
   /**

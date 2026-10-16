@@ -373,6 +373,12 @@ class ExchangeGoldenAnswerTest {
     routes.put("route-get-org-units", get("/me/org-units"));
     routes.put("route-get-org-stock", get("/org-stock"));
     routes.put(
+        "route-post-org-stock-changes",
+        post("/org-stock/changes", fixture("change-set--orgStockChangeSet/valid/book-out.json")));
+    routes.put(
+        "route-get-org-stock-members",
+        get("/org-stock/members?unit=0c2f8a51-7d3e-4b9a-9f10-5a6b7c8d9e01"));
+    routes.put(
         "route-post-blueprint-draft",
         post("/me/drafts/blueprints", fixture("blueprint-draft/valid/corpus-slice.json")));
     routes.put(
@@ -405,9 +411,12 @@ class ExchangeGoldenAnswerTest {
         case "GET /api/v1/exchange/me/org-demand" -> fixture("org-demand/valid/both-lists.json");
         case "GET /api/v1/exchange/me/org-units" -> fixture("org-unit-list/valid/all-kinds.json");
         case "GET /api/v1/exchange/org-stock" -> fixture("page--orgStockPage/valid/snapshot.json");
+        case "GET /api/v1/exchange/org-stock/members" ->
+            fixture("org-stock-members/valid/roster.json");
         case "POST /api/v1/exchange/me/blueprints/changes",
             "POST /api/v1/exchange/me/stock/changes",
-            "POST /api/v1/exchange/me/ships/changes" ->
+            "POST /api/v1/exchange/me/ships/changes",
+            "POST /api/v1/exchange/org-stock/changes" ->
             "{\"dryRun\":false,\"applied\":1,\"unchanged\":0,\"notApplied\":1,"
                 + "\"results\":[{\"index\":1,\"result\":\"unmatched\"}],"
                 + "\"offersReduced\":0,\"offersRemoved\":0}";

@@ -154,6 +154,21 @@ public class InventoryCheckoutService {
   }
 
   /**
+   * Books out part of a shared row for a Logistician of its pool through a connected application,
+   * exactly as {@link #bookOutInventoryItem} does for a Logistician in the web (REQ-XCH-045).
+   *
+   * @param id the row
+   * @param dto the book-out
+   * @param actorId the writer, recorded as the actor
+   * @return the offers the book-out lowered and removed
+   */
+  @NotNull
+  @Transactional(propagation = Propagation.MANDATORY)
+  StockChangeEffects bookOutForPool(UUID id, InventoryItemBookOutDto dto, UUID actorId) {
+    return bookOut(id, dto, actorId, true, null).offers();
+  }
+
+  /**
    * Books out part of a row and keeps its Materialbörse offers in step.
    *
    * @param id the row

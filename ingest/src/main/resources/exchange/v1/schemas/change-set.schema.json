@@ -64,6 +64,194 @@
         }
       }
     },
+    "orgStockChangeSet": {
+      "allOf": [
+        {
+          "$ref": "#"
+        }
+      ],
+      "properties": {
+        "ops": {
+          "items": {
+            "$ref": "#/$defs/orgStockOp"
+          }
+        }
+      }
+    },
+    "jobOrderLine": {
+      "type": "object",
+      "properties": {
+        "jobOrder": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "The job order's id. Opaque identifier issued by the Basetool. Clients store and echo it, never parse it."
+        },
+        "quantity": {
+          "$ref": "quantity.schema.json"
+        }
+      },
+      "required": [
+        "jobOrder",
+        "quantity"
+      ]
+    },
+    "missionLine": {
+      "type": "object",
+      "properties": {
+        "mission": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "The mission's id. Opaque identifier issued by the Basetool. Clients store and echo it, never parse it."
+        },
+        "quantity": {
+          "$ref": "quantity.schema.json"
+        }
+      },
+      "required": [
+        "mission",
+        "quantity"
+      ]
+    },
+    "orgStockOp": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "Books stock in as a new shared entry of the unit's pool, held by a member from the unit's roster.",
+          "properties": {
+            "opId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "Echoed in the result."
+            },
+            "op": {
+              "const": "book-in"
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The unit whose pool receives the stock, as the org stock's lots name it."
+            },
+            "holder": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The ref of the holder, from the unit's roster."
+            },
+            "material": {
+              "$ref": "item-ref.schema.json"
+            },
+            "location": {
+              "$ref": "location-ref.schema.json"
+            },
+            "quality": {
+              "$ref": "quality.schema.json"
+            },
+            "stolen": {
+              "type": "boolean"
+            },
+            "quantity": {
+              "$ref": "quantity.schema.json"
+            },
+            "note": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "mergeScu": {
+              "type": "boolean",
+              "description": "Merge an SCU material into the holder's entry of the same lot in the pool, as the web's merge opt-in does. Piece-counted stock always merges."
+            },
+            "jobOrders": {
+              "type": "array",
+              "maxItems": 100,
+              "description": "Earmarks to job orders that need the material or item.",
+              "items": {
+                "$ref": "#/$defs/jobOrderLine"
+              }
+            },
+            "missions": {
+              "type": "array",
+              "maxItems": 100,
+              "description": "Earmarks to missions; not for an item.",
+              "items": {
+                "$ref": "#/$defs/missionLine"
+              }
+            }
+          },
+          "required": [
+            "op",
+            "unit",
+            "holder",
+            "material",
+            "location",
+            "quality",
+            "stolen",
+            "quantity"
+          ]
+        },
+        {
+          "type": "object",
+          "description": "Books an amount out of one shared entry of the unit's pool.",
+          "properties": {
+            "opId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "Echoed in the result."
+            },
+            "op": {
+              "const": "book-out"
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The unit whose pool holds the entry."
+            },
+            "entry": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The entry's id from the org stock. Opaque identifier issued by the Basetool. Clients store and echo it, never parse it."
+            },
+            "version": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "The entry's version the client last saw. A difference answers VERSION_CONFLICT."
+            },
+            "quantity": {
+              "$ref": "quantity.schema.json"
+            },
+            "fromJobOrders": {
+              "type": "array",
+              "maxItems": 100,
+              "description": "How much comes out of each job-order earmark of the entry; the rest must be free of job-order earmarks.",
+              "items": {
+                "$ref": "#/$defs/jobOrderLine"
+              }
+            },
+            "fromMissions": {
+              "type": "array",
+              "maxItems": 100,
+              "description": "How much comes out of each mission earmark of the entry; the rest must be free of mission earmarks.",
+              "items": {
+                "$ref": "#/$defs/missionLine"
+              }
+            }
+          },
+          "required": [
+            "op",
+            "unit",
+            "entry",
+            "version",
+            "quantity"
+          ]
+        }
+      ]
+    },
     "blueprintOp": {
       "oneOf": [
         {

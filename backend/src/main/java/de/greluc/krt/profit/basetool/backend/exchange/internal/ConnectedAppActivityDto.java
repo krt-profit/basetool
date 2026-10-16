@@ -26,7 +26,7 @@ import org.jetbrains.annotations.Nullable;
  * One recent write of a connected client to the member's data (REQ-XCH-032).
  *
  * @param recordedAt when it was written
- * @param resource {@code BLUEPRINT}, {@code STOCK} or {@code SHIP}
+ * @param resource {@code BLUEPRINT}, {@code STOCK}, {@code SHIP} or {@code ORG_STOCK}
  * @param action the journal action, such as {@code BLUEPRINT_ADD} or {@code SHIP_REMOVE}
  * @param label the entry's name — a blueprint, a material or item, or a ship type — or {@code null}
  *     when it is no longer known

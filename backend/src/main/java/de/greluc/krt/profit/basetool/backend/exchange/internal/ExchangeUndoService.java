@@ -195,7 +195,8 @@ public class ExchangeUndoService {
     Instant from = since.isBefore(floor) ? floor : since;
     Map<String, List<ExchangeJournalEntry>> groups = new TreeMap<>();
     for (ExchangeJournalEntry entry : journalRepository.findUndoable(member, clientId, from)) {
-      if ((installationKey != null && !installationKey.equals(entry.getInstallationKey()))
+      if (entry.getResource() == ExchangeResource.ORG_STOCK
+          || (installationKey != null && !installationKey.equals(entry.getInstallationKey()))
           || (resource != null && resource != entry.getResource())) {
         continue;
       }
@@ -278,6 +279,7 @@ public class ExchangeUndoService {
             case BLUEPRINT -> restoreBlueprint(member, newest.getEntityKey(), before);
             case STOCK -> restoreLot(member, newest.getEntityKey(), before);
             case SHIP -> restoreShip(member, newest.getEntityKey(), before, memberships);
+            case ORG_STOCK -> false;
           };
       if (!done) {
         return GONE;
@@ -478,7 +480,7 @@ public class ExchangeUndoService {
   private void refresh(@NotNull UUID member, @NotNull ExchangeResource resource) {
     switch (resource) {
       case BLUEPRINT -> liveSync.blueprintsChanged(member);
-      case STOCK -> liveSync.stockChanged(false);
+      case STOCK, ORG_STOCK -> liveSync.stockChanged(false);
       case SHIP -> liveSync.hangarChanged(member);
       case null -> throw new NullPointerException("resource");
     }

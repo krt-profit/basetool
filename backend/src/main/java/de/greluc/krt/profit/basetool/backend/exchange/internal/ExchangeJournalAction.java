@@ -32,7 +32,9 @@ public enum ExchangeJournalAction {
   STOCK_SET_QUANTITY(ExchangeResource.STOCK),
   SHIP_LINK(ExchangeResource.SHIP),
   SHIP_UPSERT(ExchangeResource.SHIP),
-  SHIP_REMOVE(ExchangeResource.SHIP);
+  SHIP_REMOVE(ExchangeResource.SHIP),
+  ORG_STOCK_BOOK_IN(ExchangeResource.ORG_STOCK),
+  ORG_STOCK_BOOK_OUT(ExchangeResource.ORG_STOCK);
 
   /** The resource the action belongs to. */
   @NotNull private final ExchangeResource resource;

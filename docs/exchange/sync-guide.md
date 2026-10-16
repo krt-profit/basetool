@@ -187,12 +187,14 @@ mass-change window of your client.
 | Requests | 1200 per minute | client, over all its members |
 | Requests | 120 per minute | source IP address, over all members and clients, anonymous schema reads included |
 | Account checks | 10 per hour | client and member |
-| Writes (change sets and drafts) | 500 per UTC day, or `limits.writesPerDay` | client and member |
+| Writes (change sets and drafts; an org-stock change set counts each op) | 500 per UTC day, or `limits.writesPerDay` | client and member |
 | Live DPoP proofs | 600 at a time, each live until just after 30 seconds past its `iat` (`429 DPOP_PROOF_LIMIT`, [details](authentication.md#live-proofs-per-member)) | member, over all clients |
 | Live DPoP proofs | 100 000 at a time (`503 SERVICE_UNAVAILABLE`) | gateway, over all members |
 
 Every attempt counts, retries and replays included — except a `503 EXCHANGE_BUDGET_EXHAUSTED`,
-which gives its write back. Admitted answers carry `RateLimit` and
+which gives its write back. An org-stock change set counts once more for every op after its first
+once it matches its schema; one that does not fit into the day's rest is refused
+`429 QUOTA_EXCEEDED` and keeps only its first count, and a replay of its `Idempotency-Key` counts once. Admitted answers carry `RateLimit` and
 `RateLimit-Policy` headers for the member's per-minute limit; slow down before it runs out. The
 per-IP limit is checked first, before the token is read: every member and client behind one address
 shares it, so the per-client 1200 cannot be reached from a single address, and its
