@@ -162,11 +162,12 @@ With `exchange.orgstock.write`, a member who is a **Logistician of a unit** (see
 books stock into that unit's pool for any member of the unit and books any entry of the pool out,
 as the Basetool's warehouse lets them. Send a change set to `POST /exchange/v1/org-stock/changes`
 with an `Idempotency-Key`, as for every write ([sync guide](../sync-guide.md)). The ops run one after
-the other in one request; **each op counts against the daily write quota** (a `dryRun` counts once),
-and a change set that would exceed it is refused `429 QUOTA_EXCEEDED` as a whole. Every write is checked and booked by the
-Basetool's warehouse with its own rules: reservations stay protected, linked Materialbörse offers are
-lowered, the holder is notified of a book-out by someone else, the Basetool's warehouse audit names
-the member and your client, and every change is journaled under the member.
+the other in one request; **each op counts against the daily write quota** (a `dryRun` counts
+once), and a change set that would exceed it is refused `429 QUOTA_EXCEEDED` as a whole. Every
+write is checked and booked by the Basetool's warehouse with its own rules: reservations stay
+protected, linked offers of the Basetool's material exchange are lowered, the holder is notified
+of a book-out by someone else, the Basetool's warehouse audit names the member and your client,
+and every change is journaled under the member.
 
 Every op names its pool in `unit`. An op on a pool whose unit the member is not a Logistician and
 direct member of, on a personal entry, or on an entry of another pool is rejected `NOT_PERMITTED`
@@ -248,5 +249,5 @@ through the feed. `dryRun: true` checks every op without writing.
 | `EARMARK_TARGET_INVALID` | both | An earmark names a job order that does not need the material or item, an unknown mission, a mission for an item, a target twice, or — in a book-out — a target the entry is not earmarked to or more than it holds there. |
 | `UNIT_MISMATCH`, `LOCATION_UNKNOWN`, `STOLEN_MARKING_DISABLED`, `UNMATCHED`, `AMBIGUOUS` | as for [stock](stock.md) | |
 
-An undo of org-stock writes from „Verbundene Anwendungen" is not offered yet; the journal keeps
+An undo of org-stock writes under *Connected applications* is not offered yet; the journal keeps
 every change for it.

@@ -127,7 +127,12 @@ the schemas outside those fixtures (`check_exchange_docs_links.py`), lints the M
 static reference from the committed schemas (`prepare_exchange_reference.py` and the Redoc bundle of
 a pinned `redoc` release, checked against its npm integrity), copies the document and the schemas
 beside it and builds the site with Jekyll, whose edit links point at `docs/exchange/` on `main`; a pull request builds, only
-`main` deploys, and only the deploy job holds `pages: write` and `id-token: write`.
+`main` deploys, and only the deploy job holds `pages: write` and `id-token: write`. The same
+checks, the Jekyll build aside, run locally in `./gradlew check` as `:frontend:checkExchangeDocs`
+(the link and German-text check and its self-test, markdownlint from the same lockfile through the
+frontend's Node, the DPoP reference's tests and the reference preparation with its self-test; Python
+on `PATH` as `python3`, `python` on Windows, or `-PpythonExecutable`), so a page that would fail the
+workflow fails the build first.
 
 The site wears the DAS KARTELL design system (REQ-UI-001, REQ-UI-003, REQ-UI-019), not a stock
 Jekyll theme: its own layouts under `docs/exchange/_layouts/` put every page — the generated schema

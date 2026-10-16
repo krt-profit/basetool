@@ -1,3 +1,4 @@
+import com.github.gradle.node.npm.task.NpmTask
 import com.github.gradle.node.npm.task.NpxTask
 import com.github.gradle.node.task.NodeTask
 import de.greluc.krt.profit.basetool.conventions.OssLicensePolicy
@@ -789,7 +790,108 @@ val testEslintBans =
     outputs.upToDateWhen { false }
   }
 
+val repositoryRoot = layout.settingsDirectory
+val exchangeDocs = repositoryRoot.dir("docs/exchange")
+val markdownlintTool = repositoryRoot.dir(".github/tools/markdownlint")
+val pythonExecutable =
+  (findProperty("pythonExecutable") as String?)
+    ?: if (System.getProperty("os.name").orEmpty().lowercase().contains("windows")) "python"
+    else "python3"
+
+val installExchangeDocsMarkdownlint =
+  tasks.register<NpmTask>("installExchangeDocsMarkdownlint") {
+    group = "verification"
+    description =
+      "Installs the pinned markdownlint-cli of the exchange-docs workflow from its lockfile."
+    dependsOn(tasks.named("npmSetup"))
+    workingDir.set(markdownlintTool.asFile)
+    npmCommand.set(listOf("ci"))
+    args.set(listOf("--ignore-scripts", "--no-audit", "--no-fund"))
+    inputs.file(markdownlintTool.file("package.json"))
+    inputs.file(markdownlintTool.file("package-lock.json"))
+    outputs.dir(markdownlintTool.dir("node_modules"))
+  }
+
+val lintExchangeDocs =
+  tasks.register<NodeTask>("lintExchangeDocs") {
+    group = "verification"
+    description =
+      "Lints the exchange developer pages with markdownlint, as the Exchange Docs workflow does."
+    dependsOn(installExchangeDocsMarkdownlint)
+    script.set(markdownlintTool.file("node_modules/markdownlint-cli/markdownlint.js").asFile)
+    workingDir.set(repositoryRoot.asFile)
+    args.set(listOf("-c", "docs/exchange/.markdownlint.json", "docs/exchange/**/*.md"))
+    ignoreExitValue.set(false)
+    inputs.files(fileTree(exchangeDocs) { include("**/*.md", ".markdownlint.json") })
+    outputs.upToDateWhen { false }
+  }
+
+/**
+ * Registers a Python check of the Exchange Docs workflow, run from the repository root.
+ *
+ * @param name the task name
+ * @param text the task description
+ * @param arguments the script and its arguments
+ */
+fun exchangeDocsPython(name: String, text: String, arguments: List<String>) =
+  tasks.register<Exec>(name) {
+    group = "verification"
+    description = text
+    workingDir = repositoryRoot.asFile
+    environment("PYTHONDONTWRITEBYTECODE", "1")
+    commandLine(listOf(pythonExecutable) + arguments)
+    inputs.files(fileTree(exchangeDocs))
+    inputs.files(fileTree(repositoryRoot.dir(".github/scripts")) { include("*exchange*.py") })
+    inputs.files(
+      fileTree(repositoryRoot.dir("ingest/src/main/resources")) {
+        include("api/exchange-v1.openapi.json", "exchange/v1/schemas/*.json")
+      },
+    )
+    outputs.upToDateWhen { false }
+  }
+
+val exchangeDocsChecks =
+  listOf(
+    exchangeDocsPython(
+      "selftestExchangeDocsLinks",
+      "Self-tests the exchange docs link checker.",
+      listOf(".github/scripts/check_exchange_docs_links.py", "--selftest"),
+    ),
+    exchangeDocsPython(
+      "checkExchangeDocsLinks",
+      "Checks that every relative link of the exchange docs resolves and no German text is on them.",
+      listOf(".github/scripts/check_exchange_docs_links.py"),
+    ),
+    exchangeDocsPython(
+      "testExchangeDpopReference",
+      "Runs the tests of the DPoP reference implementation in the exchange docs.",
+      listOf("-m", "unittest", "discover", "-s", "docs/exchange/dpop-reference"),
+    ),
+    exchangeDocsPython(
+      "selftestExchangeReference",
+      "Self-tests the preparation of the exchange OpenAPI reference page.",
+      listOf(".github/scripts/prepare_exchange_reference.py", "--selftest"),
+    ),
+    exchangeDocsPython(
+      "prepareExchangeReference",
+      "Prepares the exchange OpenAPI reference page into the build directory.",
+      listOf(
+        ".github/scripts/prepare_exchange_reference.py",
+        "--out",
+        layout.buildDirectory.dir("exchange-reference").get().asFile.absolutePath,
+      ),
+    ),
+  )
+
+tasks.register("checkExchangeDocs") {
+  group = "verification"
+  description =
+    "Runs the checks of the Exchange Docs workflow's build job except the Jekyll build (links, German text, markdownlint, DPoP reference, OpenAPI reference)."
+  dependsOn(exchangeDocsChecks, lintExchangeDocs)
+}
+
 tasks.named("check").configure {
+  dependsOn("checkExchangeDocs")
   dependsOn(
     testKrtFetchReadJs,
     testTrustedTypesJs,

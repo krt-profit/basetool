@@ -194,11 +194,12 @@ mass-change window of your client.
 Every attempt counts, retries and replays included — except a `503 EXCHANGE_BUDGET_EXHAUSTED`,
 which gives its write back. An org-stock change set that is not a dry run counts once more for every
 op after its first once it matches its schema; one that does not fit into the day's rest is refused
-`429 QUOTA_EXCEEDED` and keeps only its first count, and a replay of its `Idempotency-Key` counts once. Admitted answers carry `RateLimit` and
-`RateLimit-Policy` headers for the member's per-minute limit; slow down before it runs out. The
-per-IP limit is checked first, before the token is read: every member and client behind one address
-shares it, so the per-client 1200 cannot be reached from a single address, and its
-`429 RATE_LIMITED` carries neither `RateLimit` headers nor a `DPoP-Nonce`.
+`429 QUOTA_EXCEEDED` and keeps only its first count, and a replay of its `Idempotency-Key` counts
+once. Admitted answers carry `RateLimit` and `RateLimit-Policy` headers for the member's
+per-minute limit; slow down before it runs out. The per-IP limit is checked first, before the
+token is read: every member and client behind one address shares it, so the per-client 1200
+cannot be reached from a single address, and its `429 RATE_LIMITED` carries neither `RateLimit`
+headers nor a `DPoP-Nonce`.
 
 The per-minute limits and the account-check limit are counted by each gateway instance on its own,
 as is the DPoP `jti` replay check; the daily write quota is shared. The Basetool runs a single
