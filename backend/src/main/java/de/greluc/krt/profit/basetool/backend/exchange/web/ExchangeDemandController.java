@@ -19,7 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.web;
 
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeDemandService;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeGate;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgDemandDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,7 +38,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * The anonymised open demand of the member's units for an exchange client, reachable only from the
- * ingest gateway (REQ-XCH-018).
+ * ingest gateway (REQ-XCH-018), with the orders of the member's Logistician units under {@code
+ * exchange.demand.details} (REQ-XCH-047).
  */
 @RestController
 @RequestMapping("/api/v1/exchange/me/org-demand")
@@ -46,6 +49,9 @@ public class ExchangeDemandController {
 
   /** Computes the demand. */
   private final ExchangeDemandService demandService;
+
+  /** Tells whether the admitted request also holds {@code exchange.demand.details}. */
+  private final ExchangeGate exchangeGate;
 
   /**
    * Returns the open demand of the units the member belongs to.
@@ -58,9 +64,15 @@ public class ExchangeDemandController {
   @PreAuthorize("@exchangeGate.allows('exchange.demand.read', authentication)")
   @Operation(
       summary = "Exchange: the open demand of my units",
-      description = "Gateway-only. Anonymised: no names, titles, free text or per-order figures.")
+      description =
+          "Gateway-only. Anonymised: no names, titles, free text or per-order figures. With"
+              + " exchange.demand.details, the open orders of the units the member is a Logistician"
+              + " of, with number, requester handle and comment but no assignee.")
   public ResponseEntity<ExchangeOrgDemandDto> orgDemand(@NotNull Authentication authentication) {
     SubjectAuthentication caller = (SubjectAuthentication) authentication;
-    return ResponseEntity.ok(demandService.demand(UUID.fromString(caller.subject())));
+    return ResponseEntity.ok(
+        demandService.demand(
+            UUID.fromString(caller.subject()),
+            exchangeGate.holds(ExchangeCapability.DEMAND_DETAILS, authentication)));
   }
 }

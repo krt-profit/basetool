@@ -2,8 +2,7 @@
 
 - **Status:** Accepted — the read, the details, the roster, the targets and the ops `book-in`,
   `book-out`, `sell`, the moves (`move-location`, `move-holder`, `move-pool`), `note`, `stolen`
-  and the earmark ops, the undo and the guard built; the demand details pending
-  (REQ-XCH-042…047).
+  and the earmark ops, the undo, the guard and the demand details built (REQ-XCH-042…047).
   Amends [ADR-0220](0220-external-clients-see-only-anonymised-org-demand-and-the-location-list.md)
   (decision 1, "no requester, no order title, no free text") and narrows the own-data-only rule of
   REQ-XCH-009.
@@ -240,3 +239,21 @@ move) — they would merge, notify and audit as new actions and cannot reverse a
 exactly; refusing the whole undo of an op when one of its entries changed — one conflict would leave
 every other entry of a large faulty batch in place; counting the amount taken instead of the ops — a
 pool's lots have no common unit across materials and items.
+
+## Amendment 7 (2026-10-16) — how the demand details are served
+
+1. **An additive capability, like the org-stock details.** `exchange.demand.details` gates no
+   route: the demand route checks it after the gate admitted `.read` and answers without `orders`
+   when it is missing, never with `403`. The job-order gate of ADR-0220 runs first; a withheld
+   answer carries no `orders`.
+2. **Absent, not empty, for a member who coordinates nothing.** `orders` is present only when the
+   member is a Logistician of at least one unit they belong to; a plain member's answer stays exactly
+   ADR-0220's, so a client cannot tell from it that the client holds the capability.
+3. **Per-order lines are clamped per order.** An order's open material line is its own requirement
+   less the stock booked to it; it does not net against the other orders of its unit the way the
+   summed lines do (REQ-XCH-018). The summed lines stay the Materialbedarf's figure.
+4. **The responsible unit is named too.** A member may be a Logistician of several units, so each
+   order carries `unit` beside `requestingUnit`.
+
+Rejected: a separate `/me/org-demand/orders` route — a second request and a second capability check
+for data the demand query already loads.

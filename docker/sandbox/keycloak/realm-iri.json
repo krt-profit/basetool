@@ -987,6 +987,32 @@
     },
     {
       "attributes": {
+        "consent.screen.text": "${xchConsentDemandDetails}",
+        "display.on.consent.screen": "true",
+        "gui.order": "15",
+        "include.in.openid.provider.metadata": "true",
+        "include.in.token.scope": "true"
+      },
+      "name": "exchange.demand.details",
+      "protocol": "openid-connect",
+      "protocolMappers": [
+        {
+          "config": {
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "included.custom.audience": "basetool-ingest",
+            "introspection.token.claim": "true",
+            "lightweight.claim": "false"
+          },
+          "consentRequired": false,
+          "name": "aud-basetool-ingest",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper"
+        }
+      ]
+    },
+    {
+      "attributes": {
         "consent.screen.text": "${xchConsentOrgStockWrite}",
         "display.on.consent.screen": "true",
         "gui.order": "14",
@@ -1196,6 +1222,7 @@
         "exchange.hangar.read",
         "exchange.hangar.write",
         "exchange.demand.read",
+        "exchange.demand.details",
         "exchange.drafts.blueprints",
         "exchange.drafts.refinery",
         "exchange.orgunits.read",
@@ -1253,6 +1280,7 @@
         "exchange.hangar.read",
         "exchange.hangar.write",
         "exchange.demand.read",
+        "exchange.demand.details",
         "exchange.drafts.blueprints",
         "exchange.drafts.refinery",
         "exchange.orgunits.read",

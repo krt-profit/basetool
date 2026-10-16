@@ -146,6 +146,13 @@ class AdminExchangeClientsPageControllerMvcTest {
                     containsString(
                         "mit Namen im gemeinsamen Lagerbestand der Einheiten lesen, in denen du"
                             + " Logistiker bist")))
+        .andExpect(content().string(containsString("value=\"exchange.demand.details\"")))
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "Offene Aufträge mit Nummer, Auftraggeber und Kommentar der Einheiten"
+                            + " lesen, in denen du Logistiker bist")))
         .andExpect(content().string(containsString("value=\"exchange.orgstock.write\"")))
         .andExpect(
             content()

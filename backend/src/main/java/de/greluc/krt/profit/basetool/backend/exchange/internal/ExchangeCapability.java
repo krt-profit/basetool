@@ -59,6 +59,9 @@ public enum ExchangeCapability {
   /** Reading the anonymised demand of the member's org units. */
   DEMAND_READ("exchange.demand.read"),
 
+  /** Adding the orders of the member's Logistician units to the org demand. */
+  DEMAND_DETAILS("exchange.demand.details"),
+
   /** Reading the member's direct org-unit memberships. */
   ORGUNITS_READ("exchange.orgunits.read"),
 

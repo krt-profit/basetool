@@ -5,6 +5,12 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
 
 ## 2026-10-16
 
+- **New: order details in the org demand.** Under the new scope `exchange.demand.details`, in
+  addition to `exchange.demand.read`, a Logistician of a unit gets `orders`: the unit's open and
+  in-progress orders with number, type, status, priority, responsible and requesting unit, requester
+  handle, comment and open lines, never an assignee
+  ([org demand](resources/org-demand.md#order-details)). `org-demand.schema.json` gains the optional
+  `orders`.
 - **New: the mass-change guard and the undo for org-stock writes.** A change set that takes too
   much out of one pool answers `409 MASS_CHANGE_CONFIRMATION_REQUIRED` and waits for the member's
   confirmation; the member's and the administrator's undo now set back org-stock writes too

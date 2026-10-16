@@ -1090,7 +1090,7 @@
     },
     "/api/v1/exchange/me/org-demand" : {
       "get" : {
-        "description" : "Gateway-only. Anonymised: no names, titles, free text or per-order figures.",
+        "description" : "Gateway-only. Anonymised: no names, titles, free text or per-order figures. With exchange.demand.details, the open orders of the units the member is a Logistician of, with number, requester handle and comment but no assignee.",
         "operationId" : "orgDemand",
         "responses" : {
           "200" : {
@@ -2689,6 +2689,91 @@
           }
         }
       },
+      "ExchangeDemandOrderDto" : {
+        "type" : "object",
+        "properties" : {
+          "comment" : {
+            "type" : "string"
+          },
+          "handle" : {
+            "type" : "string"
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeDemandOrderItemDto"
+            }
+          },
+          "materials" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeDemandOrderMaterialDto"
+            }
+          },
+          "number" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "priority" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "requestingUnit" : {
+            "$ref" : "#/components/schemas/ExchangeDemandUnitDto"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string"
+          },
+          "unit" : {
+            "$ref" : "#/components/schemas/ExchangeDemandUnitDto"
+          }
+        }
+      },
+      "ExchangeDemandOrderItemDto" : {
+        "type" : "object",
+        "properties" : {
+          "item" : {
+            "$ref" : "#/components/schemas/ExchangeItemRefDto"
+          },
+          "openQuantity" : {
+            "$ref" : "#/components/schemas/ExchangeQuantityDto"
+          }
+        }
+      },
+      "ExchangeDemandOrderMaterialDto" : {
+        "type" : "object",
+        "properties" : {
+          "material" : {
+            "$ref" : "#/components/schemas/ExchangeItemRefDto"
+          },
+          "minQuality" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "openQuantity" : {
+            "$ref" : "#/components/schemas/ExchangeQuantityDto"
+          }
+        }
+      },
+      "ExchangeDemandUnitDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        }
+      },
       "ExchangeEarmarkedDto" : {
         "type" : "object",
         "properties" : {
@@ -2869,6 +2954,12 @@
             "type" : "array",
             "items" : {
               "$ref" : "#/components/schemas/ExchangeDemandMaterialDto"
+            }
+          },
+          "orders" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeDemandOrderDto"
             }
           },
           "reason" : {

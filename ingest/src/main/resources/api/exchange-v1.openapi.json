@@ -297,6 +297,11 @@
           },
           {
             "memberToken": [
+              "exchange.demand.details"
+            ]
+          },
+          {
+            "memberToken": [
               "exchange.orgunits.read"
             ]
           },
@@ -412,6 +417,11 @@
           {
             "memberToken": [
               "exchange.demand.read"
+            ]
+          },
+          {
+            "memberToken": [
+              "exchange.demand.details"
             ]
           },
           {
@@ -839,6 +849,7 @@
       "get": {
         "operationId": "demand_read",
         "summary": "Anonymised open demand of the member's own units.",
+        "description": "With exchange.demand.details in addition, the open orders of the units the member is a Logistician of, with number, requester handle and comment but no assignee.",
         "tags": [
           "demand"
         ],

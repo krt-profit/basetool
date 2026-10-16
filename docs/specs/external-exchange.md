@@ -61,8 +61,8 @@ The exchange API is served by the ingest gateway at `/exchange/v1/**`
 The three `org-stock` rows are built: the read, as a snapshot and a feed (REQ-XCH-042), with
 `exchange.orgstock.details` (REQ-XCH-043), the writes `book-in`, `book-out`, `sell`,
 `move-location`, `move-holder`, `move-pool`, `note`, `stolen` and the earmark ops, the roster and
-the targets (REQ-XCH-045). `exchange.demand.details` is planned (ADR-0257), and until it is built
-the gateway serves no order details.
+the targets (REQ-XCH-045). `exchange.demand.details` adds the orders of the member's Logistician
+units to the org demand (REQ-XCH-047).
 | `POST /exchange/v1/me/drafts/blueprints` · `…/drafts/refinery-orders` | `exchange.drafts.blueprints` / `.refinery` | REQ-XCH-019 |
 
 Every route is deny-by-default, uses only `GET` or `POST` (the ingest bot filter admits nothing
@@ -1143,9 +1143,9 @@ demand.*
   *`ExchangeDemandServiceTest` — only the member's own units are asked.*
 - [x] The feed's open quantities equal the Materialbedarf's gaps for the same orders.
   *`ExchangeDemandParityTest`.*
-- [x] The response schema admits no name or free-text field.
-  *`ExchangeOrgDemandRouteTest` pins the schema's field sets and the `reason` enum; the only names
-  are catalogue names.*
+- [x] The response schema admits no name or free-text field outside the detailed orders of
+  REQ-XCH-047. *`ExchangeOrgDemandRouteTest` pins the schema's field sets and the `reason` enum;
+  outside `orders` the only names are catalogue names.*
 
 **Status:** the backend location list is built — WP 3.1 (#2083); the backend's demand and the
 gateway's demand route (`GET /exchange/v1/me/org-demand`) are built — WP 4.3 (#2095); the
@@ -2207,8 +2207,9 @@ it, so a rename on one side alone fails that side's build:
   expressions, `ActingMemberFilter`'s 18 exact paths, the gateway's `ExchangeRoutes` and its relay
   prefix (`ExchangeRelaySeamParityTest` in both modules), and the paths the relay actually calls
   (`ExchangeGoldenAnswerTest`);
-- the five relay headers, the fourteen capability scopes (`exchange.orgstock.details` the one that
-  gates no route of its own), the seven gate codes with their statuses, the
+- the five relay headers, the fifteen capability scopes (`exchange.orgstock.details` and
+  `exchange.demand.details` the two that gate no route of their own), the seven gate codes with
+  their statuses, the
   codes the gateway passes through and the four backend codes it translates;
 - the registry mirror document: the backend's writer must produce the seam's sample document, and
   the gateway's reader must read every member of it — renaming any member it reads changes what it
@@ -2653,19 +2654,39 @@ journal built (#2589); the undo and the guard built (#2592)
 With `exchange.demand.details` in addition to `.read`, `GET /exchange/v1/me/org-demand` adds
 `orders[]` for the open and in-progress orders whose responsible unit is one of the member's
 Logistician units (REQ-XCH-043): order id, number (`#displayId`), type, status, priority, the
-requesting unit, the Auftraggeber (`handle`), the comment and the open lines. The `handle` and the
-comment are free text the order's author typed, not a member account, so REQ-XCH-044 does not apply
-to them; no assignee is named. The summed `materials[]` and `items[]` are unchanged, and orders of
-the member's other units stay summed only. The job-order gate of REQ-XCH-018 applies first.
+responsible unit (`unit`), the requesting unit, the Auftraggeber (`handle`), the comment and the
+open lines. The `handle` and the comment are free text the order's author typed, not a member
+account, so REQ-XCH-044 does not apply to them; no assignee is named. The summed `materials[]` and
+`items[]` are unchanged, and orders of the member's other units stay summed only. The job-order
+gate of REQ-XCH-018 applies first.
+
+Like `exchange.orgstock.details` the capability gates no route: the controller asks
+`ExchangeGate#holds` after the gate admitted `.read`, and without it the answer carries no
+`orders`, never a `403`. `orders` is present only when the member is a Logistician of at least one
+unit they belong to, then possibly empty; for every other member, and in a withheld answer, it is
+absent, so their answer is exactly REQ-XCH-018's. The orders keep the demand's order, by number.
+An order's open material lines are, per material and quality floor, its requirement less the stock
+booked to it, each rounded to the material's precision and clamped at zero on their own — unlike
+the summed lines, stock booked beyond one order's need does not offset another order; for an item
+order they are what its items resolve to. Its item lines are ordered less delivered less earmarked
+per game item. Lines with nothing open are left out. The published schema (`org-demand.schema.json`,
+`$defs/order`) carries no assignee field.
 
 **Acceptance**
 
-- [ ] A Logistician of a unit gets the orders of that unit with number, Auftraggeber and comment; a
-  plain member and a client without `exchange.demand.details` get the answer of REQ-XCH-018
-  unchanged.
-- [ ] No answer names an assignee.
+- [x] A Logistician of a unit (the flag or a leadership rank) gets the orders of that unit with
+  number, Auftraggeber and comment; a plain member and a client without `exchange.demand.details`
+  (not relayed, or not granted) get the answer of REQ-XCH-018 unchanged, and the orders of the
+  member's other units stay summed only. *`ExchangeDemandDetailsControllerTest`,
+  `ExchangeDemandServiceTest`.*
+- [x] The job-order gate of REQ-XCH-018 applies first, and the capability alone opens no route.
+  *`ExchangeDemandDetailsControllerTest`, `ExchangeDemandServiceTest`.*
+- [x] No answer names an assignee; the schema pins the field set. *`ExchangeDemandDetailsControllerTest`
+  (an assigned order's answer carries neither the assignee nor the assignee's note),
+  `ExchangeOrgDemandRouteTest`; fixtures under `docs/exchange/examples/v1/org-demand/`.*
 
-**Status:** planned — PR 4 of ADR-0257
+**Code:** `ExchangeDemandService#demand`, `ExchangeDemandController`, `ExchangeDemandOrderDto`,
+`V303` · **Status:** built (#2593)
 
 ### REQ-XCH-048 — A client reads the org units the member directly belongs to
 

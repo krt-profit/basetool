@@ -89,6 +89,7 @@ body:
         - label: exchange.hangar.read
         - label: exchange.hangar.write
         - label: exchange.demand.read
+        - label: exchange.demand.details
         - label: exchange.orgunits.read
         - label: exchange.orgstock.read
         - label: exchange.orgstock.details

@@ -217,7 +217,10 @@ requires it and duplicating it into further files spreads personal data for no g
   choice to withhold their name from connected applications (off by default, set on the profile,
   audited as `EXCHANGE_NAME_WITHHOLDING_CHANGED`; REQ-XCH-044).
 - **Disclosed to the client:** only the member's own data within the capabilities the member
-  consented to, the anonymised org demand, the member's direct org units and the org unit of each
+  consented to, the anonymised org demand — for a Logistician or leader of a unit under
+  `exchange.demand.details` also the open orders of that unit with number, units, the Auftraggeber
+  and comment as their author typed them, never an assignee (REQ-XCH-047, built) —, the member's
+  direct org units and the org unit of each
   of the member's ships (name, shorthand, kind) and catalogue data — never the e-mail address
   (REQ-XCH-009, REQ-XCH-017, REQ-XCH-018, REQ-XCH-048). The one exception for other members' data
   is the shared stock of a unit (ADR-0257, REQ-XCH-042…045): a client approved for it receives the

@@ -288,7 +288,10 @@ since the go-live of 2026-09-28, so these risks hold now.
 - **The org demand feed has no low-count suppression.** A unit's single open order is recognisable
   to anyone who knows the unit; the feed goes only to a member the web's job-order gate admits
   (`canViewJobOrders`, under the exchange's reduced authorities), who could read the same order in
-  the web, and a client may cache it for 7 days (REQ-XCH-018, ADR-0220).
+  the web, and a client may cache it for 7 days (REQ-XCH-018, ADR-0220). Under
+  `exchange.demand.details` a Logistician of the unit gets the orders by number with their
+  Auftraggeber and comment, free text that may name a person and that no name withholding covers
+  (REQ-XCH-047, ADR-0257).
 - **Overwriting ship updates pass the mass-change guard.** A ship counts as removed only when one
   `upsert` changes both its name and its type; nothing compares it with its state at window start,
   as the stock rule does. A batch that retypes every ship or clears their names and locations is
