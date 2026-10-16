@@ -200,6 +200,22 @@ public class OrgUnitMembershipQueryService {
   }
 
   /**
+   * Returns the users who are direct members of an org unit of any kind, without the leadership
+   * cascade (REQ-XCH-045).
+   *
+   * @param orgUnitId the org unit; never {@code null}.
+   * @return the user ids; never {@code null}, empty for an unknown unit.
+   */
+  @NotNull
+  public Set<UUID> findDirectMemberUserIds(@NotNull UUID orgUnitId) {
+    Set<UUID> ids = new LinkedHashSet<>();
+    for (OrgUnitMembership row : membershipRepository.findAllByIdOrgUnitId(orgUnitId)) {
+      ids.add(row.getId().getUserId());
+    }
+    return ids;
+  }
+
+  /**
    * Returns the org-unit ids whose membership makes the user a Logistician of that unit, by {@link
    * OrgUnitMembership#isLogisticianOfOwnUnit()} and without the leadership cascade (REQ-XCH-043).
    *

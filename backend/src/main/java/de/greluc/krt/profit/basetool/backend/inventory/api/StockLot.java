@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import java.util.Objects;
+import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -50,13 +51,36 @@ public record StockLot(
    */
   @NotNull
   public String key() {
+    return key(
+        material != null ? material.getId() : null,
+        gameItem != null ? gameItem.getId() : null,
+        location.getId(),
+        quality,
+        stolen);
+  }
+
+  /**
+   * Returns the key of a lot given by its ids.
+   *
+   * @param materialId the material, or {@code null} for an item lot
+   * @param gameItemId the game item, used when {@code materialId} is {@code null}
+   * @param locationId the location
+   * @param quality the quality of a material lot, or {@code null}
+   * @param stolen whether the lot holds stolen stock
+   * @return the key: the catalogue id, location, quality and stolen marker
+   */
+  @NotNull
+  public static String key(
+      @Nullable UUID materialId,
+      @Nullable UUID gameItemId,
+      @NotNull UUID locationId,
+      @Nullable Integer quality,
+      boolean stolen) {
     String head =
-        material != null
-            ? "m:" + material.getId()
-            : "i:" + Objects.requireNonNull(gameItem).getId();
+        materialId != null ? "m:" + materialId : "i:" + Objects.requireNonNull(gameItemId);
     return head
         + "|l:"
-        + location.getId()
+        + locationId
         + "|q:"
         + (quality == null ? 0 : quality)
         + "|s:"

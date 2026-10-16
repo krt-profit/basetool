@@ -1970,6 +1970,245 @@
         "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
+    },
+    "/api/v1/exchange/org-stock/changes" : {
+      "post" : {
+        "description" : "Gateway-only. Each op names its pool; the member must be a Logistician of that unit. An op on another pool, a personal entry or a stale version is refused per op.",
+        "operationId" : "orgStockChanges",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ExchangeOrgStockChangeSet"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeChangeResultDto"
+                }
+              }
+            },
+            "description" : "The result"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: book stock into and out of my units' pools",
+        "tags" : [ "exchange" ],
+        "x-contract-tier" : "T0",
+        "x-domain" : "exchange"
+      }
+    },
+    "/api/v1/exchange/org-stock/members" : {
+      "get" : {
+        "description" : "Gateway-only. The unit's direct members with their ref and name, without those who withhold their name. 403 when the member is not a Logistician of the unit.",
+        "operationId" : "orgStockMembers",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "unit",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeOrgStockMembersDto"
+                }
+              }
+            },
+            "description" : "The roster",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: the roster of one of my Logistician units",
+        "tags" : [ "exchange" ],
+        "x-contract-tier" : "T0",
+        "x-domain" : "exchange"
+      }
     }
   },
   "components" : {
@@ -2511,6 +2750,23 @@
           }
         }
       },
+      "ExchangeOrgStockChangeSet" : {
+        "type" : "object",
+        "properties" : {
+          "dryRun" : {
+            "type" : "boolean"
+          },
+          "ops" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OrgStockOp"
+            },
+            "maxItems" : 500,
+            "minItems" : 1
+          }
+        },
+        "required" : [ "ops" ]
+      },
       "ExchangeOrgStockEntryDto" : {
         "type" : "object",
         "properties" : {
@@ -2580,6 +2836,20 @@
           },
           "stolen" : {
             "type" : "boolean"
+          },
+          "unit" : {
+            "$ref" : "#/components/schemas/ExchangeOrgStockUnitDto"
+          }
+        }
+      },
+      "ExchangeOrgStockMembersDto" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OrgStockMember"
+            }
           },
           "unit" : {
             "$ref" : "#/components/schemas/ExchangeOrgStockUnitDto"
@@ -3413,6 +3683,134 @@
             "type" : "string"
           }
         }
+      },
+      "OrgStockJobOrderLine" : {
+        "type" : "object",
+        "properties" : {
+          "jobOrder" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "quantity" : {
+            "$ref" : "#/components/schemas/Quantity"
+          }
+        },
+        "required" : [ "jobOrder", "quantity" ]
+      },
+      "OrgStockMember" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "ref" : {
+            "type" : "string"
+          }
+        }
+      },
+      "OrgStockMissionLine" : {
+        "type" : "object",
+        "properties" : {
+          "mission" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "quantity" : {
+            "$ref" : "#/components/schemas/Quantity"
+          }
+        },
+        "required" : [ "mission", "quantity" ]
+      },
+      "OrgStockOp" : {
+        "type" : "object",
+        "properties" : {
+          "entry" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "fromJobOrders" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OrgStockJobOrderLine"
+            },
+            "maxItems" : 100,
+            "minItems" : 0
+          },
+          "fromMissions" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OrgStockMissionLine"
+            },
+            "maxItems" : 100,
+            "minItems" : 0
+          },
+          "holder" : {
+            "type" : "string",
+            "maxLength" : 128,
+            "minLength" : 1
+          },
+          "jobOrders" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OrgStockJobOrderLine"
+            },
+            "maxItems" : 100,
+            "minItems" : 0
+          },
+          "location" : {
+            "$ref" : "#/components/schemas/ExchangeLocationRef"
+          },
+          "material" : {
+            "$ref" : "#/components/schemas/ExchangeItemRef"
+          },
+          "mergeScu" : {
+            "type" : "boolean"
+          },
+          "missions" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OrgStockMissionLine"
+            },
+            "maxItems" : 100,
+            "minItems" : 0
+          },
+          "note" : {
+            "type" : "string",
+            "maxLength" : 1000,
+            "minLength" : 0
+          },
+          "op" : {
+            "type" : "string",
+            "pattern" : "^(book-in|book-out)$"
+          },
+          "opId" : {
+            "type" : "string",
+            "maxLength" : 64,
+            "minLength" : 1
+          },
+          "quality" : {
+            "type" : "integer",
+            "format" : "int32",
+            "maximum" : 1000,
+            "minimum" : 0
+          },
+          "quantity" : {
+            "$ref" : "#/components/schemas/Quantity"
+          },
+          "stolen" : {
+            "type" : "boolean"
+          },
+          "unit" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64",
+            "minimum" : 0
+          }
+        },
+        "required" : [ "op", "quantity", "unit" ]
       },
       "ProblemDetail" : {
         "type" : "object",

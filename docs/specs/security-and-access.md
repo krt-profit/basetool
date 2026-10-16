@@ -5729,7 +5729,7 @@ literal paths, each naming a real mapping:
   `/api/v1/app/version-policy`. This replaced the patterns `/api/v1/terms` and `/api/v1/terms/**`,
   under which a future `/api/v1/terms/admin` would have escaped the gate; for the three mappings
   under `/api/v1/terms` the behaviour is identical.
-- **Acting member** (`ActingMemberFilter.ACTING_PATHS`): the thirteen exchange paths the ingest
+- **Acting member** (`ActingMemberFilter.ACTING_PATHS`): the seventeen exchange paths the ingest
   gateway may act on; every mapping under `/api/v1/exchange` is one of them.
 
 A new mapping under `/api/v1/terms` fails the test until it is listed as exempt or as gated by

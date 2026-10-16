@@ -54,10 +54,10 @@ codes, whichever side refuses it.
 | `IDEMPOTENCY_KEY_REUSED` | 422 | gateway | The key was used with a different request: another route or another body. | Use a fresh key. |
 | `IDEMPOTENCY_IN_PROGRESS` | 409 | gateway | The same key is still being processed. | Retry the same request after a short wait. |
 | `CURSOR_EXPIRED` | 410 | backend, gateway | The cursor is older than the tombstones, or not one the server issued. | Reconcile a full snapshot against the last baseline — not add-only. |
-| `VERSION_CONFLICT` | 409 | backend | A ship's `version` or a lot's `expectedQuantity` no longer matches. | Pull, merge, retry. |
+| `VERSION_CONFLICT` | 409 | backend | A ship's or org-stock entry's `version`, or a lot's `expectedQuantity`, no longer matches. | Pull, merge, retry. |
 | `MASS_CHANGE_CONFIRMATION_REQUIRED` | 409 | backend | The batch exceeds the mass-change guard; it is staged. | Show the member `confirmationUrl`; do not retry the batch. |
 | `RATE_LIMITED` | 429 | gateway | A limit per minute or per hour is exhausted: per client and member, per client, per source IP address, or the hourly account check ([limits](sync-guide.md#rate-limits-quota-and-back-off)). | Honour `Retry-After`. |
-| `QUOTA_EXCEEDED` | 429 | gateway | The daily write quota is exhausted. | Retry after `Retry-After`, the next day at the latest. |
+| `QUOTA_EXCEEDED` | 429 | gateway | The daily write quota is exhausted; an org-stock change set counts each of its ops and is refused as a whole when they do not all fit. | Retry after `Retry-After`, the next day at the latest. |
 | `BACKEND_RELAY_FAILED` | 502 | gateway | The backend did not answer usably: an error, a refusal the contract does not name, or an answer that breaks the v1 schema. | Back off; retry with the same key. |
 | `SERVICE_UNAVAILABLE` | 503 | gateway | Temporarily unavailable: a store the exchange needs cannot be reached (`Retry-After: 60`), the daily write quota cannot be counted (`Retry-After: 30`), the identity provider cannot be reached to check the token (`Retry-After: 5`), or all members together hold the gateway's cap of live DPoP proofs ([live proofs](authentication.md#live-proofs-per-member); `Retry-After` is the seconds until the earliest of them no longer counts). | Wait at least `Retry-After`, then retry the same request under the same key, with a new DPoP proof. |
 | `NOT_FOUND` | 404 | gateway | The exchange has no such route or method, or the requested document, such as a schema name, does not exist. | Check the path, the method and the name. |
@@ -72,13 +72,18 @@ codes, whichever side refuses it.
 | `UNMATCHED` | The reference resolves to nothing. | Show it; offer `catalog/resolve`. |
 | `AMBIGUOUS` | The reference resolves to several entries. | Ask the member to pick; send `bt`. |
 | `DEFAULT_NOT_REMOVABLE` | A default-granted blueprint cannot be removed. | Keep it. |
-| `STOCK_EARMARKED` | The lot's stock is reserved for a job order or mission. | Ask the member to release the reservation in the web. |
+| `STOCK_EARMARKED` | The lot's stock, or the part of an org-stock `book-out` its earmark lines do not cover, is reserved for a job order, mission or donation. | Ask the member to release the reservation in the web, or name the earmarks to take from. |
 | `STOLEN_MARKING_DISABLED` | The Basetool does not yet keep stolen stock apart. | Keep the lot local until the server supports it. |
 | `REMOVED_ELSEWHERE` | The entry has a live tombstone from another channel or installation; for a ship, the named `shipId` was removed there. | Ask the member; resend with `override: true` only if they agree. |
 | `UNIT_MISMATCH` | The quantity's unit does not match the material's. | Fix the unit. |
 | `LOCATION_UNKNOWN` | The place has no warehouse location. | Offer a place from `catalog/locations`. |
 | `LINK_TARGET_TAKEN` | The server ship is already linked to another external id of this installation. | Pull and re-link. |
 | `VERSION_CONFLICT` | As above, for this op only; also an `upsert` without `shipId` for an id this installation already linked. | Pull, merge, retry this op. |
+| `NOT_PERMITTED` | An org-stock op on a pool whose unit the member is not a Logistician of, or on an entry that is unknown, personal or in another pool. | Do not retry; offer only the member's Logistician pools. |
+| `HOLDER_UNKNOWN` | An org-stock `book-in` names a holder who is not on the unit's roster. | Read the roster again and let the member pick. |
+| `INSUFFICIENT_STOCK` | An org-stock `book-out` takes more than the entry holds. | Pull and retry with the entry's amount. |
+| `OVER_ALLOCATION` | The earmarks of one kind of an org-stock `book-in` add up to more than its amount. | Lower the earmarks. |
+| `EARMARK_TARGET_INVALID` | An org-stock earmark names a job order that does not need the material or item, an unknown mission, a target twice, or one the entry is not earmarked to. | Fix the earmarks. |
 
 ## Warnings
 

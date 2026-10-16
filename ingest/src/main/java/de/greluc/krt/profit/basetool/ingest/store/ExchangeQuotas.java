@@ -58,8 +58,15 @@ public class ExchangeQuotas {
   public static final String COUNTED = ExchangeQuotas.class.getName() + ".counted";
 
   /**
-   * Takes one count back from a counter that holds at least one, keeping its expiry; the result is
-   * the new count, or {@code -1} when there was nothing to take back.
+   * The request attribute holding the counts a write added for its further ops beyond the one the
+   * limit filter counted, so a refusal that gives the count back gives all of them back.
+   */
+  public static final String COUNTED_OPS = ExchangeQuotas.class.getName() + ".countedOps";
+
+  /**
+   * Takes up to {@code ARGV[1]} counts back from a counter that holds at least one, keeping its
+   * expiry and never going below zero; the result is the new count, or {@code -1} when there was
+   * nothing to take back.
    */
   private static final RedisScript<Long> REFUND_SCRIPT =
       new DefaultRedisScript<>(
@@ -68,8 +75,26 @@ public class ExchangeQuotas {
           if count == nil or count < 1 then
             return -1
           end
-          redis.call('SET', KEYS[1], string.format('%d', count - 1), 'KEEPTTL')
-          return count - 1
+          local left = math.max(count - tonumber(ARGV[1]), 0)
+          redis.call('SET', KEYS[1], string.format('%d', left), 'KEEPTTL')
+          return left
+          """,
+          Long.class);
+
+  /**
+   * Adds {@code ARGV[1]} counts to an existing counter, keeping its expiry; the result is the new
+   * count, or {@code -1} when there is no counter.
+   */
+  private static final RedisScript<Long> ADD_SCRIPT =
+      new DefaultRedisScript<>(
+          """
+          local count = tonumber(redis.call('GET', KEYS[1]))
+          if count == nil then
+            return -1
+          end
+          local added = count + tonumber(ARGV[1])
+          redis.call('SET', KEYS[1], string.format('%d', added), 'KEEPTTL')
+          return added
           """,
           Long.class);
 
@@ -144,8 +169,52 @@ public class ExchangeQuotas {
    */
   public void refundCounted(@NotNull HttpServletRequest request) {
     if (request.getAttribute(COUNTED) instanceof String key) {
+      long ops = request.getAttribute(COUNTED_OPS) instanceof Long extra ? extra : 0L;
       request.removeAttribute(COUNTED);
-      refund(key);
+      request.removeAttribute(COUNTED_OPS);
+      refund(key, 1 + ops);
+    }
+  }
+
+  /**
+   * Counts the further ops of a write whose every op counts (REQ-XCH-045) on the counter the limit
+   * filter counted the write on, and notes them on the request as {@link #COUNTED_OPS}.
+   *
+   * @param request the write, counted once by the limit filter
+   * @param ops how many further ops to count
+   * @return the day's count including them, or {@code -1} when the write was not counted
+   * @throws ExchangeUnavailableException if Redis cannot count
+   */
+  public long countFurtherOps(@NotNull HttpServletRequest request, long ops) {
+    if (!(request.getAttribute(COUNTED) instanceof String key)) {
+      return -1;
+    }
+    try {
+      Long count = redisTemplate.execute(ADD_SCRIPT, List.of(key), String.valueOf(ops));
+      if (count == null || count < 0) {
+        throw new ExchangeUnavailableException("The write quota cannot be counted.", null);
+      }
+      long noted = request.getAttribute(COUNTED_OPS) instanceof Long extra ? extra : 0L;
+      request.setAttribute(COUNTED_OPS, noted + ops);
+      return count;
+    } catch (ExchangeUnavailableException e) {
+      throw e;
+    } catch (RuntimeException e) {
+      log.warn("Exchange quota count failed: {}", e.getClass().getSimpleName());
+      throw new ExchangeUnavailableException("The write quota cannot be counted.", e);
+    }
+  }
+
+  /**
+   * Gives the further ops of a write back, keeping the count of the write itself; best effort.
+   *
+   * @param request the write whose further ops were counted with {@link #countFurtherOps}
+   */
+  public void refundFurtherOps(@NotNull HttpServletRequest request) {
+    if (request.getAttribute(COUNTED) instanceof String key
+        && request.getAttribute(COUNTED_OPS) instanceof Long ops) {
+      request.removeAttribute(COUNTED_OPS);
+      refund(key, ops);
     }
   }
 
@@ -156,8 +225,19 @@ public class ExchangeQuotas {
    * @param key the counter's key, from {@link Counted#key()}
    */
   public void refund(@NotNull String key) {
+    refund(key, 1);
+  }
+
+  /**
+   * Gives counts back to the counter they were counted on, never below zero; best effort, a failure
+   * is logged and the count stays.
+   *
+   * @param key the counter's key, from {@link Counted#key()}
+   * @param counts how many counts to give back
+   */
+  private void refund(@NotNull String key, long counts) {
     try {
-      redisTemplate.execute(REFUND_SCRIPT, List.of(key));
+      redisTemplate.execute(REFUND_SCRIPT, List.of(key), String.valueOf(counts));
     } catch (RuntimeException e) {
       log.warn("Exchange quota refund failed: {}", e.getClass().getSimpleName());
     }

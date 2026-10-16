@@ -12,7 +12,7 @@
 12|connectedApps|ART_15_20|5706935a6021b2b6|label|
 13|connectedAppRevocations|ART_15|9bb7f8c95d811f64||
 14|exchangeChanges|ART_15|fcc66b477aed84f2||
-15|exchangeJournal|ART_15|27ea0eb5c3d5e45a|after_state,before_state|
+15|exchangeJournal|ART_15|3b7ba0832a27ce11|after_state,before_state|
 16|exchangeBulkUndoSkips|ART_15|8d9f1772c8e8725d||
 17|exchangeShipLinks|ART_15|557c2cc7c112cd40||
 18|connectedAppsNameWithholding|ART_15_20|c041d4ffd8119650||

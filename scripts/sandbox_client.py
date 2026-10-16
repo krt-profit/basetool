@@ -42,7 +42,7 @@ REALM = "/auth/realms/iri"
 SCOPES = ("offline_access exchange.connect exchange.blueprints.read exchange.blueprints.write "
           "exchange.stock.read exchange.stock.write exchange.hangar.read exchange.hangar.write "
           "exchange.demand.read exchange.orgunits.read exchange.orgstock.read "
-          "exchange.orgstock.details")
+          "exchange.orgstock.details exchange.orgstock.write")
 DEFAULT_CA = ROOT / "docker" / "test-tls" / "basetool-test-ca.crt"
 USER_AGENT = "BasetoolSandboxClient/1.0.0 (+https://krt-profit.github.io/basetool/)"
 

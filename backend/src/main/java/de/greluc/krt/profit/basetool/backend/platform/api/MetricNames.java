@@ -822,10 +822,10 @@ public final class MetricNames {
 
   /**
    * Counter {@code basetool_exchange_writes_total{client_id,resource,outcome}} — exchange ops by
-   * registered client, resource ({@code blueprint} / {@code stock} / {@code ship}) and outcome
-   * ({@code applied} / {@code unchanged} / {@code unmatched} / {@code ambiguous} / {@code
-   * rejected}), plus {@code held} per change set the mass-change guard held back (REQ-XCH-015…-017,
-   * REQ-XCH-021, REQ-XCH-028).
+   * registered client, resource ({@code blueprint} / {@code stock} / {@code ship} / {@code
+   * org_stock}) and outcome ({@code applied} / {@code unchanged} / {@code unmatched} / {@code
+   * ambiguous} / {@code rejected}), plus {@code held} per change set the mass-change guard held
+   * back (REQ-XCH-015…-017, REQ-XCH-021, REQ-XCH-028, REQ-XCH-045).
    */
   public static final String EXCHANGE_WRITES = "basetool.exchange.writes";
 

@@ -46,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChang
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeInstallationDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeLocationListDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgDemandDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockMembersDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitListDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse;
@@ -127,6 +128,9 @@ class ExchangeWireContractTest {
               "warnings", "the gateway adds the UNKNOWN_FIELD warnings",
               "cursor", "reserved; not sent in v1"));
 
+  /** The relay path of the org-stock roster, which names its unit in a query parameter. */
+  private static final String ROSTER = "/org-stock/members";
+
   /** The paged relay paths that serve a snapshot but answer their feed cursor as expired. */
   private static final Set<String> SNAPSHOT_ONLY = Set.of("/org-stock");
 
@@ -143,6 +147,7 @@ class ExchangeWireContractTest {
           Map.entry("page--orgStockPage", ExchangeOrgStockPageDto.class),
           Map.entry("change-result", ExchangeChangeResultDto.class),
           Map.entry("org-demand", ExchangeOrgDemandDto.class),
+          Map.entry("org-stock-members", ExchangeOrgStockMembersDto.class),
           Map.entry("org-unit-list", ExchangeOrgUnitListDto.class));
 
   private final SchemaRegistry registry =
@@ -279,7 +284,10 @@ class ExchangeWireContractTest {
       }
       String path = ExchangeSeam.RELAY_PREFIX + operation.relayPath();
       if (!operation.paged()) {
-        String answer = read(path);
+        String answer =
+            read(
+                path
+                    + (ROSTER.equals(operation.relayPath()) ? "?unit=" + orgUnits.getFirst() : ""));
         if (operation.answerMember() != null) {
           JsonNode member = mapper.readTree(answer).get(operation.answerMember());
           assertThat(member).as("%s carries %s", path, operation.answerMember()).isNotNull();
@@ -381,8 +389,8 @@ class ExchangeWireContractTest {
   }
 
   /**
-   * Seeds one owned blueprint, one stock lot at a UEX city, one Staffel membership, one shared lot
-   * in that Staffel's pool and one ship in that Staffel for the member.
+   * Seeds one owned blueprint, one stock lot at a UEX city, one Logistician membership of a
+   * Staffel, one shared lot in that Staffel's pool and one ship in that Staffel for the member.
    */
   private void seed() {
     Blueprint blueprint = new Blueprint();
@@ -439,7 +447,10 @@ class ExchangeWireContractTest {
         "W" + orgUnit.toString().substring(0, 8));
     orgUnits.add(orgUnit);
     jdbc.update(
-        "INSERT INTO org_unit_membership (user_id, org_unit_id) VALUES (?, ?)", member, orgUnit);
+        "INSERT INTO org_unit_membership (user_id, org_unit_id, is_logistician) VALUES (?, ?,"
+            + " true)",
+        member,
+        orgUnit);
     jdbc.update(
         "INSERT INTO inventory_item (id, user_id, material_id, location_id, quality, amount,"
             + " personal, stolen, owning_org_unit_id, created_at, version)"

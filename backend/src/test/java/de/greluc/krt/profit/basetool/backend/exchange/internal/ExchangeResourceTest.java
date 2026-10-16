@@ -34,25 +34,36 @@ class ExchangeResourceTest {
         Map.of(
             ExchangeResource.BLUEPRINT, "blueprints",
             ExchangeResource.STOCK, "stock",
-            ExchangeResource.SHIP, "ships");
+            ExchangeResource.SHIP, "ships",
+            ExchangeResource.ORG_STOCK, "org-stock");
     Map<ExchangeResource, ExchangeCapability> capabilities =
         Map.of(
             ExchangeResource.BLUEPRINT, ExchangeCapability.BLUEPRINTS_WRITE,
             ExchangeResource.STOCK, ExchangeCapability.STOCK_WRITE,
-            ExchangeResource.SHIP, ExchangeCapability.HANGAR_WRITE);
+            ExchangeResource.SHIP, ExchangeCapability.HANGAR_WRITE,
+            ExchangeResource.ORG_STOCK, ExchangeCapability.ORGSTOCK_WRITE);
     Map<ExchangeResource, String> tags =
         Map.of(
             ExchangeResource.BLUEPRINT, "blueprint",
             ExchangeResource.STOCK, "stock",
-            ExchangeResource.SHIP, "ship");
+            ExchangeResource.SHIP, "ship",
+            ExchangeResource.ORG_STOCK, "org_stock");
 
     assertThat(names).containsOnlyKeys(Arrays.asList(ExchangeResource.values()));
     for (ExchangeResource resource : ExchangeResource.values()) {
       assertThat(resource.massChangeName()).isEqualTo(names.get(resource));
       assertThat(resource.writeCapability()).isEqualTo(capabilities.get(resource));
       assertThat(resource.metricTag()).isEqualTo(tags.get(resource));
-      assertThat(ExchangeResource.fromMassChangeName(resource.massChangeName())).contains(resource);
+      if (resource != ExchangeResource.ORG_STOCK) {
+        assertThat(ExchangeResource.fromMassChangeName(resource.massChangeName()))
+            .contains(resource);
+      }
     }
+  }
+
+  @Test
+  void theOrgStockHasNoStagedMassChange() {
+    assertThat(ExchangeResource.fromMassChangeName("org-stock")).isEmpty();
   }
 
   @Test

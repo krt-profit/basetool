@@ -19,19 +19,19 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.APPLIED;
+import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.REJECTED;
+import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.UNCHANGED;
+import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.round;
+
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeCatalogKind;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemRef;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveRequest;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStockChangeSet;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeEffects;
@@ -43,7 +43,6 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -88,11 +87,6 @@ public class ExchangeStockWriteService {
   private static final BigDecimal REMOVAL_SHARE = new BigDecimal("0.1");
 
   private static final Pattern LOT_KEY_SEPARATOR = Pattern.compile("\\|");
-  private static final String UNCHANGED = "unchanged";
-  private static final String UNMATCHED = "unmatched";
-  private static final String AMBIGUOUS = "ambiguous";
-  private static final String REJECTED = "rejected";
-  private static final String APPLIED = "applied";
   private static final String HELD = "held";
   private static final String CLIENT_CHANNEL = "client";
 
@@ -114,7 +108,7 @@ public class ExchangeStockWriteService {
   /** The refusal of a stolen lot while the stolen marking is switched off. */
   static final String STOLEN_MARKING_DISABLED = "STOLEN_MARKING_DISABLED";
 
-  private final ExchangeResolveService resolveService;
+  private final ExchangeLotCatalogue lotCatalogue;
   private final MaterialRepository materialRepository;
   private final GameItemRepository gameItemRepository;
   private final ExchangeLocationResolver locationResolver;
@@ -311,12 +305,12 @@ public class ExchangeStockWriteService {
    */
   private @NotNull List<Planned> plan(
       @NotNull ExchangeCaller caller, @NotNull List<ExchangeStockChangeSet.Op> ops) {
-    Map<Integer, Catalogue> catalogue = resolve(ops);
+    Map<Integer, ExchangeLotCatalogue.Entry> catalogue = resolve(ops);
     List<Skip> early = new ArrayList<>(ops.size());
     List<Lot> lots = new ArrayList<>(ops.size());
     for (int i = 0; i < ops.size(); i++) {
       ExchangeStockChangeSet.Op op = ops.get(i);
-      Catalogue entry = Objects.requireNonNull(catalogue.get(i));
+      ExchangeLotCatalogue.Entry entry = Objects.requireNonNull(catalogue.get(i));
       Skip skip = null;
       Lot lot = null;
       if (entry.result() != null) {
@@ -388,46 +382,9 @@ public class ExchangeStockWriteService {
    * @param ops the ops
    * @return the catalogue entry, or the result that ends the op, by op index
    */
-  private @NotNull Map<Integer, Catalogue> resolve(@NotNull List<ExchangeStockChangeSet.Op> ops) {
-    List<ExchangeItemRef> refs = ops.stream().map(ExchangeStockChangeSet.Op::material).toList();
-    ExchangeResolveResponse materials =
-        resolveService.resolve(new ExchangeResolveRequest(ExchangeCatalogKind.MATERIAL, refs));
-    Map<Integer, Catalogue> byIndex = new HashMap<>();
-    List<Integer> retry = new ArrayList<>();
-    for (ExchangeResolveResponse.Result result : materials.results()) {
-      if (result.status() == ExchangeResolveResponse.Status.RESOLVED) {
-        Material material =
-            materialRepository
-                .findById(UUID.fromString(Objects.requireNonNull(result.ref()).bt()))
-                .orElseThrow();
-        byIndex.put(result.index(), Catalogue.of(material));
-      } else if (result.status() == ExchangeResolveResponse.Status.AMBIGUOUS) {
-        byIndex.put(result.index(), Catalogue.skip(AMBIGUOUS, "AMBIGUOUS"));
-      } else {
-        retry.add(result.index());
-      }
-    }
-    if (!retry.isEmpty()) {
-      ExchangeResolveResponse items =
-          resolveService.resolve(
-              new ExchangeResolveRequest(
-                  ExchangeCatalogKind.ITEM, retry.stream().map(refs::get).toList()));
-      for (ExchangeResolveResponse.Result result : items.results()) {
-        int index = retry.get(result.index());
-        if (result.status() == ExchangeResolveResponse.Status.RESOLVED) {
-          GameItem item =
-              gameItemRepository
-                  .findById(UUID.fromString(Objects.requireNonNull(result.ref()).bt()))
-                  .orElseThrow();
-          byIndex.put(index, Catalogue.of(item));
-        } else if (result.status() == ExchangeResolveResponse.Status.AMBIGUOUS) {
-          byIndex.put(index, Catalogue.skip(AMBIGUOUS, "AMBIGUOUS"));
-        } else {
-          byIndex.put(index, Catalogue.skip(UNMATCHED, "UNMATCHED"));
-        }
-      }
-    }
-    return byIndex;
+  private @NotNull Map<Integer, ExchangeLotCatalogue.Entry> resolve(
+      @NotNull List<ExchangeStockChangeSet.Op> ops) {
+    return lotCatalogue.resolve(ops.stream().map(ExchangeStockChangeSet.Op::material).toList());
   }
 
   /**
@@ -778,17 +735,6 @@ public class ExchangeStockWriteService {
   }
 
   /**
-   * Rounds an amount to its unit: three decimals for SCU, whole pieces otherwise.
-   *
-   * @param amount the amount
-   * @param unit the unit
-   * @return the rounded amount
-   */
-  private static @NotNull BigDecimal round(@NotNull BigDecimal amount, @NotNull String unit) {
-    return amount.setScale(QuantityType.SCU.name().equals(unit) ? 3 : 0, RoundingMode.HALF_UP);
-  }
-
-  /**
    * Captures a lot's quantity for the journal.
    *
    * @param quantity the quantity
@@ -830,58 +776,6 @@ public class ExchangeStockWriteService {
 
     /** The offers removed. */
     private int removed;
-  }
-
-  /**
-   * A resolved material or item, or the result that ends the op.
-   *
-   * @param material the material, or {@code null}
-   * @param gameItem the item, or {@code null}
-   * @param unit the lot's unit
-   * @param result the result that ends the op, or {@code null}
-   * @param reason the reason of that result, or {@code null}
-   */
-  private record Catalogue(
-      @Nullable Material material,
-      @Nullable GameItem gameItem,
-      @NotNull String unit,
-      @Nullable String result,
-      @Nullable String reason) {
-
-    /**
-     * A material.
-     *
-     * @param material the material
-     * @return the entry
-     */
-    static @NotNull Catalogue of(@NotNull Material material) {
-      String unit =
-          material.getQuantityType() == QuantityType.PIECE
-              ? QuantityType.PIECE.name()
-              : QuantityType.SCU.name();
-      return new Catalogue(material, null, unit, null, null);
-    }
-
-    /**
-     * An item.
-     *
-     * @param item the item
-     * @return the entry
-     */
-    static @NotNull Catalogue of(@NotNull GameItem item) {
-      return new Catalogue(null, item, QuantityType.PIECE.name(), null, null);
-    }
-
-    /**
-     * The end of an op.
-     *
-     * @param result the result
-     * @param reason the reason
-     * @return the entry
-     */
-    static @NotNull Catalogue skip(@NotNull String result, @NotNull String reason) {
-      return new Catalogue(null, null, QuantityType.SCU.name(), result, reason);
-    }
   }
 
   /**

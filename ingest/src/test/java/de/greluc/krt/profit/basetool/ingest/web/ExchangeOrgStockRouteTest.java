@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.ingest.registry.ExchangeRevocationReader;
 import de.greluc.krt.profit.basetool.ingest.relay.ExchangeRelay;
 import de.greluc.krt.profit.basetool.ingest.support.ExchangeTestSupport;
 import java.time.Instant;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
@@ -102,7 +103,7 @@ class ExchangeOrgStockRouteTest {
                 "basetool-ingest",
                 ExchangeTestSupport.thumbprint(key),
                 member,
-                "exchange.connect exchange.orgstock.read",
+                "exchange.connect exchange.orgstock.read exchange.orgstock.write",
                 Instant.now().minusSeconds(30)));
     when(jwtDecoder.decode(STOCK_ONLY))
         .thenReturn(
@@ -116,7 +117,11 @@ class ExchangeOrgStockRouteTest {
     when(registryReader.current())
         .thenReturn(
             ExchangeTestSupport.registryWithLimits(
-                Set.of("exchange.connect", "exchange.stock.read", "exchange.orgstock.read"),
+                Set.of(
+                    "exchange.connect",
+                    "exchange.stock.read",
+                    "exchange.orgstock.read",
+                    "exchange.orgstock.write"),
                 "2.0.0",
                 120));
     when(revocationReader.isDenied(anyString())).thenReturn(false);
@@ -160,8 +165,50 @@ class ExchangeOrgStockRouteTest {
   }
 
   @Test
+  void theRosterIsRelayedForTheNamedUnitAndCheckedAgainstItsSchema() throws Exception {
+    when(relay.forward(
+            eq(HttpMethod.GET), eq(BACKEND + "/members?unit=" + UNIT), isNull(), any(), any()))
+        .thenReturn(
+            ok(
+                """
+                {"unit":{"id":"%s","name":"Staffel Iridium"},
+                 "items":[{"ref":"r1","name":"Cpt. Holder"}]}
+                """
+                    .formatted(UNIT)));
+
+    call(TOKEN, PATH + "/members?unit=" + UNIT.toString().toUpperCase(Locale.ROOT))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items[0].ref").value("r1"));
+  }
+
+  @Test
+  void aRosterWithoutAValidUnitIsRefusedBeforeTheRelay() throws Exception {
+    call(TOKEN, PATH + "/members")
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("SCHEMA_INVALID"))
+        .andExpect(jsonPath("$.errors[0].pointer").value("/unit"));
+    call(TOKEN, PATH + "/members?unit=..%2Fme%2Fstock")
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("SCHEMA_INVALID"));
+
+    verify(relay, never()).forward(any(), anyString(), any(), any(), any());
+  }
+
+  @Test
+  void aRosterAnswerWithoutItsUnitIsARelayFailure() throws Exception {
+    when(relay.forward(any(), anyString(), any(), any(), any())).thenReturn(ok("{\"items\":[]}"));
+
+    call(TOKEN, PATH + "/members?unit=" + UNIT)
+        .andExpect(status().isBadGateway())
+        .andExpect(jsonPath("$.code").value(ExchangeRelay.RELAY_FAILED));
+  }
+
+  @Test
   void aTokenWithoutTheCapabilityIsRefusedBeforeTheRelay() throws Exception {
     call(STOCK_ONLY, PATH)
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("SCOPE_MISSING"));
+    call(STOCK_ONLY, PATH + "/members?unit=" + UNIT)
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value("SCOPE_MISSING"));
 

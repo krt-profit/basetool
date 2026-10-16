@@ -146,6 +146,12 @@ class AdminExchangeClientsPageControllerMvcTest {
                     containsString(
                         "mit Namen im gemeinsamen Lagerbestand der Einheiten lesen, in denen du"
                             + " Logistiker bist")))
+        .andExpect(content().string(containsString("value=\"exchange.orgstock.write\"")))
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "Lagerbestand in die gemeinsamen Lager der Einheiten ein- und ausbuchen")))
         .andExpect(
             content().string(containsString("id=\"xc-requestsPerMinute\" min=\"1\" max=\"1200\"")))
         .andExpect(

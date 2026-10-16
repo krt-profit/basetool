@@ -97,7 +97,18 @@ public class InventoryStockCommands implements StockCommands {
     for (String lotKey : lotKeys) {
       keys.add(lotLockKey(member, lotKey));
     }
-    keys.forEach(inventoryRepository::lockExchangeLot);
+    lockInOrder(inventoryRepository, keys);
+  }
+
+  /**
+   * Takes the advisory locks of the given keys in ascending order (ADR-0229).
+   *
+   * @param repository the repository that takes a lock
+   * @param keys the lock keys
+   */
+  static void lockInOrder(
+      @NotNull InventoryItemRepository repository, @NotNull Collection<Long> keys) {
+    new TreeSet<>(keys).forEach(repository::lockExchangeLot);
   }
 
   /**

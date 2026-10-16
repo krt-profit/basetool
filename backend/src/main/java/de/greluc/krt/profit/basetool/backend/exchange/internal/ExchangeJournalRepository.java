@@ -131,11 +131,15 @@ public interface ExchangeJournalRepository extends JpaRepository<ExchangeJournal
       findFirstByUserIdAndClientIdAndResourceAndEntityKeyAndRecordedAtAfterOrderByRecordedAtAsc(
           UUID userId, String clientId, ExchangeResource resource, String entityKey, Instant since);
 
-  /** The scope filter the bulk undo queries share; a {@code null} parameter matches everything. */
+  /**
+   * The scope filter the bulk undo queries share, without the org stock's writes; a {@code null}
+   * parameter matches everything.
+   */
   String BULK_SCOPE =
       """
       FROM exchange_journal
       WHERE client_id = :clientId AND undone_at IS NULL AND recorded_at >= :since
+        AND resource <> 'ORG_STOCK'
         AND (CAST(:installationKey AS VARCHAR) IS NULL OR installation_key = :installationKey)
         AND (CAST(:resource AS VARCHAR) IS NULL OR resource = :resource)
       """;
@@ -186,6 +190,7 @@ public interface ExchangeJournalRepository extends JpaRepository<ExchangeJournal
           SELECT user_id AS userId, installation_key AS installationKey, COUNT(*) AS entries
           FROM exchange_journal
           WHERE client_id = :clientId AND undone_at IS NULL AND recorded_at >= :since
+            AND resource <> 'ORG_STOCK'
           GROUP BY user_id, installation_key
           ORDER BY COUNT(*) DESC, user_id, installation_key
           LIMIT 500

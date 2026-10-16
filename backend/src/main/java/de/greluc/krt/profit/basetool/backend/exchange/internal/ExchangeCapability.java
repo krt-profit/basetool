@@ -68,6 +68,9 @@ public enum ExchangeCapability {
   /** Adding the named single entries to the org-stock lots of the member's Logistician units. */
   ORGSTOCK_DETAILS("exchange.orgstock.details"),
 
+  /** Booking stock into and out of the pools of the member's Logistician units. */
+  ORGSTOCK_WRITE("exchange.orgstock.write"),
+
   /** Submitting blueprint drafts for review in the browser. */
   DRAFTS_BLUEPRINTS("exchange.drafts.blueprints"),
 

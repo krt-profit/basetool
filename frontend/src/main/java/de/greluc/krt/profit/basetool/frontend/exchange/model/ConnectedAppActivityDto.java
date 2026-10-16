@@ -26,7 +26,7 @@ import java.time.Instant;
  * Mirror of one recent write of a connected client to the member's data (REQ-XCH-032).
  *
  * @param recordedAt when it was written
- * @param resource {@code BLUEPRINT}, {@code STOCK} or {@code SHIP}
+ * @param resource {@code BLUEPRINT}, {@code STOCK}, {@code SHIP} or {@code ORG_STOCK}
  * @param action the journal action, such as {@code BLUEPRINT_ADD} or {@code SHIP_REMOVE}
  * @param label the entry's name, or {@code null} when it is no longer known
  * @param undone whether the member has undone it

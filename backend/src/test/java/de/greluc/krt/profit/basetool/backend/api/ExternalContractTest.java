@@ -2093,7 +2093,7 @@ class ExternalContractTest {
   private static final int FROZEN_OPERATIONS_FLOOR = 246;
 
   /**
-   * The record of tier {@code T0}, which never changes (ADR-0234): the version gate, the 16
+   * The record of tier {@code T0}, which never changes (ADR-0234): the version gate, the 18
    * exchange relay operations, the two streams and the live-sync signal. The SPI endpoint {@code
    * POST /internal/discord/account-existence} is T0 too but is not in the document.
    */
@@ -2118,14 +2118,20 @@ class ExternalContractTest {
           "POST /api/v1/exchange/me/ships/changes",
           "GET /api/v1/exchange/me/stock",
           "POST /api/v1/exchange/me/stock/changes",
-          "GET /api/v1/exchange/org-stock");
+          "GET /api/v1/exchange/org-stock",
+          "POST /api/v1/exchange/org-stock/changes",
+          "GET /api/v1/exchange/org-stock/members");
 
   /**
    * The {@code T0} operations added after the latest release, which its baseline cannot document
    * yet; an entry is removed once a release ships it (REQ-API-017).
    */
   private static final Set<String> TIER_ZERO_NEWER_THAN_THE_LATEST_RELEASE =
-      Set.of("GET /api/v1/exchange/me/org-units", "GET /api/v1/exchange/org-stock");
+      Set.of(
+          "GET /api/v1/exchange/me/org-units",
+          "GET /api/v1/exchange/org-stock",
+          "POST /api/v1/exchange/org-stock/changes",
+          "GET /api/v1/exchange/org-stock/members");
 
   /**
    * Verifies that no field reachable from the contract changed its type, format or {@code required}

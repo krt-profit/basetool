@@ -83,6 +83,15 @@ public class ExchangeEntryLabels {
             (entry.getEntityKey().startsWith("m:") ? materialOf : itemOf).put(entry.getId(), id);
           }
         }
+        case ORG_STOCK -> {
+          String lotKey = text(state, "lotKey");
+          if (lotKey != null) {
+            UUID id = lotCatalogueId(lotKey);
+            if (id != null) {
+              (lotKey.startsWith("m:") ? materialOf : itemOf).put(entry.getId(), id);
+            }
+          }
+        }
         case SHIP -> {
           UUID type = uuid(text(state, "shipType"));
           if (type != null) {

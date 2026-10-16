@@ -224,10 +224,15 @@ requires it and duplicating it into further files spreads personal data for no g
   shared stock of each unit the member directly belongs to, summed per lot over every holder and
   naming none (REQ-XCH-042, built); a client approved for its details (`exchange.orgstock.details`,
   REQ-XCH-043, built) shows a Logistician or leader of that unit the name as the web shows it, a
-  per-client pseudonym and the note of each member's shared entries in that unit, and (planned,
-  REQ-XCH-045) the unit's member roster. A member
-  who withholds their name is left out of both; their entries stay, without name, pseudonym or
-  note. The privacy notice („Verbundene Anwendungen") names this and the setting; the legal basis
+  per-client pseudonym and the note of each member's shared entries in that unit, and the unit's
+  member roster (REQ-XCH-045, built). A member who withholds their name is left out of both; their
+  entries stay, without name, pseudonym or note. A client approved for the writes
+  (`exchange.orgstock.write`, REQ-XCH-045, built) lets that Logistician book stock in for a member of
+  the unit and book members' shared entries out, as the web lets them; the Lager audit names the
+  writer and the client, the holder is notified of a book-out as in the web, and the journal of the
+  writer records each changed entry — holder id, unit, lot, amount, version and earmarks, never the
+  note — for the 90-day undo window; the writer's data export shows those rows without the holder's
+  id. The privacy notice („Verbundene Anwendungen") names this and the setting; the legal basis
   is Art. 6(1)(f), coordinating the shared stock, and the setting is the member's objection.
 - **Legal basis:** Art. 6(1)(b) for the transfer the member asked for and the connection records;
   Art. 6(1)(f) for the journal and the audit attribution (detecting misuse, undoing it). The

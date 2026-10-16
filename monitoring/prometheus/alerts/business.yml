@@ -251,7 +251,7 @@ groups:
           severity: warning
         annotations:
           summary: "An exchange client removed unusually many entries"
-          description: "One registered client (client_id) removed more than 100 blueprints, stock lots or ships across its members in the last hour. The mass-change guard stops one member losing much at once, but not a faulty release doing it to many members. Under Administration - Verbundene Anwendungen, undo the client's changes for every member since the faulty release, which suspends it first (REQ-XCH-021, REQ-XCH-028, REQ-XCH-034)."
+          description: "One registered client (client_id) removed more than 100 blueprints, stock lots, ships or org-stock entries across its members in the last hour. The mass-change guard stops one member losing much at once, but not a faulty release doing it to many members. Under Administration - Verbundene Anwendungen, undo the client's changes for every member since the faulty release, which suspends it first; org-stock writes are not undone yet and are corrected in the Globales Lager (REQ-XCH-021, REQ-XCH-028, REQ-XCH-034)."
 
       - alert: ExchangeGuardStorm
         expr: sum by (client_id) (increase(basetool_exchange_writes_total{outcome="held"}[1h])) > 10
@@ -261,6 +261,15 @@ groups:
         annotations:
           summary: "The mass-change guard keeps holding one client's batches"
           description: "The mass-change guard held back more than 10 change sets of one registered client (client_id) in the last hour. Members will see many confirmation links; a client that deletes by mistake, or a release that sends removals where it should not, looks like this. Check the client's recent writes and consider suspending it (REQ-XCH-021)."
+
+      - alert: ExchangeOrgStockRejectionSpike
+        expr: sum by (client_id) (increase(basetool_exchange_writes_total{resource="org_stock",outcome="rejected"}[1h])) > 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "An exchange client keeps sending org-stock writes the Basetool refuses"
+          description: "More than 50 org-stock ops of one registered client (client_id) were rejected in the last hour: writes to pools the member is no Logistician of, to personal or foreign entries, with stale versions, unknown holders or earmarked stock. A client that ignores the per-op reasons, or one probing other units' pools, looks like this. Check the client's recent org-stock writes and consider suspending it (REQ-XCH-045, REQ-XCH-028)."
 
       - alert: ExchangeInstallationSurge
         expr: sum by (client_id) (increase(basetool_exchange_installations_created_total[1h])) > 20

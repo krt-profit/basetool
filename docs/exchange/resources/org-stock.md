@@ -1,7 +1,9 @@
 # Org stock
 
 `GET /exchange/v1/org-stock`, scope `exchange.orgstock.read`: the shared warehouse stock of the org
-units the member directly belongs to, one pool per unit. It is read-only.
+units the member directly belongs to, one pool per unit. With `exchange.orgstock.write`, a
+Logistician of a unit also books stock into and out of that unit's pool, see
+[Writing](#writing).
 
 ## Which pools
 
@@ -153,3 +155,99 @@ without `cursor`.
 
 You may keep org stock for up to 7 days. It is other members' stock, and the entries name them:
 show it to the member who connected your client, and do not pass it on.
+
+## Writing
+
+With `exchange.orgstock.write`, a member who is a **Logistician of a unit** (see [Entries](#entries))
+books stock into that unit's pool for any member of the unit and books any entry of the pool out,
+as the Basetool's warehouse lets them. Send a change set to `POST /exchange/v1/org-stock/changes`
+with an `Idempotency-Key`, as for every write ([sync guide](../sync-guide.md)). The ops run one after
+the other in one request; **each op counts against the daily write quota** (a `dryRun` counts
+once), and a change set that would exceed it is refused `429 QUOTA_EXCEEDED` as a whole. Every
+write is checked and booked by the Basetool's warehouse with its own rules: reservations stay
+protected, linked offers of the Basetool's material exchange are lowered, the holder is notified
+of a book-out by someone else, the Basetool's warehouse audit names the member and your client,
+and every change is journaled under the member.
+
+Every op names its pool in `unit`. An op on a pool whose unit the member is not a Logistician and
+direct member of, on a personal entry, or on an entry of another pool is rejected `NOT_PERMITTED`
+and changes nothing. Use the entries' `id` and `version` from the [entries](#entries).
+
+### The roster
+
+`GET /exchange/v1/org-stock/members?unit=<unit id>`, scope `exchange.orgstock.write`: the members a
+book-in into that unit's pool may name as holder — the unit's direct members with their `ref` (the
+same pseudonym the entries carry) and name, ordered by name. Members who keep their name away from
+connected applications are left out and cannot be booked in for; their entries stay writable by id.
+A unit the member is not a Logistician of is answered `403 NOT_PERMITTED`.
+
+```json
+{
+  "unit": {"id": "7d1c2f4e-3b8a-4c55-9e21-6a0f3b2d9c10", "name": "Iridium"},
+  "items": [
+    {"ref": "q0Fh3kB9xV7m2LwP5nR8tY1cZ4dE6gJ0sU3aH7bK9fM", "name": "Hauler One"}
+  ]
+}
+```
+
+### `book-in`
+
+A new shared entry of the pool, held by the member whose `ref` you name in `holder`, with
+`material`, `location`, `quality`, `stolen` and `quantity` as in a [stock write](stock.md), an
+optional `note` and optional earmarks: `jobOrders` (`[{jobOrder, quantity}]`, job orders that need
+the material or item) and `missions` (`[{mission, quantity}]`, not for an item), each adding up to at
+most the amount. Piece-counted stock joins the holder's entry of the same lot in the pool; for an SCU
+material set `mergeScu: true` to do the same, as the warehouse's merge option does.
+
+### `book-out`
+
+Takes `quantity` out of the entry `entry` at the `version` you last read. By default only the part of
+the entry that is free of earmarks can be booked out; to take earmarked stock, name how much comes out
+of each earmark in `fromJobOrders` and `fromMissions` (`[{jobOrder, quantity}]`,
+`[{mission, quantity}]`). An entry booked out completely is removed.
+
+```json
+{
+  "ops": [
+    {
+      "op": "book-in",
+      "unit": "7d1c2f4e-3b8a-4c55-9e21-6a0f3b2d9c10",
+      "holder": "q0Fh3kB9xV7m2LwP5nR8tY1cZ4dE6gJ0sU3aH7bK9fM",
+      "material": {"bt": "c3b1e0c2-8a4e-4f64-9a51-2b9f5c7e0a11", "name": "Laranite"},
+      "location": {"name": "Area18", "uex": {"kind": "CITY", "id": 4}},
+      "quality": 500,
+      "stolen": false,
+      "quantity": {"amount": 12.5, "unit": "SCU"},
+      "note": "Hangar 3"
+    },
+    {
+      "op": "book-out",
+      "unit": "7d1c2f4e-3b8a-4c55-9e21-6a0f3b2d9c10",
+      "entry": "9a7c2e10-4f3b-4d21-8c6e-2b1a0f9d8e31",
+      "version": 3,
+      "quantity": {"amount": 14, "unit": "SCU"},
+      "fromJobOrders": [{"jobOrder": "4b2d6f80-1a3c-4e57-9b0d-7c5e3a1f2d42", "quantity": {"amount": 2, "unit": "SCU"}}]
+    }
+  ]
+}
+```
+
+### The result
+
+A [change result](../schemas/) as for every write: an applied op is counted, an op that was not is
+listed with its reason. The new entry of a `book-in` and the changed entry of a `book-out` reach you
+through the feed. `dryRun: true` checks every op without writing.
+
+| Reason | Op | Meaning |
+| --- | --- | --- |
+| `NOT_PERMITTED` | both | The pool is not one of the member's Logistician units, or the entry is unknown, personal or in another pool. |
+| `HOLDER_UNKNOWN` | `book-in` | `holder` is not on the unit's roster: not a direct member, withholding their name, or not a ref of your client. Read the roster again. |
+| `VERSION_CONFLICT` | `book-out` | The entry changed since you read it; an earlier op of the same change set counts. Pull the feed and retry. |
+| `INSUFFICIENT_STOCK` | `book-out` | The entry holds less than `quantity`. |
+| `STOCK_EARMARKED` | `book-out` | The part of `quantity` that `fromJobOrders` and `fromMissions` do not cover is earmarked, or pledged as a donation. |
+| `OVER_ALLOCATION` | `book-in` | The earmarks of one kind add up to more than `quantity`. |
+| `EARMARK_TARGET_INVALID` | both | An earmark names a job order that does not need the material or item, an unknown mission, a mission for an item, a target twice, or — in a book-out — a target the entry is not earmarked to or more than it holds there. |
+| `UNIT_MISMATCH`, `LOCATION_UNKNOWN`, `STOLEN_MARKING_DISABLED`, `UNMATCHED`, `AMBIGUOUS` | as for [stock](stock.md) | |
+
+An undo of org-stock writes under *Connected applications* is not offered yet; the journal keeps
+every change for it.
