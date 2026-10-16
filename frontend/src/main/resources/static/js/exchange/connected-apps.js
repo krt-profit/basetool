@@ -86,6 +86,7 @@ function initConnectedApps() {
                 BLUEPRINT: text('resourceBlueprint'),
                 STOCK: text('resourceStock'),
                 SHIP: text('resourceShip'),
+                ORG_STOCK: text('resourceOrgStock'),
             },
         };
     }

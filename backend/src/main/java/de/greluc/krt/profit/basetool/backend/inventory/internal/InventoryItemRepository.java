@@ -1417,6 +1417,53 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   List<InventoryItem> lockAllByIdOrderById(@Param("ids") Collection<UUID> ids);
 
   /**
+   * Counts the shared entries of one org unit's pool.
+   *
+   * @param poolUnitId the org unit
+   * @return the number of shared entries
+   */
+  @Query(
+      "SELECT COUNT(i) FROM InventoryItem i"
+          + " WHERE i.owningOrgUnit.id = :poolUnitId AND i.personal = false")
+  long countPoolEntries(@Param("poolUnitId") UUID poolUnitId);
+
+  /**
+   * Inserts a shared entry under the id it had, at version 0 and without a note, for the undo that
+   * recreates an entry a connected application's write removed (REQ-XCH-046).
+   *
+   * @param id the entry's earlier id
+   * @param holder the holder
+   * @param materialId the material, or {@code null} for an item
+   * @param gameItemId the item, or {@code null} for a material
+   * @param locationId the location
+   * @param quality the quality, or {@code null} for an item
+   * @param amount the amount
+   * @param stolen the stolen marker
+   * @param poolUnitId the org unit whose pool holds the entry
+   * @return the number of rows inserted
+   */
+  @Modifying
+  @Query(
+      value =
+          """
+          INSERT INTO inventory_item (id, user_id, material_id, game_item_id, location_id, quality,
+                                      amount, personal, stolen, owning_org_unit_id, version)
+          VALUES (:id, :holder, CAST(:materialId AS uuid), CAST(:gameItemId AS uuid), :locationId,
+                  CAST(:quality AS integer), :amount, false, :stolen, :poolUnitId, 0)
+          """,
+      nativeQuery = true)
+  int insertSharedEntry(
+      @Param("id") UUID id,
+      @Param("holder") UUID holder,
+      @Param("materialId") @Nullable UUID materialId,
+      @Param("gameItemId") @Nullable UUID gameItemId,
+      @Param("locationId") UUID locationId,
+      @Param("quality") @Nullable Integer quality,
+      @Param("amount") double amount,
+      @Param("stolen") boolean stolen,
+      @Param("poolUnitId") UUID poolUnitId);
+
+  /**
    * Locks a member's rows of one item lot, personal and shared, for the exchange (REQ-XCH-016).
    *
    * @param member the member

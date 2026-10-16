@@ -180,6 +180,11 @@ public class InventoryStockReads implements StockReads, OrderLinkedStockRows {
   }
 
   @Override
+  public long countPoolEntries(@NotNull UUID poolUnitId) {
+    return inventoryRepository.countPoolEntries(poolUnitId);
+  }
+
+  @Override
   public @NotNull List<JobOrderGameItemStockRow> gameItemStockOfOrders(
       @NotNull Collection<UUID> jobOrderIds) {
     return inventoryRepository.findGameItemStockRowsByJobOrderIds(jobOrderIds);

@@ -54,16 +54,8 @@ class ExchangeResourceTest {
       assertThat(resource.massChangeName()).isEqualTo(names.get(resource));
       assertThat(resource.writeCapability()).isEqualTo(capabilities.get(resource));
       assertThat(resource.metricTag()).isEqualTo(tags.get(resource));
-      if (resource != ExchangeResource.ORG_STOCK) {
-        assertThat(ExchangeResource.fromMassChangeName(resource.massChangeName()))
-            .contains(resource);
-      }
+      assertThat(ExchangeResource.fromMassChangeName(resource.massChangeName())).contains(resource);
     }
-  }
-
-  @Test
-  void theOrgStockHasNoStagedMassChange() {
-    assertThat(ExchangeResource.fromMassChangeName("org-stock")).isEmpty();
   }
 
   @Test

@@ -49,6 +49,7 @@ function initConnectedAppsConfirm() {
                 blueprints: text('resourceBlueprints'),
                 stock: text('resourceStock'),
                 ships: text('resourceShips'),
+                'org-stock': text('resourceOrgStock'),
             }),
         };
     }

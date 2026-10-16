@@ -1854,8 +1854,9 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
 - `basetool_exchange_writes_total{client_id,resource,outcome}` counter — ops external clients sent to
   the member's synced data and to the org stock, by registered client, resource (`blueprint` /
   `stock` / `ship` / `org_stock`) and outcome (`applied` / `unchanged` / `unmatched` / `ambiguous` /
-  `rejected`), plus `held` per change set the mass-change guard held back; shown per day on panel 80
-  of the operations dashboard (REQ-XCH-015…-017, REQ-XCH-021, REQ-XCH-045). `ExchangeGuardStorm`
+  `rejected`), plus `held` per change set the mass-change guard held back, an org-stock set once however
+  many of its pools are over the threshold; shown per day on panel 80 of the operations dashboard
+  (REQ-XCH-015…-017, REQ-XCH-021, REQ-XCH-045, REQ-XCH-046). `ExchangeGuardStorm`
   fires when one client's batches are held more than 10 times an hour, `ExchangeOrgStockRejectionSpike`
   when more than 50 of one client's org-stock ops are rejected in an hour.
 - `basetool_exchange_org_stock_pages_total{client_id}` counter — org-stock snapshot and feed pages
@@ -1864,12 +1865,13 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   instead of following the feed (REQ-XCH-042).
 - `basetool_exchange_undo_total{client_id,resource,outcome}` counter — entries a member's undo of a
   client's writes, or an admin's bulk undo of it, restored or skipped (`restored` / `skipped`), by
-  client and resource; shown on the same panel 80 (REQ-XCH-022, REQ-XCH-034). The bulk undo runs
+  client and resource, the org-stock entries a Logistician's client wrote included (`org_stock`);
+  shown on the same panel 80 (REQ-XCH-022, REQ-XCH-034, REQ-XCH-046). The bulk undo runs
   themselves are the `exchange_bulk_undo` job above, shown per day by outcome on the „Exchange"
   dashboard; `ExchangeBulkUndoFailed` (warning) fires on a failed run within the hour.
 - `basetool_exchange_mass_changes_confirmed_total{client_id,resource}` counter — held-back change
-  sets members confirmed, by client and resource; shown on panel 80 beside the gateway's staged count
-  (REQ-XCH-021).
+  sets members confirmed, by client and resource, the org stock included (`org_stock`); shown on
+  panel 80 beside the gateway's staged count (REQ-XCH-021, REQ-XCH-046).
 - `basetool_exchange_removals_total{client_id,resource}` counter — removals clients committed to
   members' entries, every org-stock book-out, sale and move into another pool included
   (`org_stock`), counted by the journal after commit; `ExchangeRemoveSpike` fires above 100 an hour

@@ -83,4 +83,24 @@ class ExchangeMassChangeGuardTest {
     assertThat(Duration.between(since.getValue(), Instant.now()))
         .isBetween(Duration.ofHours(24), Duration.ofHours(24).plusMinutes(1));
   }
+
+  @Test
+  void aPoolCountsTheWritersRemovalsOfThatPoolInTheLast24HoursAgainstItsEntries() {
+    UUID pool = UUID.randomUUID();
+    ArgumentCaptor<Instant> since = ArgumentCaptor.forClass(Instant.class);
+    when(journalService.poolRemovalsSince(eq(CALLER), eq(pool), since.capture())).thenReturn(3L);
+
+    assertThat(guard.requiresPoolConfirmation(CALLER, pool, 21, 2)).isTrue();
+    assertThat(guard.requiresPoolConfirmation(CALLER, pool, 22, 2)).isFalse();
+
+    assertThat(Duration.between(since.getValue(), Instant.now()))
+        .isBetween(Duration.ofHours(24), Duration.ofHours(24).plusMinutes(1));
+  }
+
+  @Test
+  void aPoolWithoutRemovalsInTheBatchNeverAsksAndNeverReadsTheJournal() {
+    assertThat(guard.requiresPoolConfirmation(CALLER, UUID.randomUUID(), 3, 0)).isFalse();
+
+    verify(journalService, never()).poolRemovalsSince(any(), any(), any());
+  }
 }

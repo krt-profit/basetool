@@ -169,7 +169,12 @@ at most as far back as the journal is kept (90 days by default). From the journa
 write in that span, through the same domain services; an entry changed afterwards by anything else
 is skipped as `CHANGED_AFTERWARDS`, a vanished one as `GONE`. Materialbörse offers a book-out
 lowered stay lowered, and a removed ship comes back under a new id without the mission units it was
-detached from (§11.7a). The client sees the undo in its feed, like any web edit.
+detached from (§11.7a). The client sees the undo in its feed, like any web edit. A Logistician's
+undo also takes back the org-stock writes journaled under them, in pools they still are a
+Logistician of: the Lager's `PoolEntryCommands.restore` locks every lot involved in one ascending
+pass, then removes, recreates under its own id or rewrites each entry that is still exactly as the
+client left it, and audits it as `INVENTORY_ITEM_RESTORED` (REQ-XCH-046, ADR-0257 amendment 6). The
+guard counts such a writer's removals per pool, not per member.
 
 **A bulk undo.** After a malicious or faulty release, an admin undoes one client's writes for
 every member on *Administration → Verbundene Anwendungen*: the dialog checks the scope (since

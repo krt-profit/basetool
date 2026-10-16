@@ -1022,7 +1022,7 @@
             }
           }
         },
-        "description": "Each op names its pool; an op on a pool whose unit the member is not a Logistician of, on a personal entry or on an entry of another pool is rejected NOT_PERMITTED. Every op counts against the daily write quota.",
+        "description": "Each op names its pool; an op on a pool whose unit the member is not a Logistician of, on a personal entry or on an entry of another pool is rejected NOT_PERMITTED. Every op counts against the daily write quota. A change set that takes too much out of one pool writes nothing and answers 409 MASS_CHANGE_CONFIRMATION_REQUIRED.",
         "parameters": [
           {
             "$ref": "#/components/parameters/DPoP"

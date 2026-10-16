@@ -163,6 +163,7 @@ public class AdminAuditLogPageController {
                   "INVENTORY_STOLEN_MARKED",
                   "INVENTORY_STOLEN_UNMARKED",
                   "INVENTORY_BULK_STOLEN_CHANGED",
+                  "INVENTORY_ITEM_RESTORED",
                   "INVENTORY_OWNER_REASSIGNED",
                   "INVENTORY_PURGED_ON_USER_DELETION",
                   "INVENTORY_AUDIT_EXPORTED",

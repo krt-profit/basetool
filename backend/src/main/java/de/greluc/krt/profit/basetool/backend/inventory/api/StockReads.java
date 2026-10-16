@@ -102,6 +102,15 @@ public interface StockReads {
   long countExchangeLots(@NotNull UUID member);
 
   /**
+   * Counts the shared entries of one org unit's pool, for the org stock's mass-change guard
+   * (REQ-XCH-046).
+   *
+   * @param poolUnitId the org unit whose pool is counted
+   * @return the number of shared entries
+   */
+  long countPoolEntries(@NotNull UUID poolUnitId);
+
+  /**
    * Returns every game-item earmark of the given job orders as one row each, in a single query
    * (REQ-INV-039).
    *

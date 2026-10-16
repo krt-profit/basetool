@@ -31,13 +31,13 @@ import java.time.Instant;
  *
  * @param clientId the client that sent it
  * @param installationKey the installation that sent it
- * @param resource {@code blueprints}, {@code stock} or {@code ships}
+ * @param resource {@code blueprints}, {@code stock}, {@code ships} or {@code org-stock}
  * @param changeSet the change set as the client sent it, as JSON
  * @param stagedAt when the gateway staged it, in UTC
  */
 public record ConnectedAppMassChangeRequestDto(
     @NotBlank @Size(max = 64) String clientId,
     @NotBlank @Size(max = 64) String installationKey,
-    @NotBlank @Pattern(regexp = "^(blueprints|stock|ships)$") String resource,
+    @NotBlank @Pattern(regexp = "^(blueprints|stock|ships|org-stock)$") String resource,
     @NotBlank @Size(max = 524288) String changeSet,
     @NotNull Instant stagedAt) {}

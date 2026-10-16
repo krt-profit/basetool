@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBlueprintChangeSet;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockChangeSet;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeShipChangeSet;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStockChangeSet;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
@@ -70,6 +71,7 @@ public class ExchangeMassChangeService {
   private final ExchangeBlueprintWriteService blueprintWriteService;
   private final ExchangeStockWriteService stockWriteService;
   private final ExchangeShipWriteService shipWriteService;
+  private final ExchangeOrgStockWriteService orgStockWriteService;
   private final AuditRecorder auditRecorder;
   private final MeterRegistry meterRegistry;
   private final ObjectMapper objectMapper;
@@ -232,7 +234,13 @@ public class ExchangeMassChangeService {
             ? shipWriteService.apply(caller, changeSet)
             : shipWriteService.applyConfirmed(caller, changeSet);
       }
-      case ORG_STOCK -> throw new BadRequestException("The org stock has no staged change set");
+      case ORG_STOCK -> {
+        ExchangeOrgStockChangeSet read = read(request, ExchangeOrgStockChangeSet.class);
+        ExchangeOrgStockChangeSet changeSet = new ExchangeOrgStockChangeSet(read.ops(), dryRun);
+        yield dryRun
+            ? orgStockWriteService.apply(caller, changeSet)
+            : orgStockWriteService.applyConfirmed(caller, changeSet);
+      }
     };
   }
 
@@ -264,7 +272,7 @@ public class ExchangeMassChangeService {
    *
    * @param request the staged change set
    * @return the resource
-   * @throws BadRequestException when the name is none of the three resources
+   * @throws BadRequestException when the name is none of the resources
    */
   private static @NotNull ExchangeResource resourceOf(
       @NotNull ConnectedAppMassChangeRequestDto request) {
