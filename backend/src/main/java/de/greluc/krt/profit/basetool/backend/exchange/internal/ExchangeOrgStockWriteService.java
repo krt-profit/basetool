@@ -150,34 +150,34 @@ public class ExchangeOrgStockWriteService {
     List<ExchangeChangeResultDto.OpResult> results = new ArrayList<>();
     for (int i = 0; i < plan.size(); i++) {
       String opId = ops.get(i).opId();
-      Planned planned = plan.get(i);
-      if (planned instanceof Skip skip) {
-        if (UNCHANGED.equals(skip.result())) {
-          unchanged++;
+      switch (plan.get(i)) {
+        case Skip skip -> {
+          if (UNCHANGED.equals(skip.result())) {
+            unchanged++;
+          }
+          count(caller, skip.result(), dryRun);
+          results.add(new ExchangeChangeResultDto.OpResult(i, opId, skip.result(), skip.reason()));
         }
-        count(caller, skip.result(), dryRun);
-        results.add(new ExchangeChangeResultDto.OpResult(i, opId, skip.result(), skip.reason()));
-        continue;
-      }
-      PoolOutcome outcome = run(planned, dryRun);
-      if (outcome.refusal() != null) {
-        count(caller, REJECTED, dryRun);
-        results.add(
-            new ExchangeChangeResultDto.OpResult(i, opId, REJECTED, outcome.refusal().name()));
-        continue;
-      }
-      if (outcome.unchanged()) {
-        unchanged++;
-        count(caller, UNCHANGED, dryRun);
-        results.add(new ExchangeChangeResultDto.OpResult(i, opId, UNCHANGED, null));
-        continue;
-      }
-      applied++;
-      count(caller, APPLIED, dryRun);
-      reduced += outcome.offers().reduced();
-      removed += outcome.offers().removed();
-      if (!dryRun) {
-        journal(caller, batch, planned, outcome);
+        case Write write -> {
+          PoolOutcome outcome = write.run(poolEntryCommands, dryRun);
+          if (outcome.refusal() != null) {
+            count(caller, REJECTED, dryRun);
+            results.add(
+                new ExchangeChangeResultDto.OpResult(i, opId, REJECTED, outcome.refusal().name()));
+          } else if (outcome.unchanged()) {
+            unchanged++;
+            count(caller, UNCHANGED, dryRun);
+            results.add(new ExchangeChangeResultDto.OpResult(i, opId, UNCHANGED, null));
+          } else {
+            applied++;
+            count(caller, APPLIED, dryRun);
+            reduced += outcome.offers().reduced();
+            removed += outcome.offers().removed();
+            if (!dryRun) {
+              journal(caller, batch, write, outcome);
+            }
+          }
+        }
       }
     }
     if (!dryRun && applied > 0) {
@@ -625,58 +625,17 @@ public class ExchangeOrgStockWriteService {
    * @param plan the plan
    */
   private void lock(@NotNull List<Planned> plan) {
-    Map<UUID, List<StockLot>> holderLots = new HashMap<>();
-    Set<UUID> entries = new HashSet<>();
-    List<PoolRelocation> relocations = new ArrayList<>();
+    Locks locks = new Locks(new HashMap<>(), new HashSet<>(), new ArrayList<>());
     for (Planned planned : plan) {
-      switch (planned) {
-        case BookIn bookIn ->
-            holderLots
-                .computeIfAbsent(bookIn.request().holder(), _ -> new ArrayList<>())
-                .add(bookIn.request().lot());
-        case BookOut bookOut -> entries.add(bookOut.request().entryId());
-        case Sell sell -> entries.add(sell.request().take().entryId());
-        case Move move -> {
-          PoolMove request = move.request();
-          relocations.add(
-              new PoolRelocation(
-                  request.take().entryId(),
-                  request.targetHolder(),
-                  request.targetLocation() == null ? null : request.targetLocation().getId(),
-                  null));
-        }
-        case MovePool movePool -> entries.add(movePool.request().entryId());
-        case Note note -> entries.add(note.request().entryId());
-        case Stolen stolen ->
-            relocations.add(
-                new PoolRelocation(
-                    stolen.request().entryId(), null, null, stolen.request().stolen()));
-        case Skip _ -> {}
+      if (planned instanceof Write write) {
+        write.lockInto(locks);
       }
     }
-    if (!holderLots.isEmpty() || !entries.isEmpty() || !relocations.isEmpty()) {
-      poolEntryCommands.lockLots(holderLots, entries, relocations);
+    if (!locks.holderLots().isEmpty()
+        || !locks.entries().isEmpty()
+        || !locks.relocations().isEmpty()) {
+      poolEntryCommands.lockLots(locks.holderLots(), locks.entries(), locks.relocations());
     }
-  }
-
-  /**
-   * Hands one planned op to the Lager.
-   *
-   * @param planned the op, not a {@link Skip}
-   * @param dryRun whether to check it only
-   * @return the Lager's outcome
-   */
-  private @NotNull PoolOutcome run(@NotNull Planned planned, boolean dryRun) {
-    return switch (planned) {
-      case BookIn bookIn -> poolEntryCommands.bookIn(bookIn.request(), dryRun);
-      case BookOut bookOut -> poolEntryCommands.bookOut(bookOut.request(), dryRun);
-      case Sell sell -> poolEntryCommands.sell(sell.request(), dryRun);
-      case Move move -> poolEntryCommands.move(move.request(), dryRun);
-      case MovePool movePool -> poolEntryCommands.movePool(movePool.request(), dryRun);
-      case Note note -> poolEntryCommands.setNote(note.request(), dryRun);
-      case Stolen stolen -> poolEntryCommands.markStolen(stolen.request(), dryRun);
-      case Skip _ -> throw new IllegalStateException("A skipped op reaches no Lager command");
-    };
   }
 
   /**
@@ -686,16 +645,16 @@ public class ExchangeOrgStockWriteService {
    *
    * @param caller the writer
    * @param batch the change set's id
-   * @param planned the op
+   * @param write the op
    * @param outcome its outcome
    */
   private void journal(
       @NotNull ExchangeCaller caller,
       @NotNull UUID batch,
-      @NotNull Planned planned,
+      @NotNull Write write,
       @NotNull PoolOutcome outcome) {
-    ExchangeJournalAction action = actionOf(planned);
-    UUID removedFrom = removedFrom(planned);
+    ExchangeJournalAction action = write.action();
+    UUID removedFrom = write.removedFrom();
     for (PoolEntryCommands.PoolEntryChange change : outcome.changes()) {
       PoolEntryCommands.PoolEntryState key =
           change.after() != null ? change.after() : Objects.requireNonNull(change.before());
@@ -708,45 +667,6 @@ public class ExchangeOrgStockWriteService {
           change.before(),
           change.after());
     }
-  }
-
-  /**
-   * Maps a planned op to the {@code exchange_journal} action its entries are recorded under.
-   *
-   * @param planned the op, not a {@link Skip}
-   * @return the action; a move's is the one it was planned with
-   */
-  private static @NotNull ExchangeJournalAction actionOf(@NotNull Planned planned) {
-    return switch (planned) {
-      case BookIn _ -> ExchangeJournalAction.ORG_STOCK_BOOK_IN;
-      case BookOut _ -> ExchangeJournalAction.ORG_STOCK_BOOK_OUT;
-      case Sell _ -> ExchangeJournalAction.ORG_STOCK_SELL;
-      case Move move -> move.action();
-      case MovePool _ -> ExchangeJournalAction.ORG_STOCK_MOVE_POOL;
-      case Note _ -> ExchangeJournalAction.ORG_STOCK_NOTE;
-      case Stolen _ -> ExchangeJournalAction.ORG_STOCK_STOLEN;
-      case Skip _ -> throw new IllegalStateException("A skipped op is not journaled");
-    };
-  }
-
-  /**
-   * Returns the entry whose journal row counts as a removal for the mass-change guard.
-   *
-   * @param planned the op
-   * @return the entry a book-out, a sale or a move into another pool takes stock from, or {@code
-   *     null}
-   */
-  private static @Nullable UUID removedFrom(@NotNull Planned planned) {
-    return switch (planned) {
-      case BookOut bookOut -> bookOut.request().entryId();
-      case Sell sell -> sell.request().take().entryId();
-      case Move move ->
-          move.request().targetPoolUnitId().equals(move.request().take().poolUnitId())
-              ? null
-              : move.request().take().entryId();
-      case MovePool movePool -> movePool.request().entryId();
-      case BookIn _, Note _, Stolen _, Skip _ -> null;
-    };
   }
 
   /**
@@ -855,8 +775,7 @@ public class ExchangeOrgStockWriteService {
   }
 
   /** What one op of a change set will do. */
-  private sealed interface Planned
-      permits Skip, BookIn, BookOut, Sell, Move, MovePool, Note, Stolen {}
+  private sealed interface Planned permits Skip, Write {}
 
   /**
    * An op that is decided without the Lager.
@@ -866,26 +785,143 @@ public class ExchangeOrgStockWriteService {
    */
   private record Skip(@NotNull String result, @Nullable String reason) implements Planned {}
 
+  /** An op the Lager decides: what it locks, runs and journals. */
+  private sealed interface Write extends Planned
+      permits BookIn, BookOut, Sell, Move, MovePool, Note, Stolen {
+
+    /**
+     * Adds the lots and entries this op touches to the batch's locks.
+     *
+     * @param locks the batch's locks
+     */
+    void lockInto(@NotNull Locks locks);
+
+    /**
+     * Hands this op to the Lager.
+     *
+     * @param commands the Lager's pool commands
+     * @param dryRun whether to check it only
+     * @return the Lager's outcome
+     */
+    @NotNull
+    PoolOutcome run(@NotNull PoolEntryCommands commands, boolean dryRun);
+
+    /**
+     * Returns the {@code exchange_journal} action this op's entries are recorded under.
+     *
+     * @return the action
+     */
+    @NotNull
+    ExchangeJournalAction action();
+
+    /**
+     * Returns the entry whose journal row counts as a removal for the mass-change guard.
+     *
+     * @return the entry a book-out, a sale or a move into another pool takes stock from, or {@code
+     *     null}
+     */
+    @Nullable
+    UUID removedFrom();
+  }
+
+  /**
+   * The lots, entries and relocations a batch locks before any op runs (ADR-0229).
+   *
+   * @param holderLots the lots the book-ins book into, by holder
+   * @param entries the entries the ops write
+   * @param relocations the lots moves and markings land in
+   */
+  private record Locks(
+      @NotNull Map<UUID, List<StockLot>> holderLots,
+      @NotNull Set<UUID> entries,
+      @NotNull List<PoolRelocation> relocations) {}
+
   /**
    * A book-in the Lager decides.
    *
    * @param request the book-in
    */
-  private record BookIn(@NotNull PoolBookIn request) implements Planned {}
+  private record BookIn(@NotNull PoolBookIn request) implements Write {
+
+    @Override
+    public void lockInto(@NotNull Locks locks) {
+      locks
+          .holderLots()
+          .computeIfAbsent(request.holder(), _ -> new ArrayList<>())
+          .add(request.lot());
+    }
+
+    @Override
+    public @NotNull PoolOutcome run(@NotNull PoolEntryCommands commands, boolean dryRun) {
+      return commands.bookIn(request, dryRun);
+    }
+
+    @Override
+    public @NotNull ExchangeJournalAction action() {
+      return ExchangeJournalAction.ORG_STOCK_BOOK_IN;
+    }
+
+    @Override
+    public @Nullable UUID removedFrom() {
+      return null;
+    }
+  }
 
   /**
    * A book-out the Lager decides.
    *
    * @param request the book-out
    */
-  private record BookOut(@NotNull PoolBookOut request) implements Planned {}
+  private record BookOut(@NotNull PoolBookOut request) implements Write {
+
+    @Override
+    public void lockInto(@NotNull Locks locks) {
+      locks.entries().add(request.entryId());
+    }
+
+    @Override
+    public @NotNull PoolOutcome run(@NotNull PoolEntryCommands commands, boolean dryRun) {
+      return commands.bookOut(request, dryRun);
+    }
+
+    @Override
+    public @NotNull ExchangeJournalAction action() {
+      return ExchangeJournalAction.ORG_STOCK_BOOK_OUT;
+    }
+
+    @Override
+    public @NotNull UUID removedFrom() {
+      return request.entryId();
+    }
+  }
 
   /**
    * A sale the Lager decides.
    *
    * @param request the sale
    */
-  private record Sell(@NotNull PoolSale request) implements Planned {}
+  private record Sell(@NotNull PoolSale request) implements Write {
+
+    @Override
+    public void lockInto(@NotNull Locks locks) {
+      locks.entries().add(request.take().entryId());
+    }
+
+    @Override
+    public @NotNull PoolOutcome run(@NotNull PoolEntryCommands commands, boolean dryRun) {
+      return commands.sell(request, dryRun);
+    }
+
+    @Override
+    public @NotNull ExchangeJournalAction action() {
+      return ExchangeJournalAction.ORG_STOCK_SELL;
+    }
+
+    @Override
+    public @NotNull UUID removedFrom() {
+      return request.take().entryId();
+    }
+  }
 
   /**
    * A move to another location or holder the Lager decides.
@@ -894,26 +930,114 @@ public class ExchangeOrgStockWriteService {
    * @param action {@code ORG_STOCK_MOVE_LOCATION} or {@code ORG_STOCK_MOVE_HOLDER}
    */
   private record Move(@NotNull PoolMove request, @NotNull ExchangeJournalAction action)
-      implements Planned {}
+      implements Write {
+
+    @Override
+    public void lockInto(@NotNull Locks locks) {
+      locks
+          .relocations()
+          .add(
+              new PoolRelocation(
+                  request.take().entryId(),
+                  request.targetHolder(),
+                  request.targetLocation() == null ? null : request.targetLocation().getId(),
+                  null));
+    }
+
+    @Override
+    public @NotNull PoolOutcome run(@NotNull PoolEntryCommands commands, boolean dryRun) {
+      return commands.move(request, dryRun);
+    }
+
+    @Override
+    public @Nullable UUID removedFrom() {
+      return request.targetPoolUnitId().equals(request.take().poolUnitId())
+          ? null
+          : request.take().entryId();
+    }
+  }
 
   /**
    * A note edit the Lager decides.
    *
    * @param request the note edit
    */
-  private record Note(@NotNull PoolNote request) implements Planned {}
+  private record Note(@NotNull PoolNote request) implements Write {
+
+    @Override
+    public void lockInto(@NotNull Locks locks) {
+      locks.entries().add(request.entryId());
+    }
+
+    @Override
+    public @NotNull PoolOutcome run(@NotNull PoolEntryCommands commands, boolean dryRun) {
+      return commands.setNote(request, dryRun);
+    }
+
+    @Override
+    public @NotNull ExchangeJournalAction action() {
+      return ExchangeJournalAction.ORG_STOCK_NOTE;
+    }
+
+    @Override
+    public @Nullable UUID removedFrom() {
+      return null;
+    }
+  }
 
   /**
    * A move into another pool of the holder the Lager decides.
    *
    * @param request the pool change
    */
-  private record MovePool(@NotNull PoolChange request) implements Planned {}
+  private record MovePool(@NotNull PoolChange request) implements Write {
+
+    @Override
+    public void lockInto(@NotNull Locks locks) {
+      locks.entries().add(request.entryId());
+    }
+
+    @Override
+    public @NotNull PoolOutcome run(@NotNull PoolEntryCommands commands, boolean dryRun) {
+      return commands.movePool(request, dryRun);
+    }
+
+    @Override
+    public @NotNull ExchangeJournalAction action() {
+      return ExchangeJournalAction.ORG_STOCK_MOVE_POOL;
+    }
+
+    @Override
+    public @NotNull UUID removedFrom() {
+      return request.entryId();
+    }
+  }
 
   /**
    * A stolen marking the Lager decides.
    *
    * @param request the marking
    */
-  private record Stolen(@NotNull PoolStolen request) implements Planned {}
+  private record Stolen(@NotNull PoolStolen request) implements Write {
+
+    @Override
+    public void lockInto(@NotNull Locks locks) {
+      locks.relocations().add(new PoolRelocation(request.entryId(), null, null, request.stolen()));
+    }
+
+    @Override
+    public @NotNull PoolOutcome run(@NotNull PoolEntryCommands commands, boolean dryRun) {
+      return commands.markStolen(request, dryRun);
+    }
+
+    @Override
+    public @NotNull ExchangeJournalAction action() {
+      return ExchangeJournalAction.ORG_STOCK_STOLEN;
+    }
+
+    @Override
+    public @Nullable UUID removedFrom() {
+      return null;
+    }
+  }
 }

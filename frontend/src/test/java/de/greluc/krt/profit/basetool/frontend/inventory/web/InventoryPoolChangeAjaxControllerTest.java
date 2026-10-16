@@ -44,6 +44,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.ParameterizedTypeReference;
@@ -128,7 +129,10 @@ class InventoryPoolChangeAjaxControllerTest {
   void theTargetsAreRelayed() throws Exception {
     UUID itemId = UUID.randomUUID();
     UUID bravo = UUID.randomUUID();
-    when(backendApiClient.get(eq(TARGETS_URI), any(ParameterizedTypeReference.class), eq(itemId)))
+    when(backendApiClient.get(
+            eq(TARGETS_URI),
+            ArgumentMatchers.<ParameterizedTypeReference<List<OrgUnitReferenceDto>>>any(),
+            eq(itemId)))
         .thenReturn(List.of(new OrgUnitReferenceDto(bravo, "Bravo", "BRV", "SPECIAL_COMMAND")));
 
     mockMvc
