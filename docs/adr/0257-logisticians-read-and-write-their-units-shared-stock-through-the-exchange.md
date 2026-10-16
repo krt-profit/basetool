@@ -1,7 +1,8 @@
 # ADR-0257 — Logisticians read and write their units' shared stock through the exchange, by name
 
-- **Status:** Accepted — the read, the details, `book-in`/`book-out` and the roster built; the other
-  write ops, the undo, the guard and the demand details pending (REQ-XCH-042…047).
+- **Status:** Accepted — the read, the details, the roster and the ops `book-in`, `book-out`, `sell`,
+  the moves, `note` and `stolen` built; the earmark ops, the undo, the guard and the demand details
+  pending (REQ-XCH-042…047).
   Amends [ADR-0220](0220-external-clients-see-only-anonymised-org-demand-and-the-location-list.md)
   (decision 1, "no requester, no order title, no free text") and narrows the own-data-only rule of
   REQ-XCH-009.
@@ -158,3 +159,25 @@ lot and a second cursor.
 Rejected: an all-or-nothing batch that answers the first refusal for the whole request — the client
 could not tell which op failed, and the existing change results already carry per-op reasons; a
 path template on the acting list — it would loosen REQ-SEC-080 and every seam test for one route.
+
+## Amendment 4 (2026-10-16) — sale, moves, note and stolen
+
+1. **The web's services, the web's effects.** `sell` goes through the Lager's sale, so the mission
+   proceeds are split and booked exactly as in the web (only for missions the writer takes part
+   in); the moves go through the Lager's transfer, which carries the planned earmarks along, merges
+   and tells both holders; `note` and `stolen` go through the note edit and the stolen marking. The
+   pool commands check first and answer `STOCK_EARMARKED`, `STOCK_OFFERED` or `INSUFFICIENT_STOCK`
+   where those services would throw.
+2. **The receiving pool is the op's, not the web's pick.** A transfer for a pool stamps the
+   receiving pool directly — the entry's for `move-location`, `toUnit` for `move-holder` — instead
+   of the web's org-unit picker, which reads the web caller's own memberships. The new holder must
+   be on the roster of `toUnit`, a unit the writer is a Logistician of.
+3. **A pool change of one holder is not a move.** A `move-holder` to the entry's own holder into
+   another pool is refused `NOT_PERMITTED`: the web does that as an org-unit change with its own
+   audit event, which is not one of these ops. The same holder at the same place is `unchanged`, as
+   are a `note` and a `stolen` that find the entry as asked; they write nothing.
+4. **Relocations lock their target lot.** A move or stolen marking names the lot the stock lands
+   in by the entry's lot with holder, location or marker replaced; its advisory lock and rows join
+   the batch's single ascending pass (ADR-0229).
+5. **What counts as a removal.** The source entry of a book-out, a sale and a `move-holder` into
+   another pool; a move within the pool, a note and a marking do not.

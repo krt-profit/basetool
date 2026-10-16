@@ -59,9 +59,10 @@ The exchange API is served by the ingest gateway at `/exchange/v1/**`
 | `GET /exchange/v1/org-stock/members?unit=` · `…/targets?unit=` | `exchange.orgstock.write` | REQ-XCH-045 |
 
 Of the three `org-stock` rows the read is built, as a snapshot and a feed (REQ-XCH-042), with
-`exchange.orgstock.details` (REQ-XCH-043), and so are the writes `book-in` and `book-out` and the
-roster (REQ-XCH-045); the other write ops, the targets and `exchange.demand.details` are planned
-(ADR-0257), and until they are built the gateway serves none of them.
+`exchange.orgstock.details` (REQ-XCH-043), and so are the writes `book-in`, `book-out`, `sell`,
+`move-location`, `move-holder`, `note` and `stolen` and the roster (REQ-XCH-045); the earmark ops,
+the targets and `exchange.demand.details` are planned (ADR-0257), and until they are built the
+gateway serves none of them.
 | `POST /exchange/v1/me/drafts/blueprints` · `…/drafts/refinery-orders` | `exchange.drafts.blueprints` / `.refinery` | REQ-XCH-019 |
 
 Every route is deny-by-default, uses only `GET` or `POST` (the ingest bot filter admits nothing
@@ -2456,12 +2457,20 @@ a stale one is refused `VERSION_CONFLICT` for that op (see *Per op* below). Only
   - `book-in`: a new shared entry in the pool for a holder given by `ref` from the roster, with
     material or item, location, quality, „gestohlen", amount, optional note, optional earmarks and
     the SCU merge opt-in of REQ-INV-026;
-  - `book-out` and `sell` of an entry, with the deduct-from plans of REQ-INV-027;
+  - `book-out` and `sell` of an entry, with the deduct-from plans of REQ-INV-027; a `sell` names its
+    terminal and proceeds, and each mission the plan takes from gets its share of the proceeds as in
+    the web (booked only when the writer takes part in the mission);
   - `move-location`: a transfer to another location, same holder and pool;
   - `move-holder`: a transfer to a holder who is a direct member of one of the writer's Logistician
-    units and does not withhold their name, into that unit's pool;
+    units and does not withhold their name, into that unit's pool (`toUnit`, the holder by `ref`
+    from its roster); a move to the entry's own holder at its own place is `unchanged`, one into
+    another pool of the same holder is `NOT_PERMITTED`. Both moves carry the earmarks the plan takes
+    along and merge as the web's transfer does (`mergeScu` for an SCU material);
   - `allocation-add`, `allocation-change`, `allocation-remove` on an entry;
-  - `note` and `stolen` on an entry.
+  - `note` and `stolen` on an entry: `note` sets or, absent or blank, clears the note; `stolen` sets
+    or removes the marker of the whole entry or, with a `quantity`, of a part that becomes an entry
+    of its own (REQ-INV-053). A `note`, `stolen` or move that finds the entry as it asks is
+    `unchanged`.
 - **Roster.** `GET /exchange/v1/org-stock/members?unit=<unit>` (backend
   `GET /api/v1/exchange/org-stock/members`) lists the unit's direct members with `ref` and name,
   ordered by name, without those who withhold their name, as `org-stock-members.schema.json`; a unit
@@ -2480,9 +2489,12 @@ a stale one is refused `VERSION_CONFLICT` for that op (see *Per op* below). Only
 - **Per op, as for ships.** The ops run in their order, each on its own: an op that is refused is
   reported in the change result as `rejected` with its reason and changes nothing, and the rest of the
   batch still applies. The reasons are `NOT_PERMITTED`, `HOLDER_UNKNOWN` (a `book-in` holder not on
-  the unit's roster), `VERSION_CONFLICT`, `INSUFFICIENT_STOCK`, `STOCK_EARMARKED` (what the
-  deduct-from plan does not cover lies in an earmark or a donation pledge; without a plan only the
-  free part can be booked out), `OVER_ALLOCATION`, `EARMARK_TARGET_INVALID`, and those of
+  the unit's roster, and a `move-holder` holder not on the roster of `toUnit`), `VERSION_CONFLICT`,
+  `INSUFFICIENT_STOCK`, `STOCK_EARMARKED` (what the deduct-from plan does not cover lies in an
+  earmark or a donation pledge; without a plan only the free part can be booked out, sold or moved;
+  a partial `stolen` would leave less than the entry's earmarks), `STOCK_OFFERED` (a partial
+  `stolen` would leave less than the entry offers on the Materialbörse), `OVER_ALLOCATION`,
+  `EARMARK_TARGET_INVALID`, and those of
   REQ-XCH-016 for the material, the place and the unit. The Lager decides its own refusals
   (`PoolEntryCommands`); every holder lot the batch touches takes its advisory lock first, then all
 their rows are locked in ascending id order (ADR-0229). `dryRun`
@@ -2497,13 +2509,18 @@ their rows are locked in ascending id order (ADR-0229). `dryRun`
   the SCU merge opt-in — and books another member's entry out; the row, the Lager audit event
   (`INVENTORY_ITEM_CREATED`, `INVENTORY_ITEM_CONSUMED`, naming the writer and the client) and the
   holder's notification are those of the web's action. *`ExchangeOrgStockWriteControllerTest`.*
-- [ ] A Logistician sells, moves an entry to another location and to another member, edits earmarks,
-  the note and „gestohlen" (#2590, #2591).
+- [x] A Logistician sells another member's entry — the mission's share of the proceeds booked as
+  in the web —, moves an entry to another location and to a member of another of their Logistician
+  units, edits the note and „gestohlen" of the whole entry or a part; the rows, the Lager audit
+  events (`INVENTORY_ITEM_SOLD`, `INVENTORY_ITEM_TRANSFERRED`, `INVENTORY_ITEM_NOTE_UPDATED`,
+  `INVENTORY_STOLEN_MARKED`, naming the writer and the client), the holders' notifications and the
+  org-stock feed are those of the web's action. *`ExchangeOrgStockWriteControllerTest`.*
+- [ ] A Logistician edits earmarks (#2591).
 - [x] An op on a pool where the writer is not a Logistician, on a personal row or on a row of
   another pool is refused `NOT_PERMITTED` and changes nothing. *`ExchangeOrgStockWriteControllerTest`.*
 - [x] A `book-in` naming a member who withholds their name, or who is not a member of the unit, is
-  refused `HOLDER_UNKNOWN`. *`ExchangeOrgStockWriteControllerTest`.* A `move-holder` follows with
-  #2590.
+  refused `HOLDER_UNKNOWN`, and so is a `move-holder` to such a member; a `move-holder` into a unit
+  the writer is not a Logistician of is `NOT_PERMITTED`. *`ExchangeOrgStockWriteControllerTest`.*
 - [x] A stale version is `VERSION_CONFLICT`, earmarked stock is protected unless the book-out names
   the earmark, and a replayed idempotency key returns the first result (the gateway's filter, as for
   every write). *`ExchangeOrgStockWriteControllerTest`, `ExchangeIdempotencyFilterTest`.*
@@ -2516,9 +2533,9 @@ their rows are locked in ascending id order (ADR-0229). `dryRun`
 **Code:** `ExchangeOrgStockWriteService`, `ExchangeOrgStockRoster`, `ExchangeLotCatalogue`,
 `PoolEntryCommands` / `InventoryPoolEntryCommands`, `ExchangeOrgStockController#orgStockChanges` /
 `#orgStockMembers`, `ExchangeController#orgStockChanges` / `#orgStockMembers`,
-`ExchangeQuotas#countFurtherOps`, `V298` · **Status:** the capability, the roster, `book-in` and
-`book-out` built (#2589); `sell`, the moves, `note` and `stolen` (#2590) and the earmark ops and
-targets (#2591) planned
+`ExchangeQuotas#countFurtherOps`, `V298`, `V299` · **Status:** the capability, the roster,
+`book-in` and `book-out` built (#2589); `sell`, the moves, `note` and `stolen` built (#2590); the
+earmark ops and targets (#2591) planned
 
 ### REQ-XCH-046 — Org-stock writes are journaled, undoable and guarded per writer and pool
 
@@ -2530,12 +2547,15 @@ as in the web and cannot undo the writer's changes. The mass-change guard (REQ-X
 book-outs, sales and moves out of a pool per writer and pool with its own window rules; a batch over
 the threshold is held for confirmation in the writer's browser.
 
-*Journal (#2589).* Every applied `book-in` and `book-out` writes one `exchange_journal` row per
-Lager entry it changed (`resource = ORG_STOCK`, actions `ORG_STOCK_BOOK_IN` / `ORG_STOCK_BOOK_OUT`,
-keyed by the entry id) under the writer, with the entry's holder, pool, lot key, amount, version
-and earmarks before and after — not the holder's note; the writer's data export shows these rows
-without the holder; a merge also journals each entry it folded away. A book-out
-counts as a removal (`basetool_exchange_removals_total{resource="org_stock"}`). Until the undo
+*Journal (#2589, #2590).* Every applied op writes one `exchange_journal` row per Lager entry it
+changed (`resource = ORG_STOCK`, actions `ORG_STOCK_BOOK_IN`, `ORG_STOCK_BOOK_OUT`,
+`ORG_STOCK_SELL`, `ORG_STOCK_MOVE_LOCATION`, `ORG_STOCK_MOVE_HOLDER`, `ORG_STOCK_NOTE`,
+`ORG_STOCK_STOLEN`, keyed by the entry id) under the writer, with the entry's holder, pool, lot key,
+amount, version and earmarks before and after — not the holder's note; the writer's data export
+shows these rows without the holder; a move or a stolen split also journals the entry it created,
+and a merge each entry it folded away. The entry a book-out, a sale or a `move-holder` into another
+pool takes stock from counts as a removal
+(`basetool_exchange_removals_total{resource="org_stock"}`). Until the undo
 below is built, the member's undo and the admin's bulk undo leave org-stock rows untouched and do
 not count them.
 

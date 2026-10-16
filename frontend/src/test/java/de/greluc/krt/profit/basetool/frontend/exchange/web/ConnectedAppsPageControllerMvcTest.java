@@ -206,7 +206,8 @@ class ConnectedAppsPageControllerMvcTest {
             content()
                 .string(
                     containsString(
-                        "Lagerbestand in die gemeinsamen Lager der Einheiten ein- und ausbuchen")))
+                        "Gemeinsamen Lagerbestand der Einheiten, in denen du Logistiker bist, ein-"
+                            + " und ausbuchen")))
         .andExpect(content().string(not(containsString("??"))));
     mockMvc
         .perform(get("/connected-apps").param("lang", "en"))
@@ -224,7 +225,7 @@ class ConnectedAppsPageControllerMvcTest {
             content()
                 .string(
                     containsString(
-                        "Book stock into and out of the shared warehouse stock of the org units")))
+                        "Book, sell, move and edit the shared warehouse stock of the org units")))
         .andExpect(content().string(not(containsString("??"))));
   }
 

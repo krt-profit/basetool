@@ -2,7 +2,7 @@
 
 `GET /exchange/v1/org-stock`, scope `exchange.orgstock.read`: the shared warehouse stock of the org
 units the member directly belongs to, one pool per unit. With `exchange.orgstock.write`, a
-Logistician of a unit also books stock into and out of that unit's pool, see
+Logistician of a unit also books, sells, moves and edits the stock of that unit's pool, see
 [Writing](#writing).
 
 ## Which pools
@@ -159,15 +159,16 @@ show it to the member who connected your client, and do not pass it on.
 ## Writing
 
 With `exchange.orgstock.write`, a member who is a **Logistician of a unit** (see [Entries](#entries))
-books stock into that unit's pool for any member of the unit and books any entry of the pool out,
-as the Basetool's warehouse lets them. Send a change set to `POST /exchange/v1/org-stock/changes`
+books stock into that unit's pool for any member of the unit, and books out, sells, moves and edits
+any entry of the pool, as the Basetool's warehouse lets them. Send a change set to
+`POST /exchange/v1/org-stock/changes`
 with an `Idempotency-Key`, as for every write ([sync guide](../sync-guide.md)). The ops run one after
 the other in one request; **each op counts against the daily write quota** (a `dryRun` counts
 once), and a change set that would exceed it is refused `429 QUOTA_EXCEEDED` as a whole. Every
 write is checked and booked by the Basetool's warehouse with its own rules: reservations stay
 protected, linked offers of the Basetool's material exchange are lowered, the holder is notified
-of a book-out by someone else, the Basetool's warehouse audit names the member and your client,
-and every change is journaled under the member.
+of a book-out, a sale or a move by someone else, the Basetool's warehouse audit names the member and
+your client, and every change is journaled under the member.
 
 Every op names its pool in `unit`. An op on a pool whose unit the member is not a Logistician and
 direct member of, on a personal entry, or on an entry of another pool is rejected `NOT_PERMITTED`
@@ -206,6 +207,35 @@ the entry that is free of earmarks can be booked out; to take earmarked stock, n
 of each earmark in `fromJobOrders` and `fromMissions` (`[{jobOrder, quantity}]`,
 `[{mission, quantity}]`). An entry booked out completely is removed.
 
+### `sell`
+
+A `book-out` that records a sale: `quantity`, `fromJobOrders` and `fromMissions` as for a
+`book-out`, plus the `terminal` the stock was sold at and the `proceeds` in aUEC. Each mission in
+`fromMissions` receives its share of the proceeds, `proceeds × mission's amount ÷ quantity`, as
+mission income — only when the member takes part in that mission, as in the Basetool's warehouse.
+
+### `move-location` and `move-holder`
+
+Moves `quantity` of the entry `entry` to a new entry. `move-location` keeps holder and pool and names
+the new `location`. `move-holder` keeps the location and names the new `holder` by its `ref` from
+the roster of `toUnit`, the unit whose pool receives the stock: `unit` itself or another unit the
+member is a Logistician of. The earmarks named in `fromJobOrders` and `fromMissions` move along;
+everything else must come from the free part, as for a `book-out`. Piece-counted stock joins the
+receiving holder's entry of the same lot; for an SCU material set `mergeScu: true` to do the same.
+The previous and the new holder are notified. A move to the entry's own holder and place is
+`unchanged`; a `move-holder` to the entry's own holder into another pool is `NOT_PERMITTED`.
+
+### `note` and `stolen`
+
+`note` sets the entry's `note`; without `note`, or with a blank one, it clears it. `stolen` sets
+the marker in `stolen` on the whole entry or, with a `quantity`, on that part of it, which becomes
+an entry of its own. Either op is `unchanged` when the entry already is as asked.
+
+### A change set
+
+The ops of one change set run in their order, each against the entry as the ops before it left it,
+so a later op on the same entry carries the version the earlier one produced:
+
 ```json
 {
   "ops": [
@@ -227,6 +257,32 @@ of each earmark in `fromJobOrders` and `fromMissions` (`[{jobOrder, quantity}]`,
       "version": 3,
       "quantity": {"amount": 14, "unit": "SCU"},
       "fromJobOrders": [{"jobOrder": "4b2d6f80-1a3c-4e57-9b0d-7c5e3a1f2d42", "quantity": {"amount": 2, "unit": "SCU"}}]
+    },
+    {
+      "op": "sell",
+      "unit": "7d1c2f4e-3b8a-4c55-9e21-6a0f3b2d9c10",
+      "entry": "1f3e5a7c-9b2d-4c64-8e0a-3d5f7b9c1e75",
+      "version": 0,
+      "quantity": {"amount": 6, "unit": "SCU"},
+      "terminal": "TDD Area18",
+      "proceeds": 48250
+    },
+    {
+      "op": "move-holder",
+      "unit": "7d1c2f4e-3b8a-4c55-9e21-6a0f3b2d9c10",
+      "entry": "1f3e5a7c-9b2d-4c64-8e0a-3d5f7b9c1e75",
+      "version": 1,
+      "quantity": {"amount": 4, "unit": "SCU"},
+      "toUnit": "7d1c2f4e-3b8a-4c55-9e21-6a0f3b2d9c10",
+      "holder": "q0Fh3kB9xV7m2LwP5nR8tY1cZ4dE6gJ0sU3aH7bK9fM"
+    },
+    {
+      "op": "stolen",
+      "unit": "7d1c2f4e-3b8a-4c55-9e21-6a0f3b2d9c10",
+      "entry": "9a7c2e10-4f3b-4d21-8c6e-2b1a0f9d8e31",
+      "version": 4,
+      "stolen": true,
+      "quantity": {"amount": 2, "unit": "SCU"}
     }
   ]
 }
@@ -235,18 +291,19 @@ of each earmark in `fromJobOrders` and `fromMissions` (`[{jobOrder, quantity}]`,
 ### The result
 
 A [change result](../schemas/) as for every write: an applied op is counted, an op that was not is
-listed with its reason. The new entry of a `book-in` and the changed entry of a `book-out` reach you
-through the feed. `dryRun: true` checks every op without writing.
+listed with its reason. The entries an op created or changed reach you through the feed.
+`dryRun: true` checks every op without writing.
 
 | Reason | Op | Meaning |
 | --- | --- | --- |
-| `NOT_PERMITTED` | both | The pool is not one of the member's Logistician units, or the entry is unknown, personal or in another pool. |
-| `HOLDER_UNKNOWN` | `book-in` | `holder` is not on the unit's roster: not a direct member, withholding their name, or not a ref of your client. Read the roster again. |
-| `VERSION_CONFLICT` | `book-out` | The entry changed since you read it; an earlier op of the same change set counts. Pull the feed and retry. |
-| `INSUFFICIENT_STOCK` | `book-out` | The entry holds less than `quantity`. |
-| `STOCK_EARMARKED` | `book-out` | The part of `quantity` that `fromJobOrders` and `fromMissions` do not cover is earmarked, or pledged as a donation. |
+| `NOT_PERMITTED` | all | The pool, or the `toUnit` of a `move-holder`, is not one of the member's Logistician units; the entry is unknown, personal or in another pool; or a `move-holder` names the entry's own holder for another pool. |
+| `HOLDER_UNKNOWN` | `book-in`, `move-holder` | `holder` is not on the roster of the receiving unit: not a direct member, withholding their name, or not a ref of your client. Read the roster again. |
+| `VERSION_CONFLICT` | all but `book-in` | The entry changed since you read it; an earlier op of the same change set counts. Pull the feed and retry. |
+| `INSUFFICIENT_STOCK` | all but `book-in`, `note` | The entry holds less than `quantity`. |
+| `STOCK_EARMARKED` | `book-out`, `sell`, moves, `stolen` | The part of `quantity` that `fromJobOrders` and `fromMissions` do not cover is earmarked, or pledged as a donation; for a partial `stolen`, the rest of the entry would hold less than its earmarks. |
+| `STOCK_OFFERED` | `stolen` | The rest of the entry after a partial `stolen` would hold less than it offers on the Basetool's material exchange. |
 | `OVER_ALLOCATION` | `book-in` | The earmarks of one kind add up to more than `quantity`. |
-| `EARMARK_TARGET_INVALID` | both | An earmark names a job order that does not need the material or item, an unknown mission, a mission for an item, a target twice, or — in a book-out — a target the entry is not earmarked to or more than it holds there. |
+| `EARMARK_TARGET_INVALID` | `book-in`, `book-out`, `sell`, moves | An earmark names a job order that does not need the material or item, an unknown mission, a mission for an item, a target twice, or — when taking from an entry — a target the entry is not earmarked to or more than it holds there. |
 | `UNIT_MISMATCH`, `LOCATION_UNKNOWN`, `STOLEN_MARKING_DISABLED`, `UNMATCHED`, `AMBIGUOUS` | as for [stock](stock.md) | |
 
 An undo of org-stock writes under *Connected applications* is not offered yet; the journal keeps

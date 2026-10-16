@@ -1871,8 +1871,8 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   sets members confirmed, by client and resource; shown on panel 80 beside the gateway's staged count
   (REQ-XCH-021).
 - `basetool_exchange_removals_total{client_id,resource}` counter — removals clients committed to
-  members' entries, every org-stock book-out included (`org_stock`), counted by the journal after
-  commit; `ExchangeRemoveSpike` fires above 100 an hour
+  members' entries, every org-stock book-out, sale and move into another pool included
+  (`org_stock`), counted by the journal after commit; `ExchangeRemoveSpike` fires above 100 an hour
   for one client (REQ-XCH-028).
 - `basetool_exchange_installations_created_total{client_id}` counter — installations seen for the
   first time; `ExchangeInstallationSurge` fires above 20 an hour for one client (REQ-XCH-007,

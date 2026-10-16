@@ -228,8 +228,9 @@ requires it and duplicating it into further files spreads personal data for no g
   member roster (REQ-XCH-045, built). A member who withholds their name is left out of both; their
   entries stay, without name, pseudonym or note. A client approved for the writes
   (`exchange.orgstock.write`, REQ-XCH-045, built) lets that Logistician book stock in for a member of
-  the unit and book members' shared entries out, as the web lets them; the Lager audit names the
-  writer and the client, the holder is notified of a book-out as in the web, and the journal of the
+  the unit and book out, sell, move, annotate and mark members' shared entries, as the web lets them;
+  the Lager audit names the writer and the client, the holders are notified of a book-out, sale or
+  move as in the web, and the journal of the
   writer records each changed entry — holder id, unit, lot, amount, version and earmarks, never the
   note — for the 90-day undo window; the writer's data export shows those rows without the holder's
   id. The privacy notice („Verbundene Anwendungen") names this and the setting; the legal basis
