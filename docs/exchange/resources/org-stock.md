@@ -126,9 +126,9 @@ lot when the pool no longer holds any of it. Store the new `nextCursor` after ev
 A lot changes when someone books stock into or out of the pool, moves it to another place, holder or
 unit, changes its quality, its stolen marker or its note, rebooks it between personal and shared,
 or earmarks it for a job order or a mission. For the entries it also changes when a holder's name
-changes or they start or stop withholding it, and when an earmarked mission is renamed. A tombstone names the channel that removed the lot and,
-for a client, its `clientId`; `installationId` is set only when one of the member's own
-installations removed it.
+changes or they start or stop withholding it, and when an earmarked mission is renamed. A
+tombstone names the channel that removed the lot and, for a client, its `clientId`;
+`installationId` is set only when one of the member's own installations removed it.
 
 Every feed page lists `units` too. Drop the lots of a unit that is no longer listed. When the
 member joins a unit, the feed delivers every lot of its pool, so you never need a new snapshot for
