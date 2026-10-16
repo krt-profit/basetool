@@ -68,11 +68,12 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public void lockLots(
-      @NotNull Map<UUID, Set<String>> holderLots, @NotNull Collection<UUID> entryIds) {
+      @NotNull Map<UUID, List<StockLot>> holderLots, @NotNull Collection<UUID> entryIds) {
     Set<Long> keys = new TreeSet<>();
+    Set<UUID> rows = new TreeSet<>();
     holderLots.forEach(
         (holder, lots) ->
-            lots.forEach(lot -> keys.add(InventoryStockCommands.lotLockKey(holder, lot))));
+            lots.forEach(lot -> keys.add(InventoryStockCommands.lotLockKey(holder, lot.key()))));
     if (!entryIds.isEmpty()) {
       for (InventoryItemRepository.RowLot row : inventoryRepository.findRowLots(entryIds)) {
         String lot =
@@ -83,9 +84,36 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
                 row.getQuality(),
                 Boolean.TRUE.equals(row.getStolen()));
         keys.add(InventoryStockCommands.lotLockKey(row.getHolderId(), lot));
+        rows.add(row.getId());
       }
     }
-    keys.forEach(inventoryRepository::lockExchangeLot);
+    InventoryStockCommands.lockInOrder(inventoryRepository, keys);
+    holderLots.forEach((holder, lots) -> lots.forEach(lot -> rows.addAll(lotRowIds(holder, lot))));
+    if (!rows.isEmpty()) {
+      inventoryRepository.lockAllByIdOrderById(rows);
+    }
+  }
+
+  /**
+   * Reads the ids of a holder's rows of a lot, personal and shared, without locking them.
+   *
+   * @param holder the holder
+   * @param lot the lot
+   * @return the row ids
+   */
+  private @NotNull List<UUID> lotRowIds(@NotNull UUID holder, @NotNull StockLot lot) {
+    return lot.material() != null
+        ? inventoryRepository.findMaterialLotRowIds(
+            holder,
+            lot.material().getId(),
+            lot.location().getId(),
+            lot.quality() == null ? 0 : lot.quality(),
+            lot.stolen())
+        : inventoryRepository.findItemLotRowIds(
+            holder,
+            Objects.requireNonNull(lot.gameItem()).getId(),
+            lot.location().getId(),
+            lot.stolen());
   }
 
   @Override

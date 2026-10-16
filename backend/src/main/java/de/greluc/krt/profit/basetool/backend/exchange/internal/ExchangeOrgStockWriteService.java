@@ -19,8 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.APPLIED;
+import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.REJECTED;
+import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.UNCHANGED;
+import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.round;
+
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemRef;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockChangeSet;
@@ -39,7 +43,6 @@ import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -50,7 +53,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -85,10 +87,6 @@ public class ExchangeOrgStockWriteService {
 
   /** The refusal of a quantity whose unit is not the material's. */
   static final String UNIT_MISMATCH = "UNIT_MISMATCH";
-
-  private static final String UNCHANGED = "unchanged";
-  private static final String REJECTED = "rejected";
-  private static final String APPLIED = "applied";
 
   private final ExchangeOrgUnitService orgUnitService;
   private final ExchangeOrgStockRoster roster;
@@ -373,14 +371,14 @@ public class ExchangeOrgStockWriteService {
    * @param plan the plan
    */
   private void lock(@NotNull List<Planned> plan) {
-    Map<UUID, Set<String>> holderLots = new HashMap<>();
+    Map<UUID, List<StockLot>> holderLots = new HashMap<>();
     Set<UUID> entries = new HashSet<>();
     for (Planned planned : plan) {
       switch (planned) {
         case BookIn bookIn ->
             holderLots
-                .computeIfAbsent(bookIn.request().holder(), _ -> new TreeSet<>())
-                .add(bookIn.request().lot().key());
+                .computeIfAbsent(bookIn.request().holder(), _ -> new ArrayList<>())
+                .add(bookIn.request().lot());
         case BookOut bookOut -> entries.add(bookOut.request().entryId());
         case Skip _ -> {}
       }
@@ -498,17 +496,6 @@ public class ExchangeOrgStockWriteService {
       }
     }
     return List.copyOf(earmarks);
-  }
-
-  /**
-   * Rounds an amount to its unit: three decimals for SCU, whole pieces otherwise.
-   *
-   * @param amount the amount
-   * @param unit the unit
-   * @return the rounded amount
-   */
-  private static @NotNull BigDecimal round(@NotNull BigDecimal amount, @NotNull String unit) {
-    return amount.setScale(QuantityType.SCU.name().equals(unit) ? 3 : 0, RoundingMode.HALF_UP);
   }
 
   /**

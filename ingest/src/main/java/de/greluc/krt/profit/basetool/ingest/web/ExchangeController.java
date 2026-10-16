@@ -701,9 +701,9 @@ public class ExchangeController {
    * Checks a change set, relays it and checks the answer; a change set of more than {@value
    * #LARGE_CHANGE_SET_OPS} ops is relayed within the large-set bulkhead, whose {@code RELAY_BUSY}
    * refusal gives the write's quota count back, and one the backend's mass-change guard held back
-   * is staged for the member's confirmation. Where every op counts, the ops after the first are
-   * counted against the daily write quota once the change set matches its schema, and a change set
-   * over the quota is refused with them given back.
+   * is staged for the member's confirmation. Where every op counts, the ops after the first of a
+   * change set that is not a dry run are counted against the daily write quota once it matches its
+   * schema, and a change set over the quota is refused with them given back.
    *
    * @param resource the resource: {@code org-stock}, or the segment below {@code /me} of a member
    *     resource
@@ -741,7 +741,10 @@ public class ExchangeController {
     if (unreportable != null) {
       return unreportable;
     }
-    if (everyOpCounts && body.get("ops") instanceof ArrayNode ops && ops.size() > 1) {
+    if (everyOpCounts
+        && !body.path("dryRun").asBoolean(false)
+        && body.get("ops") instanceof ArrayNode ops
+        && ops.size() > 1) {
       ResponseEntity<?> overQuota = countFurtherOps(context, request, ops.size() - 1L);
       if (overQuota != null) {
         return overQuota;

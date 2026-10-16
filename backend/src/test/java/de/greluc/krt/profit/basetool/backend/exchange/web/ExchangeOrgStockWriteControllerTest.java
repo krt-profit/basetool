@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
+import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportService;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
@@ -65,6 +66,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * A Logistician of a pool books stock in for a member of the unit and books another member's entry
@@ -88,6 +90,8 @@ class ExchangeOrgStockWriteControllerTest {
   @Autowired private ExchangeSettingsRepository settingsRepository;
   @Autowired private KnownExchangeClients knownClients;
   @Autowired private MeterRegistry meterRegistry;
+  @Autowired private DataExportService dataExportService;
+  @Autowired private JsonMapper jsonMapper;
   @Autowired private JdbcTemplate jdbc;
 
   private final List<UUID> users = new ArrayList<>();
@@ -229,6 +233,30 @@ class ExchangeOrgStockWriteControllerTest {
     assertThat(journal.get("removal")).isEqualTo(true);
     assertThat((String) journal.get("before_state")).contains("\"amount\":10.0");
     assertThat((String) journal.get("after_state")).contains("\"amount\":6.0");
+  }
+
+  @Test
+  void theWritersDataExportCarriesTheJournalWithoutTheHolder() throws Exception {
+    UUID staffel = orgUnit();
+    joins(member, staffel, true);
+    UUID entry = stock(holder, material("SCU"), location(), 10, staffel, false);
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), WRITE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(ops(bookOut(staffel, entry, 0, "4", "SCU"))))
+        .andExpect(status().isOk());
+    assertThat(
+            (String)
+                jdbc.queryForObject(
+                    "SELECT before_state FROM exchange_journal WHERE entity_key = ?",
+                    String.class,
+                    entry.toString()))
+        .contains(holder.toString());
+
+    String export = jsonMapper.writeValueAsString(dataExportService.export(member));
+
+    assertThat(export).contains("ORG_STOCK_BOOK_OUT").doesNotContain(holder.toString());
   }
 
   @Test

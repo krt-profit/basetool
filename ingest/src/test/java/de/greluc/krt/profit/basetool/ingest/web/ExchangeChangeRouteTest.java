@@ -170,6 +170,16 @@ class ExchangeChangeRouteTest {
   }
 
   @Test
+  void anOrgStockDryRunCountsOnlyAsOneWrite() throws Exception {
+    when(relay.forward(any(), anyString(), any(), any(), any())).thenReturn(ok(RESULT));
+    String dryRun = bookOuts(3).replace("{\"ops\"", "{\"dryRun\":true,\"ops\"");
+
+    post("/exchange/v1/org-stock/changes", dryRun).andExpect(status().isOk());
+
+    verify(quotas, never()).countFurtherOps(any(), anyLong());
+  }
+
+  @Test
   void anOrgStockChangeSetOfOneOpCountsNoFurtherOp() throws Exception {
     when(relay.forward(any(), anyString(), any(), any(), any())).thenReturn(ok(RESULT));
 

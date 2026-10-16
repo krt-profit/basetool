@@ -1362,6 +1362,61 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   List<RowLot> findRowLots(@Param("ids") Collection<UUID> ids);
 
   /**
+   * Reads the ids of a member's rows of one material lot, personal and shared, without locking
+   * them.
+   *
+   * @param member the member
+   * @param materialId the material
+   * @param locationId the location
+   * @param quality the quality
+   * @param stolen whether the lot is stolen
+   * @return the row ids
+   */
+  @Query(
+      """
+      SELECT i.id FROM InventoryItem i WHERE i.user.id = :member
+        AND i.material.id = :materialId AND i.location.id = :locationId
+        AND i.quality = :quality AND i.stolen = :stolen
+      """)
+  List<UUID> findMaterialLotRowIds(
+      @Param("member") UUID member,
+      @Param("materialId") UUID materialId,
+      @Param("locationId") UUID locationId,
+      @Param("quality") int quality,
+      @Param("stolen") boolean stolen);
+
+  /**
+   * Reads the ids of a member's rows of one item lot, personal and shared, without locking them.
+   *
+   * @param member the member
+   * @param gameItemId the item
+   * @param locationId the location
+   * @param stolen whether the lot is stolen
+   * @return the row ids
+   */
+  @Query(
+      """
+      SELECT i.id FROM InventoryItem i WHERE i.user.id = :member
+        AND i.gameItem.id = :gameItemId AND i.location.id = :locationId AND i.stolen = :stolen
+      """)
+  List<UUID> findItemLotRowIds(
+      @Param("member") UUID member,
+      @Param("gameItemId") UUID gameItemId,
+      @Param("locationId") UUID locationId,
+      @Param("stolen") boolean stolen);
+
+  /**
+   * Locks the given rows in ascending id order, so two writers that share rows never lock them in
+   * opposite orders.
+   *
+   * @param ids the rows
+   * @return the rows, locked for the transaction
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT i FROM InventoryItem i WHERE i.id IN :ids ORDER BY i.id")
+  List<InventoryItem> lockAllByIdOrderById(@Param("ids") Collection<UUID> ids);
+
+  /**
    * Locks a member's rows of one item lot, personal and shared, for the exchange (REQ-XCH-016).
    *
    * @param member the member

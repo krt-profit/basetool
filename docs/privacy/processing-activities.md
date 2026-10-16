@@ -231,7 +231,8 @@ requires it and duplicating it into further files spreads personal data for no g
   the unit and book members' shared entries out, as the web lets them; the Lager audit names the
   writer and the client, the holder is notified of a book-out as in the web, and the journal of the
   writer records each changed entry — holder id, unit, lot, amount, version and earmarks, never the
-  note — for the 90-day undo window. The privacy notice („Verbundene Anwendungen") names this and the setting; the legal basis
+  note — for the 90-day undo window; the writer's data export shows those rows without the holder's
+  id. The privacy notice („Verbundene Anwendungen") names this and the setting; the legal basis
   is Art. 6(1)(f), coordinating the shared stock, and the setting is the member's objection.
 - **Legal basis:** Art. 6(1)(b) for the transfer the member asked for and the connection records;
   Art. 6(1)(f) for the journal and the audit attribution (detecting misuse, undoing it). The

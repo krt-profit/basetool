@@ -140,17 +140,19 @@ lot and a second cursor.
    book-out without a plan takes only the free part: the exchange never lets the Lager pick whose
    earmark shrinks.
 3. **Locks.** Every holder lot a batch touches — the book-ins' and the lot of every named entry, read
-   without a row lock — takes its advisory lock first, in one ascending pass, before any row is
-   locked (ADR-0229).
+   without a row lock — takes its advisory lock first, in one ascending pass; then the rows of those
+   lots and the named entries are locked together in ascending id order, so no Lager path that
+   locks rows can deadlock with the batch on its own row order (ADR-0229).
 4. **The roster is a query parameter.** `GET /exchange/v1/org-stock/members?unit=` instead of
    `…/units/{unit}/members`, so every path of the acting-member filter stays a literal
    (REQ-SEC-080); owner decision of the same day. The targets route follows the same shape.
 5. **Journal.** One row per Lager entry an op changed, keyed by the entry, under the writer; a
    merge journals each entry it folded away too, so the change can be reversed. The holder's note is
-   not journaled: the journal is part of the writer's data export. Until the undo is built (#2592),
+   not journaled, and the writer's data export shows the rows without the holder's id, since both
+   belong to another member. Until the undo is built (#2592),
    the member's and the admin's undo leave org-stock rows untouched and do not count them.
-6. **Every op counts.** The gateway counts an org-stock change set once at its limit filter and once
-   more for every further op after the schema check; a set that does not fit into the day's rest is
+6. **Every op counts.** The gateway counts an org-stock change set once at its limit filter and, unless
+   it is a dry run, once more for every further op after the schema check; a set that does not fit into the day's rest is
    refused `429 QUOTA_EXCEEDED` with the further ops given back.
 
 Rejected: an all-or-nothing batch that answers the first refusal for the whole request — the client

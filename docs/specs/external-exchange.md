@@ -2469,9 +2469,9 @@ a stale one is refused `VERSION_CONFLICT` for that op (see *Per op* below). Only
   Materialbörse offers follow, the web's notifications are sent, peers see the change live
   (REQ-XCH-030), and the Lager audit records each op with the writer and the external client.
 - Each op counts toward the client's writes per day (REQ-XCH-023): the gateway counts the write
-  once at the limit filter and every further op once the change set matches its schema, a `dryRun`
-  included; a change set that does not fit into the day's rest is `429 QUOTA_EXCEEDED` with the
-  further ops given back.
+  once at the limit filter and, unless it is a `dryRun`, every further op once the change set
+  matches its schema; a change set that does not fit into the day's rest is `429 QUOTA_EXCEEDED`
+  with the further ops given back.
 - **Per op, as for ships.** The ops run in their order, each on its own: an op that is refused is
   reported in the change result as `rejected` with its reason and changes nothing, and the rest of the
   batch still applies. The reasons are `NOT_PERMITTED`, `HOLDER_UNKNOWN` (a `book-in` holder not on
@@ -2479,7 +2479,8 @@ a stale one is refused `VERSION_CONFLICT` for that op (see *Per op* below). Only
   deduct-from plan does not cover lies in an earmark or a donation pledge; without a plan only the
   free part can be booked out), `OVER_ALLOCATION`, `EARMARK_TARGET_INVALID`, and those of
   REQ-XCH-016 for the material, the place and the unit. The Lager decides its own refusals
-  (`PoolEntryCommands`); every holder lot the batch touches is locked first (ADR-0229). `dryRun`
+  (`PoolEntryCommands`); every holder lot the batch touches takes its advisory lock first, then all
+their rows are locked in ascending id order (ADR-0229). `dryRun`
   checks every op without writing.
 - **Wire shape.** `change-set.schema.json#/$defs/orgStockChangeSet`; the answer is
   `change-result.schema.json`. Ids of units, entries, job orders and missions are the ones the org
@@ -2501,8 +2502,8 @@ a stale one is refused `VERSION_CONFLICT` for that op (see *Per op* below). Only
 - [x] A stale version is `VERSION_CONFLICT`, earmarked stock is protected unless the book-out names
   the earmark, and a replayed idempotency key returns the first result (the gateway's filter, as for
   every write). *`ExchangeOrgStockWriteControllerTest`, `ExchangeIdempotencyFilterTest`.*
-- [x] Every op counts toward the writes per day; a change set over the quota is refused with its
-  further ops given back. *`ExchangeChangeRouteTest`, `ExchangeStoreRedisIntegrationTest`.*
+- [x] Every op counts toward the writes per day, a dry run once; a change set over the quota is
+  refused with its further ops given back. *`ExchangeChangeRouteTest`, `ExchangeStoreRedisIntegrationTest`.*
 - [x] The roster leaves out members who withhold their name and refuses a unit the writer is not a
   Logistician of. *`ExchangeOrgStockWriteControllerTest`, `ExchangeOrgStockRouteTest`.* The targets
   follow with #2591.
@@ -2527,7 +2528,8 @@ the threshold is held for confirmation in the writer's browser.
 *Journal (#2589).* Every applied `book-in` and `book-out` writes one `exchange_journal` row per
 Lager entry it changed (`resource = ORG_STOCK`, actions `ORG_STOCK_BOOK_IN` / `ORG_STOCK_BOOK_OUT`,
 keyed by the entry id) under the writer, with the entry's holder, pool, lot key, amount, version
-and earmarks before and after — not the holder's note, which would reach the writer's data export; a merge also journals each entry it folded away. A book-out
+and earmarks before and after — not the holder's note; the writer's data export shows these rows
+without the holder; a merge also journals each entry it folded away. A book-out
 counts as a removal (`basetool_exchange_removals_total{resource="org_stock"}`). Until the undo
 below is built, the member's undo and the admin's bulk undo leave org-stock rows untouched and do
 not count them.

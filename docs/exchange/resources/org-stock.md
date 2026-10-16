@@ -162,8 +162,8 @@ With `exchange.orgstock.write`, a member who is a **Logistician of a unit** (see
 books stock into that unit's pool for any member of the unit and books any entry of the pool out,
 as the Basetool's warehouse lets them. Send a change set to `POST /exchange/v1/org-stock/changes`
 with an `Idempotency-Key`, as for every write ([sync guide](../sync-guide.md)). The ops run one after
-the other in one request; **each op counts against the daily write quota**, and a change set that
-would exceed it is refused `429 QUOTA_EXCEEDED` as a whole. Every write is checked and booked by the
+the other in one request; **each op counts against the daily write quota** (a `dryRun` counts once),
+and a change set that would exceed it is refused `429 QUOTA_EXCEEDED` as a whole. Every write is checked and booked by the
 Basetool's warehouse with its own rules: reservations stay protected, linked Materialbörse offers are
 lowered, the holder is notified of a book-out by someone else, the Basetool's warehouse audit names
 the member and your client, and every change is journaled under the member.

@@ -19,13 +19,17 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.APPLIED;
+import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.REJECTED;
+import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.UNCHANGED;
+import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.round;
+
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStockChangeSet;
@@ -39,7 +43,6 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -84,9 +87,6 @@ public class ExchangeStockWriteService {
   private static final BigDecimal REMOVAL_SHARE = new BigDecimal("0.1");
 
   private static final Pattern LOT_KEY_SEPARATOR = Pattern.compile("\\|");
-  private static final String UNCHANGED = "unchanged";
-  private static final String REJECTED = "rejected";
-  private static final String APPLIED = "applied";
   private static final String HELD = "held";
   private static final String CLIENT_CHANNEL = "client";
 
@@ -732,17 +732,6 @@ public class ExchangeStockWriteService {
       free = free.add(BigDecimal.valueOf(Math.max(0.0, row.getAmount() - reserved)));
     }
     return free;
-  }
-
-  /**
-   * Rounds an amount to its unit: three decimals for SCU, whole pieces otherwise.
-   *
-   * @param amount the amount
-   * @param unit the unit
-   * @return the rounded amount
-   */
-  private static @NotNull BigDecimal round(@NotNull BigDecimal amount, @NotNull String unit) {
-    return amount.setScale(QuantityType.SCU.name().equals(unit) ? 3 : 0, RoundingMode.HALF_UP);
   }
 
   /**

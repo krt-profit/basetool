@@ -78,9 +78,14 @@ public class ExchangeExportSections implements PersonalDataExportSection {
                 "exchangeJournal",
                 ART_15,
                 "Recorded for every write an external client made to the member's synced data, with"
-                    + " the entry before and after, so the member can undo it; kept 90 days.",
+                    + " the entry before and after, so the member can undo it; an org-stock entry"
+                    + " without its holder, another member; kept 90 days.",
                 """
-                SELECT client_id, resource, entity_key, action, before_state, after_state,
+                SELECT client_id, resource, entity_key, action,
+                       CASE WHEN resource = 'ORG_STOCK' THEN (before_state::jsonb - 'holder')::text
+                            ELSE before_state END AS before_state,
+                       CASE WHEN resource = 'ORG_STOCK' THEN (after_state::jsonb - 'holder')::text
+                            ELSE after_state END AS after_state,
                        recorded_at, undone_at
                 FROM exchange_journal WHERE user_id = :userId ORDER BY recorded_at
                 """)

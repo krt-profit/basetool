@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.backend.inventory.api;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -41,13 +40,14 @@ public interface PoolEntryCommands {
 
   /**
    * Takes the advisory lot locks of every holder lot a batch touches, in ascending order of the
-   * lock keys, before any row is read (ADR-0229): the given holder lots, and the lot of each named
-   * entry as it is now.
+   * lock keys, before any row is read (ADR-0229) — the given holder lots and the lot of each named
+   * entry as it is now — and then locks the rows of those lots and the named entries in ascending
+   * id order.
    *
-   * @param holderLots the stock lot keys ({@link StockLot#key()}) a batch books into, by holder
+   * @param holderLots the lots a batch books into, by holder
    * @param entryIds the entries a batch books out of; an unknown id is left out
    */
-  void lockLots(@NotNull Map<UUID, Set<String>> holderLots, @NotNull Collection<UUID> entryIds);
+  void lockLots(@NotNull Map<UUID, List<StockLot>> holderLots, @NotNull Collection<UUID> entryIds);
 
   /**
    * Books stock in as a new shared entry of the pool held by {@code holder}, as the Lager's

@@ -192,8 +192,8 @@ mass-change window of your client.
 | Live DPoP proofs | 100 000 at a time (`503 SERVICE_UNAVAILABLE`) | gateway, over all members |
 
 Every attempt counts, retries and replays included — except a `503 EXCHANGE_BUDGET_EXHAUSTED`,
-which gives its write back. An org-stock change set counts once more for every op after its first
-once it matches its schema; one that does not fit into the day's rest is refused
+which gives its write back. An org-stock change set that is not a dry run counts once more for every
+op after its first once it matches its schema; one that does not fit into the day's rest is refused
 `429 QUOTA_EXCEEDED` and keeps only its first count, and a replay of its `Idempotency-Key` counts once. Admitted answers carry `RateLimit` and
 `RateLimit-Policy` headers for the member's per-minute limit; slow down before it runs out. The
 per-IP limit is checked first, before the token is read: every member and client behind one address

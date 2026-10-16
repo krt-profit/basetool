@@ -8,7 +8,8 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
 - **New: org-stock writes.** Under the new scope `exchange.orgstock.write`, a Logistician of a unit
   books stock into the unit's pool for a member of the unit (`book-in`) and books an entry out
   (`book-out`) through `POST /exchange/v1/org-stock/changes`; `GET /exchange/v1/org-stock/members`
-  lists the unit's roster to name the holder from. Each op counts against the daily write quota
+  lists the unit's roster to name the holder from. Each op counts against the daily write quota, a
+  dry run once
   ([org stock](resources/org-stock.md#writing)). New: `change-set.schema.json#/$defs/orgStockChangeSet`
   and `org-stock-members.schema.json`; new per-op reasons `NOT_PERMITTED`, `HOLDER_UNKNOWN`,
   `INSUFFICIENT_STOCK`, `OVER_ALLOCATION` and `EARMARK_TARGET_INVALID`.
