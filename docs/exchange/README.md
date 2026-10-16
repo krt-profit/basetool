@@ -31,6 +31,7 @@ the registry grants it to the client.
 | `exchange.demand.read` | the anonymous open demand of the member's units |
 | `exchange.orgunits.read` | the org units the member directly belongs to |
 | `exchange.orgstock.read` | the shared warehouse stock of those units, one pool per unit |
+| `exchange.orgstock.details` | with `.read`, the single named entries in the pools of units where the member is a Logistician |
 | `exchange.drafts.blueprints` / `.refinery` | staging blueprints or refinery orders for review in the browser |
 
 `catalog/resolve` and `catalog/locations` are open to any exchange scope.

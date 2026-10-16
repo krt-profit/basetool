@@ -20,8 +20,10 @@
 package de.greluc.krt.profit.basetool.backend.exchange.internal.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import java.util.List;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * One org-stock lot: one unit's shared stock of one material or item at one location, quality and
@@ -36,6 +38,8 @@ import org.jetbrains.annotations.Nullable;
  * @param stolen whether the lot is marked stolen
  * @param quantity the summed amount with its unit
  * @param earmarked the amounts earmarked to job orders and to missions
+ * @param entries the single rows, only in a pool of the member's Logistician units under {@code
+ *     exchange.orgstock.details} (REQ-XCH-043), else {@code null}
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ExchangeOrgStockLotDto(
@@ -47,4 +51,5 @@ public record ExchangeOrgStockLotDto(
     int quality,
     boolean stolen,
     @NotNull ExchangeQuantityDto quantity,
-    @NotNull ExchangeEarmarkedDto earmarked) {}
+    @NotNull ExchangeEarmarkedDto earmarked,
+    @Nullable @Unmodifiable List<ExchangeOrgStockEntryDto> entries) {}

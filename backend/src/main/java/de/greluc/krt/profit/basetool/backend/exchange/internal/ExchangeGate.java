@@ -147,6 +147,30 @@ public class ExchangeGate {
   }
 
   /**
+   * Tells whether a request this gate already admitted also holds a further capability, relayed and
+   * granted, without refusing it otherwise.
+   *
+   * @param capability the further capability
+   * @param authentication the admitted relayed authentication
+   * @return {@code true} when the capability was relayed and the client is granted it
+   */
+  @Transactional(readOnly = true)
+  public boolean holds(
+      @NotNull ExchangeCapability capability, @NotNull Authentication authentication) {
+    String authority = Roles.EXCHANGE_CAPABILITY_PREFIX + capability.getScope();
+    if (!(authentication instanceof SubjectAuthentication subject)
+        || subject.externalClient() == null
+        || authentication.getAuthorities().stream()
+            .noneMatch(a -> authority.equals(a.getAuthority()))) {
+      return false;
+    }
+    return clientRepository
+        .findWithCapabilitiesByClientId(subject.externalClient())
+        .map(client -> client.getCapabilities().contains(capability))
+        .orElse(false);
+  }
+
+  /**
    * Returns the scopes both relayed and granted, after the relay, switch and client checks.
    *
    * @param authentication the current authentication

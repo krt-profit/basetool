@@ -148,14 +148,14 @@ class ExchangeChangeRetentionServiceTest {
         ExchangeFeedCursor.feed(new ExchangeFeedPosition(horizon.tx(), horizon.seq() - 1)).format();
     String at = ExchangeFeedCursor.feed(horizon).format();
 
-    assertThatThrownBy(() -> orgStockService.page(caller, below, 10))
+    assertThatThrownBy(() -> orgStockService.page(caller, below, 10, false))
         .isInstanceOfSatisfying(
             ExchangeProblemException.class,
             e -> {
               assertThat(e.code()).isEqualTo("CURSOR_EXPIRED");
               assertThat(e.status()).isEqualTo(HttpStatus.GONE);
             });
-    assertThat(orgStockService.page(caller, at, 10).units())
+    assertThat(orgStockService.page(caller, at, 10, false).units())
         .extracting(ExchangeOrgUnitDto::id)
         .containsExactly(pool);
   }

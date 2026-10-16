@@ -22,10 +22,11 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal.dto;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * The part of an org-stock lot earmarked per dimension, in the lot's unit (REQ-XCH-042).
+ * An amount per earmark dimension of an org-stock lot or entry, in the lot's unit: the earmarked
+ * part of a lot (REQ-XCH-042) or the free part of an entry (REQ-XCH-043).
  *
- * @param jobOrders the amount earmarked to job orders, zero when none
- * @param missions the amount earmarked to missions, zero when none
+ * @param jobOrders the amount for the job-order dimension
+ * @param missions the amount for the mission dimension
  */
 public record ExchangeEarmarkedDto(
     @NotNull ExchangeQuantityDto jobOrders, @NotNull ExchangeQuantityDto missions) {}

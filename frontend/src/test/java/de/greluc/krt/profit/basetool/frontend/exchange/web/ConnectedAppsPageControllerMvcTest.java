@@ -176,12 +176,12 @@ class ConnectedAppsPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
-  void theOrgStockCapabilityIsNamedInGermanAndEnglish() throws Exception {
+  void theOrgStockCapabilitiesAreNamedInGermanAndEnglish() throws Exception {
     ConnectedAppDto app =
         new ConnectedAppDto(
             "versekit",
             "VerseKit",
-            List.of("exchange.connect", "exchange.orgstock.read"),
+            List.of("exchange.connect", "exchange.orgstock.read", "exchange.orgstock.details"),
             List.of(new ConnectedInstallationDto(INSTALLATION, "Desktop", null, null, false)),
             List.of());
     when(backendApiClient.get(eq("/api/v1/connected-apps"), anyTypeRef())).thenReturn(List.of(app));
@@ -192,6 +192,12 @@ class ConnectedAppsPageControllerMvcTest {
         .andExpect(
             content()
                 .string(containsString("Gemeinsamen Lagerbestand der eigenen Einheiten lesen")))
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "mit Namen im gemeinsamen Lagerbestand der Einheiten lesen, in denen du"
+                            + " Logistiker bist")))
         .andExpect(content().string(not(containsString("??"))));
     mockMvc
         .perform(get("/connected-apps").param("lang", "en"))
@@ -199,6 +205,12 @@ class ConnectedAppsPageControllerMvcTest {
         .andExpect(
             content()
                 .string(containsString("Read the shared warehouse stock of your own org units")))
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "Read single entries with names in the shared warehouse stock of the org"
+                            + " units in which you are a logistician")))
         .andExpect(content().string(not(containsString("??"))));
   }
 

@@ -62,7 +62,10 @@ class ExchangeChangeFeedTriggerIntegrationTest {
           "inventory_item_mission_allocation",
           "ship",
           "org_unit",
-          "org_unit_membership");
+          "org_unit_membership",
+          "app_user",
+          "exchange_name_withholding",
+          "mission");
 
   @Autowired private JdbcTemplate jdbc;
   @Autowired private UserRepository userRepository;

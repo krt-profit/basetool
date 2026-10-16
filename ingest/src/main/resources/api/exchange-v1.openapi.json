@@ -307,6 +307,11 @@
           },
           {
             "memberToken": [
+              "exchange.orgstock.details"
+            ]
+          },
+          {
+            "memberToken": [
               "exchange.drafts.blueprints"
             ]
           },
@@ -412,6 +417,11 @@
           {
             "memberToken": [
               "exchange.orgstock.read"
+            ]
+          },
+          {
+            "memberToken": [
+              "exchange.orgstock.details"
             ]
           },
           {
@@ -937,6 +947,7 @@
             }
           }
         },
+        "description": "With exchange.orgstock.details in addition, every lot of a pool in which the member is a Logistician of the unit carries its single entries.",
         "parameters": [
           {
             "$ref": "#/components/parameters/DPoP"

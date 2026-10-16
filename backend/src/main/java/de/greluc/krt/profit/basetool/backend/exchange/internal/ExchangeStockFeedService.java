@@ -232,7 +232,7 @@ public class ExchangeStockFeedService {
    * @param name the name
    * @return the name, at most {@value #MAX_NAME} characters
    */
-  private static @NotNull String cut(@NotNull String name) {
+  static @NotNull String cut(@NotNull String name) {
     return name.length() > MAX_NAME ? name.substring(0, MAX_NAME) : name;
   }
 }

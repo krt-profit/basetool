@@ -116,7 +116,7 @@ class TableOwnershipTest {
   private static final int TABLE_FLOOR = 127;
 
   /** Today's user-defined trigger count; the sweep must see at least this many. */
-  private static final int TRIGGER_FLOOR = 22;
+  private static final int TRIGGER_FLOOR = 25;
 
   /** Today's count of native statements in repositories and entity formulas. */
   private static final int NATIVE_STATEMENT_FLOOR = 30;
@@ -131,54 +131,89 @@ class TableOwnershipTest {
 
   /** The triggers that reach another module's tables, keyed by trigger name. */
   static final Map<String, Crossing> CROSS_MODULE_TRIGGERS =
-      Map.of(
-          "trg_personal_blueprint_exchange_change",
-          new Crossing(
-              Set.of("exchange_change", "app_user"),
-              "V252 change feed: the exchange's key log is written with the blueprint row"
-                  + " (ADR-0224); app_user is read to skip an account being deleted."),
-          "trg_default_blueprint_exchange_change",
-          new Crossing(
-              Set.of("exchange_change", "app_user"),
-              "V252 change feed for every owner of a default blueprint's product (ADR-0224)."),
-          "trg_inventory_item_exchange_change",
-          new Crossing(
-              Set.of("exchange_change", "app_user", "org_unit"),
-              "V252/V260/V296 change feed: one entry per stock lot a row leaves or joins, and per"
-                  + " org-stock lot of the unit whose pool it changes (ADR-0224, REQ-XCH-042)."),
-          "trg_inventory_item_job_order_allocation_exchange_change",
-          new Crossing(
-              Set.of("exchange_change", "org_unit"),
-              "V296 org-stock feed: an earmark changes the lot of its shared row (REQ-XCH-042)."),
-          "trg_inventory_item_mission_allocation_exchange_change",
-          new Crossing(
-              Set.of("exchange_change", "org_unit"),
-              "V296 org-stock feed: an earmark changes the lot of its shared row (REQ-XCH-042)."),
-          "trg_org_unit_membership_exchange_change",
-          new Crossing(
-              Set.of("exchange_change", "inventory_item"),
-              "V296 org-stock feed: a member joining a unit receives its pool, read from"
-                  + " inventory_item (REQ-XCH-042)."),
-          "trg_ship_exchange_change",
-          new Crossing(
-              Set.of("exchange_change", "app_user"),
-              "V252 change feed: the ship id follows its owner (ADR-0224)."),
-          "trg_org_unit_exchange_change",
-          new Crossing(
-              Set.of("exchange_change", "app_user", "ship", "inventory_item"),
-              "V293/V296 change feed: a renamed unit re-announces its ships and the lots of its"
-                  + " pool, read from ship and inventory_item, so a client never keeps a stale unit"
-                  + " (REQ-XCH-017, REQ-XCH-042)."),
-          "trg_guard_promotion_topic_owner_kind",
-          new Crossing(
-              Set.of("org_unit"),
-              "Read-only guard that a topic's owning unit is a squadron; a downward read into"
-                  + " orgunit."),
-          "trg_guard_rank_requirement_owner_kind",
-          new Crossing(
-              Set.of("org_unit"),
-              "Read-only guard that a rank requirement's owning unit is a squadron; a downward"
-                  + " read into orgunit."));
+      Map.ofEntries(
+          Map.entry(
+              "trg_personal_blueprint_exchange_change",
+              new Crossing(
+                  Set.of("exchange_change", "app_user"),
+                  "V252 change feed: the exchange's key log is written with the blueprint row"
+                      + " (ADR-0224); app_user is read to skip an account being deleted.")),
+          Map.entry(
+              "trg_default_blueprint_exchange_change",
+              new Crossing(
+                  Set.of("exchange_change", "app_user"),
+                  "V252 change feed for every owner of a default blueprint's product (ADR-0224).")),
+          Map.entry(
+              "trg_inventory_item_exchange_change",
+              new Crossing(
+                  Set.of("exchange_change", "app_user", "org_unit"),
+                  "V252/V260/V296 change feed: one entry per stock lot a row leaves or joins, and"
+                      + " per org-stock lot of the unit whose pool it changes (ADR-0224,"
+                      + " REQ-XCH-042).")),
+          Map.entry(
+              "trg_inventory_item_job_order_allocation_exchange_change",
+              new Crossing(
+                  Set.of("exchange_change", "org_unit"),
+                  "V296 org-stock feed: an earmark changes the lot of its shared row"
+                      + " (REQ-XCH-042).")),
+          Map.entry(
+              "trg_inventory_item_mission_allocation_exchange_change",
+              new Crossing(
+                  Set.of("exchange_change", "org_unit"),
+                  "V296 org-stock feed: an earmark changes the lot of its shared row"
+                      + " (REQ-XCH-042).")),
+          Map.entry(
+              "trg_org_unit_membership_exchange_change",
+              new Crossing(
+                  Set.of("exchange_change", "inventory_item"),
+                  "V296 org-stock feed: a member joining a unit receives its pool, read from"
+                      + " inventory_item (REQ-XCH-042).")),
+          Map.entry(
+              "trg_app_user_exchange_change",
+              new Crossing(
+                  Set.of("exchange_change", "inventory_item", "org_unit"),
+                  "V297 org-stock feed: a renamed holder re-announces the lots they hold a shared"
+                      + " row in, read from inventory_item (REQ-XCH-043).")),
+          Map.entry(
+              "trg_exchange_name_withholding_exchange_change",
+              new Crossing(
+                  Set.of("inventory_item", "org_unit"),
+                  "V297 org-stock feed: switching the name withholding re-announces the holder's"
+                      + " lots, read from inventory_item (REQ-XCH-044).")),
+          Map.entry(
+              "trg_mission_exchange_change",
+              new Crossing(
+                  Set.of(
+                      "exchange_change",
+                      "inventory_item",
+                      "inventory_item_mission_allocation",
+                      "org_unit"),
+                  "V297 org-stock feed: a renamed mission re-announces the lots with an entry"
+                      + " earmarked to it, read from the allocation table (REQ-XCH-043).")),
+          Map.entry(
+              "trg_ship_exchange_change",
+              new Crossing(
+                  Set.of("exchange_change", "app_user"),
+                  "V252 change feed: the ship id follows its owner (ADR-0224).")),
+          Map.entry(
+              "trg_org_unit_exchange_change",
+              new Crossing(
+                  Set.of("exchange_change", "app_user", "ship", "inventory_item"),
+                  "V293/V296 change feed: a renamed unit re-announces its ships and the lots of its"
+                      + " pool, read from ship and inventory_item, so a client never keeps a stale"
+                      + " unit (REQ-XCH-017, REQ-XCH-042).")),
+          Map.entry(
+              "trg_guard_promotion_topic_owner_kind",
+              new Crossing(
+                  Set.of("org_unit"),
+                  "Read-only guard that a topic's owning unit is a squadron; a downward read into"
+                      + " orgunit.")),
+          Map.entry(
+              "trg_guard_rank_requirement_owner_kind",
+              new Crossing(
+                  Set.of("org_unit"),
+                  "Read-only guard that a rank requirement's owning unit is a squadron; a downward"
+                      + " read into orgunit.")));
 
   /**
    * The native statements that reach another module's tables, keyed {@code Owner#member}: a

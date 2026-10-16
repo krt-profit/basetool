@@ -212,7 +212,7 @@ public final class ExchangeSeam {
           INSTALLATION_HEADER,
           CONNECTED_AT_HEADER);
 
-  /** The twelve capability scopes. */
+  /** The thirteen capability scopes. */
   public static final @Unmodifiable Set<String> CAPABILITY_SCOPES =
       Set.of(
           CONNECT,
@@ -225,8 +225,16 @@ public final class ExchangeSeam {
           "exchange.demand.read",
           "exchange.orgunits.read",
           "exchange.orgstock.read",
+          "exchange.orgstock.details",
           "exchange.drafts.blueprints",
           "exchange.drafts.refinery");
+
+  /**
+   * The capability scopes that gate no route of their own and add to the answer of another route's
+   * capability (REQ-XCH-043).
+   */
+  public static final @Unmodifiable Set<String> ADDITIVE_SCOPES =
+      Set.of("exchange.orgstock.details");
 
   /**
    * The registry gate's codes, each with the only status either side answers it with (REQ-XCH-025).
