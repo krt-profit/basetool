@@ -715,6 +715,16 @@ first hit after that was missing from `Http5xxRateHigh`, `HttpLatencyP95High` an
   value as a URI variable (`ScWikiClient.fetchOne`: `/api/items/{id}`), so the client-side `uri` tag
   is the template. The backend keeps the default client cap of 100, which its few external
   templates stay far below; a raw id in the path blows through it within one sync run.
+- Every observed `RestClient` derives the client `uri` already scrubbed through
+  `ScrubbedClientRequestObservationConvention` (query cut, UUID and numeric segments as `{id}`):
+  the backend's builders and the ingest's relay and Keycloak clients.
+  `ObservationPrivacyFilter` only runs when an observation stops, but a `RestClient` tags the
+  `http.client.requests.active` long-task timer with the template when it starts, and that timer
+  falls under the same cap; without the convention every page of an SC Wiki walk
+  (`/api/items?page[number]=N…`) and every exchange feed cursor was a new `uri` there. The two
+  copies are held identical by `ObservationPrivacyFilterMirrorParityTest`. The frontend's
+  `WebClient` needs none: it starts the observation before it knows the template, so its `.active`
+  timer carries `uri=none`.
 - `HttpUriTagCapNear` (`apps.yml`, warning) fires when an application reports 900 distinct `uri`
   values on either meter for 15 minutes — the drift a test cannot see, such as a raw path leaking
   into the tag.

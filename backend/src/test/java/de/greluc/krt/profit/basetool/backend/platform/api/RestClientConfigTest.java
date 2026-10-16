@@ -22,9 +22,14 @@ package de.greluc.krt.profit.basetool.backend.platform.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.observation.DefaultMeterObservationHandler;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import java.time.Duration;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
@@ -140,6 +145,53 @@ class RestClientConfigTest {
       assertThat(server.getRequestCount()).isZero();
       assertThat(internal.get().uri("/ping").retrieve().body(String.class)).isEqualTo("ok");
     }
+  }
+
+  /**
+   * Two pages of the same endpoint share one {@code uri} tag on the timer and on the {@code
+   * .active} long-task timer, which is tagged at observation start before {@link
+   * ObservationPrivacyFilter} runs.
+   *
+   * @throws Exception if the mock server cannot be started
+   */
+  @Test
+  void pagesOfOneEndpointShareOneUriTagOnTheActiveTimer() throws Exception {
+    try (MockWebServer server = new MockWebServer()) {
+      server.enqueue(new MockResponse().setBody("ok"));
+      server.enqueue(new MockResponse().setBody("ok"));
+      server.start();
+      MeterRegistry meterRegistry = new SimpleMeterRegistry();
+      ObservationRegistry observationRegistry = ObservationRegistry.create();
+      observationRegistry
+          .observationConfig()
+          .observationHandler(new DefaultMeterObservationHandler(meterRegistry))
+          .observationFilter(new ObservationPrivacyFilter());
+      RestClient client =
+          new RestClientConfig()
+              .restClientBuilder(observationRegistry)
+              .baseUrl(server.url("/").toString())
+              .build();
+
+      client.get().uri("/api/items?page[number]=1&page[size]=200").retrieve().toBodilessEntity();
+      client.get().uri("/api/items?page[number]=2&page[size]=200").retrieve().toBodilessEntity();
+
+      assertThat(uriTags(meterRegistry, "http.client.requests.active"))
+          .containsExactly("/api/items");
+      assertThat(uriTags(meterRegistry, "http.client.requests")).containsExactly("/api/items");
+    }
+  }
+
+  /**
+   * Collects the distinct {@code uri} tag values of the meters with the given name.
+   *
+   * @param meterRegistry the registry to search
+   * @param name the exact meter name
+   * @return the distinct {@code uri} values
+   */
+  private static Set<String> uriTags(MeterRegistry meterRegistry, String name) {
+    return meterRegistry.find(name).meters().stream()
+        .map(meter -> meter.getId().getTag("uri"))
+        .collect(Collectors.toSet());
   }
 
   /**

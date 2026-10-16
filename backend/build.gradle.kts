@@ -185,6 +185,9 @@ tasks.named<Test>("test") {
         "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/kernel/observability/ObservationPrivacyFilter.java",
       ),
       layout.settingsDirectory.file(
+        "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/observability/ScrubbedClientRequestObservationConvention.java",
+      ),
+      layout.settingsDirectory.file(
         "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/relay/KeycloakTrustSupport.java",
       ),
       layout.settingsDirectory.file(

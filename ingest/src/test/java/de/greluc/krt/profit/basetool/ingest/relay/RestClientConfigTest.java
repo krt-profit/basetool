@@ -25,14 +25,19 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import de.greluc.krt.profit.basetool.ingest.config.ExchangeStoreProperties;
 import de.greluc.krt.profit.basetool.ingest.config.IngestProperties;
 import de.greluc.krt.profit.basetool.ingest.config.ServiceAccountProperties;
+import de.greluc.krt.profit.basetool.ingest.observability.ObservationPrivacyFilter;
 import de.greluc.krt.profit.basetool.ingest.support.TestLoggingProperties;
 import de.greluc.krt.profit.basetool.ingest.support.TestProperties;
 import de.greluc.krt.profit.basetool.ingest.support.TestSslBundles;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.observation.DefaultMeterObservationHandler;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import java.security.KeyStore;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
@@ -329,5 +334,53 @@ class RestClientConfigTest {
       assertThat(recorded.getRequestLine()).endsWith("HTTP/1.1");
       assertThat(recorded.getHeader("Upgrade")).isNull();
     }
+  }
+
+  @Test
+  void pagesOfOneFeedShareOneUriTagOnTheActiveTimer() throws Exception {
+    try (MockWebServer backend = new MockWebServer()) {
+      backend.enqueue(new MockResponse().setBody("{}"));
+      backend.enqueue(new MockResponse().setBody("{}"));
+      backend.start();
+      MeterRegistry meterRegistry = new SimpleMeterRegistry();
+      ObservationRegistry observationRegistry = ObservationRegistry.create();
+      observationRegistry
+          .observationConfig()
+          .observationHandler(new DefaultMeterObservationHandler(meterRegistry))
+          .observationFilter(new ObservationPrivacyFilter());
+      MockEnvironment environment = new MockEnvironment();
+      environment.setActiveProfiles("test");
+      RestClient client =
+          new RestClientConfig(
+                  properties(backend.url("/").toString(), false),
+                  TestProperties.serviceAccount(),
+                  environment,
+                  new DefaultSslBundleRegistry(),
+                  observationRegistry,
+                  new BackendCallLoggingInterceptor(TestLoggingProperties.defaults()))
+              .exchangeRestClient();
+
+      client
+          .get()
+          .uri("/api/v1/exchange/me/stock?cursor=c1&limit=50")
+          .retrieve()
+          .toBodilessEntity();
+      client
+          .get()
+          .uri("/api/v1/exchange/me/stock?cursor=c2&limit=50")
+          .retrieve()
+          .toBodilessEntity();
+
+      assertThat(uriTags(meterRegistry, "http.client.requests.active"))
+          .containsExactly("/api/v1/exchange/me/stock");
+      assertThat(uriTags(meterRegistry, "http.client.requests"))
+          .containsExactly("/api/v1/exchange/me/stock");
+    }
+  }
+
+  private static Set<String> uriTags(MeterRegistry meterRegistry, String name) {
+    return meterRegistry.find(name).meters().stream()
+        .map(meter -> meter.getId().getTag("uri"))
+        .collect(Collectors.toSet());
   }
 }

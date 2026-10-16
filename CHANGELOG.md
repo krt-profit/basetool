@@ -12,6 +12,8 @@
 
 ### Fixed
 
+- **Monitoring: SC-Wiki-Sync sprengt das `uri`-Limit nicht mehr.** Backend und Ingest bereinigen den `uri`-Tag ausgehender Anfragen schon beim Start; vorher legte der Laufzeit-Timer `http.client.requests.active` je Wiki-Seite oder Feed-Cursor einen neuen Tag-Wert an, bis Micrometer weitere Werte verwarf (REQ-OBS-006).
+
 - **Passwort vergessen: klarer, was einzugeben ist.** Die Seite fragt nach E-Mail-Adresse oder Benutzername und erklärt, dass bei Discord-Konten der Discord-Benutzername gilt (nicht Server-Nickname oder Anzeigename), und zwar der von der ersten Anmeldung (Keycloak-Theme, REQ-SEC-082).
 
 - **Anmeldung über Discord: Mitglieder kommen wieder ins Tool.** Seit dem Admin-OTP für Discord-Logins (13.10.) endete jede Discord-Anmeldung eines Nicht-Admins mit „Ungültiger Benutzername oder Passwort“. Der Post-Login-Flow erhält einen Pflichtschritt „Allow access“ vor dem Admin-OTP-Block; `scripts/harden-keycloak-realm.py` legt ihn an und meldet sein Fehlen (REQ-SEC-082).

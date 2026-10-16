@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.ingest.relay;
 
 import de.greluc.krt.profit.basetool.ingest.config.IngestProperties;
 import de.greluc.krt.profit.basetool.ingest.config.ServiceAccountProperties;
+import de.greluc.krt.profit.basetool.ingest.observability.ScrubbedClientRequestObservationConvention;
 import io.micrometer.observation.ObservationRegistry;
 import java.net.Socket;
 import java.net.http.HttpClient;
@@ -104,6 +105,7 @@ public class RestClientConfig {
         .baseUrl(ingestProperties.backendBaseUrl())
         .requestFactory(requestFactory(backendSslContext(), EXCHANGE_READ_TIMEOUT))
         .observationRegistry(observationRegistry)
+        .observationConvention(new ScrubbedClientRequestObservationConvention())
         .requestInterceptor(backendCallLoggingInterceptor)
         .requestInterceptor(new ResponseSizeLimitInterceptor(ingestProperties.maxPayloadBytes()))
         .build();
@@ -125,6 +127,7 @@ public class RestClientConfig {
     return RestClient.builder()
         .requestFactory(requestFactory(keycloakSslContext(), readTimeout))
         .observationRegistry(observationRegistry)
+        .observationConvention(new ScrubbedClientRequestObservationConvention())
         .build();
   }
 
