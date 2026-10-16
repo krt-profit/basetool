@@ -114,8 +114,12 @@ public class ExchangeOrgStockController {
       summary = "Exchange: book stock into and out of my units' pools",
       description =
           "Gateway-only. Each op names its pool; the member must be a Logistician of that unit."
-              + " An op on another pool, a personal entry or a stale version is refused per op.")
+              + " An op on another pool, a personal entry or a stale version is refused per op."
+              + " 409 MASS_CHANGE_CONFIRMATION_REQUIRED writes nothing.")
   @ApiResponse(responseCode = "200", description = "The result")
+  @ApiResponse(
+      responseCode = "409",
+      description = "The writer must confirm the batch (MASS_CHANGE_CONFIRMATION_REQUIRED)")
   public ResponseEntity<ExchangeChangeResultDto> orgStockChanges(
       @NotNull @Valid @RequestBody ExchangeOrgStockChangeSet changeSet,
       @NotNull Authentication authentication) {

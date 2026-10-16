@@ -1973,7 +1973,7 @@
     },
     "/api/v1/exchange/org-stock/changes" : {
       "post" : {
-        "description" : "Gateway-only. Each op names its pool; the member must be a Logistician of that unit. An op on another pool, a personal entry or a stale version is refused per op.",
+        "description" : "Gateway-only. Each op names its pool; the member must be a Logistician of that unit. An op on another pool, a personal entry or a stale version is refused per op. 409 MASS_CHANGE_CONFIRMATION_REQUIRED writes nothing.",
         "operationId" : "orgStockChanges",
         "requestBody" : {
           "content" : {

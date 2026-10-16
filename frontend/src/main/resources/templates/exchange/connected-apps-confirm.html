@@ -10,7 +10,7 @@
 <th:block th:fragment="pageContent">
 <main>
     <span id="cac-i18n" hidden
-          th:attr="data-error=#{notification.error.title},data-summary=#{connectedApps.confirmMass.summary},data-done=#{connectedApps.confirmMass.done},data-discarded=#{connectedApps.confirmMass.discarded},data-refused=#{connectedApps.confirmMass.refused},data-resource-blueprints=#{connectedApps.confirmMass.resource.blueprints},data-resource-stock=#{connectedApps.confirmMass.resource.stock},data-resource-ships=#{connectedApps.confirmMass.resource.ships}"></span>
+          th:attr="data-error=#{notification.error.title},data-summary=#{connectedApps.confirmMass.summary},data-done=#{connectedApps.confirmMass.done},data-discarded=#{connectedApps.confirmMass.discarded},data-refused=#{connectedApps.confirmMass.refused},data-resource-blueprints=#{connectedApps.confirmMass.resource.blueprints},data-resource-stock=#{connectedApps.confirmMass.resource.stock},data-resource-ships=#{connectedApps.confirmMass.resource.ships},data-resource-org-stock=#{connectedApps.confirmMass.resource.orgStock}"></span>
 
     <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='connectedApps.title', eyebrowHref=@{/connected-apps}, titleText=#{connectedApps.confirmMass.title})}"></th:block>
 

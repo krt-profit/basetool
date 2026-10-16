@@ -353,5 +353,22 @@ listed with its reason. The entries an op created or changed reach you through t
 | `EARMARK_TARGET_INVALID` | `book-in`, `book-out`, `sell`, moves, earmark ops | An earmark names a job order that does not need the material or item, an unknown mission, a mission for an item, a target twice, or — when taking from an entry — a target the entry is not earmarked to or more than it holds there; `allocation-add` names a target the entry is already earmarked to, `allocation-change` one it is not. |
 | `UNIT_MISMATCH`, `LOCATION_UNKNOWN`, `STOLEN_MARKING_DISABLED`, `UNMATCHED`, `AMBIGUOUS` | as for [stock](stock.md) | |
 
-An undo of org-stock writes under *Connected applications* is not offered yet; the journal keeps
-every change for it.
+### The mass-change guard
+
+Per pool, the Basetool counts the ops of a change set that take stock out of it — `book-out`,
+`sell`, `move-pool` and a `move-holder` into another pool — together with those your client made
+for the same member and pool in the last 24 hours. A change set that takes one pool above 25 such
+ops, or above a fifth of its entries with at least 5, writes nothing and answers
+`409 MASS_CHANGE_CONFIRMATION_REQUIRED` with a `confirmationUrl`; the member confirms it in the
+browser, as described in the [sync guide](../sync-guide.md#the-mass-change-guard). Each op counts
+once, whatever amount it takes; a move within the pool, a note, a marking and an earmark op do not
+count. A dry run is never held.
+
+### Undo
+
+The member can undo your client's org-stock writes under *Connected applications*, and an
+administrator can undo them for every member. Each entry goes back to what it was before your
+first write in the chosen span: entries you booked in disappear, entries you emptied come back
+under their old `id`, and the rest get back their holder, pool, place, amount and earmarks. An
+entry someone changed since your last write stays as it is. The undo does not bring back a note
+or a sale's proceeds. The changes reach you through the feed like any other.

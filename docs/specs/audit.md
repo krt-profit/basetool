@@ -90,6 +90,9 @@ web, naming its client (REQ-AUDIT-005):
   summary; an unchanged row records nothing, REQ-INV-053) /
   an exchange client's stock write (REQ-XCH-016: a book-in `INVENTORY_ITEM_CREATED`, a book-out the
   Lager's own `DISCARD` book-out, `INVENTORY_ITEM_CONSUMED`, a stolen flip the marker events above, each under the client's id) /
+  the undo of a client's org-stock writes (`INVENTORY_ITEM_RESTORED` per shared row it removed,
+  recreated or set back, with the amount afterwards and whether it was removed; an entry already as
+  restored records nothing, REQ-XCH-046) /
   global wipe; plus the cross-area writers (refinery store → `INVENTORY_RECEIVED_FROM_REFINERY`,
   job-order handover — material handover **and** item delivery consuming the order's earmarked item
   stock, REQ-ORDERS-030 → `INVENTORY_HANDED_OVER`, job-order item-production consumption →

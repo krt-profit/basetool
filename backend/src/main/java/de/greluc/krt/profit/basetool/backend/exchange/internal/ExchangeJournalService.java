@@ -130,6 +130,21 @@ public class ExchangeJournalService {
   }
 
   /**
+   * Counts a client's org-stock removals by one writer out of one pool within a window.
+   *
+   * @param caller the client and writer
+   * @param pool the pool's org unit
+   * @param since the start of the window
+   * @return the removals not undone
+   */
+  @Transactional(readOnly = true)
+  public long poolRemovalsSince(
+      @NotNull ExchangeCaller caller, @NotNull UUID pool, @NotNull Instant since) {
+    return journalRepository.countPoolRemovals(
+        caller.member(), caller.clientId(), pool.toString(), since);
+  }
+
+  /**
    * Deletes the entries past their retention.
    *
    * @param cutoff the oldest write still kept

@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipCommands;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
@@ -43,7 +44,9 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -66,10 +69,11 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Undoes a client's writes to the member's entries since a point in time (REQ-XCH-022): each entry
- * goes back to its state before the client's first write in that span, unless something else has
- * changed it since the client's last one; Materialbörse offers a book-out lowered stay lowered. An
- * admin's bulk undo runs the same per member (REQ-XCH-034).
+ * Undoes a client's writes since a point in time (REQ-XCH-022, REQ-XCH-046) — to the member's own
+ * entries and to the org-stock entries the member wrote as a Logistician: each entry goes back to
+ * its state before the client's first write in that span, unless something else has changed it
+ * since the client's last one; Materialbörse offers a book-out lowered stay lowered. An admin's
+ * bulk undo runs the same per member (REQ-XCH-034).
  */
 @Service
 @RequiredArgsConstructor
@@ -93,6 +97,8 @@ public class ExchangeUndoService {
   private final PersonalBlueprintCommands blueprintService;
   private final ExchangeStockWriteService stockWriteService;
   private final StockCommands stockCommands;
+  private final PoolEntryCommands poolEntryCommands;
+  private final ExchangeOrgUnitService orgUnitService;
   private final ShipRepository shipRepository;
   private final ShipTypeRepository shipTypeRepository;
   private final LocationRepository locationRepository;
@@ -123,7 +129,8 @@ public class ExchangeUndoService {
     final ExchangeClient client =
         Entities.require(
             clientRepository.findWithCapabilitiesByClientId(clientId), () -> "Client not found");
-    Outcome outcome = perform(member, clientId, since, null, null);
+    Outcome outcome =
+        perform(member, clientId, since, null, null, orgUnitService.logisticianUnits(member));
     auditRecorder.record(
         AuditEventType.EXCHANGE_CHANGES_UNDONE,
         client.getId(),
@@ -163,7 +170,7 @@ public class ExchangeUndoService {
       @Nullable String installationKey,
       @Nullable ExchangeResource resource,
       @NotNull UUID runId) {
-    Outcome outcome = perform(member, client.getClientId(), since, installationKey, resource);
+    Outcome outcome = perform(member, client.getClientId(), since, installationKey, resource, null);
     auditRecorder.record(
         AuditEventType.EXCHANGE_CHANGES_UNDONE,
         client.getId(),
@@ -183,6 +190,9 @@ public class ExchangeUndoService {
    * @param since the start of the span; clamped to the retention
    * @param installationKey the one installation to undo, or {@code null} for all
    * @param resource the one resource to undo, or {@code null} for all
+   * @param pools the units the member is a Logistician and direct member of now, whose org-stock
+   *     entries alone the member may set back; {@code null} for an admin's run, which sets back
+   *     every one
    * @return the outcome
    */
   private @NotNull Outcome perform(
@@ -190,13 +200,13 @@ public class ExchangeUndoService {
       @NotNull String clientId,
       @NotNull Instant since,
       @Nullable String installationKey,
-      @Nullable ExchangeResource resource) {
+      @Nullable ExchangeResource resource,
+      @Nullable Set<UUID> pools) {
     Instant floor = clock.instant().minus(retention.maxAge());
     Instant from = since.isBefore(floor) ? floor : since;
     Map<String, List<ExchangeJournalEntry>> groups = new TreeMap<>();
     for (ExchangeJournalEntry entry : journalRepository.findUndoable(member, clientId, from)) {
-      if (entry.getResource() == ExchangeResource.ORG_STOCK
-          || (installationKey != null && !installationKey.equals(entry.getInstallationKey()))
+      if ((installationKey != null && !installationKey.equals(entry.getInstallationKey()))
           || (resource != null && resource != entry.getResource())) {
         continue;
       }
@@ -205,13 +215,23 @@ public class ExchangeUndoService {
               entry.getResource().name() + ':' + entry.getEntityKey(), _ -> new ArrayList<>())
           .add(entry);
     }
-    stockCommands.lockLots(
-        member,
+    List<String> lots =
         groups.values().stream()
             .map(List::getFirst)
             .filter(entry -> entry.getResource() == ExchangeResource.STOCK)
             .map(ExchangeJournalEntry::getEntityKey)
-            .toList());
+            .toList();
+    List<List<ExchangeJournalEntry>> orgGroups =
+        groups.values().stream()
+            .filter(group -> group.getFirst().getResource() == ExchangeResource.ORG_STOCK)
+            .toList();
+    Map<List<ExchangeJournalEntry>, String> orgStock;
+    if (orgGroups.isEmpty()) {
+      stockCommands.lockLots(member, lots);
+      orgStock = Map.of();
+    } else {
+      orgStock = restoreOrgStock(member, lots, orgGroups, pools);
+    }
     int restored = 0;
     List<ExchangeJournalEntry> skippedEntries = new ArrayList<>();
     List<Skipped> skipped = new ArrayList<>();
@@ -222,7 +242,10 @@ public class ExchangeUndoService {
     for (List<ExchangeJournalEntry> group : groups.values()) {
       ExchangeJournalEntry newest = group.getFirst();
       ExchangeResource entryResource = newest.getResource();
-      String reason = restore(member, clientId, group, memberships);
+      String reason =
+          entryResource == ExchangeResource.ORG_STOCK
+              ? orgStock.get(group)
+              : restore(member, clientId, group, memberships);
       if (reason != null) {
         skippedEntries.add(newest);
         skipped.add(new Skipped(newest.getId(), entryResource, reason));
@@ -279,7 +302,8 @@ public class ExchangeUndoService {
             case BLUEPRINT -> restoreBlueprint(member, newest.getEntityKey(), before);
             case STOCK -> restoreLot(member, newest.getEntityKey(), before);
             case SHIP -> restoreShip(member, newest.getEntityKey(), before, memberships);
-            case ORG_STOCK -> false;
+            case ORG_STOCK ->
+                throw new IllegalStateException("Org-stock entries are restored together");
           };
       if (!done) {
         return GONE;
@@ -287,6 +311,93 @@ public class ExchangeUndoService {
     }
     unlink(member, clientId, links);
     return null;
+  }
+
+  /**
+   * Sets every org-stock entry in scope back to its state before the client's first write in the
+   * span, in one call that first locks them all together with the member's own lots the undo sets
+   * back afterwards; an entry of a pool the member may no longer write is left alone as {@code
+   * GONE}.
+   *
+   * @param member the member whose writes are undone
+   * @param lots the member's own lots the undo sets back afterwards
+   * @param groups the client's writes to each entry, newest first
+   * @param pools the units the member is a Logistician and direct member of now, or {@code null}
+   *     when every pool may be set back
+   * @return the reason each group was left alone, or {@code null} for a restored one, by group
+   */
+  private @NotNull Map<List<ExchangeJournalEntry>, String> restoreOrgStock(
+      @NotNull UUID member,
+      @NotNull List<String> lots,
+      @NotNull List<List<ExchangeJournalEntry>> groups,
+      @Nullable Set<UUID> pools) {
+    IdentityHashMap<List<ExchangeJournalEntry>, String> reasons = new IdentityHashMap<>();
+    List<PoolEntryCommands.PoolRestore> restores = new ArrayList<>();
+    List<List<ExchangeJournalEntry>> restoring = new ArrayList<>();
+    for (List<ExchangeJournalEntry> group : groups) {
+      IdentityHashMap<ExchangeJournalEntry, WriteOrder> places = new IdentityHashMap<>();
+      group.forEach(entry -> places.put(entry, writeOrder(entry)));
+      List<ExchangeJournalEntry> ordered =
+          group.stream().sorted(Comparator.comparing(places::get)).toList();
+      PoolEntryCommands.PoolEntryState target = poolState(ordered.getFirst().getBeforeState());
+      PoolEntryCommands.PoolEntryState expected = poolState(ordered.getLast().getAfterState());
+      if (pools != null && !(inPools(target, pools) && inPools(expected, pools))) {
+        reasons.put(group, GONE);
+        continue;
+      }
+      restores.add(
+          new PoolEntryCommands.PoolRestore(
+              UUID.fromString(group.getFirst().getEntityKey()), expected, target));
+      restoring.add(group);
+    }
+    List<PoolEntryCommands.PoolRestoreResult> results =
+        poolEntryCommands.restore(Map.of(member, lots), restores);
+    for (int i = 0; i < results.size(); i++) {
+      reasons.put(
+          restoring.get(i),
+          switch (results.get(i)) {
+            case RESTORED -> null;
+            case CHANGED_AFTERWARDS -> CHANGED_AFTERWARDS;
+            case GONE -> GONE;
+          });
+    }
+    return reasons;
+  }
+
+  /**
+   * Orders an entry's journaled writes: by transaction, and within one by the version the entry had
+   * before the write, since a change set's rows share their recording time.
+   *
+   * @param entry a journaled write
+   * @return its place, the earliest first
+   */
+  private @NotNull WriteOrder writeOrder(@NotNull ExchangeJournalEntry entry) {
+    PoolEntryCommands.PoolEntryState before = poolState(entry.getBeforeState());
+    return new WriteOrder(entry.getTx(), before == null ? Long.MIN_VALUE : before.version());
+  }
+
+  /**
+   * Whether a journaled state lies in one of the given pools.
+   *
+   * @param state the state, or {@code null} for an absent entry
+   * @param pools the pools
+   * @return {@code true} for an absent entry or one in those pools
+   */
+  private static boolean inPools(
+      @Nullable PoolEntryCommands.PoolEntryState state, @NotNull Set<UUID> pools) {
+    return state == null || pools.contains(state.poolUnitId());
+  }
+
+  /**
+   * Reads a journaled org-stock state.
+   *
+   * @param json the state, or {@code null}
+   * @return the state, or {@code null} for none
+   */
+  private @Nullable PoolEntryCommands.PoolEntryState poolState(@Nullable String json) {
+    return json == null
+        ? null
+        : objectMapper.readValue(json, PoolEntryCommands.PoolEntryState.class);
   }
 
   /**
@@ -559,4 +670,19 @@ public class ExchangeUndoService {
    * @param orgUnitId the unit, or {@code null} for none
    */
   private record EarlierUnit(@Nullable UUID orgUnitId) {}
+
+  /**
+   * The place of a journaled org-stock write among the writes to the same entry.
+   *
+   * @param tx the writing transaction
+   * @param versionBefore the entry's version before the write, the lowest for a creation
+   */
+  private record WriteOrder(long tx, long versionBefore) implements Comparable<WriteOrder> {
+
+    @Override
+    public int compareTo(@NotNull WriteOrder other) {
+      int byTx = Long.compare(tx, other.tx);
+      return byTx != 0 ? byTx : Long.compare(versionBefore, other.versionBefore);
+    }
+  }
 }

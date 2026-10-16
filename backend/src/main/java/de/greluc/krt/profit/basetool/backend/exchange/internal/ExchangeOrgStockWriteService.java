@@ -25,6 +25,7 @@ import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOp
 import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.round;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemRef;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockChangeSet;
@@ -48,6 +49,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.Poo
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolSale;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolStolen;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.Counter;
@@ -63,6 +65,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -101,6 +104,9 @@ public class ExchangeOrgStockWriteService {
   /** The refusal of a quantity whose unit is not the material's. */
   static final String UNIT_MISMATCH = "UNIT_MISMATCH";
 
+  /** The outcome counted for a batch the mass-change guard holds back. */
+  private static final String HELD = "held";
+
   private final ExchangeOrgUnitService orgUnitService;
   private final ExchangeOrgStockRoster roster;
   private final ExchangeOrgStockTargets targets;
@@ -108,21 +114,57 @@ public class ExchangeOrgStockWriteService {
   private final ExchangeLocationResolver locationResolver;
   private final PoolEntryCommands poolEntryCommands;
   private final ExchangeJournalService journalService;
+  private final ExchangeMassChangeGuard guard;
+  private final StockReads stockReads;
   private final ExchangeLiveSync liveSync;
   private final MeterRegistry meterRegistry;
 
   /**
-   * Applies one change set in one transaction, op by op in its order.
+   * Applies one change set in one transaction, op by op in its order, unless it takes so much out
+   * of one pool that the writer must confirm it (REQ-XCH-046).
    *
    * @param caller the client, installation and writer
    * @param changeSet the writes
    * @return the counts, the offers the ops lowered or removed, and the detail of every op that was
    *     not applied
    * @throws BadRequestException when an op lacks a field its kind needs
+   * @throws ExchangeProblemException {@code 409 MASS_CHANGE_CONFIRMATION_REQUIRED} when the batch
+   *     takes too much out of one pool; nothing is written then
    */
   @Transactional
   public @NotNull ExchangeChangeResultDto apply(
       @NotNull ExchangeCaller caller, @NotNull ExchangeOrgStockChangeSet changeSet) {
+    return run(caller, changeSet, true);
+  }
+
+  /**
+   * Applies a change set the writer confirmed after the mass-change guard held it back, without
+   * asking the guard again (REQ-XCH-021, REQ-XCH-046).
+   *
+   * @param caller the client, installation and writer the change set was staged for
+   * @param changeSet the writes
+   * @return the counts, the offers the ops lowered or removed, and the detail of every op that was
+   *     not applied
+   * @throws BadRequestException when an op lacks a field its kind needs
+   */
+  @Transactional
+  public @NotNull ExchangeChangeResultDto applyConfirmed(
+      @NotNull ExchangeCaller caller, @NotNull ExchangeOrgStockChangeSet changeSet) {
+    return run(caller, changeSet, false);
+  }
+
+  /**
+   * Plans a change set, asks the guard when told to, and applies it op by op.
+   *
+   * @param caller the client, installation and writer
+   * @param changeSet the writes
+   * @param guarded whether the mass-change guard decides
+   * @return the result
+   */
+  private @NotNull ExchangeChangeResultDto run(
+      @NotNull ExchangeCaller caller,
+      @NotNull ExchangeOrgStockChangeSet changeSet,
+      boolean guarded) {
     List<ExchangeOrgStockChangeSet.Op> ops = changeSet.ops();
     ops.forEach(ExchangeOrgStockWriteService::requireFields);
     Set<UUID> pools = orgUnitService.logisticianUnits(caller.member());
@@ -151,6 +193,10 @@ public class ExchangeOrgStockWriteService {
                 planAllocation(op, pools, EarmarkChange.REMOVE);
             default -> throw new BadRequestException("Unknown org-stock op");
           });
+    }
+    if (guarded && !changeSet.dryRun() && holdsBack(caller, ops, plan)) {
+      count(caller, HELD, false);
+      throw ExchangeProblemException.massChangeConfirmationRequired();
     }
     lock(plan);
     boolean dryRun = changeSet.dryRun();
@@ -204,6 +250,34 @@ public class ExchangeOrgStockWriteService {
         reduced,
         removed,
         null);
+  }
+
+  /**
+   * Whether the batch's book-outs, sales and moves out of a pool take any one pool over the
+   * mass-change guard's threshold for the writer.
+   *
+   * @param caller the client and writer
+   * @param ops the ops
+   * @param plan what each op will do
+   * @return {@code true} when the writer must confirm the batch
+   */
+  private boolean holdsBack(
+      @NotNull ExchangeCaller caller,
+      @NotNull List<ExchangeOrgStockChangeSet.Op> ops,
+      @NotNull List<Planned> plan) {
+    Map<UUID, Long> removals = new TreeMap<>();
+    for (int i = 0; i < plan.size(); i++) {
+      if (plan.get(i) instanceof Write write && write.removedFrom() != null) {
+        removals.merge(ops.get(i).unit(), 1L, Long::sum);
+      }
+    }
+    for (Map.Entry<UUID, Long> pool : removals.entrySet()) {
+      if (guard.requiresPoolConfirmation(
+          caller, pool.getKey(), stockReads.countPoolEntries(pool.getKey()), pool.getValue())) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**

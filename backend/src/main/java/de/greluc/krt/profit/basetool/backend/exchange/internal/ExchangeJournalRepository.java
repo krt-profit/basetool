@@ -56,6 +56,31 @@ public interface ExchangeJournalRepository extends JpaRepository<ExchangeJournal
       @Param("since") Instant since);
 
   /**
+   * Counts a client's org-stock removals by one writer out of one pool since a point in time,
+   * leaving out the ones undone.
+   *
+   * @param userId the writer
+   * @param clientId the client
+   * @param pool the pool's org unit, as text
+   * @param since the start of the window
+   * @return the number of removals
+   */
+  @Query(
+      value =
+          """
+          SELECT COUNT(*) FROM exchange_journal
+          WHERE user_id = :userId AND client_id = :clientId AND resource = 'ORG_STOCK'
+            AND removal AND undone_at IS NULL AND recorded_at >= :since
+            AND CAST(before_state AS jsonb) ->> 'poolUnitId' = :pool
+          """,
+      nativeQuery = true)
+  long countPoolRemovals(
+      @Param("userId") UUID userId,
+      @Param("clientId") String clientId,
+      @Param("pool") String pool,
+      @Param("since") Instant since);
+
+  /**
    * Lists a client's writes to a member's entries since a point in time that are not undone, newest
    * first, the order an undo walks them.
    *
@@ -131,15 +156,11 @@ public interface ExchangeJournalRepository extends JpaRepository<ExchangeJournal
       findFirstByUserIdAndClientIdAndResourceAndEntityKeyAndRecordedAtAfterOrderByRecordedAtAsc(
           UUID userId, String clientId, ExchangeResource resource, String entityKey, Instant since);
 
-  /**
-   * The scope filter the bulk undo queries share, without the org stock's writes; a {@code null}
-   * parameter matches everything.
-   */
+  /** The scope filter the bulk undo queries share; a {@code null} parameter matches everything. */
   String BULK_SCOPE =
       """
       FROM exchange_journal
       WHERE client_id = :clientId AND undone_at IS NULL AND recorded_at >= :since
-        AND resource <> 'ORG_STOCK'
         AND (CAST(:installationKey AS VARCHAR) IS NULL OR installation_key = :installationKey)
         AND (CAST(:resource AS VARCHAR) IS NULL OR resource = :resource)
       """;
@@ -190,7 +211,6 @@ public interface ExchangeJournalRepository extends JpaRepository<ExchangeJournal
           SELECT user_id AS userId, installation_key AS installationKey, COUNT(*) AS entries
           FROM exchange_journal
           WHERE client_id = :clientId AND undone_at IS NULL AND recorded_at >= :since
-            AND resource <> 'ORG_STOCK'
           GROUP BY user_id, installation_key
           ORDER BY COUNT(*) DESC, user_id, installation_key
           LIMIT 500

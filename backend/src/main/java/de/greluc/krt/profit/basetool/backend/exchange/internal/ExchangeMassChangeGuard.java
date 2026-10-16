@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
@@ -68,6 +69,25 @@ public class ExchangeMassChangeGuard {
       return false;
     }
     long inWindow = journalService.removalsSince(caller, resource, clock.instant().minus(WINDOW));
+    return trips(inWindow, batchRemovals, currentCount);
+  }
+
+  /**
+   * Checks the removals one org-stock batch takes out of one pool before it is applied: per client,
+   * writer and pool, with the pool's shared entries as the current count (REQ-XCH-046).
+   *
+   * @param caller the client and writer
+   * @param pool the pool's org unit
+   * @param currentCount the pool's shared entries before the batch
+   * @param batchRemovals the batch's book-outs, sales and moves out of the pool
+   * @return {@code true} when the writer must confirm the batch
+   */
+  public boolean requiresPoolConfirmation(
+      @NotNull ExchangeCaller caller, @NotNull UUID pool, long currentCount, long batchRemovals) {
+    if (batchRemovals <= 0) {
+      return false;
+    }
+    long inWindow = journalService.poolRemovalsSince(caller, pool, clock.instant().minus(WINDOW));
     return trips(inWindow, batchRemovals, currentCount);
   }
 

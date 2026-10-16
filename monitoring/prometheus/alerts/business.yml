@@ -251,7 +251,7 @@ groups:
           severity: warning
         annotations:
           summary: "An exchange client removed unusually many entries"
-          description: "One registered client (client_id) removed more than 100 blueprints, stock lots, ships or org-stock entries across its members in the last hour. The mass-change guard stops one member losing much at once, but not a faulty release doing it to many members. Under Administration - Verbundene Anwendungen, undo the client's changes for every member since the faulty release, which suspends it first; org-stock writes are not undone yet and are corrected in the Globales Lager (REQ-XCH-021, REQ-XCH-028, REQ-XCH-034)."
+          description: "One registered client (client_id) removed more than 100 blueprints, stock lots, ships or org-stock entries across its members in the last hour. The mass-change guard stops one member losing much at once, but not a faulty release doing it to many members. Under Administration - Verbundene Anwendungen, undo the client's changes for every member since the faulty release, which suspends it first and includes the org-stock writes (REQ-XCH-021, REQ-XCH-028, REQ-XCH-034, REQ-XCH-046)."
 
       - alert: ExchangeGuardStorm
         expr: sum by (client_id) (increase(basetool_exchange_writes_total{outcome="held"}[1h])) > 10

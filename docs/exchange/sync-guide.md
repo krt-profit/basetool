@@ -144,6 +144,7 @@ What counts as a removal:
 | Blueprints | an applied `remove` |
 | Ships | a `remove`, and an `upsert` that changes both the name and the ship type |
 | Stock | a lot set to 0, or cut to at most a tenth of what it held before your client's first change to it within the 24 hours — unless the batch's rises of the same material or item cover the fall (a move) |
+| Org stock | a `book-out`, `sell`, `move-pool` or `move-holder` into another pool, counted per pool instead of per resource, against the pool's entries ([org stock](resources/org-stock.md#the-mass-change-guard)) |
 
 For example, with 40 blueprints and no removals in the window, a batch may remove 8 (8 × 5 = 40, not
 more than 40); a batch removing 9 is held. Spreading removals over many small batches does not help,

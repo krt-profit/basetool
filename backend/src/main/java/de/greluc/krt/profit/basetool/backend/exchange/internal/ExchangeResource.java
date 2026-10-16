@@ -84,17 +84,13 @@ public enum ExchangeResource {
   }
 
   /**
-   * Maps a staged mass change's resource name to its resource; the org stock has no staged mass
-   * change.
+   * Maps a staged mass change's resource name to its resource.
    *
    * @param name the name, as {@link #massChangeName()} spells it
    * @return the resource, or empty for any other value
    */
   @NotNull
   public static Optional<ExchangeResource> fromMassChangeName(@Nullable String name) {
-    return Arrays.stream(values())
-        .filter(r -> r != ORG_STOCK)
-        .filter(r -> r.massChangeName().equals(name))
-        .findFirst();
+    return Arrays.stream(values()).filter(r -> r.massChangeName().equals(name)).findFirst();
   }
 }

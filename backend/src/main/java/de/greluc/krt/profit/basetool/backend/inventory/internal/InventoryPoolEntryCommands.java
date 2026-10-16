@@ -49,6 +49,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -76,6 +77,14 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   private final InventoryEarmarkLookup earmarkLookup;
   private final StockOfferLookup stockOfferLookup;
   private final InventoryProperties inventoryProperties;
+  private final InventoryPoolRestorer restorer;
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public @NotNull @Unmodifiable List<PoolRestoreResult> restore(
+      @NotNull Map<UUID, ? extends Collection<String>> lots, @NotNull List<PoolRestore> restores) {
+    return restorer.restore(lots, restores);
+  }
 
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
@@ -259,7 +268,10 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
                 reductions(take.fromMissions())),
             take.actor());
     PoolEntryState after =
-        inventoryRepository.findById(take.entryId()).map(this::stateOf).orElse(null);
+        inventoryRepository
+            .findById(take.entryId())
+            .map(InventoryPoolEntryCommands::stateOf)
+            .orElse(null);
     return PoolOutcome.applied(List.of(new PoolEntryChange(before, after)), offers);
   }
 
@@ -830,7 +842,11 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
     List<PoolEntryChange> changes = new ArrayList<>();
     before.forEach(
         (id, state) -> {
-          PoolEntryState after = inventoryRepository.findById(id).map(this::stateOf).orElse(null);
+          PoolEntryState after =
+              inventoryRepository
+                  .findById(id)
+                  .map(InventoryPoolEntryCommands::stateOf)
+                  .orElse(null);
           if (!state.equals(after)) {
             changes.add(new PoolEntryChange(state, after));
           }
@@ -871,7 +887,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
    * @param row the entry, a shared row of a pool
    * @return its state
    */
-  private @NotNull PoolEntryState stateOf(@NotNull InventoryItem row) {
+  static @NotNull PoolEntryState stateOf(@NotNull InventoryItem row) {
     Map<UUID, Double> jobs = new TreeMap<>();
     for (InventoryJobOrderAllocation slice : row.getJobOrderAllocations()) {
       if (slice.getJobOrderId() != null && slice.getAmount() != null) {
@@ -906,7 +922,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
    * @param row the entry
    * @return its amount, {@code 0} when it has none
    */
-  private static double held(@NotNull InventoryItem row) {
+  static double held(@NotNull InventoryItem row) {
     return row.getAmount() == null ? 0.0 : row.getAmount();
   }
 

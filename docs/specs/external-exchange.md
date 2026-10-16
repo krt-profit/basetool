@@ -1273,7 +1273,8 @@ removals, or above 20 % of (current count + entries removed in the window) with 
 staged and answered with `MASS_CHANGE_CONFIRMATION_REQUIRED` and a confirmation URL under
 „Verbundene Anwendungen". Removals are `remove`, a quantity set to 0, a lot's reductions
 accumulated to ≥ 90 % within the window, and a ship update that changes name and type; a move
-within one batch is not a removal. Only the member's browser session can confirm.
+within one batch is not a removal. Only the member's browser session can confirm. The org stock
+counts per client, writer and pool instead, with its own removals (REQ-XCH-046).
 
 **Acceptance**
 
@@ -1355,7 +1356,8 @@ WP 4.5 (#2087)
 ### REQ-XCH-022 — Every exchange write is journaled and can be undone
 
 Each exchange write is journaled for 90 days. The member can undo a client's writes since a point
-in time from „Verbundene Anwendungen"; undo is version-checked, skips and reports rows the member
+in time from „Verbundene Anwendungen" — the org-stock writes they made as a Logistician included
+(REQ-XCH-046); undo is version-checked, skips and reports rows the member
 changed afterwards or a merge removed, and does not restore Materialbörse offers. An admin can run
 the same undo for every member of one client at once (REQ-XCH-034).
 
@@ -2032,8 +2034,8 @@ it changed, and is audited and instrumented. Re-activating the client stays a se
 **The scope.** `POST /api/v1/connected-apps/admin/clients/{id}/undo {since, installationId?, resource?}`
 (`ADMIN`, answers `202` with the run) undoes the client's journal entries recorded at or after
 `since`, clamped to the configured retention (`app.exchange.change-retention.max-age`), that are not
-undone yet; `resource` is `BLUEPRINT`, `STOCK` or `SHIP`, `installationId` one installation of that
-client. A `since` in the future is `400`. `…/undo/preview` answers the members and entries in scope
+undone yet, the org-stock writes of every writer included (REQ-XCH-046); `resource` is `BLUEPRINT`,
+`STOCK`, `SHIP` or `ORG_STOCK`, `installationId` one installation of that client. A `since` in the future is `400`. `…/undo/preview` answers the members and entries in scope
 and whether the client is still active, writing nothing; `…/undo/installations?since=` lists the
 client's installations with writes in the span (member name, last seen, disconnected, count — never
 the member-given label), at most 500, for choosing one. `GET /api/v1/connected-apps/admin/undo-runs` lists
@@ -2062,7 +2064,8 @@ restart).
 
 **Notification.** The rule-engine event `EXCHANGE_BULK_UNDO_APPLIED` (seed `V257`, selector
 `EVENT_RECIPIENT`) tells each member once per run how many entries the administration took back and
-names the client by its registry display name only.
+names the client by its registry display name only. For org-stock writes the member told is the
+writer under whom they are journaled; the holders of the entries are not notified (REQ-XCH-046).
 
 **Retention.** Runs and their skipped entries are purged with the exchange change feed and journal,
 90 days after they ended; the skipped entries are part of the member's Art. 15 export
@@ -2572,10 +2575,10 @@ capability, the roster, `book-in` and `book-out` built (#2589); `sell`, the move
 Every org-stock op is journaled under the writer (REQ-XCH-022) with the before and after of each
 entry it changed. The writer can undo their own client writes from „Verbundene Anwendungen"; an
 undo that meets an entry changed since is refused for that entry as a conflict. The admin's bulk
-undo of a client (REQ-XCH-034) includes org-stock writes. The holders of the entries are notified
-as in the web and cannot undo the writer's changes. The mass-change guard (REQ-XCH-021) counts
-book-outs, sales and moves out of a pool per writer and pool with its own window rules; a batch over
-the threshold is held for confirmation in the writer's browser.
+undo of a client (REQ-XCH-034) includes org-stock writes. The writes notify the holders of the
+entries as in the web; the holders cannot undo the writer's changes. The mass-change guard
+(REQ-XCH-021) counts book-outs, sales and moves out of a pool per writer and pool with its own
+window rules; a batch over the threshold is held for confirmation in the writer's browser.
 
 *Journal (#2589, #2590, #2591).* Every applied op writes one `exchange_journal` row per Lager entry it
 changed (`resource = ORG_STOCK`, actions `ORG_STOCK_BOOK_IN`, `ORG_STOCK_BOOK_OUT`,
@@ -2586,19 +2589,64 @@ holder, pool, lot key, amount, version and earmarks before and after — not the
 writer's data export shows these rows without the holder; a move or a stolen split also journals the
 entry it created, and a merge each entry it folded away. The entry a book-out, a sale, a
 `move-pool` or a `move-holder` into another pool takes stock from counts as a removal
-(`basetool_exchange_removals_total{resource="org_stock"}`). Until the undo
-below is built, the member's undo and the admin's bulk undo leave org-stock rows untouched and do
-not count them.
+(`basetool_exchange_removals_total{resource="org_stock"}`).
+
+*Undo (#2592).* The writer's undo (`POST /api/v1/connected-apps/{clientId}/undo`, REQ-XCH-022) and
+the admin's bulk undo (REQ-XCH-034, `resource = ORG_STOCK` or all) take the journal rows a client
+wrote under the writer. Each entry goes back to its journaled state before the client's first write
+in the span, through the Lager's `PoolEntryCommands.restore`, whatever op wrote it: an entry the
+writes created is removed, one they emptied or merged away is recreated under its own id (version
+0, no note), and an existing one gets back its holder, pool, location, quality, „gestohlen", amount
+and job-order and mission earmarks. An entry is restored only while it is exactly as the client's
+last write left it — the journaled state after that write, version included, or absent when the
+write removed it; otherwise it is skipped as `CHANGED_AFTERWARDS`. One whose earlier state names a
+material, item, location, pool, holder or earmark target that is gone, or a holder who no longer
+directly belongs to the pool, is skipped as `GONE`, and so is, in the writer's own undo, an entry
+of a pool whose unit the writer is no longer a Logistician and direct member of; the admin's run
+restores every pool. An entry's writes are taken in the order of their transactions and, within
+one change set, of the versions they started from. Every lot an entry lies in and goes back to, and
+the writer's own lots the same undo sets back, take their advisory locks in one ascending pass
+before any row, then the entries' rows in ascending id order (ADR-0229). Each changed entry is
+audited in the Lager as `INVENTORY_ITEM_RESTORED` (amount afterwards, whether it was removed;
+naming the actor — the writer, or the admin of a bulk run — and the holder), the undo as
+`EXCHANGE_CHANGES_UNDONE`, and it is counted in `basetool_exchange_undo_total{resource="org_stock"}`.
+The undo restores neither the holder's note, which is not journaled, nor donation pledges,
+Materialbörse offers or the mission proceeds a sale booked; an offer above a lowered amount is
+lowered with it; an entry whose donation pledges the restore would remove or exceed is skipped as
+`CHANGED_AFTERWARDS`. It notifies no holder — the web has no counterpart — and the org-stock feed and
+the peers' pages follow as for every Lager change. The holders' own undo reaches only the journal
+rows written under them, so it never touches the writer's changes.
+
+*Guard (#2592).* Before an org-stock change set that is not a dry run is applied, the guard counts,
+per pool, its ops that take stock out of that pool — `book-out`, `sell`, `move-pool` and
+`move-holder` into another pool; a move within the pool, a note, a marking and an earmark op do not
+count — and the removals the client's journal holds for the same writer and pool in the last 24
+hours, not undone. The pool's current count is its shared entries. The rule is REQ-XCH-021's: a
+pool trips above 25 removals, or when they are at least 5 and more than a fifth of the current
+count plus the window's removals. Each op counts once, whatever amount it takes; there is no
+90-percent rule. A batch that trips one pool is answered `409 MASS_CHANGE_CONFIRMATION_REQUIRED`,
+writes nothing, is counted `held`, and the gateway stages it as `org-stock`; the writer previews
+and confirms it in the browser as REQ-XCH-021 describes, and the confirmed batch is applied without
+the guard (`ExchangeOrgStockWriteService#applyConfirmed`).
 
 **Acceptance**
 
-- [ ] An undo restores the entries a write changed, refuses an entry changed since, and is
-  audited.
-- [ ] A batch that books out more of one pool than the guard allows is held and applies only after
-  the writer confirms it.
-- [ ] The admin's bulk undo of a client restores its org-stock writes for every writer.
+- [x] An undo restores the entries a write changed for every op type — of a `note`, everything but
+  the note's text, which is not journaled — refuses an entry changed since, and is audited.
+  *`ExchangeOrgStockUndoControllerTest`.*
+- [x] A batch that books out more of one pool than the guard allows is held and applies only after
+  the writer confirms it; the guard counts per pool, and a note or a move within the pool does not
+  count. *`ExchangeOrgStockUndoControllerTest`, `ExchangeMassChangeGuardTest`,
+  `exchange_write_alerts_test.yml`.*
+- [x] The admin's bulk undo of a client restores its org-stock writes for every writer.
+  *`ExchangeOrgStockUndoControllerTest`.*
+- [x] The holders of the entries cannot undo the writer's changes, and a writer who is no longer a
+  Logistician of the pool cannot undo its entries. *`ExchangeOrgStockUndoControllerTest`.*
 
-**Status:** the journal built (#2589); the undo and the guard planned (#2592)
+**Code:** `ExchangeUndoService`, `PoolEntryCommands#restore` / `InventoryPoolRestorer`,
+`ExchangeMassChangeGuard#requiresPoolConfirmation`, `ExchangeOrgStockWriteService#applyConfirmed`,
+`ExchangeMassChangeService`, `ExchangeJournalRepository#countPoolRemovals`, `V302` · **Status:** the
+journal built (#2589); the undo and the guard built (#2592)
 
 ### REQ-XCH-047 — The demand details name orders for a Logistician of the responsible unit
 

@@ -2,7 +2,8 @@
 
 - **Status:** Accepted — the read, the details, the roster, the targets and the ops `book-in`,
   `book-out`, `sell`, the moves (`move-location`, `move-holder`, `move-pool`), `note`, `stolen`
-  and the earmark ops built; the undo, the guard and the demand details pending (REQ-XCH-042…047).
+  and the earmark ops, the undo and the guard built; the demand details pending
+  (REQ-XCH-042…047).
   Amends [ADR-0220](0220-external-clients-see-only-anonymised-org-demand-and-the-location-list.md)
   (decision 1, "no requester, no order title, no free text") and narrows the own-data-only rule of
   REQ-XCH-009.
@@ -205,3 +206,37 @@ path template on the acting list — it would loosen REQ-SEC-080 and every seam 
 Rejected: calling the web's allocation methods from the pool path — their commit-time increment would
 add a second version bump per op and leave the in-batch version stale; separate `material` and `item`
 parameters — the lots already name both by one id.
+
+## Amendment 6 (2026-10-16) — the undo and the guard
+
+1. **Restore by state, in the Lager.** The undo does not replay the web's inverse actions; the
+   Lager's `PoolEntryCommands.restore` sets each entry the client's writes touched back to its
+   journaled state before the first of them: it removes an entry the writes created, recreates one
+   they removed under its own id (version 0, no note), and gives an existing one back its holder,
+   pool, lot, amount and earmarks. One mechanism covers every op type, merges and splits included,
+   and the entry keeps the id a client already holds. Each changed entry is audited as
+   `INVENTORY_ITEM_RESTORED`.
+2. **An entry, not an op, is the unit of conflict.** An entry is restored only while it is exactly
+   in the journaled state after the client's last write to it, version included; otherwise it is
+   skipped as `CHANGED_AFTERWARDS` and the rest of the undo goes on. Within one change set the writes
+   to an entry share their recording time, so they are ordered by the version each started from.
+3. **What stays.** The holder's note is not journaled (Amendment 3), so a note edit cannot be undone;
+   neither are donation pledges, Materialbörse offers or a sale's mission proceeds restored, as for
+   the member's own stock. The undo notifies no holder; the web has no such action to mirror.
+4. **The writer's undo needs the role still; the admin's does not.** A writer who is no longer a
+   Logistician and direct member of an entry's pool has that entry skipped as `GONE`; the admin's
+   bulk undo restores every writer's entries regardless. A holder's undo reaches only the rows
+   journaled under the holder.
+5. **One lock pass.** The pool lots an undo restores and the writer's own stock lots it sets back
+   take their advisory locks together, ascending, before any row (ADR-0229).
+6. **The guard per pool.** Each op that takes stock out of a pool — `book-out`, `sell`, `move-pool`,
+   `move-holder` into another pool — counts once per writer and pool, whatever its amount, against
+   the removals of the last 24 hours journaled for that writer and pool; the pool's shared entries
+   are the current count, and the thresholds are REQ-XCH-021's. A held batch is staged as
+   `org-stock` and confirmed in the writer's browser like any other.
+
+Rejected: undoing through the web's inverse actions (book-in for a book-out, a transfer back for a
+move) — they would merge, notify and audit as new actions and cannot reverse a merge or a split
+exactly; refusing the whole undo of an op when one of its entries changed — one conflict would leave
+every other entry of a large faulty batch in place; counting the amount taken instead of the ops — a
+pool's lots have no common unit across materials and items.

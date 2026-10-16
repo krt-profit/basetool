@@ -157,6 +157,50 @@ public interface PoolEntryCommands {
   PoolOutcome allocate(@NotNull PoolAllocation allocation, boolean dryRun);
 
   /**
+   * Sets shared entries back to journaled states for the undo of a connected application's writes
+   * (REQ-XCH-046): an entry is removed, recreated under its own id, or given back its holder, pool,
+   * lot, amount and job-order and mission earmarks, and each change is audited as {@code
+   * INVENTORY_ITEM_RESTORED}. Every lot involved, and every further lot the caller names, takes its
+   * advisory lock first in one ascending pass, then the entries' rows in ascending id order
+   * (ADR-0229). The note, the donation pledges and the Materialbörse offers are not restored; an
+   * offer above a lowered amount is lowered with it.
+   *
+   * @param lots further lots the caller writes in the same transaction, as lot keys by holder
+   * @param restores the entries, each with the state the writes left it in and the state to restore
+   * @return the result of each restore, in the given order
+   */
+  @NotNull
+  @Unmodifiable
+  List<PoolRestoreResult> restore(
+      @NotNull Map<UUID, ? extends Collection<String>> lots, @NotNull List<PoolRestore> restores);
+
+  /**
+   * One shared entry to set back.
+   *
+   * @param entryId the entry
+   * @param expected the state the writes left it in, or {@code null} when they removed it; any
+   *     other state now refuses the restore
+   * @param target the state to restore, or {@code null} to remove the entry
+   */
+  record PoolRestore(
+      @NotNull UUID entryId, @Nullable PoolEntryState expected, @Nullable PoolEntryState target) {}
+
+  /** What became of one restore. */
+  enum PoolRestoreResult {
+    /** The entry is back in its earlier state. */
+    RESTORED,
+
+    /** The entry is no longer in the state the writes left it in, so it was left alone. */
+    CHANGED_AFTERWARDS,
+
+    /**
+     * The earlier state names a material, item, location, pool, holder or earmark target that is
+     * gone, or a holder who no longer belongs to the pool.
+     */
+    GONE
+  }
+
+  /**
    * A book-in into a pool, recorded under the current request's acting member.
    *
    * @param holder the member who holds the new entry

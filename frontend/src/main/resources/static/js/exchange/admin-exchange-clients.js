@@ -498,6 +498,7 @@ function initAdminExchangeClients() {
                     BLUEPRINT: text(data, 'resourceBlueprint'),
                     STOCK: text(data, 'resourceStock'),
                     SHIP: text(data, 'resourceShip'),
+                    ORG_STOCK: text(data, 'resourceOrgStock'),
                 },
             };
         }

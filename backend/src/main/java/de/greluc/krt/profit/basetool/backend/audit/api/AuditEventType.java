@@ -145,6 +145,12 @@ public enum AuditEventType {
   INVENTORY_BULK_STOLEN_CHANGED(AuditDomain.INVENTORY),
 
   /**
+   * A shared row was set back by the undo of a connected application's org-stock writes: removed,
+   * recreated or given back its earlier state (REQ-XCH-046).
+   */
+  INVENTORY_ITEM_RESTORED(AuditDomain.INVENTORY),
+
+  /**
    * A deleted user's inventory rows were bulk-reassigned to the fallback admin.
    *
    * @deprecated not emitted, user deletion purges the rows instead ({@link

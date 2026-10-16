@@ -5,6 +5,10 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
 
 ## 2026-10-16
 
+- **New: the mass-change guard and the undo for org-stock writes.** A change set that takes too
+  much out of one pool answers `409 MASS_CHANGE_CONFIRMATION_REQUIRED` and waits for the member's
+  confirmation; the member's and the administrator's undo now set back org-stock writes too
+  ([org stock](resources/org-stock.md#the-mass-change-guard)).
 - **New: org-stock earmarks and targets.** `POST /exchange/v1/org-stock/changes` gains the ops
   `allocation-add`, `allocation-change` and `allocation-remove`, each naming one `jobOrder` or
   `mission` of an entry; `GET /exchange/v1/org-stock/targets?unit=&material=` lists the job orders
