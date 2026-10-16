@@ -25,13 +25,14 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * One snapshot page of the org stock, with the units the member currently reads (REQ-XCH-042).
+ * One snapshot or feed page of the org stock, with the units the member currently reads
+ * (REQ-XCH-042).
  *
  * @param items the lots on this page
  * @param removed the tombstones on this page; always empty on a snapshot page
  * @param units the units whose pools the member reads; a unit not listed is gone with its lots
- * @param nextCursor the next snapshot page, or after the last page the feed position the snapshot
- *     was taken at
+ * @param nextCursor the next snapshot page, after the last snapshot page the feed position the
+ *     snapshot was taken at, or the next feed position
  * @param hasMore whether a further page is ready now
  */
 public record ExchangeOrgStockPageDto(

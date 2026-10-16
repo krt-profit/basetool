@@ -34,6 +34,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,8 +44,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The change feed's triggers against Postgres: every write path to a synced table is sequenced,
- * attributed from the transaction variable, and a default-set change reaches every owner
- * (REQ-XCH-013, ADR-0224).
+ * attributed from the transaction variable, a default-set change reaches every owner, and every
+ * change of a pool's shared rows reaches the org-stock feed keyed by unit (REQ-XCH-013,
+ * REQ-XCH-042, ADR-0224).
  */
 @SpringBootTest
 @Transactional
@@ -52,7 +54,15 @@ class ExchangeChangeFeedTriggerIntegrationTest {
 
   /** Every table whose writes the feed must see, with the triggers that sequence them. */
   private static final Set<String> SYNCED_TABLES =
-      Set.of("personal_blueprint", "default_blueprint", "inventory_item", "ship", "org_unit");
+      Set.of(
+          "personal_blueprint",
+          "default_blueprint",
+          "inventory_item",
+          "inventory_item_job_order_allocation",
+          "inventory_item_mission_allocation",
+          "ship",
+          "org_unit",
+          "org_unit_membership");
 
   @Autowired private JdbcTemplate jdbc;
   @Autowired private UserRepository userRepository;
@@ -276,6 +286,316 @@ class ExchangeChangeFeedTriggerIntegrationTest {
   }
 
   @Test
+  void everyChangeOfASharedRowIsSequencedByItsUnitLot() {
+    UUID pool = orgUnit("feed-pool");
+    UUID material = material("feed-laranite");
+    UUID location = location("feed-levski");
+    String lot = orgLot(pool, material, location, 2, false);
+    source("web");
+
+    UUID row = stock(alice, material, location, 2, false, false, pool);
+    jdbc.update("UPDATE inventory_item SET amount = 4 WHERE id = ?", row);
+    jdbc.update("UPDATE inventory_item SET user_id = ? WHERE id = ?", bob, row);
+    jdbc.update("UPDATE inventory_item SET note = 'for the op' WHERE id = ?", row);
+    jdbc.update("UPDATE inventory_item SET version = version + 1 WHERE id = ?", row);
+    jdbc.update("DELETE FROM inventory_item WHERE id = ?", row);
+
+    assertThat(orgChanges(pool))
+        .extracting(OrgChange::key, OrgChange::channel)
+        .containsExactly(
+            org.assertj.core.groups.Tuple.tuple(lot, "web"),
+            org.assertj.core.groups.Tuple.tuple(lot, "web"),
+            org.assertj.core.groups.Tuple.tuple(lot, "web"),
+            org.assertj.core.groups.Tuple.tuple(lot, "web"),
+            org.assertj.core.groups.Tuple.tuple(lot, "web"));
+  }
+
+  @Test
+  void aClientChangeOfTheOrgStockIsAttributedToItsClientAndKey() {
+    UUID pool = orgUnit("feed-client-pool");
+    source("client|versekit|" + "K".repeat(43));
+
+    stock(alice, material("feed-iron"), location("feed-hurston"), 1, false, false, pool);
+
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT source_channel, source_client, source_key, user_id FROM exchange_change"
+                    + " WHERE org_unit_id = ?",
+                pool))
+        .containsEntry("source_channel", "client")
+        .containsEntry("source_client", "versekit")
+        .containsEntry("source_key", "K".repeat(43))
+        .containsEntry("user_id", null);
+  }
+
+  @Test
+  void personalRowsAndOwnerlessSharedRowsNeverReachTheOrgFeed() {
+    UUID pool = orgUnit("feed-quiet-pool");
+    UUID material = material("feed-copper");
+    UUID location = location("feed-microtech");
+
+    UUID personal = stock(alice, material, location, 1, true, false, pool);
+    jdbc.update("UPDATE inventory_item SET amount = 3 WHERE id = ?", personal);
+    stock(alice, material, location, 1, false, false, null);
+
+    assertThat(orgChanges(pool)).isEmpty();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM exchange_change WHERE resource = 'ORG_STOCK'"
+                    + " AND entity_key LIKE ?",
+                Integer.class,
+                "%m:" + material + "%"))
+        .isZero();
+  }
+
+  @Test
+  void rebookingBetweenPersonalAndSharedIsAnOrgStockChange() {
+    UUID pool = orgUnit("feed-rebook-pool");
+    UUID material = material("feed-gold");
+    UUID location = location("feed-port-olisar");
+    UUID row = stock(alice, material, location, 1, true, false, pool);
+
+    jdbc.update("UPDATE inventory_item SET personal = false WHERE id = ?", row);
+    jdbc.update("UPDATE inventory_item SET personal = true WHERE id = ?", row);
+
+    assertThat(orgChanges(pool))
+        .extracting(OrgChange::key)
+        .containsExactly(
+            orgLot(pool, material, location, 1, false), orgLot(pool, material, location, 1, false));
+  }
+
+  @Test
+  void changingTheUnitSequencesTheLotItLeftAndTheLotItJoined() {
+    UUID from = orgUnit("feed-from-pool");
+    UUID to = orgUnit("feed-to-pool");
+    UUID material = material("feed-beryl");
+    UUID location = location("feed-everus");
+    UUID row = stock(alice, material, location, 1, false, false, from);
+
+    jdbc.update("UPDATE inventory_item SET owning_org_unit_id = ? WHERE id = ?", to, row);
+
+    assertThat(orgChanges(from))
+        .extracting(OrgChange::key)
+        .containsExactly(
+            orgLot(from, material, location, 1, false), orgLot(from, material, location, 1, false));
+    assertThat(orgChanges(to))
+        .extracting(OrgChange::key)
+        .containsExactly(orgLot(to, material, location, 1, false));
+  }
+
+  @Test
+  void aMoveOrAStolenMarkSequencesBothLotsOfThePool() {
+    UUID pool = orgUnit("feed-move-pool");
+    UUID material = material("feed-taranite");
+    UUID from = location("feed-a18");
+    UUID to = location("feed-nb");
+    UUID row = stock(alice, material, from, 1, false, false, pool);
+
+    jdbc.update("UPDATE inventory_item SET location_id = ? WHERE id = ?", to, row);
+    jdbc.update("UPDATE inventory_item SET stolen = true WHERE id = ?", row);
+
+    assertThat(orgChanges(pool))
+        .extracting(OrgChange::key)
+        .containsExactly(
+            orgLot(pool, material, from, 1, false),
+            orgLot(pool, material, from, 1, false),
+            orgLot(pool, material, to, 1, false),
+            orgLot(pool, material, to, 1, false),
+            orgLot(pool, material, to, 1, true));
+  }
+
+  @Test
+  void anEarmarkInsertUpdateOrDeleteSequencesTheLotOfItsRow() {
+    UUID pool = orgUnit("feed-earmark-pool");
+    UUID material = material("feed-corundum");
+    UUID location = location("feed-orison-2");
+    UUID row = stock(alice, material, location, 1, false, false, pool);
+    UUID personal = stock(alice, material, location, 1, true, false, pool);
+    int before = orgChanges(pool).size();
+    UUID mission = UUID.randomUUID();
+    jdbc.update("INSERT INTO mission (id, name, version) VALUES (?, 'Op', 0)", mission);
+    UUID shared = UUID.randomUUID();
+
+    jdbc.update(
+        """
+        INSERT INTO inventory_item_mission_allocation (id, inventory_item_id, mission_id, amount,
+                                                       version, created_at, updated_at)
+        VALUES (?, ?, ?, 1, 0, now(), now())
+        """,
+        shared,
+        row,
+        mission);
+    jdbc.update("UPDATE inventory_item_mission_allocation SET amount = 0.5 WHERE id = ?", shared);
+    jdbc.update("DELETE FROM inventory_item_mission_allocation WHERE id = ?", shared);
+    jdbc.update(
+        """
+        INSERT INTO inventory_item_mission_allocation (id, inventory_item_id, mission_id, amount,
+                                                       version, created_at, updated_at)
+        VALUES (?, ?, ?, 1, 0, now(), now())
+        """,
+        UUID.randomUUID(),
+        personal,
+        mission);
+
+    assertThat(orgChanges(pool).subList(before, orgChanges(pool).size()))
+        .extracting(OrgChange::key)
+        .containsExactly(
+            orgLot(pool, material, location, 1, false),
+            orgLot(pool, material, location, 1, false),
+            orgLot(pool, material, location, 1, false));
+  }
+
+  @Test
+  void aJobOrderEarmarkSequencesTheLotOfItsRow() {
+    UUID pool = orgUnit("feed-order-pool");
+    UUID material = material("feed-tungsten");
+    UUID location = location("feed-lorville-2");
+    UUID row = stock(alice, material, location, 1, false, false, pool);
+    int before = orgChanges(pool).size();
+    UUID order = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO job_order (id, priority, created_at, updated_at, version, status,"
+            + " requesting_org_unit_id, responsible_org_unit_id, type)"
+            + " VALUES (?, 2, now(), now(), 0, 'OPEN', ?, ?, 'MATERIAL')",
+        order,
+        pool,
+        pool);
+
+    jdbc.update(
+        """
+        INSERT INTO inventory_item_job_order_allocation (id, inventory_item_id, job_order_id,
+                                                         amount, delivered, version, created_at,
+                                                         updated_at)
+        VALUES (?, ?, ?, 1, false, 0, now(), now())
+        """,
+        UUID.randomUUID(),
+        row,
+        order);
+
+    assertThat(orgChanges(pool).subList(before, orgChanges(pool).size()))
+        .extracting(OrgChange::key)
+        .containsExactly(orgLot(pool, material, location, 1, false));
+  }
+
+  @Test
+  void joiningAUnitAnnouncesEveryLotOfItsPoolOnce() {
+    UUID pool = orgUnit("feed-join-pool");
+    UUID material = material("feed-agricium-2");
+    UUID location = location("feed-grim-hex-2");
+    stock(bob, material, location, 1, false, false, pool);
+    stock(bob, material, location, 1, false, false, pool);
+    stock(bob, material, location, 1, true, false, pool);
+    int before = orgChanges(pool).size();
+
+    jdbc.update(
+        "INSERT INTO org_unit_membership (user_id, org_unit_id, role) VALUES (?, ?, 'MEMBER')",
+        alice,
+        pool);
+
+    assertThat(orgChanges(pool).subList(before, orgChanges(pool).size()))
+        .extracting(OrgChange::key)
+        .containsExactly(orgLot(pool, material, location, 1, false));
+  }
+
+  @Test
+  void anAppChangeOfQualityOrMaterialSequencesBothLotsOfThePool() {
+    UUID pool = orgUnit("feed-app-pool");
+    UUID material = material("feed-hephaestanite");
+    UUID other = material("feed-borase");
+    UUID location = location("feed-seraphim");
+    UUID row = stock(alice, material, location, 1, false, false, pool);
+    int before = orgChanges(pool).size();
+    source("app");
+
+    jdbc.update("UPDATE inventory_item SET quality = 7 WHERE id = ?", row);
+    jdbc.update("UPDATE inventory_item SET material_id = ? WHERE id = ?", other, row);
+
+    assertThat(orgChanges(pool).subList(before, orgChanges(pool).size()))
+        .extracting(OrgChange::key, OrgChange::channel)
+        .containsExactly(
+            org.assertj.core.groups.Tuple.tuple(orgLot(pool, material, location, 1, false), "app"),
+            org.assertj.core.groups.Tuple.tuple(orgLot(pool, material, location, 7, false), "app"),
+            org.assertj.core.groups.Tuple.tuple(orgLot(pool, material, location, 7, false), "app"),
+            org.assertj.core.groups.Tuple.tuple(orgLot(pool, other, location, 7, false), "app"));
+  }
+
+  @Test
+  void aMembershipMovedToAnotherUnitAnnouncesThatPool() {
+    UUID from = orgUnit("feed-membership-from");
+    UUID to = orgUnit("feed-membership-to");
+    UUID material = material("feed-aluminium");
+    UUID location = location("feed-tressler");
+    stock(bob, material, location, 1, false, false, to);
+    jdbc.update(
+        "INSERT INTO org_unit_membership (user_id, org_unit_id, role) VALUES (?, ?, 'MEMBER')",
+        alice,
+        from);
+    int before = orgChanges(to).size();
+
+    jdbc.update(
+        "UPDATE org_unit_membership SET org_unit_id = ? WHERE user_id = ? AND org_unit_id = ?",
+        to,
+        alice,
+        from);
+
+    assertThat(orgChanges(to).subList(before, orgChanges(to).size()))
+        .extracting(OrgChange::key)
+        .containsExactly(orgLot(to, material, location, 1, false));
+  }
+
+  @Test
+  void renamingAUnitAnnouncesEveryLotOfItsPool() {
+    UUID pool = orgUnit("feed-rename-pool");
+    UUID material = material("feed-bexalite");
+    UUID location = location("feed-area-18-3");
+    stock(bob, material, location, 1, false, false, pool);
+    int before = orgChanges(pool).size();
+
+    jdbc.update("UPDATE org_unit SET name = 'feed-renamed-pool' WHERE id = ?", pool);
+
+    assertThat(orgChanges(pool).subList(before, orgChanges(pool).size()))
+        .extracting(OrgChange::key)
+        .containsExactly(orgLot(pool, material, location, 1, false));
+  }
+
+  @Test
+  void theMigrationAnnouncesEachSharedLotOfEveryPoolOnce() throws Exception {
+    UUID pool = orgUnit("feed-backfill-pool");
+    UUID material = material("feed-diamond");
+    UUID location = location("feed-crusader");
+    stock(alice, material, location, 4, false, false, pool);
+    stock(bob, material, location, 4, false, false, pool);
+    stock(alice, material, location, 4, true, false, pool);
+    jdbc.update("DELETE FROM exchange_change WHERE org_unit_id = ?", pool);
+    String migration =
+        new String(
+            Objects.requireNonNull(
+                    getClass()
+                        .getResourceAsStream("/db/migration/V296__exchange_org_stock_feed.sql"))
+                .readAllBytes(),
+            StandardCharsets.UTF_8);
+
+    jdbc.execute(migration.substring(migration.lastIndexOf("INSERT INTO exchange_change")));
+
+    assertThat(orgChanges(pool))
+        .extracting(OrgChange::key, OrgChange::channel)
+        .containsExactly(
+            org.assertj.core.groups.Tuple.tuple(
+                orgLot(pool, material, location, 4, false), "system"));
+  }
+
+  @Test
+  void deletingAUnitDropsItsOrgFeedWithoutFailing() {
+    UUID pool = orgUnit("feed-gone-pool");
+    stock(alice, material("feed-silicon"), location("feed-arccorp"), 1, false, false, pool);
+    jdbc.update("DELETE FROM inventory_item WHERE owning_org_unit_id = ?", pool);
+
+    jdbc.update("DELETE FROM org_unit WHERE id = ?", pool);
+
+    assertThat(orgChanges(pool)).isEmpty();
+  }
+
+  @Test
   void deletingAMemberDropsTheirFeedWithoutFailing() {
     blueprint(alice, "a");
 
@@ -330,12 +650,35 @@ class ExchangeChangeFeedTriggerIntegrationTest {
       int quality,
       boolean personal,
       boolean stolen) {
+    return stock(owner, material, location, quality, personal, stolen, null);
+  }
+
+  /**
+   * Inserts a stock row of an org unit's pool directly, as a bulk path would.
+   *
+   * @param owner the holder
+   * @param material the material
+   * @param location the location
+   * @param quality the quality
+   * @param personal whether it is the holder's personal stock
+   * @param stolen whether it is stolen
+   * @param pool the owning org unit, or {@code null}
+   * @return the row id
+   */
+  private @NotNull UUID stock(
+      @NotNull UUID owner,
+      @NotNull UUID material,
+      @NotNull UUID location,
+      int quality,
+      boolean personal,
+      boolean stolen,
+      @Nullable UUID pool) {
     UUID id = UUID.randomUUID();
     jdbc.update(
         """
         INSERT INTO inventory_item (id, user_id, material_id, location_id, quality, amount,
-                                    personal, stolen)
-        VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+                                    personal, stolen, owning_org_unit_id)
+        VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)
         """,
         id,
         owner,
@@ -343,9 +686,77 @@ class ExchangeChangeFeedTriggerIntegrationTest {
         location,
         quality,
         personal,
-        stolen);
+        stolen,
+        pool);
     return id;
   }
+
+  /**
+   * Seeds an active squadron.
+   *
+   * @param name the unique name
+   * @return its id
+   */
+  private @NotNull UUID orgUnit(@NotNull String name) {
+    UUID id = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO org_unit (id, kind, name, shorthand, active, is_promotion_enabled,"
+            + " is_profit_eligible) VALUES (?, 'SQUADRON', ?, ?, TRUE, FALSE, FALSE)",
+        id,
+        name,
+        "F" + id.toString().substring(0, 8));
+    return id;
+  }
+
+  /**
+   * Builds the org-stock key of a material lot in a pool.
+   *
+   * @param pool the owning org unit
+   * @param material the material
+   * @param location the location
+   * @param quality the quality
+   * @param stolen whether it is stolen
+   * @return the key
+   */
+  private static @NotNull String orgLot(
+      @NotNull UUID pool,
+      @NotNull UUID material,
+      @NotNull UUID location,
+      int quality,
+      boolean stolen) {
+    return "u:"
+        + pool
+        + "|m:"
+        + material
+        + "|l:"
+        + location
+        + "|q:"
+        + quality
+        + "|s:"
+        + (stolen ? "1" : "0");
+  }
+
+  /**
+   * Lists a pool's org-stock feed entries in sequence order.
+   *
+   * @param pool the org unit
+   * @return the entries' keys and channels
+   */
+  private @NotNull List<OrgChange> orgChanges(@NotNull UUID pool) {
+    return jdbc.query(
+        "SELECT entity_key, source_channel FROM exchange_change"
+            + " WHERE org_unit_id = ? AND resource = 'ORG_STOCK' ORDER BY seq",
+        (rs, _) -> new OrgChange(rs.getString(1), rs.getString(2)),
+        pool);
+  }
+
+  /**
+   * One org-stock feed entry.
+   *
+   * @param key the org-stock lot key
+   * @param channel the writing channel
+   */
+  private record OrgChange(@NotNull String key, @NotNull String channel) {}
 
   /**
    * Seeds a material.

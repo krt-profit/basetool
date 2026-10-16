@@ -302,7 +302,7 @@
       },
       "type": "timeseries",
       "title": "Org stock pages/hour per client",
-      "description": "Org-stock snapshot pages the backend served (GET /exchange/v1/org-stock), per registry client: the shared stock of the units the reading member directly belongs to. A client re-reads the whole snapshot to refresh until the org-stock feed ships, so a steep rise is a client polling too often. REQ-XCH-042, ADR-0257.",
+      "description": "Org-stock snapshot and feed pages the backend served (GET /exchange/v1/org-stock), per registry client: the shared stock of the units the reading member directly belongs to. A steep rise is a client polling too often or re-reading the snapshot instead of following the feed. REQ-XCH-042, ADR-0257.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

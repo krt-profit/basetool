@@ -1847,10 +1847,10 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   guard held back; shown per day on panel 80 of the operations dashboard (REQ-XCH-015…-017,
   REQ-XCH-021). `ExchangeGuardStorm` fires when one client's batches are held more than 10 times an
   hour.
-- `basetool_exchange_org_stock_pages_total{client_id}` counter — org-stock snapshot pages the backend
-  served, by registered client; shown per hour on the „Exchange" dashboard beside the DPoP replay
-  refusals. Until the org-stock feed ships a client refreshes by re-reading the snapshot, so a steep
-  rise is a client polling too often (REQ-XCH-042).
+- `basetool_exchange_org_stock_pages_total{client_id}` counter — org-stock snapshot and feed pages
+  the backend served, by registered client; shown per hour on the „Exchange" dashboard beside the
+  DPoP replay refusals. A steep rise is a client polling too often or re-reading the snapshot
+  instead of following the feed (REQ-XCH-042).
 - `basetool_exchange_undo_total{client_id,resource,outcome}` counter — entries a member's undo of a
   client's writes, or an admin's bulk undo of it, restored or skipped (`restored` / `skipped`), by
   client and resource; shown on the same panel 80 (REQ-XCH-022, REQ-XCH-034). The bulk undo runs

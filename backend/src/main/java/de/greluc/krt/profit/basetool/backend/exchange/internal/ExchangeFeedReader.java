@@ -106,9 +106,58 @@ public class ExchangeFeedReader {
       @NotNull ExchangeFeedPosition after,
       int size) {
     long watermark = changeRepository.watermark();
-    List<ExchangeChangeRepository.ChangedKey> changed =
+    return page(
+        member,
+        after,
+        size,
+        watermark,
         changeRepository.findChangedKeys(
-            member, resource.name(), after.tx(), after.seq(), watermark, size + 1);
+            member, resource.name(), after.tx(), after.seq(), watermark, size + 1));
+  }
+
+  /**
+   * Returns the org-stock lot keys of the given units' pools that changed after a position, each
+   * once in the order of its latest change, only from finished transactions (REQ-XCH-042).
+   *
+   * @param member the member the client reads for, whose own installations a tombstone names
+   * @param units the units whose pools the member reads now
+   * @param after the position
+   * @param size the page size
+   * @return the keys, how each was last removed, and where the next page starts
+   */
+  public @NotNull Changes orgChanges(
+      @NotNull UUID member,
+      @NotNull Collection<UUID> units,
+      @NotNull ExchangeFeedPosition after,
+      int size) {
+    long watermark = changeRepository.watermark();
+    return page(
+        member,
+        after,
+        size,
+        watermark,
+        units.isEmpty()
+            ? List.of()
+            : changeRepository.findChangedOrgKeys(
+                units, after.tx(), after.seq(), watermark, size + 1));
+  }
+
+  /**
+   * Cuts the changed keys to one page and positions the next one.
+   *
+   * @param member the member the client reads for
+   * @param after the position the page starts after
+   * @param size the page size
+   * @param watermark the oldest transaction id still running when the keys were read
+   * @param changed up to {@code size + 1} changed keys in feed order
+   * @return the page's keys and the next position
+   */
+  private @NotNull Changes page(
+      @NotNull UUID member,
+      @NotNull ExchangeFeedPosition after,
+      int size,
+      long watermark,
+      @NotNull List<ExchangeChangeRepository.ChangedKey> changed) {
     boolean more = changed.size() > size;
     List<ExchangeChangeRepository.ChangedKey> delivered = more ? changed.subList(0, size) : changed;
     ExchangeFeedPosition next;
@@ -138,16 +187,17 @@ public class ExchangeFeedReader {
     if (delivered.isEmpty()) {
       return Map.of();
     }
-    Map<Long, ExchangeChange> latest =
+    Map<Long, ExchangeChangeRepository.Origin> latest =
         changeRepository
-            .findAllById(
+            .findOrigins(
                 delivered.stream().map(ExchangeChangeRepository.ChangedKey::getSeq).toList())
             .stream()
-            .collect(Collectors.toMap(ExchangeChange::getSeq, Function.identity()));
+            .collect(
+                Collectors.toMap(ExchangeChangeRepository.Origin::getSeq, Function.identity()));
     Map<String, String> installations = installationIds(member, latest.values());
     Map<String, Removal> removals = new HashMap<>();
     for (ExchangeChangeRepository.ChangedKey key : delivered) {
-      ExchangeChange change = Objects.requireNonNull(latest.get(key.getSeq()));
+      ExchangeChangeRepository.Origin change = Objects.requireNonNull(latest.get(key.getSeq()));
       removals.put(
           key.getEntityKey(),
           new Removal(
@@ -171,10 +221,10 @@ public class ExchangeFeedReader {
    * @return the opaque installation id by {@code client|key}
    */
   private @NotNull Map<String, String> installationIds(
-      @NotNull UUID member, @NotNull Collection<ExchangeChange> changes) {
+      @NotNull UUID member, @NotNull Collection<ExchangeChangeRepository.Origin> changes) {
     List<String> keys =
         changes.stream()
-            .map(ExchangeChange::getSourceKey)
+            .map(ExchangeChangeRepository.Origin::getSourceKey)
             .filter(Objects::nonNull)
             .distinct()
             .toList();

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -109,6 +110,55 @@ public interface ExchangeChangeRepository extends JpaRepository<ExchangeChange, 
       @Param("limit") int limit);
 
   /**
+   * Returns the org-stock lot keys of the given units' pools that changed after a feed position and
+   * below the watermark, each once with its latest entry, in the order of those entries
+   * (REQ-XCH-042).
+   *
+   * @param units the units whose pools are read; never empty
+   * @param tx the position's transaction id
+   * @param seq the position's sequence number
+   * @param watermark the oldest transaction id still running
+   * @param limit the most keys to return
+   * @return the changed keys
+   */
+  @Query(
+      value =
+          """
+          SELECT latest.entity_key AS entityKey, latest.tx AS tx, latest.seq AS seq
+          FROM (SELECT DISTINCT ON (c.entity_key) c.entity_key, c.tx, c.seq
+                FROM exchange_change c
+                WHERE c.org_unit_id IN (:units) AND c.resource = 'ORG_STOCK'
+                  AND (c.tx, c.seq) > (:tx, :seq) AND c.tx < :watermark
+                ORDER BY c.entity_key, c.tx DESC, c.seq DESC) latest
+          ORDER BY latest.tx, latest.seq
+          LIMIT :limit
+          """,
+      nativeQuery = true)
+  List<ChangedKey> findChangedOrgKeys(
+      @Param("units") Collection<UUID> units,
+      @Param("tx") long tx,
+      @Param("seq") long seq,
+      @Param("watermark") long watermark,
+      @Param("limit") int limit);
+
+  /**
+   * Returns when and by whom the given entries were written, for member and org-stock entries
+   * alike.
+   *
+   * @param seqs the entries' sequence numbers
+   * @return one origin per entry found
+   */
+  @Query(
+      value =
+          """
+          SELECT seq, changed_at AS changedAt, source_channel AS sourceChannel,
+                 source_client AS sourceClient, source_key AS sourceKey
+          FROM exchange_change WHERE seq IN (:seqs)
+          """,
+      nativeQuery = true)
+  List<Origin> findOrigins(@Param("seqs") Collection<Long> seqs);
+
+  /**
    * Returns the latest entry of one key, the one that tells who changed it last.
    *
    * @param userId the member
@@ -145,6 +195,45 @@ public interface ExchangeChangeRepository extends JpaRepository<ExchangeChange, 
      * @return the number
      */
     long getSeq();
+  }
+
+  /** When and through which channel an entry was written, as a native query returns it. */
+  interface Origin {
+
+    /**
+     * The entry's sequence number.
+     *
+     * @return the number
+     */
+    long getSeq();
+
+    /**
+     * When the entry was written.
+     *
+     * @return the time
+     */
+    Instant getChangedAt();
+
+    /**
+     * The writing channel: {@code web}, {@code app}, {@code client} or {@code system}.
+     *
+     * @return the channel
+     */
+    String getSourceChannel();
+
+    /**
+     * The registry client id when a client wrote it.
+     *
+     * @return the client id, or {@code null}
+     */
+    String getSourceClient();
+
+    /**
+     * The installation's key thumbprint when a client wrote it.
+     *
+     * @return the thumbprint, or {@code null}
+     */
+    String getSourceKey();
   }
 
   /** A changed key with the position of its latest entry. */

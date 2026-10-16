@@ -58,7 +58,7 @@ The exchange API is served by the ingest gateway at `/exchange/v1/**`
 | `POST /exchange/v1/org-stock/changes` | `exchange.orgstock.write` | REQ-XCH-045 |
 | `GET /exchange/v1/org-stock/units/{unit}/members` · `…/targets` | `exchange.orgstock.write` | REQ-XCH-045 |
 
-Of the three `org-stock` rows the read is built, as a snapshot (REQ-XCH-042); the writes, the
+Of the three `org-stock` rows the read is built, as a snapshot and a feed (REQ-XCH-042); the writes, the
 roster, the targets and the two `.details` capabilities are planned (ADR-0257), and until they are
 built the gateway serves none of them.
 | `POST /exchange/v1/me/drafts/blueprints` · `…/drafts/refinery-orders` | `exchange.drafts.blueprints` / `.refinery` | REQ-XCH-019 |
@@ -811,9 +811,7 @@ feed is sequenced at the database level, so writes that bypass the services — 
 provisioning, „delete all", admin purge, user deletion, org re-stamping, owner reassignment and a
 change of the default blueprint set — appear in it. Removals leave tombstones with `removedBy`
 (`web`, `app`, `client` with client id and installation id, `system`) and `removedAt`, kept 90 days
-and purged nightly. A cursor older than the tombstones answers `410 CURSOR_EXPIRED`. One interim
-exception: the org stock answers its own feed cursor `410 CURSOR_EXPIRED` until its feed is built
-(REQ-XCH-042, owner decision 2026-10-15).
+and purged nightly. A cursor older than the tombstones answers `410 CURSOR_EXPIRED`.
 
 The sequence is `exchange_change` (ADR-0224): an `AFTER` row trigger on every synced table records
 `(member, resource, key)` with its writing transaction's id and a sequence number, and the feed reads
@@ -829,8 +827,10 @@ purged position as the horizon, below which a cursor has expired.
 
 - [x] A test fails for any write path to the synced tables that bypasses the sequence.
   *`ExchangeChangeFeedTriggerIntegrationTest` pins the synced tables — `personal_blueprint`,
-  `default_blueprint`, `inventory_item` (the member's rows, personal and shared, keyed by lot),
-  `ship` and `org_unit` (the ships of a renamed unit) — to their triggers and runs bulk deletes,
+  `default_blueprint`, `inventory_item` (the member's rows, personal and shared, keyed by lot, and
+  the shared rows of a pool, keyed by unit lot), both allocation tables and `org_unit_membership`
+  (the org stock of REQ-XCH-042), `ship` and `org_unit` (the ships and lots of a renamed unit) — to
+  their triggers and runs bulk deletes,
   owner reassignment, a move to another place, a rebooking between personal and shared that leaves
   the lot unchanged, and user deletion through them. `V260` announced every lot holding shared rows
   once, as a `system` change, so a cursor taken before it still sees them (ADR-0230).*
@@ -2300,22 +2300,28 @@ other units never appear; the admin all-scope and pin never apply.
   departure takes effect on the next request.
 - **Feed.** Org stock is its own feed resource, keyed by unit instead of by member, with the
   cursor, tombstone, 90-day retention and `410 CURSOR_EXPIRED` rules of REQ-XCH-013. Its entries are
-  written by triggers on every change that alters a lot or the details of REQ-XCH-043: an
-  `inventory_item` insert or delete, a change of its amount, holder, material, item, location,
-  quality, „gestohlen", personal flag, owning org unit or note, an insert, update or delete on either
-  allocation table, and a holder's name change or name withholding (REQ-XCH-044), which announces
-  every lot the holder has an entry in. A rebooking between personal and shared therefore shows up
-  here although it changes no `/me/stock` lot.
+  `ORG_STOCK` rows of `exchange_change` that carry the unit (`org_unit_id`) and no member, and a feed
+  page reads only the units the member belongs to at that request, so changes of other units' rows
+  never reach it. The entries are written by triggers on every change that alters a lot or the
+  details of REQ-XCH-043: an `inventory_item` insert or delete, a change of its amount, holder,
+  material, item, location, quality, „gestohlen", personal flag, owning org unit or note, an insert,
+  update or delete on either allocation table, and a holder's name change or name withholding
+  (REQ-XCH-044), which announces every lot the holder has an entry in. A rebooking between personal
+  and shared therefore shows up here although it changes no `/me/stock` lot. Joining a unit
+  announces every lot of its pool, so a member whose cursor predates the join receives the pool
+  through the feed, and a rename of the unit announces them for the lots' `unit.name`. `V296`
+  announced every shared lot once, as a `system` change, so a cursor taken before it resumes
+  without a gap.
 - **Gates.** The pending-approval, role and terms gates of REQ-XCH-009 apply. A client may cache
   org stock for up to 7 days.
 - **Wire shape.** The answer is `page.schema.json#/$defs/orgStockPage`: the page members of
   REQ-XCH-013 plus `units[]` of `org-unit.schema.json`, its lots `org-stock-lot.schema.json` with
   `unit` `{id, name}` and `earmarked` `{jobOrders, missions}` as quantities in the lot's unit. A
   snapshot pages by each lot's lowest row id, as `/me/stock` does, and its last page carries the
-  feed cursor it was taken at (REQ-XCH-013). Until the feed is built, resuming with that cursor is
-  `410 CURSOR_EXPIRED`, so a client refreshes by reading a new snapshot; once it is built the same
-  cursor resumes the feed (owner decision 2026-10-15, an exception to REQ-XCH-013's use of the
-  code). The backend counts each page served as
+  feed cursor it was taken at (REQ-XCH-013); a feed page answers each changed lot once, with its
+  current state or a tombstone keyed like the lot. A tombstone's `installationId` names only an
+  installation of the reading member; another member's removal carries the channel and client
+  alone. The backend counts each page served, snapshot or feed, as
   `basetool_exchange_org_stock_pages_total{client_id}`.
 
 **Acceptance**
@@ -2330,14 +2336,19 @@ other units never appear; the admin all-scope and pin never apply.
 - [x] A client without `exchange.orgstock.read` granted and consented gets `403 SCOPE_MISSING`
   from the gateway before the relay, and the backend refuses a relayed request the same way.
   *`ExchangeOrgStockRouteTest`, `ExchangeOrgStockControllerTest`.*
-- [ ] Rebooking an entry from personal to shared, changing its unit, editing its note and adding an
-  earmark each produce an org-stock feed entry for the lot concerned.
-- [ ] After the member leaves a unit, the next page no longer lists the unit or its lots.
+- [x] Rebooking an entry from personal to shared, changing its unit, editing its note and adding an
+  earmark each produce an org-stock feed entry for the lot concerned, attributed to the writing
+  channel; changes of other units' rows do not reach the member's feed.
+  *`ExchangeChangeFeedTriggerIntegrationTest`, `ExchangeOrgStockControllerTest`.*
+- [x] After the member leaves a unit, the next page no longer lists the unit or its lots; after
+  joining one, the feed delivers its pool. *`ExchangeOrgStockControllerTest`.*
+- [ ] A holder's name change or name withholding announces their lots (with REQ-XCH-043/-044).
 
-**Code:** `ExchangeOrgStockController`, `ExchangeOrgStockService`, `StockReads#exchangeOrgLots`,
+**Code:** `ExchangeOrgStockController`, `ExchangeOrgStockService`, `StockReads#exchangeOrgLots` /
+`#exchangeOrgLotsByKeys`, `ExchangeFeedReader#orgChanges`, the `V296` triggers,
 `ExchangeController#orgStock` · **Status:** the snapshot, the capability (`V295`, the provisioner's
 `xchConsentOrgStockRead`), the schemas, the docs and the page counter built (#2586); the feed
-(#2587) remains
+built (#2587); the name announcements follow with the details (#2588)
 
 ### REQ-XCH-043 — A Logistician of the pool sees the single entries by name
 

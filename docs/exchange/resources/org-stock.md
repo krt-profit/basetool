@@ -68,10 +68,39 @@ a departure takes effect on the next request.
 Page the snapshot with `limit` (1 to 1000, default 500) and the `nextCursor` of the previous page
 while `hasMore` is `true`. A lot whose stock changes while you page may move to a later page.
 
-As for every resource, the last page carries a feed cursor: store it. **There is no org-stock feed
-yet**, so reading with that cursor is answered `410 CURSOR_EXPIRED`; read a new snapshot without
-`cursor`, exactly as after any expired cursor. The feed will be announced in the
-[changelog](../changelog.md); from then on the same cursor resumes it.
+## Following changes
+
+As for every resource, the last snapshot page carries a feed cursor: store it, and read with it
+later to get only what changed since ([sync guide](../sync-guide.md)). A feed page holds each
+changed lot once, in `items` with its current state or in `removed` as a tombstone keyed like the
+lot when the pool no longer holds any of it. Store the new `nextCursor` after every page.
+
+A lot changes when someone books stock into or out of the pool, moves it to another place, holder or
+unit, changes its quality, its stolen marker or its note, rebooks it between personal and shared,
+or earmarks it for a job order or a mission. A tombstone names the channel that removed the lot and,
+for a client, its `clientId`; `installationId` is set only when one of the member's own
+installations removed it.
+
+Every feed page lists `units` too. Drop the lots of a unit that is no longer listed. When the
+member joins a unit, the feed delivers every lot of its pool, so you never need a new snapshot for
+it. A cursor older than the 90-day tombstones is answered `410 CURSOR_EXPIRED`: read a new snapshot
+without `cursor`.
+
+```json
+{
+  "items": [ ],
+  "removed": [
+    {
+      "key": "u:7d1c2f4e-3b8a-4c55-9e21-6a0f3b2d9c10|m:c3b1e0c2-8a4e-4f64-9a51-2b9f5c7e0a11|l:5e2a9d71-0c4b-4f8e-b3a6-1d7c8e9f0a22|q:500|s:0",
+      "removedAt": "2026-10-16T09:12:44Z",
+      "removedBy": {"channel": "web"}
+    }
+  ],
+  "units": [ ],
+  "nextCursor": "f1.4802.0",
+  "hasMore": false
+}
+```
 
 You may keep org stock for up to 7 days. It is other members' stock: show it to the member who
 connected your client, and do not pass it on.

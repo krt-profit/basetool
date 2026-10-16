@@ -3,6 +3,14 @@
 Changes to the Exchange API contract, newest first. Every change within `v1` is additive
 ([versioning](versioning.md)).
 
+## 2026-10-16
+
+- **New: the org-stock feed.** The feed cursor on the last page of `GET /exchange/v1/org-stock`
+  now resumes a change feed instead of answering `410 CURSOR_EXPIRED`: each changed lot once, its
+  current state or a tombstone, with the units the member reads on every page. A member who joins a
+  unit receives its pool through the feed ([org stock](resources/org-stock.md#following-changes)).
+  No schema changes.
+
 ## 2026-10-15
 
 - **New: the org stock.** `GET /exchange/v1/org-stock` under the new scope `exchange.orgstock.read`
