@@ -132,7 +132,7 @@ public class InventoryCheckoutService {
   @Transactional
   public InventoryItemDto bookOutInventoryItem(
       UUID id, InventoryItemBookOutDto dto, UUID currentUserId, boolean isAdmin) {
-    return bookOut(id, dto, currentUserId, isAdmin, null).item();
+    return bookOut(id, dto, currentUserId, isAdmin, null, null).item();
   }
 
   /**
@@ -150,7 +150,7 @@ public class InventoryCheckoutService {
   @NotNull
   @Transactional(propagation = Propagation.MANDATORY)
   public StockChangeEffects bookOutForClient(UUID id, InventoryItemBookOutDto dto, UUID memberId) {
-    return bookOut(id, dto, memberId, false, StockChangeReason.STOCK).offers();
+    return bookOut(id, dto, memberId, false, StockChangeReason.STOCK, null).offers();
   }
 
   /**
@@ -165,7 +165,26 @@ public class InventoryCheckoutService {
   @NotNull
   @Transactional(propagation = Propagation.MANDATORY)
   StockChangeEffects bookOutForPool(UUID id, InventoryItemBookOutDto dto, UUID actorId) {
-    return bookOut(id, dto, actorId, true, null).offers();
+    return bookOut(id, dto, actorId, true, null, null).offers();
+  }
+
+  /**
+   * Transfers part of a shared row for a Logistician of its pool through a connected application,
+   * as {@link #bookOutInventoryItem} does with {@code TRANSFER}, into the given pool instead of the
+   * web's org-unit pick (REQ-XCH-045).
+   *
+   * @param id the row
+   * @param dto the transfer, of type {@code TRANSFER}
+   * @param actorId the writer, recorded as the actor
+   * @param targetPool the org unit whose pool receives the moved stock
+   * @return the moved stock's row after any merge, and the source's offer effects
+   */
+  @NotNull
+  @Transactional(propagation = Propagation.MANDATORY)
+  PoolTransfer transferForPool(
+      UUID id, InventoryItemBookOutDto dto, UUID actorId, @NotNull OrgUnit targetPool) {
+    BookOut done = bookOut(id, dto, actorId, true, null, targetPool);
+    return new PoolTransfer(Objects.requireNonNull(done.item()).id(), done.offers());
   }
 
   /**
@@ -177,6 +196,7 @@ public class InventoryCheckoutService {
    * @param isAdmin whether the caller may book out another member's row
    * @param offerReason the audit reason of the offer effects, or {@code null} for the checkout
    *     type's
+   * @param targetPool the pool a transfer moves into, or {@code null} for the org-unit pick
    * @return the remaining row, or {@code null} for a depleted discard or sale, and the offer
    *     effects
    */
@@ -186,7 +206,8 @@ public class InventoryCheckoutService {
       InventoryItemBookOutDto dto,
       UUID currentUserId,
       boolean isAdmin,
-      @Nullable StockChangeReason offerReason) {
+      @Nullable StockChangeReason offerReason,
+      @Nullable OrgUnit targetPool) {
     InventoryItem item =
         Entities.require(inventoryItemRepository.findById(id), "Inventory item not found");
 
@@ -254,7 +275,8 @@ public class InventoryCheckoutService {
           sourceLabel,
           materialName,
           depleted,
-          offerReason != null ? offerReason : StockChangeReason.TRANSFER);
+          offerReason != null ? offerReason : StockChangeReason.TRANSFER,
+          targetPool);
     }
     final StockChangeReason reason = offerReason != null ? offerReason : StockChangeReason.CHECKOUT;
     final TransferredLot bookedOutLot =
@@ -328,6 +350,7 @@ public class InventoryCheckoutService {
    * @param materialName the material name snapshot
    * @param depleted whether the source row depletes to zero
    * @param offerReason the audit reason of the source's offer effects
+   * @param targetPool the pool to stamp onto the new row, or {@code null} for the org-unit pick
    * @return the DTO of the newly created target row, and the source's offer effects
    * @throws NotFoundException when the target user or location is unknown
    * @throws BadRequestException when the transfer changes neither user nor location
@@ -342,7 +365,8 @@ public class InventoryCheckoutService {
       String sourceLabel,
       String materialName,
       boolean depleted,
-      @NotNull StockChangeReason offerReason) {
+      @NotNull StockChangeReason offerReason,
+      @Nullable OrgUnit targetPool) {
     final User sourceUser = item.getUser();
     final Location sourceLocation = item.getLocation();
     User targetUser = item.getUser();
@@ -365,8 +389,10 @@ public class InventoryCheckoutService {
     }
 
     final OrgUnit targetOwningOrgUnit =
-        ownerScopeService.resolveOrgUnitForPickerOutputNullable(
-            targetUser, dto.targetOwningOrgUnitId());
+        targetPool != null
+            ? targetPool
+            : ownerScopeService.resolveOrgUnitForPickerOutputNullable(
+                targetUser, dto.targetOwningOrgUnitId());
 
     InventoryItem newItem = new InventoryItem();
     newItem.setUser(targetUser);
@@ -1368,6 +1394,14 @@ public class InventoryCheckoutService {
    * @param offers the Materialbörse offers the book-out lowered and removed
    */
   private record BookOut(@Nullable InventoryItemDto item, @NotNull StockChangeEffects offers) {}
+
+  /**
+   * The outcome of a transfer into a pool.
+   *
+   * @param targetId the row that holds the moved stock, after any merge
+   * @param offers the Materialbörse offers the transfer lowered and removed on the source
+   */
+  record PoolTransfer(@NotNull UUID targetId, @NotNull StockChangeEffects offers) {}
 
   /**
    * One row a transfer action moved, snapshotted before the source row is reduced or deleted.

@@ -159,6 +159,7 @@ public class AdminAuditLogPageController {
                   "INVENTORY_ORG_RESTAMPED",
                   "INVENTORY_ORG_UNIT_CHANGED",
                   "INVENTORY_BULK_ORG_UNIT_CHANGED",
+                  "INVENTORY_POOL_CHANGED",
                   "INVENTORY_STOLEN_MARKED",
                   "INVENTORY_STOLEN_UNMARKED",
                   "INVENTORY_BULK_STOLEN_CHANGED",

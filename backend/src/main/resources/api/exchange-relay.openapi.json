@@ -3781,12 +3781,17 @@
           },
           "op" : {
             "type" : "string",
-            "pattern" : "^(book-in|book-out)$"
+            "pattern" : "^(book-in|book-out|sell|move-location|move-holder|move-pool|note|stolen)$"
           },
           "opId" : {
             "type" : "string",
             "maxLength" : 64,
             "minLength" : 1
+          },
+          "proceeds" : {
+            "type" : "number",
+            "maximum" : 999999999999999,
+            "minimum" : 0
           },
           "quality" : {
             "type" : "integer",
@@ -3800,6 +3805,15 @@
           "stolen" : {
             "type" : "boolean"
           },
+          "terminal" : {
+            "type" : "string",
+            "maxLength" : 120,
+            "minLength" : 1
+          },
+          "toUnit" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
           "unit" : {
             "type" : "string",
             "format" : "uuid"
@@ -3810,7 +3824,7 @@
             "minimum" : 0
           }
         },
-        "required" : [ "op", "quantity", "unit" ]
+        "required" : [ "op", "unit" ]
       },
       "ProblemDetail" : {
         "type" : "object",

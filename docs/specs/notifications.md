@@ -88,6 +88,7 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `MATERIAL_EXCHANGE_OFFER_UNAVAILABLE` | `MATERIAL_EXCHANGE_OFFER_UNAVAILABLE` | V277 | `EVENT_RECIPIENTS` (the members who registered interest); coded `reasonCode`; supersedes `MATERIAL_EXCHANGE_INTEREST_REGISTERED` | REQ-MARKET-021 |
 | `MATERIAL_REQUEST_UNAVAILABLE` | `MATERIAL_REQUEST_UNAVAILABLE` | V277 | `EVENT_RECIPIENTS` (the members who signalled they can supply); supersedes `MATERIAL_REQUEST_FULFILLMENT_SIGNALLED` | REQ-MARKET-022 |
 | `INVENTORY_BOOKED_OUT_BY_OTHER` | `INVENTORY_BOOKED_OUT_BY_OTHER` | V277 | `EVENT_RECIPIENT` (the row's owner); coded `actionCode`, one notice per action | REQ-INV-056 |
+| `INVENTORY_POOL_CHANGED_BY_OTHER` | `INVENTORY_POOL_CHANGED_BY_OTHER` | V300 | `EVENT_RECIPIENT` (the row's holder); `actor`, `fromUnit`, `toUnit`, `lots`; one notice per move, none when the holder moved it | REQ-INV-059 |
 | `BANK_BOOKING_REQUEST_APPROVED` | `BANK_BOOKING_REQUEST_APPROVED` | V278 | `ROLE` `BANK_MANAGEMENT`, `ACCOUNT_GRANT`, `EVENT_RECIPIENT` (the requester); cleared by the revocation and by confirm / reject / cancel | REQ-BANK-057 |
 | `BANK_BOOKING_REQUEST_APPROVAL_REVOKED` | none (no rule) | — | supersedes the request's `BANK_BOOKING_REQUEST_APPROVED` | REQ-BANK-057 |
 | `BANK_GRANT_CHANGED` | `BANK_GRANT_CHANGED` | V278 | `EVENT_RECIPIENT` (the grantee); supersedes the grantee's earlier grant notices for the account | REQ-BANK-058 |

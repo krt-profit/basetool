@@ -151,7 +151,8 @@ class AdminExchangeClientsPageControllerMvcTest {
             content()
                 .string(
                     containsString(
-                        "Lagerbestand in die gemeinsamen Lager der Einheiten ein- und ausbuchen")))
+                        "Gemeinsamen Lagerbestand der Einheiten, in denen du Logistiker bist, ein-"
+                            + " und ausbuchen")))
         .andExpect(
             content().string(containsString("id=\"xc-requestsPerMinute\" min=\"1\" max=\"1200\"")))
         .andExpect(

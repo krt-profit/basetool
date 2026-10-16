@@ -561,6 +561,39 @@
 <th:block th:if="${canMarkStolen}">
     <th:block th:replace="~{inventory/fragments/inventory-stolen-mark :: stolenMarkModal('inv-admin')}"></th:block>
 </th:block>
+
+<th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN)">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='poolChangeModal', titleKey='inventory.poolChange.modal.title', variant='krt-modal--wide', closeTrigger='inv-admin-close-pool', body=~{::poolChangeModal-body})}">
+    <th:block th:ref="poolChangeModal-body">
+        <form id="poolChangeForm">
+        <div class="krt-modal-body">
+            <p id="poolChangeMessage" class="lager-modal-message"></p>
+            <div class="form-group mb-1">
+                <label for="poolChangeTarget" class="form-label" th:text="#{inventory.poolChange.target}">Ziel-Einheit</label>
+                <select id="poolChangeTarget" class="w-full" data-testid="pool-change-target"></select>
+                <p id="poolChangeNoTarget" class="form-hint is-hidden" th:text="#{inventory.poolChange.noTarget}">Keine andere Einheit des Inhabers, in der du Logistiker bist.</p>
+            </div>
+            <div class="form-group mb-1">
+                <label for="poolChangeAmount" class="form-label" th:text="#{inventory.poolChange.amount}">Menge</label>
+                <input type="number" id="poolChangeAmount" class="w-full" min="0" step="any" data-testid="pool-change-amount">
+                <p class="form-hint" th:text="#{inventory.poolChange.amount.hint}">Der ganze Eintrag beh&auml;lt seine Reservierungen; eine Teilmenge kommt aus dem freien Bestand.</p>
+            </div>
+            <div class="form-group check-row mb-1">
+                <input type="checkbox" id="poolChangeMergeStock">
+                <div>
+                    <label for="poolChangeMergeStock" th:text="#{inventory.merge.label}">Mit vorhandenem Bestand zusammenf&uuml;hren</label>
+                    <p class="form-hint" th:text="#{inventory.merge.help}">F&uuml;gt diese Menge mit vorhandenem, gleichartigem Bestand zu einem Eintrag zusammen.</p>
+                </div>
+            </div>
+        </div>
+        <div class="krt-modal-foot">
+            <button type="button" class="btn btn-ghost" data-trigger="inv-admin-close-pool" th:text="#{inventory.poolChange.cancel}">Abbrechen</button>
+            <button type="submit" id="poolChangeSubmitBtn" class="btn btn--cta" data-testid="pool-change-submit" th:text="#{inventory.poolChange.confirm}">Pool wechseln</button>
+        </div>
+        </form>
+    </th:block>
+</th:block>
+</th:block>
 </th:block>
 <th:block th:fragment="pageTail">
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
@@ -590,6 +623,14 @@
         success: /*[[#{success.inventory.rebook}]]*/ 'Eintrag erfolgreich umgebucht',
         error: /*[[#{error.inventory.rebook.failed}]]*/ 'Fehler beim Umbuchen des Eintrags',
         unchanged: /*[[#{error.inventory.rebook.unchanged}]]*/ 'Wähle einen anderen Nutzer oder Ort als den aktuellen.'
+    };
+
+    var poolChangeI18n = {
+        message: /*[[#{inventory.poolChange.modal.message}]]*/ 'In welches Lager soll dieser Eintrag aus {0} wechseln?',
+        success: /*[[#{inventory.poolChange.success}]]*/ 'Eintrag in das andere Lager verschoben.',
+        error: /*[[#{inventory.poolChange.error}]]*/ 'Der Eintrag konnte nicht verschoben werden.',
+        loadError: /*[[#{inventory.poolChange.loadError}]]*/ 'Die Einheiten konnten nicht geladen werden.',
+        invalidAmount: /*[[#{inventory.poolChange.invalidAmount}]]*/ 'Bitte eine Menge zwischen 0 und dem Bestand eingeben.'
     };
 
     var noteI18n = {

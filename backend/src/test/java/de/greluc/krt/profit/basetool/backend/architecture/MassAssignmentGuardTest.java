@@ -51,6 +51,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemBoo
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemCreateDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemOrgUnitChangeDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemPersonalRebookDto;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemPoolChangeDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateClaimDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderItemRequestDto;
@@ -247,6 +248,12 @@ class MassAssignmentGuardTest {
           Map.entry(BulkOrgUnitChangeRequest.class, Map.of("targetOwningOrgUnitId", MOVE_TARGET)),
           Map.entry(
               InventoryItemOrgUnitChangeDto.class, Map.of("targetOwningOrgUnitId", MOVE_TARGET)),
+          Map.entry(
+              InventoryItemPoolChangeDto.class,
+              Map.of(
+                  "targetOwningOrgUnitId",
+                  "the receiving pool, a direct membership of the holder in which the caller is a"
+                      + " Logistician, checked by InventoryPoolChangeService.changePool")),
           Map.entry(BulkRebookRequest.class, Map.of("targetOwningOrgUnitId", REBOOK_TARGET)),
           Map.entry(InventoryItemBookOutDto.class, Map.of("targetOwningOrgUnitId", REBOOK_TARGET)),
           Map.entry(

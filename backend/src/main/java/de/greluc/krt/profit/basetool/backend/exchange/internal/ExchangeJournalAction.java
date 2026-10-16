@@ -34,7 +34,13 @@ public enum ExchangeJournalAction {
   SHIP_UPSERT(ExchangeResource.SHIP),
   SHIP_REMOVE(ExchangeResource.SHIP),
   ORG_STOCK_BOOK_IN(ExchangeResource.ORG_STOCK),
-  ORG_STOCK_BOOK_OUT(ExchangeResource.ORG_STOCK);
+  ORG_STOCK_BOOK_OUT(ExchangeResource.ORG_STOCK),
+  ORG_STOCK_SELL(ExchangeResource.ORG_STOCK),
+  ORG_STOCK_MOVE_LOCATION(ExchangeResource.ORG_STOCK),
+  ORG_STOCK_MOVE_HOLDER(ExchangeResource.ORG_STOCK),
+  ORG_STOCK_MOVE_POOL(ExchangeResource.ORG_STOCK),
+  ORG_STOCK_NOTE(ExchangeResource.ORG_STOCK),
+  ORG_STOCK_STOLEN(ExchangeResource.ORG_STOCK);
 
   /** The resource the action belongs to. */
   @NotNull private final ExchangeResource resource;

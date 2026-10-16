@@ -623,6 +623,18 @@
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-rebook"/></svg>
                 </button>
                 <button type="button" class="btn btn-ghost btn-xs btn-icon"
+                        th:if="${entry.canEdit == true and entry.owningSquadron != null}"
+                        th:data-id="${entry.id}"
+                        th:data-version="${entry.version}"
+                        th:data-amount="${entry.amount}"
+                        th:data-quantity-type="${entry.material.quantityType}"
+                        th:data-org-unit-name="${entry.owningSquadron.name}"
+                        data-trigger="inv-admin-pool"
+                        data-testid="pool-change-open"
+                        th:title="#{inventory.poolChange.action}" th:aria-label="#{inventory.poolChange.action}">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-swap"/></svg>
+                </button>
+                <button type="button" class="btn btn-ghost btn-xs btn-icon"
                         th:if="${canMarkStolen == true and entry.canEdit == true}"
                         th:data-id="${entry.id}"
                         th:data-version="${entry.version}"
@@ -760,6 +772,18 @@
                         data-trigger="inv-admin-umbuchen"
                         th:title="#{inventory.rebook.action}" th:aria-label="#{inventory.rebook.action}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-rebook"/></svg>
+                </button>
+                <button type="button" class="btn btn-ghost btn-xs btn-icon"
+                        th:if="${entry.canEdit == true and entry.owningSquadron != null}"
+                        th:data-id="${entry.id}"
+                        th:data-version="${entry.version}"
+                        th:data-amount="${entry.amount}"
+                        data-quantity-type="PIECE"
+                        th:data-org-unit-name="${entry.owningSquadron.name}"
+                        data-trigger="inv-admin-pool"
+                        data-testid="pool-change-open"
+                        th:title="#{inventory.poolChange.action}" th:aria-label="#{inventory.poolChange.action}">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-swap"/></svg>
                 </button>
                 <button type="button" class="btn btn-ghost btn-xs btn-icon"
                         th:if="${canMarkStolen == true and entry.canEdit == true}"

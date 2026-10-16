@@ -5,6 +5,12 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
 
 ## 2026-10-16
 
+- **New: org-stock sale, moves, note and stolen.** `POST /exchange/v1/org-stock/changes` gains the
+  ops `sell` (with `terminal` and `proceeds`, mission shares booked as in the Basetool),
+  `move-location`, `move-holder` (to a member of a unit the member is a Logistician of, with
+  `toUnit`), `move-pool` (into another pool of the entry's holder), `note` and `stolen` (the whole
+  entry or a part)
+  ([org stock](resources/org-stock.md#writing)); new per-op reason `STOCK_OFFERED`.
 - **New: org-stock writes.** Under the new scope `exchange.orgstock.write`, a Logistician of a unit
   books stock into the unit's pool for a member of the unit (`book-in`) and books an entry out
   (`book-out`) through `POST /exchange/v1/org-stock/changes`; `GET /exchange/v1/org-stock/members`

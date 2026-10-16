@@ -261,6 +261,13 @@ public enum NotificationType {
   INVENTORY_BOOKED_OUT_BY_OTHER,
 
   /**
+   * Somebody else moved the recipient's shared Lager stock into another pool (REQ-INV-059),
+   * rendered with {@code actor}, the {@code fromUnit} and {@code toUnit} names and the {@code
+   * lots}.
+   */
+  INVENTORY_POOL_CHANGED_BY_OTHER,
+
+  /**
    * A booking request is approved and ready to confirm (REQ-BANK-057), rendered with {@code type},
    * {@code amount}, {@code accountNo} and {@code approver}.
    */
@@ -500,6 +507,7 @@ public enum NotificationType {
           MATERIAL_EXCHANGE_OFFER_UNAVAILABLE,
           MATERIAL_REQUEST_UNAVAILABLE,
           INVENTORY_BOOKED_OUT_BY_OTHER,
+          INVENTORY_POOL_CHANGED_BY_OTHER,
           BANK_BOOKING_REQUEST_APPROVED,
           BANK_GRANT_CHANGED,
           BANK_GRANT_REVOKED,

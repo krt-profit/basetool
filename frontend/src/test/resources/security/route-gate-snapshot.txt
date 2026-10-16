@@ -328,6 +328,8 @@
 /inventory/{id}/note PUT -> InventoryWriteController#updateInventoryItemNote gate=class:isAuthenticated() layout=yes
 /inventory/{id}/org-unit POST -> InventoryOrgUnitChangeProxyController#changeOrgUnit gate=class:isAuthenticated() layout=no
 /inventory/{id}/personal-rebook POST -> InventoryWriteController#rebookPersonalInventoryItem gate=class:isAuthenticated() layout=yes
+/inventory/{id}/pool POST -> InventoryPoolChangeProxyController#changePool gate=class:isAuthenticated() layout=no
+/inventory/{id}/pool-targets GET -> InventoryPoolChangeProxyController#poolTargets gate=class:isAuthenticated() layout=no
 /inventory/{id}/stolen POST -> InventoryStolenMarkProxyController#markStolen gate=class:isAuthenticated() layout=no
 /inventory/{id}/transfer POST -> InventoryWriteController#transferInventoryItem gate=class:isAuthenticated() layout=yes
 /licenses GET -> OssLicensesController#showLicenses gate=none layout=yes

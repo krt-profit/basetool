@@ -38,15 +38,18 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemCre
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemNoteUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemOrgUnitChangeDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemPersonalRebookDto;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemPoolChangeDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemStolenMarkDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryMergeCandidatesDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryOrgUnitChangeService;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryPoolChangeService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStolenMarkService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitReferenceDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -138,6 +141,7 @@ public class InventoryItemController {
 
   private final InventoryItemService inventoryItemService;
   private final InventoryOrgUnitChangeService inventoryOrgUnitChangeService;
+  private final InventoryPoolChangeService inventoryPoolChangeService;
   private final InventoryStolenMarkService inventoryStolenMarkService;
   private final InventoryAggregationService inventoryAggregationService;
   private final UserService userService;
@@ -870,6 +874,66 @@ public class InventoryItemController {
       @PathVariable @NotNull UUID id,
       @RequestBody @Valid InventoryItemOrgUnitChangeDto dto) {
     return inventoryOrgUnitChangeService.changeOrgUnit(id, dto, userService.getUserIdFromJwt(jwt));
+  }
+
+  /**
+   * Moves a shared row, or a part of it, into the pool of another org unit its holder directly
+   * belongs to (REQ-INV-059), for a Logistician of both units.
+   *
+   * @param jwt the caller's token
+   * @param id the row
+   * @param dto the version, the target unit, the part and the merge opt-in
+   * @return the row that holds the moved stock, or the stack row it was merged into
+   */
+  @Operation(
+      summary = "Move a shared row into another pool",
+      description =
+          "Moves a shared row, or a part split off its free stock, into the pool of another org"
+              + " unit the holder directly belongs to. The caller must be a Logistician of both"
+              + " units. Merges per the stock-merge rules, notifies the holder when somebody else"
+              + " moved it, and applies optimistic locking via the version field.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Moved; the resulting row is returned"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "A personal row, a holder outside the unit, or an invalid part"),
+    @ApiResponse(responseCode = "403", description = "Not a Logistician of both units"),
+    @ApiResponse(responseCode = "404", description = "Inventory item or org unit not found"),
+    @ApiResponse(
+        responseCode = "409",
+        description = "Optimistic locking conflict, or the rest would fall below its offer"),
+    @ApiResponse(responseCode = "422", description = "The rest could not carry its earmarks")
+  })
+  @PostMapping("/{id}/pool")
+  @PreAuthorize("isAuthenticated() and @inventoryAccessPolicy.canEditInventoryItem(#id)")
+  public InventoryItemDto changePool(
+      @AuthenticationPrincipal Jwt jwt,
+      @PathVariable @NotNull UUID id,
+      @RequestBody @Valid InventoryItemPoolChangeDto dto) {
+    return inventoryPoolChangeService.changePool(id, dto, userService.getUserIdFromJwt(jwt));
+  }
+
+  /**
+   * Lists the pools the caller may move a shared row into (REQ-INV-059).
+   *
+   * @param id the row
+   * @return the holder's other units in which the caller is a Logistician, by name
+   */
+  @Operation(
+      summary = "List the pools a shared row may move into",
+      description =
+          "The org units the row's holder directly belongs to, other than the row's own, in which"
+              + " the caller is a Logistician; empty for a personal row or when the caller is no"
+              + " Logistician of the row's pool.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "The units"),
+    @ApiResponse(responseCode = "403", description = "Access denied"),
+    @ApiResponse(responseCode = "404", description = "Inventory item not found")
+  })
+  @GetMapping("/{id}/pool-targets")
+  @PreAuthorize("isAuthenticated() and @inventoryAccessPolicy.canEditInventoryItem(#id)")
+  public List<OrgUnitReferenceDto> poolTargets(@PathVariable @NotNull UUID id) {
+    return inventoryPoolChangeService.poolTargets(id);
   }
 
   /**

@@ -38,6 +38,7 @@ import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
 import { krtInventory } from '/js/inventory/inventory-common.js';
 import { krtHerkunft } from '/js/inventory/inventory-herkunft.js';
 import { inventoryHooks } from '/js/inventory/inventory-hooks.js';
+import { initPoolChange } from '/js/inventory/inventory-pool-change.js';
 
 const adminLager = /** @type {KrtInventoryApi} */ (krtInventory).createLager({
     triggerPrefix: 'inv-admin',
@@ -827,5 +828,11 @@ const adminUmbuchenFormEl = document.getElementById('umbuchenForm');
 if (adminUmbuchenFormEl) {
     adminUmbuchenFormEl.addEventListener('submit', submitUmbuchen);
 }
+
+initPoolChange(() => {
+    filterInventory();
+    broadcastInventoryAllChanged();
+    adminLager.broadcastBoardChanged();
+});
 
 adminLager.bind();

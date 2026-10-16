@@ -88,7 +88,8 @@
       "inventory/inventory-material.js",
       "inventory/inventory-materialboerse.js",
       "inventory/inventory-my.js",
-      "inventory/inventory-note-modal.js"
+      "inventory/inventory-note-modal.js",
+      "inventory/inventory-pool-change.js"
     ],
     "joborder": [
       "joborder/item-collection.js",

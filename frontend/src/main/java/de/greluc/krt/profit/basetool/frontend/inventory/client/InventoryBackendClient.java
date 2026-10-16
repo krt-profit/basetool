@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemNoteUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemOrgUnitChangeDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemPersonalRebookDto;
+import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemPoolChangeDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemStolenMarkDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryMergeCandidatesDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderReferenceDto;
@@ -46,6 +47,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemRefe
 import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MissionReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.OrgUnitReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
@@ -76,6 +78,9 @@ public class InventoryBackendClient {
 
   private static final ParameterizedTypeReference<PageResponse<AggregatedInventoryDto>>
       AGGREGATED_INVENTORY_PAGE = new ParameterizedTypeReference<>() {};
+
+  private static final ParameterizedTypeReference<List<OrgUnitReferenceDto>> ORG_UNIT_LIST =
+      new ParameterizedTypeReference<>() {};
 
   private static final ParameterizedTypeReference<PageResponse<InventoryItemDto>>
       INVENTORY_ITEM_PAGE = new ParameterizedTypeReference<>() {};
@@ -774,6 +779,32 @@ public class InventoryBackendClient {
       @NotNull UUID id, @NotNull InventoryItemOrgUnitChangeDto request) {
     return backendApiClient.post(
         "/api/v1/inventory/{id}/org-unit", request, InventoryItemDto.class, id);
+  }
+
+  /**
+   * Moves a shared row, or a part of it, into another pool of its holder (REQ-INV-059).
+   *
+   * @param id the row
+   * @param request the version, target unit, part and merge opt-in
+   * @return the row that holds the moved stock, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public InventoryItemDto changePool(
+      @NotNull UUID id, @NotNull InventoryItemPoolChangeDto request) {
+    return backendApiClient.post(
+        "/api/v1/inventory/{id}/pool", request, InventoryItemDto.class, id);
+  }
+
+  /**
+   * Lists the pools the caller may move a shared row into (REQ-INV-059).
+   *
+   * @param id the row
+   * @return the holder's other units in which the caller is a Logistician, or {@code null} when the
+   *     backend sent no body
+   */
+  @Nullable
+  public List<OrgUnitReferenceDto> poolTargets(@NotNull UUID id) {
+    return backendApiClient.get("/api/v1/inventory/{id}/pool-targets", ORG_UNIT_LIST, id);
   }
 
   /**

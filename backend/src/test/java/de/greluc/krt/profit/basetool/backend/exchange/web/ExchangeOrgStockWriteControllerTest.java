@@ -62,6 +62,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.web.FilterChainProxy;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -69,12 +70,13 @@ import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * A Logistician of a pool books stock in for a member of the unit and books another member's entry
- * out through the exchange, with the Lager's rules, audit, notifications and journal; every other
- * pool, personal entry, stale version and unlisted holder is refused per op (REQ-XCH-045,
- * REQ-XCH-046, REQ-XCH-044).
+ * A Logistician of a pool books stock in for a member of the unit, books out, sells and moves
+ * another member's entry and edits its note and stolen marker through the exchange, with the
+ * Lager's rules, audit, notifications and journal; every other pool, personal entry, stale version
+ * and unlisted holder is refused per op (REQ-XCH-045, REQ-XCH-046, REQ-XCH-044).
  */
 @SpringBootTest
+@TestPropertySource(properties = "app.inventory.stolen-marking-enabled=true")
 class ExchangeOrgStockWriteControllerTest {
 
   private static final String CHANGES = "/api/v1/exchange/org-stock/changes";
@@ -141,7 +143,14 @@ class ExchangeOrgStockWriteControllerTest {
       jdbc.update("DELETE FROM notification WHERE recipient_user_id = ?", id);
     }
     jobOrders.forEach(id -> jdbc.update("DELETE FROM job_order WHERE id = ?", id));
-    missions.forEach(id -> jdbc.update("DELETE FROM mission WHERE id = ?", id));
+    for (UUID id : missions) {
+      jdbc.update(
+          "DELETE FROM mission_finance_entry WHERE mission_participant_id IN"
+              + " (SELECT id FROM mission_participant WHERE mission_id = ?)",
+          id);
+      jdbc.update("DELETE FROM mission_participant WHERE mission_id = ?", id);
+      jdbc.update("DELETE FROM mission WHERE id = ?", id);
+    }
     users.forEach(id -> jdbc.update("DELETE FROM app_user WHERE id = ?", id));
     orgUnits.reversed().forEach(id -> jdbc.update("DELETE FROM org_unit WHERE id = ?", id));
     materials.forEach(id -> jdbc.update("DELETE FROM material WHERE id = ?", id));
@@ -590,6 +599,624 @@ class ExchangeOrgStockWriteControllerTest {
         .perform(relayed(get(MEMBERS).param("unit", staffel.toString()), "exchange.orgstock.read"))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value("SCOPE_MISSING"));
+  }
+
+  @Test
+  void aSaleOfAnotherMembersEntryBooksTheMissionShareOfTheProceedsAsTheWebDoes() throws Exception {
+    UUID staffel = orgUnit();
+    joins(member, staffel, true);
+    joins(holder, staffel, false);
+    UUID entry = stock(holder, material("SCU"), location(), 10, staffel, false);
+    UUID mission = mission();
+    earmarkToMission(entry, mission, 4);
+    UUID participant = participates(mission, member);
+
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), WRITE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    ops(
+                        entryOp(
+                            "sell",
+                            staffel,
+                            entry,
+                            0,
+                            ",\"quantity\":{\"amount\":4,\"unit\":\"SCU\"},\"terminal\":\"TDD"
+                                + " Area18\",\"proceeds\":1000,\"fromMissions\":[{\"mission\":\""
+                                + mission
+                                + "\",\"quantity\":{\"amount\":4,\"unit\":\"SCU\"}}]"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(1));
+
+    assertThat(amountOf(entry)).isEqualTo(6);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM inventory_item_mission_allocation WHERE inventory_item_id ="
+                    + " ?",
+                Long.class,
+                entry))
+        .isZero();
+    Map<String, Object> finance =
+        jdbc.queryForMap(
+            "SELECT * FROM mission_finance_entry WHERE mission_participant_id = ?", participant);
+    assertThat(finance.get("type")).isEqualTo("INCOME");
+    assertThat(((Number) finance.get("amount")).doubleValue()).isEqualTo(1000);
+    Map<String, Object> audit =
+        jdbc.queryForMap(
+            "SELECT * FROM audit_event WHERE subject_id = ? AND event_type = 'INVENTORY_ITEM_SOLD'",
+            entry);
+    assertThat(audit.get("actor_user_id")).isEqualTo(member);
+    assertThat(audit.get("target_user_id")).isEqualTo(holder);
+    assertThat(audit.get("client_id")).isEqualTo(client);
+    assertThat(notificationsOf(holder)).isPositive();
+    Map<String, Object> journal =
+        jdbc.queryForMap("SELECT * FROM exchange_journal WHERE entity_key = ?", entry.toString());
+    assertThat(journal.get("action")).isEqualTo("ORG_STOCK_SELL");
+    assertThat(journal.get("removal")).isEqualTo(true);
+  }
+
+  @Test
+  void aMoveToAnotherLocationKeepsHolderAndPoolAndIsAuditedAsATransfer() throws Exception {
+    UUID staffel = orgUnit();
+    joins(member, staffel, true);
+    joins(holder, staffel, false);
+    UUID titanium = material("SCU");
+    UUID entry = stock(holder, titanium, location(), 10, staffel, false);
+    UUID hangar = location();
+    long feed = feedRowsOf(staffel);
+
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), WRITE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    ops(
+                        entryOp(
+                            "move-location",
+                            staffel,
+                            entry,
+                            0,
+                            ",\"quantity\":{\"amount\":4,\"unit\":\"SCU\"},\"location\":{\"name\":"
+                                + "\"Writes "
+                                + hangar
+                                + "\"}"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(1));
+
+    assertThat(amountOf(entry)).isEqualTo(6);
+    Map<String, Object> moved =
+        jdbc.queryForMap("SELECT * FROM inventory_item WHERE location_id = ?", hangar);
+    assertThat(moved.get("user_id")).isEqualTo(holder);
+    assertThat(moved.get("owning_org_unit_id")).isEqualTo(staffel);
+    assertThat(moved.get("personal")).isEqualTo(false);
+    assertThat(((Number) moved.get("amount")).doubleValue()).isEqualTo(4);
+    Map<String, Object> audit =
+        jdbc.queryForMap(
+            "SELECT * FROM audit_event WHERE subject_id = ? AND event_type ="
+                + " 'INVENTORY_ITEM_TRANSFERRED'",
+            entry);
+    assertThat(audit.get("actor_user_id")).isEqualTo(member);
+    assertThat(audit.get("client_id")).isEqualTo(client);
+    assertThat(
+            jdbc.queryForList(
+                "SELECT action FROM exchange_journal WHERE user_id = ? AND removal = false",
+                String.class,
+                member))
+        .containsExactly("ORG_STOCK_MOVE_LOCATION", "ORG_STOCK_MOVE_LOCATION");
+    assertThat(feedRowsOf(staffel)).isGreaterThan(feed);
+  }
+
+  @Test
+  void aMoveToAMemberOfAnotherLogisticianUnitLandsInThatUnitsPoolAndTellsBothHolders()
+      throws Exception {
+    UUID staffel = orgUnit();
+    UUID other = orgUnit();
+    joins(member, staffel, true);
+    joins(member, other, true);
+    joins(holder, staffel, false);
+    UUID receiver = user("receiver");
+    joins(receiver, other, false);
+    UUID titanium = material("SCU");
+    UUID area18 = location();
+    UUID entry = stock(holder, titanium, area18, 10, staffel, false);
+
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), WRITE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(ops(moveHolder(staffel, entry, "4", other, ref(other, receiver)))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(1));
+
+    assertThat(amountOf(entry)).isEqualTo(6);
+    Map<String, Object> moved =
+        jdbc.queryForMap(
+            "SELECT * FROM inventory_item WHERE user_id = ? AND material_id = ?",
+            receiver,
+            titanium);
+    assertThat(moved.get("owning_org_unit_id")).isEqualTo(other);
+    assertThat(moved.get("location_id")).isEqualTo(area18);
+    assertThat(((Number) moved.get("amount")).doubleValue()).isEqualTo(4);
+    assertThat(
+            jdbc.queryForMap(
+                    "SELECT * FROM audit_event WHERE subject_id = ? AND event_type ="
+                        + " 'INVENTORY_ITEM_TRANSFERRED'",
+                    entry)
+                .get("target_user_id"))
+        .isEqualTo(receiver);
+    assertThat(notificationsOf(holder)).isPositive();
+    assertThat(notificationsOf(receiver)).isPositive();
+    Map<String, Object> source =
+        jdbc.queryForMap("SELECT * FROM exchange_journal WHERE entity_key = ?", entry.toString());
+    assertThat(source.get("action")).isEqualTo("ORG_STOCK_MOVE_HOLDER");
+    assertThat(source.get("removal")).isEqualTo(true);
+    assertThat(
+            jdbc.queryForMap(
+                    "SELECT * FROM exchange_journal WHERE entity_key = ?",
+                    moved.get("id").toString())
+                .get("removal"))
+        .isEqualTo(false);
+  }
+
+  @Test
+  void aMoveToAMemberOutsideTheWritersLogisticianUnitsOrWhoWithholdsTheirNameIsRefused()
+      throws Exception {
+    UUID staffel = orgUnit();
+    UUID plain = orgUnit();
+    joins(member, staffel, true);
+    joins(member, plain, false);
+    joins(holder, staffel, false);
+    UUID outsider = user("outsider");
+    joins(outsider, plain, false);
+    UUID hidden = user("hidden");
+    joins(hidden, staffel, false);
+    String hiddenRef = ref(staffel, hidden);
+    withholds(hidden, true);
+    UUID entry = stock(holder, material("SCU"), location(), 10, staffel, false);
+
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), WRITE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    ops(
+                        moveHolder(staffel, entry, "1", plain, "any-ref"),
+                        moveHolder(staffel, entry, "1", staffel, hiddenRef),
+                        moveHolder(staffel, entry, "1", staffel, "not-a-ref"),
+                        moveHolder(staffel, entry, "1", staffel, ref(staffel, holder)))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(0))
+        .andExpect(jsonPath("$.unchanged").value(1))
+        .andExpect(jsonPath("$.results[0].reason").value("NOT_PERMITTED"))
+        .andExpect(jsonPath("$.results[1].reason").value("HOLDER_UNKNOWN"))
+        .andExpect(jsonPath("$.results[2].reason").value("HOLDER_UNKNOWN"))
+        .andExpect(jsonPath("$.results[3].result").value("unchanged"));
+
+    assertThat(amountOf(entry)).isEqualTo(10);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM inventory_item WHERE user_id IN (?, ?)",
+                Long.class,
+                outsider,
+                hidden))
+        .isZero();
+  }
+
+  @Test
+  void aMoveOfPieceStockMergesIntoTheReceiversEntryAndJournalsTheFoldedEntry() throws Exception {
+    UUID staffel = orgUnit();
+    UUID other = orgUnit();
+    joins(member, staffel, true);
+    joins(member, other, true);
+    UUID receiver = user("receiver");
+    joins(receiver, other, false);
+    UUID beacon = material("PIECE");
+    UUID area18 = location();
+    UUID entry = stock(holder, beacon, area18, 5, staffel, false);
+    UUID existing = stock(receiver, beacon, area18, 3, other, false);
+
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), WRITE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    ops(
+                        moveHolder(staffel, entry, "2", other, ref(other, receiver))
+                            .replace("\"SCU\"", "\"PIECE\""))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(1));
+
+    assertThat(
+            jdbc.queryForList(
+                "SELECT amount FROM inventory_item WHERE user_id = ? AND material_id = ?",
+                Double.class,
+                receiver,
+                beacon))
+        .containsExactly(5.0);
+    assertThat(amountOf(entry)).isEqualTo(3);
+    assertThat(
+            jdbc.queryForMap(
+                    "SELECT * FROM exchange_journal WHERE entity_key = ?", existing.toString())
+                .get("after_state"))
+        .isNull();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM exchange_journal WHERE user_id = ?", Long.class, member))
+        .isEqualTo(3);
+  }
+
+  @Test
+  void aMovePoolMovesTheEntryIntoAnotherPoolOfItsHolderAndTellsThem() throws Exception {
+    UUID staffel = orgUnit();
+    UUID other = orgUnit();
+    joins(member, staffel, true);
+    joins(member, other, true);
+    joins(holder, staffel, false);
+    joins(holder, other, false);
+    UUID whole = stock(holder, material("SCU"), location(), 10, staffel, false);
+    UUID split = stock(holder, material("SCU"), location(), 10, staffel, false);
+
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), WRITE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    ops(
+                        entryOp("move-pool", staffel, whole, 0, ",\"toUnit\":\"" + other + "\""),
+                        entryOp(
+                            "move-pool",
+                            staffel,
+                            split,
+                            0,
+                            ",\"toUnit\":\""
+                                + other
+                                + "\",\"quantity\":{\"amount\":4,\"unit\":\"SCU\"}"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(2));
+
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT owning_org_unit_id FROM inventory_item WHERE id = ?", UUID.class, whole))
+        .isEqualTo(other);
+    assertThat(amountOf(split)).isEqualTo(6);
+    assertThat(
+            jdbc.queryForList(
+                "SELECT amount FROM inventory_item WHERE user_id = ? AND owning_org_unit_id = ?"
+                    + " AND id <> ?",
+                Double.class,
+                holder,
+                other,
+                whole))
+        .containsExactly(4.0);
+    Map<String, Object> audit =
+        jdbc.queryForMap(
+            "SELECT * FROM audit_event WHERE subject_id = ? AND event_type ="
+                + " 'INVENTORY_POOL_CHANGED'",
+            whole);
+    assertThat(audit.get("actor_user_id")).isEqualTo(member);
+    assertThat(audit.get("client_id")).isEqualTo(client);
+    assertThat(notificationsOf(holder)).isPositive();
+    Map<String, Object> journal =
+        jdbc.queryForMap("SELECT * FROM exchange_journal WHERE entity_key = ?", whole.toString());
+    assertThat(journal.get("action")).isEqualTo("ORG_STOCK_MOVE_POOL");
+    assertThat(journal.get("removal")).isEqualTo(true);
+    assertThat((String) journal.get("after_state")).contains(other.toString());
+  }
+
+  @Test
+  void aMovePoolOutsideTheWritersUnitsOrTheHoldersUnitsIsRefused() throws Exception {
+    UUID staffel = orgUnit();
+    UUID plain = orgUnit();
+    UUID foreign = orgUnit();
+    joins(member, staffel, true);
+    joins(member, plain, false);
+    joins(member, foreign, true);
+    joins(holder, staffel, false);
+    joins(holder, plain, false);
+    UUID entry = stock(holder, material("SCU"), location(), 10, staffel, false);
+
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), WRITE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    ops(
+                        entryOp("move-pool", staffel, entry, 0, ",\"toUnit\":\"" + plain + "\""),
+                        entryOp("move-pool", staffel, entry, 0, ",\"toUnit\":\"" + foreign + "\""),
+                        entryOp("move-pool", staffel, entry, 0, ",\"toUnit\":\"" + staffel + "\""),
+                        moveHolder(staffel, entry, "1", foreign, ref(staffel, holder)))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(0))
+        .andExpect(jsonPath("$.unchanged").value(1))
+        .andExpect(jsonPath("$.results[0].reason").value("NOT_PERMITTED"))
+        .andExpect(jsonPath("$.results[1].reason").value("HOLDER_UNKNOWN"))
+        .andExpect(jsonPath("$.results[2].result").value("unchanged"))
+        .andExpect(jsonPath("$.results[3].reason").value("HOLDER_UNKNOWN"));
+
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT owning_org_unit_id FROM inventory_item WHERE id = ?", UUID.class, entry))
+        .isEqualTo(staffel);
+  }
+
+  @Test
+  void aNoteEditIsAuditedAndTheSameNoteAgainIsUnchanged() throws Exception {
+    UUID staffel = orgUnit();
+    joins(member, staffel, true);
+    UUID entry = stock(holder, material("SCU"), location(), 10, staffel, false);
+
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), WRITE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    ops(
+                        entryOp("note", staffel, entry, 0, ",\"note\":\"Hangar 7\""),
+                        entryOp("note", staffel, entry, 1, ",\"note\":\" Hangar 7 \""))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(1))
+        .andExpect(jsonPath("$.unchanged").value(1));
+
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT note FROM inventory_item WHERE id = ?", String.class, entry))
+        .isEqualTo("Hangar 7");
+    Map<String, Object> audit =
+        jdbc.queryForMap(
+            "SELECT * FROM audit_event WHERE subject_id = ? AND event_type ="
+                + " 'INVENTORY_ITEM_NOTE_UPDATED'",
+            entry);
+    assertThat(audit.get("actor_user_id")).isEqualTo(member);
+    assertThat(audit.get("client_id")).isEqualTo(client);
+    Map<String, Object> journal =
+        jdbc.queryForMap("SELECT * FROM exchange_journal WHERE entity_key = ?", entry.toString());
+    assertThat(journal.get("action")).isEqualTo("ORG_STOCK_NOTE");
+    assertThat((String) journal.get("after_state")).doesNotContain("Hangar 7");
+
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), WRITE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(ops(entryOp("note", staffel, entry, 1, ""))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(1));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT note FROM inventory_item WHERE id = ?", String.class, entry))
+        .isNull();
+  }
+
+  @Test
+  void aStolenMarkingChangesTheWholeEntryOrSplitsOffAPart() throws Exception {
+    UUID staffel = orgUnit();
+    joins(member, staffel, true);
+    UUID titanium = material("SCU");
+    UUID area18 = location();
+    UUID whole = stock(holder, titanium, area18, 5, staffel, false);
+    UUID split = stock(holder, material("SCU"), area18, 10, staffel, false);
+
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), WRITE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    ops(
+                        entryOp("stolen", staffel, whole, 0, ",\"stolen\":true"),
+                        entryOp(
+                            "stolen",
+                            staffel,
+                            split,
+                            0,
+                            ",\"stolen\":true,\"quantity\":{\"amount\":3,\"unit\":\"SCU\"}"),
+                        entryOp("stolen", staffel, whole, 1, ",\"stolen\":true"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(2))
+        .andExpect(jsonPath("$.unchanged").value(1));
+
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT stolen FROM inventory_item WHERE id = ?", Boolean.class, whole))
+        .isTrue();
+    assertThat(amountOf(split)).isEqualTo(7);
+    assertThat(
+            jdbc.queryForList(
+                "SELECT amount FROM inventory_item WHERE id <> ? AND stolen AND user_id = ? AND"
+                    + " material_id <> ?",
+                Double.class,
+                split,
+                holder,
+                titanium))
+        .containsExactly(3.0);
+    assertThat(
+            jdbc.queryForMap(
+                    "SELECT * FROM audit_event WHERE subject_id = ? AND event_type ="
+                        + " 'INVENTORY_STOLEN_MARKED'",
+                    whole)
+                .get("client_id"))
+        .isEqualTo(client);
+    assertThat(
+            jdbc.queryForList(
+                "SELECT action FROM exchange_journal WHERE user_id = ?", String.class, member))
+        .hasSize(3)
+        .containsOnly("ORG_STOCK_STOLEN");
+  }
+
+  @Test
+  void aPartialStolenMarkingThatWouldLeaveEarmarksUncoveredIsRefused() throws Exception {
+    UUID staffel = orgUnit();
+    joins(member, staffel, true);
+    UUID entry = stock(holder, material("SCU"), location(), 10, staffel, false);
+    earmarkToJobOrder(entry, 8, staffel);
+
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), WRITE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    ops(
+                        entryOp(
+                            "stolen",
+                            staffel,
+                            entry,
+                            0,
+                            ",\"stolen\":true,\"quantity\":{\"amount\":3,\"unit\":\"SCU\"}"),
+                        entryOp(
+                            "stolen",
+                            staffel,
+                            entry,
+                            0,
+                            ",\"stolen\":true,\"quantity\":{\"amount\":11,\"unit\":\"SCU\"}"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(0))
+        .andExpect(jsonPath("$.results[0].reason").value("STOCK_EARMARKED"))
+        .andExpect(jsonPath("$.results[1].reason").value("INSUFFICIENT_STOCK"));
+
+    assertThat(amountOf(entry)).isEqualTo(10);
+  }
+
+  @Test
+  void theNewOpsAreRefusedOutsideTheWritersPoolsAndOnStaleVersions() throws Exception {
+    UUID staffel = orgUnit();
+    UUID plain = orgUnit();
+    joins(member, staffel, true);
+    joins(member, plain, false);
+    UUID inPlain = stock(holder, material("SCU"), location(), 5, plain, false);
+    UUID entry = stock(holder, material("SCU"), location(), 5, staffel, false);
+    String sale =
+        ",\"quantity\":{\"amount\":1,\"unit\":\"SCU\"},\"terminal\":\"T\",\"proceeds\":10";
+
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), WRITE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    ops(
+                        entryOp("sell", plain, inPlain, 0, sale),
+                        entryOp("note", plain, inPlain, 0, ",\"note\":\"x\""),
+                        entryOp("stolen", plain, inPlain, 0, ",\"stolen\":true"),
+                        entryOp("sell", staffel, inPlain, 0, sale),
+                        entryOp("sell", staffel, entry, 3, sale),
+                        entryOp("note", staffel, entry, 3, ",\"note\":\"x\""))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(0))
+        .andExpect(jsonPath("$.results[0].reason").value("NOT_PERMITTED"))
+        .andExpect(jsonPath("$.results[1].reason").value("NOT_PERMITTED"))
+        .andExpect(jsonPath("$.results[2].reason").value("NOT_PERMITTED"))
+        .andExpect(jsonPath("$.results[3].reason").value("NOT_PERMITTED"))
+        .andExpect(jsonPath("$.results[4].reason").value("VERSION_CONFLICT"))
+        .andExpect(jsonPath("$.results[5].reason").value("VERSION_CONFLICT"));
+
+    assertThat(amountOf(inPlain)).isEqualTo(5);
+    assertThat(amountOf(entry)).isEqualTo(5);
+  }
+
+  /**
+   * Builds an op on an entry.
+   *
+   * @param kind the op
+   * @param unit the pool the op names
+   * @param entry the entry
+   * @param version the version the client read
+   * @param members further members, each starting with a comma
+   * @return the op
+   */
+  private static @NotNull String entryOp(
+      @NotNull String kind,
+      @NotNull UUID unit,
+      @NotNull UUID entry,
+      long version,
+      @NotNull String members) {
+    return "{\"op\":\""
+        + kind
+        + "\",\"unit\":\""
+        + unit
+        + "\",\"entry\":\""
+        + entry
+        + "\",\"version\":"
+        + version
+        + members
+        + "}";
+  }
+
+  /**
+   * Builds a {@code move-holder} op of an SCU amount.
+   *
+   * @param unit the pool the entry lies in
+   * @param entry the entry
+   * @param amount the amount
+   * @param toUnit the pool that receives it
+   * @param holderRef the new holder's ref
+   * @return the op
+   */
+  private static @NotNull String moveHolder(
+      @NotNull UUID unit,
+      @NotNull UUID entry,
+      @NotNull String amount,
+      @NotNull UUID toUnit,
+      @NotNull String holderRef) {
+    return entryOp(
+        "move-holder",
+        unit,
+        entry,
+        0,
+        ",\"quantity\":{\"amount\":"
+            + amount
+            + ",\"unit\":\"SCU\"},\"toUnit\":\""
+            + toUnit
+            + "\",\"holder\":\""
+            + holderRef
+            + "\"");
+  }
+
+  /**
+   * Counts the org-stock feed rows of a pool.
+   *
+   * @param unit the pool's unit
+   * @return the rows
+   */
+  private long feedRowsOf(@NotNull UUID unit) {
+    Long rows =
+        jdbc.queryForObject(
+            "SELECT count(*) FROM exchange_change WHERE org_unit_id = ?", Long.class, unit);
+    return rows == null ? 0 : rows;
+  }
+
+  /**
+   * Earmarks part of a row to a mission.
+   *
+   * @param inventoryItem the row
+   * @param mission the mission
+   * @param amount the earmarked amount
+   */
+  private void earmarkToMission(@NotNull UUID inventoryItem, @NotNull UUID mission, double amount) {
+    jdbc.update(
+        """
+        INSERT INTO inventory_item_mission_allocation (id, inventory_item_id, mission_id, amount,
+                                                       version, created_at, updated_at)
+        VALUES (?, ?, ?, ?, 0, now(), now())
+        """,
+        UUID.randomUUID(),
+        inventoryItem,
+        mission,
+        amount);
+  }
+
+  /**
+   * Makes a member a participant of a mission.
+   *
+   * @param mission the mission
+   * @param user the member
+   * @return the participant's id
+   */
+  private @NotNull UUID participates(@NotNull UUID mission, @NotNull UUID user) {
+    UUID participant = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO mission_participant (id, version, mission_id, user_id) VALUES (?, 0, ?, ?)",
+        participant,
+        mission,
+        user);
+    return participant;
   }
 
   /**

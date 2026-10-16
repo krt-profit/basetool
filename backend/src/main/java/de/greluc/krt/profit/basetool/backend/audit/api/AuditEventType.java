@@ -132,6 +132,9 @@ public enum AuditEventType {
   /** A member changed the org unit of a selection of their own personal rows (REQ-INV-052). */
   INVENTORY_BULK_ORG_UNIT_CHANGED(AuditDomain.INVENTORY),
 
+  /** A Logistician moved a shared row, or a part of it, into another pool (REQ-INV-059). */
+  INVENTORY_POOL_CHANGED(AuditDomain.INVENTORY),
+
   /** A row, or a part split off it, was marked „gestohlen" (REQ-INV-053). */
   INVENTORY_STOLEN_MARKED(AuditDomain.INVENTORY),
 
