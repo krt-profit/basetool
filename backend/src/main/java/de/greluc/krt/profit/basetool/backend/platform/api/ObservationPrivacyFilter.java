@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.platform.internal;
+package de.greluc.krt.profit.basetool.backend.platform.api;
 
 import io.micrometer.common.KeyValue;
 import io.micrometer.observation.Observation;

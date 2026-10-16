@@ -40,8 +40,9 @@ import org.springframework.web.client.RestClient;
  * Provides the backend's outbound HTTP clients: a {@link RestClient.Builder} on the JDK {@link
  * HttpClient} with bounded timeouts and the Micrometer {@link ObservationRegistry} (ADR-0204).
  *
- * <p>Every call is observed as {@code http.client.requests} with the default key values, plus a
- * client span when tracing is on (REQ-OBS-009).
+ * <p>Every call is observed as {@code http.client.requests} with the default key values, the {@code
+ * uri} already scrubbed by {@link ScrubbedClientRequestObservationConvention}, plus a client span
+ * when tracing is on (REQ-OBS-009).
  */
 @Configuration
 public class RestClientConfig {
@@ -95,7 +96,8 @@ public class RestClientConfig {
   public RestClient.Builder restClientBuilder(@NotNull ObservationRegistry observationRegistry) {
     return RestClient.builder()
         .requestFactory(requestFactory)
-        .observationRegistry(observationRegistry);
+        .observationRegistry(observationRegistry)
+        .observationConvention(new ScrubbedClientRequestObservationConvention());
   }
 
   /**
@@ -115,7 +117,8 @@ public class RestClientConfig {
       @NotNull ObservationRegistry observationRegistry) {
     return RestClient.builder()
         .requestFactory(externalRequestFactory)
-        .observationRegistry(observationRegistry);
+        .observationRegistry(observationRegistry)
+        .observationConvention(new ScrubbedClientRequestObservationConvention());
   }
 
   /**
