@@ -677,6 +677,10 @@ there is no separate income-attribution input.
   `INVENTORY_ALLOCATION_AMOUNT_MISSING` and the form does not submit, an explicit amount always
   wins, and a blank-amount row still trips the personal-entry rejection.
 
+A connected application does the same for a Logistician of the entry's pool through the org-stock
+ops `allocation-add`, `allocation-change` and `allocation-remove` (REQ-XCH-045), with these rules and
+events; there the entry's version advances once per op, at the write, so the ops of one batch chain.
+
 **Enforced by:** `InventoryItemServiceTest`, `InventoryItemServiceBookOutTest`,
 `InventoryItemServiceAllocationTest`, `InventoryCheckoutServiceAuditTest`, `InventoryStockMergeTest`, `JobOrderHandoverServiceTest`,
 `InventoryAllocationSoakDataTest`, `InventoryItemControllerTest`, `InventoryPageControllerMvcTest`,
@@ -685,7 +689,8 @@ e2e `InventoryOperationsE2eTest` (Herkunft picker gate + deduct-from; re-picking
 already-allocated order edits its slice instead of posting a duplicate) ·
 **Code:** `InventoryJobOrderAllocation`, `InventoryMissionAllocation`,
 `inventory/internal/InventoryAllocations`, `InventoryItemController` (allocation endpoints),
-`InventoryItemService#createInventoryItem`, `InventoryCheckoutService` (book-out / merge / SELL),
+`InventoryItemService#createInventoryItem` / `#writeAllocationForPool`, `InventoryCheckoutService`
+(book-out / merge / SELL),
 `JobOrderStockReadService#getMaterialCollection`, `InventoryItemMapper`,
 `V217__add_inventory_allocation_tables.sql`, `V218__drop_inventory_scalar_associations.sql`,
 `inventory/fragments/inventory-stack-entries.html`, `inventory-common.js` (the allocation chips both Lager

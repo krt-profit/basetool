@@ -62,7 +62,8 @@ snapshot, an optional target-user reference, a compact details payload, and the 
 originating-client label of [REQ-AUDIT-005](#req-audit-005--the-trail-records-which-client-a-mutation-came-through).
 
 Coverage is **complete**, including the cross-area writers and the system/automatic mutations.
-A write a connected application makes through the exchange (REQ-XCH-015…-017) records the same
+A write a connected application makes through the exchange (REQ-XCH-015…-017, and a Logistician's
+org-stock writes of REQ-XCH-045, earmarks included) records the same
 events in the Blueprints, Lager, Materialbörse, Hangar and Missionen areas as the same write in the
 web, naming its client (REQ-AUDIT-005):
 

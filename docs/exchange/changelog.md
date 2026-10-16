@@ -5,6 +5,11 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
 
 ## 2026-10-16
 
+- **New: org-stock earmarks and targets.** `POST /exchange/v1/org-stock/changes` gains the ops
+  `allocation-add`, `allocation-change` and `allocation-remove`, each naming one `jobOrder` or
+  `mission` of an entry; `GET /exchange/v1/org-stock/targets?unit=&material=` lists the job orders
+  and missions an entry of the unit's pool may be earmarked to
+  ([org stock](resources/org-stock.md#the-targets)). New: `org-stock-targets.schema.json`.
 - **New: org-stock sale, moves, note and stolen.** `POST /exchange/v1/org-stock/changes` gains the
   ops `sell` (with `terminal` and `proceeds`, mission shares booked as in the Basetool),
   `move-location`, `move-holder` (to a member of a unit the member is a Logistician of, with

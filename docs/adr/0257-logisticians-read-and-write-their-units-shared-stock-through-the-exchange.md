@@ -1,8 +1,8 @@
 # ADR-0257 — Logisticians read and write their units' shared stock through the exchange, by name
 
-- **Status:** Accepted — the read, the details, the roster and the ops `book-in`, `book-out`, `sell`,
-  the moves (`move-location`, `move-holder`, `move-pool`), `note` and `stolen` built; the earmark ops, the undo, the guard and the demand details
-  pending (REQ-XCH-042…047).
+- **Status:** Accepted — the read, the details, the roster, the targets and the ops `book-in`,
+  `book-out`, `sell`, the moves (`move-location`, `move-holder`, `move-pool`), `note`, `stolen`
+  and the earmark ops built; the undo, the guard and the demand details pending (REQ-XCH-042…047).
   Amends [ADR-0220](0220-external-clients-see-only-anonymised-org-demand-and-the-location-list.md)
   (decision 1, "no requester, no order title, no free text") and narrows the own-data-only rule of
   REQ-XCH-009.
@@ -182,3 +182,26 @@ path template on the acting list — it would loosen REQ-SEC-080 and every seam 
    the batch's single ascending pass (ADR-0229).
 5. **What counts as a removal.** The source entry of a book-out, a sale, a `move-pool` and a
    `move-holder` into another pool; a move within the pool, a note and a marking do not.
+
+## Amendment 5 (2026-10-16) — earmarks and their targets
+
+1. **The web's allocation writes, one version per op.** `allocation-add`, `allocation-change` and
+   `allocation-remove` go through the Lager's own allocation rules and audit
+   (`INVENTORY_ALLOCATION_*`), on the entry the batch already locked. The web forces the entry's
+   version up only at commit; the pool path instead advances it at the flush, once per op, so a later
+   op of the same batch can name the next version and the journal records the version the client
+   will read.
+2. **A change set names one target per earmark op.** Each op carries `jobOrder` or `mission`, never
+   both; the gateway's schema refuses anything else.
+3. **The targets are the web picker's for the pool's unit.** `GET …/org-stock/targets?unit=&material=`
+   lists the open and in-progress job orders that need the material or item and that the unit, a
+   Spezialkommando or no unit is responsible for, behind the web's job-order gate, and the missions of
+   the Lager's mission picker with that unit as the active one; `material` is the lots'
+   `material.bt`, which names a material or an item, so one parameter serves both.
+4. **The exchange keeps the web's freedom of target.** As in the web, an earmark may name any job
+   order that needs the material and any existing mission; the targets are what the client offers,
+   not a second rule.
+
+Rejected: calling the web's allocation methods from the pool path — their commit-time increment would
+add a second version bump per op and leave the in-batch version stale; separate `material` and `item`
+parameters — the lots already name both by one id.
