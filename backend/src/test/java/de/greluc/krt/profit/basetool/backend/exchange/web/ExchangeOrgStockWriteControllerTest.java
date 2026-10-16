@@ -430,7 +430,7 @@ class ExchangeOrgStockWriteControllerTest {
     joins(member, staffel, true);
     UUID titanium = material("SCU");
     UUID entry = stock(holder, titanium, location(), 10, staffel, false);
-    UUID order = earmarkToJobOrder(entry, titanium, 6, staffel);
+    UUID order = earmarkToJobOrder(entry, 6, staffel);
 
     mockMvc
         .perform(
@@ -847,16 +847,15 @@ class ExchangeOrgStockWriteControllerTest {
   }
 
   /**
-   * Earmarks part of a row to a new job order of the unit that needs the material.
+   * Earmarks part of a row to a new job order of the unit.
    *
    * @param inventoryItem the row
-   * @param material the material the order needs
    * @param amount the earmarked amount
    * @param unit the requesting and responsible unit
    * @return the order id
    */
   private @NotNull UUID earmarkToJobOrder(
-      @NotNull UUID inventoryItem, @NotNull UUID material, double amount, @NotNull UUID unit) {
+      @NotNull UUID inventoryItem, double amount, @NotNull UUID unit) {
     UUID order = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO job_order (id, priority, created_at, updated_at, version, status,"
