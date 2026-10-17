@@ -248,6 +248,11 @@ reserved: it joins the exchange as a registry client of its own at the go-live.
   reactivation — `ExchangeConnectionsE2eTest.anAdminSuspensionAndReactivationReachTheGateway`,
   which requires the first refusal and every refusal until the reactivation reaches the gateway
   to be `403 CLIENT_SUSPENDED`, whichever side gave it.*
+- [x] Each confirmation on the page labels its button with the action it confirms — „Erweitern",
+  „Sperren", „Ausschalten", „Einschalten", „Zurücknehmen" (EN: Grant, Suspend, Turn off, Turn on,
+  Undo) — from its own `admin.exchangeClients.*.ok` key; none reads „Löschen", since none deletes.
+  *`AdminExchangeClientsPageControllerMvcTest.eachConfirmationNamesItsOwnAction`,
+  `AdminExchangeClientsE2eTest`.*
 - [x] The registry table fits the page width on a desktop screen — its headers wrap and a row's
   actions stack — and every capability checkbox in the form keeps one size, however long its
   label. *Page stylesheet `admin-exchange-clients.css`; not gated by a test.*

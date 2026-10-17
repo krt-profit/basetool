@@ -4,7 +4,11 @@
 
 ### Added
 
-- **Profitberechnung: Sortieren per Spaltenkopf.** Material, je SCU, Marge, Kapital und Max Profit sortieren per Klick auf den Spaltenkopf, ein zweiter Klick dreht die Reihenfolge um – auch auf dem Handy über eine Leiste über der Liste. Die Platzziffer bleibt der Rang nach Max Profit; die Sortierung bleibt bei einer neuen Berechnung erhalten und wird pro Browser gemerkt (REQ-UI-029).
+- **Profitberechnung: Sortieren per Spaltenkopf.** Material, je SCU, Marge, Kapital und Max Profit sortieren per Klick auf den Spaltenkopf, ein zweiter Klick dreht die Reihenfolge um – auch auf dem Handy über eine Leiste über der Liste. Die Platzziffer bleibt der Rang nach Max Profit; die Sortierung bleibt bei einer neuen Berechnung erhalten und wird pro Browser gemerkt (REQ-UI-030).
+
+- **Material-Detailseite: UEX-Stand je Preis.** Die Terminal-Tabelle zeigt in der neuen Spalte „UEX-Stand“, wann UEX den Preis des Terminals zuletzt aktualisiert hat; Preise, die älter als sieben Tage sind, sind als veraltet markiert. Die Kachel „Aktualisiert“ heißt jetzt „Letzter UEX-Sync“; `GET /api/v1/materials/{id}/prices` liefert dafür `uexUpdatedAt` (REQ-UI-015).
+
+- **Testsystem im Footer erkennbar.** Auf dem Testsystem zeigt der Footer jeder Seite ein gelbes „Testsystem"-Schild, damit niemand dort versehentlich echte Arbeit erledigt; Produktion bleibt unverändert. Geschaltet über die neue Umgebungsvariable `APP_INSTANCE_TEST_SYSTEM` (Frontend, REQ-UI-029).
 
 ### Changed
 
@@ -12,9 +16,13 @@
 
 ### Fixed
 
+- **Mitglied bearbeiten: Rang passt nicht zur Officer-Rolle.** Ein Rang außerhalb des Bereichs der Keycloak-Rolle (Officer 1–12, Mitglieder 13–20) wird nicht mehr als „ungültiges Argument“ abgelehnt, sondern am Rang-Feld mit dem Hinweis, welche Rolle das Mitglied noch hat und dass sie zuerst in Keycloak geändert werden muss; unter dem Rang steht der erlaubte Bereich. Neuer API-Fehlercode `RANK_OUTSIDE_ROLE_RANGE` (REQ-ROLE-007, ADR-0264).
+
 - **Lager-Übersicht: Umschalter „Globales Lager | Mein Lager“ ohne Leerraum.** Die Segmente sind wieder genau so breit wie ihre Beschriftung; die Kopfzeilen-Navigation vererbte ihren Abstand an jeden Segment-Umschalter, der als `<nav>` gesetzt ist (Design-System-CSS, REQ-UI-028).
 
 - **Verbundene Anwendungen (Admin): Layout.** Die Tabelle der registrierten Anwendungen passt wieder in die Seitenbreite, statt seitlich zu scrollen, und die Berechtigungs-Checkboxen im Formular sind bei langen Bezeichnungen alle gleich groß (REQ-XCH-003).
+
+- **Verbundene Anwendungen (Admin): Bestätigungen benennen ihre Aktion.** Die Bestätigungsdialoge der Seite beschriften ihren Knopf mit „Erweitern", „Sperren", „Ein-/Ausschalten" bzw. „Zurücknehmen" statt mit „Löschen", obwohl nichts gelöscht wird (REQ-XCH-003).
 
 ## [v1.16.5](https://github.com/krt-profit/basetool/releases/tag/v1.16.5) - 2026-10-17
 

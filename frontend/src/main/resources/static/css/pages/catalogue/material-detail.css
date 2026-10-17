@@ -52,6 +52,24 @@
         color: var(--color-white);
     }
 
+    .md-terminals td.md-uex-age {
+        white-space: nowrap;
+    }
+
+    .md-terminals td.md-uex-age .cell-title {
+        color: var(--color-gray-1);
+        font-weight: var(--fw-regular);
+    }
+
+    .md-terminals td.md-uex-age--stale .cell-title {
+        color: var(--color-warning);
+    }
+
+    .md-terminals td.md-uex-age .krt-icon {
+        margin-right: 0.25rem;
+        vertical-align: -0.125em;
+    }
+
     .md-terminals td.md-price--none {
         color: var(--color-gray-2-text);
         font-weight: var(--fw-regular);

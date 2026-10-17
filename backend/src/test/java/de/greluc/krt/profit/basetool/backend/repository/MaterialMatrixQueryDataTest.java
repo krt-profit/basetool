@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialPrice;
@@ -27,9 +28,11 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Terminal;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialMatrixItemDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialPriceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialPriceRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.TerminalRepository;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,8 +46,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Verifies {@link MaterialPriceRepository#findMatrixItems} against PostgreSQL: the four optional
- * filters, their intersection and the base predicates (REQ-UI-014). Fixtures use unique names; each
- * test rolls back.
+ * filters, their intersection and the base predicates (REQ-UI-014), and the UEX update time of
+ * {@link MaterialPriceRepository#findPricesByMaterialId} (REQ-UI-015). Fixtures use unique names;
+ * each test rolls back.
  */
 @SpringBootTest
 @Transactional
@@ -194,6 +198,24 @@ class MaterialMatrixQueryDataTest {
         .doesNotContain(staleDock);
   }
 
+  @Test
+  void detailPriceList_carriesTheUexUpdateTimePerRow() {
+    Material copper = persistMaterial("Copper-" + uid);
+    Terminal stamped = persistTerminal("Stamped-" + uid, stanton, true, true, false);
+    Terminal unstamped = persistTerminal("Unstamped-" + uid, stanton, true, true, false);
+    Instant updatedAt = Instant.parse("2026-10-17T09:12:00Z");
+    persistPrice(copper, stamped, null, BigDecimal.valueOf(90)).setDateModified(updatedAt);
+    persistPrice(copper, unstamped, null, BigDecimal.valueOf(80));
+
+    Page<MaterialPriceDto> page =
+        materialPriceRepository.findPricesByMaterialId(copper.getId(), PAGE);
+
+    assertThat(page.getContent())
+        .extracting(MaterialPriceDto::terminalName, MaterialPriceDto::uexUpdatedAt)
+        .containsExactlyInAnyOrder(
+            tuple("Stamped-" + uid, updatedAt), tuple("Unstamped-" + uid, null));
+  }
+
   private Material persistMaterial(String name) {
     Material material = new Material();
     material.setName(name);
@@ -234,7 +256,8 @@ class MaterialMatrixQueryDataTest {
     persistPrice(material, terminal, null, null);
   }
 
-  private void persistPrice(Material material, Terminal terminal, BigDecimal buy, BigDecimal sell) {
+  private MaterialPrice persistPrice(
+      Material material, Terminal terminal, BigDecimal buy, BigDecimal sell) {
     MaterialPrice price = new MaterialPrice();
     price.setMaterial(material);
     price.setTerminal(terminal);
@@ -242,6 +265,6 @@ class MaterialMatrixQueryDataTest {
     price.setPriceSell(sell);
     price.setStatusBuy(buy != null);
     price.setStatusSell(sell != null);
-    materialPriceRepository.save(price);
+    return materialPriceRepository.save(price);
   }
 }

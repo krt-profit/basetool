@@ -77,7 +77,7 @@ export function nextSortState(state, key, firstDir) {
 }
 
 /**
- * Makes a table's column headers sort its body rows (REQ-UI-029). A sortable header is a
+ * Makes a table's column headers sort its body rows (REQ-UI-030). A sortable header is a
  * `th[data-sort-col]` holding a `button.sort-header[data-sort-key]`; `data-sort-first="desc"` on
  * the button starts that column descending.
  *
@@ -162,5 +162,5 @@ function attach(table, options) {
     };
 }
 
-/** Sortable table headers, one implementation for every page (REQ-UI-029). */
+/** Sortable table headers, one implementation for every page (REQ-UI-030). */
 export const krtTableSort = { attach };

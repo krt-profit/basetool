@@ -19,11 +19,16 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.MembershipOperations;
+import de.greluc.krt.profit.basetool.backend.identity.api.RankOutsideRoleRangeException;
 import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -71,9 +76,38 @@ class UserServiceRankTest {
 
     when(userRepository.findById(id)).thenReturn(Optional.of(user));
 
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> userService.updateUserAttributes(id, 13, null, null, 0L, null));
+    RankOutsideRoleRangeException thrown =
+        assertThrows(
+            RankOutsideRoleRangeException.class,
+            () -> userService.updateUserAttributes(id, 13, null, null, 0L, null));
+    assertEquals("RANK_OUTSIDE_ROLE_RANGE", thrown.code());
+    assertEquals("OFFICER", thrown.getRole());
+    assertEquals("problem.rank_outside_role_range.officer.detail", thrown.getMessage());
+    verify(userRepository, never()).save(any());
+  }
+
+  @Test
+  void updateUserAttributes_FormerLeadStillOfficer_Rank20_NamesTheOfficerRole() {
+    UUID id = UUID.randomUUID();
+    User user = new User();
+    user.setId(id);
+    user.setVersion(0L);
+    user.setRank(8);
+    Role officerRole = new Role();
+    officerRole.setName("OFFICER");
+    Role memberRole = new Role();
+    memberRole.setName("KRT_MEMBER");
+    user.setRoles(Set.of(officerRole, memberRole));
+
+    when(userRepository.findById(id)).thenReturn(Optional.of(user));
+
+    RankOutsideRoleRangeException thrown =
+        assertThrows(
+            RankOutsideRoleRangeException.class,
+            () -> userService.updateUserAttributes(id, 20, null, null, 0L, null));
+    assertEquals("OFFICER", thrown.getRole());
+    assertEquals(12, thrown.getMaxRank());
+    assertEquals(8, user.getRank());
   }
 
   @Test
@@ -103,9 +137,12 @@ class UserServiceRankTest {
 
     when(userRepository.findById(id)).thenReturn(Optional.of(user));
 
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> userService.updateUserAttributes(id, 5, null, null, 0L, null));
+    RankOutsideRoleRangeException thrown =
+        assertThrows(
+            RankOutsideRoleRangeException.class,
+            () -> userService.updateUserAttributes(id, 5, null, null, 0L, null));
+    assertEquals("KRT_MEMBER", thrown.getRole());
+    assertEquals("problem.rank_outside_role_range.member.detail", thrown.getMessage());
   }
 
   @Test

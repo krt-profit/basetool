@@ -129,7 +129,7 @@ class MaterialsProfitCalculationRendersE2eTest {
   }
 
   /**
-   * Sorts a ready results table through its column headers (REQ-UI-029): the default order is Max.
+   * Sorts a ready results table through its column headers (REQ-UI-030): the default order is Max.
    * Profit descending, a click on Marge orders the rows by margin with the highest first and marks
    * that header, a second click reverses it, and every row keeps its profit rank.
    */

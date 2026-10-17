@@ -77,6 +77,8 @@ spring:
             user-name-attribute: preferred_username
 
 app:
+  instance:
+    test-system: ${APP_INSTANCE_TEST_SYSTEM:false}
   grafana:
     operations-dashboard-url: ${APP_GRAFANA_OPERATIONS_DASHBOARD_URL:https://grafana.profit-base.online/d/basetool-operations}
   android-app-link:

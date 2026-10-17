@@ -19,7 +19,7 @@
 
 /**
  * Regression tests for the shared sortable table headers: the value order, the click cycle, and
- * the row order and `aria-sort` marks a sorter writes into a table (REQ-UI-029).
+ * the row order and `aria-sort` marks a sorter writes into a table (REQ-UI-030).
  */
 
 import assert from 'node:assert/strict';

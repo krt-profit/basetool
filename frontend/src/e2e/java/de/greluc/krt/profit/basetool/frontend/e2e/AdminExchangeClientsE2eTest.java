@@ -106,7 +106,7 @@ class AdminExchangeClientsE2eTest {
             page,
             () -> {
               rowOf(page, "E2E Exchange Client").locator("[data-xc-suspend]").click();
-              page.locator(".krt-confirm-overlay .krt-confirm-ok").click();
+              confirmAs(page, "data-confirm-suspend-ok");
             });
         assertThat(rowOf(page, "E2E Exchange Client")).hasAttribute("data-status", "SUSPENDED");
 
@@ -122,7 +122,7 @@ class AdminExchangeClientsE2eTest {
             page,
             () -> {
               page.locator("#xc-form button[type='submit']").click();
-              page.locator(".krt-confirm-overlay .krt-confirm-ok").click();
+              confirmAs(page, "data-confirm-widen-ok");
             });
         assertThat(rowOf(page, "E2E Exchange Client").locator(".xc-capabilities li")).hasCount(3);
 
@@ -137,7 +137,7 @@ class AdminExchangeClientsE2eTest {
             page,
             () -> {
               rowOf(page, "E2E Exchange Client").locator("[data-xc-suspend]").click();
-              page.locator(".krt-confirm-overlay .krt-confirm-ok").click();
+              confirmAs(page, "data-confirm-suspend-ok");
             });
 
         assertThat(page.locator(".notification-toast.error-toast")).hasCount(0);
@@ -205,12 +205,25 @@ class AdminExchangeClientsE2eTest {
    * @param page the registry page
    */
   private static void flipSwitch(Page page) {
+    boolean enabled = "true".equals(page.locator("#xc-switch").getAttribute("data-enabled"));
     awaitRegistryRefresh(
         page,
         () -> {
           page.locator("[data-xc-switch]").click();
-          page.locator(".krt-confirm-overlay .krt-confirm-ok").click();
+          confirmAs(page, enabled ? "data-confirm-off-ok" : "data-confirm-on-ok");
         });
+  }
+
+  /**
+   * Confirms the open confirmation after checking that its button carries the dialog's own label.
+   *
+   * @param page the registry page
+   * @param attribute the {@code #xc-i18n} attribute that holds the expected label
+   */
+  private static void confirmAs(Page page, String attribute) {
+    Locator ok = page.locator(".krt-confirm-overlay .krt-confirm-ok");
+    assertThat(ok).hasText(page.locator("#xc-i18n").getAttribute(attribute));
+    ok.click();
   }
 
   /**

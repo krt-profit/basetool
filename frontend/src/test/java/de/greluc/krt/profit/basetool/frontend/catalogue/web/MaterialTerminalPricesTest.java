@@ -20,10 +20,13 @@
 package de.greluc.krt.profit.basetool.frontend.catalogue.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialMatrixItemDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialPriceDto;
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -36,6 +39,39 @@ class MaterialTerminalPricesTest {
 
   /** The material every case is about. */
   private static final UUID MATERIAL = UUID.fromString("00000000-0000-0000-0000-000000000001");
+
+  /** The instant every UEX age is measured against. */
+  private static final Instant NOW = Instant.parse("2026-10-17T12:00:00Z");
+
+  /**
+   * Each row carries the age of its own UEX update; only an update older than seven days is stale,
+   * and a row without one has neither.
+   */
+  @Test
+  void rows_carryTheUexAgeAndMarkUpdatesOlderThanSevenDaysAsStale() {
+    List<MaterialTerminalPrices.Row> rows =
+        MaterialTerminalPrices.rows(
+            List.of(
+                price("Fresh", null, "90", NOW.minus(Duration.ofHours(3))),
+                price("Edge", null, "80", NOW.minus(Duration.ofDays(7))),
+                price("Old", null, "70", NOW.minus(Duration.ofDays(19))),
+                price("Unknown", null, "60")),
+            List.of(),
+            NOW);
+
+    assertThat(rows)
+        .extracting(
+            MaterialTerminalPrices.Row::terminalName,
+            row -> row.uexAge() == null ? null : row.uexAge().unit(),
+            row -> row.uexAge() == null ? null : row.uexAge().amount(),
+            MaterialTerminalPrices.Row::uexStale)
+        .containsExactly(
+            tuple("Fresh", "hours", 3L, false),
+            tuple("Edge", "days", 7L, false),
+            tuple("Old", "days", 19L, true),
+            tuple("Unknown", null, null, false));
+    assertThat(rows.get(2).uexAge().syncedAt()).isEqualTo(NOW.minus(Duration.ofDays(19)));
+  }
 
   /**
    * Rows that buy the material come first, highest sale first; the rest follow by name, and a zero
@@ -50,7 +86,8 @@ class MaterialTerminalPricesTest {
                 price("Lorville CBD", null, "88.2"),
                 price("Area18 TDD", "80", "89.6"),
                 price("Alpha", "0", "0")),
-            List.of());
+            List.of(),
+            NOW);
 
     assertThat(rows)
         .extracting(MaterialTerminalPrices.Row::terminalName)
@@ -68,7 +105,8 @@ class MaterialTerminalPricesTest {
             List.of(price("Area18 TDD", null, "89.6"), price("Unknown", null, "50")),
             List.of(
                 matrix("Area18 TDD", "Stanton", "ArcCorp", "Area18", null),
-                matrix("Everus Harbor", "Stanton", "Hurston", null, "Everus Harbor")));
+                matrix("Everus Harbor", "Stanton", "Hurston", null, "Everus Harbor")),
+            NOW);
 
     assertThat(rows.get(0).location()).isEqualTo("ArcCorp · Area18");
     assertThat(rows.get(0).planetCssClass()).isEqualTo("planet-arccorp");
@@ -86,7 +124,8 @@ class MaterialTerminalPricesTest {
                     price("Area18 TDD", "80", "89.6"),
                     price("Lorville CBD", "75.5", "88.2"),
                     price("Everus Harbor", null, "86.9")),
-                List.of()));
+                List.of(),
+                NOW));
 
     assertThat(summary.bestSell()).isEqualByComparingTo("89.6");
     assertThat(summary.bestSellTerminal()).isEqualTo("Area18 TDD");
@@ -152,6 +191,20 @@ class MaterialTerminalPricesTest {
    * @return the price
    */
   private static MaterialPriceDto price(String terminal, String buy, String sell) {
+    return price(terminal, buy, sell, null);
+  }
+
+  /**
+   * One price of a terminal with the time UEX last updated it.
+   *
+   * @param terminal the terminal
+   * @param buy the purchase price, or {@code null}
+   * @param sell the sale price, or {@code null}
+   * @param uexUpdatedAt the UEX update time, or {@code null}
+   * @return the price
+   */
+  private static MaterialPriceDto price(
+      String terminal, String buy, String sell, Instant uexUpdatedAt) {
     return new MaterialPriceDto(
         UUID.randomUUID(),
         terminal,
@@ -160,7 +213,8 @@ class MaterialTerminalPricesTest {
         null,
         null,
         true,
-        true);
+        true,
+        uexUpdatedAt);
   }
 
   /**

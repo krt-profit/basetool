@@ -49,6 +49,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialService;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -153,7 +154,8 @@ class MaterialServiceTest {
             100,
             200,
             true,
-            true);
+            true,
+            Instant.parse("2026-10-17T09:12:00Z"));
     Page<MaterialPriceDto> expectedPage = new PageImpl<>(List.of(dto));
 
     when(materialPriceRepository.findPricesByMaterialId(materialId, pageRequest))
