@@ -137,6 +137,37 @@ class HangarImportIntegrationTest {
   }
 
   @Test
+  void importFleetview_memberOfSeveralUnitsWithoutPin_importsShipsWithoutUnit() throws Exception {
+    Squadron second = new Squadron();
+    second.setName("Import Second Staffel");
+    second.setShorthand("S" + UUID.randomUUID().toString().substring(0, 8));
+    second = squadronRepository.save(second);
+    OrgUnitMembership secondMembership = new OrgUnitMembership();
+    secondMembership.setId(new OrgUnitMembershipId(user1.getId(), second.getId()));
+    secondMembership.setUser(user1);
+    secondMembership.setJoinedAt(Instant.now());
+    orgUnitMembershipRepository.save(secondMembership);
+
+    String json =
+        """
+        [{"name":"135c","shipname":"","type":"ship"}]
+        """;
+    MockMultipartFile file =
+        new MockMultipartFile(
+            "file", "fleetview.json", "application/json", json.getBytes(StandardCharsets.UTF_8));
+
+    mockMvc
+        .perform(
+            multipart("/api/v1/hangar/import/ships")
+                .file(file)
+                .with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))))
+        .andExpect(status().isOk());
+
+    Ship imported = shipRepository.findByOwnerId(user1.getId()).stream().findFirst().orElseThrow();
+    assertNull(imported.getOwningOrgUnit());
+  }
+
+  @Test
   void importFleetview_unauthenticated_returns401() throws Exception {
     String json =
         """

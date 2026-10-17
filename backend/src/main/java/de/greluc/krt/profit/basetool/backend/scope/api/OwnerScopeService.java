@@ -332,6 +332,18 @@ public class OwnerScopeService implements SquadronVisibility {
   }
 
   /**
+   * Delegates to {@link OrgUnitStampingService#resolveOrgUnitForImport(User)}: the owning org unit
+   * of the ships a hangar import creates (REQ-HANGAR-014).
+   *
+   * @param targetUser the member the ships are imported for
+   * @return the only membership or the honoured pin, or {@code null} for none
+   */
+  @Nullable
+  public OrgUnit resolveOrgUnitForImport(@NotNull User targetUser) {
+    return orgUnitStampingService.resolveOrgUnitForImport(targetUser);
+  }
+
+  /**
    * Delegates to {@link OrgUnitStampingService#resolveOwnerMembershipTarget(User, UUID)}: the
    * target of a later org-unit change of an owner's aggregate (REQ-HANGAR-009).
    *

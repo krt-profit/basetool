@@ -1863,6 +1863,77 @@ class OwnerScopeServiceTest {
         () -> service.resolveOrgUnitForPickerOutputNullable(user, UUID.randomUUID()));
   }
 
+  @Test
+  void resolveOrgUnitForImport_noMembership_returnsNull() {
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    when(orgUnitMembershipRepository.findAllByIdUserId(user.getId())).thenReturn(List.of());
+
+    assertNull(service.resolveOrgUnitForImport(user));
+  }
+
+  @Test
+  void resolveOrgUnitForImport_singleMembership_stampsIt() {
+    Squadron home = new Squadron();
+    UUID homeId = UUID.randomUUID();
+    home.setId(homeId);
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
+        .thenReturn(List.of(staffelMembership(user.getId(), homeId)));
+    when(orgUnitRepository.findById(homeId)).thenReturn(Optional.of(home));
+
+    assertSame(home, service.resolveOrgUnitForImport(user));
+  }
+
+  @Test
+  void resolveOrgUnitForImport_severalMembershipsWithoutPin_returnsNullInsteadOfRefusing() {
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
+        .thenReturn(
+            List.of(
+                staffelMembership(user.getId(), UUID.randomUUID()),
+                staffelMembership(user.getId(), UUID.randomUUID())));
+    when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
+
+    assertNull(service.resolveOrgUnitForImport(user));
+  }
+
+  @Test
+  void resolveOrgUnitForImport_severalMembershipsWithForeignPin_returnsNull() {
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
+        .thenReturn(
+            List.of(
+                staffelMembership(user.getId(), UUID.randomUUID()),
+                staffelMembership(user.getId(), UUID.randomUUID())));
+    when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+        .thenReturn(UUID.randomUUID().toString());
+
+    assertNull(service.resolveOrgUnitForImport(user));
+  }
+
+  @Test
+  void resolveOrgUnitForImport_severalMembershipsWithOwnPin_stampsThePin() {
+    Squadron pinned = new Squadron();
+    UUID pinnedId = UUID.randomUUID();
+    pinned.setId(pinnedId);
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
+        .thenReturn(
+            List.of(
+                staffelMembership(user.getId(), UUID.randomUUID()),
+                staffelMembership(user.getId(), pinnedId)));
+    when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+        .thenReturn(pinnedId.toString());
+    when(orgUnitRepository.findById(pinnedId)).thenReturn(Optional.of(pinned));
+
+    assertSame(pinned, service.resolveOrgUnitForImport(user));
+  }
+
   @Nested
   class HasRoleInOrgUnitTests {
 

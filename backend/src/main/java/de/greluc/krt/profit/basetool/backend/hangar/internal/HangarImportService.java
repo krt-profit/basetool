@@ -158,7 +158,7 @@ public class HangarImportService {
           Ship ship = new Ship();
           ship.setOwner(user);
           if (!owningOrgUnitResolved) {
-            owningOrgUnit = ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, null);
+            owningOrgUnit = ownerScopeService.resolveOrgUnitForImport(user);
             owningOrgUnitResolved = true;
           }
           ship.setOwningOrgUnit(owningOrgUnit);
