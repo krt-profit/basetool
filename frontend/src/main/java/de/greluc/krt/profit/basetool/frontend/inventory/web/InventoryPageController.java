@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.PickerSearch;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -71,6 +72,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -153,19 +155,13 @@ public class InventoryPageController {
       @RequestParam(required = false) String fragment,
       Model model) {
     boolean itemsView = isItemsView(view);
-    List<AggregatedInventoryDto> aggregated = new ArrayList<>();
-    try {
-      PageResponse<AggregatedInventoryDto> p = inventoryClient.aggregated(page, size, itemsView);
-      if (p != null) {
-        if (p.content() != null) {
-          aggregated = new ArrayList<>(p.content());
-        }
-        model.addAttribute("inventoryPage", p);
-      }
-    } catch (Exception e) {
-      log.error("Failed to fetch aggregated inventory", e);
-      model.addAttribute("error", "error.inventory.aggregate.load");
-    }
+    List<AggregatedInventoryDto> aggregated =
+        loadPageSection(
+            model,
+            "aggregated-inventory",
+            "inventoryPage",
+            "error.inventory.aggregate.load",
+            () -> inventoryClient.aggregated(page, size, itemsView));
 
     List<MaterialReferenceDto> materials = itemsView ? List.of() : fetchMaterials();
 
@@ -215,20 +211,13 @@ public class InventoryPageController {
     int effectivePage = page == null || page < 0 ? 0 : page;
     int effectiveSize =
         size != null && DRILLDOWN_PAGE_SIZES.contains(size) ? size : DRILLDOWN_DEFAULT_PAGE_SIZE;
-    List<InventoryItemDto> items = new ArrayList<>();
-    try {
-      PageResponse<InventoryItemDto> p =
-          fetchDrilldownPage(false, materialId, effectivePage, effectiveSize);
-      if (p != null) {
-        if (p.content() != null) {
-          items = new ArrayList<>(p.content());
-        }
-        model.addAttribute("inventoryMaterialPage", p);
-      }
-    } catch (Exception e) {
-      log.error("Failed to fetch material inventory", e);
-      model.addAttribute("error", "error.inventory.material.load");
-    }
+    List<InventoryItemDto> items =
+        loadPageSection(
+            model,
+            "material-drilldown",
+            "inventoryMaterialPage",
+            "error.inventory.material.load",
+            () -> fetchDrilldownPage(false, materialId, effectivePage, effectiveSize));
 
     model.addAttribute("items", items);
     model.addAttribute("pageSizes", DRILLDOWN_PAGE_SIZES);
@@ -297,20 +286,13 @@ public class InventoryPageController {
     int effectivePage = page == null || page < 0 ? 0 : page;
     int effectiveSize =
         size != null && DRILLDOWN_PAGE_SIZES.contains(size) ? size : DRILLDOWN_DEFAULT_PAGE_SIZE;
-    List<InventoryItemDto> items = new ArrayList<>();
-    try {
-      PageResponse<InventoryItemDto> p =
-          fetchDrilldownPage(true, gameItemId, effectivePage, effectiveSize);
-      if (p != null) {
-        if (p.content() != null) {
-          items = new ArrayList<>(p.content());
-        }
-        model.addAttribute("inventoryGameItemPage", p);
-      }
-    } catch (Exception e) {
-      log.error("Failed to fetch game-item inventory", e);
-      model.addAttribute("error", "error.inventory.gameItem.load");
-    }
+    List<InventoryItemDto> items =
+        loadPageSection(
+            model,
+            "game-item-drilldown",
+            "inventoryGameItemPage",
+            "error.inventory.gameItem.load",
+            () -> fetchDrilldownPage(true, gameItemId, effectivePage, effectiveSize));
 
     model.addAttribute("items", items);
     model.addAttribute("pageSizes", DRILLDOWN_PAGE_SIZES);
@@ -354,6 +336,74 @@ public class InventoryPageController {
   }
 
   /**
+   * Loads a paged table section: the page goes into the model under {@code pageAttribute}, its rows
+   * are returned; a failed read sets {@code error} to {@code errorKey} and returns no rows.
+   *
+   * @param model the page model
+   * @param section the section name for the failure log
+   * @param pageAttribute the model attribute that carries the page
+   * @param errorKey the {@code error} message key on failure
+   * @param read reads the page from the backend
+   * @param <T> the row type
+   * @return the page's rows, empty when the backend sent none or the read failed
+   */
+  @NotNull
+  private <T> List<T> loadPageSection(
+      @NotNull Model model,
+      @NotNull String section,
+      @NotNull String pageAttribute,
+      @NotNull String errorKey,
+      @NotNull Supplier<PageResponse<T>> read) {
+    List<T> rows = new ArrayList<>();
+    if (!SectionFallback.run(
+        log,
+        section,
+        () -> {
+          PageResponse<T> p = read.get();
+          if (p != null) {
+            if (p.content() != null) {
+              rows.addAll(p.content());
+            }
+            model.addAttribute(pageAttribute, p);
+          }
+        })) {
+      model.addAttribute("error", errorKey);
+    }
+    return rows;
+  }
+
+  /**
+   * Loads a grouped Lager table section; a failed read sets {@code error} to {@code errorKey} and
+   * returns no groups.
+   *
+   * @param model the page model
+   * @param section the section name for the failure log
+   * @param errorKey the {@code error} message key on failure
+   * @param read reads the grouped result from the backend
+   * @return the groups, empty when the backend sent none or the read failed
+   */
+  @NotNull
+  private List<GroupedInventoryDto> loadGroupedSection(
+      @NotNull Model model,
+      @NotNull String section,
+      @NotNull String errorKey,
+      @NotNull Supplier<List<GroupedInventoryDto>> read) {
+    List<GroupedInventoryDto> groups = new ArrayList<>();
+    if (!SectionFallback.run(
+        log,
+        section,
+        () -> {
+          List<GroupedInventoryDto> res = read.get();
+          if (res != null) {
+            groups.addAll(res);
+          }
+        })) {
+      model.addAttribute("error", errorKey);
+    }
+    return groups;
+  }
+
+  /**
    * JSON proxy for the {@code remote-game-items} combobox (REQ-FE-016): searches bookable game
    * items by name via the authenticated client and returns a flat list, empty on backend failure.
    *
@@ -364,14 +414,17 @@ public class InventoryPageController {
   @GetMapping("/item-search")
   @ResponseBody
   public List<InventoryGameItemReferenceDto> itemSearch(@RequestParam(required = false) String q) {
-    try {
-      PageResponse<InventoryGameItemReferenceDto> page =
-          inventoryClient.itemCatalog(PickerSearch.PAGE_SIZE, q == null ? "" : q);
-      return page != null && page.content() != null ? page.content() : List.of();
-    } catch (Exception e) {
-      log.error("Failed to search bookable game items", e);
-      return List.of();
-    }
+    return SectionFallback.load(
+        log,
+        "item-search",
+        () -> {
+          PageResponse<InventoryGameItemReferenceDto> page =
+              inventoryClient.itemCatalog(PickerSearch.PAGE_SIZE, q == null ? "" : q);
+          return page != null && page.content() != null
+              ? page.content()
+              : List.<InventoryGameItemReferenceDto>of();
+        },
+        List.of());
   }
 
   /**
@@ -423,24 +476,20 @@ public class InventoryPageController {
     StolenFilter stolen = new StolenFilter(stolenOnly, nonStolenOnly);
 
     if (itemsView) {
-      List<GroupedInventoryDto> groupedItems = new ArrayList<>();
-      try {
-        List<GroupedInventoryDto> res =
-            fetchGroupedItemInventory(
-                InventoryBackendClient.Listing.MY,
-                gameItemIds,
-                locationIds,
-                jobOrderIds,
-                personalOnly,
-                nonPersonalOnly,
-                stolen);
-        if (res != null) {
-          groupedItems = res;
-        }
-      } catch (Exception e) {
-        log.error("Failed to fetch my grouped item inventory", e);
-        model.addAttribute("error", "error.inventory.personal.load");
-      }
+      List<GroupedInventoryDto> groupedItems =
+          loadGroupedSection(
+              model,
+              "my-item-inventory",
+              "error.inventory.personal.load",
+              () ->
+                  fetchGroupedItemInventory(
+                      InventoryBackendClient.Listing.MY,
+                      gameItemIds,
+                      locationIds,
+                      jobOrderIds,
+                      personalOnly,
+                      nonPersonalOnly,
+                      stolen));
       model.addAttribute("groupedItems", groupedItems);
       model.addAttribute("items", new ArrayList<>());
       model.addAttribute(
@@ -488,26 +537,22 @@ public class InventoryPageController {
       return "inventory/inventory-my";
     }
 
-    List<GroupedInventoryDto> groupedItems = new ArrayList<>();
-    try {
-      List<GroupedInventoryDto> res =
-          fetchGroupedMaterialInventory(
-              InventoryBackendClient.Listing.MY,
-              materialIds,
-              locationIds,
-              minQuality,
-              jobOrderIds,
-              missionIds,
-              personalOnly,
-              nonPersonalOnly,
-              stolen);
-      if (res != null) {
-        groupedItems = res;
-      }
-    } catch (Exception e) {
-      log.error("Failed to fetch my grouped inventory", e);
-      model.addAttribute("error", "error.inventory.personal.load");
-    }
+    List<GroupedInventoryDto> groupedItems =
+        loadGroupedSection(
+            model,
+            "my-material-inventory",
+            "error.inventory.personal.load",
+            () ->
+                fetchGroupedMaterialInventory(
+                    InventoryBackendClient.Listing.MY,
+                    materialIds,
+                    locationIds,
+                    minQuality,
+                    jobOrderIds,
+                    missionIds,
+                    personalOnly,
+                    nonPersonalOnly,
+                    stolen));
 
     model.addAttribute("groupedItems", groupedItems);
     model.addAttribute("items", new ArrayList<>());
@@ -760,13 +805,10 @@ public class InventoryPageController {
       @NotNull Supplier<List<GroupedInventoryDto>> unfilteredFetch) {
     List<GroupedInventoryDto> source = groupedItems;
     if (!fragment && anyFilterActive) {
-      try {
-        List<GroupedInventoryDto> unfiltered = unfilteredFetch.get();
-        if (unfiltered != null) {
-          source = unfiltered;
-        }
-      } catch (Exception e) {
-        log.warn("Failed to fetch unfiltered groups for the location filter options", e);
+      List<GroupedInventoryDto> unfiltered =
+          SectionFallback.load(log, "location-filter-options", unfilteredFetch, null);
+      if (unfiltered != null) {
+        source = unfiltered;
       }
     }
     return source.stream()
@@ -807,14 +849,16 @@ public class InventoryPageController {
             || personalFlagActive;
     List<GroupedInventoryDto> source = groupedItems;
     if (!fragment && anyFilterActive) {
-      try {
-        List<GroupedInventoryDto> unfiltered =
-            fetchGroupedItemInventory(listing, null, null, null, false, false, StolenFilter.NONE);
-        if (unfiltered != null) {
-          source = unfiltered;
-        }
-      } catch (Exception e) {
-        log.warn("Failed to fetch unfiltered item groups for the gameItem filter options", e);
+      List<GroupedInventoryDto> unfiltered =
+          SectionFallback.load(
+              log,
+              "game-item-filter-options",
+              () ->
+                  fetchGroupedItemInventory(
+                      listing, null, null, null, false, false, StolenFilter.NONE),
+              null);
+      if (unfiltered != null) {
+        source = unfiltered;
       }
     }
     return source.stream()
@@ -866,24 +910,20 @@ public class InventoryPageController {
     StolenFilter stolen = new StolenFilter(stolenOnly, nonStolenOnly);
 
     if (itemsView) {
-      List<GroupedInventoryDto> groupedItems = new ArrayList<>();
-      try {
-        List<GroupedInventoryDto> res =
-            fetchGroupedItemInventory(
-                InventoryBackendClient.Listing.ALL,
-                gameItemIds,
-                locationIds,
-                jobOrderIds,
-                false,
-                false,
-                stolen);
-        if (res != null) {
-          groupedItems = res;
-        }
-      } catch (Exception e) {
-        log.error("Failed to fetch all grouped item inventory", e);
-        model.addAttribute("error", "error.inventory.global.load");
-      }
+      List<GroupedInventoryDto> groupedItems =
+          loadGroupedSection(
+              model,
+              "all-item-inventory",
+              "error.inventory.global.load",
+              () ->
+                  fetchGroupedItemInventory(
+                      InventoryBackendClient.Listing.ALL,
+                      gameItemIds,
+                      locationIds,
+                      jobOrderIds,
+                      false,
+                      false,
+                      stolen));
       model.addAttribute("groupedItems", groupedItems);
       model.addAttribute("items", new ArrayList<>());
       model.addAttribute(
@@ -924,26 +964,22 @@ public class InventoryPageController {
       return "inventory/inventory-admin";
     }
 
-    List<GroupedInventoryDto> groupedItems = new ArrayList<>();
-    try {
-      List<GroupedInventoryDto> res =
-          fetchGroupedMaterialInventory(
-              InventoryBackendClient.Listing.ALL,
-              materialIds,
-              locationIds,
-              minQuality,
-              jobOrderIds,
-              missionIds,
-              false,
-              false,
-              stolen);
-      if (res != null) {
-        groupedItems = res;
-      }
-    } catch (Exception e) {
-      log.error("Failed to fetch all grouped inventory", e);
-      model.addAttribute("error", "error.inventory.global.load");
-    }
+    List<GroupedInventoryDto> groupedItems =
+        loadGroupedSection(
+            model,
+            "all-material-inventory",
+            "error.inventory.global.load",
+            () ->
+                fetchGroupedMaterialInventory(
+                    InventoryBackendClient.Listing.ALL,
+                    materialIds,
+                    locationIds,
+                    minQuality,
+                    jobOrderIds,
+                    missionIds,
+                    false,
+                    false,
+                    stolen));
 
     model.addAttribute("groupedItems", groupedItems);
     model.addAttribute("items", new ArrayList<>());
@@ -1073,13 +1109,11 @@ public class InventoryPageController {
         }
       }
       if (!ids.isEmpty()) {
-        try {
-          List<UUID> result = inventoryClient.releasedItemIds(ids);
-          if (result != null) {
-            released.addAll(result);
-          }
-        } catch (Exception e) {
-          log.error("Failed to load Materialbörse released-item ids", e);
+        List<UUID> result =
+            SectionFallback.load(
+                log, "released-item-ids", () -> inventoryClient.releasedItemIds(ids), null);
+        if (result != null) {
+          released.addAll(result);
         }
       }
     }
@@ -1170,23 +1204,32 @@ public class InventoryPageController {
       @NotNull Supplier<PageResponse<InventoryItemDto>> read,
       Model model,
       boolean includeMissions) {
-    PageResponse<InventoryItemDto> p = null;
-    try {
-      p = read.get();
-    } catch (Exception e) {
-      log.error("Failed to fetch stack entries", e);
+    if (!SectionFallback.run(log, "stack-entries", () -> addStackEntries(model, read.get()))) {
       model.addAttribute("error", "inventory.stack.entries.error");
+      addStackEntries(model, null);
     }
-    List<InventoryItemDto> entries =
-        (p != null && p.content() != null) ? new ArrayList<>(p.content()) : new ArrayList<>();
-    model.addAttribute("entries", entries);
-    model.addAttribute("entriesPage", p);
     List<JobOrderReferenceDto> stackJobOrders = fetchActiveJobOrders(true);
     model.addAttribute("jobOrders", stackJobOrders);
     model.addAttribute("orderNeedAmounts", orderNeedAmounts(stackJobOrders));
     model.addAttribute("orderGameItemNeedAmounts", orderGameItemNeedAmounts(stackJobOrders));
     model.addAttribute(
         "missions", includeMissions ? fetchMissions() : List.<MissionReferenceDto>of());
+  }
+
+  /**
+   * Adds a stack-entries page and its rows to the model as {@code entriesPage} and {@code entries}.
+   *
+   * @param model the fragment model
+   * @param page the loaded page, or {@code null} when none was loaded
+   */
+  private static void addStackEntries(
+      @NotNull Model model, @Nullable PageResponse<InventoryItemDto> page) {
+    List<InventoryItemDto> entries =
+        (page != null && page.content() != null)
+            ? new ArrayList<>(page.content())
+            : new ArrayList<>();
+    model.addAttribute("entries", entries);
+    model.addAttribute("entriesPage", page);
   }
 
   /**
@@ -1222,14 +1265,18 @@ public class InventoryPageController {
     var jobOrdersFuture = parallelPageLoader.loadAsync(() -> fetchActiveJobOrders(true));
     var ownerFuture = parallelPageLoader.loadAsync(() -> fetchOwnerPickerOptions(boundForm));
     var selectedUserFuture = parallelPageLoader.loadAsync(() -> fetchSelectedInputUser(boundForm));
-    CompletableFuture.allOf(
-            materialsFuture,
-            locationsFuture,
-            missionsFuture,
-            jobOrdersFuture,
-            ownerFuture,
-            selectedUserFuture)
-        .join();
+    SectionFallback.run(
+        log,
+        "input-catalogs",
+        () ->
+            CompletableFuture.allOf(
+                    materialsFuture,
+                    locationsFuture,
+                    missionsFuture,
+                    jobOrdersFuture,
+                    ownerFuture,
+                    selectedUserFuture)
+                .join());
     model.addAttribute("materials", materialsFuture.join());
     model.addAttribute("locations", locationsFuture.join());
     model.addAttribute("missions", missionsFuture.join());
@@ -1344,7 +1391,7 @@ public class InventoryPageController {
   private String writeOrderNeedsJson(Map<String, Object> needs) {
     try {
       return NEEDS_MAPPER.writeValueAsString(needs);
-    } catch (Exception e) {
+    } catch (JacksonException e) {
       log.warn("Failed to serialise job-order need figures for the check-in picker", e);
       return "{}";
     }
@@ -1362,15 +1409,8 @@ public class InventoryPageController {
     if (form == null || !Boolean.TRUE.equals(form.getIsGlobal()) || form.getUserId() == null) {
       return null;
     }
-    try {
-      return inventoryClient.user(form.getUserId());
-    } catch (Exception e) {
-      log.warn(
-          "Failed to resolve selected user {} for inventory-input picker seed",
-          form.getUserId(),
-          e);
-      return null;
-    }
+    return SectionFallback.load(
+        log, "input-selected-user", () -> inventoryClient.user(form.getUserId()), null);
   }
 
   /**
@@ -1381,46 +1421,31 @@ public class InventoryPageController {
    * @return picker options, or an empty list on failure; never {@code null}.
    */
   private List<OrgUnitMembershipOptionDto> fetchOwnerPickerOptions(InventoryForm form) {
-    if (form != null && Boolean.TRUE.equals(form.getIsGlobal()) && form.getUserId() != null) {
-      try {
-        List<OrgUnitMembershipOptionDto> options = inventoryClient.memberships(form.getUserId());
-        return options != null ? options : List.of();
-      } catch (Exception e) {
-        log.warn("Failed to fetch memberships for owner-picker", e);
-        return List.of();
-      }
-    }
-    try {
-      List<OrgUnitMembershipOptionDto> options = inventoryClient.pickableOrgUnits();
-      return options != null ? options : List.of();
-    } catch (Exception e) {
-      log.warn("Failed to fetch pickable org units for owner-picker", e);
-      return List.of();
-    }
+    List<OrgUnitMembershipOptionDto> options =
+        form != null && Boolean.TRUE.equals(form.getIsGlobal()) && form.getUserId() != null
+            ? SectionFallback.load(
+                log,
+                "owner-picker-memberships",
+                () -> inventoryClient.memberships(form.getUserId()),
+                null)
+            : SectionFallback.load(
+                log, "owner-picker-org-units", inventoryClient::pickableOrgUnits, null);
+    return options != null ? options : List.of();
   }
 
   private List<UserReferenceDto> fetchUsers() {
-    try {
-      List<UserReferenceDto> content = inventoryClient.users();
-      if (content != null) {
-        return content;
-      }
-    } catch (Exception _) {
-      log.warn("Failed to fetch users (might not be an admin/officer)");
-    }
-    return new ArrayList<>();
+    List<UserReferenceDto> content =
+        SectionFallback.load(log, "user-catalog", inventoryClient::users, null);
+    return content != null ? content : new ArrayList<>();
   }
 
   @NotNull
   private List<MaterialReferenceDto> fetchMaterials() {
     List<MaterialReferenceDto> materials = new ArrayList<>();
-    try {
-      List<MaterialReferenceDto> content = inventoryClient.materials();
-      if (content != null) {
-        materials.addAll(content);
-      }
-    } catch (Exception e) {
-      log.error("Failed to fetch materials", e);
+    List<MaterialReferenceDto> content =
+        SectionFallback.load(log, "material-catalog", inventoryClient::materials, null);
+    if (content != null) {
+      materials.addAll(content);
     }
     return materials;
   }
@@ -1428,13 +1453,10 @@ public class InventoryPageController {
   @NotNull
   private List<LocationReferenceDto> fetchLocations() {
     List<LocationReferenceDto> locations = new ArrayList<>();
-    try {
-      List<LocationReferenceDto> content = inventoryClient.locations();
-      if (content != null) {
-        locations.addAll(content);
-      }
-    } catch (Exception e) {
-      log.error("Failed to fetch locations", e);
+    List<LocationReferenceDto> content =
+        SectionFallback.load(log, "location-catalog", inventoryClient::locations, null);
+    if (content != null) {
+      locations.addAll(content);
     }
     return locations;
   }
@@ -1454,27 +1476,19 @@ public class InventoryPageController {
   @NotNull
   private List<JobOrderReferenceDto> fetchActiveJobOrders(boolean withNeeds) {
     List<JobOrderReferenceDto> orders = new ArrayList<>();
-    try {
-      List<JobOrderReferenceDto> content = inventoryClient.activeJobOrders(withNeeds);
-      if (content != null) {
-        orders.addAll(content);
-      }
-    } catch (Exception e) {
-      log.error("Failed to fetch active job orders", e);
+    List<JobOrderReferenceDto> content =
+        SectionFallback.load(
+            log, "job-order-catalog", () -> inventoryClient.activeJobOrders(withNeeds), null);
+    if (content != null) {
+      orders.addAll(content);
     }
     return orders;
   }
 
   private List<MissionReferenceDto> fetchMissions() {
-    try {
-      List<MissionReferenceDto> content = inventoryClient.missions();
-      if (content != null) {
-        return content;
-      }
-    } catch (Exception e) {
-      log.error("Failed to fetch missions", e);
-    }
-    return new ArrayList<>();
+    List<MissionReferenceDto> content =
+        SectionFallback.load(log, "mission-catalog", inventoryClient::missions, null);
+    return content != null ? content : new ArrayList<>();
   }
 
   @Nullable
