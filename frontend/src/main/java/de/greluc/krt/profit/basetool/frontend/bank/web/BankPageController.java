@@ -27,10 +27,10 @@ import de.greluc.krt.profit.basetool.frontend.bank.model.BankDashboardDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankHolderBookingDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankHolderDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankTransferFeeRateDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -221,12 +221,8 @@ public class BankPageController {
    */
   @NotNull
   private String balanceChartFragment(UUID id, String chartRange, Model model) {
-    BankAccountDetailDto detail = null;
-    try {
-      detail = bankClient.account(id);
-    } catch (RuntimeException e) {
-      log.warn("Error loading account {} for balance-chart fragment", id, e);
-    }
+    BankAccountDetailDto detail =
+        SectionFallback.load(log, "bank-account-chart-detail", () -> bankClient.account(id), null);
     addChartModel(id, chartRange, detail, model);
     return "bank/bank-account-detail :: balanceChart";
   }
@@ -247,16 +243,12 @@ public class BankPageController {
     int effectivePage = page == null || page < 0 ? 0 : page;
     BankAccountDetailSupport.HistoryPeriod period =
         BankAccountDetailSupport.resolveHistoryPeriod(from, to);
-    PageResponse<BankBookingDto> bookings;
-    try {
-      bookings = fetchBookings(id, effectivePage, size, period.fromInstant(), period.toInstant());
-    } catch (BackendServiceException e) {
-      log.debug("Error loading bookings for account {}", id, e);
-      bookings = null;
-    } catch (RuntimeException e) {
-      log.error("Error loading bookings for account {}", id, e);
-      bookings = null;
-    }
+    PageResponse<BankBookingDto> bookings =
+        SectionFallback.load(
+            log,
+            "bank-account-bookings",
+            () -> fetchBookings(id, effectivePage, size, period.fromInstant(), period.toInstant()),
+            null);
     model.addAttribute("bookings", bookings);
     model.addAttribute("balancesAfter", fetchBalancesAfter(id, bookings));
     model.addAttribute("historyFrom", period.fromDate());
@@ -287,14 +279,14 @@ public class BankPageController {
     if (anchor == null || bookings == null) {
       return Map.of();
     }
-    try {
-      BigDecimal anchorBalance =
-          BankRunningBalance.lastBalance(fetchBalanceSeries(id, anchor, anchor));
-      return BankRunningBalance.balancesAfter(bookings.content(), anchorBalance);
-    } catch (RuntimeException e) {
-      log.warn("Error loading the running balance for account {}", id, e);
-      return Map.of();
-    }
+    return SectionFallback.load(
+        log,
+        "bank-account-running-balance",
+        () ->
+            BankRunningBalance.balancesAfter(
+                bookings.content(),
+                BankRunningBalance.lastBalance(fetchBalanceSeries(id, anchor, anchor))),
+        Map.of());
   }
 
   /**
@@ -312,12 +304,9 @@ public class BankPageController {
     Instant createdAt =
         detail != null && detail.account() != null ? detail.account().createdAt() : null;
     Instant chartFrom = BankAccountDetailSupport.chartFromInstant(range, createdAt, now);
-    BankBalanceSeriesDto series = null;
-    try {
-      series = fetchBalanceSeries(id, chartFrom, now);
-    } catch (RuntimeException e) {
-      log.warn("Error loading balance series for account {}", id, e);
-    }
+    BankBalanceSeriesDto series =
+        SectionFallback.load(
+            log, "bank-account-balance-series", () -> fetchBalanceSeries(id, chartFrom, now), null);
     model.addAttribute(
         "chart",
         BankBalanceChart.of(
@@ -398,16 +387,9 @@ public class BankPageController {
   @NotNull
   private String holderBookingsFragment(UUID id, Integer page, Model model) {
     int effectivePage = page == null || page < 0 ? 0 : page;
-    PageResponse<BankHolderBookingDto> bookings;
-    try {
-      bookings = fetchHolderBookings(id, effectivePage);
-    } catch (BackendServiceException e) {
-      log.debug("Error loading holder bookings fragment for holder {}", id, e);
-      bookings = null;
-    } catch (Exception e) {
-      log.error("Error loading holder bookings fragment for holder {}", id, e);
-      bookings = null;
-    }
+    PageResponse<BankHolderBookingDto> bookings =
+        SectionFallback.load(
+            log, "bank-holder-bookings", () -> fetchHolderBookings(id, effectivePage), null);
     model.addAttribute("bookings", bookings);
     model.addAttribute("paginationBaseUrl", "/bank/holders/" + id);
     return "bank/bank-holder-detail :: holderBookings";
