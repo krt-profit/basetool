@@ -53,8 +53,9 @@ its target module, first matching rule wins (REQ-MOD-001…006).
 - **A Spring Data fragment implementation lies in the package of its fragment interface.** Spring Data looks
   the `Impl` up beside the interface; when a move splits them the method is silently derived from its name as a
   query (and auto-flushes). `RepositoryFragmentPlacementTest` pins it.
-- **A field of another module's type is not `@Autowired`.** `ModularityTest` rejects field injection across
-  modules; MapStruct abstract mappers take such a mapper through a package-private `@Autowired` setter.
+- **No field is `@Autowired`.** `ArchitectureTest.noFieldIsAutowired` rejects every one, and `ModularityTest`
+  separately rejects field injection across modules. A MapStruct abstract mapper takes each collaborator — of
+  its own module or another — through a package-private `@Autowired` setter.
 - **A test that reads backend sources by path** (the frontend's `NotificationTypeMessageCoverageTest` does) is not found by
   a move's text scan when the path is split over a string concatenation; grep for `../backend` after a move.
 - **A new module package gets its Spring Modulith declarations in the same PR** (REQ-MOD-006,

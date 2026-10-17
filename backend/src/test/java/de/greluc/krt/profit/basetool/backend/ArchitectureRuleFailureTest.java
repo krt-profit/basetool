@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.architecture.fixtures.bankseam.SanctionedBr
 import de.greluc.krt.profit.basetool.architecture.fixtures.cycles.alpha.Alpha;
 import de.greluc.krt.profit.basetool.architecture.fixtures.exchange.ExchangeFixtureController;
 import de.greluc.krt.profit.basetool.architecture.fixtures.exchangeleak.FixtureScopeService;
+import de.greluc.krt.profit.basetool.architecture.fixtures.injection.FieldInjectedFixture;
 import de.greluc.krt.profit.basetool.architecture.fixtures.layers.FixtureMapper;
 import de.greluc.krt.profit.basetool.architecture.fixtures.layers.event.FixtureEvent;
 import de.greluc.krt.profit.basetool.architecture.fixtures.layers.integration.FixtureClient;
@@ -113,6 +114,14 @@ class ArchitectureRuleFailureTest {
         ArchitectureTest.mapperLayerShouldNotReachIntoSecurityContextRule(),
         SECURITY,
         "LeakyMapper");
+  }
+
+  @Test
+  void theFieldInjectionRuleFails() {
+    assertReports(
+        ArchitectureTest.noFieldIsAutowiredRule(),
+        importPackageOf(FieldInjectedFixture.class),
+        "FieldInjectedFixture.collaborator");
   }
 
   @Test

@@ -209,6 +209,9 @@ equivalents — a new violation fails `./gradlew test`:
   (the controller and frontend proxy require merely `isAuthenticated()`), so this rule fails a future
   mutation that drops the check — which would otherwise ship reachable by any authenticated member —
   at build time rather than in production (security review, INFO regression guard).
+- No backend field is `@Autowired` (`noFieldIsAutowired`): dependencies arrive through the
+  constructor, and a MapStruct abstract mapper takes them through package-private `@Autowired`
+  setters.
 - The frontend does not depend on Spring Data JPA or JDBC (`frontendShouldNotDependOnSpringDataJpa`,
   `frontendShouldNotUseJdbcDirectly`); ingest depends on no persistence at all.
 
