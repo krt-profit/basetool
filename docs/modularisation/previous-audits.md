@@ -70,9 +70,10 @@ section. Every implementing pull request is on `main`.
 
 The remaining work carries priority P1 in 8 findings, P2 in 16 and P3 in 9; 123 findings are closed.
 The tables are the 2026-09-29 snapshot; since then #2387 closed BLD-PERF-04 and CI-SEC-12 and the
-leftovers of CI-01, SEC-16, TST-18, ING-SEC-04 and OPS-SEC-08 (PSB-11, PSB-12, PSB-14), and moved
-CI-SEC-16 (PSB-13) as far as a workflow change could; #2390 closed CI-SEC-16 (PSB-13) in code, with
-the owner's environment step and secret deletion left.
+leftovers of CI-01, SEC-16, TST-18 and OPS-SEC-08 (PSB-11, PSB-12, PSB-14) plus the ingest half of
+ING-SEC-04, and moved CI-SEC-16 (PSB-13) as far as a workflow change could; #2390 closed CI-SEC-16
+(PSB-13) in code, with the owner's environment step and secret deletion left; #2661 closed the
+frontend half of ING-SEC-04.
 Ten DONE findings have a production half that only a host or Prometheus read could confirm —
 APPSEC-04, APPSEC-05, APPSEC-07, CI-SEC-01, ING-SEC-03, ING-SEC-04, OPS-PRIV-01, OPS-SEC-01,
 OPS-SEC-05 and OPS-SIMP-03; the knowledge base records the state of their rollout. "Operations" is
@@ -162,7 +163,7 @@ Ordered by area, then by the audit's priority.
 | ING-SEC-03 | Ingest | P2 → closed | Whether the gates apply in prod can only be settled with host access | DONE | CONFIRMED | Audience-gate gauge, alert and panel; the production value was not re-read. | #1990, #2270; `ingest/src/main/java/…/metrics/IngestGatePostureMetric.java:44` |
 | ING-SIMP-02 | Ingest | P2 → closed | Bucket factory duplicated; per-IP and per-subject limits share one budget | DONE | CONFIRMED | One factory, a separate per-IP capacity. | #1990; `ingest/src/main/java/…/ratelimit/RateLimitBuckets.java:61` |
 | ING-MOD-01 | Ingest | P3 → closed | Remove WebFlux from the internet-facing gateway | DONE | CONFIRMED | `RestClient` on the JDK client (ADR-0204). | #2008; `ingest/src/main/java/…/config/RestClientConfig.java:102-144` |
-| ING-SEC-04 | Ingest | P3 → P3 | Every ingest container holds the key that also identifies backend and Keycloak | DONE | ADJUSTED | Per-service leaves done (ADR-0211); the jar's hostname-check default is still off. **Closed 2026-10-04 (#2387):** the ingest jar defaults to `true`, `dev`/`test` opt out. | #2034, #2036; `ingest/src/main/resources/application.yml:50` |
+| ING-SEC-04 | Ingest | P3 → P3 | Every ingest container holds the key that also identifies backend and Keycloak | DONE | ADJUSTED | Per-service leaves done (ADR-0211); the jars' hostname-check default was still off. **Ingest closed 2026-10-04 (#2387), frontend 2026-10-17 (#2661):** both jars default to `true`; ingest's `dev`/`test` opt out, the frontend's trust any certificate and skip the check regardless. | #2034, #2036, #2661; `ingest/src/main/resources/application.yml:50`, `frontend/src/main/resources/application.yml:88` |
 | KC-CI-01 | Keycloak | P1 → closed | Login-gate module without SpotBugs/FindSecBugs and without coverage | DONE | CONFIRMED | SpotBugs, FindSecBugs and coverage floors wired. | #1990; `keycloak-spi/build.gradle.kts:4,7` |
 | KC-PERF-01 | Keycloak | P1 → closed | The first Discord login queries the same guild endpoint three times | DONE | CONFIRMED | One member lookup per first login. | #1990; `keycloak-spi/src/main/java/…/DiscordGuildRoleGateAuthenticator.java:117-125` |
 | THEME-SEC-01 | Keycloak | P1 → closed | Login form blocks password managers and always ticks "remember me" | DONE | CONFIRMED | Autocomplete hints; remember-me only when set (REQ-SEC-066). | #1990; `keycloak-theme/krt-theme/login/login.ftl:13-27` |
@@ -474,8 +475,12 @@ Every finding that is not DONE or not CONFIRMED, grouped by the priority of the 
   hostname check are in place (ADR-0211, #2034, #2036). The jar default of
   `app.ingest.verify-backend-hostname` is `false` (`ingest/src/main/resources/application.yml:50`)
   and only the deployment switches it on, so a jar started outside compose or Quadlet under a
-  non-dev profile skips the check. The default flips to `true`, dev and test opt out, and the E2E
-  stack verifies it.
+  non-dev profile skips the check; the frontend's `app.http.verify-backend-hostname` carried the
+  same default. The default flips to `true`, dev and test opt out, and the E2E stack verifies it.
+  **Done in two halves:** the ingest jar 2026-10-04 (#2387), the frontend 2026-10-17 (#2661,
+  `frontend/src/main/resources/application.yml:88`). Ingest's `dev` and `test` profiles opt out
+  explicitly; the frontend's trust any certificate and skip the check regardless of the switch
+  (`WebClientConfig`), so neither needs an override.
 - **CI-07** (CI · DONE · ADJUSTED · P3 → P3). The plan job reuses per-module images from the newest
   verified ancestor (ADR-0210; #2031, #2033, #2046). `.github/scripts/image_reuse_plan.py:44-112`
   derives each module's inputs from the Dockerfile's COPY lines, so a new `backend-*` subproject

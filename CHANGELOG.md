@@ -45,6 +45,8 @@
 
 - **Verbundene Anwendungen (Admin): Bestätigungen benennen ihre Aktion.** Die Bestätigungsdialoge der Seite beschriften ihren Knopf mit „Erweitern", „Sperren", „Ein-/Ausschalten" bzw. „Zurücknehmen" statt mit „Löschen", obwohl nichts gelöscht wird (REQ-XCH-003).
 
+- **Build: Build ohne erreichbares `git` scheitert nicht mehr.** Lief der Frontend-Build dort, wo kein `git` auf dem `PATH` liegt – etwa in einem schlanken Container –, verwarf Gradle den Konfigurations-Cache und beendete den Build mit Fehler, obwohl jeder Task durchlief; weder das Abfangen des Fehlers noch `-PappVersion` half. Der Build fragt `git describe` jetzt nur noch, wenn ein Git-Checkout und ein `git`-Programm vorhanden sind, und nimmt sonst die Projektversion (REQ-OPS-021).
+
 ## [v1.16.5](https://github.com/krt-profit/basetool/releases/tag/v1.16.5) - 2026-10-17
 
 ### Added

@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-11.
-> **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0213](../adr/0213-a-release-that-moves-the-provider-jar-costs-one-outage.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md), [ADR-0083](../adr/0083-deploy-bot-health-drift-targeted-restart.md), [ADR-0145](../adr/0145-build-provenance-anchored-outside-the-registry.md), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md), [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md), [ADR-0187](../adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md), [ADR-0188](../adr/0188-the-host-bootstrap-is-an-ansible-role.md), [ADR-0189](../adr/0189-stateful-containers-run-as-their-own-uid.md), [ADR-0190](../adr/0190-every-container-but-keycloak-runs-read-only.md), [ADR-0196](../adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md), [ADR-0246](../adr/0246-pull-requests-merge-through-a-merge-queue-not-the-strict-up-to-date-policy.md), [ADR-0248](../adr/0248-the-shared-build-conventions-are-precompiled-plugins-of-an-included-build.md)
+> **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0213](../adr/0213-a-release-that-moves-the-provider-jar-costs-one-outage.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md), [ADR-0083](../adr/0083-deploy-bot-health-drift-targeted-restart.md), [ADR-0145](../adr/0145-build-provenance-anchored-outside-the-registry.md), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md), [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md), [ADR-0187](../adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md), [ADR-0188](../adr/0188-the-host-bootstrap-is-an-ansible-role.md), [ADR-0189](../adr/0189-stateful-containers-run-as-their-own-uid.md), [ADR-0190](../adr/0190-every-container-but-keycloak-runs-read-only.md), [ADR-0196](../adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md), [ADR-0246](../adr/0246-pull-requests-merge-through-a-merge-queue-not-the-strict-up-to-date-policy.md), [ADR-0248](../adr/0248-the-shared-build-conventions-are-precompiled-plugins-of-an-included-build.md), [ADR-0275](../adr/0275-the-plugin-classpath-resolves-from-the-portal-with-maven-central-behind-it.md)
 
 # Deployment delivery & promotion
 
@@ -1295,6 +1295,29 @@ into the CHANGELOG, on the very commit being built. `.github/scripts/app_version
 prefers the newest dated CHANGELOG section *when it carries no tag yet*, and falls back to
 `git describe` in every other case, so only the release commit is affected.
 
+**A build without `git` still has a version, and still stores its configuration-cache entry.** The
+frontend stamps `build-info.properties` from `-PappVersion` when that property is set and from
+`git describe --tags --always --dirty` otherwise, falling back to the project version. That `git`
+call is a `providers.exec` value source, and a value source whose process cannot start is a
+configuration-cache **problem**, not a caught exception: Gradle discards the entry and fails the
+build although the version fell back and every task succeeded. Neither `runCatching` around the
+read nor `-PappVersion` prevents it, because the source is computed when the entry is stored rather
+than when the value is read. `frontend/build.gradle.kts` therefore registers the value source only
+when `rootDir/.git` exists **and** a `git` executable is on `PATH`, and takes the project version
+when either is missing. The image build is unaffected either way: `docker/app/Dockerfile` passes
+`--no-configuration-cache`, which is why its git-less `eclipse-temurin` builder never hit this.
+
+**Nothing but a deliberate check reaches that path**, which is why one exists: an Actions runner
+always carries `git`, and the one git-less build this project runs is the image build, which has
+the configuration cache off. `scripts/check-gitless-config-cache.sh` therefore makes `git`
+unreachable itself. Two things about it are not obvious from reading it. It sets `PATH` to an empty
+directory and starts Gradle through `java -jar gradle/wrapper/gradle-wrapper.jar` rather than
+through `gradlew`, because the wrapper script resolves `xargs` and `uname` through `PATH` and would
+die before Gradle started. And it asserts `Configuration cache entry stored.` and `Configuration
+cache entry reused.` by name rather than the absence of a discard, so a `PATH` that still carries
+`git`, a stamp that is still `git describe`, or a Gradle release that renames the message fails the
+check rather than turning it green without having checked anything.
+
 Reuse is an optimisation, never a weakening of the supply chain. It applies only when **every** gate
 passes, and the doubt case is always a full build:
 
@@ -1422,9 +1445,18 @@ produced artifact.
   never skip. `image_reuse_plan.py --selftest` covers each branch of the skip decision and of the
   reuse-base search; the plan script was exercised against stubbed git/registry answers for both
   (2026-09-23).
+- [x] With no `git` on `PATH`, `:frontend:bootBuildInfo --configuration-cache` succeeds, stores its
+  entry, reuses it on the second run and stamps the project version; with `git` present the stamp
+  stays `git describe` and the entry is reused. Before the guard the same run failed because the
+  `ProcessOutputValueSource` could not start `git`, which discarded the entry — with and without
+  `-PappVersion` (2026-10-17). `scripts/check-gitless-config-cache.sh` asserts those four runs and
+  is a step of `ci.yml`'s `build` job, after the build that leaves the daemon and the Gradle caches
+  warm — 28 s for all four, measured locally.
 
 **Enforced by:** `.github/workflows/release-images.yml` (`plan`, `build`, `scan`, `merge`) ·
-`.github/scripts/image_reuse_plan.py` · `.github/workflows/promote.yml` (`sync-testing`) · **Decision:** [ADR-0137](../adr/0137-one-image-build-per-commit-and-no-buildkit-layer-cache.md),
+`.github/scripts/image_reuse_plan.py` · `.github/workflows/promote.yml` (`sync-testing`) ·
+`frontend/build.gradle.kts` (`resolvedAppVersion`) · `scripts/check-gitless-config-cache.sh`
+(`ci.yml`, `build`) · **Decision:** [ADR-0137](../adr/0137-one-image-build-per-commit-and-no-buildkit-layer-cache.md),
 [ADR-0210](../adr/0210-a-main-push-that-changes-no-image-input-re-tags-the-previous-build.md)
 
 ### REQ-OPS-022 — Non-production environments are fed by their own promotion channel
@@ -2937,6 +2969,17 @@ isolated projects have nothing to reject and a module added later inherits no de
   `gradle/verification-metadata.xml` (REQ-OPS-034); the image builds copy `build-logic/`, which makes
   it a shared image input, and `build-logic/**` is a path filter of the dependency-check and
   sandbox-image workflows.
+- **The plugin classpath resolves from the portal with Maven Central behind it.** Both settings
+  files declare `pluginManagement { repositories { gradlePluginPortal(); mavenCentral() } }`, which
+  is what seeds every project's `buildscript.repositories` in both builds — the repositories of
+  `dependencyResolutionManagement` do not apply to that classpath, so without the declaration the
+  default leaves the Gradle Plugin Portal as the only source. The portal answers the plugin markers
+  Gradle publishes itself and redirects every other artifact to Maven Central, so a portal outage
+  took the whole build down for artifacts Central was serving all along: the Kotlin jars the
+  `kotlin-dsl` plugin puts on `build-logic`'s classpath failed to resolve on main on 2026-10-17.
+  Central is a fallback, not a second source of truth — the portal stays first and every artifact
+  still matches its committed checksum (REQ-OPS-034), the same bytes either way
+  ([ADR-0275](../adr/0275-the-plugin-classpath-resolves-from-the-portal-with-maven-central-behind-it.md)).
 - **No behaviour change by the move.** The task graph (`build -m`, `tasks --all`), every task's
   type, dependencies and inputs, the compiler arguments including Error Prone's, the test JVM
   arguments, the resolved classpaths and the SBOM component lists are identical before and after.
@@ -2953,7 +2996,8 @@ isolated projects have nothing to reject and a module added later inherits no de
 
 **Enforced by:** `build-logic/` · `settings.gradle.kts` · `.github/scripts/check_sbom_coverage.py`
 (`sbom-coverage`) · `.github/scripts/image_reuse_plan.py` (`--selftest`) · **Decision:**
-[ADR-0248](../adr/0248-the-shared-build-conventions-are-precompiled-plugins-of-an-included-build.md) ·
+[ADR-0248](../adr/0248-the-shared-build-conventions-are-precompiled-plugins-of-an-included-build.md),
+[ADR-0275](../adr/0275-the-plugin-classpath-resolves-from-the-portal-with-maven-central-behind-it.md) ·
 **Related:** REQ-OPS-034, REQ-OPS-037, REQ-OPS-038
 
 ### REQ-OPS-047 — A library module of an application is named `<app>-<name>`, and the build reads the name
