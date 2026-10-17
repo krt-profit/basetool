@@ -3,8 +3,9 @@
 > **Doc type:** Operator runbook for **one** release — the move of production (and, through
 > `promote.yml`'s `sync-testing`, the testing host) from **v1.16.5 to v1.17.0**, the first release of
 > #2638 (backend API internal-only, Android app discontinued), together with #2693 (VerseKit: share
-> own stock into a unit pool). Written 2026-10-17 from an audit of the 45 pull requests between
-> `v1.16.5` and `61a692bc7` and from read-only reads of production the same day. **Historical once 1.17.0 is live and §5 is done**: move it to `docs/archive/` then and let
+> own stock into a unit pool). Written 2026-10-17 from an audit of the 46 pull requests between
+> `v1.16.5` and `7d816a1fc` and from read-only reads of production the same day. **Historical once
+> 1.17.0 is live and §5 is done**: move it to `docs/archive/` then and let
 > [`deployment.md`](deployment.md) stay the living truth.
 >
 > **Every step that writes to a host is a production write**: it waits for @greluc's explicit yes,
@@ -20,9 +21,10 @@ Shell conventions (`cd /`, `${UCTL}`, `${UPOD}`) are the ones in
 
 | | Value |
 |---|---|
-| Range | `v1.16.5` (2026-10-17) to `61a692bc7`, 45 pull requests |
+| Range | `v1.16.5` (2026-10-17) to `7d816a1fc`, 46 pull requests |
 | #2638 | parts 1–4 merged: #2681 (ADRs), #2686 (API vhost and `net-proxy-api` gone, absence probes), #2692 (Android-only API surface gone, `azp` gate, CSRF/CORS off, forwarded headers narrowed), #2700 (`basetool-android` client and App Link surface gone), plus #2701, #2703, #2704, #2706. Part 5 (#2675) runs 7 days **after** this release |
 | #2693 | #2702 (Lager `RebookCommands`), #2708 (`split` on `GET /exchange/v1/me/stock`), #2709 (`share` op), #2711 (`unshare` op). No new scope: both ops ride `exchange.stock.write`, which VerseKit's approval already lists |
+| Testing only | #2710 (#2639): seeding and wiping the testing system. `testing-reset.sh` is deliberately not in `host-scripts.list`, and `provision-keycloak-realm.py --seed-client` refuses a production origin; nothing to do on production |
 | Other security | #2669: the management ports require the scrape credential; #2667: frontend hostname check on by default |
 | Flyway | three, `V304`–`V306` (head before: `V303`): `V304` replaces the trigger function `exchange_inventory_item_changed()`; `V305` and `V306` swap `exchange_journal`'s `ck_exchange_journal_action` for one that also admits `STOCK_SHARE` and `STOCK_UNSHARE`. The `ADD CONSTRAINT` validates every journal row under an exclusive lock while the apps are stopped; expected seconds |
 | Stateful infra | no image bump; the stateful-infra gate does not trigger |
