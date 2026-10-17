@@ -15,7 +15,7 @@
 > [0240](../adr/0240-navigation-is-a-structured-drawer-a-quick-access-and-a-phone-tab-bar.md) (REQ-UI-026) ·
 > [0242](../adr/0242-page-patterns-a-to-c-and-the-design-system-update-2026-10.md) (REQ-UI-027, REQ-UI-009) ·
 > [0243](../adr/0243-colours-and-stacking-layers-are-written-through-tokens.md) (REQ-UI-001, REQ-UI-023) ·
-> **Next free id:** `REQ-UI-029` · **Visual source of truth:** the design
+> **Next free id:** `REQ-UI-030` · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)),
 > read at the design system's latest `main` ([ADR-0259](../adr/0259-the-design-system-submodule-follows-its-main.md)).
@@ -1773,6 +1773,28 @@ whole app.
 **Code:** `static/css/kernel/styles.css`, `kernel/fragments/components.html`,
 `kernel/fragments/page-head.html`, `static/js/kernel/krt-filter-panel.js` ·
 **Related:** REQ-UI-001, REQ-UI-006, REQ-UI-027
+
+### REQ-UI-029 — The test system says so in every footer
+
+The test system looks exactly like production, so real work can land there by mistake, or test work
+on production.
+
+- **Switch.** `app.instance.test-system` (`APP_INSTANCE_TEST_SYSTEM`, `InstanceProperties`),
+  default `false`. Set by configuration only, never guessed from the hostname. The testing host sets
+  it to `true`; production leaves it unset.
+- **What shows.** With the switch on, the shared footer (`kernel/fragments/footer.html`) opens with
+  `.krt-footer-instance`: a filled warning-yellow label with black text, the `⚠` glyph and
+  „Testsystem" / "Test system" in uppercase, with a tooltip explaining that this is not the live
+  system. The footer's top border turns warning-yellow (`.krt-footer--test-system`). Every page that
+  renders the footer shows it, for every role, the public legal pages included.
+- **Production shows nothing.** With the switch off the footer markup is unchanged.
+- The header and the browser tab title carry no marker.
+
+**Enforced by:** `TestSystemFooterMarkerMvcTest` (both states, DE and EN),
+`InstanceMarkerAdviceTest` ·
+**Code:** `kernel/layout/InstanceProperties.java`, `kernel/layout/InstanceMarkerAdvice.java`,
+`kernel/fragments/footer.html`, `static/css/kernel/styles.css` ·
+**Related:** REQ-UI-001
 
 ## Out of scope
 

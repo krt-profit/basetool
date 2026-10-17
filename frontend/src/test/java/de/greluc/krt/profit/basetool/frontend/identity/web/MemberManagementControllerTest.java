@@ -665,10 +665,124 @@ class MemberManagementControllerTest {
       verify(backendApiClient)
           .patch(eq("/api/v1/org-units/members/{id}/memberships"), any(), any(), eq(id));
     }
+
+    @Test
+    void rankOutsideRoleRange_flashesTheRankToast_andSendsNoMembershipPatch() {
+      UUID id = UUID.randomUUID();
+      Model model = new ConcurrentModel();
+      MemberEditForm form =
+          new MemberEditForm(
+              20, "desc", "Alice", 1L, null, null, null, null, null, null, null, null, true);
+      BindingResult br = mock(BindingResult.class);
+      when(br.hasErrors()).thenReturn(false);
+      doThrow(rankRefusal("Still holds the Officer role."))
+          .when(backendApiClient)
+          .put(eq("/api/v1/users/{id}/attributes"), any(), eq(Void.class), eq(id));
+
+      String view = controller.updateMember(id, form, br, model, redirectAttributes);
+
+      assertEquals("redirect:/members/" + id + "/edit", view);
+      assertEquals(
+          "error.member.rank.outsideRoleRange",
+          redirectAttributes.getFlashAttributes().get("errorToast"));
+      verify(backendApiClient, never()).patch(anyString(), any(), any(), any(Object[].class));
+    }
+
+    @Test
+    void membershipOnlySave_withUnchangedRank_clearsTheStaffelThroughThePatch() {
+      UUID id = UUID.randomUUID();
+      Model model = new ConcurrentModel();
+      MemberEditForm form =
+          new MemberEditForm(
+              8, "desc", "Alice", 1L, null, null, null, null, null, null, null, null, true);
+      BindingResult br = mock(BindingResult.class);
+      when(br.hasErrors()).thenReturn(false);
+
+      String view = controller.updateMember(id, form, br, model, redirectAttributes);
+
+      assertEquals("redirect:/members", view);
+      ArgumentCaptor<Object> body = ArgumentCaptor.forClass(Object.class);
+      verify(backendApiClient)
+          .patch(eq("/api/v1/org-units/members/{id}/memberships"), body.capture(), any(), eq(id));
+      assertTrue(
+          ((de.greluc.krt.profit.basetool.frontend.orgunit.model.MembershipDeltaRequest)
+                  body.getValue())
+              .staffeln()
+              .isEmpty());
+      assertEquals(
+          "notification.success.save", redirectAttributes.getFlashAttributes().get("successToast"));
+    }
+  }
+
+  /**
+   * Builds the backend's role-range refusal as the frontend parses it.
+   *
+   * @param detail the localized detail the backend sent, or {@code null} for none
+   * @return the {@code RANK_OUTSIDE_ROLE_RANGE} failure
+   */
+  private static de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException
+      rankRefusal(String detail) {
+    return new de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException(
+        "refused",
+        null,
+        400,
+        de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException
+            .CODE_RANK_OUTSIDE_ROLE_RANGE,
+        null,
+        List.of(),
+        detail);
   }
 
   @Nested
   class AjaxTwinTests {
+
+    @Test
+    void updateMemberAjax_rankOutsideRoleRange_returns422OnTheRankField() {
+      UUID id = UUID.randomUUID();
+      MemberEditForm form =
+          new MemberEditForm(
+              20, "desc", "Alice", 4L, null, null, null, null, null, null, null, null, true);
+      BindingResult br = mock(BindingResult.class);
+      when(br.hasErrors()).thenReturn(false);
+      doThrow(rankRefusal("This member still holds the Officer role."))
+          .when(backendApiClient)
+          .put(eq("/api/v1/users/{id}/attributes"), any(), eq(Void.class), eq(id));
+
+      org.springframework.http.ResponseEntity<Object> response =
+          controller.updateMemberAjax(id, form, br, java.util.Locale.ENGLISH);
+
+      assertEquals(422, response.getStatusCode().value());
+      assertEquals(
+          java.util.Map.of("rank", "This member still holds the Officer role."),
+          response.getBody());
+      verify(backendApiClient, never()).patch(anyString(), any(), any(), any(Object[].class));
+      verify(liveSyncLocalBus, never()).publish(anyString(), any());
+    }
+
+    @Test
+    void updateMemberAjax_rankOutsideRoleRange_withoutDetail_usesTheFrontendMessage() {
+      UUID id = UUID.randomUUID();
+      MemberEditForm form =
+          new MemberEditForm(
+              20, "desc", "Alice", 4L, null, null, null, null, null, null, null, null, true);
+      BindingResult br = mock(BindingResult.class);
+      when(br.hasErrors()).thenReturn(false);
+      doThrow(rankRefusal(null))
+          .when(backendApiClient)
+          .put(eq("/api/v1/users/{id}/attributes"), any(), eq(Void.class), eq(id));
+      when(messageSource.getMessage(
+              eq("error.member.rank.outsideRoleRange"),
+              any(),
+              anyString(),
+              eq(java.util.Locale.ENGLISH)))
+          .thenReturn("Rank does not fit the role.");
+
+      org.springframework.http.ResponseEntity<Object> response =
+          controller.updateMemberAjax(id, form, br, java.util.Locale.ENGLISH);
+
+      assertEquals(422, response.getStatusCode().value());
+      assertEquals(java.util.Map.of("rank", "Rank does not fit the role."), response.getBody());
+    }
 
     @Test
     void updateMemberAjax_validationError_returns422WithFieldMessages() {

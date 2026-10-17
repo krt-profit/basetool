@@ -312,7 +312,11 @@ public class MemberManagementController {
       }
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "updateMember", id, e);
-      redirectAttributes.addFlashAttribute("errorToast", "error.member.update.failed");
+      redirectAttributes.addFlashAttribute(
+          "errorToast",
+          isRankOutsideRoleRange(e)
+              ? "error.member.rank.outsideRoleRange"
+              : "error.member.update.failed");
       return "redirect:/members/"
           + id
           + "/edit"
@@ -362,6 +366,15 @@ public class MemberManagementController {
       body.put("version", currentUserVersion(id, form.version()));
       return ResponseEntity.ok(body);
     } catch (BackendServiceException e) {
+      if (isRankOutsideRoleRange(e)) {
+        log.warn(
+            "AJAX member update refused: status={}, code={}",
+            e.getStatusCode(),
+            e.getProblemCode());
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT)
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(Map.of("rank", rankRefusalMessage(e, locale)));
+      }
       return relayBackendError("AJAX member update failed", e);
     } catch (Exception e) {
       log.error("AJAX member update failed", e);
@@ -418,6 +431,35 @@ public class MemberManagementController {
     } catch (Exception _) {
     }
     return (priorVersion == null ? 0L : priorVersion) + 1;
+  }
+
+  /**
+   * Tells whether the backend refused the save because the rank does not fit the member's stored
+   * Keycloak role (REQ-ROLE-007).
+   *
+   * @param e the backend failure
+   * @return {@code true} for the {@code RANK_OUTSIDE_ROLE_RANGE} refusal
+   */
+  private static boolean isRankOutsideRoleRange(@NotNull BackendServiceException e) {
+    return BackendServiceException.CODE_RANK_OUTSIDE_ROLE_RANGE.equals(e.getProblemCode());
+  }
+
+  /**
+   * The rank field's message for a role-range refusal: the backend's localized, role-specific
+   * detail, or the frontend's generic rank message when the detail is missing.
+   *
+   * @param e the {@code RANK_OUTSIDE_ROLE_RANGE} failure
+   * @param locale the request locale
+   * @return the message shown under the rank field
+   */
+  @NotNull
+  private String rankRefusalMessage(@NotNull BackendServiceException e, @NotNull Locale locale) {
+    String detail = e.getProblemDetail();
+    if (detail != null && !detail.isBlank()) {
+      return detail;
+    }
+    return messageSource.getMessage(
+        "error.member.rank.outsideRoleRange", null, "error.member.rank.outsideRoleRange", locale);
   }
 
   /**
