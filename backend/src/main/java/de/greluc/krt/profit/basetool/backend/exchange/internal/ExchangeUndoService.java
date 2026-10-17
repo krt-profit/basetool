@@ -300,7 +300,7 @@ public class ExchangeUndoService {
       boolean done =
           switch (resource) {
             case BLUEPRINT -> restoreBlueprint(member, newest.getEntityKey(), before);
-            case STOCK -> restoreLot(member, newest.getEntityKey(), before);
+            case STOCK -> restoreLot(member, newest.getEntityKey(), before, data);
             case SHIP -> restoreShip(member, newest.getEntityKey(), before, memberships);
             case ORG_STOCK ->
                 throw new IllegalStateException("Org-stock entries are restored together");
@@ -427,17 +427,37 @@ public class ExchangeUndoService {
   }
 
   /**
-   * Sets a lot back to its earlier quantity.
+   * Takes the client's shares of a lot back to personal, then sets the lot back to its earlier
+   * quantity.
    *
    * @param member the member
    * @param lotKey the lot
    * @param before the state before the client's first write
-   * @return whether the lot could be restored
+   * @param writes the client's writes to the lot, newest first
+   * @return whether the lot could be restored; {@code false} when a pool no longer holds what was
+   *     shared into it
    */
   private boolean restoreLot(
-      @NotNull UUID member, @NotNull String lotKey, @Nullable JsonNode before) {
+      @NotNull UUID member,
+      @NotNull String lotKey,
+      @Nullable JsonNode before,
+      @NotNull List<ExchangeJournalEntry> writes) {
     String unit = text(before, "unit");
     if (before == null || before.get("quantity") == null || unit == null) {
+      return false;
+    }
+    Map<UUID, BigDecimal> shared = new TreeMap<>();
+    for (ExchangeJournalEntry write : writes) {
+      if (write.getAction() == ExchangeJournalAction.STOCK_SHARE) {
+        JsonNode after = parse(write.getAfterState());
+        String pool = text(after, "orgUnit");
+        if (after == null || pool == null || after.get("shared") == null) {
+          return false;
+        }
+        shared.merge(UUID.fromString(pool), after.get("shared").decimalValue(), BigDecimal::add);
+      }
+    }
+    if (!shared.isEmpty() && !stockWriteService.takeBackShares(member, lotKey, unit, shared)) {
       return false;
     }
     BigDecimal quantity = before.get("quantity").decimalValue();

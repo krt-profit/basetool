@@ -29,6 +29,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -41,30 +42,49 @@ import org.jetbrains.annotations.Nullable;
 public record ExchangeStockChangeSet(
     @NotNull @Size(min = 1, max = 500) List<@NotNull @Valid Op> ops, boolean dryRun) {
 
+  /** The op that sets a lot to a quantity. */
+  public static final String SET_QUANTITY = "set-quantity";
+
+  /** The op that moves part of a lot's personal stock into a unit's pool. */
+  public static final String SHARE = "share";
+
   /**
-   * One lot's new quantity.
+   * One op on a lot: a {@code set-quantity} sets it to a quantity, a {@code share} moves part of
+   * its personal stock into the pool of {@code orgUnit}.
    *
    * @param opId the client's id for the op, echoed in the result, or {@code null}
-   * @param op always {@code set-quantity}
+   * @param op {@code set-quantity} or {@code share}
    * @param material the material or item
    * @param location the Lager location
    * @param quality the quality of a material lot, ignored for an item
    * @param stolen whether the lot is marked stolen
-   * @param quantity the quantity the lot should hold
-   * @param expectedQuantity the quantity the client last saw, 0 for a new lot
-   * @param override whether the op may refill a lot emptied elsewhere, after asking the member
+   * @param quantity the quantity the lot should hold, or the amount a share moves
+   * @param expectedQuantity the quantity the client last saw, 0 for a new lot; for a share, the
+   *     lot's personal amount in its last synced {@code split}
+   * @param override whether a {@code set-quantity} may refill a lot emptied elsewhere, after asking
+   *     the member
+   * @param orgUnit the unit whose pool a {@code share} fills; required there, ignored otherwise
    */
   @Schema(name = "Op")
   public record Op(
       @Nullable @Size(min = 1, max = 64) String opId,
-      @NotNull @Pattern(regexp = "^set-quantity$") String op,
+      @NotNull @Pattern(regexp = "^(set-quantity|share)$") String op,
       @NotNull @Valid ExchangeItemRef material,
       @NotNull @Valid ExchangeLocationRef location,
       @NotNull @QualityValue Integer quality,
       @NotNull Boolean stolen,
       @NotNull @Valid Quantity quantity,
       @NotNull @Valid Quantity expectedQuantity,
-      @Nullable Boolean override) {}
+      @Nullable Boolean override,
+      @Nullable @Valid UnitRef orgUnit) {}
+
+  /**
+   * The org unit a share names.
+   *
+   * @param id the unit's id
+   */
+  @Schema(name = "StockOpUnit")
+  public record UnitRef(@NotNull UUID id) {}
 
   /**
    * An amount with its unit.

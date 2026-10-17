@@ -928,6 +928,66 @@
             "quantity",
             "expectedQuantity"
           ]
+        },
+        {
+          "type": "object",
+          "description": "Moves part of the lot's personal stock into the pool of a unit the member directly belongs to; the member stays the holder.",
+          "properties": {
+            "opId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "Echoed in the result."
+            },
+            "op": {
+              "const": "share"
+            },
+            "material": {
+              "$ref": "item-ref.schema.json"
+            },
+            "location": {
+              "$ref": "location-ref.schema.json"
+            },
+            "quality": {
+              "$ref": "quality.schema.json"
+            },
+            "stolen": {
+              "type": "boolean"
+            },
+            "orgUnit": {
+              "type": "object",
+              "description": "The unit whose pool receives the stock: one of the units GET /me/org-units returns.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "description": "Opaque identifier issued by the Basetool. Clients store and echo it, never parse it."
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "quantity": {
+              "$ref": "quantity.schema.json",
+              "description": "The amount to move; at most expectedQuantity."
+            },
+            "expectedQuantity": {
+              "$ref": "quantity.schema.json",
+              "description": "The lot's split.personal the client last saw. A difference answers VERSION_CONFLICT."
+            }
+          },
+          "required": [
+            "op",
+            "material",
+            "location",
+            "quality",
+            "stolen",
+            "orgUnit",
+            "quantity",
+            "expectedQuantity"
+          ]
         }
       ]
     },
