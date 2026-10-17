@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.catalogue.web;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.matchesPattern;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -215,8 +217,8 @@ class MaterialsPageControllerMvcTest {
   }
 
   /**
-   * The detail page renders completely with its script, the terminal search and sort controls, and
-   * the planet-stripe stylesheet.
+   * The detail page renders completely with its script, the terminal search, a sort button in each
+   * of the four column headers instead of a sort segment, and the planet-stripe stylesheet.
    */
   @Test
   @WithMockUser
@@ -233,7 +235,18 @@ class MaterialsPageControllerMvcTest {
         .andExpect(content().string(containsString("</body>")))
         .andExpect(content().string(containsString("</html>")))
         .andExpect(content().string(containsString("id=\"terminalFilter\"")))
-        .andExpect(content().string(containsString("name=\"terminalSort\"")))
+        .andExpect(content().string(not(containsString("name=\"terminalSort\""))))
+        .andExpect(content().string(containsString("data-testid=\"price-sort-terminal\"")))
+        .andExpect(content().string(containsString("data-testid=\"price-sort-location\"")))
+        .andExpect(content().string(containsString("data-testid=\"price-sort-buy\"")))
+        .andExpect(
+            content()
+                .string(
+                    matchesPattern(
+                        "(?s).*<th scope=\"col\" class=\"num\" data-sort-col=\"sell\""
+                            + " aria-sort=\"descending\">\\s*<button type=\"button\""
+                            + " class=\"sort-header\" data-sort-key=\"sell\""
+                            + " data-sort-first=\"desc\".*")))
         .andExpect(content().string(containsString("data-terminal=\"Area18\"")))
         .andExpect(PageStylesheets.content(containsString(".md-terminal-row.planet-hurston")));
   }

@@ -17,6 +17,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { krtTableSort } from '/js/kernel/krt-table-sort.js';
+
+/**
+ * Wires the price table: column-header sorting and the terminal search.
+ */
 function initMaterialDetail() {
     const table = /** @type {HTMLTableElement | null} */ (document.getElementById('priceTable'));
     const input = /** @type {HTMLInputElement | null} */ (
@@ -34,57 +39,46 @@ function initMaterialDetail() {
     const rowsBody = tbody;
 
     /**
-     * A row's price on one side.
+     * A row's value in one sortable column.
      *
      * @param {HTMLTableRowElement} row the terminal row
-     * @param {'sell' | 'buy'} side the side
-     * @returns {number | null} the price, or `null` when the terminal does not trade that side
+     * @param {string} key the column key: `terminal`, `location`, `sell` or `buy`
+     * @returns {number | string | null} the price or text, or `null` when the row has none
      */
-    function priceOf(row, side) {
-        const raw = row.getAttribute(`data-${side}`);
+    function valueOf(row, key) {
+        const raw = row.getAttribute(`data-${key}`);
         if (raw === null || raw === '') {
             return null;
+        }
+        if (key === 'terminal' || key === 'location') {
+            return raw;
         }
         const n = Number(raw);
         return isFinite(n) ? n : null;
     }
 
     /**
-     * Sorts the rows: by sale price, highest first, or by purchase price, lowest first; rows
-     * without that side go last, by terminal name.
+     * Orders two rows of equal value by terminal name.
      *
-     * @param {'sell' | 'buy'} side the sort side
+     * @param {HTMLTableRowElement} a the first row
+     * @param {HTMLTableRowElement} b the second row
+     * @returns {number} the comparison result
      */
-    function sortBy(side) {
-        const rows = /** @type {HTMLTableRowElement[]} */ (
-            Array.prototype.slice.call(rowsBody.rows)
+    function byTerminal(a, b) {
+        return String(a.getAttribute('data-terminal') || '').localeCompare(
+            String(b.getAttribute('data-terminal') || ''),
+            undefined,
+            { sensitivity: 'base' },
         );
-        rows.sort((a, b) => {
-            const pa = priceOf(a, side);
-            const pb = priceOf(b, side);
-            if (pa !== null && pb !== null && pa !== pb) {
-                return side === 'sell' ? pb - pa : pa - pb;
-            }
-            if (pa === null && pb !== null) return 1;
-            if (pa !== null && pb === null) return -1;
-            return String(a.getAttribute('data-terminal') || '').localeCompare(
-                String(b.getAttribute('data-terminal') || ''),
-                undefined,
-                { sensitivity: 'base' },
-            );
-        });
-        rows.forEach((row) => {
-            rowsBody.appendChild(row);
-        });
-        priceTable.setAttribute('data-sort', side);
-        priceTable.querySelectorAll('th[data-sort-col]').forEach((th) => {
-            const active = th.getAttribute('data-sort-col') === side;
-            th.setAttribute(
-                'aria-sort',
-                active ? (side === 'sell' ? 'descending' : 'ascending') : 'none',
-            );
-        });
     }
+
+    krtTableSort
+        .attach(priceTable, {
+            initial: { key: 'sell', dir: 'desc' },
+            valueOf,
+            tiebreak: byTerminal,
+        })
+        .apply();
 
     /** Shows the rows whose terminal name contains the search text. */
     function filterTerminals() {
@@ -105,15 +99,6 @@ function initMaterialDetail() {
     if (input) {
         input.addEventListener('input', filterTerminals);
     }
-
-    document.querySelectorAll('input[name="terminalSort"]').forEach((el) => {
-        const radio = /** @type {HTMLInputElement} */ (el);
-        radio.addEventListener('change', () => {
-            if (radio.checked) {
-                sortBy(radio.value === 'buy' ? 'buy' : 'sell');
-            }
-        });
-    });
 }
 
 initMaterialDetail();

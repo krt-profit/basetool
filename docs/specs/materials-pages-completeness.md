@@ -122,11 +122,15 @@ terminal), „Ø Verkauf" (mean of the positive sale prices, with the number of 
 „Aktualisiert" (age of the last UEX sweep). The table lists Terminal · Ort · Verkauf · Einkauf; the
 location and the planet stripe come from the cached price matrix's rows of the same material (a
 matrix failure only empties the location). Zero or negative prices show as „–". The rows are sorted
-by sale price, highest first, terminals buying nothing last by name; the segment „Verkauf ·
-Einkauf" re-sorts in the browser (purchase ascending) and the search narrows the rows by terminal.
+by sale price, highest first, terminals buying nothing last by name. Each of the four column headers
+is a sort button of the shared sortable header: a click on an inactive column sorts by it in its
+first direction (Terminal and Ort A–Z, Verkauf highest first, Einkauf lowest first), a second click
+reverses it; rows without a value stay last, ties go by terminal name, and the header carries the
+matching `aria-sort`. Sorting happens in the browser and keeps the terminal search's narrowing.
 
 *Amended 2026-10-03 (website overhaul phase 3): chips, the four figures, the location column, the
-sale-price sort with the „Verkauf · Einkauf" segment.*
+sale-price sort. Amended 2026-10-17 (#2634): the column headers sort, the „Verkauf · Einkauf"
+segment is gone.*
 
 **Acceptance**
 
@@ -134,6 +138,8 @@ sale-price sort with the „Verkauf · Einkauf" segment.*
 - [ ] The rendered `prices` model attribute contains the concatenation of every page's content.
 - [ ] A backend failure leaves `prices` empty and surfaces the placeholder, never a half-assembled
   list.
+- [ ] Every column header of the price table is a sort `<button>`; the sale column starts active and
+  descending, and no separate sort segment is rendered.
 
 **Enforced by:** `MaterialsPageControllerTest` /
 `MaterialsPageControllerMvcTest.getMaterialDetail_*` / `MaterialTerminalPricesTest` / `UexAgeTest` ·
