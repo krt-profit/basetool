@@ -28,10 +28,10 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Age of the last UEX sweep in the coarsest unit that still reads naturally, for the trade pages'
- * freshness hint.
+ * Age of a UEX instant — the last sweep or a price's last update on UEX — in the coarsest unit that
+ * still reads naturally, for the trade pages' freshness hints.
  *
- * @param syncedAt the instant of the last sweep
+ * @param syncedAt the instant the age is measured from
  * @param unit the message-key suffix: {@code now}, {@code minutes}, {@code hours} or {@code days}
  * @param amount the number of units; {@code 0} for {@code now}
  */
@@ -44,9 +44,9 @@ public record UexAge(@NotNull Instant syncedAt, @NotNull String unit, long amoun
   private static final long HOURS_BEFORE_DAYS = 48;
 
   /**
-   * The age of a sweep at {@code now}; a sweep stamped in the future counts as just now.
+   * The age of an instant at {@code now}; an instant in the future counts as just now.
    *
-   * @param syncedAt the sweep instant, or {@code null} when no sweep is known
+   * @param syncedAt the instant, or {@code null} when none is known
    * @param now the reference instant
    * @return the age, or {@code null} when {@code syncedAt} is {@code null}
    */

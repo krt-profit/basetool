@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Material-Detailseite: UEX-Stand je Preis.** Die Terminal-Tabelle zeigt in der neuen Spalte „UEX-Stand“, wann UEX den Preis des Terminals zuletzt aktualisiert hat; Preise, die älter als sieben Tage sind, sind als veraltet markiert. Die Kachel „Aktualisiert“ heißt jetzt „Letzter UEX-Sync“; `GET /api/v1/materials/{id}/prices` liefert dafür `uexUpdatedAt` (REQ-UI-015).
+
 ### Changed
 
 - **Monitoring: CSP-Verstöße nennen ihre Ursache.** Der Fehler-Beacon meldet bei einem `trusted-types`-Verstoß den versuchten Policy-Namen und bei jedem CSP-Verstoß, ob der Code von der eigenen Seite, einer Browser-Erweiterung oder anderswoher stammt; `basetool_client_csp_violation_total` trägt dafür das Label `code_origin` (Dashboard 07, Panel 85). Grundlage für die Trusted-Types-Umstellung auf `enforce` (REQ-SEC-064, REQ-FE-022).
