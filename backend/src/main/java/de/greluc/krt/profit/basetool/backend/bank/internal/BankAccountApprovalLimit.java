@@ -45,8 +45,8 @@ import org.jetbrains.annotations.Nullable;
  * booking request up to {@link #limitAmount} aUEC without the responsible holder's approval.
  *
  * <p>A requester matching no tier needs the holder's approval for any amount. The audience mirrors
- * {@link BankAccountViewGrant}; limits are managed only through {@code OrgUnitBankAccessService} as
- * an idempotent upsert.
+ * {@link BankAccountViewGrant}; limits are managed only through {@code OrgUnitBankSettingsService}
+ * as an idempotent upsert.
  */
 @Entity
 @Table(name = "bank_account_approval_limit")

@@ -35,6 +35,8 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.CreateBankBookingRequ
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankAccessService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankAccountSettingsDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankBalanceDto;
+import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankRequestService;
+import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankSettingsService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.SetBankApprovalLimitRequest;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import java.math.BigDecimal;
@@ -57,6 +59,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class OrgUnitBankControllerTest {
 
   @Mock private OrgUnitBankAccessService orgUnitBankAccessService;
+  @Mock private OrgUnitBankSettingsService orgUnitBankSettingsService;
+  @Mock private OrgUnitBankRequestService orgUnitBankRequestService;
 
   @InjectMocks private OrgUnitBankController controller;
 
@@ -103,16 +107,16 @@ class OrgUnitBankControllerTest {
         new CreateBankBookingRequest(
             UUID.randomUUID(), BankBookingRequestType.DEPOSIT, null, new BigDecimal("500"), "note");
     BankBookingRequestDto dto = requestDto();
-    when(orgUnitBankAccessService.createBookingRequest(request)).thenReturn(dto);
+    when(orgUnitBankRequestService.createBookingRequest(request)).thenReturn(dto);
 
     assertSame(dto, controller.createBookingRequest(request));
-    verify(orgUnitBankAccessService).createBookingRequest(request);
+    verify(orgUnitBankRequestService).createBookingRequest(request);
   }
 
   @Test
   void listOwnBookingRequests_delegatesToService() {
     BankBookingRequestDto dto = requestDto();
-    when(orgUnitBankAccessService.listOwnBookingRequests()).thenReturn(List.of(dto));
+    when(orgUnitBankRequestService.listOwnBookingRequests()).thenReturn(List.of(dto));
 
     assertSame(dto, controller.listOwnBookingRequests().getFirst());
   }
@@ -121,10 +125,10 @@ class OrgUnitBankControllerTest {
   void cancelOwnBookingRequest_delegatesWithVersion() {
     UUID id = UUID.randomUUID();
     BankBookingRequestDto dto = requestDto();
-    when(orgUnitBankAccessService.cancelOwnBookingRequest(id, 3L)).thenReturn(dto);
+    when(orgUnitBankRequestService.cancelOwnBookingRequest(id, 3L)).thenReturn(dto);
 
     assertSame(dto, controller.cancelOwnBookingRequest(id, new CancelBankBookingRequest(3L)));
-    verify(orgUnitBankAccessService).cancelOwnBookingRequest(id, 3L);
+    verify(orgUnitBankRequestService).cancelOwnBookingRequest(id, 3L);
   }
 
   @Test
@@ -152,33 +156,33 @@ class OrgUnitBankControllerTest {
             List.of(),
             true,
             null);
-    when(orgUnitBankAccessService.setRoleApprovalLimit(id, "ENSIGN", new BigDecimal("1000")))
+    when(orgUnitBankSettingsService.setRoleApprovalLimit(id, "ENSIGN", new BigDecimal("1000")))
         .thenReturn(settings);
 
     assertSame(
         settings,
         controller.setRoleApprovalLimit(
             id, "ENSIGN", new SetBankApprovalLimitRequest(new BigDecimal("1000"))));
-    verify(orgUnitBankAccessService).setRoleApprovalLimit(id, "ENSIGN", new BigDecimal("1000"));
+    verify(orgUnitBankSettingsService).setRoleApprovalLimit(id, "ENSIGN", new BigDecimal("1000"));
   }
 
   @Test
   void grantOwnerApproval_delegatesToService() {
     UUID id = UUID.randomUUID();
     BankBookingRequestDto dto = requestDto();
-    when(orgUnitBankAccessService.grantOwnerApproval(id)).thenReturn(dto);
+    when(orgUnitBankRequestService.grantOwnerApproval(id)).thenReturn(dto);
 
     assertSame(dto, controller.grantOwnerApproval(id));
-    verify(orgUnitBankAccessService).grantOwnerApproval(id);
+    verify(orgUnitBankRequestService).grantOwnerApproval(id);
   }
 
   @Test
   void listForeignRequests_delegatesToService() {
     BankBookingRequestDto dto = requestDto();
-    when(orgUnitBankAccessService.listRequestsForResponsibleAccounts()).thenReturn(List.of(dto));
+    when(orgUnitBankRequestService.listRequestsForResponsibleAccounts()).thenReturn(List.of(dto));
 
     assertSame(dto, controller.listForeignRequests().getFirst());
-    verify(orgUnitBankAccessService).listRequestsForResponsibleAccounts();
+    verify(orgUnitBankRequestService).listRequestsForResponsibleAccounts();
   }
 
   private static BankBookingRequestDto requestDto() {

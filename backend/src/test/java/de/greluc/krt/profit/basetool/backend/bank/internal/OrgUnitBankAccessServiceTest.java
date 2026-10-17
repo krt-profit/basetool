@@ -62,11 +62,11 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.test.util.ReflectionTestUtils;
 
 /**
- * Unit tests for {@link OrgUnitBankAccessService} (REQ-BANK-021): visibility per account type, the
- * holder-redacted drill-in, the balance-target gate and view grants.
+ * Unit tests for {@link OrgUnitBankAccessService} with {@link OrgUnitBankSettingsService} and
+ * {@link OrgUnitBankRequestService} (REQ-BANK-021): visibility per account type, the
+ * holder-redacted drill-in, the balance-target gate, view grants and booking requestService.
  *
  * <p>Lenient strictness allows shared per-test stubs.
  */
@@ -91,6 +91,8 @@ class OrgUnitBankAccessServiceTest {
   @Mock private OrgUnitRepository orgUnitRepository;
 
   private OrgUnitBankAccessService service;
+  private OrgUnitBankSettingsService settingsService;
+  private OrgUnitBankRequestService requestService;
 
   @BeforeEach
   void defaultStubs() {
@@ -104,9 +106,8 @@ class OrgUnitBankAccessServiceTest {
   }
 
   /**
-   * Sets real visibility and approval-limit collaborators, built on the scenario mocks, into the
-   * {@link OrgUnitBankAccessService} under test via {@link ReflectionTestUtils}, since Mockito does
-   * not inject one {@code @InjectMocks} target into another.
+   * Builds the seam and its settings and request services on the scenario mocks, with real
+   * visibility and approval-limit collaborators.
    */
   private void wireDelegates() {
     OrgUnitBankVisibilityService visibilityService =
@@ -122,17 +123,27 @@ class OrgUnitBankAccessServiceTest {
             bankPostingRepository,
             viewGrantRepository,
             approvalLimitRepository,
-            bankBookingRequestRepository,
             bereichRepository,
-            userRepository,
             bankAccountService,
-            bankApprovalLimitService,
             bankStatementReportService,
-            bankBookingRequestService,
+            orgUnitRepository);
+    settingsService =
+        new OrgUnitBankSettingsService(
+            service,
+            bankAccountRepository,
+            viewGrantRepository,
+            userRepository,
+            bankApprovalLimitService,
             bankAuditService,
             visibilityService,
-            approvalLimitService,
-            orgUnitRepository);
+            approvalLimitService);
+    requestService =
+        new OrgUnitBankRequestService(
+            service,
+            authHelperService,
+            bankAccountRepository,
+            bankBookingRequestRepository,
+            bankBookingRequestService);
   }
 
   private static OrgUnit squadron(UUID id, String name, String shorthand) {
@@ -497,7 +508,7 @@ class OrgUnitBankAccessServiceTest {
         .thenReturn(true);
     when(bankAccountRepository.saveAndFlush(account)).thenReturn(account);
 
-    var settings = service.setBalanceTarget(accountId, new BigDecimal("10000"), 3L);
+    var settings = settingsService.setBalanceTarget(accountId, new BigDecimal("10000"), 3L);
 
     assertThat(settings.balanceTarget()).isEqualByComparingTo("10000");
     assertThat(account.getBalanceTarget()).isEqualByComparingTo("10000");
@@ -517,7 +528,7 @@ class OrgUnitBankAccessServiceTest {
 
     assertThrows(
         AccessDeniedException.class,
-        () -> service.setBalanceTarget(accountId, new BigDecimal("10000"), 1L));
+        () -> settingsService.setBalanceTarget(accountId, new BigDecimal("10000"), 1L));
     verify(bankAccountRepository, never()).saveAndFlush(any());
   }
 
@@ -533,7 +544,7 @@ class OrgUnitBankAccessServiceTest {
 
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
-        () -> service.setBalanceTarget(accountId, new BigDecimal("1"), 4L));
+        () -> settingsService.setBalanceTarget(accountId, new BigDecimal("1"), 4L));
   }
 
   @Test
@@ -551,8 +562,8 @@ class OrgUnitBankAccessServiceTest {
     when(ownerScopeService.currentUserHoldsRoleOnOrgUnit(staffelId, MembershipRole.STAFFELLEITER))
         .thenReturn(false);
 
-    service.setBalanceTarget(accountId, new BigDecimal("100"), 1L);
-    service.addRoleVisibility(accountId, MembershipRole.ENSIGN.name());
+    settingsService.setBalanceTarget(accountId, new BigDecimal("100"), 1L);
+    settingsService.addRoleVisibility(accountId, MembershipRole.ENSIGN.name());
 
     verify(bankAuditService)
         .record(eq(BankAuditEventType.BALANCE_TARGET_SET), eq(accountId), any(), any(), any());
@@ -574,7 +585,7 @@ class OrgUnitBankAccessServiceTest {
             accountId, BankAccountViewGranteeKind.MEMBERSHIP_ROLE, MembershipRole.ENSIGN.name()))
         .thenReturn(false);
 
-    service.addRoleVisibility(accountId, MembershipRole.ENSIGN.name());
+    settingsService.addRoleVisibility(accountId, MembershipRole.ENSIGN.name());
 
     verify(viewGrantRepository).save(any(BankAccountViewGrant.class));
     verify(bankAuditService)
@@ -593,7 +604,9 @@ class OrgUnitBankAccessServiceTest {
 
     assertThrows(
         de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
-        () -> service.addRoleVisibility(accountId, MembershipRole.BEREICHSKOORDINATOR.name()));
+        () ->
+            settingsService.addRoleVisibility(
+                accountId, MembershipRole.BEREICHSKOORDINATOR.name()));
     verify(viewGrantRepository, never()).save(any());
   }
 
@@ -623,7 +636,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null)))
         .thenReturn(expected);
 
-    assertThat(service.createBookingRequest(request)).isSameAs(expected);
+    assertThat(requestService.createBookingRequest(request)).isSameAs(expected);
     verifyNoInteractions(ownerScopeService);
   }
 
@@ -662,7 +675,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null)))
         .thenReturn(expected);
 
-    assertThat(service.createBookingRequest(request)).isSameAs(expected);
+    assertThat(requestService.createBookingRequest(request)).isSameAs(expected);
     verifyNoInteractions(ownerScopeService);
   }
 
@@ -692,7 +705,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null)))
         .thenReturn(expected);
 
-    assertThat(service.createBookingRequest(request)).isSameAs(expected);
+    assertThat(requestService.createBookingRequest(request)).isSameAs(expected);
     verifyNoInteractions(ownerScopeService);
     verify(approvalLimitRepository, never()).findByAccountId(any());
   }
@@ -722,7 +735,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null)))
         .thenReturn(expected);
 
-    assertThat(service.createBookingRequest(request)).isSameAs(expected);
+    assertThat(requestService.createBookingRequest(request)).isSameAs(expected);
   }
 
   @Test
@@ -755,7 +768,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null)))
         .thenReturn(requestDto(accountId, orgUnitId));
 
-    service.createBookingRequest(request);
+    requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
@@ -790,7 +803,7 @@ class OrgUnitBankAccessServiceTest {
 
     assertThrows(
         de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
-        () -> service.createBookingRequest(request));
+        () -> requestService.createBookingRequest(request));
     verifyNoInteractions(bankBookingRequestService);
   }
 
@@ -805,7 +818,7 @@ class OrgUnitBankAccessServiceTest {
     when(ownerScopeService.currentOversightScope())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
 
-    assertThrows(AccessDeniedException.class, () -> service.createBookingRequest(request));
+    assertThrows(AccessDeniedException.class, () -> requestService.createBookingRequest(request));
     verifyNoInteractions(bankBookingRequestService);
   }
 
@@ -843,7 +856,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null)))
         .thenReturn(requestDto(accountId, orgUnitId));
 
-    service.createBookingRequest(request);
+    requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
@@ -890,7 +903,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null)))
         .thenReturn(requestDto(accountId, orgUnitId));
 
-    service.createBookingRequest(request);
+    requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
@@ -937,7 +950,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null)))
         .thenReturn(requestDto(accountId, orgUnitId));
 
-    service.createBookingRequest(request);
+    requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
@@ -993,7 +1006,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null)))
         .thenReturn(requestDto(accountId, orgUnitId));
 
-    service.createBookingRequest(request);
+    requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
@@ -1048,7 +1061,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null)))
         .thenReturn(requestDto(accountId, orgUnitId));
 
-    service.createBookingRequest(request);
+    requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
@@ -1113,7 +1126,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null)))
         .thenReturn(requestDto(accountId, UUID.randomUUID()));
 
-    service.createBookingRequest(request);
+    requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
@@ -1155,7 +1168,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null)))
         .thenReturn(requestDto(accountId, UUID.randomUUID()));
 
-    service.createBookingRequest(request);
+    requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
@@ -1197,7 +1210,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null)))
         .thenReturn(requestDto(accountId, UUID.randomUUID()));
 
-    service.createBookingRequest(request);
+    requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
@@ -1245,7 +1258,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null)))
         .thenReturn(requestDto(accountId, orgUnitId));
 
-    service.createBookingRequest(request);
+    requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
@@ -1294,7 +1307,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null)))
         .thenReturn(requestDto(accountId, orgUnitId));
 
-    service.createBookingRequest(request);
+    requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
@@ -1337,7 +1350,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null)))
         .thenReturn(requestDto(accountId, UUID.randomUUID()));
 
-    service.createBookingRequest(request);
+    requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
@@ -1369,7 +1382,7 @@ class OrgUnitBankAccessServiceTest {
     when(bankBookingRequestRepository.findByIdForUpdate(requestId))
         .thenReturn(Optional.of(bookingRequest));
 
-    assertThrows(AccessDeniedException.class, () -> service.grantOwnerApproval(requestId));
+    assertThrows(AccessDeniedException.class, () -> requestService.grantOwnerApproval(requestId));
     verifyNoInteractions(bankBookingRequestService);
   }
 
@@ -1390,7 +1403,7 @@ class OrgUnitBankAccessServiceTest {
     when(bankBookingRequestService.applyOwnerApprovalWithinTransaction(bookingRequest, true))
         .thenReturn(requestDto(accountId, orgUnitId));
 
-    BankBookingRequestDto dto = service.grantOwnerApproval(requestId);
+    BankBookingRequestDto dto = requestService.grantOwnerApproval(requestId);
 
     assertThat(dto).isNotNull();
     verify(bankBookingRequestService).applyOwnerApprovalWithinTransaction(bookingRequest, true);
@@ -1414,7 +1427,7 @@ class OrgUnitBankAccessServiceTest {
     when(bankBookingRequestService.applyOwnerApprovalWithinTransaction(bookingRequest, true))
         .thenReturn(requestDto(accountId, UUID.randomUUID()));
 
-    BankBookingRequestDto dto = service.grantOwnerApproval(requestId);
+    BankBookingRequestDto dto = requestService.grantOwnerApproval(requestId);
 
     assertThat(dto).isNotNull();
     verify(bankBookingRequestService).applyOwnerApprovalWithinTransaction(bookingRequest, true);
@@ -1452,7 +1465,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null)))
         .thenReturn(requestDto(accountId, UUID.randomUUID()));
 
-    service.createBookingRequest(request);
+    requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
@@ -1496,7 +1509,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null)))
         .thenReturn(requestDto(accountId, UUID.randomUUID()));
 
-    service.raiseCartelDirectBookingRequest(
+    requestService.raiseCartelDirectBookingRequest(
         accountId,
         BankBookingRequestType.WITHDRAWAL,
         new BigDecimal("3000"),
@@ -1546,7 +1559,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null)))
         .thenReturn(requestDto(accountId, UUID.randomUUID()));
 
-    service.raiseCartelDirectBookingRequest(
+    requestService.raiseCartelDirectBookingRequest(
         accountId, BankBookingRequestType.WITHDRAWAL, new BigDecimal("9000"), null, "reason", null);
 
     verify(bankBookingRequestService)
@@ -1607,7 +1620,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null)))
         .thenReturn(requestDto(accountId, orgUnitId));
 
-    service.createBookingRequest(request);
+    requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
@@ -1670,7 +1683,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null)))
         .thenReturn(requestDto(accountId, bereichId));
 
-    service.createBookingRequest(request);
+    requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
@@ -1702,7 +1715,7 @@ class OrgUnitBankAccessServiceTest {
         requestDto(accountId, UUID.randomUUID(), "Bar uebergeben, Zeuge greluc");
     when(bankBookingRequestService.listForCurrentRequester()).thenReturn(List.of(withNote));
 
-    List<BankBookingRequestDto> own = service.listOwnBookingRequests();
+    List<BankBookingRequestDto> own = requestService.listOwnBookingRequests();
 
     assertThat(own).hasSize(1);
     assertThat(own.getFirst().staffNote()).isNull();
@@ -1727,7 +1740,7 @@ class OrgUnitBankAccessServiceTest {
     when(bankBookingRequestService.listForAccounts(anyCollection()))
         .thenReturn(List.of(requestDto(accountId, orgUnitId, "Bar uebergeben, Zeuge greluc")));
 
-    List<BankBookingRequestDto> foreign = service.listRequestsForResponsibleAccounts();
+    List<BankBookingRequestDto> foreign = requestService.listRequestsForResponsibleAccounts();
 
     assertThat(foreign)
         .singleElement()
@@ -1762,7 +1775,7 @@ class OrgUnitBankAccessServiceTest {
     UpdateBankBookingRequest update =
         new UpdateBankBookingRequest(
             new BigDecimal("100000"), null, "reason", null, null, null, 0L);
-    service.updateOwnBookingRequest(requestId, update);
+    requestService.updateOwnBookingRequest(requestId, update);
 
     verify(bankBookingRequestService)
         .updateOwn(
@@ -1799,7 +1812,7 @@ class OrgUnitBankAccessServiceTest {
 
     UpdateBankBookingRequest update =
         new UpdateBankBookingRequest(new BigDecimal("900"), null, "reason", null, null, null, 0L);
-    service.updateOwnBookingRequest(requestId, update);
+    requestService.updateOwnBookingRequest(requestId, update);
 
     verify(bankBookingRequestService)
         .updateOwn(eq(requestId), eq(update), eq(false), eq(new BigDecimal("1000")), isNull());
@@ -1824,7 +1837,7 @@ class OrgUnitBankAccessServiceTest {
     assertThrows(
         NotFoundException.class,
         () ->
-            service.updateOwnBookingRequest(
+            requestService.updateOwnBookingRequest(
                 requestId,
                 new UpdateBankBookingRequest(
                     new BigDecimal("900"), null, "reason", null, null, null, 0L)));

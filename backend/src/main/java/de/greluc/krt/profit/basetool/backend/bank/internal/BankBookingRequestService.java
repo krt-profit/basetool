@@ -73,7 +73,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Lifecycle engine for confirm-before-post bank booking requests (REQ-BANK-022/-023).
  *
  * <p>Org-unit-blind: it consults only bank roles and grants (REQ-BANK-008), while {@link
- * OrgUnitBankAccessService} handles requester-side authorization. A {@code PENDING} request moves
+ * OrgUnitBankRequestService} handles requester-side authorization. A {@code PENDING} request moves
  * no money; only {@link #confirm} books it through {@link BankLedgerService}. Every decision locks
  * the request row and checks its {@code @Version}.
  */
@@ -500,7 +500,7 @@ public class BankBookingRequestService {
 
   /**
    * Lists every request on the given accounts, newest first (REQ-BANK-041) — backs the responsible
-   * holder's "Fremde Anträge" tab. Org-unit-blind: the caller ({@link OrgUnitBankAccessService})
+   * holder's "Fremde Anträge" tab. Org-unit-blind: the caller ({@link OrgUnitBankRequestService})
    * supplies the set of accounts the holder is responsible for. The caller's own requests are left
    * out unless they are an admin, because they may not approve them (REQ-BANK-062).
    *
@@ -922,8 +922,8 @@ public class BankBookingRequestService {
 
   /**
    * Grants or revokes the responsible holder's approval on an already-locked request (REQ-BANK-041)
-   * and audits it. Must run inside the caller's transaction, after {@link OrgUnitBankAccessService}
-   * has authorized the caller.
+   * and audits it. Must run inside the caller's transaction, after {@link
+   * OrgUnitBankRequestService} has authorized the caller.
    *
    * @param request the locked, managed request
    * @param granted whether to grant ({@code true}) or revoke ({@code false}) the approval
