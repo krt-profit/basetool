@@ -32,6 +32,8 @@
 
 ### Fixed
 
+- **Lager: Ausbuchen und Umbuchen zeigen Einsätze mit Name und Datum.** Unter „Herkunft der Menge" stand bei einem Einsatz statt seines Namens dessen interne ID, vor allem nach einer gerade erst vorgenommenen Zuordnung. Jetzt erscheinen Name und geplantes Datum, ein nicht mehr auffindbarer Einsatz als „Unbekannter Einsatz" (REQ-INV-027).
+
 - **Monitoring: SC-Wiki-Sync sprengt das `uri`-Limit nicht mehr.** Backend und Ingest bereinigen den `uri`-Tag ausgehender Anfragen schon beim Start; vorher legte der Laufzeit-Timer `http.client.requests.active` je Wiki-Seite oder Feed-Cursor einen neuen Tag-Wert an, bis Micrometer weitere Werte verwarf (REQ-OBS-006).
 
 - **Passwort vergessen: klarer, was einzugeben ist.** Die Seite fragt nach E-Mail-Adresse oder Benutzername und erklärt, dass bei Discord-Konten der Discord-Benutzername gilt (nicht Server-Nickname oder Anzeigename), und zwar der von der ersten Anmeldung (Keycloak-Theme, REQ-SEC-082).
