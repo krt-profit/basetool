@@ -3008,8 +3008,8 @@ go down (ADR-0267).
   on `main` with every entry at its file's measured maximum.
 - [x] A probe file of 1,011 lines with a 162-line method in `ingest` (not committed) fails
   `checkstyleMain` with a `fileLength` and a `methodLength` finding.
-- [x] Lowering the `OrgUnitBankAccessService` file entry and the `SecurityConfig` method entry by one
-  line each fails `checkstyleMain` with `fileLengthOrgUnitBankAccessService` and
+- [x] Lowering the `MissionWriteController` file entry and the `SecurityConfig` method entry by one
+  line each fails `checkstyleMain` with `fileLengthMissionWriteController` and
   `methodLengthSecurityConfig`.
 
 **Enforced by:** `config/checkstyle/google_checks.xml` (`checkstyleMain`, `maxWarnings = 0`) ·

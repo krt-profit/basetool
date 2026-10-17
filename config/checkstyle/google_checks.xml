@@ -60,19 +60,6 @@
     <property name="max" value="1000"/>
   </module>
   <module name="FileLength">
-    <property name="id" value="fileLengthOrgUnitBankAccessService"/>
-    <property name="fileExtensions" value="java"/>
-    <property name="max" value="1820"/>
-  </module>
-  <module name="SuppressionSingleFilter">
-    <property name="id" value="fileLength"/>
-    <property name="files" value="basetool.backend.bank.internal.OrgUnitBankAccessService\.java$"/>
-  </module>
-  <module name="SuppressionSingleFilter">
-    <property name="id" value="fileLengthOrgUnitBankAccessService"/>
-    <property name="files" value="^(?!.*basetool.backend.bank.internal.OrgUnitBankAccessService\.java$)"/>
-  </module>
-  <module name="FileLength">
     <property name="id" value="fileLengthMissionWriteController"/>
     <property name="fileExtensions" value="java"/>
     <property name="max" value="1777"/>
@@ -84,19 +71,6 @@
   <module name="SuppressionSingleFilter">
     <property name="id" value="fileLengthMissionWriteController"/>
     <property name="files" value="^(?!.*basetool.frontend.mission.web.MissionWriteController\.java$)"/>
-  </module>
-  <module name="FileLength">
-    <property name="id" value="fileLengthLiveSyncWebSocketHandler"/>
-    <property name="fileExtensions" value="java"/>
-    <property name="max" value="1706"/>
-  </module>
-  <module name="SuppressionSingleFilter">
-    <property name="id" value="fileLength"/>
-    <property name="files" value="basetool.frontend.kernel.livesync.LiveSyncWebSocketHandler\.java$"/>
-  </module>
-  <module name="SuppressionSingleFilter">
-    <property name="id" value="fileLengthLiveSyncWebSocketHandler"/>
-    <property name="files" value="^(?!.*basetool.frontend.kernel.livesync.LiveSyncWebSocketHandler\.java$)"/>
   </module>
   <module name="FileLength">
     <property name="id" value="fileLengthP4kImportService"/>
