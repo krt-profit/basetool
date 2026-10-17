@@ -27,12 +27,12 @@ import de.greluc.krt.profit.basetool.frontend.bank.model.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.OrgUnitBankAccountDetailDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.OrgUnitBankAccountSettingsDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.OrgUnitBankBalanceDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -127,19 +127,24 @@ public class OrgUnitBankPageController {
         parallelPageLoader.loadAsync(this::fetchForeignRequests);
     CompletableFuture<List<BankAccountRefDto>> transferTargetsFuture =
         parallelPageLoader.loadAsync(this::fetchTransferTargets);
-    CompletableFuture.allOf(
-            balancesFuture, ownRequestsFuture, foreignRequestsFuture, transferTargetsFuture)
-        .join();
+    List<OrgUnitBankBalanceDto> balances =
+        SectionFallback.load(log, "org-unit-bank-balances", balancesFuture::join, List.of());
+    List<BankBookingRequestDto> ownRequests =
+        SectionFallback.load(log, "org-unit-bank-own-requests", ownRequestsFuture::join, List.of());
+    List<BankBookingRequestDto> foreignRequests =
+        SectionFallback.load(
+            log, "org-unit-bank-foreign-requests", foreignRequestsFuture::join, List.of());
+    List<BankAccountRefDto> joinedTransferTargets =
+        SectionFallback.load(
+            log, "org-unit-bank-transfer-targets", transferTargetsFuture::join, List.of());
 
     List<OrgUnitBankBalanceDto> safeBalances =
-        BankAccountOrder.byName(balancesFuture.join(), OrgUnitBankBalanceDto::accountName);
+        BankAccountOrder.byName(balances, OrgUnitBankBalanceDto::accountName);
     model.addAttribute("balances", safeBalances);
-    List<BankBookingRequestDto> ownRequests = ownRequestsFuture.join();
     model.addAttribute("ownRequests", ownRequests);
     model.addAttribute("sparks", sparksByAccountId(safeBalances));
     boolean anyCanRequest = safeBalances.stream().anyMatch(OrgUnitBankBalanceDto::canRequest);
     model.addAttribute("anyCanRequest", anyCanRequest);
-    List<BankBookingRequestDto> foreignRequests = foreignRequestsFuture.join();
     model.addAttribute("foreignRequests", foreignRequests);
     model.addAttribute("openRequests", BankRequestSteps.openRequests(ownRequests, foreignRequests));
     model.addAttribute(
@@ -147,7 +152,7 @@ public class OrgUnitBankPageController {
         safeBalances.stream().anyMatch(b -> b.canManageSettings() && b.canRequest())
             || !foreignRequests.isEmpty());
     List<BankAccountRefDto> transferTargets =
-        BankAccountOrder.byName(transferTargetsFuture.join(), BankAccountRefDto::name);
+        BankAccountOrder.byName(joinedTransferTargets, BankAccountRefDto::name);
     model.addAttribute("requestTransferTargets", transferTargets);
     model.addAttribute("requestSources", transferTargets);
     model.addAttribute("canRequestAny", !transferTargets.isEmpty());
@@ -209,17 +214,9 @@ public class OrgUnitBankPageController {
    * @return the balance cards, or an empty list when the backend call fails or returns nothing
    */
   private List<OrgUnitBankBalanceDto> fetchBalances() {
-    try {
-      List<OrgUnitBankBalanceDto> balances = bankClient.orgUnitBalances();
-      if (balances != null) {
-        return balances;
-      }
-    } catch (BackendServiceException e) {
-      log.debug("Failed to fetch org-unit bank balances", e);
-    } catch (RuntimeException e) {
-      log.warn("Failed to fetch org-unit bank balances", e);
-    }
-    return List.of();
+    List<OrgUnitBankBalanceDto> balances =
+        SectionFallback.load(log, "org-unit-bank-balances", bankClient::orgUnitBalances, null);
+    return balances == null ? List.of() : balances;
   }
 
   /**
@@ -228,17 +225,10 @@ public class OrgUnitBankPageController {
    * @return the caller's requests, or an empty list when the backend call fails or returns nothing
    */
   private List<BankBookingRequestDto> fetchOwnRequests() {
-    try {
-      List<BankBookingRequestDto> requests = bankClient.ownOrgUnitRequests();
-      if (requests != null) {
-        return requests;
-      }
-    } catch (BackendServiceException e) {
-      log.debug("Failed to fetch org-unit bank own requests", e);
-    } catch (RuntimeException e) {
-      log.warn("Failed to fetch org-unit bank own requests", e);
-    }
-    return List.of();
+    List<BankBookingRequestDto> requests =
+        SectionFallback.load(
+            log, "org-unit-bank-own-requests", bankClient::ownOrgUnitRequests, null);
+    return requests == null ? List.of() : requests;
   }
 
   /**
@@ -247,17 +237,10 @@ public class OrgUnitBankPageController {
    * @return the foreign requests, or an empty list when the backend call fails or returns nothing
    */
   private List<BankBookingRequestDto> fetchForeignRequests() {
-    try {
-      List<BankBookingRequestDto> requests = bankClient.foreignOrgUnitRequests();
-      if (requests != null) {
-        return requests;
-      }
-    } catch (BackendServiceException e) {
-      log.debug("Failed to fetch org-unit bank foreign requests", e);
-    } catch (RuntimeException e) {
-      log.warn("Failed to fetch org-unit bank foreign requests", e);
-    }
-    return List.of();
+    List<BankBookingRequestDto> requests =
+        SectionFallback.load(
+            log, "org-unit-bank-foreign-requests", bankClient::foreignOrgUnitRequests, null);
+    return requests == null ? List.of() : requests;
   }
 
   /**
@@ -266,17 +249,10 @@ public class OrgUnitBankPageController {
    * @return the transfer targets, or an empty list when the backend call fails or returns nothing
    */
   private List<BankAccountRefDto> fetchTransferTargets() {
-    try {
-      List<BankAccountRefDto> targets = bankClient.orgUnitTransferTargets();
-      if (targets != null) {
-        return targets;
-      }
-    } catch (BackendServiceException e) {
-      log.debug("Failed to fetch org-unit bank transfer targets", e);
-    } catch (RuntimeException e) {
-      log.warn("Failed to fetch org-unit bank transfer targets", e);
-    }
-    return List.of();
+    List<BankAccountRefDto> targets =
+        SectionFallback.load(
+            log, "org-unit-bank-transfer-targets", bankClient::orgUnitTransferTargets, null);
+    return targets == null ? List.of() : targets;
   }
 
   /**
@@ -317,12 +293,9 @@ public class OrgUnitBankPageController {
       return "bank/org-unit-bank-account-detail :: orgUnitBankBookings";
     }
     if ("orgUnitBalanceChart".equals(fragment)) {
-      OrgUnitBankAccountDetailDto chartDetail = null;
-      try {
-        chartDetail = bankClient.orgUnitAccount(id);
-      } catch (RuntimeException e) {
-        log.warn("Error loading org-unit account {} for balance-chart fragment", id, e);
-      }
+      OrgUnitBankAccountDetailDto chartDetail =
+          SectionFallback.load(
+              log, "org-unit-bank-chart-detail", () -> bankClient.orgUnitAccount(id), null);
       addChartModel(id, chartRange, chartDetail, model);
       return "bank/org-unit-bank-account-detail :: orgUnitBalanceChart";
     }
@@ -411,14 +384,14 @@ public class OrgUnitBankPageController {
     int effectiveSize = size == null ? BankAccountDetailSupport.DEFAULT_PAGE_SIZE : size;
     BankAccountDetailSupport.HistoryPeriod period =
         BankAccountDetailSupport.resolveHistoryPeriod(from, to);
-    PageResponse<BankBookingDto> bookings = null;
-    try {
-      bookings =
-          bankClient.orgUnitAccountBookings(
-              id, effectivePage, effectiveSize, period.fromInstant(), period.toInstant());
-    } catch (RuntimeException e) {
-      log.warn("Error loading org-unit bookings for account {}", id, e);
-    }
+    PageResponse<BankBookingDto> bookings =
+        SectionFallback.load(
+            log,
+            "org-unit-bank-bookings",
+            () ->
+                bankClient.orgUnitAccountBookings(
+                    id, effectivePage, effectiveSize, period.fromInstant(), period.toInstant()),
+            null);
     model.addAttribute("bookings", bookings);
     model.addAttribute("balancesAfter", fetchBalancesAfter(id, bookings));
     model.addAttribute("historyFrom", period.fromDate());
@@ -449,14 +422,15 @@ public class OrgUnitBankPageController {
     if (anchor == null || bookings == null) {
       return Map.of();
     }
-    try {
-      BankBalanceSeriesDto series = bankClient.orgUnitBalanceSeries(id, anchor, anchor);
-      return BankRunningBalance.balancesAfter(
-          bookings.content(), BankRunningBalance.lastBalance(series));
-    } catch (RuntimeException e) {
-      log.warn("Error loading the org-unit running balance for account {}", id, e);
-      return Map.of();
-    }
+    return SectionFallback.load(
+        log,
+        "org-unit-bank-running-balance",
+        () ->
+            BankRunningBalance.balancesAfter(
+                bookings.content(),
+                BankRunningBalance.lastBalance(
+                    bankClient.orgUnitBalanceSeries(id, anchor, anchor))),
+        Map.of());
   }
 
   /**
@@ -478,12 +452,12 @@ public class OrgUnitBankPageController {
             ? detail.detail().account().createdAt()
             : null;
     Instant chartFrom = BankAccountDetailSupport.chartFromInstant(range, createdAt, now);
-    BankBalanceSeriesDto series = null;
-    try {
-      series = bankClient.orgUnitBalanceSeries(id, chartFrom, now);
-    } catch (RuntimeException e) {
-      log.warn("Error loading org-unit balance series for account {}", id, e);
-    }
+    BankBalanceSeriesDto series =
+        SectionFallback.load(
+            log,
+            "org-unit-bank-balance-series",
+            () -> bankClient.orgUnitBalanceSeries(id, chartFrom, now),
+            null);
     model.addAttribute(
         "chart",
         BankBalanceChart.of(

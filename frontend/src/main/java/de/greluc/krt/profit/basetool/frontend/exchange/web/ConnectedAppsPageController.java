@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.exchange.client.ExchangeBackendCli
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ConnectedAppDto;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ConnectedInstallationDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -66,14 +67,16 @@ public class ConnectedAppsPageController {
   @NotNull
   @GetMapping
   public String page(@Nullable @RequestParam(required = false) String fragment, Model model) {
-    List<ConnectedAppDto> apps = List.of();
-    try {
-      List<ConnectedAppDto> loaded = exchangeClient.connectedApps();
-      apps = loaded == null ? List.of() : loaded;
-    } catch (Exception e) {
-      log.debug("Failed to load the connected apps", e);
+    List<ConnectedAppDto> loaded =
+        SectionFallback.load(
+            log,
+            "connected-apps",
+            () -> Objects.requireNonNullElse(exchangeClient.connectedApps(), List.of()),
+            null);
+    if (loaded == null) {
       model.addAttribute("error", "connectedApps.error.load");
     }
+    List<ConnectedAppDto> apps = loaded == null ? List.of() : loaded;
     model.addAttribute("apps", apps);
     model.addAttribute(
         "anyUnseen",

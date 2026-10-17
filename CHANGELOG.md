@@ -27,6 +27,7 @@
 ### Fixed
 
 - **Fehler beim Speichern: richtige Meldung und erneute Anmeldung.** 53 AJAX-Aktionen (Lager, Aufträge, Raffinerie, Missionen, Benachrichtigungen, Mitglieder, Profil, Organigramm, Admin-Stammdaten u. a.) fangen Fehler nicht mehr selbst als pauschalen 500/502 ab: Konflikte wie „gleichzeitig geändert" (409) behalten ihren Status und ihre Meldung, und eine abgelaufene Anmeldung führt wieder zur Keycloak-Anmeldung statt zu einem Fehler-Toast (Frontend, REQ-FE-036).
+- **Abgelaufene Anmeldung beim Seitenaufruf.** Seiten, deren Abschnitte einzeln nachladen (Startseite, Lager, Aufträge, Raffinerie, Missionen, Bank, Blueprints, Admin-Seiten u. a.), leiten bei abgelaufener Anmeldung wieder zur Keycloak-Anmeldung weiter, statt die Seite mit Fehlerhinweisen in jedem Abschnitt anzuzeigen (Frontend, REQ-FE-036).
 
 - **Einsatz-Detailseite: nicht geladene Auswahllisten werden gemeldet.** Schlägt das Laden einer Auswahlliste (Jobtypen, Crew-Funktionen, Organisationseinheiten, Frequenz- oder Schiffstypen, Schiffe für Einheiten) fehl, nennt ein Hinweis über den Tabs die betroffenen Listen, statt die Auswahl stillschweigend leer zu lassen; das Frontend protokolliert jeden Fehlschlag als WARN. Die Listen laden jetzt parallel (Frontend, REQ-MISSION-030).
 

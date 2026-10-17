@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogPages.Comple
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -81,25 +82,26 @@ public class AdminLocationsPageController {
   @NotNull
   @GetMapping
   public String listData(Model model) {
-    try {
-      CompleteCatalog<LocationDto> locationsCatalog =
-          CatalogPages.fetchAll(catalogueClient::locationPage);
-
-      List<LocationDto> locations = new ArrayList<>(locationsCatalog.items());
-      locations.sort(
-          Comparator.comparing(
-              l -> l.name() == null ? "" : l.name(), String.CASE_INSENSITIVE_ORDER));
-      model.addAttribute("locations", locations);
-      model.addAttribute("catalogTruncated", locationsCatalog.truncated());
-
-    } catch (BackendServiceException e) {
-      log.debug("Error loading locations data", e);
-      model.addAttribute("error", "error.admin.locations.load");
-    } catch (Exception e) {
-      log.error("Error loading locations data", e);
+    if (!SectionFallback.run(log, "admin-locations", () -> addLocations(model))) {
       model.addAttribute("error", "error.admin.locations.load");
     }
     return "catalogue/admin/locations";
+  }
+
+  /**
+   * Adds every location sorted by name and whether the page walk hit its cap.
+   *
+   * @param model the admin locations model
+   */
+  private void addLocations(@NotNull Model model) {
+    CompleteCatalog<LocationDto> locationsCatalog =
+        CatalogPages.fetchAll(catalogueClient::locationPage);
+
+    List<LocationDto> locations = new ArrayList<>(locationsCatalog.items());
+    locations.sort(
+        Comparator.comparing(l -> l.name() == null ? "" : l.name(), String.CASE_INSENSITIVE_ORDER));
+    model.addAttribute("locations", locations);
+    model.addAttribute("catalogTruncated", locationsCatalog.truncated());
   }
 
   /**

@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.RelayParams;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.client.PersonalInventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryForm;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryItemCreateRequest;
@@ -260,26 +261,21 @@ public class AdminPersonalInventoryPageController {
    */
   @Nullable
   private UserDto fetchUser(UUID userSub) {
-    try {
-      return personalInventoryClient.user(userSub);
-    } catch (Exception e) {
-      log.warn(
-          "Failed to fetch selected member {} for admin personal inventory picker", userSub, e);
-      return null;
-    }
+    return SectionFallback.load(
+        log, "selected-member", () -> personalInventoryClient.user(userSub), null);
   }
 
   private PageResponse<PersonalInventoryItemDto> fetchItems(
       UUID userSub, String q, Integer page, Integer size, String sort) {
-    try {
-      return personalInventoryClient.memberItemPage(
-          userSub,
-          new PersonalInventoryBackendClient.ItemQuery(
-              page, size == null ? 50 : size, RelayParams.sortSpecOrNull(sort), q));
-    } catch (Exception e) {
-      log.error("Failed to fetch personal inventory items for {}", userSub, e);
-      return new PageResponse<>(new ArrayList<>(), 0, size == null ? 50 : size, 0, 0, List.of());
-    }
+    return SectionFallback.load(
+        log,
+        "member-items",
+        () ->
+            personalInventoryClient.memberItemPage(
+                userSub,
+                new PersonalInventoryBackendClient.ItemQuery(
+                    page, size == null ? 50 : size, RelayParams.sortSpecOrNull(sort), q)),
+        new PageResponse<>(new ArrayList<>(), 0, size == null ? 50 : size, 0, 0, List.of()));
   }
 
   private String classifyError(Exception e, String defaultKey) {

@@ -32,11 +32,13 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Contract;
@@ -190,16 +192,13 @@ public class MemberHangarPageController {
    */
   private @NotNull PageResponse<ShipDto> loadShips(
       @NotNull UUID userId, int page, int size, @NotNull Model model) {
-    try {
-      PageResponse<ShipDto> ships = hangarClient.memberShips(userId, page, size);
-      if (ships != null) {
-        return ships;
-      }
-    } catch (Exception e) {
-      log.error("Failed to read the member's ships for the admin member hangar", e);
+    AtomicReference<PageResponse<ShipDto>> ships = new AtomicReference<>();
+    if (!SectionFallback.run(
+        log, "member-ships", () -> ships.set(hangarClient.memberShips(userId, page, size)))) {
       model.addAttribute("error", "error.hangar.ships.load");
     }
-    return new PageResponse<>(List.of(), page, size, 0L, 0, List.of());
+    PageResponse<ShipDto> loaded = ships.get();
+    return loaded != null ? loaded : new PageResponse<>(List.of(), page, size, 0L, 0, List.of());
   }
 
   /**

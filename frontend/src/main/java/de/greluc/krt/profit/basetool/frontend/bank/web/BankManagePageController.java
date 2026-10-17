@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -132,13 +133,14 @@ public class BankManagePageController {
    */
   @Nullable
   private BankAccountDto fetchCartelAccount() {
-    try {
-      PageResponse<BankAccountDto> page = bankClient.cartelAccountPage();
-      return page == null || page.content().isEmpty() ? null : page.content().getFirst();
-    } catch (RuntimeException e) {
-      log.debug("Could not resolve the CARTEL account for the KRT-Freigaben tab", e);
-      return null;
-    }
+    return SectionFallback.load(
+        log,
+        "bank-cartel-account",
+        () -> {
+          PageResponse<BankAccountDto> page = bankClient.cartelAccountPage();
+          return page == null || page.content().isEmpty() ? null : page.content().getFirst();
+        },
+        null);
   }
 
   /**

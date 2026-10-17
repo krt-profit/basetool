@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendC
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.QualityTierDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -62,11 +63,13 @@ public class AdminQualityTiersPageController {
   @NotNull
   @GetMapping
   public String list(@RequestParam(required = false) @Nullable String fragment, Model model) {
-    try {
-      List<QualityTierDto> tiers = catalogueClient.qualityTiers();
-      model.addAttribute("tiers", tiers == null ? List.of() : tiers);
-    } catch (Exception e) {
-      log.error("Failed to load quality-tier admin page", e);
+    if (!SectionFallback.run(
+        log,
+        "quality-tiers",
+        () -> {
+          List<QualityTierDto> tiers = catalogueClient.qualityTiers();
+          model.addAttribute("tiers", tiers == null ? List.of() : tiers);
+        })) {
       model.addAttribute("error", "admin.qualityTiers.error.load");
       model.addAttribute("tiers", List.of());
     }

@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogPages.Comple
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -86,39 +87,42 @@ public class AdminMaterialsPageController {
   @NotNull
   @GetMapping
   public String listMaterials(Model model) {
-    try {
-      CompleteCatalog<MaterialDto> materialsCatalog =
-          CatalogPages.fetchAll(catalogueClient::materialPage);
-      List<MaterialDto> materials = new ArrayList<>(materialsCatalog.items());
-      model.addAttribute("catalogTruncated", materialsCatalog.truncated());
-
-      List<MaterialDto> refinedMaterials =
-          materials.stream()
-              .sorted(
-                  Comparator.comparing(
-                      m -> m.name() == null ? "" : m.name(), String.CASE_INSENSITIVE_ORDER))
-              .toList();
-      model.addAttribute("refinedMaterials", refinedMaterials);
-
-      List<MaterialDto> sortedMaterials =
-          materials.stream()
-              .sorted(
-                  Comparator.comparing(
-                      m -> m.name() == null ? "" : m.name(), String.CASE_INSENSITIVE_ORDER))
-              .toList();
-      model.addAttribute("materials", sortedMaterials);
-
-      List<MaterialCategoryDto> categories = catalogueClient.materialCategories();
-      model.addAttribute("categories", categories);
-
-    } catch (BackendServiceException e) {
-      log.debug("Error loading materials data", e);
-      model.addAttribute("error", "error.admin.materials.load");
-    } catch (Exception e) {
-      log.error("Error loading materials data", e);
+    if (!SectionFallback.run(log, "admin-materials", () -> addMaterials(model))) {
       model.addAttribute("error", "error.admin.materials.load");
     }
     return "catalogue/admin/materials";
+  }
+
+  /**
+   * Adds the name-sorted materials, the refined-material dropdown source, the categories and
+   * whether the page walk hit its cap.
+   *
+   * @param model the admin materials model
+   */
+  private void addMaterials(@NotNull Model model) {
+    CompleteCatalog<MaterialDto> materialsCatalog =
+        CatalogPages.fetchAll(catalogueClient::materialPage);
+    List<MaterialDto> materials = new ArrayList<>(materialsCatalog.items());
+    model.addAttribute("catalogTruncated", materialsCatalog.truncated());
+
+    List<MaterialDto> refinedMaterials =
+        materials.stream()
+            .sorted(
+                Comparator.comparing(
+                    m -> m.name() == null ? "" : m.name(), String.CASE_INSENSITIVE_ORDER))
+            .toList();
+    model.addAttribute("refinedMaterials", refinedMaterials);
+
+    List<MaterialDto> sortedMaterials =
+        materials.stream()
+            .sorted(
+                Comparator.comparing(
+                    m -> m.name() == null ? "" : m.name(), String.CASE_INSENSITIVE_ORDER))
+            .toList();
+    model.addAttribute("materials", sortedMaterials);
+
+    List<MaterialCategoryDto> categories = catalogueClient.materialCategories();
+    model.addAttribute("categories", categories);
   }
 
   /**

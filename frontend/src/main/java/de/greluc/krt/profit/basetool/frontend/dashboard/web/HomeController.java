@@ -22,10 +22,10 @@ package de.greluc.krt.profit.basetool.frontend.dashboard.web;
 import de.greluc.krt.profit.basetool.frontend.dashboard.client.DashboardBackendClient;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.AnnouncementDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionListDto;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -82,21 +82,10 @@ public class HomeController {
     if (principal == null) {
       return "dashboard/landing";
     }
-    try {
-      Instant now = Instant.now();
-      Instant horizon = now.plus(7, ChronoUnit.DAYS);
-      PageResponse<MissionListDto> upcomingPage = dashboardClient.upcomingMissions(now, horizon);
-      List<MissionListDto> upcomingMissions =
-          (upcomingPage != null && upcomingPage.content() != null)
-              ? upcomingPage.content()
-              : List.of();
-      model.addAttribute("upcomingMissions", upcomingMissions);
-    } catch (BackendServiceException e) {
-      log.debug("Could not fetch upcoming missions", e);
-      model.addAttribute("upcomingMissions", List.of());
-      model.addAttribute("error", "error.mission.fetch");
-    } catch (Exception e) {
-      log.error("Could not fetch upcoming missions", e);
+    if (!SectionFallback.run(
+        log,
+        "upcoming-missions",
+        () -> model.addAttribute("upcomingMissions", loadUpcomingMissions()))) {
       model.addAttribute("upcomingMissions", List.of());
       model.addAttribute("error", "error.mission.fetch");
     }
@@ -112,52 +101,67 @@ public class HomeController {
       session.setAttribute("welcomeMessageShown", true);
     }
 
-    try {
-      UserDto currentUser = dashboardClient.currentUser();
-      model.addAttribute("currentUser", currentUser);
-
-      Set<UUID> myOrgUnitIds = new HashSet<>();
-      if (currentUser.squadrons() != null) {
-        for (SquadronReferenceDto su : currentUser.squadrons()) {
-          if (su != null && su.id() != null) {
-            myOrgUnitIds.add(su.id());
-          }
-        }
-      }
-      if (currentUser.squadron() != null && currentUser.squadron().id() != null) {
-        myOrgUnitIds.add(currentUser.squadron().id());
-      }
-      try {
-        List<UUID> directOrgUnitIds = dashboardClient.myOrgUnitIds();
-        if (directOrgUnitIds != null) {
-          for (UUID id : directOrgUnitIds) {
-            if (id != null) {
-              myOrgUnitIds.add(id);
-            }
-          }
-        }
-      } catch (Exception ex) {
-        log.warn("Could not fetch own org-unit memberships for the home highlight", ex);
-      }
-      model.addAttribute("myOrgUnitIds", myOrgUnitIds);
-
-      AnnouncementDto announcement = dashboardClient.announcement();
-      model.addAttribute("announcement", announcement);
-
-      boolean unread = false;
-      if (announcement != null && announcement.id() != null) {
-        if (currentUser.lastReadAnnouncementId() == null
-            || !currentUser.lastReadAnnouncementId().equals(announcement.id())) {
-          unread = true;
-        }
-      }
-      model.addAttribute("unreadAnnouncement", unread);
-    } catch (BackendServiceException e) {
-      log.debug("Could not load home user/announcement context", e);
-    } catch (Exception e) {
-      log.warn("Unexpected failure building home context", e);
-    }
+    SectionFallback.run(log, "home-context", () -> addMemberContext(model));
     return "dashboard/index";
+  }
+
+  /**
+   * Loads the missions starting within the next seven days.
+   *
+   * @return the upcoming missions, empty when the backend sent no page
+   */
+  @NotNull
+  private List<MissionListDto> loadUpcomingMissions() {
+    Instant now = Instant.now();
+    Instant horizon = now.plus(7, ChronoUnit.DAYS);
+    PageResponse<MissionListDto> upcomingPage = dashboardClient.upcomingMissions(now, horizon);
+    return (upcomingPage != null && upcomingPage.content() != null)
+        ? upcomingPage.content()
+        : List.of();
+  }
+
+  /**
+   * Adds the current user, the org units to highlight and the announcement with its unread flag.
+   *
+   * @param model the dashboard model
+   */
+  private void addMemberContext(@NotNull Model model) {
+    UserDto currentUser = dashboardClient.currentUser();
+    model.addAttribute("currentUser", currentUser);
+
+    Set<UUID> myOrgUnitIds = new HashSet<>();
+    if (currentUser.squadrons() != null) {
+      for (SquadronReferenceDto su : currentUser.squadrons()) {
+        if (su != null && su.id() != null) {
+          myOrgUnitIds.add(su.id());
+        }
+      }
+    }
+    if (currentUser.squadron() != null && currentUser.squadron().id() != null) {
+      myOrgUnitIds.add(currentUser.squadron().id());
+    }
+    List<UUID> directOrgUnitIds =
+        SectionFallback.load(log, "own-org-units", dashboardClient::myOrgUnitIds, List.of());
+    if (directOrgUnitIds != null) {
+      for (UUID id : directOrgUnitIds) {
+        if (id != null) {
+          myOrgUnitIds.add(id);
+        }
+      }
+    }
+    model.addAttribute("myOrgUnitIds", myOrgUnitIds);
+
+    AnnouncementDto announcement = dashboardClient.announcement();
+    model.addAttribute("announcement", announcement);
+
+    boolean unread = false;
+    if (announcement != null && announcement.id() != null) {
+      if (currentUser.lastReadAnnouncementId() == null
+          || !currentUser.lastReadAnnouncementId().equals(announcement.id())) {
+        unread = true;
+      }
+    }
+    model.addAttribute("unreadAnnouncement", unread);
   }
 
   /**
@@ -171,11 +175,7 @@ public class HomeController {
   @PostMapping("/announcement/read")
   @PreAuthorize("isAuthenticated()")
   public String markAnnouncementAsRead(@RequestParam UUID id) {
-    try {
-      dashboardClient.markAnnouncementRead(id);
-    } catch (Exception e) {
-      log.error("Failed to mark announcement as read", e);
-    }
+    SectionFallback.run(log, "announcement-read", () -> dashboardClient.markAnnouncementRead(id));
     return "redirect:/";
   }
 

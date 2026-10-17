@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogPages;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogPages.CompleteCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -86,29 +87,33 @@ public class ShipDataPageController {
       model.addAttribute("shipTypeForm", new ShipTypeForm("", null, ""));
     }
 
-    try {
-      CompleteCatalog<ManufacturerDto> manufacturersCatalog =
-          CatalogPages.fetchAll(catalogueClient::manufacturerPage);
-      List<ManufacturerDto> manufacturers = new ArrayList<>(manufacturersCatalog.items());
-      manufacturers.sort(
-          Comparator.comparing(ManufacturerDto::name, String.CASE_INSENSITIVE_ORDER));
-      model.addAttribute("manufacturers", manufacturers);
-
-      CompleteCatalog<ShipTypeDto> shipTypesCatalog =
-          CatalogPages.fetchAll(catalogueClient::shipTypePage);
-      List<ShipTypeDto> shipTypes = new ArrayList<>(shipTypesCatalog.items());
-      shipTypes.sort(Comparator.comparing(ShipTypeDto::name, String.CASE_INSENSITIVE_ORDER));
-      model.addAttribute("shipTypes", shipTypes);
-
-      model.addAttribute(
-          "catalogTruncated", manufacturersCatalog.truncated() || shipTypesCatalog.truncated());
-
-    } catch (Exception e) {
-      log.error("Error loading ship data", e);
+    if (!SectionFallback.run(log, "ship-data", () -> addCatalogs(model))) {
       model.addAttribute("error", "error.shipdata.load");
     }
 
     return "catalogue/ship-data";
+  }
+
+  /**
+   * Adds the name-sorted manufacturers and ship types and whether either page walk hit its cap.
+   *
+   * @param model the ship-data model
+   */
+  private void addCatalogs(@NotNull Model model) {
+    CompleteCatalog<ManufacturerDto> manufacturersCatalog =
+        CatalogPages.fetchAll(catalogueClient::manufacturerPage);
+    List<ManufacturerDto> manufacturers = new ArrayList<>(manufacturersCatalog.items());
+    manufacturers.sort(Comparator.comparing(ManufacturerDto::name, String.CASE_INSENSITIVE_ORDER));
+    model.addAttribute("manufacturers", manufacturers);
+
+    CompleteCatalog<ShipTypeDto> shipTypesCatalog =
+        CatalogPages.fetchAll(catalogueClient::shipTypePage);
+    List<ShipTypeDto> shipTypes = new ArrayList<>(shipTypesCatalog.items());
+    shipTypes.sort(Comparator.comparing(ShipTypeDto::name, String.CASE_INSENSITIVE_ORDER));
+    model.addAttribute("shipTypes", shipTypes);
+
+    model.addAttribute(
+        "catalogTruncated", manufacturersCatalog.truncated() || shipTypesCatalog.truncated());
   }
 
   /**

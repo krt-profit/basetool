@@ -21,15 +21,16 @@ package de.greluc.krt.profit.basetool.frontend.blueprint.web;
 
 import de.greluc.krt.profit.basetool.frontend.blueprint.client.BlueprintBackendClient;
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
-import de.greluc.krt.profit.basetool.logging.LogSafe;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.slf4j.event.Level;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -55,14 +56,6 @@ public class AdminBlueprintsPageController {
   /** Page size for the blueprint list — one detail-rich card per row, so kept modest. */
   private static final int PAGE_SIZE = 25;
 
-  /**
-   * Character budget for the search term when it is written to a log line. An output-name or
-   * Wiki-key filter an admin could plausibly be typing fits comfortably; anything longer is a paste
-   * or an attack and is truncated by {@link LogSafe#text(String, int)} rather than allowed to
-   * stretch the line.
-   */
-  private static final int MAX_LOGGED_QUERY = 80;
-
   /** Reads the blueprint catalogue pages. */
   private final BlueprintBackendClient blueprintClient;
 
@@ -86,26 +79,8 @@ public class AdminBlueprintsPageController {
     int safePage = Math.max(page, 0);
     String trimmed = (search == null || search.isBlank()) ? null : search.trim();
 
-    try {
-      PageResponse<BlueprintDto> response =
-          blueprintClient.blueprintPage(PAGE_SIZE, safePage, trimmed);
-      if (response != null) {
-        model.addAttribute(
-            "blueprints", response.content() == null ? List.of() : response.content());
-        model.addAttribute("currentPage", response.page());
-        model.addAttribute("totalPages", response.totalPages());
-        model.addAttribute("totalElements", response.totalElements());
-      } else {
-        populateEmpty(model);
-      }
-    } catch (BackendServiceException e) {
-      log.debug(
-          "Error loading blueprints data (search={})", LogSafe.text(trimmed, MAX_LOGGED_QUERY), e);
-      model.addAttribute("error", "error.admin.blueprints.load");
-      populateEmpty(model);
-    } catch (Exception e) {
-      log.error(
-          "Error loading blueprints data (search={})", LogSafe.text(trimmed, MAX_LOGGED_QUERY), e);
+    if (!SectionFallback.run(
+        log, Level.ERROR, "admin-blueprints", () -> addBlueprintPage(safePage, trimmed, model))) {
       model.addAttribute("error", "error.admin.blueprints.load");
       populateEmpty(model);
     }
@@ -113,6 +88,27 @@ public class AdminBlueprintsPageController {
     return "results".equals(fragment)
         ? "blueprint/admin/blueprints :: results"
         : "blueprint/admin/blueprints";
+  }
+
+  /**
+   * Loads one blueprint page and fills the paging model attributes, empty when the backend sent no
+   * page.
+   *
+   * @param safePage zero-based page index, already clamped
+   * @param trimmed the trimmed search term, or {@code null} for no filter
+   * @param model Thymeleaf model to fill
+   */
+  private void addBlueprintPage(int safePage, @Nullable String trimmed, @NotNull Model model) {
+    PageResponse<BlueprintDto> response =
+        blueprintClient.blueprintPage(PAGE_SIZE, safePage, trimmed);
+    if (response != null) {
+      model.addAttribute("blueprints", response.content() == null ? List.of() : response.content());
+      model.addAttribute("currentPage", response.page());
+      model.addAttribute("totalPages", response.totalPages());
+      model.addAttribute("totalElements", response.totalElements());
+    } else {
+      populateEmpty(model);
+    }
   }
 
   /**

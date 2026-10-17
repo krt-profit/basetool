@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendCli
 import de.greluc.krt.profit.basetool.frontend.identity.model.DecideDeletionRequestRequest;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -67,10 +68,10 @@ public class AdminDeletionRequestsPageController {
   @GetMapping
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String page(Model model) {
-    try {
-      model.addAttribute("requests", identityClient.deletionRequests());
-    } catch (Exception e) {
-      log.error("Loading the deletion-request queue failed", e);
+    if (!SectionFallback.run(
+        log,
+        "deletion-requests",
+        () -> model.addAttribute("requests", identityClient.deletionRequests()))) {
       model.addAttribute("requests", List.of());
       model.addAttribute("error", "admin.deletionRequests.error.load");
     }

@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceExcep
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.client.MaterialExchangeBackendClient;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.client.MaterialExchangeBackendClient.BoardFilter;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeCountsDto;
@@ -459,18 +460,16 @@ public class MaterialboersePageController {
       Double minAmount,
       String sort,
       boolean excludeStolen) {
-    try {
-      PageResponse<MaterialExchangeOfferDto> page =
-          materialExchangeClient.offers(
-              new BoardFilter(tab, BOARD_SIZE, minQuality, minAmount, sort, q), excludeStolen);
-      return page == null ? List.of() : page.content();
-    } catch (BackendServiceException e) {
-      log.debug("Failed to load Materialbörse board", e);
-      return List.of();
-    } catch (Exception e) {
-      log.error("Failed to load Materialbörse board", e);
-      return List.of();
-    }
+    return SectionFallback.load(
+        log,
+        "offer-board",
+        () -> {
+          PageResponse<MaterialExchangeOfferDto> page =
+              materialExchangeClient.offers(
+                  new BoardFilter(tab, BOARD_SIZE, minQuality, minAmount, sort, q), excludeStolen);
+          return page == null ? List.of() : page.content();
+        },
+        List.of());
   }
 
   /**
@@ -485,15 +484,8 @@ public class MaterialboersePageController {
     if (offerId == null) {
       return null;
     }
-    try {
-      return materialExchangeClient.offer(offerId);
-    } catch (BackendServiceException e) {
-      log.debug("Failed to load Materialbörse offer {}", offerId, e);
-      return null;
-    } catch (Exception e) {
-      log.error("Failed to load Materialbörse offer {}", offerId, e);
-      return null;
-    }
+    return SectionFallback.load(
+        log, "offer-detail", () -> materialExchangeClient.offer(offerId), null);
   }
 
   /**
@@ -502,15 +494,11 @@ public class MaterialboersePageController {
    * @return the counts.
    */
   private MaterialExchangeCountsDto loadCounts() {
-    try {
-      return materialExchangeClient.offerCounts();
-    } catch (BackendServiceException e) {
-      log.debug("Failed to load Materialbörse counts", e);
-      return new MaterialExchangeCountsDto(0, 0);
-    } catch (Exception e) {
-      log.error("Failed to load Materialbörse counts", e);
-      return new MaterialExchangeCountsDto(0, 0);
-    }
+    return SectionFallback.load(
+        log,
+        "offer-counts",
+        materialExchangeClient::offerCounts,
+        new MaterialExchangeCountsDto(0, 0));
   }
 
   /**
@@ -542,18 +530,16 @@ public class MaterialboersePageController {
    */
   private List<MaterialRequestDto> loadRequests(
       String tab, String q, Integer minQuality, Double minAmount, String sort) {
-    try {
-      PageResponse<MaterialRequestDto> page =
-          materialExchangeClient.requests(
-              new BoardFilter(tab, BOARD_SIZE, minQuality, minAmount, sort, q));
-      return page == null ? List.of() : page.content();
-    } catch (BackendServiceException e) {
-      log.debug("Failed to load Materialbörse Gesuche board", e);
-      return List.of();
-    } catch (Exception e) {
-      log.error("Failed to load Materialbörse Gesuche board", e);
-      return List.of();
-    }
+    return SectionFallback.load(
+        log,
+        "request-board",
+        () -> {
+          PageResponse<MaterialRequestDto> page =
+              materialExchangeClient.requests(
+                  new BoardFilter(tab, BOARD_SIZE, minQuality, minAmount, sort, q));
+          return page == null ? List.of() : page.content();
+        },
+        List.of());
   }
 
   /**
@@ -568,15 +554,8 @@ public class MaterialboersePageController {
     if (requestId == null) {
       return null;
     }
-    try {
-      return materialExchangeClient.request(requestId);
-    } catch (BackendServiceException e) {
-      log.debug("Failed to load Materialbörse request {}", requestId, e);
-      return null;
-    } catch (Exception e) {
-      log.error("Failed to load Materialbörse request {}", requestId, e);
-      return null;
-    }
+    return SectionFallback.load(
+        log, "request-detail", () -> materialExchangeClient.request(requestId), null);
   }
 
   /**
@@ -585,16 +564,9 @@ public class MaterialboersePageController {
    * @return the counts.
    */
   private MaterialExchangeCountsDto loadRequestCounts() {
-    try {
-      MaterialExchangeCountsDto counts = materialExchangeClient.requestCounts();
-      return counts == null ? new MaterialExchangeCountsDto(0, 0) : counts;
-    } catch (BackendServiceException e) {
-      log.debug("Failed to load Materialbörse Gesuche counts", e);
-      return new MaterialExchangeCountsDto(0, 0);
-    } catch (Exception e) {
-      log.error("Failed to load Materialbörse Gesuche counts", e);
-      return new MaterialExchangeCountsDto(0, 0);
-    }
+    MaterialExchangeCountsDto counts =
+        SectionFallback.load(log, "request-counts", materialExchangeClient::requestCounts, null);
+    return counts == null ? new MaterialExchangeCountsDto(0, 0) : counts;
   }
 
   /**

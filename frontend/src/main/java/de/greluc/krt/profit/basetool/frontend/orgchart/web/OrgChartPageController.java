@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.orgchart.web;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.orgchart.client.OrgChartBackendClient;
 import de.greluc.krt.profit.basetool.frontend.orgchart.model.OrgChartPositionCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.orgchart.model.OrgChartPositionUpdateRequest;
@@ -74,10 +75,8 @@ public class OrgChartPageController {
   @GetMapping
   @PreAuthorize("isAuthenticated()")
   public String orgChart(@RequestParam(required = false) String fragment, Model model) {
-    try {
-      model.addAttribute("orgChart", orgChartClient.orgChart());
-    } catch (Exception e) {
-      log.error("Failed to load org chart", e);
+    if (!SectionFallback.run(
+        log, "org-chart", () -> model.addAttribute("orgChart", orgChartClient.orgChart()))) {
       model.addAttribute("error", "error.orgChart.load");
     }
     if ("chartBody".equals(fragment)) {

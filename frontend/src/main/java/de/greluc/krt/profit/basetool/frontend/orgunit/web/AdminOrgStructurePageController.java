@@ -25,11 +25,13 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.CacheDomain;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.orgunit.client.OrgUnitBackendClient;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.BereichCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitNodeDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitParentUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrganisationsleitungCreateRequest;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
@@ -104,17 +106,19 @@ public class AdminOrgStructurePageController {
   @NotNull
   @GetMapping
   public String page(@RequestParam(required = false) String fragment, Model model) {
-    List<OrgUnitNodeDto> nodes = List.of();
-    try {
-      List<OrgUnitNodeDto> fetched = orgUnitClient.orgUnitNodes();
-      if (fetched != null) {
-        nodes = fetched;
-      }
-    } catch (Exception e) {
-      log.debug("Failed to load org units for the structure page", e);
+    List<OrgUnitNodeDto> fetched = new ArrayList<>();
+    if (!SectionFallback.run(
+        log,
+        "org-structure-units",
+        () -> {
+          List<OrgUnitNodeDto> loaded = orgUnitClient.orgUnitNodes();
+          if (loaded != null) {
+            fetched.addAll(loaded);
+          }
+        })) {
       model.addAttribute("error", "admin.orgStructure.error.load");
     }
-    nodes = sortForDisplay(nodes);
+    List<OrgUnitNodeDto> nodes = sortForDisplay(fetched);
     model.addAttribute("nodes", nodes);
     model.addAttribute(
         "organisationsleitungen", nodes.stream().filter(n -> KIND_OL.equals(n.kind())).toList());

@@ -24,11 +24,13 @@ import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintOverviewE
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintOverviewOwnerDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -82,19 +84,14 @@ public class BlueprintOverviewPageController {
     int effectivePage = page == null || page < 0 ? 0 : page;
     int effectiveSize = size != null && PAGE_SIZES.contains(size) ? size : DEFAULT_PAGE_SIZE;
     String trimmedSearch = search == null || search.isBlank() ? null : search.trim();
-    List<BlueprintOverviewEntryDto> overview = new ArrayList<>();
-    PageResponse<BlueprintOverviewEntryDto> res = null;
-    try {
-      res = blueprintClient.overviewPage(effectivePage, effectiveSize, trimmedSearch);
-      if (res != null && res.content() != null) {
-        overview = new ArrayList<>(res.content());
-      }
-    } catch (Exception e) {
-      log.error("Failed to fetch blueprint availability overview", e);
+    if (!SectionFallback.run(
+        log,
+        "blueprint-overview",
+        () -> addOverviewPage(effectivePage, effectiveSize, trimmedSearch, model))) {
       model.addAttribute("error", "error.blueprintOverview.load");
+      model.addAttribute("overview", new ArrayList<BlueprintOverviewEntryDto>());
+      model.addAttribute("overviewPage", null);
     }
-    model.addAttribute("overview", overview);
-    model.addAttribute("overviewPage", res);
     model.addAttribute("search", trimmedSearch);
     model.addAttribute("pageSizes", PAGE_SIZES);
     return "results".equals(fragment)
@@ -111,13 +108,28 @@ public class BlueprintOverviewPageController {
   @GetMapping("/owners")
   @ResponseBody
   public List<BlueprintOverviewOwnerDto> owners(@RequestParam String productKey) {
-    try {
-      List<BlueprintOverviewOwnerDto> owners = blueprintClient.overviewOwners(productKey);
-      return owners != null ? owners : List.of();
-    } catch (Exception e) {
-      log.warn(
-          "Failed to fetch blueprint owners for productKey='{}': {}", productKey, e.getMessage());
-      return List.of();
-    }
+    List<BlueprintOverviewOwnerDto> owners =
+        SectionFallback.load(
+            log,
+            "blueprint-overview-owners",
+            () -> blueprintClient.overviewOwners(productKey),
+            null);
+    return owners != null ? owners : List.of();
+  }
+
+  /**
+   * Loads one page of the availability overview and adds its rows and the page envelope.
+   *
+   * @param page zero-based, already-clamped page index
+   * @param size the whitelisted page size
+   * @param search the trimmed product-name fragment, or {@code null} for no filter
+   * @param model the model receiving {@code overview} and {@code overviewPage}
+   */
+  private void addOverviewPage(int page, int size, @Nullable String search, @NotNull Model model) {
+    PageResponse<BlueprintOverviewEntryDto> res = blueprintClient.overviewPage(page, size, search);
+    List<BlueprintOverviewEntryDto> overview =
+        res != null && res.content() != null ? new ArrayList<>(res.content()) : new ArrayList<>();
+    model.addAttribute("overview", overview);
+    model.addAttribute("overviewPage", res);
   }
 }

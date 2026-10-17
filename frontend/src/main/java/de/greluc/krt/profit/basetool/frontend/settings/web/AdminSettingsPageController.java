@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogPages.Comple
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SpecialCommandDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.settings.client.SettingsBackendClient;
@@ -40,6 +41,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -101,67 +103,42 @@ public class AdminSettingsPageController {
   @NotNull
   @GetMapping
   public String viewSettings(Model model) {
-    int yellowDays = 30;
-    int redDays = 90;
-    Long yellowVersion = 0L;
-    Long redVersion = 0L;
-    String refineryRoundingMode = "UP";
-    Long refineryRoundingVersion = 0L;
+    LoadedSetting<Integer> yellow =
+        SectionFallback.load(
+            log,
+            "age-yellow-days",
+            () -> readSetting(SystemSetting.JOB_ORDER_AGE_YELLOW_DAYS, Integer::parseInt),
+            new LoadedSetting<>(30, 0L));
+    LoadedSetting<Integer> red =
+        SectionFallback.load(
+            log,
+            "age-red-days",
+            () -> readSetting(SystemSetting.JOB_ORDER_AGE_RED_DAYS, Integer::parseInt),
+            new LoadedSetting<>(90, 0L));
+    LoadedSetting<String> rounding =
+        SectionFallback.load(
+            log,
+            "refinery-rounding-mode",
+            () -> readSetting(SystemSetting.REFINERY_ROUNDING_MODE, Function.identity()),
+            new LoadedSetting<>("UP", 0L));
+    LoadedSetting<BigDecimal> transferFee =
+        SectionFallback.load(
+            log,
+            "transfer-fee-rate",
+            () ->
+                readSetting(
+                    SystemSetting.OPERATION_TRANSFER_FEE_RATE,
+                    AdminSettingsPageController::toPercent),
+            new LoadedSetting<>(DEFAULT_TRANSFER_FEE_PERCENT, 0L));
 
-    try {
-      SystemSettingDto yellowSetting = settingsClient.read(SystemSetting.JOB_ORDER_AGE_YELLOW_DAYS);
-      yellowDays = Integer.parseInt(yellowSetting.value());
-      yellowVersion = yellowSetting.version();
-    } catch (BackendServiceException e) {
-      log.debug("Could not fetch yellow days setting", e);
-    } catch (Exception e) {
-      log.warn("Could not fetch yellow days setting", e);
-    }
-
-    try {
-      SystemSettingDto redSetting = settingsClient.read(SystemSetting.JOB_ORDER_AGE_RED_DAYS);
-      redDays = Integer.parseInt(redSetting.value());
-      redVersion = redSetting.version();
-    } catch (BackendServiceException e) {
-      log.debug("Could not fetch red days setting", e);
-    } catch (Exception e) {
-      log.warn("Could not fetch red days setting", e);
-    }
-
-    try {
-      SystemSettingDto roundingSetting = settingsClient.read(SystemSetting.REFINERY_ROUNDING_MODE);
-      refineryRoundingMode = roundingSetting.value();
-      refineryRoundingVersion = roundingSetting.version();
-    } catch (BackendServiceException e) {
-      log.debug("Could not fetch refinery rounding mode setting", e);
-    } catch (Exception e) {
-      log.warn("Could not fetch refinery rounding mode setting", e);
-    }
-
-    BigDecimal transferFeePercent = DEFAULT_TRANSFER_FEE_PERCENT;
-    Long transferFeeVersion = 0L;
-    try {
-      SystemSettingDto feeSetting = settingsClient.read(SystemSetting.OPERATION_TRANSFER_FEE_RATE);
-      transferFeePercent =
-          new BigDecimal(feeSetting.value()).multiply(ONE_HUNDRED).stripTrailingZeros();
-      if (transferFeePercent.scale() < 0) {
-        transferFeePercent = transferFeePercent.setScale(0, RoundingMode.UNNECESSARY);
-      }
-      transferFeeVersion = feeSetting.version();
-    } catch (BackendServiceException e) {
-      log.debug("Could not fetch operation transfer fee rate setting", e);
-    } catch (Exception e) {
-      log.warn("Could not fetch operation transfer fee rate setting", e);
-    }
-
-    model.addAttribute("ageYellowDays", yellowDays);
-    model.addAttribute("ageYellowVersion", yellowVersion);
-    model.addAttribute("ageRedDays", redDays);
-    model.addAttribute("ageRedVersion", redVersion);
-    model.addAttribute("refineryRoundingMode", refineryRoundingMode);
-    model.addAttribute("refineryRoundingVersion", refineryRoundingVersion);
-    model.addAttribute("transferFeePercent", transferFeePercent.toPlainString());
-    model.addAttribute("transferFeeVersion", transferFeeVersion);
+    model.addAttribute("ageYellowDays", yellow.value());
+    model.addAttribute("ageYellowVersion", yellow.version());
+    model.addAttribute("ageRedDays", red.value());
+    model.addAttribute("ageRedVersion", red.version());
+    model.addAttribute("refineryRoundingMode", rounding.value());
+    model.addAttribute("refineryRoundingVersion", rounding.version());
+    model.addAttribute("transferFeePercent", transferFee.value().toPlainString());
+    model.addAttribute("transferFeeVersion", transferFee.version());
     CompleteCatalog<SquadronDto> squadronCatalog = fetchSquadronsForPromotionToggle();
     model.addAttribute("squadrons", squadronCatalog.items());
     CompleteCatalog<SpecialCommandDto> specialCommandCatalog =
@@ -181,19 +158,21 @@ public class AdminSettingsPageController {
    * @return active squadrons sorted by name plus the truncation flag, never {@code null}.
    */
   private CompleteCatalog<SquadronDto> fetchSquadronsForPromotionToggle() {
-    try {
-      CompleteCatalog<SquadronDto> catalog = CatalogPages.fetchAll(settingsClient::squadronPage);
-      List<SquadronDto> sorted =
-          catalog.items().stream()
-              .sorted(
-                  Comparator.comparing(
-                      s -> s.name() == null ? "" : s.name(), String.CASE_INSENSITIVE_ORDER))
-              .toList();
-      return new CompleteCatalog<>(sorted, catalog.totalElements(), catalog.truncated());
-    } catch (Exception e) {
-      log.warn("Could not fetch squadrons for admin-settings promotion toggle: {}", e.getMessage());
-      return CompleteCatalog.empty();
-    }
+    return SectionFallback.load(
+        log,
+        "promotion-toggle-squadrons",
+        () -> {
+          CompleteCatalog<SquadronDto> catalog =
+              CatalogPages.fetchAll(settingsClient::squadronPage);
+          List<SquadronDto> sorted =
+              catalog.items().stream()
+                  .sorted(
+                      Comparator.comparing(
+                          s -> s.name() == null ? "" : s.name(), String.CASE_INSENSITIVE_ORDER))
+                  .toList();
+          return new CompleteCatalog<>(sorted, catalog.totalElements(), catalog.truncated());
+        },
+        CompleteCatalog.empty());
   }
 
   /**
@@ -203,21 +182,48 @@ public class AdminSettingsPageController {
    * @return active Spezialkommandos sorted by name plus the truncation flag, never {@code null}.
    */
   private CompleteCatalog<SpecialCommandDto> fetchSpecialCommandsForProfitToggle() {
-    try {
-      CompleteCatalog<SpecialCommandDto> catalog =
-          CatalogPages.fetchAll(settingsClient::specialCommandPage);
-      List<SpecialCommandDto> sorted =
-          catalog.items().stream()
-              .sorted(
-                  Comparator.comparing(
-                      s -> s.name() == null ? "" : s.name(), String.CASE_INSENSITIVE_ORDER))
-              .toList();
-      return new CompleteCatalog<>(sorted, catalog.totalElements(), catalog.truncated());
-    } catch (Exception e) {
-      log.warn(
-          "Could not fetch special commands for admin-settings profit toggle: {}", e.getMessage());
-      return CompleteCatalog.empty();
-    }
+    return SectionFallback.load(
+        log,
+        "profit-toggle-special-commands",
+        () -> {
+          CompleteCatalog<SpecialCommandDto> catalog =
+              CatalogPages.fetchAll(settingsClient::specialCommandPage);
+          List<SpecialCommandDto> sorted =
+              catalog.items().stream()
+                  .sorted(
+                      Comparator.comparing(
+                          s -> s.name() == null ? "" : s.name(), String.CASE_INSENSITIVE_ORDER))
+                  .toList();
+          return new CompleteCatalog<>(sorted, catalog.totalElements(), catalog.truncated());
+        },
+        CompleteCatalog.empty());
+  }
+
+  /**
+   * Reads one system setting and converts its stored value for the form.
+   *
+   * @param setting the setting to read
+   * @param convert turns the stored string into the form value; it may throw on a malformed value
+   * @param <T> the form value type
+   * @return the converted value with the setting's optimistic-lock version
+   */
+  @NotNull
+  private <T> LoadedSetting<T> readSetting(
+      @NotNull SystemSetting setting, @NotNull Function<String, T> convert) {
+    SystemSettingDto dto = settingsClient.read(setting);
+    return new LoadedSetting<>(convert.apply(dto.value()), dto.version());
+  }
+
+  /**
+   * Converts the stored transfer-fee fraction into the percentage the form shows.
+   *
+   * @param fraction the stored fraction, e.g. {@code 0.005}
+   * @return the percentage without trailing zeros and with a non-negative scale, e.g. {@code 0.5}
+   */
+  @NotNull
+  private static BigDecimal toPercent(@NotNull String fraction) {
+    BigDecimal percent = new BigDecimal(fraction).multiply(ONE_HUNDRED).stripTrailingZeros();
+    return percent.scale() < 0 ? percent.setScale(0, RoundingMode.UNNECESSARY) : percent;
   }
 
   /**
@@ -375,6 +381,15 @@ public class AdminSettingsPageController {
     body.put("detail", messageSource.getMessage(messageKey, null, messageKey, locale));
     return ResponseEntity.status(422).contentType(MediaType.APPLICATION_PROBLEM_JSON).body(body);
   }
+
+  /**
+   * One setting's form value with the optimistic-lock version the form echoes back.
+   *
+   * @param value the form value, or {@code null} when the backend stored none
+   * @param version the setting's version
+   * @param <T> the form value type
+   */
+  private record LoadedSetting<T>(T value, Long version) {}
 
   /**
    * JSON payload of {@link #updateSettingsAjax}; the numeric fields stay strings so they are parsed
