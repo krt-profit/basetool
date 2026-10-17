@@ -34,6 +34,10 @@
 
 ### Changed
 
+- **Datenschutzerklärung: der Abschnitt zur Android-App entfällt.** Die eingestellte App wird nicht mehr beschrieben, und GitHub ist nicht mehr als Empfänger genannt; das Verarbeitungsverzeichnis, die Empfängerliste und die Liste der zugelassenen Clients sind entsprechend angepasst (ADR-0268).
+
+- **Betrieb: die `APP_ANDROID_*_OVERRIDE`-Variablen sind auch aus der Konfiguration entfernt.** `.env.example`, `docker-compose.yml` und die `env.d`-Vorlage des Backends reichen sie nicht mehr weiter; eine verbliebene Zeile in der Host-`.env` wirkt nicht und kann gelöscht werden (ADR-0268).
+
 - **Preis-Übersicht: besser lesbare Filterleiste.** Die Dropdowns „Materialien" und „System" sowie der Button „Filter" haben jetzt Füllung und sichtbaren Rand nach dem Design-System; eine eingeschränkte Auswahl ist orange markiert, „Filter" zeigt die Zahl aktiver Filter (REQ-UI-014).
 
 - **Materialdetail: Sortieren über die Spaltenköpfe.** Die Tabelle „Preise und Terminals" sortiert per Klick auf Terminal, Ort, Verkauf oder Einkauf; ein zweiter Klick dreht die Richtung um – auch auf dem Handy über eine Leiste über der Liste. Der Umschalter „Verkauf · Einkauf" entfällt, Standard bleibt „Verkauf, höchster zuerst" (REQ-UI-015, REQ-UI-030).

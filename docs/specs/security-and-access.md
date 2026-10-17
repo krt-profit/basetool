@@ -3607,14 +3607,14 @@ layer directly.
 - [x] The Lager row flag is false for a caller who passes the scope check on another member's row
   but holds no Logistician-or-above role, and true for that row's owner and for a Logistician in
   scope.
-- [ ] Walked on a device with an admin account: outstanding.
+- [x] ~~Walked on a device with an admin account~~ — moot: the Android client it was meant for is
+  discontinued (ADR-0268), and the web reads the flags the tests above pin.
 
 **Enforced by:** `MeControllerTest`, `StockViewerAccessServiceTest`, `InventoryItemMapperTest` ·
 **Code:** `MeController`, `StockViewerAccess`, `StockViewerAccessService`,
 `EarmarkTargetPolicy#mayEditJobOrderEarmarks` (implemented by `JobOrderAccessPolicy`),
 `InventoryAccessPolicy#canEditInventoryItem`, `InventoryItemMapper`,
-`JobOrderMapper` · **Related:** REQ-SEC-046, ADR-0047, and the Android counterpart REQ-APP-AUTH-014
-(`basetool-android` `docs/specs/auth.md`)
+`JobOrderMapper` · **Related:** REQ-SEC-046, ADR-0047
 
 ### REQ-SEC-048 — One endpoint answers which org units a caller may pin
 
@@ -3676,9 +3676,9 @@ hierarchy that no gate would have caught, because both answers are individually 
   verified against the test stack 2026-09-01.
 - [x] An OL seat is offered every unit the cascade names, top-down
   (`…_olSeat_reachesEveryUnitTheCascadeNames`).
-- [ ] Both clients read this endpoint rather than branching themselves. The web half is done —
-  `OrgUnitContextAdvice` makes the one call (checked 2026-09-22); the Android half is tracked in
-  `basetool-android`.
+- [x] Every client reads this endpoint rather than branching itself. The web is the only client
+  left — `OrgUnitContextAdvice` makes the one call (checked 2026-09-22); the Android client is
+  discontinued (ADR-0268).
 
 **Enforced by:** `MeControllerTest`, `OrgUnitMembershipQueryServiceTest` · **Code:**
 `MeController#getPinnableOrgUnits`, `OrgUnitMembershipQueryService#listAllPinnableOptions` /
@@ -4298,11 +4298,11 @@ There is no role below member. The seeded `GUEST` role is gone (`V239`), and wit
 represented — an authenticated caller with an **empty authority set**.
 
 **The rule:** an authenticated token whose realm roles map to no application role is refused with
-`403 NO_ROLE` on every `/api/**` path, before a handler runs. Three paths are exempt, for the same
+`403 NO_ROLE` on every `/api/**` path, before a handler runs. Two paths are exempt, for the same
 reasons they are exempt from the pending gate: `/api/v1/users/me/registration-status` (or the
-refusal has no way to explain itself), and the two REQ-SEC-052 reads (the Android app attaches its
-bearer to every call once a session exists, so gating them would refuse the version policy and the
-terms text to exactly the callers most likely to need both).
+refusal has no way to explain itself), and the anonymous terms read of REQ-SEC-052,
+`GET /api/v1/terms/document` (a caller that sends a bearer along must still reach the text it has to
+consent to).
 
 **Why a refusal and not an empty set.** An empty authority set passes every `isAuthenticated()`
 gate and fails only the ones that name a role, so whether such a caller is admitted depends on which
@@ -6052,8 +6052,8 @@ member-readable only because the Android app took the two job-order age threshol
 app 19 reads the typed `GET /api/v1/orders/settings` instead, the web reads the typed
 `GET /api/v1/orders/settings` and `GET /api/v1/refinery-orders/settings`, and the admin page is the
 one reader left of the store (`SettingsBackendClient`). The two typed reads stay
-`isAuthenticated()`. An app below build 19 meets the update wall (REQ-API-020) before it could
-see a `403`.
+`isAuthenticated()`. With the Android app discontinued (ADR-0268), no client reads the raw rows
+except the admin page.
 
 **Acceptance**
 

@@ -1,6 +1,6 @@
 # Processors and recipients (Art. 28 GDPR)
 
-> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-10-02.
+> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-10-17.
 
 Every third party that can reach personal data, what role it plays, and what has to be in place for
 it. A party is a **processor** when it processes on the controller's instructions (Art. 28 — a data
@@ -65,14 +65,6 @@ either a missing contract or a missing paragraph in the privacy policy.
   service. The transfer, and the mechanism the provider relies on, are disclosed in the privacy
   policy's Discord section.
 - **Named in the privacy policy:** yes, with both entities and a link to Discord's own policy.
-
-### GitHub
-
-- **Role:** independent controller, and **not a recipient of anything from the tool**. The Android
-  app is distributed through GitHub releases, and the app checks for a newer release against the
-  GitHub API directly from the member's device. The tool itself sends GitHub no personal data.
-- **Named in the privacy policy:** yes, in the Android-app section, with a link to GitHub's privacy
-  statement.
 
 ### Providers of approved exchange clients
 

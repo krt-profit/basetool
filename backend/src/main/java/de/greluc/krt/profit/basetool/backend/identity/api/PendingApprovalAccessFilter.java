@@ -57,7 +57,7 @@ import tools.jackson.databind.ObjectMapper;
  * Refuses every {@code /api/**} request with 403 for an authenticated caller who is pending
  * approval (REQ-SEC-017) or holds no application role (REQ-SEC-053).
  *
- * <p>Exempt are the registration-status endpoint and the two anonymous reads of REQ-SEC-052. Runs
+ * <p>Exempt are the registration-status endpoint and the anonymous terms read of REQ-SEC-052. Runs
  * after {@link ActingMemberFilter}, so ingest requests are judged on the acting member. The body is
  * an RFC&nbsp;7807 problem document with a freshly minted correlation id.
  */

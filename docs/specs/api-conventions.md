@@ -1521,6 +1521,9 @@ changed or removed (ADR-0234).
 > `RetiredOperations`, `RetiredOperationFilter`, `RetiredOperationsConfig`,
 > `backend/src/main/resources/api/retired-operations.txt` and the `410 APP_UPDATE_REQUIRED` body.
 > An operation a wave retired now answers `404` like any other path the server does not serve.
+> The three `APP_ANDROID_*_OVERRIDE` variables are passed by neither `docker-compose.yml` nor
+> `quadlet/env.d/backend.env.tmpl` and are gone from `.env.example`, so a line left in a host
+> `.env` reaches no container.
 >
 > **The deploy-seam finding outlives the mechanism.** "A value that gates an API must deploy and
 > roll back with that API, not sit in a host file" is why the floor was a reviewed literal in

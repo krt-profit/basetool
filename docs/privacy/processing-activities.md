@@ -1,6 +1,6 @@
 # Record of processing activities (Art. 30 GDPR)
 
-> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-10-15.
+> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-10-17.
 
 Art. 30 GDPR requires a controller to maintain a record of its processing activities. The small-
 organisation exemption in **Art. 30(5) does not apply**: it is available only where processing is
@@ -178,19 +178,17 @@ requires it and duplicating it into further files spreads personal data for no g
   [`data-subject-requests.md`](data-subject-requests.md). It is personal data and does not belong in
   a git repository.
 
-### A10 — Companion clients (desktop extractor, Android app)
+### A10 — Companion client (desktop extractor)
 
 - **Purpose:** let a member import data the game produced (refinery results, personal blueprints)
-  without typing it, and use the tool from an Android phone.
+  without typing it.
 - **Data:** the desktop extractor analyses its source locally and sends only the result, as text,
   to the ingest gateway; screenshots and log files never leave the device. From 2.10.0 it is a
   connected application under A11 and the first entry of the public approved-client list: a draft is
   staged **single-use, for the uploading account only**, until the member confirms it in the web
   interface, and only then stored under A2; the opt-in direct blueprint sync writes through the
-  exchange like any other connected application. The Android app is part of the platform, shows the
-  same data with the same permissions and processes nothing server-side of its own; on the device it
-  keeps an encrypted refresh token and the content last fetched, both excluded from Android backup
-  and deleted on sign-out.
+  exchange like any other connected application. The Android app this activity also covered is
+  discontinued (ADR-0268); the server processes nothing for it any more.
 - **Legal basis:** Art. 6(1)(b).
 - **Where:** the ingest handoff staging in Redis (REQ-INGEST-003, REQ-XCH-019); for the direct sync,
   A11; on the member's own device.
@@ -329,7 +327,6 @@ Full detail, including the role each party plays, in [`processors.md`](processor
 |-----------------------------------|------------------------|-------------------------------------------------------------------|
 | Hosting provider                  | Processor              | Everything, as the operator of the infrastructure                 |
 | Discord                           | Independent controller | The authentication exchange for members who use the Discord login |
-| GitHub                            | Independent controller | Nothing from the tool — the Android app is downloaded from, and checks for updates at, GitHub directly |
 | Other members of the organisation | —                      | The data the visibility rules expose inside the tool              |
 | Providers of approved exchange clients | Not a processor; an independent controller for anything their software passes on | The member's own data within the consented capabilities, delivered to the member's own device at the member's request (A11) |
 

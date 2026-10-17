@@ -1,6 +1,6 @@
 # Data protection (GDPR) — documentation index
 
-> **Doc type:** Living documents — kept in sync with `main`. Last reviewed: 2026-09-28.
+> **Doc type:** Living documents — kept in sync with `main`. Last reviewed: 2026-10-17.
 
 This folder holds the **organisational** half of the project's data-protection obligations: the
 documents the GDPR requires a controller to *have*, as opposed to the behaviour it requires the
@@ -64,7 +64,7 @@ a supervisory authority reads first.
 ## Scope
 
 These documents cover the Profit Basetool as deployed: backend, frontend, ingest gateway, the
-Keycloak SPI and theme, the Android app and the desktop extractor, plus the platform they run on —
+Keycloak SPI and theme and the desktop extractor, plus the platform they run on —
 since 2026-09-22 a rootless-Podman host on Rocky Linux 10 with the monitoring stack beside it.
 They describe **shapes and locations**, never values: no credentials, no internal hostnames, no
 member names, no production subject ids. This is a public repository.
