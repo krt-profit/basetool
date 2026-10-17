@@ -21,35 +21,55 @@ package de.greluc.krt.profit.basetool.frontend.kernel.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
 import java.util.List;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.oauth2.client.ClientAuthorizationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 
 /** Pins the section-fallback contract of {@link SectionFallback} (REQ-FE-036). */
 class SectionFallbackTest {
 
-  private final Logger log = mock(Logger.class);
+  private final Logger log = (Logger) LoggerFactory.getLogger(SectionFallbackTest.class);
 
-  @Test
-  void loadReturnsTheCallsResultWithoutLogging() {
-    assertThat(SectionFallback.load(log, "rows", () -> List.of("a"), List.of())).containsExactly("a");
-    verify(log, never()).warn(anyString(), any(Object.class), any(Object.class));
+  private final ListAppender<ILoggingEvent> appender = new ListAppender<>();
+
+  private Level previousLevel;
+
+  @BeforeEach
+  void attach() {
+    appender.start();
+    log.addAppender(appender);
+    previousLevel = log.getLevel();
+    log.setLevel(Level.DEBUG);
+  }
+
+  @AfterEach
+  void detach() {
+    log.detachAppender(appender);
+    log.setLevel(previousLevel);
   }
 
   @Test
-  void loadAnswersAFailureWithTheFallbackAndLogsItOnce() {
+  void loadReturnsTheCallsResultWithoutLogging() {
+    assertThat(SectionFallback.load(log, "rows", () -> List.of("a"), List.of()))
+        .containsExactly("a");
+    assertThat(appender.list).isEmpty();
+  }
+
+  @Test
+  void loadAnswersAFailureWithTheFallbackAndLogsItOnceAtWarn() {
     IllegalStateException failure = new IllegalStateException("boom");
 
     List<String> result =
@@ -62,7 +82,47 @@ class SectionFallbackTest {
             List.of());
 
     assertThat(result).isEmpty();
-    verify(log).warn("Page section '{}' unavailable", "rows", failure);
+    assertThat(appender.list)
+        .singleElement()
+        .satisfies(
+            event -> {
+              assertThat(event.getLevel()).isEqualTo(Level.WARN);
+              assertThat(event.getFormattedMessage()).isEqualTo("Page section 'rows' unavailable");
+              assertThat(event.getThrowableProxy().getMessage()).isEqualTo("boom");
+            });
+  }
+
+  @Test
+  void aBackendFailureLogsAtDebugWhateverTheCallerNames() {
+    SectionFallback.load(
+        log,
+        org.slf4j.event.Level.ERROR,
+        "rows",
+        () -> {
+          throw new BackendServiceException("down", null, 503);
+        },
+        List.of());
+
+    assertThat(appender.list)
+        .singleElement()
+        .extracting(ILoggingEvent::getLevel)
+        .isEqualTo(Level.DEBUG);
+  }
+
+  @Test
+  void anUnexpectedFailureLogsAtTheLevelTheCallerNames() {
+    SectionFallback.run(
+        log,
+        org.slf4j.event.Level.DEBUG,
+        "search",
+        () -> {
+          throw new IllegalStateException("boom");
+        });
+
+    assertThat(appender.list)
+        .singleElement()
+        .extracting(ILoggingEvent::getLevel)
+        .isEqualTo(Level.DEBUG);
   }
 
   @Test
@@ -79,7 +139,7 @@ class SectionFallbackTest {
                     },
                     List.of()))
         .isSameAs(reauth);
-    verify(log, never()).warn(anyString(), any(Object.class), any(Object.class));
+    assertThat(appender.list).isEmpty();
   }
 
   @Test
@@ -129,7 +189,10 @@ class SectionFallbackTest {
                   throw new IllegalStateException("boom");
                 }))
         .isFalse();
-    verify(log).warn(eq("Page section '{}' unavailable"), eq("stats"), any(Object.class));
+    assertThat(appender.list)
+        .singleElement()
+        .extracting(ILoggingEvent::getLevel)
+        .isEqualTo(Level.WARN);
   }
 
   @Test

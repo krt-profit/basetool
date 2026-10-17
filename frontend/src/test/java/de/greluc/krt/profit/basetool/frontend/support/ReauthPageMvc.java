@@ -95,8 +95,7 @@ public final class ReauthPageMvc {
   @NotNull
   public static ReauthenticationRequiredException expiredSession() {
     return new ReauthenticationRequiredException(
-        "expired",
-        new ClientAuthorizationException(new OAuth2Error("invalid_grant"), "keycloak"));
+        "expired", new ClientAuthorizationException(new OAuth2Error("invalid_grant"), "keycloak"));
   }
 
   /**

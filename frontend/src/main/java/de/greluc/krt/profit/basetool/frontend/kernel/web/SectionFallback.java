@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationReq
 import java.util.function.Supplier;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
+import org.slf4j.event.Level;
 
 /**
  * Runs the backend call behind one section of a page so that a failure leaves the rest of the page
@@ -33,7 +34,7 @@ import org.slf4j.Logger;
  * failure whose cause chain carries the OAuth2 re-authentication signal, propagates to {@link
  * GlobalExceptionHandler}, which sends the browser to the login. Every other runtime failure is
  * logged once and answered with the fallback: a mapped {@link BackendServiceException} at {@code
- * DEBUG}, anything else at {@code WARN}.
+ * DEBUG}, anything else at {@code WARN} or the level the caller names.
  */
 public final class SectionFallback {
 
@@ -43,7 +44,8 @@ public final class SectionFallback {
   private SectionFallback() {}
 
   /**
-   * Loads the value of one page section, or the fallback when the call fails.
+   * Loads the value of one page section, or the fallback when the call fails, logging an unexpected
+   * failure at {@code WARN}.
    *
    * @param log the caller's logger
    * @param section a constant name of the section for the log line, never user data
@@ -59,20 +61,43 @@ public final class SectionFallback {
       @NotNull String section,
       @NotNull Supplier<? extends T> call,
       T fallback) {
+    return load(log, Level.WARN, section, call, fallback);
+  }
+
+  /**
+   * Loads the value of one page section, or the fallback when the call fails, logging an unexpected
+   * failure at the given level.
+   *
+   * @param log the caller's logger
+   * @param unexpectedLevel the level for a failure that is no {@link BackendServiceException}
+   * @param section a constant name of the section for the log line, never user data
+   * @param call the backend call
+   * @param fallback the value the section shows when the call fails
+   * @param <T> the section's value type
+   * @return the call's result, or {@code fallback} when the call threw
+   * @throws ReauthenticationRequiredException when the user's session can no longer reach the
+   *     backend
+   */
+  public static <T> T load(
+      @NotNull Logger log,
+      @NotNull Level unexpectedLevel,
+      @NotNull String section,
+      @NotNull Supplier<? extends T> call,
+      T fallback) {
     try {
       return call.get();
     } catch (ReauthenticationRequiredException e) {
       throw e;
     } catch (RuntimeException e) {
       rethrowReauthSignal(section, e);
-      logFailure(log, section, e);
+      logFailure(log, unexpectedLevel, section, e);
       return fallback;
     }
   }
 
   /**
    * Runs the work of one page section and reports whether it succeeded, so the caller can mark the
-   * section unavailable.
+   * section unavailable; an unexpected failure is logged at {@code WARN}.
    *
    * @param log the caller's logger
    * @param section a constant name of the section for the log line, never user data
@@ -81,8 +106,27 @@ public final class SectionFallback {
    * @throws ReauthenticationRequiredException when the user's session can no longer reach the
    *     backend
    */
+  public static boolean run(@NotNull Logger log, @NotNull String section, @NotNull Runnable work) {
+    return run(log, Level.WARN, section, work);
+  }
+
+  /**
+   * Runs the work of one page section and reports whether it succeeded, logging an unexpected
+   * failure at the given level.
+   *
+   * @param log the caller's logger
+   * @param unexpectedLevel the level for a failure that is no {@link BackendServiceException}
+   * @param section a constant name of the section for the log line, never user data
+   * @param work the section's backend calls and model writes
+   * @return {@code true} when the work completed, {@code false} when it threw
+   * @throws ReauthenticationRequiredException when the user's session can no longer reach the
+   *     backend
+   */
   public static boolean run(
-      @NotNull Logger log, @NotNull String section, @NotNull Runnable work) {
+      @NotNull Logger log,
+      @NotNull Level unexpectedLevel,
+      @NotNull String section,
+      @NotNull Runnable work) {
     try {
       work.run();
       return true;
@@ -90,7 +134,7 @@ public final class SectionFallback {
       throw e;
     } catch (RuntimeException e) {
       rethrowReauthSignal(section, e);
-      logFailure(log, section, e);
+      logFailure(log, unexpectedLevel, section, e);
       return false;
     }
   }
@@ -99,16 +143,17 @@ public final class SectionFallback {
    * Writes the one log line of a section failure.
    *
    * @param log the caller's logger
+   * @param unexpectedLevel the level for a failure that is no {@link BackendServiceException}
    * @param section the section name
    * @param failure the caught failure
    */
   private static void logFailure(
-      @NotNull Logger log, @NotNull String section, @NotNull RuntimeException failure) {
-    if (failure instanceof BackendServiceException) {
-      log.debug("Page section '{}' unavailable", section, failure);
-    } else {
-      log.warn("Page section '{}' unavailable", section, failure);
-    }
+      @NotNull Logger log,
+      @NotNull Level unexpectedLevel,
+      @NotNull String section,
+      @NotNull RuntimeException failure) {
+    Level level = failure instanceof BackendServiceException ? Level.DEBUG : unexpectedLevel;
+    log.atLevel(level).setCause(failure).log("Page section '{}' unavailable", section);
   }
 
   /**
