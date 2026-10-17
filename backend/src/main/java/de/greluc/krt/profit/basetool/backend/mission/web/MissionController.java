@@ -50,7 +50,6 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.AddExternalPartici
 import de.greluc.krt.profit.basetool.backend.mission.internal.AddFrequencyRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.AddMissionObjectiveRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.AddMissionStepRequest;
-import de.greluc.krt.profit.basetool.backend.mission.internal.AddParticipantByIdRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.AddUnitRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.JoinMissionRequest;
@@ -1085,34 +1084,6 @@ public class MissionController {
             request.comment(),
             request.orgUnitIds(),
             request.payoutPreference());
-    return redactParticipantsForPeer(
-        mission.getParticipants().stream().map(missionMapper::toDto).toList());
-  }
-
-  /**
-   * Adds one registered member, named by {@code app_user} id, to the roster; manager-only
-   * (REQ-MISSION-020).
-   *
-   * <p>Unlike {@link #addParticipantSlim} it accepts no free-text name, which is why it is admitted
-   * on the public API vhost (ADR-0170).
-   *
-   * @param id mission id
-   * @param request the member to add
-   * @return the mission's participant list after the add, peer-redacted below Logistician
-   */
-  @PostMapping("/{id}/participants/by-id")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
-  @Operation(
-      summary = "Add a registered member by id (manager-only, slim response)",
-      description =
-          "Adds the registered member named by userId as a participant and returns the updated"
-              + " participant list as slim DTOs. Restricted to callers who may manage the mission;"
-              + " takes no free-text name. The member's org units and payout default are stamped"
-              + " exactly as on self-enrolment.")
-  public List<MissionParticipantDto> addParticipantByIdSlim(
-      @PathVariable @NotNull UUID id,
-      @RequestBody @Valid @NotNull AddParticipantByIdRequest request) {
-    var mission = missionService.addParticipant(id, request.userId(), null, null, null, null, null);
     return redactParticipantsForPeer(
         mission.getParticipants().stream().map(missionMapper::toDto).toList());
   }

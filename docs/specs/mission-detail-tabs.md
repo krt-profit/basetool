@@ -674,7 +674,13 @@ frontend `MissionForm` (`objectivesJson` / `stepsJson`), `CreateMissionRequest`,
 `MissionWriteController.createMission`, `mission/mission-detail.html` (create sections + sticky actions),
 `mission-detail.js` (create-form editor module).
 
-### REQ-MISSION-020 — Manager-only add-by-id
+### REQ-MISSION-020 — Manager-only add-by-id for the app *(removed)*
+
+> **Removed 2026-10-17 (ADR-0268, #2638).** The endpoint existed only for the discontinued Android
+> app and had no caller left, so `POST …/participants/by-id`, its handler and
+> `AddParticipantByIdRequest` are deleted. A manager adds members on the web through
+> `POST …/participants`, whose `MISSION_PARTICIPANT_ADDED` audit event (REQ-AUDIT-001) is
+> unchanged. The text below is the record of what was removed.
 
 A mission manager adds a registered member to the roster by user id through
 `POST /api/v1/missions/{id}/participants/by-id` (owner decision 2026-09-22, ADR-0170 amendment).
@@ -694,10 +700,7 @@ client calls it.
 - [x] A manager adds a member by id and gets the participant list; a non-manager — even naming
   themselves — gets 403; a body without `userId` is a 400; anonymous is refused (401).
 
-**Enforced by:** `MissionControllerSlimEndpointsTest` (`addParticipantByIdSlim_*`). The edge
-admission and the contract tests that also covered it went with the API vhost (ADR-0268,
-REQ-OPS-042 superseded) and the frozen contract set (ADR-0269). **Code:**
-`MissionController#addParticipantByIdSlim`, `AddParticipantByIdRequest`.
+**Enforced by:** nothing — removed with the endpoint. **Code:** none.
 
 ### REQ-MISSION-018 — Registration count on the mission list row
 
