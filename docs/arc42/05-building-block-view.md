@@ -235,7 +235,9 @@ implementation), `InventoryStockReads` (the `StockReads` implementation), `Inven
 `StockViewerAccessService`, `InventoryCraftableStock` (the blueprint's `CraftableStockSource`),
 `InventoryOrgUnitReconciler` (the org-unit module's `FirstMembershipObserver`), its GDPR participants, the
 three repositories, `InventoryItemMapper`, `InventoryItemCatalogService` (the `StockItemCatalogue`) and the
-request and read DTOs. `inventory.api` publishes what other modules use: `StockCommands`, `StockReads`
+request and read DTOs. `inventory.api` publishes what other modules use: `StockCommands`,
+`RebookCommands` (a member's own lot between personal and a pool, implemented by
+`InventoryRebookCommands`; REQ-INV-060, ADR-0277), `StockReads`
 (the exchange's lots, the stock earmarked to a job order as `LinkedStockRow` or Lager DTOs, the rows the
 Materialbörse offers), `StockItemCatalogue`, `InventoryItemDto` with its two allocation DTOs and the
 projection rows. The other modules see a Lager row as `StockRow`, a read-only live view of the managed row (getters, the two reservation sums and the order slice), and change it only through `StockCommands`, which take the row's id and act on the managed instance the caller already holds, so locks, the persistence context and the optimistic version are the row's own. The three entities (`InventoryItem`, which implements `StockRow`, and the two allocations) lie in `inventory.internal` with `InventoryAllocations` and `InventoryAuditLabels` (P4-1 part 3, option A2, confirmed by the owner 2026-10-12; `StockWriteOwnershipTest`, `StockRowViewCharacterisationTest`, `ExchangeStockWritePathCharacterisationTest`). Four more

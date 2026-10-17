@@ -319,6 +319,11 @@ by optimistic locking on the source row's `version`, and owner-scoped (`@invento
 an admin/logistician may act within scope). Every rebooking records its own audit event
 (`INVENTORY_ITEM_DEPERSONALIZED` / `INVENTORY_ITEM_PERSONALIZED`, REQ-AUDIT-001).
 
+The split itself is the Lager's row rebooking, which other modules reach by lot through
+`RebookCommands` (REQ-INV-060). Two parts are the web's own extras on top of it: the pool picked by
+the owner or auto-stamped for a sole membership, and the shared row without a unit for a
+membershipless owner.
+
 In the UI the action is the per-entry **Umbuchen** row action (`krt-icon-rebook`) on `/inventory/my`;
 its modal also hosts the relocated location/user transfer (the former book-out `TRANSFER` mode), so
 **Ausbuchen** is now consume/sell only and **Umbuchen** owns every rebooking. The squadron-wide
@@ -1610,6 +1615,59 @@ default) and the merge opt-in.
 `MassAssignmentGuardTest` · **Code:** `inventory/internal/InventoryPoolChangeService`,
 `InventoryItemController#changePool` / `#poolTargets`, `InventoryPoolChangeProxyController`,
 `inventory-pool-change.js`, `V300` · **Issues:** #2590
+
+### REQ-INV-060 — Other modules rebook a member's own lot between personal and a pool
+
+The inventory module publishes the rebooking of REQ-INV-007 to other modules as
+`inventory.api.RebookCommands` (ADR-0277), addressed by lot instead of by row. One call moves an
+amount of the member's own stock of one lot between personal and one named org unit's pool, in either
+direction. It joins the caller's transaction, after the caller has taken the member's lot lock
+(ADR-0229).
+
+- **Into the pool** the rows are taken in this order: the member's personal rows stamped with the
+  target unit, then the personal rows without a unit, then the other personal rows, each group oldest
+  first. A row is split where only part of it is needed.
+- **Back to personal** only the member's own shared rows of that pool move, oldest first. The member
+  need not belong to the unit any more.
+- **Every moved row** goes through the web's row rebooking: the member stays the holder, the
+  material or item, location, quality and „gestohlen" marker carry over, the new row has no earmark
+  and no note, and the source is lowered or deleted. SCU stock is not merged; piece and item stock
+  merges as REQ-INV-026 says.
+- **Refusals are answered, not thrown**, and change nothing:
+  - `NOT_A_MEMBER` — into the pool of a unit that is not one of the member's direct memberships (any of
+    the four kinds); an admin role or a leadership seat adds nothing;
+  - `UNIT_MISMATCH` — a fraction of piece or item stock;
+  - `INSUFFICIENT_STOCK` — less stock at the source than asked;
+  - `STOCK_EARMARKED` — the move would take stock reserved for a job order, mission or donation;
+    back to personal, a shared row with a job-order or mission earmark does not move at all, as in the
+    web;
+  - `STOCK_OFFERED` — the move would leave a row below what it offers on the Materialbörse.
+- **Audit.** Each moved row records `INVENTORY_ITEM_DEPERSONALIZED` or `INVENTORY_ITEM_PERSONALIZED`
+  (REQ-AUDIT-001), with the client of the request's authentication (REQ-AUDIT-005) and no free text
+  or personal data in the details.
+- **Report.** The call returns every row of the lot it created, changed, removed or merged away, with
+  its state before and after (personal marker, unit, amount, version, job-order and mission
+  earmarks), so a caller can journal the change for undo. A dry run decides and writes nothing.
+- **The web's own extras stay in the web** (REQ-INV-007): the pool picked or auto-stamped for a sole
+  membership, and a shared row without a unit for a member without memberships. The command never
+  chooses a pool. The bulk rebooking (REQ-INV-036) keeps its own whole-row move, which carries the
+  earmarks and the note.
+
+**Acceptance**
+
+- [x] A share takes the target unit's rows, then the unit-less rows, then the rest, oldest first,
+  skipping reserved stock and splitting the last row.
+- [x] A whole share and a partial unshare move the right amounts; holder, quality and stolen marker
+  carry over; another pool's rows and another member's rows stay.
+- [x] An unshare still works after the member left the unit.
+- [x] Each refusal is answered and changes nothing.
+- [x] A dry run writes nothing; each direction is audited under the calling client; the report
+  carries the states before and after.
+
+**Enforced by:** `RebookCommandsTest`, `InventoryItemServicePersonalRebookTest`,
+`InventoryModuleContractTest`, `ModularityTest` · **Code:** `inventory/api/RebookCommands`,
+`inventory/internal/InventoryRebookCommands`, `InventoryCheckoutService#rebookRow` · **Issues:**
+#2693, #2694
 
 ## Out of scope
 

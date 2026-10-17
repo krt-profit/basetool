@@ -114,7 +114,7 @@
   <module name="FileLength">
     <property name="id" value="fileLengthInventoryCheckoutService"/>
     <property name="fileExtensions" value="java"/>
-    <property name="max" value="1483"/>
+    <property name="max" value="1471"/>
   </module>
   <module name="SuppressionSingleFilter">
     <property name="id" value="fileLength"/>
@@ -348,7 +348,7 @@
   <module name="FileLength">
     <property name="id" value="fileLengthInventoryPoolEntryCommands"/>
     <property name="fileExtensions" value="java"/>
-    <property name="max" value="1035"/>
+    <property name="max" value="1023"/>
   </module>
   <module name="SuppressionSingleFilter">
     <property name="id" value="fileLength"/>

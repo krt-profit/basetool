@@ -221,10 +221,10 @@ public class InventoryCheckoutService {
       throw new BadRequestException("Cannot book out more than the available amount");
     }
 
-    if (requiresWholeUnits(item)
+    if (item.countsWholeUnits()
         && dto.amount() % 1 != 0
         && Double.compare(dto.amount(), item.getAmount()) != 0) {
-      throw new BadRequestException(wholeUnitAmountDetail(item));
+      throw new BadRequestException(item.wholeUnitAmountDetail());
     }
 
     if (item.getGameItem() != null
@@ -260,7 +260,7 @@ public class InventoryCheckoutService {
 
     final UUID sourceId = item.getId();
     final String sourceLabel = InventoryAuditLabels.label(item);
-    final String materialName = catalogName(item);
+    final String materialName = InventoryAuditLabels.catalogName(item);
     final UUID sourceOwnerId = item.getUser().getId();
     final boolean depleted = remainingAmount <= QUANTITY_EPSILON;
     List<UUID> financeEntryIds = List.of();
@@ -283,7 +283,7 @@ public class InventoryCheckoutService {
         new TransferredLot(
             materialName,
             dto.amount(),
-            requiresWholeUnits(item),
+            item.countsWholeUnits(),
             item.getQuality(),
             item.getLocation() != null ? item.getLocation().getName() : null);
 
@@ -501,7 +501,12 @@ public class InventoryCheckoutService {
     return stockSoldForTarget.soldForMissions(
         currentUserId,
         shares,
-        "Sale of " + dto.amount() + "x " + catalogName(item) + " at " + dto.terminal());
+        "Sale of "
+            + dto.amount()
+            + "x "
+            + InventoryAuditLabels.catalogName(item)
+            + " at "
+            + dto.terminal());
   }
 
   /**
@@ -657,10 +662,10 @@ public class InventoryCheckoutService {
     if (dto.amount() > item.getAmount()) {
       throw new BadRequestException("Cannot rebook more than the available amount");
     }
-    if (requiresWholeUnits(item)
+    if (item.countsWholeUnits()
         && dto.amount() % 1 != 0
         && Double.compare(dto.amount(), item.getAmount()) != 0) {
-      throw new BadRequestException(wholeUnitAmountDetail(item));
+      throw new BadRequestException(item.wholeUnitAmountDetail());
     }
 
     final boolean sourcePersonal = Boolean.TRUE.equals(item.getPersonal());
@@ -678,12 +683,37 @@ public class InventoryCheckoutService {
             : ownerScopeService.resolveOrgUnitForPickerOutputNullable(
                 item.getUser(), dto.targetOwningOrgUnitId());
 
-    final double remainingAmount = ScuAmounts.roundToScuScale(item.getAmount() - dto.amount());
+    final boolean merge = Boolean.TRUE.equals(dto.mergeStock());
+    return inventoryItemMapper.toDto(
+        rebookRow(item, dto.amount(), targetPersonal, targetOwningOrgUnit, merge));
+  }
+
+  /**
+   * Splits an amount of a row into a new row of its holder and lot with the given personal marker
+   * and org unit (REQ-INV-007), lowering or deleting the source, auditing the move and merging the
+   * new row (REQ-INV-026); the new row carries no earmark and no note.
+   *
+   * @param item the managed source row
+   * @param amount the amount to move, at most the row's
+   * @param targetPersonal the personal marker of the new row
+   * @param targetOwningOrgUnit the org unit of the new row, or {@code null}
+   * @param mergeStock the merge opt-in of an SCU material
+   * @return the row that holds the moved stock, after any merge
+   * @throws OverAllocationException when the source's earmarks no longer fit what it keeps
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  InventoryItem rebookRow(
+      @NotNull InventoryItem item,
+      double amount,
+      boolean targetPersonal,
+      @Nullable OrgUnit targetOwningOrgUnit,
+      boolean mergeStock) {
+    final double remainingAmount = ScuAmounts.roundToScuScale(item.getAmount() - amount);
     final boolean depleted = remainingAmount <= QUANTITY_EPSILON;
 
     final UUID sourceId = item.getId();
     final String sourceLabel = InventoryAuditLabels.label(item);
-    final String materialName = catalogName(item);
+    final String materialName = InventoryAuditLabels.catalogName(item);
     final UUID ownerId = item.getUser().getId();
 
     InventoryItem newItem = new InventoryItem();
@@ -693,7 +723,7 @@ public class InventoryCheckoutService {
     newItem.setGameItem(item.getGameItem());
     newItem.setLocation(item.getLocation());
     newItem.setQuality(item.getQuality());
-    newItem.setAmount(ScuAmounts.roundToScuScale(dto.amount().doubleValue()));
+    newItem.setAmount(ScuAmounts.roundToScuScale(amount));
     newItem.setPersonal(targetPersonal);
     newItem.setStolen(item.getStolen());
     InventoryItem savedNew = inventoryItemRepository.save(newItem);
@@ -719,14 +749,12 @@ public class InventoryCheckoutService {
         sourceLabel,
         ownerId,
         AuditDetails.of("material", materialName)
-            .with("amount", dto.amount())
+            .with("amount", amount)
             .with("newRow", newItem.getId())
             .with("targetOrgUnit", targetOwningOrgUnit != null ? targetOwningOrgUnit.getId() : "-")
             .with("depleted", depleted));
 
-    final InventoryItem mergedTarget =
-        mergeStockIfRequested(savedNew, Boolean.TRUE.equals(dto.mergeStock()));
-    return inventoryItemMapper.toDto(mergedTarget);
+    return mergeStockIfRequested(savedNew, mergeStock);
   }
 
   /**
@@ -812,46 +840,6 @@ public class InventoryCheckoutService {
             .with("q", row.getQuality())
             .with("trigger", autoMerge ? "auto" : "manual"));
     return row;
-  }
-
-  /**
-   * Whether a row's amounts must be whole numbers: game-item rows and {@code PIECE} material rows.
-   *
-   * @param item the inventory row
-   * @return {@code true} iff amounts on this row must be whole numbers
-   */
-  private static boolean requiresWholeUnits(@NotNull InventoryItem item) {
-    return item.getGameItem() != null
-        || (item.getMaterial() != null
-            && item.getMaterial().getQuantityType() == QuantityType.PIECE);
-  }
-
-  /**
-   * Builds the 400 detail for a fractional amount on a whole-unit row, naming the row's catalog
-   * kind.
-   *
-   * @param item the whole-unit row the amount was rejected for
-   * @return the catalog-appropriate problem detail
-   */
-  @NotNull
-  private static String wholeUnitAmountDetail(@NotNull InventoryItem item) {
-    return item.getGameItem() != null
-        ? "Amount must be a whole number for item stock"
-        : "Amount must be a whole number for PIECE materials";
-  }
-
-  /**
-   * Returns a row's catalog display name for audit and finance snapshots: the material or game-item
-   * name, or an em dash when neither is set.
-   *
-   * @param item the inventory row, read within the transaction
-   * @return the row's catalog display name
-   */
-  private static String catalogName(InventoryItem item) {
-    if (item.getMaterial() != null) {
-      return item.getMaterial().getName();
-    }
-    return item.getGameItem() != null ? item.getGameItem().getName() : "—";
   }
 
   /**
@@ -1452,9 +1440,9 @@ public class InventoryCheckoutService {
           sourceRowId,
           from,
           to,
-          catalogName(item),
+          InventoryAuditLabels.catalogName(item),
           amount,
-          requiresWholeUnits(item),
+          item.countsWholeUnits(),
           item.getQuality(),
           fromLocation != null ? fromLocation.getName() : null,
           toLocation != null ? toLocation.getName() : null);

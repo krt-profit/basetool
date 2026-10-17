@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
@@ -226,6 +227,28 @@ public class InventoryItem extends AbstractEntity<UUID> implements StockRow {
     if (amount != null) {
       amount = ScuAmounts.roundToScuScale(amount.doubleValue());
     }
+  }
+
+  /**
+   * Tells whether the row counts whole units: a game-item row or a {@code PIECE} material row.
+   *
+   * @return {@code true} iff amounts on this row must be whole numbers
+   */
+  boolean countsWholeUnits() {
+    return getGameItem() != null
+        || (getMaterial() != null && getMaterial().getQuantityType() == QuantityType.PIECE);
+  }
+
+  /**
+   * Builds the 400 detail for a fractional amount on this whole-unit row, naming its catalog kind.
+   *
+   * @return the catalog-appropriate problem detail
+   */
+  @NotNull
+  String wholeUnitAmountDetail() {
+    return getGameItem() != null
+        ? "Amount must be a whole number for item stock"
+        : "Amount must be a whole number for PIECE materials";
   }
 
   @Override

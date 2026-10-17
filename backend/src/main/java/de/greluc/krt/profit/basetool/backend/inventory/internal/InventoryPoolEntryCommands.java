@@ -888,18 +888,6 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
    * @return its state
    */
   static @NotNull PoolEntryState stateOf(@NotNull InventoryItem row) {
-    Map<UUID, Double> jobs = new TreeMap<>();
-    for (InventoryJobOrderAllocation slice : row.getJobOrderAllocations()) {
-      if (slice.getJobOrderId() != null && slice.getAmount() != null) {
-        jobs.merge(slice.getJobOrderId(), slice.getAmount(), Double::sum);
-      }
-    }
-    Map<UUID, Double> missions = new TreeMap<>();
-    for (InventoryMissionAllocation slice : row.getMissionAllocations()) {
-      if (slice.getMissionId() != null && slice.getAmount() != null) {
-        missions.merge(slice.getMissionId(), slice.getAmount(), Double::sum);
-      }
-    }
     return new PoolEntryState(
         row.getId(),
         row.getUser().getId(),
@@ -912,8 +900,8 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
             Boolean.TRUE.equals(row.getStolen())),
         held(row),
         row.getVersion() == null ? 0L : row.getVersion(),
-        jobs,
-        missions);
+        InventoryAllocations.jobOrderEarmarks(row),
+        InventoryAllocations.missionEarmarks(row));
   }
 
   /**
