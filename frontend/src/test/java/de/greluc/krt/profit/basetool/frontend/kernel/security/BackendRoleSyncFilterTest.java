@@ -335,8 +335,7 @@ class BackendRoleSyncFilterTest {
   /** Verifies that public documents skip the filter body entirely. */
   @Test
   void publicDocument_skipsFilterBodyEntirely() throws Exception {
-    for (String path :
-        new String[] {"/robots.txt", "/.well-known/assetlinks.json", "/manifest.webmanifest"}) {
+    for (String path : new String[] {"/robots.txt", "/manifest.webmanifest"}) {
       when(request.getRequestURI()).thenReturn(path);
 
       filter.doFilterInternal(request, response, chain);
@@ -344,7 +343,7 @@ class BackendRoleSyncFilterTest {
 
     verify(backendApiClient, never()).get(anyString(), eq(RegistrationStatusDto.class));
     verify(backendApiClient, never()).get(anyString(), eq(UserDto.class));
-    verify(chain, times(3)).doFilter(request, response);
+    verify(chain, times(2)).doFilter(request, response);
   }
 
   @Test

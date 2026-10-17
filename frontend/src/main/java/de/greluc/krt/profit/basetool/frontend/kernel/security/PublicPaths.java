@@ -57,10 +57,7 @@ public final class PublicPaths {
 
   /** The public documents, each an exact path — see {@link #isPublicDocument}. */
   private static final List<PathPattern> PUBLIC_DOCUMENTS =
-      List.of(
-          PATH_PARSER.parse("/robots.txt"),
-          PATH_PARSER.parse("/.well-known/assetlinks.json"),
-          PATH_PARSER.parse("/manifest.webmanifest"));
+      List.of(PATH_PARSER.parse("/robots.txt"), PATH_PARSER.parse("/manifest.webmanifest"));
 
   /** The authentication plumbing patterns; see {@link #isAuthInfrastructure}. */
   private static final List<PathPattern> AUTH_INFRASTRUCTURE =
@@ -151,7 +148,6 @@ public final class PublicPaths {
    *
    * <ul>
    *   <li>{@code /robots.txt} — crawler directives.
-   *   <li>{@code /.well-known/assetlinks.json} — Android App Links verification (REQ-SEC-038).
    *   <li>{@code /manifest.webmanifest} — the web app manifest (REQ-UI-020).
    * </ul>
    *

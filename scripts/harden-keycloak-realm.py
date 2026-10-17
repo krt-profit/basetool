@@ -59,10 +59,10 @@ SMTP_FIELDS = ("host", "port", "from", "fromDisplayName", "auth", "user", "start
 KEEP_STORED_VALUE = "**********"
 
 
-def _load_mobile_provisioner():
-    """Import scripts/provision-keycloak-mobile-client.py, whose kcadm wrapper this script reuses."""
-    path = SCRIPT_DIR / "provision-keycloak-mobile-client.py"
-    spec = importlib.util.spec_from_file_location("provision_keycloak_mobile_client", path)
+def _load_kcadm():
+    """Import scripts/keycloak_kcadm.py, whose kcadm wrapper this script reuses."""
+    path = SCRIPT_DIR / "keycloak_kcadm.py"
+    spec = importlib.util.spec_from_file_location("keycloak_kcadm", path)
     if spec is None or spec.loader is None:
         raise SystemExit(f"FATAL: cannot load the kcadm wrapper from {path}")
     module = importlib.util.module_from_spec(spec)
@@ -70,11 +70,11 @@ def _load_mobile_provisioner():
     return module
 
 
-mobile = _load_mobile_provisioner()
-KcadmError = mobile.KcadmError
+kcadm = _load_kcadm()
+KcadmError = kcadm.KcadmError
 
 
-class HardenKcadm(mobile.Kcadm):
+class HardenKcadm(kcadm.Kcadm):
     """The shared kcadm wrapper plus the two write shapes the flow endpoints need."""
 
     def write(self, verb: str, path: str, payload: dict | list, what: str, merge: bool = False) -> None:

@@ -2289,9 +2289,9 @@ dispatcher actually serves:
   byte-identical; any diff is an intended route or gate change and is reviewed as such. The file is
   rewritten with `./gradlew :frontend:test --tests '*RouteGateSnapshotTest' -PupdateSnapshots`.
 - **A gate on every handler.** Every application handler has an effective `@PreAuthorize` — its own
-  or its class's — except an exact list of nine handlers named `SimpleName#method`: the anonymous
-  surface of REQ-SEC-052 (landing page, Impressum, privacy, terms, licences, the App Link callback and
-  help page, `assetlinks.json`, the web app manifest). A handler moved out of a class-gated
+  or its class's — except an exact list of six handlers named `SimpleName#method`: the anonymous
+  surface of REQ-SEC-052 (landing page, Impressum, privacy, terms, licences, the web app manifest).
+  A handler moved out of a class-gated
   controller fails the build instead of being served to any signed-in member. The class-level rule
   of `ArchitectureTest` (REQ-SEC-052) stays as it is.
 

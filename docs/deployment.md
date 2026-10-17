@@ -1398,11 +1398,12 @@ ${UPOD} logs --since 2m keycloak | grep -iE 'error|exception|provider' | head
 The realm lives in `db-keycloak`, not in any artifact: delivery never touches it, and
 `realm-export.json` only seeds an empty one. What the Basetool needs from it — its clients (including
 the approved exchange clients from `scripts/keycloak/external-clients.json`), the two ingest
-audience scopes and the ten `exchange.*` capability scopes, scope assignments, the DPoP policy, service-account roles, token settings —
+audience scopes and the ten `exchange.*` capability scopes, scope assignments, service-account roles, token settings —
 is brought to production's shape by `scripts/provision-keycloak-realm.py` (`REQ-OPS-033`,
 [ADR-0202](adr/0202-a-realm-is-brought-to-the-production-shape-by-a-provisioner-that-never-deletes.md)):
 dry run by default, `--apply` to write, origins from `--public-origin`, nothing deleted that only
-the target has. Run it on a **new** host's realm, and on the **testing** host whenever
+the target has — except the retired Android client `basetool-android` and its `krt-mobile-dpop`
+policy and profile, which it deletes wherever they remain (ADR-0202 amendment 7). Run it on a **new** host's realm, and on the **testing** host whenever
 `scripts/keycloak-config-snapshot.sql` diffs against production outside the environment-specific
 lines. The procedure, and the `.env` values a newly created confidential client needs, are in
 [`INGEST_KEYCLOAK_SETUP.md` → *New or out-of-date realm*](archive/INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner).
@@ -1949,7 +1950,7 @@ empty input prints "no TLS errors" just the same.)*
 Keycloak's own leaf keystore, and the keycloak unit mounts no truststore. The session probably keeps
 working, but nobody has verified it; the fallback, and whether keycloak should mount the CA-only
 truststore, are an open question in
-[`keycloak/README.md` → *Runbook — provisioning the mobile client*](keycloak/README.md#runbook--provisioning-the-mobile-client-basetool-android).
+[`keycloak/README.md` → *Runbook — a kcadm session on the production container*](keycloak/README.md#runbook--a-kcadm-session-on-the-production-container).
 **Rollback:** re-promote the previous release (the old units mount the shared keystore, which is
 untouched and still trusted by every client).
 

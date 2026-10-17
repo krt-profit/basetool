@@ -19,8 +19,6 @@ tests:
         values: "0x10"
       - series: 'up{job="blackbox-public-surface", instance="https://profit-base.online/manifest.webmanifest"}'
         values: "0x10"
-      - series: 'up{job="blackbox-app-link", instance="https://profit-base.online/app/callback"}'
-        values: "0x10"
       - series: 'up{job="blackbox-hsts", instance="https://profit-base.online"}'
         values: "0x10"
       - series: 'up{job="blackbox-internal-tls", instance="https://backend:11261"}'

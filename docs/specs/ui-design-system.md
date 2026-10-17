@@ -1141,9 +1141,9 @@ Binding details:
   through the browser menu. Adding a worker later is an ADR, not a refactor.
 - **The manifest is a controller, not a file under `static/`.** Four of its properties belong to the
   response rather than to a file: the localised `description`, the content-hashed icon URL, the
-  media type Spring's resource handler does not know, and `200`-never-`302`. The last is the same
-  trap `/.well-known/assetlinks.json` was written for, and both paths sit in the same
-  `SecurityConfig` allow-list.
+  media type Spring's resource handler does not know, and `200`-never-`302`. The last needs the path
+  in the `SecurityConfig` allow-list and in `PublicPaths`, the trap the Android App Links descriptor
+  fell into (REQ-SEC-038, superseded).
 - **The locale travels in the URL, and the fetch carries no credentials.** The page is
   server-rendered and already knows the reader's locale, so the link is
   `@{/manifest.webmanifest(locale=${#locale.language})}` and the response is a pure function of its

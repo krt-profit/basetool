@@ -1,5 +1,4 @@
 / GET -> HomeController#home gate=none layout=yes
-/.well-known/assetlinks.json GET produces=[application/json] -> AssetLinksController#assetLinks gate=none layout=no
 /admin/announcement GET -> AdminAnnouncementPageController#showAnnouncementPage gate=class:hasRole('ADMIN') layout=yes
 /admin/announcement/delete POST -> AdminAnnouncementPageController#deleteAnnouncement gate=class:hasRole('ADMIN') layout=yes
 /admin/announcement/delete POST headers=[X-Requested-With=XMLHttpRequest] -> AdminAnnouncementPageController#deleteAnnouncementAjax gate=class:hasRole('ADMIN') layout=yes
@@ -259,8 +258,6 @@
 /api/v1/orders/{jobOrderId}/handovers/report/preview POST -> JobOrderHandoverReportProxyController#previewHandoverReport gate=method:isAuthenticated() layout=no
 /api/v1/orders/{jobOrderId}/handovers/{handoverId}/report GET -> JobOrderHandoverReportProxyController#downloadHandoverReport gate=method:isAuthenticated() layout=no
 /api/v1/orders/{jobOrderId}/item-handovers/{handoverId}/report GET -> JobOrderHandoverReportProxyController#downloadItemHandoverReport gate=method:isAuthenticated() layout=no
-/app/callback GET -> AppLinkController#callback gate=none layout=yes
-/app/link-help GET -> AppLinkController#linkHelp gate=none layout=yes
 /bank GET -> BankPageController#dashboard gate=method:hasRole('BANK_EMPLOYEE') layout=yes
 /bank/accounts/{id} GET -> BankPageController#accountDetail gate=method:hasRole('BANK_EMPLOYEE') layout=yes
 /bank/grants GET -> BankGrantsPageController#grants gate=method:hasRole('BANK_MANAGEMENT') layout=yes

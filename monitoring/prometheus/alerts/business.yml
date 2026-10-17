@@ -564,7 +564,7 @@ groups:
           (basetool_sse_connections == 0)
           and on()
           (sum(rate(http_server_requests_seconds_count{job="basetool-frontend",
-          uri!~"/|/\\*\\*|/actuator.*|/impressum|/privacy|/terms|/licenses|/manifest.webmanifest|/robots.txt|/\\.well-known/.*|/app/callback|/app/link-help|NOT_FOUND|UNKNOWN|REDIRECTION"}[15m])) > 0.01)
+          uri!~"/|/\\*\\*|/actuator.*|/impressum|/privacy|/terms|/licenses|/manifest.webmanifest|/robots.txt|/\\.well-known/.*|NOT_FOUND|UNKNOWN|REDIRECTION"}[15m])) > 0.01)
         for: 30m
         labels:
           severity: warning

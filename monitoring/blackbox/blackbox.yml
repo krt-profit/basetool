@@ -241,23 +241,3 @@ modules:
       ip_protocol_fallback: false
       tls_config:
         insecure_skip_verify: false
-
-  http_app_link_fallback_303:
-    prober: http
-    timeout: 10s
-    http:
-      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
-      valid_status_codes: [303]
-      method: GET
-      follow_redirects: false
-      headers:
-        X-Basetool-Probe: "app-link-fallback"
-      fail_if_header_not_matches:
-        - header: Location
-          regexp: '^(https://profit-base\.online)?/app/link-help$'
-      fail_if_ssl: false
-      fail_if_not_ssl: false
-      preferred_ip_protocol: "ip4"
-      ip_protocol_fallback: false
-      tls_config:
-        insecure_skip_verify: false
