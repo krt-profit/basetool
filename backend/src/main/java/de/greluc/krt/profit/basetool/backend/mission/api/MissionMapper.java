@@ -54,9 +54,29 @@ public abstract class MissionMapper {
   /** Projects the operation a mission belongs to from the per-transaction operation memo. */
   private static final String OPERATION_EXPRESSION = "java(resolveOperation(mission))";
 
-  @Autowired protected MissionViewerAccess missionViewerAccess;
+  protected MissionViewerAccess missionViewerAccess;
 
-  @Autowired protected MissionOperationLookup missionOperationLookup;
+  protected MissionOperationLookup missionOperationLookup;
+
+  /**
+   * Receives the viewer-access seam that gates the redacted and the manage projections.
+   *
+   * @param access the container's {@link MissionViewerAccess}
+   */
+  @Autowired
+  void setMissionViewerAccess(MissionViewerAccess access) {
+    this.missionViewerAccess = access;
+  }
+
+  /**
+   * Receives the per-transaction lookup of the operation a mission belongs to.
+   *
+   * @param lookup the container's {@link MissionOperationLookup}
+   */
+  @Autowired
+  void setMissionOperationLookup(MissionOperationLookup lookup) {
+    this.missionOperationLookup = lookup;
+  }
 
   /**
    * The same {@link UserMapper} the generated subclass delegates the roster's {@code UserDto}s to,
