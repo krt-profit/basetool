@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -67,6 +69,38 @@ public final class InventoryAllocations {
     return item.getMissionAllocations().stream()
         .mapToDouble(a -> a.getAmount() != null ? a.getAmount() : 0.0)
         .sum();
+  }
+
+  /**
+   * Sums the entry's job-order slices per order.
+   *
+   * @param item the entry (its job-order allocations must be loaded within the tx)
+   * @return the earmarked amount by job order, sorted by id
+   */
+  public static @NotNull Map<UUID, Double> jobOrderEarmarks(@NotNull InventoryItem item) {
+    Map<UUID, Double> jobs = new TreeMap<>();
+    for (InventoryJobOrderAllocation slice : item.getJobOrderAllocations()) {
+      if (slice.getJobOrderId() != null && slice.getAmount() != null) {
+        jobs.merge(slice.getJobOrderId(), slice.getAmount(), Double::sum);
+      }
+    }
+    return jobs;
+  }
+
+  /**
+   * Sums the entry's mission slices per mission.
+   *
+   * @param item the entry (its mission allocations must be loaded within the tx)
+   * @return the earmarked amount by mission, sorted by id
+   */
+  public static @NotNull Map<UUID, Double> missionEarmarks(@NotNull InventoryItem item) {
+    Map<UUID, Double> missions = new TreeMap<>();
+    for (InventoryMissionAllocation slice : item.getMissionAllocations()) {
+      if (slice.getMissionId() != null && slice.getAmount() != null) {
+        missions.merge(slice.getMissionId(), slice.getAmount(), Double::sum);
+      }
+    }
+    return missions;
   }
 
   /**

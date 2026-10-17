@@ -56,6 +56,21 @@ public final class InventoryAuditLabels {
   }
 
   /**
+   * Returns a row's catalog display name for audit and finance snapshots: the material or game-item
+   * name, or an em dash when neither is set.
+   *
+   * @param item the inventory row, read within the transaction
+   * @return the row's catalog display name
+   */
+  @NotNull
+  public static String catalogName(@NotNull InventoryItem item) {
+    if (item.getMaterial() != null) {
+      return item.getMaterial().getName();
+    }
+    return item.getGameItem() != null ? item.getGameItem().getName() : "—";
+  }
+
+  /**
    * Renders an inventory row's first earmarked job order for an audit details payload.
    *
    * @param item the inventory row; allocations must be loadable in the transaction
