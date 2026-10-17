@@ -775,6 +775,11 @@ ExecStart=/var/iri/code/scripts/deploy.sh --tag testing
 
 It serves its own domain from the same bundle: `IRI_KEYCLOAK_HOSTNAME` in its `.env` (with the
 `/auth` path) moves Keycloak's hostname and the issuer the apps validate together (ADR-0167).
+`APP_INSTANCE_TEST_SYSTEM=true` in its `.env` puts the test-system marker into every footer
+(REQ-UI-029); production leaves the line out. After adding it, render `env.d/` and restart the
+frontend as in [Trusted Types](#trusted-types-report-then-enforce), with that line in place of the
+Trusted Types one; `grep -c '^APP_INSTANCE_TEST_SYSTEM=true$' /var/iri/code/env.d/frontend.env`
+prints `1`.
 
 ### Manual deploy, rollback and checks
 
