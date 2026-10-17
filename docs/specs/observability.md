@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-28.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-17.
 > **Owner area:** OBS · **Related:** [`security-and-access.md`](security-and-access.md), [ADR-0204](../adr/0204-backend-and-ingest-call-http-through-restclient-without-webflux.md) (outbound clients of backend and ingest), [`org-unit-tenancy.md`](org-unit-tenancy.md), [ADR-0072](../adr/0072-monitoring-stack-prometheus-grafana.md), [ADR-0095](../adr/0095-ship-app-container-stdout-to-loki.md), [ADR-0162](../adr/0162-edge-is-native-nginx-with-a-separate-acme-client.md) (native edge, NPM retired), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md) (rootless Podman), monitoring epic [#936](https://github.com/krt-profit/basetool/issues/936) · **Operator doc:** [`monitoring/README.md`](../../monitoring/README.md)
 >
 > **Runtime.** Since the 2026-09-22 cutover production runs rootless Podman under Quadlet on Rocky
@@ -3620,16 +3620,16 @@ check that preceded it was green on a host where neither was readable.
 > `android_version_policy_override_test.yml` (REQ-API-020, superseded).
 
 
-Exposing `/api/v1` on its own internet-reachable vhost (ADR-0135) adds two questions the monitoring
-plane could not answer, and both have to be answerable *before* the surface is live rather than
+Exposing `/api/v1` on its own internet-reachable vhost (ADR-0135) added two questions the monitoring
+plane could not answer, and both had to be answerable *before* the surface went live rather than
 after the first incident.
 
 **Which client software is calling.** The backend counts every authenticated `/api/**` request on
-`basetool_api_client_requests_total{client_id}`, keyed on the token's `azp`. Until the native app
-ships this is almost entirely the web frontend, and that is the point: the counter needs a baseline
-to be read against, and afterwards it is the only place a request can be attributed to the app
-rather than to a browser — the denominator of any per-client budget, and the one signal a client
-kill switch could ever act on. The label is **bounded** and never taken from the token unfiltered
+`basetool_api_client_requests_total{client_id}`, keyed on the token's `azp`. With the Android app
+discontinued (ADR-0268) the callers are the web frontend and the ingest gateway, the latter split by
+the connected application it relays for; the counter is the only place a request is attributed to
+one of them — the denominator of any per-client budget, and the one signal a client kill switch
+could ever act on. The label is **bounded** and never taken from the token unfiltered
 (REQ-OBS-006): an `azp` is used verbatim only while it names a client the deployment knows —
 `app.monitoring.api-clients.known-client-ids` or a configured ingest gateway
 (`app.security.ingest-gateway.client-ids`, so the two lists cannot drift) or a client of the exchange
@@ -3650,11 +3650,9 @@ joining two answers, and they only mean the same thing while one rule produces b
 complements — this counter finds the window, the audit column attributes the individual act, which
 a counter can never do.
 
-The counter **observes and never refuses**. The ingest gateway enforces a client allow-list because
-it fronts a single approved tool (REQ-INGEST-011); this surface serves whichever first-party clients
-the realm carries, and turning an unrecognised `azp` into a 403 would lock out a client on the day
-it is registered in Keycloak and before it reaches a properties file. The gate that matters is the
-audience check on the token itself.
+The counter **observes and never refuses**. Refusing is the token decoder's job: since ADR-0270 it
+accepts only an `azp` named in `app.security.jwt.accepted-client-ids`, beside the audience check,
+so the counter only ever sees a request that is already admitted.
 
 Placement is load-bearing on **both** sides, and the metric is silent rather than loud when it is
 wrong. The filter must run **after** `BearerTokenAuthenticationFilter` — before it there is no

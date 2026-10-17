@@ -26,8 +26,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * Switches of the Lager.
  *
  * @param stolenMarkingEnabled whether members may book stock in as „gestohlen" and mark or unmark
- *     it (REQ-INV-053); off until the app release that shows the marker is enforced. Reading and
- *     filtering the marker work either way.
+ *     it (REQ-INV-053); on unless switched off. Reading and filtering the marker work either way.
  */
 @ConfigurationProperties(prefix = "app.inventory")
-public record InventoryProperties(@DefaultValue("false") boolean stolenMarkingEnabled) {}
+public record InventoryProperties(@DefaultValue("true") boolean stolenMarkingEnabled) {}

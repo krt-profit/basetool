@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-17.
 > **Owner area:** AUTH/SEC · **Related ADRs:** [ADR-0001](../adr/0001-frontend-confidential-oauth2-client.md) · **Role matrix:** [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md)
 
 # Security & access control
@@ -1893,10 +1893,10 @@ Six invariants that must survive any rewrite:
 **The wording itself is a backend resource, and it is readable without a token** (ADR-0138). `GET
 /api/v1/terms/document` returns the text as structured data — title, intro, ordered sections, each
 with its paragraphs and bullets — together with the version an acceptance would be recorded against.
-Both clients render from it: the web frontend's public `/terms` page and its consent gate, and the
-Android app's terms screen. Before it existed the wording lived in the frontend's message bundle and
-the app could not reach it at all, leaving only a copy in the APK (which drifts from the version
-being accepted) or a trip to a browser mid-consent.
+The web frontend's public `/terms` page and its consent gate render from it; the Android app's terms
+screen did too until the app was discontinued (ADR-0268). Before it existed the wording lived in the
+frontend's message bundle and the app could not reach it at all, leaving only a copy in the APK
+(which drifts from the version being accepted) or a trip to a browser mid-consent.
 
 Anonymous, deliberately: **a text everybody must read before agreeing to anything cannot require
 having agreed.** The public `/terms` page is reachable with no session and must stay so, and the
@@ -2368,7 +2368,8 @@ Authenticated callers are clamped by the kernel page policy of REQ-API-005: 1 00
 - [x] `GET /api/v1/materials/{id}/terminals` answers 401 without a token (`SecurityTest`).
 - [x] `GET /api/v1/materials/prices-overview`, `GET /api/v1/materials/{id}/prices` and `GET
   /api/v1/materials/profit-calculation` answer 401 without a token
-  (`ApiVhostAnonymousSurfaceTest`), and the nightly `edge-deny-probe` asserts it.
+  (`AnonymousSurfaceSweepTest`; `ApiVhostAnonymousSurfaceTest` and the vhost rows of the nightly
+  `edge-deny-probe` pinned them until the vhost was removed, ADR-0268).
 - [x] `GET /api/v1/materials/{id}` answers `401` without a token like every other catalogue read
   (REQ-SEC-052); it was the last one to close and is swept rather than pinned as an exemption.
 - [x] ~~An anonymous request with `size=50000` is refused with `400` and the stable code
@@ -2986,7 +2987,7 @@ for an anonymous write and getting `403`, because the CSRF filter runs ahead of 
 >
 > **The requirement itself is not discharged, it is relocated.** "Which `/api/v1` paths answer
 > without a token" is still a question with a security answer — it is now answered at the filter
-> chain alone, where `SecurityConfig` and `ApiVhostAnonymousSurfaceTest` answer it, with no edge
+> chain alone, where `SecurityConfig` and `AnonymousSurfaceSweepTest` answer it, with no edge
 > allow-list as a second opinion. Losing that second opinion is the cost of the change and was
 > accepted with it: an anonymous path is now one review away from the internet-facing surfaces that
 > remain, instead of two. Everything below about the vhost, the allow-list and the generated map is
@@ -3239,9 +3240,9 @@ back. Keep that line at WARN and out of the `401`→DEBUG carve-out; `AccessDeni
 
 **Enforced by:** review at the moment a path is added · **Code:** `SecurityConfig` (filter chain)
 — the edge files that carried the second half (`api-admission.conf`, `api-allowlist.conf`,
-`50-api.conf.template`) were removed with the vhost · **Tests:** `ApiVhostAnonymousSurfaceTest` (the
-anonymous status of every path); `EdgeProbeBackendStatusTest`, `EdgeAdmissionTest` and
-`EdgeAdmissionNginxTest` went with the generator ·
+`50-api.conf.template`) were removed with the vhost · **Tests:** `AnonymousSurfaceSweepTest` and
+`OpenApiAnonymousOperationsTest` (the anonymous surface); `ApiVhostAnonymousSurfaceTest`,
+`EdgeProbeBackendStatusTest`, `EdgeAdmissionTest` and `EdgeAdmissionNginxTest` went with the vhost ·
 **Decision:** [ADR-0135](../adr/0135-public-api-vhost-not-a-gateway.md),
 [ADR-0138](../adr/0138-terms-wording-is-a-backend-resource.md)
 
@@ -3323,8 +3324,8 @@ goes through.
 
 Note what did **not** catch this, because the same blind spots apply to the next nested record:
 `anonymousReadableMissionEndpointsMustRedactGuestPii` (now `peerReadableMissionEndpointsMustRedactPii`)
-asserts that a redaction method is *called*, never that the redaction is *complete*; and `ExternalContractTest` freezes
-`assignedUnits` only as a top-level field name and never inspects the nested shape.
+asserts that a redaction method is *called*, never that the redaction is *complete*; and `ExternalContractTest` froze
+`assignedUnits` only as a top-level field name and never inspected the nested shape.
 
 **Acceptance**
 
@@ -3637,9 +3638,9 @@ round-trips into one.
 > as `KRT Member` alone, exactly as REQ-SEC-036 prescribes for a partial-scope client.
 >
 > **That reading was accurate and the design behind it did not survive.** The owner reversed
-> REQ-SEC-035 on 2026-09-02 and the mobile scope now carries `Admin`, so the admin branch fires for
-> an app caller too and this endpoint's two branches finally mean the same thing on both clients —
-> which is what it was written for. The 2026-09-01 text is kept because it is the reason the
+> REQ-SEC-035 on 2026-09-02 and the mobile scope carried `Admin` from then until the client was
+> deleted (ADR-0268), so the admin branch fired for an app caller too and this endpoint's two
+> branches meant the same thing on both clients — which is what it was written for. The 2026-09-01 text is kept because it is the reason the
 > reversal was needed: the symptom was never this endpoint's defect, and fixing it here would have
 > been fixing the wrong thing.
 >
@@ -4284,8 +4285,7 @@ through them) ·
 REQ-FE-025) ·
 `HomeControllerMvcTest#anonymousRootRendersTheLandingPageWithoutDataOrSession` ·
 `SecurityConfigStaticAssetPermitAllTest` · `ManagementPortIsolationTest` ·
-`ApiVhostAnonymousSurfaceTest` and the nightly `edge-deny-probe.yml` (the same statuses from outside
-the host) · **Code:** `backend/…/app/api/SecurityConfig`, `frontend/…/kernel/security/SecurityConfig`,
+the nightly `edge-deny-probe.yml` (the same statuses from outside the host) · **Code:** `backend/…/app/api/SecurityConfig`, `frontend/…/kernel/security/SecurityConfig`,
 `frontend/…/dashboard/web/HomeController`, `frontend/…/kernel/layout/SafeCsrfAdvice`,
 `templates/dashboard/landing.html` · **ADR:**
 [ADR-0159](../adr/0159-the-basetool-has-no-anonymous-or-guest-surface.md)
@@ -5799,8 +5799,7 @@ data lands on the main profile; the Basetool never discloses the stored handle t
 
 **Enforced by:** `UserServiceRsiHandleTest`, `UserRsiHandleIntegrationTest`,
 `UserAccountMergeServiceTest`, `HandleSpellingCoverageTest`, `PersonSearchCoverageTest`,
-`HandleErasureCoverageTest`, `DataExportScrubCoverageTest`, `ExternalContractTest`,
-`ApiVhostAnonymousSurfaceTest`, `ProfileRsiHandleMvcTest`, `MemberManagementControllerTest`,
+`HandleErasureCoverageTest`, `DataExportScrubCoverageTest`, `ProfileRsiHandleMvcTest`, `MemberManagementControllerTest`,
 `ProfileRsiHandleInPlaceE2eTest` · **Code:** `V246__add_rsi_handle_to_app_user.sql`, `User`,
 `UserService#updateUserRsiHandle`, `UserRepository#existsOtherAccountWithName`, `UserController`,
 `UserAccountMergeService`, `HandleSpellings`, the `PersonMentionSource` sources, the
@@ -5826,8 +5825,10 @@ Mass assignment is closed by structure, not by the care of each mapper:
 
 Two reviewed lists hold today's deliberate exceptions, and a stale entry fails the build:
 
-- **Thirteen dual-use types** whose split would rename a frozen OpenAPI schema the app consumes, which
-  the modularisation's Phase 0 forbids: `BereichDto`, `FrequencyTypeDto`, `JobTypeDto`,
+- **Thirteen dual-use types**, kept because a split would have renamed an OpenAPI schema the Android
+  app consumed, which the modularisation's Phase 0 forbade. With the app discontinued (ADR-0269) that
+  reason has lapsed, and each entry is a split that is now allowed rather than a fixed exception:
+  `BereichDto`, `FrequencyTypeDto`, `JobTypeDto`,
   `LocationDto`, `MaterialCategoryDto`, `MaterialDto`, `OrganisationsleitungDto`,
   `RefineryOrderDto`, `RefiningMethodDto`, `SpecialCommandDto`, `SquadronDto`, `StarSystemDto`,
   `TerminalDto`. Each entry names which of its server-managed components a MockMvc test proves
@@ -6048,12 +6049,10 @@ dry run by default, with a rollback file, never deleting.
 `GET /api/v1/settings` and `GET /api/v1/settings/{key}` expose the raw `system_setting` rows with
 their optimistic-lock versions. They carry `hasRole('ADMIN')`, like the write `PUT
 /api/v1/settings/{key}` (owner decision of 2026-10-11, wave 6 of the API cut). The reads were
-member-readable only because the Android app took the two job-order age thresholds from them;
-app 19 reads the typed `GET /api/v1/orders/settings` instead, the web reads the typed
-`GET /api/v1/orders/settings` and `GET /api/v1/refinery-orders/settings`, and the admin page is the
-one reader left of the store (`SettingsBackendClient`). The two typed reads stay
-`isAuthenticated()`. With the Android app discontinued (ADR-0268), no client reads the raw rows
-except the admin page.
+member-readable only because the Android app took the two job-order age thresholds from them, until
+app 19 moved to the typed `GET /api/v1/orders/settings`. The web reads the typed
+`GET /api/v1/orders/settings` and `GET /api/v1/refinery-orders/settings`, which stay
+`isAuthenticated()`, and the admin page is the one reader of the store (`SettingsBackendClient`).
 
 **Acceptance**
 

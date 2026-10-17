@@ -34,6 +34,8 @@
 
 ### Changed
 
+- **Lager: die Markierung „gestohlen" ist standardmäßig freigeschaltet.** `APP_INVENTORY_STOLEN_MARKING_ENABLED` steht jetzt auf `true`; Mitglieder können Bestand als gestohlen einbuchen, markieren und die Markierung aufheben, ohne dass der Host den Schalter setzen muss. `false` schaltet es weiterhin ab (REQ-INV-053).
+
 - **Datenschutzerklärung: der Abschnitt zur Android-App entfällt.** Die eingestellte App wird nicht mehr beschrieben, und GitHub ist nicht mehr als Empfänger genannt; das Verarbeitungsverzeichnis, die Empfängerliste und die Liste der zugelassenen Clients sind entsprechend angepasst (ADR-0268).
 
 - **Betrieb: die `APP_ANDROID_*_OVERRIDE`-Variablen sind auch aus der Konfiguration entfernt.** `.env.example`, `docker-compose.yml` und die `env.d`-Vorlage des Backends reichen sie nicht mehr weiter; eine verbliebene Zeile in der Host-`.env` wirkt nicht und kann gelöscht werden (ADR-0268).

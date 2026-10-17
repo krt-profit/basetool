@@ -401,9 +401,9 @@ which is the question a half that has quietly stopped raises (REQ-OBS-011).
 > regardless. What ended is the signal as a payload and as the fan-out's parameter, not the
 > knowledge of which type reached whom.
 >
-> **The event name is still frozen** ([api-conventions.md](api-conventions.md)), so if a future
-> client ever needs to know *what* arrived, the event can carry data again — a new decision, with a
-> reader attached.
+> **The event name stays `notification`**, so if a future client ever needs to know *what* arrived,
+> the event can carry data again — a new decision, with a reader attached. It is no longer frozen by
+> REQ-API-009 (superseded with the app, ADR-0269); its readers deploy with the backend.
 
 
 The push carried the literal string `new`. That is enough for the web app, whose handler takes no
@@ -412,8 +412,8 @@ cannot file the shade entry under the right notification channel, and without an
 open the screen the message is about. Both are requirements of its own design specification
 (`REQ-APP-UI-007` there), and neither is answerable from a bare ping.
 
-**The event name does not change.** `notification` is what the frozen contract pins
-([api-conventions.md](api-conventions.md)); only its `data` grows. The web client is unaffected by
+**The event name does not change.** `notification` is what the frozen contract pinned
+([api-conventions.md](api-conventions.md), REQ-API-009, superseded); only its `data` grows. The web client is unaffected by
 construction — it never read the payload.
 
 **The payload is a signal, and a signal is per notification type — not per event.** One event
