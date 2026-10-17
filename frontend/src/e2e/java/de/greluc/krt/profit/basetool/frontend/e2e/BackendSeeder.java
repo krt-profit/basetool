@@ -25,6 +25,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -49,6 +50,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Seeds the backend state the ephemeral-stack flows need through the backend REST API, with a
@@ -1997,6 +1999,44 @@ public final class BackendSeeder {
       return terminalName;
     } catch (Exception e) {
       throw new IllegalStateException("BackendSeeder.seedSellableTerminal failed", e);
+    }
+  }
+
+  /**
+   * Seeds over JDBC a fresh {@code terminal} with the given name and its {@code material_price} row
+   * for a material. Local-stack only.
+   *
+   * @param materialId the id of the priced material
+   * @param terminalName the new terminal's display name
+   * @param sell the sale price, or {@code null} when the terminal does not buy the material
+   * @param buy the purchase price, or {@code null} when the terminal does not sell the material
+   */
+  public void seedTerminalPrice(
+      String materialId, String terminalName, @Nullable BigDecimal sell, @Nullable BigDecimal buy) {
+    UUID terminalId = UUID.randomUUID();
+    try (Connection connection = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASSWORD)) {
+      try (PreparedStatement ps =
+          connection.prepareStatement(
+              "INSERT INTO terminal (id, name, hidden) VALUES (?, ?, false)")) {
+        ps.setObject(1, terminalId);
+        ps.setString(2, terminalName);
+        ps.executeUpdate();
+      }
+      try (PreparedStatement ps =
+          connection.prepareStatement(
+              "INSERT INTO material_price (id, material_id, terminal_id, price_sell, status_sell,"
+                  + " price_buy, status_buy) VALUES (?, ?, ?, ?, ?, ?, ?)")) {
+        ps.setObject(1, UUID.randomUUID());
+        ps.setObject(2, UUID.fromString(materialId));
+        ps.setObject(3, terminalId);
+        ps.setBigDecimal(4, sell);
+        ps.setBoolean(5, sell != null);
+        ps.setBigDecimal(6, buy);
+        ps.setBoolean(7, buy != null);
+        ps.executeUpdate();
+      }
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.seedTerminalPrice failed", e);
     }
   }
 

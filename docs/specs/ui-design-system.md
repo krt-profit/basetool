@@ -1827,14 +1827,17 @@ instead of a page's own copy.
 The profit calculation sorts by Material, je SCU, Marge, Kapital and Max. Profit (default Max.
 Profit descending; Kapital starts ascending, Material A–Z, the others descending); its rank number
 `#` stays the profit rank of each material whatever the order, so a re-sort never renumbers it. The
+material detail price table sorts by Terminal, Ort, Verkauf and Einkauf (default Verkauf
+descending; Verkauf starts descending, the others ascending; ties by terminal name, REQ-UI-015). The
 material-demand page keeps its own three-step cycle (REQ-ORDERS-034)
 until it moves onto the helper.
 
 **Enforced by:** `:frontend:testTableSort` (`scripts/krt-table-sort.test.mjs`),
-`MaterialsProfitCalculationRendersE2eTest` ·
+`MaterialsProfitCalculationRendersE2eTest`, `MaterialDetailPriceSortE2eTest` ·
 **Code:** `static/js/kernel/krt-table-sort.js`, `static/css/kernel/styles.css` (`.sort-header`),
 `templates/catalogue/materials-profit-calculation.html`,
-`static/js/catalogue/materials-profit-calculation.js` ·
+`static/js/catalogue/materials-profit-calculation.js`, `templates/catalogue/material-detail.html`,
+`static/js/catalogue/material-detail.js` ·
 **Related:** REQ-UI-009, REQ-UI-017 · **Issues:** #2635, #2634
 
 ## Out of scope
