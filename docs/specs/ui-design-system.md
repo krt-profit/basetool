@@ -987,7 +987,7 @@ band already is. The band therefore shows **three** coupled elements, not two.
 > approval by CIG's legal department. Neither document mentions the other's notice or offers itself
 > as a substitute, so the overlap is CIG's. Dropping the §2b line would satisfy the Agreement and
 > the Guidelines only in substance — a low-risk deviation, but a deviation, and this requirement is
-> amended first if it is ever taken. The Android app records the same finding in its
+> amended first if it is ever taken. The discontinued Android app recorded the same finding in its
 > `REQ-APP-SET-007` (`docs/specs/settings.md` in the `basetool-android` repository).
 
 Section 2b accepts three placements on a website — the home page, an always-visible navigation
@@ -1091,10 +1091,9 @@ Binding details:
   not slack to be cropped. Do not fork a tightened copy of the asset to "fill" the box.
 - **The mark renders only in `#E77E23`, white or black** (REQ-UI-002). `basetool-logo-white.svg` is
   the white variant for print/overlay; no other recolour exists.
-- The sibling apps draw from the same family — the SC Extractor's desktop icon from
-  `basetool-extractor-*`, the Android launcher icon from `basetool-appicon-512.png`. Their
-  integration is governed in their own repos; only the shared source of truth (the design skill) is
-  common.
+- The sibling app draws from the same family — the SC Extractor's desktop icon from
+  `basetool-extractor-*`. Its integration is governed in its own repo; only the shared source of
+  truth (the design skill) is common.
 
 **Acceptance**
 
@@ -1113,10 +1112,10 @@ every page template, `META-INF/resources/logos/basetool-*`,
 
 ### REQ-UI-020 — The web app is installable, and installs without a service worker
 
-The tool is installable to a phone or tablet home screen as a standalone app. This exists **for
-iPhone and iPad**: those members have no native client and cannot get one — the Android app's channel
-(a signed artifact from GitHub Releases) has no Apple equivalent a fan project can reach, so a
-home-screen web app is the whole mobile story on that platform. The analysis behind that sentence is
+The tool is installable to a phone or tablet home screen as a standalone app. There is no native
+client, so a home-screen web app is the whole mobile story: the Android app is discontinued
+(ADR-0268), and iPhone and iPad never had one — the app's channel (a signed artifact from GitHub
+Releases) has no Apple equivalent a fan project can reach. The analysis behind the Apple half is
 `docs/APPLE_PLATFORM_FEASIBILITY.md` in the `basetool-android` repository; the decision is
 [ADR-0164](../adr/0164-an-installable-web-app-without-a-service-worker.md).
 
@@ -1215,8 +1214,8 @@ table), REQ-OBS-012 (the edge posture probes).
 The Basetool is GPL-3.0-only and its images are distributed, so every third-party component inside
 them is owed a notice, and every library among them must be GPL-3.0-compatible. Both halves are
 decided in [ADR-0197](../adr/0197-shipped-dependencies-pass-a-gpl-compatible-licence-gate-and-are-listed-on-a-public-page.md);
-this requirement is the user-facing one. The Android app has the same screen (`REQ-APP-SET-006` in
-`basetool-android`), and the web page follows it.
+this requirement is the user-facing one. The discontinued Android app had the same screen
+(`REQ-APP-SET-006` in `basetool-android`), and the web page followed it.
 
 - **Where.** `/licenses`, titled „Open-Source-Lizenzen" / "Open-source licences". Linked from the
   footer directly after „Nutzungsbedingungen", from the legal links at the end of the phone menu

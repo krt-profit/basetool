@@ -1071,7 +1071,7 @@ member's own decision; it changes nothing for anybody else and nothing about wha
 - **Applied before anything is written.** `NotificationCreationService` removes a member who muted
   the type from the recipients the rules resolved (`NotificationMuteService#withoutMuted`), in the
   normal and in the reconcile path. A muted type is therefore **neither stored in the inbox nor
-  pushed**, so the Android app raises no OS notification for it. Notices already stored stay.
+  pushed**. Notices already stored stay.
 - **Not mutable.** `NotificationType#isMutable()` is `false` for `ACCOUNT_DELETION_REQUESTED` and
   `ACCOUNT_DELETION_REQUEST_DECLINED` (legal deadlines, REQ-SEC-061) and
   `EXCHANGE_INSTALLATION_CONNECTED` (the phishing signal, REQ-XCH-032). Such a type is never
@@ -1080,14 +1080,10 @@ member's own decision; it changes nothing for anybody else and nothing about wha
 - **API.** `GET /api/v1/notifications/preferences` lists every type with `mutable` and `muted`;
   `PUT /api/v1/notifications/preferences/{type}` with `{muted}` stores the choice. Both are
   `isAuthenticated()` and keyed on the caller; the write is idempotent and carries no version (a
-  boolean toggle, last writer wins) and answers `400` for a type that cannot be muted. Both
-  operations are in the frozen contract set as `T1` (REQ-API-009, REQ-API-016) and admitted by the API
-  vhost, because the Android app calls them; from the first released app build on they can no longer
-  change incompatibly.
+  boolean toggle, last writer wins) and answers `400` for a type that cannot be muted.
 - **Web.** The profile page has the card „Benachrichtigungen": one checkbox per type, grouped by the
   area the type name's prefix names, a locked row for a non-mutable type, saved per click through
-  `krtFetch` without a reload; a failed write re-renders the card from the server (REQ-FE-001). The
-  Android app offers the same list in Einstellungen.
+  `krtFetch` without a reload; a failed write re-renders the card from the server (REQ-FE-001).
 - **Privacy.** The Art. 15 export has the section `notificationMutes`; the account merge moves the
   rows and deduplicates on the type.
 - **Observable.** `basetool_notification_muted_total{notification_type}` counts the recipients
@@ -1122,8 +1118,8 @@ ends in `Code` therefore gives the placeholder of the same name without the suff
 word: with `changeCode = cancelled`, `{change}` renders as `notifications.value.change.cancelled`
 in the member's language; a code without a word renders as itself. The type's own template names
 the placeholder (`{mission}: {change} durch {actor}`). A parameter named just `Code` is an ordinary
-parameter. Every client applies the rule when it fills a template: the web inbox and bell
-(`NotificationPageController#render`) and the Android app (`NotificationText`).
+parameter. The web inbox and bell apply the rule when they fill a template
+(`NotificationPageController#render`).
 
 **Acceptance**
 
@@ -1168,6 +1164,5 @@ that outlasts the limit (a stalled database) rejects the task; that is a lost no
   REQ-NOTIF-014 and the pending-registration admin mail REQ-NOTIF-015); wiring it into the rule
   engine per notification type is deferred.
 - Discord channel delivery.
-- Browser (Web Push) and push-service (FCM) notifications. The Android app raises its own OS
-  notifications from its authenticated SSE stream (REQ-NOTIF-021); no push service is involved.
+- Browser (Web Push) and push-service (FCM) notifications.
 - A dedicated user-group entity (the `GROUP` selector kind is reserved for it).

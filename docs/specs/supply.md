@@ -215,8 +215,8 @@ below (REQ-UI-027).
 
 ## Out of scope
 
-Money, deals and partners ([`purchasing.md`](purchasing.md)); profit medals; Android screens beyond the
-rendering of the notices; any `/exchange/v1` surface.
+Money, deals and partners ([`purchasing.md`](purchasing.md)); profit medals; any `/exchange/v1`
+surface.
 
 ## Open questions
 

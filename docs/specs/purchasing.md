@@ -286,8 +286,7 @@ an admin (REQ-PUR-006).
 
 ## Out of scope
 
-Profit medals; Android screens beyond the rendering of the notices; any `/exchange/v1` surface; a
-second funding account; automatic price discovery.
+Profit medals; any `/exchange/v1` surface; a second funding account; automatic price discovery.
 
 ## Open questions
 

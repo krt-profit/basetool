@@ -694,11 +694,14 @@ echo it through DTOs and `data-version` DOM attributes; ledger and audit rows ar
 insert-only and deliberately version-less. The booking flow observes the CLAUDE.md
 concurrency rules (`…WithinTransaction` pattern, no bulk updates in loops).
 
-The bank endpoints are also consumed by the Android app over the public API vhost: the shapes it
-reads are part of the frozen external contract set ([REQ-API-009](api-conventions.md)), and the
-direct-booking endpoints (`/deposits`, `/withdrawals`, `/transfers`, `/transfer-fee-rate`) are on
-the vhost allow-list ([ADR-0156](../adr/0156-the-app-carries-the-banks-direct-booking.md)). Which
-client a bank mutation came through is recorded on the trail (REQ-BANK-012, REQ-AUDIT-005).
+The bank endpoints have no client outside the in-repo frontend: the Android app that read them over
+the public API vhost is discontinued and the vhost is gone
+([ADR-0268](../adr/0268-the-backend-is-internal-only-and-ingest-is-the-single-public-api-entry-point.md)),
+and the frozen external contract set ended with it
+([ADR-0269](../adr/0269-the-frozen-external-contract-ends-with-its-only-client.md)). The
+direct-booking endpoints (`/deposits`, `/withdrawals`, `/transfers`, `/transfer-fee-rate`) keep
+their rule ([ADR-0156](../adr/0156-the-app-carries-the-banks-direct-booking.md)). Which client a
+bank mutation came through is recorded on the trail (REQ-BANK-012, REQ-AUDIT-005).
 
 **Acceptance**
 
