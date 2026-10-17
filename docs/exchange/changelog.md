@@ -5,6 +5,11 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
 
 ## 2026-10-17
 
+- **New: taking stock back from a unit's pool.** `POST /exchange/v1/me/stock/changes` gains the op
+  `unshare`, the reverse of `share`: it moves part of the member's own stock in the pool of
+  `orgUnit` back to personal, also from a unit the member has left
+  ([stock](resources/stock.md#taking-stock-back-from-a-units-pool)).
+  `change-set.schema.json#/$defs/stockOp` gains the `unshare` variant.
 - **New: sharing stock into a unit's pool.** `POST /exchange/v1/me/stock/changes` gains the op
   `share`, which moves part of a lot's personal stock into the pool of a unit the member directly
   belongs to, named in `orgUnit` ([stock](resources/stock.md#sharing-into-a-units-pool)). New

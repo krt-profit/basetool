@@ -22,6 +22,8 @@
 
 ### Added
 
+- **Exchange: Bestand aus einer Einheit zurücknehmen.** Mit der neuen Operation `unshare` auf `POST /exchange/v1/me/stock/changes` holt eine verbundene Anwendung einen Teil des eigenen geteilten Bestands eines Postens aus dem Pool einer Einheit zurück ins persönliche Lager, auch aus einer Einheit, die das Mitglied verlassen hat; Bestände anderer Mitglieder bleiben unberührt. Reservierter Bestand bleibt im Pool, die Umbuchung ist wie im Web auditiert und über „Verbundene Anwendungen“ rückgängig zu machen (Migration `V306`, ADR-0278, REQ-XCH-016).
+
 - **Exchange: Bestand an eine Einheit geben.** Eine verbundene Anwendung kann mit der neuen Operation `share` auf `POST /exchange/v1/me/stock/changes` einen Teil des persönlichen Bestands eines Postens in den Pool einer Einheit geben, in der das Mitglied direkt Mitglied ist; es bleibt Halter. Die Einheit wird immer ausdrücklich genannt, die Umbuchung ist wie im Web auditiert und über „Verbundene Anwendungen“ rückgängig zu machen (Migration `V305`, ADR-0278, REQ-XCH-016).
 
 - **Exchange: Aufteilung eines Lagerpostens.** Jeder Posten von `GET /exchange/v1/me/stock` trägt jetzt `split`: wie viel davon persönlich ist und wie viel das Mitglied selbst in welchem Einheiten-Pool hält, auch in einer verlassenen Einheit. Eine Umbuchung zwischen persönlich und geteilt erscheint damit im Änderungs-Feed, Schlüssel und Gesamtmenge bleiben gleich (Migration `V304`, REQ-XCH-016).
