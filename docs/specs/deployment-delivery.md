@@ -2937,6 +2937,16 @@ isolated projects have nothing to reject and a module added later inherits no de
   `gradle/verification-metadata.xml` (REQ-OPS-034); the image builds copy `build-logic/`, which makes
   it a shared image input, and `build-logic/**` is a path filter of the dependency-check and
   sandbox-image workflows.
+- **The plugin classpath resolves from the portal with Maven Central behind it.** Both settings
+  files declare `pluginManagement { repositories { gradlePluginPortal(); mavenCentral() } }`, which
+  is what seeds every project's `buildscript.repositories` in both builds — the repositories of
+  `dependencyResolutionManagement` do not apply to that classpath, so without the declaration the
+  default leaves the Gradle Plugin Portal as the only source. The portal answers the plugin markers
+  Gradle publishes itself and redirects every other artifact to Maven Central, so a portal outage
+  took the whole build down for artifacts Central was serving all along: the Kotlin jars the
+  `kotlin-dsl` plugin puts on `build-logic`'s classpath failed to resolve on main on 2026-10-17.
+  Central is a fallback, not a second source of truth — the portal stays first and every artifact
+  still matches its committed checksum (REQ-OPS-034), the same bytes either way.
 - **No behaviour change by the move.** The task graph (`build -m`, `tasks --all`), every task's
   type, dependencies and inputs, the compiler arguments including Error Prone's, the test JVM
   arguments, the resolved classpaths and the SBOM component lists are identical before and after.
