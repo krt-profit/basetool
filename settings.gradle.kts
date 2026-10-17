@@ -1,4 +1,10 @@
-pluginManagement { includeBuild("build-logic") }
+pluginManagement {
+  includeBuild("build-logic")
+  repositories {
+    gradlePluginPortal()
+    mavenCentral()
+  }
+}
 
 plugins { id("de.fayard.refreshVersions") version "0.60.6" apply false }
 
