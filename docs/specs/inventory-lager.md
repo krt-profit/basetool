@@ -308,7 +308,7 @@ the source row's current flag, never from the client:
   association.
 
 A rebooking is not the only way a personal row's unit changes: the owner may set it afterwards on
-its own, including to no unit (REQ-INV-052; in the web, the Android app follows with #2097). A
+its own, including to no unit (REQ-INV-052). A
 personal row booked in through the exchange carries no unit (REQ-XCH-016).
 
 The operation is an **append-only split** (REQ-INV-001), structurally identical to the book-out
@@ -1371,8 +1371,7 @@ and a `TRANSFER` may not change it alone (REQ-INV-025).
   `INVENTORY_ORG_UNIT_CHANGED` (from / to as `kind:id` or `none`), a selection one
   `INVENTORY_BULK_ORG_UNIT_CHANGED` summary (REQ-AUDIT-001).
 - The page re-renders in place and tells peers through live sync (`inventory` / `stock`,
-  REQ-FE-001); the Android app reaches both routes through the `api.*` allowlist (ADR-0135) and gets
-  the action with #2097.
+  REQ-FE-001).
 
 **Acceptance**
 
@@ -1416,9 +1415,9 @@ Lager row — shared or personal, material or game item — carries a **„gesto
   the offer) or below its earmarks (`422`).
 - **Behind a server switch.** `app.inventory.stolen-marking-enabled`
   (`APP_INVENTORY_STOLEN_MARKING_ENABLED`, default **off**) gates booking in as stolen and every
-  mark/unmark; it is advertised as `canMarkStolen` in `/api/v1/me/capabilities`, so the column and
-  the routes ship before the Android app can show them. The sequence (#2092): this release with the
-  switch off → the app release of #2097 → the app's minimum version raised → the switch on. Reading,
+  mark/unmark; it is advertised as `canMarkStolen` in `/api/v1/me/capabilities`. The switch waited
+  for an Android release (#2092, #2097) that never shipped; with the app discontinued (ADR-0268) it
+  is a plain feature flag. Reading,
   the chip and the filters work either way.
 - **Shown everywhere stock appears**: a danger chip „Gestohlen" on stack and entry rows of both
   Lager views, in the allocation pickers (REQ-INV-039), on an order's allocated stock and handover

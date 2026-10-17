@@ -674,37 +674,38 @@ frontend `MissionForm` (`objectivesJson` / `stepsJson`), `CreateMissionRequest`,
 `MissionWriteController.createMission`, `mission/mission-detail.html` (create sections + sticky actions),
 `mission-detail.js` (create-form editor module).
 
-### REQ-MISSION-020 — Manager-only add-by-id for the app
+### REQ-MISSION-020 — Manager-only add-by-id
 
 A mission manager adds a registered member to the roster by user id through
 `POST /api/v1/missions/{id}/participants/by-id` (owner decision 2026-09-22, ADR-0170 amendment).
-It replaces the deprecated `POST …/participants` deleted the same day and exists for the Android
-app's "Teilnehmer hinzufügen" on the public API vhost.
+It replaced the deprecated `POST …/participants` deleted the same day and was built for the Android
+app's "Teilnehmer hinzufügen" on the public API vhost; with the app discontinued (ADR-0268) no
+client calls it.
 
 - **Gate:** `canManageMission(#id)` only — no self-enrolment branch (that is `…/join`).
 - **Body:** `AddParticipantByIdRequest{userId}`, required; no free-text name, org units, comment or
   sign-up answers. The member's org units and payout default are stamped as on any registered add.
 - **Answer:** the participant list, peer-redacted below Logistician (REQ-SEC-007).
-- **Edge:** admitted on the API vhost and frozen in REQ-API-009; the add-anybody
-  `POST …/participants` stays off the edge (the former `…/participants/add` is deleted).
+- **Edge:** none — the backend is internal-only (ADR-0268) and the frozen contract set is gone
+  (ADR-0269); the former `…/participants/add` is deleted.
 
 **Acceptance**
 
 - [x] A manager adds a member by id and gets the participant list; a non-manager — even naming
   themselves — gets 403; a body without `userId` is a 400; anonymous is refused (401).
 
-**Enforced by:** `MissionControllerSlimEndpointsTest` (`addParticipantByIdSlim_*`),
-`ApiVhostAnonymousSurfaceTest`, `ExternalContractTest` (frozen). The edge admission that also
-covered it went with the API vhost (ADR-0268, REQ-OPS-042 superseded). **Code:**
+**Enforced by:** `MissionControllerSlimEndpointsTest` (`addParticipantByIdSlim_*`). The edge
+admission and the contract tests that also covered it went with the API vhost (ADR-0268,
+REQ-OPS-042 superseded) and the frozen contract set (ADR-0269). **Code:**
 `MissionController#addParticipantByIdSlim`, `AddParticipantByIdRequest`.
 
 ### REQ-MISSION-018 — Registration count on the mission list row
 
 Every mission **list** row carries `registeredCount` — how many members and external participants
 are registered for that mission. A `MissionParticipant` row **is** the registration (there is no accept/decline state to
-weigh), so the figure is that row count. It is the number the Android app's mission tile shows as
-"{n} angemeldet" (design chapter 05); until now the count existed only on the **detail** DTO, so a
-list consumer could not show it without one detail read per row.
+weigh), so the figure is that row count. The web mission list shows it; it was added for the
+Android app's mission tile ("{n} angemeldet"), because the count existed only on the **detail** DTO
+and a list consumer could not show it without one detail read per row.
 
 **No N+1.** The count is deliberately *not* read from the mission's lazy `participants` collection —
 that would be one SELECT per row, which REQ-DATA-003 forbids. `MissionController.withRegisteredCounts`

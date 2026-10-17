@@ -726,9 +726,10 @@ and the `scope`-claim value the capability check reads — is assigned to `baset
 inherited from its creation, to `basetool-ingest-gateway`; to no browser client and, by owner
 decision of 2026-09-22, **not** to `basetool-android`. The app had inherited both ingest scopes from
 the realm defaults, so an app token passed the audience and capability checks and only the `azp`
-allowlist kept it out. The app requests neither scope and never calls ingest; its own
-`aud=basetool-backend` comes from its `backend-audience` mapper. `provision-keycloak-realm.py`
-removes both scopes from the app in every realm it provisions (production on the owner's apply).
+allowlist kept it out. The app requested neither scope and never called ingest; its own
+`aud=basetool-backend` came from its `backend-audience` mapper. The app is discontinued
+(ADR-0268), and `provision-keycloak-realm.py` deletes `basetool-android` wherever it finds it
+(REQ-OPS-033).
 
 *Amended 2026-09-28 (H1, REQ-XCH-005):* since #2201 the provisioner's target shape withholds both
 ingest scopes from `basetool-sc-extractor` as well — the extractor is exchange-only from its 2.10.0
