@@ -427,15 +427,15 @@ public class ExchangeUndoService {
   }
 
   /**
-   * Takes the client's shares of a lot back to personal, then sets the lot back to its earlier
-   * quantity.
+   * Sets the lot's pools back by the net amount the client's shares and unshares moved into each,
+   * then sets the lot back to its earlier quantity.
    *
    * @param member the member
    * @param lotKey the lot
    * @param before the state before the client's first write
    * @param writes the client's writes to the lot, newest first
    * @return whether the lot could be restored; {@code false} when a pool no longer holds what was
-   *     shared into it
+   *     shared into it, or stock cannot go back into a pool the member has left
    */
   private boolean restoreLot(
       @NotNull UUID member,
@@ -446,18 +446,23 @@ public class ExchangeUndoService {
     if (before == null || before.get("quantity") == null || unit == null) {
       return false;
     }
-    Map<UUID, BigDecimal> shared = new TreeMap<>();
+    Map<UUID, BigDecimal> moved = new TreeMap<>();
     for (ExchangeJournalEntry write : writes) {
-      if (write.getAction() == ExchangeJournalAction.STOCK_SHARE) {
+      boolean share = write.getAction() == ExchangeJournalAction.STOCK_SHARE;
+      if (share || write.getAction() == ExchangeJournalAction.STOCK_UNSHARE) {
         JsonNode after = parse(write.getAfterState());
         String pool = text(after, "orgUnit");
-        if (after == null || pool == null || after.get("shared") == null) {
+        JsonNode amount = after == null ? null : after.get(share ? "shared" : "unshared");
+        if (pool == null || amount == null) {
           return false;
         }
-        shared.merge(UUID.fromString(pool), after.get("shared").decimalValue(), BigDecimal::add);
+        moved.merge(
+            UUID.fromString(pool),
+            share ? amount.decimalValue() : amount.decimalValue().negate(),
+            BigDecimal::add);
       }
     }
-    if (!shared.isEmpty() && !stockWriteService.takeBackShares(member, lotKey, unit, shared)) {
+    if (!moved.isEmpty() && !stockWriteService.restorePools(member, lotKey, unit, moved)) {
       return false;
     }
     BigDecimal quantity = before.get("quantity").decimalValue();

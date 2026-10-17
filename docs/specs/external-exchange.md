@@ -967,6 +967,21 @@ audited by the Lager's `INVENTORY_ITEM_DEPERSONALIZED` under the client, journal
 decided without a write by `dryRun`. An undo moves the shared amount back to personal, then sets
 the lot's quantity back; a pool that no longer holds it leaves the lot skipped as `GONE`.
 
+An `unshare` op is the reverse of `share` with the same fields and rules (ADR-0278 amendment 1):
+it moves part of the member's own shared stock of a lot in the pool of `orgUnit` back to personal,
+never another member's rows in that pool, and the pool may belong to a unit the member has left.
+`expectedQuantity` is that pool's amount in the lot's `split` as the earlier ops of the batch leave
+it (`VERSION_CONFLICT`); once an earlier `set-quantity` of the batch books out more than the lot's
+personal stock, a later unshare of that lot is `VERSION_CONFLICT`. A `quantity` above the expected
+amount is `QUANTITY_ABOVE_EXPECTED`, a fraction of a piece `UNIT_MISMATCH`, and earmarked stock
+`STOCK_EARMARKED`, as in the web; `INSUFFICIENT_STOCK` and `STOCK_OFFERED` come from the Lager as
+for a share. Once the Lager refuses a share or unshare, every later share or unshare of that lot in
+the batch is `VERSION_CONFLICT`, since the batch counted the refused move. An unshare is audited by `INVENTORY_ITEM_PERSONALIZED` under the client, journaled as
+`STOCK_UNSHARE`, never a removal for the mass-change guard, and decided without a write by
+`dryRun`. An undo nets a lot's shares and unshares per pool, moves each net amount back, all or
+nothing, then sets the lot's quantity back; stock cannot go back into the pool of a unit the member
+has left, which leaves the lot skipped as `GONE`.
+
 *Amended 2026-10-02 (ADR-0230, owner decision of the same day):* a lot covered the member's personal
 rows only, and a material carrying a UEX commodity id — nearly the whole catalogue, every ore and
 refined metal included — was stored at quality 0 whatever the client sent. Three lots of one
@@ -1027,6 +1042,23 @@ production had landed at quality 0 (203 journal entries, 36 lots).
   share of every lot is never held back as a mass change. *`ExchangeStockShareControllerTest`.*
 - [x] An undo takes a share back to personal and sets the lot back; a share whose pool stock is
   gone is skipped as `GONE`. *`ExchangeUndoControllerTest`.*
+- [x] An unshare with a matching `expectedQuantity` moves exactly `quantity` of the member's own
+  rows in the pool back to personal; the lot keeps its `key` and total, its `split` and feed show
+  the move, and it is audited under the client and journaled as `STOCK_UNSHARE`.
+  *`ExchangeStockUnshareControllerTest`.*
+- [x] An unshare from the pool of a unit the member has left succeeds; another member's rows in the
+  pool are never touched, and an unshare of more than the member's own amount there is refused.
+  *`ExchangeStockUnshareControllerTest`.*
+- [x] An unshare is refused with nothing written for a stale `expectedQuantity`, a `quantity` above
+  it, earmarked stock and a fraction of a piece; without `orgUnit` the change set is invalid.
+  *`ExchangeStockUnshareControllerTest`.*
+- [x] A share and an unshare of one lot in one change set are decided in order; a rebooking after
+  one the Lager refused on the same lot is `VERSION_CONFLICT`; `dryRun` writes nothing; an unshare
+  of every lot is never held back as a mass change.
+  *`ExchangeStockUnshareControllerTest`.*
+- [x] An undo shares an unshare back into its pool and reverses a share and unshares of one lot
+  together; an unshare from a unit the member has left is skipped as `GONE`.
+  *`ExchangeUndoControllerTest`.*
 - [x] Moving stock to the lot's stolen twin marks the rows — a part split off, a whole lot flipped —
   and a piece book-in joins the existing row. *`ExchangeStockWriteControllerTest`.*
 

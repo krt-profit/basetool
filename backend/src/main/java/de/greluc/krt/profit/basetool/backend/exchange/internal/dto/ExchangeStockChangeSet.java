@@ -48,27 +48,32 @@ public record ExchangeStockChangeSet(
   /** The op that moves part of a lot's personal stock into a unit's pool. */
   public static final String SHARE = "share";
 
+  /** The op that moves part of the member's own stock in a unit's pool back to personal. */
+  public static final String UNSHARE = "unshare";
+
   /**
    * One op on a lot: a {@code set-quantity} sets it to a quantity, a {@code share} moves part of
-   * its personal stock into the pool of {@code orgUnit}.
+   * its personal stock into the pool of {@code orgUnit}, an {@code unshare} moves part of the
+   * member's own stock in that pool back to personal.
    *
    * @param opId the client's id for the op, echoed in the result, or {@code null}
-   * @param op {@code set-quantity} or {@code share}
+   * @param op {@code set-quantity}, {@code share} or {@code unshare}
    * @param material the material or item
    * @param location the Lager location
    * @param quality the quality of a material lot, ignored for an item
    * @param stolen whether the lot is marked stolen
-   * @param quantity the quantity the lot should hold, or the amount a share moves
+   * @param quantity the quantity the lot should hold, or the amount a share or unshare moves
    * @param expectedQuantity the quantity the client last saw, 0 for a new lot; for a share, the
-   *     lot's personal amount in its last synced {@code split}
+   *     lot's personal amount in its last synced {@code split}; for an unshare, that pool's amount
    * @param override whether a {@code set-quantity} may refill a lot emptied elsewhere, after asking
    *     the member
-   * @param orgUnit the unit whose pool a {@code share} fills; required there, ignored otherwise
+   * @param orgUnit the unit whose pool a {@code share} fills or an {@code unshare} empties;
+   *     required there, ignored otherwise
    */
   @Schema(name = "Op")
   public record Op(
       @Nullable @Size(min = 1, max = 64) String opId,
-      @NotNull @Pattern(regexp = "^(set-quantity|share)$") String op,
+      @NotNull @Pattern(regexp = "^(set-quantity|share|unshare)$") String op,
       @NotNull @Valid ExchangeItemRef material,
       @NotNull @Valid ExchangeLocationRef location,
       @NotNull @QualityValue Integer quality,
@@ -79,7 +84,7 @@ public record ExchangeStockChangeSet(
       @Nullable @Valid UnitRef orgUnit) {}
 
   /**
-   * The org unit a share names.
+   * The org unit a share or unshare names.
    *
    * @param id the unit's id
    */

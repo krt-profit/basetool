@@ -89,7 +89,8 @@ changes while a snapshot is read may move to a later page; its change follows in
 Send an `Idempotency-Key` and a change set of 1 to 500 ops, `dryRun` optional. A `set-quantity`
 op names the lot and says what it should hold, and what the client last saw it hold; a
 [`share`](#sharing-into-a-units-pool) op moves part of the lot's personal stock into a unit's
-pool. Both kinds may be mixed in one change set:
+pool, and an [`unshare`](#taking-stock-back-from-a-units-pool) op moves the member's own stock in a
+pool back to personal. All three kinds may be mixed in one change set:
 
 ```json
 {
@@ -177,6 +178,37 @@ A share takes the member's personal stock already marked for the target unit fir
 personal stock without a unit, then the rest, the oldest first. The stolen marking, the quality
 and the location stay as they are.
 
+### Taking stock back from a unit's pool
+
+An `unshare` op is the reverse of a share: it moves part of the member's own stock of a lot in the
+pool of `orgUnit` back to personal. Other members' stock in that pool is never touched. It has the
+fields of a share, with `"op": "unshare"`:
+
+- `orgUnit` is always required. It may be any pool in the lot's `split`, also one of a unit the
+  member has left.
+- `quantity` is the amount to move.
+- `expectedQuantity` is that pool's amount in the lot's `split` in the client's last synced state,
+  as the earlier ops of the change set leave it. After a `set-quantity` of the same lot that books
+  out more than its personal stock, the pools cannot be followed within the change set, and an
+  unshare of that lot is refused as `VERSION_CONFLICT`.
+
+After the material, location, unit and stolen steps above, an unshare is decided in these steps:
+
+| Step | Refused as |
+| --- | --- |
+| An item's `quantity` is whole pieces | `rejected` `UNIT_MISMATCH` |
+| The member's amount in the pool must equal `expectedQuantity` | `rejected` `VERSION_CONFLICT` |
+| `quantity` is at most `expectedQuantity` | `rejected` `QUANTITY_ABOVE_EXPECTED` |
+| A `quantity` of 0 | `unchanged` |
+| The member's own stock in the pool holds `quantity` | `rejected` `INSUFFICIENT_STOCK` |
+| None of it is earmarked to a job order or mission, or reserved for a donation | `rejected` `STOCK_EARMARKED` |
+| The move leaves every row at least what it offers on the Material Exchange | `rejected` `STOCK_OFFERED` |
+
+An unshare takes the member's rows in the pool oldest first. The rows keep their unit marking, so a
+later share into the same unit takes them first. When a share or unshare of a lot is refused in
+one of the last three steps, every later share or unshare of that lot in the change set is refused
+as `VERSION_CONFLICT`, because its `expectedQuantity` counted the refused move.
+
 ## What a change books
 
 A change is booked like the warehouse books it, audited in the warehouse under your client's name:
@@ -188,6 +220,9 @@ A change is booked like the warehouse books it, audited in the warehouse under y
 - **A share** rebooks the stock from personal into the unit's pool, as the member's rebooking in
   the web does. It never counts as a removal for the mass-change guard, and an undo moves it
   back to personal.
+- **An unshare** rebooks the member's own stock from the pool back to personal, as in the web. It
+  never counts as a removal either, and an undo moves it back into the pool. An undo cannot do that
+  for a unit the member has left; the lot is then skipped as `GONE`.
 
 **Material Exchange offers.** The Material Exchange is the Basetool's board of stock offers and
 requests between members, unrelated to this API. A book-out that leaves less stock than an offer

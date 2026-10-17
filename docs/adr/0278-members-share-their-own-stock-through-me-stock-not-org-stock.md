@@ -8,7 +8,7 @@
   [ADR-0230](0230-an-exchange-stock-lot-is-everything-the-member-holds-at-its-quality.md) ·
   [ADR-0257](0257-logisticians-read-and-write-their-units-shared-stock-through-the-exchange.md) ·
   [ADR-0277](0277-the-lager-publishes-the-personal-and-shared-rebooking-as-rebookcommands.md) ·
-  issues #2693, #2696
+  issues #2693, #2696, #2697
 
 ## Context
 
@@ -42,7 +42,8 @@ storage", and their unit's items ended up in their personal stock.
 - The lot's `key` and total never change on a share; the lot reaches the feed with its new
   `split`.
 - An undo cannot take back a share whose pool stock is gone: the lot is skipped as `GONE`.
-- Taking stock back out of a pool (`unshare`) is a separate op on the same change set.
+- Taking stock back out of a pool (`unshare`) is a separate op on the same change set
+  (amendment 1).
 
 ## Alternatives considered
 
@@ -50,3 +51,25 @@ storage", and their unit's items ended up in their personal stock.
   Logisticians, and opening it to every member for one op would blur who may write a pool.
 - **Book `set-quantity` rises into the member's sole unit.** Rejected: the client would not know
   where the stock lands, and a member of several units could not choose.
+
+## Amendment 1 — `unshare` (2026-10-17, issue #2697)
+
+- The same change set gains an `unshare` op, the reverse of `share`, with the same fields:
+  addressed by lot, `orgUnit` `{id}` always required, `quantity`, `expectedQuantity`, optional
+  `opId`.
+- An unshare takes only the member's own shared rows in the named pool, never another member's.
+  The pool may belong to a unit the member has left; no membership is checked.
+- `expectedQuantity` is that pool's amount in the lot's `split` the client last saw, as the earlier
+  ops of the batch leave it (`VERSION_CONFLICT`); a `quantity` above it is
+  `QUANTITY_ABOVE_EXPECTED`. Once an earlier `set-quantity` of the batch books out more than the
+  lot's personal stock, the pools can no longer be followed and a later unshare of that lot is
+  `VERSION_CONFLICT`.
+- Earmarked shared stock is refused as `STOCK_EARMARKED`, as in the web; the Lager's
+  `RebookCommands` decides the rows and the other refusals. Once it refuses a share or unshare,
+  later shares and unshares of that lot in the batch are `VERSION_CONFLICT`.
+- An unshare is audited by the Lager's `INVENTORY_ITEM_PERSONALIZED` under the client, journaled as
+  `STOCK_UNSHARE`, and never a removal for the mass-change guard.
+- An undo nets the shares and unshares of a lot per pool: a pool that gained stock gives it back to
+  personal, a pool that lost stock gets it back from personal, all or nothing, before the lot's
+  quantity is set back. Stock cannot go back into the pool of a unit the member has left, so such
+  an undo leaves the lot skipped as `GONE`.
