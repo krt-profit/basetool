@@ -1,6 +1,11 @@
 # ADR-0156 — The app carries the bank's direct booking, and an exclusion may not cite a fact nobody re-checks
 
-- **Status:** Accepted
+- **Status:** Accepted — amended by
+  [ADR-0269](0269-the-frozen-external-contract-ends-with-its-only-client.md)
+  (2026-10-17): the vhost admission rules and the four bank exclusions are moot with the allow-list
+  and the app. The second half — *an exclusion may not cite a fact nobody re-checks*, and a probe
+  written from an expectation turning a mistake into a green light — is a process finding and
+  stands.
 - **Date:** 2026-09-03
 - **Deciders:** Repository owner (@greluc)
 - **Related:** spec [REQ-API-009](../specs/api-conventions.md) · [REQ-SEC-037](../specs/security-and-access.md) · REQ-BANK-009 · REQ-BANK-047 · app spec `REQ-APP-BANK-007` / `REQ-APP-BANK-016` (basetool-android) · [ADR-0109](0109-krt-middle-band-bankleitung-and-over-ceiling-auto-request.md) · [ADR-0135](0135-public-api-vhost-not-a-gateway.md) · [ADR-0136](0136-external-contract-set-for-shipped-clients.md) · **Runbook:** [`docs/archive/API_VHOST_ROLLOUT_RUNBOOK.md`](../archive/API_VHOST_ROLLOUT_RUNBOOK.md) → *Phase O*

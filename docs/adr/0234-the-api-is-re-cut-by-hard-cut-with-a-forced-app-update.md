@@ -2,7 +2,12 @@
 
 - **Status:** Accepted — machinery in place (Phase 0: contract tiers, frozen set from the app's call list, declared-break ledger, generated edge admission, release-bound floor, `APP_UPDATE_REQUIRED`, the app's policy re-read in app v0.5.0); the cuts follow wave by wave (REST API track). Supersedes
   the retirement clause of [ADR-0136](0136-external-contract-set-for-shipped-clients.md) (decision
-  bullet 4).
+  bullet 4). Amended by
+  [ADR-0269](0269-the-frozen-external-contract-ends-with-its-only-client.md) (2026-10-17): with the
+  app discontinued the machinery loses its subject — the tiers, the call lists, the declared-break
+  ledger, the generated edge admission, the release-bound floor and `APP_UPDATE_REQUIRED` are
+  removed, and a wave is an ordinary atomic deploy. The per-domain cut (D-03) and the exchange
+  carve-out (D-05) stand.
 - **Date:** 2026-09-29 (hard cut, D-03, D-04, D-05); 2026-10-01 (release-bound floor, D-11)
 - **Deciders:** @greluc (owner decisions D-03, D-04, D-05, D-11)
 - **Related:** [domain modularisation plan](../archive/DOMAIN_MODULARISATION_PLAN.md) §5.10, §7.9 ·

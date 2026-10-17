@@ -1,6 +1,9 @@
 # ADR-0151 — Clients are told their authorisation instead of deriving it
 
-> **Status:** Accepted · **Date:** 2026-09-01 · **Deciders:** @greluc
+> **Status:** Accepted — amended by
+> [ADR-0269](0269-the-frozen-external-contract-ends-with-its-only-client.md) (2026-10-17): one of
+> the two clients is gone with the Android app, and the rule stands for the web frontend, whose
+> hand-written hierarchy was right only by accident. · **Date:** 2026-09-01 · **Deciders:** @greluc
 > **Related:** ADR-0011 (the app knows its permissions and refuses in place), ADR-0047 (the leaf
 > interface that keeps mappers out of the service layer), `REQ-SEC-047`, `REQ-SEC-048`,
 > `docs/specs/security-and-access.md`, `ROLES_AND_PERMISSIONS.md`

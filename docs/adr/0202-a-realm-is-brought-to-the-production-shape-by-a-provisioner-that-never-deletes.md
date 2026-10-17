@@ -1,6 +1,11 @@
 # ADR-0202 — A realm is brought to the production shape by a provisioner that never deletes
 
-- **Status:** Accepted
+- **Status:** Accepted — amended by
+  [ADR-0268](0268-the-backend-is-internal-only-and-ingest-is-the-single-public-api-entry-point.md)
+  (2026-10-17): the production shape loses `basetool-android`, the `krt-mobile-dpop` profile, its
+  policy and the `dpop-refresh-only` marker role (ADR-0131). Because the provisioner never deletes,
+  removing them is a deliberate production write needing @greluc's explicit per-action approval
+  (#2674); converging the remaining shape is unchanged.
 - **Date:** 2026-09-22
 - **Deciders:** @greluc (requested 2026-09-22: "the testing host must mirror production")
 - **Related:** [ADR-0131](0131-mobile-auth-refresh-only-dpop-binding.md) (the DPoP policy and its

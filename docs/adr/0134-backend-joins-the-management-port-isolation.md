@@ -3,6 +3,12 @@
 - **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since v1.7.7 (2026-09-09) at the latest (backend `ManagementPortSecurityConfig` + `ManagementPortIsolationTest`, management port `11271`).
   Amended by [ADR-0265](0265-the-management-ports-require-the-scrape-credential.md): metrics and
   info on the management port require the scrape credential; only health stays unauthenticated.
+  Amended by
+  [ADR-0268](0268-the-backend-is-internal-only-and-ingest-is-the-single-public-api-entry-point.md)
+  (2026-10-17): the public vhost whose forwarding made the carve-out untenable is gone, so the
+  premise of this ADR falls away — and the decision stands. The dedicated management port and the
+  `ROLE_ADMIN`-gated log-level write are kept; reverting to an app-port scrape would be work in the
+  wrong direction.
 - **Date:** 2026-08-18
 - **Related:** [ADR-0090](0090-isolate-app-actuator-on-internal-management-port.md) (extended,
   not superseded) · [ADR-0072](0072-monitoring-stack-prometheus-grafana.md) ·
