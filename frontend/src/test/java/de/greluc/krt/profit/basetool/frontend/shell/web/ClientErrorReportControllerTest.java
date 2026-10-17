@@ -110,7 +110,8 @@ class ClientErrorReportControllerTest {
                 "https://app/js/mission/missions.js",
                 42,
                 7,
-                MetricNames.CLIENT_ERROR_SCRIPT_ERROR));
+                MetricNames.CLIENT_ERROR_SCRIPT_ERROR,
+                null));
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
     assertThat(counterFor(MetricNames.CLIENT_ERROR_SCRIPT_ERROR)).isEqualTo(1.0d);
@@ -120,7 +121,12 @@ class ClientErrorReportControllerTest {
   void report_isLoggedAtDebugAndNeverAtInfoOrAbove() {
     controller.report(
         new ClientErrorReport(
-            "boom", "https://app/js/a.js", 1, 2, MetricNames.CLIENT_ERROR_UNHANDLED_REJECTION));
+            "boom",
+            "https://app/js/a.js",
+            1,
+            2,
+            MetricNames.CLIENT_ERROR_UNHANDLED_REJECTION,
+            null));
 
     assertThat(appender.list).hasSize(1);
     assertThat(appender.list.getFirst().getLevel()).isEqualTo(Level.DEBUG);
@@ -130,7 +136,7 @@ class ClientErrorReportControllerTest {
   @ValueSource(strings = {"stack_trace", "SCRIPT_ERROR", "", "script_error ", "../../etc"})
   void unknownKind_isRejectedAndCreatesNoMeterSeries(String kind) {
     ResponseEntity<Void> response =
-        controller.report(new ClientErrorReport("boom", "https://app/js/a.js", 1, 2, kind));
+        controller.report(new ClientErrorReport("boom", "https://app/js/a.js", 1, 2, kind, null));
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     assertThat(meterRegistry.find(MetricNames.CLIENT_ERROR).counters()).isEmpty();
@@ -153,7 +159,8 @@ class ClientErrorReportControllerTest {
             "https://app/js/a.js?access_token=super-secret#L42",
             1,
             2,
-            MetricNames.CLIENT_ERROR_SCRIPT_ERROR));
+            MetricNames.CLIENT_ERROR_SCRIPT_ERROR,
+            null));
 
     String line = appender.list.getFirst().getFormattedMessage();
     assertThat(line).contains("source=https://app/js/a.js");
@@ -166,7 +173,7 @@ class ClientErrorReportControllerTest {
 
     controller.report(
         new ClientErrorReport(
-            forged, "https://app/js/a.js", 1, 2, MetricNames.CLIENT_ERROR_RESOURCE_ERROR));
+            forged, "https://app/js/a.js", 1, 2, MetricNames.CLIENT_ERROR_RESOURCE_ERROR, null));
 
     String line = appender.list.getFirst().getFormattedMessage();
     assertThat(line).doesNotContain("\n");
@@ -184,13 +191,14 @@ class ClientErrorReportControllerTest {
   }
 
   @Test
-  void payloadAcceptsExactlyTheFiveDeclaredFields() {
+  void payloadAcceptsExactlyTheSixDeclaredFields() {
     List<String> components =
         Arrays.stream(ClientErrorReport.class.getRecordComponents())
             .map(RecordComponent::getName)
             .toList();
 
-    assertThat(components).containsExactly("message", "source", "line", "column", "kind");
+    assertThat(components)
+        .containsExactly("message", "source", "line", "column", "kind", "codeOrigin");
   }
 
   @Test
@@ -203,7 +211,7 @@ class ClientErrorReportControllerTest {
   }
 
   @Test
-  void beaconSendsExactlyTheFiveAllowedFieldsAndNothingElse() throws IOException {
+  void beaconSendsExactlyTheSixAllowedFieldsAndNothingElse() throws IOException {
     String beacon = readBeaconModule();
     Matcher payload = BEACON_PAYLOAD.matcher(beacon);
     assertThat(payload.find()).as("no `const payload = {…}` literal in %s", BEACON_MODULE).isTrue();
@@ -217,7 +225,8 @@ class ClientErrorReportControllerTest {
       keys.add(key.group(1));
     }
 
-    assertThat(keys).containsExactlyInAnyOrder("kind", "message", "source", "line", "column");
+    assertThat(keys)
+        .containsExactlyInAnyOrder("kind", "message", "source", "line", "column", "codeOrigin");
   }
 
   @Test
@@ -248,7 +257,8 @@ class ClientErrorReportControllerTest {
                 "https://evil.example",
                 null,
                 null,
-                MetricNames.CLIENT_ERROR_CSP_VIOLATION));
+                MetricNames.CLIENT_ERROR_CSP_VIOLATION,
+                null));
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
     assertThat(counterFor(MetricNames.CLIENT_ERROR_CSP_VIOLATION)).isEqualTo(1.0d);
@@ -266,7 +276,7 @@ class ClientErrorReportControllerTest {
   void cspViolation_isCountedByAllowListedDirective(String message, String directive) {
     controller.report(
         new ClientErrorReport(
-            message, "inline", null, null, MetricNames.CLIENT_ERROR_CSP_VIOLATION));
+            message, "inline", null, null, MetricNames.CLIENT_ERROR_CSP_VIOLATION, null));
 
     assertThat(directiveCount(directive)).isEqualTo(1.0d);
     assertThat(meterRegistry.find(MetricNames.CLIENT_CSP_VIOLATION).counters()).hasSize(1);
@@ -275,7 +285,8 @@ class ClientErrorReportControllerTest {
   @Test
   void cspViolationWithoutMessage_isCountedAsOtherDirective() {
     controller.report(
-        new ClientErrorReport(null, null, null, null, MetricNames.CLIENT_ERROR_CSP_VIOLATION));
+        new ClientErrorReport(
+            null, null, null, null, MetricNames.CLIENT_ERROR_CSP_VIOLATION, null));
 
     assertThat(directiveCount(MetricNames.DIRECTIVE_OTHER)).isEqualTo(1.0d);
   }
@@ -284,7 +295,7 @@ class ClientErrorReportControllerTest {
   void otherKinds_createNoDirectiveSeries() {
     controller.report(
         new ClientErrorReport(
-            "script-src", null, null, null, MetricNames.CLIENT_ERROR_SCRIPT_ERROR));
+            "script-src", null, null, null, MetricNames.CLIENT_ERROR_SCRIPT_ERROR, null));
 
     assertThat(meterRegistry.find(MetricNames.CLIENT_CSP_VIOLATION).counters()).isEmpty();
   }
@@ -298,7 +309,8 @@ class ClientErrorReportControllerTest {
               null,
               null,
               null,
-              MetricNames.CLIENT_ERROR_CSP_VIOLATION));
+              MetricNames.CLIENT_ERROR_CSP_VIOLATION,
+              null));
     }
 
     assertThat(meterRegistry.find(MetricNames.CLIENT_CSP_VIOLATION).counters()).hasSize(1);
@@ -310,7 +322,12 @@ class ClientErrorReportControllerTest {
     ResponseEntity<Void> response =
         controller.report(
             new ClientErrorReport(
-                "herkunftI18n.rest", null, null, null, MetricNames.CLIENT_ERROR_I18N_MISSING));
+                "herkunftI18n.rest",
+                null,
+                null,
+                null,
+                MetricNames.CLIENT_ERROR_I18N_MISSING,
+                null));
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
     assertThat(counterFor(MetricNames.CLIENT_ERROR_I18N_MISSING)).isEqualTo(1.0d);
@@ -331,7 +348,8 @@ class ClientErrorReportControllerTest {
             "https://user:secret@evil.example:8443/track/member-42?token=abc#frag",
             null,
             null,
-            MetricNames.CLIENT_ERROR_CSP_VIOLATION));
+            MetricNames.CLIENT_ERROR_CSP_VIOLATION,
+            null));
 
     String line = appender.list.getFirst().getFormattedMessage();
     assertThat(line).contains("source=https://evil.example:8443,");
@@ -347,6 +365,88 @@ class ClientErrorReportControllerTest {
     assertThat(ClientErrorReportController.originOnly("https://cdn.example/a.js?x=1"))
         .isEqualTo("https://cdn.example");
     assertThat(ClientErrorReportController.originOnly(null)).isNull();
+  }
+
+  @ParameterizedTest
+  @CsvSource(
+      value = {
+        "self, self",
+        "extension, extension",
+        "inline, inline",
+        "other, other",
+        "EXTENSION, other",
+        "chrome-extension://abc, other",
+        "NULL, other"
+      },
+      nullValues = "NULL")
+  void cspViolation_isCountedByAllowListedCodeOrigin(String codeOrigin, String expected) {
+    controller.report(
+        new ClientErrorReport(
+            "trusted-types", null, null, null, MetricNames.CLIENT_ERROR_CSP_VIOLATION, codeOrigin));
+
+    Counter counter =
+        meterRegistry
+            .find(MetricNames.CLIENT_CSP_VIOLATION)
+            .tag(MetricNames.TAG_DIRECTIVE, "trusted-types")
+            .tag(MetricNames.TAG_CODE_ORIGIN, expected)
+            .counter();
+    assertThat(counter).isNotNull();
+    assertThat(counter.count()).isEqualTo(1.0d);
+  }
+
+  @Test
+  void hostileCodeOrigin_cannotMintAnUnboundedSeries() {
+    for (int i = 0; i < 50; i++) {
+      controller.report(
+          new ClientErrorReport(
+              "img-src", null, null, null, MetricNames.CLIENT_ERROR_CSP_VIOLATION, "member-" + i));
+    }
+
+    assertThat(meterRegistry.find(MetricNames.CLIENT_CSP_VIOLATION).counters()).hasSize(1);
+  }
+
+  @Test
+  void trustedTypesPolicyNameAndCodeOrigin_reachTheLogLine() {
+    controller.report(
+        new ClientErrorReport(
+            "trusted-types dompurify",
+            "trusted-types-policy",
+            null,
+            null,
+            MetricNames.CLIENT_ERROR_CSP_VIOLATION,
+            MetricNames.CODE_ORIGIN_EXTENSION));
+
+    String line = appender.list.getFirst().getFormattedMessage();
+    assertThat(line)
+        .contains("message=trusted-types dompurify,")
+        .contains("source=trusted-types-policy,")
+        .contains("codeOrigin=extension]");
+  }
+
+  @Test
+  void cspViolationMessage_losesEveryCharacterAPathOrMarkupNeeds() {
+    controller.report(
+        new ClientErrorReport(
+            "trusted-types https://evil.example/member-42?x=<b>",
+            null,
+            null,
+            null,
+            MetricNames.CLIENT_ERROR_CSP_VIOLATION,
+            MetricNames.CODE_ORIGIN_OTHER));
+
+    String line = appender.list.getFirst().getFormattedMessage();
+    assertThat(line).contains("message=trusted-types https???evil.example?member-42?x=?b?,");
+    assertThat(line).doesNotContain("/").doesNotContain("<");
+  }
+
+  @Test
+  void cspMessage_keepsDirectiveSinkAndPolicyNames() {
+    assertThat(
+            ClientErrorReportController.cspMessage("require-trusted-types-for Element innerHTML"))
+        .isEqualTo("require-trusted-types-for Element innerHTML");
+    assertThat(ClientErrorReportController.cspMessage("trusted-types my_policy.v2#a=b@c"))
+        .isEqualTo("trusted-types my_policy.v2#a=b@c");
+    assertThat(ClientErrorReportController.cspMessage(null)).isNull();
   }
 
   private double counterFor(String kind) {

@@ -10,6 +10,18 @@
     const KIND_I18N_MISSING = 'i18n_missing';
 
     const MAX_FIELD_LENGTH = 200;
+    const MAX_POLICY_NAME_LENGTH = 40;
+
+    const CODE_ORIGIN_SELF = 'self';
+    const CODE_ORIGIN_EXTENSION = 'extension';
+    const CODE_ORIGIN_INLINE = 'inline';
+    const CODE_ORIGIN_OTHER = 'other';
+    const EXTENSION_SCHEMES = [
+        'chrome-extension:',
+        'moz-extension:',
+        'safari-web-extension:',
+        'webkit-masked-url:',
+    ];
 
     const BUDGET_KEY = 'krtClientErrorBudget';
     const BUDGET_CAPACITY = 5;
@@ -22,6 +34,7 @@
      * @property {string | null} source the script URL or blocked origin
      * @property {number | null} line the line number
      * @property {number | null} column the column number
+     * @property {string | null} codeOrigin where a CSP violation's code came from, or null
      */
 
     /**
@@ -231,8 +244,9 @@
      * @param {unknown} source the script URL or blocked origin
      * @param {unknown} line the line number
      * @param {unknown} column the column number
+     * @param {string | null} [codeOrigin] one of the `CODE_ORIGIN_*` values for a CSP violation
      */
-    function report(kind, message, source, line, column) {
+    function report(kind, message, source, line, column, codeOrigin = null) {
         if (sending || !takeToken()) {
             return;
         }
@@ -242,6 +256,7 @@
             source: scriptUrl(source),
             line: number(line),
             column: number(column),
+            codeOrigin,
         };
         if (deliver(payload)) {
             return;
@@ -287,19 +302,64 @@
     );
 
     /**
+     * Reduces a Trusted Types policy name to its first 40 characters, each outside letters, digits
+     * and `_ . # = @ -` replaced by `?`.
+     *
+     * @param {string} value the attempted policy name
+     * @returns {string} the reduced name, empty when there was none
+     */
+    function policyName(value) {
+        return value
+            .trim()
+            .slice(0, MAX_POLICY_NAME_LENGTH)
+            .replace(/[^A-Za-z0-9_.#=@-]/g, '?');
+    }
+
+    /**
      * The violated directive; for a Trusted Types sink violation also the sink the browser names in
-     * front of the sample's `|`, never the sample's markup.
+     * front of the sample's `|`, for a policy violation the attempted policy name, never markup.
      *
      * @param {SecurityPolicyViolationEvent} event the violation event
-     * @returns {string} the directive, with the sink appended where applicable
+     * @returns {string} the directive, with the sink or policy name appended where applicable
      */
     function violationMessage(event) {
         const directive = event.effectiveDirective || event.violatedDirective;
-        if (directive !== 'require-trusted-types-for' || typeof event.sample !== 'string') {
+        if (typeof event.sample !== 'string') {
             return directive;
         }
-        const sink = event.sample.split('|')[0].trim();
-        return sink ? `${directive} ${sink}` : directive;
+        if (directive === 'require-trusted-types-for') {
+            const sink = event.sample.split('|')[0].trim();
+            return sink ? `${directive} ${sink}` : directive;
+        }
+        if (directive === 'trusted-types') {
+            const name = policyName(event.sample);
+            return name ? `${directive} ${name}` : directive;
+        }
+        return directive;
+    }
+
+    /**
+     * Classifies where a violation's code came from by its `sourceFile`: the page's own origin, a
+     * browser extension, no source file at all, or anything else. Never the URL itself.
+     *
+     * @param {unknown} value the event's sourceFile
+     * @returns {string} one of the `CODE_ORIGIN_*` values
+     */
+    function codeOriginOf(value) {
+        if (value === null || value === undefined || value === '') {
+            return CODE_ORIGIN_INLINE;
+        }
+        const s = String(value).toLowerCase();
+        if (EXTENSION_SCHEMES.some((scheme) => s.startsWith(scheme))) {
+            return CODE_ORIGIN_EXTENSION;
+        }
+        try {
+            return new URL(s).origin === window.location.origin
+                ? CODE_ORIGIN_SELF
+                : CODE_ORIGIN_OTHER;
+        } catch (_notAUrl) {
+            return CODE_ORIGIN_OTHER;
+        }
     }
 
     document.addEventListener('securitypolicyviolation', (event) => {
@@ -310,6 +370,7 @@
                 event ? blockedOrigin(event.blockedURI) : null,
                 null,
                 null,
+                event ? codeOriginOf(event.sourceFile) : null,
             );
         } catch (_reportFailed) {}
     });

@@ -30,6 +30,7 @@ the how-to behind that rule.
 | `:frontend:testKrtFetchReadJs` | Node | the read path `krtFetch.get` / `getJson` (REQ-FE-031) |
 | `:frontend:testEslintBans` | Node + ESLint API | the transport, baseline and Trusted Types sink bans fire on planted sources |
 | `:frontend:testTrustedTypesJs` | Node | the `krtHtml` builder and the two Trusted Types policies (ADR-0239) |
+| `:frontend:testClientErrorCspJs` | Node | the beacon's CSP violation report: policy name, sink, code origin (REQ-SEC-064) |
 | `:frontend:checkExchangeDocs` | Python + markdownlint (pinned in `.github/tools/markdownlint`) + Node | everything under `docs/exchange/` exactly as the Exchange Docs workflow checks it, the Jekyll build aside: **no German text** (no umlaut, `ß` or `„`: write *Connected applications*, *warehouse*, *Material Exchange*), every relative link and anchor resolving, **markdownlint lines of at most 100 characters** (tables and code blocks exempt — rewrap the whole paragraph after an edit), the DPoP reference tests, the OpenAPI reference preparation. Needs Python on `PATH` (`python3`, `python` on Windows, or `-PpythonExecutable=…`). Run it after **every** edit of the developer pages: `./gradlew :frontend:checkExchangeDocs` |
 | `:frontend:testTypecheckRatchet` | Node | every script (subfolders too) is listed in a domain of `typecheck-ratchet.json`; each script lives in its domain's folder; no suppression pragma; `tsconfig.json` keeps `strict`, `checkJs`, `noImplicitAny` and `useUnknownInCatchVariables` on (REQ-FE-018) |
 
