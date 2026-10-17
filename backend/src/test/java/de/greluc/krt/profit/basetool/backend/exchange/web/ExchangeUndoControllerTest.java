@@ -493,6 +493,122 @@ class ExchangeUndoControllerTest {
     assertThat(total(laranite)).isZero();
   }
 
+  @Test
+  void anUnshareIsSharedBackIntoItsPool() throws Exception {
+    UUID laranite = material("Laranite");
+    UUID place = location();
+    UUID squadron = orgUnit("SQUADRON");
+    joins(squadron);
+    sharedRow(laranite, place, 10, squadron);
+    write(
+            "stock",
+            "{\"ops\":["
+                + rebook("unshare", laranite, locationName(place), squadron, "4", "10")
+                + "]}")
+        .andExpect(jsonPath("$.applied").value(1));
+
+    undo(Instant.now().minus(1, ChronoUnit.HOURS))
+        .andExpect(jsonPath("$.restored").value(1))
+        .andExpect(jsonPath("$.skipped.length()").value(0));
+
+    assertThat(total(laranite)).isEqualTo(10.0);
+    assertThat(pooled(squadron)).isEqualTo(10.0);
+  }
+
+  @Test
+  void aShareAndAnUnshareOfOneLotAreBothUndone() throws Exception {
+    UUID laranite = material("Laranite");
+    UUID place = location();
+    UUID squadron = orgUnit("SQUADRON");
+    UUID wing = orgUnit("SQUADRON");
+    joins(squadron);
+    joins(wing);
+    personalRow(laranite, place, 10);
+    sharedRow(laranite, place, 5, wing);
+    String name = locationName(place);
+    write(
+            "stock",
+            "{\"ops\":["
+                + share(laranite, name, squadron, "6", "10")
+                + ","
+                + rebook("unshare", laranite, name, squadron, "2", "6")
+                + ","
+                + rebook("unshare", laranite, name, wing, "5", "5")
+                + "]}")
+        .andExpect(jsonPath("$.applied").value(3));
+    assertThat(pooled(squadron)).isEqualTo(4.0);
+    assertThat(pooled(wing)).isZero();
+
+    undo(Instant.now().minus(1, ChronoUnit.HOURS))
+        .andExpect(jsonPath("$.restored").value(1))
+        .andExpect(jsonPath("$.skipped.length()").value(0));
+
+    assertThat(total(laranite)).isEqualTo(15.0);
+    assertThat(pooled(squadron)).isZero();
+    assertThat(pooled(wing)).isEqualTo(5.0);
+  }
+
+  @Test
+  void anUnshareFromAUnitTheMemberHasLeftIsSkippedAsGone() throws Exception {
+    UUID laranite = material("Laranite");
+    UUID place = location();
+    UUID left = orgUnit("SQUADRON");
+    sharedRow(laranite, place, 10, left);
+    write(
+            "stock",
+            "{\"ops\":["
+                + rebook("unshare", laranite, locationName(place), left, "10", "10")
+                + "]}")
+        .andExpect(jsonPath("$.applied").value(1));
+
+    undo(Instant.now().minus(1, ChronoUnit.HOURS))
+        .andExpect(jsonPath("$.restored").value(0))
+        .andExpect(jsonPath("$.skipped[0].resource").value("STOCK"))
+        .andExpect(jsonPath("$.skipped[0].reason").value("GONE"));
+
+    assertThat(pooled(left)).isZero();
+    assertThat(total(laranite)).isEqualTo(10.0);
+  }
+
+  /**
+   * Seeds a shared row of the member at quality 500.
+   *
+   * @param material the material
+   * @param location the location
+   * @param amount the amount
+   * @param unit the pool's unit
+   */
+  private void sharedRow(
+      @NotNull UUID material, @NotNull UUID location, double amount, @NotNull UUID unit) {
+    jdbc.update(
+        "INSERT INTO inventory_item (id, user_id, material_id, location_id, quality, amount,"
+            + " personal, stolen, owning_org_unit_id, created_at, version) VALUES (?, ?, ?, ?,"
+            + " 500, ?, false, false, ?, now(), 0)",
+        UUID.randomUUID(),
+        member,
+        material,
+        location,
+        amount,
+        unit);
+  }
+
+  /**
+   * Sums the member's own stock in a pool.
+   *
+   * @param unit the pool's unit
+   * @return the amount
+   */
+  private double pooled(@NotNull UUID unit) {
+    Double sum =
+        jdbc.queryForObject(
+            "SELECT COALESCE(SUM(amount), 0) FROM inventory_item WHERE user_id = ?"
+                + " AND NOT personal AND owning_org_unit_id = ?",
+            Double.class,
+            member,
+            unit);
+    return sum == null ? 0 : sum;
+  }
+
   /**
    * Seeds a personal row of the member without an org unit at quality 500.
    *
@@ -531,12 +647,33 @@ class ExchangeUndoControllerTest {
       @NotNull UUID unit,
       @NotNull String quantity,
       @NotNull String expected) {
+    return rebook("share", material, place, unit, quantity, expected);
+  }
+
+  /**
+   * Builds a share or unshare op of a not-stolen SCU lot at quality 500.
+   *
+   * @param op the op's name
+   * @param material the material
+   * @param place the location name
+   * @param unit the pool's unit
+   * @param quantity the amount to move
+   * @param expected the amount the client last saw at the source
+   * @return the op as JSON
+   */
+  private static @NotNull String rebook(
+      @NotNull String op,
+      @NotNull UUID material,
+      @NotNull String place,
+      @NotNull UUID unit,
+      @NotNull String quantity,
+      @NotNull String expected) {
     return """
-    {"op":"share","material":{"bt":"%s"},"location":{"name":"%s"},"quality":500,"stolen":false,
+    {"op":"%s","material":{"bt":"%s"},"location":{"name":"%s"},"quality":500,"stolen":false,
      "orgUnit":{"id":"%s"},"quantity":{"amount":%s,"unit":"SCU"},
      "expectedQuantity":{"amount":%s,"unit":"SCU"}}\
     """
-        .formatted(material, place, unit, quantity, expected);
+        .formatted(op, material, place, unit, quantity, expected);
   }
 
   /**

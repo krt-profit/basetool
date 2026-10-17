@@ -988,6 +988,66 @@
             "quantity",
             "expectedQuantity"
           ]
+        },
+        {
+          "type": "object",
+          "description": "Moves part of the member's own shared stock of the lot in a unit's pool back to personal; other members' stock in the pool is never touched.",
+          "properties": {
+            "opId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "Echoed in the result."
+            },
+            "op": {
+              "const": "unshare"
+            },
+            "material": {
+              "$ref": "item-ref.schema.json"
+            },
+            "location": {
+              "$ref": "location-ref.schema.json"
+            },
+            "quality": {
+              "$ref": "quality.schema.json"
+            },
+            "stolen": {
+              "type": "boolean"
+            },
+            "orgUnit": {
+              "type": "object",
+              "description": "The unit whose pool gives the stock back: any pool in the lot's split, also one of a unit the member has left.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "description": "Opaque identifier issued by the Basetool. Clients store and echo it, never parse it."
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "quantity": {
+              "$ref": "quantity.schema.json",
+              "description": "The amount to move; at most expectedQuantity."
+            },
+            "expectedQuantity": {
+              "$ref": "quantity.schema.json",
+              "description": "That pool's amount in the lot's split the client last saw. A difference answers VERSION_CONFLICT."
+            }
+          },
+          "required": [
+            "op",
+            "material",
+            "location",
+            "quality",
+            "stolen",
+            "orgUnit",
+            "quantity",
+            "expectedQuantity"
+          ]
         }
       ]
     },

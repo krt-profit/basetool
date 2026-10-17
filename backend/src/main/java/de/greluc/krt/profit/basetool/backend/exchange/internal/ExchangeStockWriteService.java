@@ -81,7 +81,8 @@ import tools.jackson.databind.ObjectMapper;
  * more of a row than its job-order and mission reservations leave free, through the Lager's own
  * book-out, which lowers linked Materialbörse offers and audits each offer it lowers or removes;
  * they are counted in the result. A share moves part of a lot's personal stock into the pool of one
- * of the member's direct units through the Lager's rebooking ({@link ExchangeStockShares}).
+ * of the member's direct units, an unshare moves the member's own stock in a pool back to personal,
+ * both through the Lager's rebooking ({@link ExchangeStockShares}).
  */
 @Service
 @RequiredArgsConstructor
@@ -194,11 +195,12 @@ public class ExchangeStockWriteService {
             : flipStolen(caller.member(), plan);
     List<ExchangeChangeResultDto.OpResult> results = new ArrayList<>();
     Set<String> touched = new HashSet<>();
+    Set<String> refused = new HashSet<>();
     for (int i = 0; i < plan.size(); i++) {
       String opId = changeSet.ops().get(i).opId();
       Planned planned = plan.get(i);
-      if (planned instanceof Share share) {
-        planned = runShare(caller, batch, share, changeSet.dryRun(), touched);
+      if (planned instanceof Rebooking rebooking) {
+        planned = runRebooking(caller, batch, rebooking, changeSet.dryRun(), touched, refused);
       }
       switch (planned) {
         case Change change -> {
@@ -209,7 +211,7 @@ public class ExchangeStockWriteService {
           touched.add(change.lot().key());
           applied++;
         }
-        case Share _ -> {
+        case Rebooking _ -> {
           if (!changeSet.dryRun()) {
             counter(caller, APPLIED).increment();
           }
@@ -328,8 +330,8 @@ public class ExchangeStockWriteService {
     List<Lot> lots = new ArrayList<>(ops.size());
     for (int i = 0; i < ops.size(); i++) {
       ExchangeStockChangeSet.Op op = ops.get(i);
-      if (isShare(op) && op.orgUnit() == null) {
-        throw new BadRequestException("A share names its org unit");
+      if (ExchangeStockShares.isRebooking(op) && op.orgUnit() == null) {
+        throw new BadRequestException("A share or unshare names its org unit");
       }
       ExchangeLotCatalogue.Entry entry = Objects.requireNonNull(catalogue.get(i));
       Skip skip = null;
@@ -343,7 +345,8 @@ public class ExchangeStockWriteService {
           skip = new Skip(REJECTED, LOCATION_UNKNOWN);
         } else if (!unit.equals(op.quantity().unit())
             || !unit.equals(op.expectedQuantity().unit())
-            || (isShare(op) && !ExchangeStockShares.isWhole(op.quantity(), unit))) {
+            || (ExchangeStockShares.isRebooking(op)
+                && !ExchangeStockShares.isWhole(op.quantity(), unit))) {
           skip = new Skip(REJECTED, UNIT_MISMATCH);
         } else if (Boolean.TRUE.equals(op.stolen())
             && !inventoryProperties.stolenMarkingEnabled()) {
@@ -360,11 +363,11 @@ public class ExchangeStockWriteService {
     }
     Map<String, List<StockRow>> locked = lockInKeyOrder(caller.member(), lots);
     Map<String, BigDecimal> quantities = new HashMap<>();
-    Map<String, BigDecimal> personals = new HashMap<>();
-    Set<UUID> memberships =
-        ops.stream().anyMatch(ExchangeStockWriteService::isShare)
-            ? membershipQueryService.findDirectMembershipOrgUnitIds(caller.member())
-            : Set.of();
+    ExchangeStockShares.Ledger ledger =
+        new ExchangeStockShares.Ledger(
+            ops.stream().anyMatch(op -> ExchangeStockChangeSet.SHARE.equals(op.op()))
+                ? membershipQueryService.findDirectMembershipOrgUnitIds(caller.member())
+                : Set.of());
     List<Planned> plan = new ArrayList<>();
     for (int i = 0; i < ops.size(); i++) {
       if (early.get(i) != null) {
@@ -376,24 +379,16 @@ public class ExchangeStockWriteService {
       String unit = lot.unit();
       List<StockRow> rows = Objects.requireNonNull(locked.get(lot.key()));
       BigDecimal current = quantities.computeIfAbsent(lot.key(), _ -> round(sum(rows), unit));
-      BigDecimal personal =
-          personals.computeIfAbsent(
-              lot.key(), _ -> round(sum(ExchangeStockShares.personalRows(rows)), unit));
       BigDecimal expected = round(op.expectedQuantity().amount(), unit);
       BigDecimal target = round(op.quantity().amount(), unit);
-      if (isShare(op)) {
-        UUID orgUnitId = Objects.requireNonNull(op.orgUnit()).id();
-        String refusal =
-            ExchangeStockShares.refusal(orgUnitId, memberships, personal, expected, target);
-        if (refusal != null || target.signum() == 0) {
-          plan.add(new Skip(refusal == null ? UNCHANGED : REJECTED, refusal));
-        } else {
-          personals.put(lot.key(), personal.subtract(target));
-          plan.add(
-              new Share(
-                  new ExchangeStockShares.Move(
-                      lot.stock(), lot.key(), unit, orgUnitId, target, current)));
-        }
+      if (ExchangeStockShares.isRebooking(op)) {
+        ExchangeStockShares.Decision decision =
+            ledger.decide(op, lot.stock(), lot.key(), unit, rows, current, expected, target);
+        ExchangeStockShares.Move move = decision.move();
+        plan.add(
+            move != null
+                ? new Rebooking(move)
+                : new Skip(decision.refusal() == null ? UNCHANGED : REJECTED, decision.refusal()));
         continue;
       }
       if (current.compareTo(expected) != 0) {
@@ -416,57 +411,60 @@ public class ExchangeStockWriteService {
         continue;
       }
       quantities.put(lot.key(), target);
-      BigDecimal delta = target.subtract(current);
-      personals.put(
-          lot.key(),
-          delta.signum() > 0
-              ? personal.add(delta)
-              : personal.subtract(personal.min(delta.negate())));
+      ledger.changed(lot.key(), unit, rows, current, target);
       plan.add(new Change(lot, current, target, rows));
     }
     return plan;
   }
 
   /**
-   * Runs a planned share; a dry run leaves a lot an earlier op of the batch would have written to
-   * the plan.
+   * Runs a planned share or unshare; a dry run leaves a lot an earlier op of the batch would have
+   * written to the plan, and a lot whose earlier rebooking the Lager refused is a version conflict,
+   * since the plan counted that rebooking.
    *
    * @param caller the caller
    * @param batch the change set's id
-   * @param share the share
+   * @param rebooking the share or unshare
    * @param dryRun whether to write nothing
-   * @param touched the lots earlier ops of the batch wrote or would have written; the share's lot
-   *     is added
-   * @return the share when it ran or would run, else the skip of the Lager's refusal
+   * @param touched the lots earlier ops of the batch wrote or would have written; the move's lot is
+   *     added
+   * @param refused the lots whose earlier rebooking the Lager refused; the move's lot is added on a
+   *     refusal
+   * @return the move when it ran or would run, else the skip of its refusal
    */
-  private @NotNull Planned runShare(
+  private @NotNull Planned runRebooking(
       @NotNull ExchangeCaller caller,
       @NotNull UUID batch,
-      @NotNull Share share,
+      @NotNull Rebooking rebooking,
       boolean dryRun,
-      @NotNull Set<String> touched) {
-    String key = share.move().key();
+      @NotNull Set<String> touched,
+      @NotNull Set<String> refused) {
+    String key = rebooking.move().key();
+    if (refused.contains(key)) {
+      return new Skip(REJECTED, VERSION_CONFLICT);
+    }
     if (!(dryRun && touched.contains(key))) {
-      String refusal = shares.run(caller, batch, share.move(), dryRun);
+      String refusal = shares.run(caller, batch, rebooking.move(), dryRun);
       if (refusal != null) {
+        refused.add(key);
         return new Skip(REJECTED, refusal);
       }
     }
     touched.add(key);
-    return share;
+    return rebooking;
   }
 
   /**
-   * Moves a lot's shared stock in the named pools back to personal for an undo; all or nothing.
+   * Sets a lot's pools back for an undo; all or nothing.
    *
    * @param member the member
    * @param lotKey the lot's key as the journal records it
    * @param unit the lot's unit
-   * @param pools the amount to take back from each pool
-   * @return whether every pool gave its amount back; {@code false} writes nothing
+   * @param pools the net amount the client moved into each pool
+   * @return whether every pool could be set back; {@code false} writes nothing
    */
   @Transactional(propagation = Propagation.MANDATORY)
-  public boolean takeBackShares(
+  public boolean restorePools(
       @NotNull UUID member,
       @NotNull String lotKey,
       @NotNull String unit,
@@ -477,16 +475,6 @@ public class ExchangeStockWriteService {
     }
     stockCommands.lockLots(member, List.of(lotKey));
     return shares.takeBack(member, parsed.get().stock(), pools);
-  }
-
-  /**
-   * Whether an op is a share.
-   *
-   * @param op the op
-   * @return {@code true} for a {@code share}
-   */
-  private static boolean isShare(@NotNull ExchangeStockChangeSet.Op op) {
-    return ExchangeStockChangeSet.SHARE.equals(op.op());
   }
 
   /**
@@ -829,7 +817,7 @@ public class ExchangeStockWriteService {
    * @param rows the rows
    * @return the sum
    */
-  private static @NotNull BigDecimal sum(@NotNull List<StockRow> rows) {
+  static @NotNull BigDecimal sum(@NotNull List<StockRow> rows) {
     BigDecimal sum = BigDecimal.ZERO;
     for (StockRow row : rows) {
       sum = sum.add(BigDecimal.valueOf(row.getAmount()));
@@ -957,14 +945,14 @@ public class ExchangeStockWriteService {
   }
 
   /** What one op of a change set will do. */
-  private sealed interface Planned permits Change, Share, Skip {}
+  private sealed interface Planned permits Change, Rebooking, Skip {}
 
   /**
-   * An op that moves part of a lot's personal stock into a pool.
+   * An op that moves part of a lot's stock between personal and a pool.
    *
-   * @param move the share
+   * @param move the share or unshare
    */
-  private record Share(@NotNull ExchangeStockShares.Move move) implements Planned {}
+  private record Rebooking(@NotNull ExchangeStockShares.Move move) implements Planned {}
 
   /**
    * An op that changes a lot.

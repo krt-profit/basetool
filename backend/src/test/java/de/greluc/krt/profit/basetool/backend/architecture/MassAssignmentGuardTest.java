@@ -339,7 +339,8 @@ class MassAssignmentGuardTest {
               Map.of(
                   "orgUnit",
                   "the unit whose pool a share fills, which ExchangeStockWriteService and"
-                      + " RebookCommands require to be a direct membership of the member"
+                      + " RebookCommands require to be a direct membership of the member, or"
+                      + " whose pool an unshare empties of the member's own rows only"
                       + " (REQ-XCH-016)")),
           Map.entry(
               ExchangeOrgUnitChoice.class,

@@ -3901,7 +3901,7 @@
           },
           "op" : {
             "type" : "string",
-            "pattern" : "^(set-quantity|share)$"
+            "pattern" : "^(set-quantity|share|unshare)$"
           },
           "opId" : {
             "type" : "string",

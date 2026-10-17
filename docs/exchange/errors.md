@@ -72,7 +72,7 @@ codes, whichever side refuses it.
 | `UNMATCHED` | The reference resolves to nothing. | Show it; offer `catalog/resolve`. |
 | `AMBIGUOUS` | The reference resolves to several entries. | Ask the member to pick; send `bt`. |
 | `DEFAULT_NOT_REMOVABLE` | A default-granted blueprint cannot be removed. | Keep it. |
-| `STOCK_EARMARKED` | The lot's stock, the stock a `share` would move, or the part of an org-stock `book-out` its earmark lines do not cover, is reserved for a job order, mission or donation. | Ask the member to release the reservation in the web, or name the earmarks to take from. |
+| `STOCK_EARMARKED` | The lot's stock, the stock a `share` or `unshare` would move, or the part of an org-stock `book-out` its earmark lines do not cover, is reserved for a job order, mission or donation. | Ask the member to release the reservation in the web, or name the earmarks to take from. |
 | `STOLEN_MARKING_DISABLED` | The Basetool does not yet keep stolen stock apart. | Keep the lot local until the server supports it. |
 | `REMOVED_ELSEWHERE` | The entry has a live tombstone from another channel or installation; for a ship, the named `shipId` was removed there. | Ask the member; resend with `override: true` only if they agree. |
 | `UNIT_MISMATCH` | The quantity's unit does not match the material's. | Fix the unit. |
@@ -81,10 +81,10 @@ codes, whichever side refuses it.
 | `VERSION_CONFLICT` | As above, for this op only; also an `upsert` without `shipId` for an id this installation already linked. | Pull, merge, retry this op. |
 | `NOT_PERMITTED` | An org-stock op on a pool whose unit the member is not a Logistician of, a `move-holder` into such a pool or to the entry's own holder in another pool, or an op on an entry that is unknown, personal or in another pool. | Do not retry; offer only the member's Logistician pools. |
 | `HOLDER_UNKNOWN` | An org-stock `book-in` or `move-holder` names a holder who is not on the receiving unit's roster. | Read the roster again and let the member pick. |
-| `INSUFFICIENT_STOCK` | An org-stock op takes or marks more than the entry holds, or a stock `share` more than the member's personal stock, shared stock outside any unit left out. | Pull and retry with the entry's amount. |
-| `STOCK_OFFERED` | A partial org-stock `stolen` or `move-pool`, or a stock `share`, would leave the stock below what it offers on the Basetool's material exchange. | Take less, or ask the holder to lower the offer in the web. |
+| `INSUFFICIENT_STOCK` | An org-stock op takes or marks more than the entry holds, a stock `share` more than the member's personal stock, shared stock outside any unit left out, or an `unshare` more than the member's own stock in the pool. | Pull and retry with the entry's amount. |
+| `STOCK_OFFERED` | A partial org-stock `stolen` or `move-pool`, or a stock `share` or `unshare`, would leave the stock below what it offers on the Basetool's material exchange. | Take less, or ask the holder to lower the offer in the web. |
 | `NOT_A_MEMBER` | A stock `share` names a unit the member is not a direct member of. | Offer only the units of `GET /me/org-units`. |
-| `QUANTITY_ABOVE_EXPECTED` | A stock `share` moves more than its `expectedQuantity`. | Move at most the personal amount the client last saw. |
+| `QUANTITY_ABOVE_EXPECTED` | A stock `share` or `unshare` moves more than its `expectedQuantity`. | Move at most the amount the client last saw at the source. |
 | `OVER_ALLOCATION` | The earmarks of one kind of an org-stock `book-in` add up to more than its amount, or an earmark op would earmark more of one kind than the entry holds. | Lower the earmarks. |
 | `EARMARK_TARGET_INVALID` | An org-stock earmark names a job order that does not need the material or item, an unknown mission, a mission for an item, a target twice, one the entry is not earmarked to, or, for `allocation-add`, one it already is. | Read the [targets](resources/org-stock.md#the-targets) and the entry again. |
 
