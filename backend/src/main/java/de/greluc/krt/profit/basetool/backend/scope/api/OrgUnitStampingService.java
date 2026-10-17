@@ -159,6 +159,29 @@ public class OrgUnitStampingService {
   }
 
   /**
+   * Resolves the owning org unit of the ships a hangar import creates (REQ-HANGAR-014): the
+   * member's only direct membership, else the active-context pin when it is one of them, else none,
+   * because an import names no unit and the member assigns it later with „Einheit ändern".
+   *
+   * @param targetUser the member the ships are imported for
+   * @return the resolved org unit, or {@code null} when none applies
+   */
+  @Nullable
+  public OrgUnit resolveOrgUnitForImport(@NotNull User targetUser) {
+    Set<UUID> memberOrgUnitIds = collectMemberOrgUnitIds(targetUser);
+    if (memberOrgUnitIds.isEmpty()) {
+      return null;
+    }
+    if (memberOrgUnitIds.size() > 1) {
+      Optional<UUID> pinned = requestScopeResolver.readActiveSquadronFromHeader();
+      if (pinned.isEmpty() || !memberOrgUnitIds.contains(pinned.get())) {
+        return null;
+      }
+    }
+    return resolveStampedOrgUnit(memberOrgUnitIds, null);
+  }
+
+  /**
    * Resolves the target of a later org-unit change of an owner's aggregate (REQ-HANGAR-009): one of
    * the owner's direct memberships of any kind, or none. Neither the caller's scope nor an
    * active-context pin widens it.

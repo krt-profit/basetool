@@ -303,6 +303,27 @@ REQ-HANGAR-009 and REQ-HANGAR-010 applied to the **member**.
 `MemberHangarShipProxyController`, `hangar/member-hangar.html`, `hangar/member-hangar.js`,
 `V291__seed_admin_ship_org_unit_notification_rule.sql` · **Issues:** #2601 (epic #2595, #2581).
 
+### REQ-HANGAR-014 — An import never fails on the member's org units
+
+„Schiffsliste importieren" offers no unit picker, so the import MUST NOT refuse a member who belongs
+to several org units. The ships it creates go to the member's only direct membership, else to the
+active org unit of the sidebar when it is one of the member's direct memberships, else to no unit;
+the member assigns them afterwards with „Einheit ändern" (REQ-HANGAR-009 / -010). This is the rule
+of a connected application's create (REQ-XCH-017) plus the pin, and an exception to REQ-ORG-017's
+„pin, else choose", which needs a picker the import does not have.
+
+**Acceptance**
+
+- [x] A member of several units with „Alle Staffeln" active imports successfully; the ships carry no
+  unit.
+- [x] With an active org unit among the member's memberships, the ships carry that unit.
+- [x] A member of exactly one unit, or of none, imports as before.
+
+**Enforced by:** `OwnerScopeServiceTest` (`resolveOrgUnitForImport_*`),
+`HangarImportIntegrationTest#importFleetview_memberOfSeveralUnitsWithoutPin_importsShipsWithoutUnit`,
+`HangarImportServiceTest` · **Code:** `OrgUnitStampingService#resolveOrgUnitForImport`,
+`HangarImportService#importShips`.
+
 ## Out of scope
 
 - The **squadron** hangar overview (`/hangar/squadron`) — REQ-HANGAR-001 — and the **admin per-user**

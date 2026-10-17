@@ -34,6 +34,7 @@
 
 ### Fixed
 
+- **Hangar-Import bei mehreren Org-Einheiten.** „Schiffsliste importieren" brach mit „Einige Felder sind ungültig" ab, wenn man mehreren Einheiten angehört und keine Einheit in der Seitenleiste gewählt ist. Die Schiffe landen jetzt in der aktiven Einheit, sonst ohne Einheit und lassen sich mit „Einheit ändern" zuordnen (Backend, REQ-HANGAR-014).
 - **Fehler beim Speichern: richtige Meldung und erneute Anmeldung.** 53 AJAX-Aktionen (Lager, Aufträge, Raffinerie, Missionen, Benachrichtigungen, Mitglieder, Profil, Organigramm, Admin-Stammdaten u. a.) fangen Fehler nicht mehr selbst als pauschalen 500/502 ab: Konflikte wie „gleichzeitig geändert" (409) behalten ihren Status und ihre Meldung, und eine abgelaufene Anmeldung führt wieder zur Keycloak-Anmeldung statt zu einem Fehler-Toast (Frontend, REQ-FE-036).
 - **Abgelaufene Anmeldung beim Seitenaufruf.** Seiten, deren Abschnitte einzeln nachladen (Startseite, Lager, Aufträge, Raffinerie, Missionen, Bank, Blueprints, Admin-Seiten u. a.), leiten bei abgelaufener Anmeldung wieder zur Keycloak-Anmeldung weiter, statt die Seite mit Fehlerhinweisen in jedem Abschnitt anzuzeigen (Frontend, REQ-FE-036).
 

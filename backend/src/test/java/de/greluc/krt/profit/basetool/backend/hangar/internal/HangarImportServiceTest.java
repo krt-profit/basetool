@@ -98,7 +98,7 @@ class HangarImportServiceTest {
         new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
     stubSquadron.setId(UUID.randomUUID());
     org.mockito.Mockito.lenient()
-        .when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(any(), any()))
+        .when(ownerScopeService.resolveOrgUnitForImport(any()))
         .thenReturn(stubSquadron);
   }
 
@@ -325,7 +325,7 @@ class HangarImportServiceTest {
     assertThat(result.duplicateCount()).isEqualTo(1);
     verify(shipRepository, times(2)).save(any(Ship.class));
     verify(shipRepository, times(1)).countShipsPerTypeByOwnerId(userId);
-    verify(ownerScopeService, times(1)).resolveOrgUnitForPickerOutputNullable(any(), any());
+    verify(ownerScopeService, times(1)).resolveOrgUnitForImport(any());
   }
 
   @Test
@@ -1497,7 +1497,7 @@ class HangarImportServiceTest {
 
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
-    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(any(), any())).thenReturn(null);
+    when(ownerScopeService.resolveOrgUnitForImport(any())).thenReturn(null);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
@@ -1525,7 +1525,7 @@ class HangarImportServiceTest {
 
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
-    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(any(), any()))
+    when(ownerScopeService.resolveOrgUnitForImport(any()))
         .thenThrow(new BadRequestException("multi-membership importer needs a picker"));
 
     assertThrows(BadRequestException.class, () -> hangarImportService.importShips(userId, file));
