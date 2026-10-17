@@ -108,7 +108,8 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
 
   /**
    * Loads the orders in the given statuses that one of the given org units is responsible for, with
-   * both kinds' requirement branches, for the exchange's org demand (REQ-XCH-018).
+   * both kinds' requirement branches and both org units, for the exchange's org demand
+   * (REQ-XCH-018, REQ-XCH-047).
    *
    * @param statuses the statuses to keep; never empty
    * @param orgUnitIds the responsible org units; never empty
@@ -123,7 +124,8 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
         "items.blueprint",
         "items.materials",
         "items.materials.material",
-        "responsibleOrgUnit"
+        "responsibleOrgUnit",
+        "requestingOrgUnit"
       })
   @Query(
       """

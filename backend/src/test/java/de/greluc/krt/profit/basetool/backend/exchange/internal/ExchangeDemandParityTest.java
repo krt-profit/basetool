@@ -121,7 +121,8 @@ class ExchangeDemandParityTest {
             materialRepository,
             blueprintRepository,
             familyResolver,
-            ownerScopeService);
+            ownerScopeService,
+            null);
     web =
         new JobOrderMaterialDemandService(
             jobOrderRepository,
@@ -164,7 +165,7 @@ class ExchangeDemandParityTest {
     givenOrders(Set.of(iridium.getId()), first, second, items);
 
     Map<Bucket, Double> webGaps = webGaps(web.getMaterialDemandOverview());
-    List<ExchangeDemandMaterialDto> lines = exchange.demand(MEMBER).materials();
+    List<ExchangeDemandMaterialDto> lines = exchange.demand(MEMBER, false).materials();
 
     assertThat(webGaps)
         .containsExactlyInAnyOrderEntriesOf(
@@ -186,7 +187,7 @@ class ExchangeDemandParityTest {
     when(ownerScopeService.canViewJobOrders()).thenReturn(false);
 
     MaterialDemandOverviewDto overview = web.getMaterialDemandOverview();
-    ExchangeOrgDemandDto demand = exchange.demand(MEMBER);
+    ExchangeOrgDemandDto demand = exchange.demand(MEMBER, false);
 
     assertThat(overview.groups()).isEmpty();
     assertThat(demand.materials()).isEmpty();
@@ -214,7 +215,7 @@ class ExchangeDemandParityTest {
     assertThat(overview.groups().get(0).materials().get(0).claimedAmount()).isEqualTo(30.0);
     assertThat(webGaps)
         .containsExactlyInAnyOrderEntriesOf(Map.of(new Bucket(agricium.id(), 0), 40.0));
-    assertThat(exchangeOpen(exchange.demand(MEMBER).materials())).isEqualTo(webGaps);
+    assertThat(exchangeOpen(exchange.demand(MEMBER, false).materials())).isEqualTo(webGaps);
   }
 
   @Test
@@ -239,7 +240,8 @@ class ExchangeDemandParityTest {
     assertThat(webGaps)
         .containsExactlyInAnyOrderEntriesOf(
             Map.of(new Bucket(agricium.id(), 650), 14.5, new Bucket(beryl.id(), 0), 0.0));
-    assertThat(exchangeOpen(exchange.demand(MEMBER).materials())).isEqualTo(positive(webGaps));
+    assertThat(exchangeOpen(exchange.demand(MEMBER, false).materials()))
+        .isEqualTo(positive(webGaps));
   }
 
   @Test
@@ -256,7 +258,7 @@ class ExchangeDemandParityTest {
 
     assertThat(webGaps)
         .containsExactlyInAnyOrderEntriesOf(Map.of(new Bucket(agricium.id(), 0), 5.0));
-    assertThat(exchangeOpen(exchange.demand(MEMBER).materials())).isEqualTo(webGaps);
+    assertThat(exchangeOpen(exchange.demand(MEMBER, false).materials())).isEqualTo(webGaps);
   }
 
   @Test
@@ -271,7 +273,7 @@ class ExchangeDemandParityTest {
     Map<Bucket, Double> webGaps = webGaps(web.getMaterialDemandOverview());
 
     assertThat(webGaps).containsExactlyInAnyOrderEntriesOf(Map.of(new Bucket(frames.id(), 0), 0.0));
-    assertThat(exchange.demand(MEMBER).materials()).isEmpty();
+    assertThat(exchange.demand(MEMBER, false).materials()).isEmpty();
   }
 
   /**

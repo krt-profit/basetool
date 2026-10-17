@@ -58,7 +58,8 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * The org demand route through both gates, with the backend relay mocked, and the schema that keeps
- * it anonymous (REQ-XCH-018).
+ * it anonymous (REQ-XCH-018) apart from the orders of the demand details, which name no assignee
+ * (REQ-XCH-047).
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 class ExchangeOrgDemandRouteTest {
@@ -75,6 +76,16 @@ class ExchangeOrgDemandRouteTest {
        "updatedAt":"2026-09-27T12:00:00Z"}
       """
           .formatted(UUID.randomUUID(), UUID.randomUUID());
+  private static final String DETAILED =
+      """
+      {"materials":[],"items":[],"updatedAt":"2026-09-27T12:00:00Z",
+       "orders":[{"id":"%s","number":17,"type":"MATERIAL","status":"%s","priority":2,
+                  "unit":{"id":"%s","name":"Alpha"},"requestingUnit":{"id":"%s","name":"Bravo"},
+                  "handle":"Requester","comment":"Bring it to Lorville",
+                  "materials":[{"material":{"bt":"%s","name":"Quantanium"},"minQuality":650,
+                                "openQuantity":{"amount":6,"unit":"SCU"}}],
+                  "items":[]}]}
+      """;
   private static final String WITHHELD =
       """
       {"materials":[],"items":[],"updatedAt":"2026-09-28T12:00:00Z","reason":"%s"}
@@ -157,17 +168,69 @@ class ExchangeOrgDemandRouteTest {
   }
 
   @Test
-  void theSchemaDeclaresNoPersonOrderOrFreeTextField() throws Exception {
+  void theDetailedOrdersAreRelayedAndCheckedAgainstTheSchema() throws Exception {
+    when(relay.forward(
+            eq(HttpMethod.GET), eq("/api/v1/exchange/me/org-demand"), isNull(), any(), any()))
+        .thenReturn(ok(detailed("IN_PROGRESS")));
+
+    call()
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.orders[0].number").value(17))
+        .andExpect(jsonPath("$.orders[0].handle").value("Requester"))
+        .andExpect(jsonPath("$.orders[0].materials[0].openQuantity.amount").value(6));
+  }
+
+  @Test
+  void aDetailedOrderOutsideTheOpenStatusesIsARelayFailure() throws Exception {
+    when(relay.forward(any(), anyString(), any(), any(), any()))
+        .thenReturn(ok(detailed("COMPLETED")));
+
+    call()
+        .andExpect(status().isBadGateway())
+        .andExpect(jsonPath("$.code").value(ExchangeRelay.RELAY_FAILED));
+  }
+
+  @Test
+  void theSchemaDeclaresNoPersonOrderOrFreeTextFieldOutsideTheDetailedOrders() throws Exception {
     JsonNode schema = MAPPER.readTree(Files.readString(SCHEMAS.resolve("org-demand.schema.json")));
 
     assertThat(names(schema.at("/properties")))
-        .containsExactly("items", "materials", "reason", "updatedAt");
+        .containsExactly("items", "materials", "orders", "reason", "updatedAt");
     assertThat(schema.at("/properties/reason/enum").valueStream().map(JsonNode::asString))
         .containsExactly("NOT_PERMITTED");
     assertThat(names(schema.at("/properties/materials/items/properties")))
         .containsExactly("material", "minQuality", "openQuantity", "rawRefs", "source");
     assertThat(names(schema.at("/properties/items/items/properties")))
         .containsExactly("craftableByMe", "item", "openQuantity");
+    assertThat(names(schema.at("/$defs/order/properties")))
+        .containsExactly(
+            "comment",
+            "handle",
+            "id",
+            "items",
+            "materials",
+            "number",
+            "priority",
+            "requestingUnit",
+            "status",
+            "type",
+            "unit");
+    assertThat(names(schema.at("/$defs/order/properties/materials/items/properties")))
+        .containsExactly("material", "minQuality", "openQuantity");
+    assertThat(names(schema.at("/$defs/order/properties/items/items/properties")))
+        .containsExactly("item", "openQuantity");
+    assertThat(names(schema.at("/$defs/unit/properties"))).containsExactly("id", "name");
+  }
+
+  /**
+   * Builds a detailed demand with one order in the given status.
+   *
+   * @param status the order's status
+   * @return the answer body
+   */
+  private static @NotNull String detailed(@NotNull String status) {
+    return DETAILED.formatted(
+        UUID.randomUUID(), status, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
   }
 
   /**

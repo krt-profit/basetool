@@ -29,6 +29,7 @@ the registry grants it to the client.
 | `exchange.stock.read` / `.write` | reading and setting the member's stock lots, personal and shared |
 | `exchange.hangar.read` / `.write` | reading and changing the member's own ships |
 | `exchange.demand.read` | the anonymous open demand of the member's units |
+| `exchange.demand.details` | with `.read`, the single orders of units where the member is a Logistician |
 | `exchange.orgunits.read` | the org units the member directly belongs to |
 | `exchange.orgstock.read` | the shared warehouse stock of those units, one pool per unit |
 | `exchange.orgstock.details` | with `.read`, the single named entries in the pools of units where the member is a Logistician |

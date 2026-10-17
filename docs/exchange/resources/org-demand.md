@@ -2,7 +2,8 @@
 
 `GET /exchange/v1/me/org-demand`, scope `exchange.demand.read`: what the member's units still need,
 so a client can show the member where their stock or their crafting helps. It is anonymous and
-read-only; there is no paging and no cursor.
+read-only; there is no paging and no cursor. With the additional scope `exchange.demand.details`,
+a Logistician of a unit also gets that unit's orders one by one; see [order details](#order-details).
 
 ## Whose demand
 
@@ -78,11 +79,63 @@ An item order appears twice: as its item line and as the `item-order` material l
 made of. Count one or the other, never both. Lines with nothing open are left out. `updatedAt` is
 when the server computed the answer.
 
+## Order details
+
+With `exchange.demand.details` in addition to `exchange.demand.read`, the answer carries
+`orders[]`: the open and in-progress orders whose responsible unit is one the member is a
+**Logistician of** — the member's own Logistician flag or a leadership seat in exactly that unit; a
+seat above it does not count. `orders` is present only when the member is a Logistician of at least
+one unit they belong to, and then lists that unit's orders by number, possibly none. It is absent
+without the scope, for every other member and when the demand is withheld. `materials` and `items`
+stay exactly as above, and the orders of the member's other units stay summed there only.
+
+```json
+"orders": [
+  {
+    "id": "0b9a6f0e-4c1d-4a8e-9a3f-5c2d7e8f9a10",
+    "number": 412,
+    "type": "MATERIAL",
+    "status": "OPEN",
+    "priority": 3,
+    "unit": {"id": "7d1c2b3a-0000-4000-8000-000000000001", "name": "Alpha Squadron"},
+    "requestingUnit": {"id": "7d1c2b3a-0000-4000-8000-000000000002", "name": "Bravo Squadron"},
+    "handle": "Quartermaster",
+    "comment": "Deliver to the hangar at Lorville.",
+    "materials": [
+      {
+        "material": {"bt": "m-agr", "name": "Agricium"},
+        "minQuality": 650,
+        "openQuantity": {"amount": 40, "unit": "SCU"}
+      }
+    ],
+    "items": []
+  }
+]
+```
+
+| Field | Meaning |
+| --- | --- |
+| `id` | The order's id, the same an org-stock earmark names. Opaque. |
+| `number` | The running number the Basetool shows as `#412`. |
+| `type` | `MATERIAL` or `ITEM`. |
+| `status` | `OPEN` or `IN_PROGRESS`. |
+| `priority` | The order's place in the queue, 1 first; absent when it has none. |
+| `unit` | The unit responsible for the order, one the member is a Logistician of. |
+| `requestingUnit` | The unit that placed the order and receives the goods. |
+| `handle` | The requester as the order's author typed it — free text, not a member account. Absent when empty. |
+| `comment` | The order's comment, free text. Absent when empty. |
+| `materials` | Per material and quality floor, what this order still needs: its requirement minus the stock booked to it, never below zero. For an item order, what its items are made of. |
+| `items` | For an item order, per game item: ordered minus delivered minus reserved. Empty for a material order. |
+
+Lines with nothing open are left out. An order never names who works on it.
+
 ## What it does not reveal
 
-No requester, assignee, order number or title, unit name, free text or per-order figure — only
-catalogue names and summed amounts. Sums are not suppressed for small counts, so a line may stand for
-a single order. Treat the document as the member's organisation's internal data.
+Without the order details: no requester, assignee, order number or title, unit name, free text or
+per-order figure — only catalogue names and summed amounts. With them, the orders of the member's
+Logistician units carry their number, units, requester and comment, but never an assignee. Sums are
+not suppressed for small counts, so a line may stand for a single order. Treat the document as the
+member's organisation's internal data.
 
 ## Caching
 

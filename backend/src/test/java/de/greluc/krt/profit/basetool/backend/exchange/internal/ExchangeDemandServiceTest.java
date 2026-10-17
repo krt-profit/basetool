@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeDemandMaterialDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeDemandUnitDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgDemandDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
@@ -55,6 +56,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectio
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService.OrderLinkedStockIndex;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.math.BigDecimal;
@@ -87,6 +89,7 @@ class ExchangeDemandServiceTest {
   @Mock private PersonalBlueprintRepository blueprintRepository;
   @Mock private BlueprintVariantFamilyResolver familyResolver;
   @Mock private OwnerScopeService ownerScopeService;
+  @Mock private ExchangeOrgUnitService orgUnitService;
   @InjectMocks private ExchangeDemandService service;
 
   private OrderLinkedStockIndex stock;
@@ -109,7 +112,7 @@ class ExchangeDemandServiceTest {
   void aMemberOfNoUnitSeesNoDemandAndNoOrderIsRead() {
     when(membershipRepository.findOrgUnitIdsByUserId(MEMBER)).thenReturn(Set.of());
 
-    ExchangeOrgDemandDto demand = service.demand(MEMBER);
+    ExchangeOrgDemandDto demand = service.demand(MEMBER, false);
 
     assertThat(demand.materials()).isEmpty();
     assertThat(demand.items()).isEmpty();
@@ -121,7 +124,7 @@ class ExchangeDemandServiceTest {
   void aMemberWhoFailsTheJobOrderGateGetsNotPermittedAndNothingIsRead() {
     when(ownerScopeService.canViewJobOrders()).thenReturn(false);
 
-    ExchangeOrgDemandDto demand = service.demand(MEMBER);
+    ExchangeOrgDemandDto demand = service.demand(MEMBER, false);
 
     assertThat(demand.materials()).isEmpty();
     assertThat(demand.items()).isEmpty();
@@ -137,7 +140,7 @@ class ExchangeDemandServiceTest {
     givenOrders(order);
     requires(order, QualityTierFixtures.noneDto(), 8.0, 0.0);
 
-    ExchangeOrgDemandDto demand = service.demand(MEMBER);
+    ExchangeOrgDemandDto demand = service.demand(MEMBER, false);
 
     assertThat(demand.reason()).isNull();
     assertThat(demand.materials()).hasSize(1);
@@ -150,7 +153,7 @@ class ExchangeDemandServiceTest {
     when(jobOrderRepository.findOpenForExchangeDemand(any(), eq(Set.of(UNIT))))
         .thenReturn(List.of());
 
-    service.demand(MEMBER);
+    service.demand(MEMBER, false);
 
     verify(jobOrderRepository)
         .findOpenForExchangeDemand(
@@ -173,7 +176,7 @@ class ExchangeDemandServiceTest {
     when(materialRepository.findAllByRefinedMaterialIdIn(Set.of(quantanium.getId())))
         .thenReturn(List.of(ore));
 
-    List<ExchangeDemandMaterialDto> lines = service.demand(MEMBER).materials();
+    List<ExchangeDemandMaterialDto> lines = service.demand(MEMBER, false).materials();
 
     assertThat(lines).hasSize(2);
     ExchangeDemandMaterialDto good =
@@ -206,7 +209,7 @@ class ExchangeDemandServiceTest {
     when(blueprintRepository.findOwnerProductByOwnerUserIdIn(Set.of(MEMBER)))
         .thenReturn(List.of(new BlueprintOwnerProduct(MEMBER, "ORC-mkX Helmet")));
 
-    ExchangeOrgDemandDto demand = service.demand(MEMBER);
+    ExchangeOrgDemandDto demand = service.demand(MEMBER, false);
 
     assertThat(demand.items()).hasSize(2);
     assertThat(demand.items().get(0).item().bt()).isEqualTo(arrowhead.getId().toString());
@@ -216,6 +219,140 @@ class ExchangeDemandServiceTest {
     assertThat(demand.items().get(0).craftableByMe()).isFalse();
     assertThat(demand.items().get(1).item().bt()).isEqualTo(helmet.getId().toString());
     assertThat(demand.items().get(1).craftableByMe()).isTrue();
+  }
+
+  @Test
+  void withoutTheDetailsCapabilityTheAnswerNamesNoOrderAndNoLogisticianIsLookedUp() {
+    JobOrder order = order(JobOrderType.MATERIAL);
+    givenOrders(order);
+    requires(order, QualityTierFixtures.noneDto(), 8.0, 0.0);
+
+    ExchangeOrgDemandDto demand = service.demand(MEMBER, false);
+
+    assertThat(demand.orders()).isNull();
+    verifyNoInteractions(orgUnitService);
+  }
+
+  @Test
+  void aLogisticianOfTheResponsibleUnitGetsItsOrdersAndTheOtherUnitsStaySummedOnly() {
+    UUID other = UUID.randomUUID();
+    JobOrder mine = order(JobOrderType.MATERIAL);
+    mine.setDisplayId(17);
+    mine.setPriority(2);
+    mine.setHandle("Requester#1");
+    mine.setComment("Bring it to Lorville");
+    mine.setResponsibleOrgUnit(squadron(UNIT, "Alpha"));
+    UUID requesting = UUID.randomUUID();
+    mine.setRequestingOrgUnit(squadron(requesting, "Bravo"));
+    JobOrder foreign = order(JobOrderType.MATERIAL);
+    foreign.setResponsibleOrgUnit(squadron(other, "Charlie"));
+    when(membershipRepository.findOrgUnitIdsByUserId(MEMBER)).thenReturn(Set.of(UNIT, other));
+    when(jobOrderRepository.findOpenForExchangeDemand(any(), any()))
+        .thenReturn(List.of(mine, foreign));
+    when(orgUnitService.logisticianUnits(MEMBER)).thenReturn(Set.of(UNIT));
+    requires(mine, QualityTierFixtures.goodDto(), 10.0, 4.0);
+    requires(foreign, QualityTierFixtures.goodDto(), 3.0, 0.0);
+
+    ExchangeOrgDemandDto demand = service.demand(MEMBER, true);
+
+    assertThat(demand.materials())
+        .singleElement()
+        .satisfies(
+            l -> assertThat(l.openQuantity().amount()).isEqualByComparingTo(new BigDecimal("9")));
+    assertThat(demand.orders())
+        .singleElement()
+        .satisfies(
+            o -> {
+              assertThat(o.id()).isEqualTo(mine.getId());
+              assertThat(o.number()).isEqualTo(17);
+              assertThat(o.type()).isEqualTo("MATERIAL");
+              assertThat(o.status()).isEqualTo("OPEN");
+              assertThat(o.priority()).isEqualTo(2);
+              assertThat(o.unit()).isEqualTo(new ExchangeDemandUnitDto(UNIT, "Alpha"));
+              assertThat(o.requestingUnit())
+                  .isEqualTo(new ExchangeDemandUnitDto(requesting, "Bravo"));
+              assertThat(o.handle()).isEqualTo("Requester#1");
+              assertThat(o.comment()).isEqualTo("Bring it to Lorville");
+              assertThat(o.items()).isEmpty();
+              assertThat(o.materials())
+                  .singleElement()
+                  .satisfies(
+                      m -> {
+                        assertThat(m.material().bt()).isEqualTo(quantanium.getId().toString());
+                        assertThat(m.minQuality()).isEqualTo(650);
+                        assertThat(m.openQuantity().amount())
+                            .isEqualByComparingTo(new BigDecimal("6"));
+                      });
+            });
+  }
+
+  @Test
+  void anOrdersOpenLinesClampEachMaterialOnItsOwnAndCountItsOpenPieces() {
+    JobOrder covered = order(JobOrderType.MATERIAL);
+    covered.setResponsibleOrgUnit(squadron(UNIT, "Alpha"));
+    JobOrder items = order(JobOrderType.ITEM);
+    items.setResponsibleOrgUnit(squadron(UNIT, "Alpha"));
+    GameItem helmet = gameItem("ORC-mkX Helmet");
+    items.getItems().add(line(helmet, "ORC-mkX Helmet", 5, 1));
+    givenOrders(covered, items);
+    when(orgUnitService.logisticianUnits(MEMBER)).thenReturn(Set.of(UNIT));
+    requires(covered, QualityTierFixtures.noneDto(), 2.0, 5.0);
+    requires(items, QualityTierFixtures.noneDto(), 3.0, 1.0);
+    when(stockReads.gameItemStockOfOrders(any()))
+        .thenReturn(List.of(new JobOrderGameItemStockRow(items.getId(), helmet.getId(), 2.0)));
+
+    ExchangeOrgDemandDto demand = service.demand(MEMBER, true);
+
+    assertThat(demand.orders()).hasSize(2);
+    assertThat(demand.orders().get(0).materials()).isEmpty();
+    assertThat(demand.orders().get(1).type()).isEqualTo("ITEM");
+    assertThat(demand.orders().get(1).materials())
+        .singleElement()
+        .satisfies(
+            m -> assertThat(m.openQuantity().amount()).isEqualByComparingTo(new BigDecimal("2")));
+    assertThat(demand.orders().get(1).items())
+        .singleElement()
+        .satisfies(
+            i -> {
+              assertThat(i.item().bt()).isEqualTo(helmet.getId().toString());
+              assertThat(i.openQuantity().amount()).isEqualByComparingTo(new BigDecimal("2"));
+              assertThat(i.openQuantity().unit()).isEqualTo("PIECE");
+            });
+  }
+
+  @Test
+  void aMemberWhoIsNoLogisticianOfTheirUnitsGetsTheAnswerWithoutOrders() {
+    JobOrder order = order(JobOrderType.MATERIAL);
+    order.setResponsibleOrgUnit(squadron(UNIT, "Alpha"));
+    givenOrders(order);
+    when(orgUnitService.logisticianUnits(MEMBER)).thenReturn(Set.of(UUID.randomUUID()));
+    requires(order, QualityTierFixtures.noneDto(), 8.0, 0.0);
+
+    ExchangeOrgDemandDto demand = service.demand(MEMBER, true);
+
+    assertThat(demand.materials()).hasSize(1);
+    assertThat(demand.orders()).isNull();
+  }
+
+  @Test
+  void aLogisticianWithNothingOpenGetsAnEmptyOrderList() {
+    givenOrders();
+    when(orgUnitService.logisticianUnits(MEMBER)).thenReturn(Set.of(UNIT));
+
+    ExchangeOrgDemandDto demand = service.demand(MEMBER, true);
+
+    assertThat(demand.orders()).isEmpty();
+  }
+
+  @Test
+  void theJobOrderGateAppliesBeforeTheDetails() {
+    when(ownerScopeService.canViewJobOrders()).thenReturn(false);
+
+    ExchangeOrgDemandDto demand = service.demand(MEMBER, true);
+
+    assertThat(demand.reason()).isEqualTo(ExchangeOrgDemandDto.Reason.NOT_PERMITTED);
+    assertThat(demand.orders()).isNull();
+    verifyNoInteractions(orgUnitService, jobOrderRepository);
   }
 
   /**
@@ -264,6 +401,13 @@ class ExchangeDemandServiceTest {
     line.setAmount(amount);
     line.setDeliveredAmount(delivered);
     return line;
+  }
+
+  private static @NotNull Squadron squadron(@NotNull UUID id, @NotNull String name) {
+    Squadron squadron = new Squadron();
+    squadron.setId(id);
+    squadron.setName(name);
+    return squadron;
   }
 
   private static @NotNull GameItem gameItem(@NotNull String name) {

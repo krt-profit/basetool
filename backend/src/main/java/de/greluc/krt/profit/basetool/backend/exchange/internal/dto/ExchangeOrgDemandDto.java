@@ -28,20 +28,24 @@ import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * The anonymised open demand of the units the member belongs to: no requester, assignee, title,
- * free text or per-order breakdown (REQ-XCH-018).
+ * free text or per-order breakdown (REQ-XCH-018), except the orders of the member's Logistician
+ * units under {@code exchange.demand.details} (REQ-XCH-047).
  *
  * @param materials the open material lines
  * @param items the open item lines of item orders
  * @param updatedAt when the demand was computed
  * @param reason why both lists are empty regardless of the orders, or {@code null} when the member
  *     may see the demand
+ * @param orders the open orders of the member's Logistician units under {@code
+ *     exchange.demand.details}, or {@code null} without the capability or such a unit
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ExchangeOrgDemandDto(
     @NotNull @Unmodifiable List<ExchangeDemandMaterialDto> materials,
     @NotNull @Unmodifiable List<ExchangeDemandItemDto> items,
     @NotNull Instant updatedAt,
-    @Nullable Reason reason) {
+    @Nullable Reason reason,
+    @Nullable @Unmodifiable List<ExchangeDemandOrderDto> orders) {
 
   /**
    * An empty demand withheld for the given reason.
@@ -52,7 +56,7 @@ public record ExchangeOrgDemandDto(
    */
   public static @NotNull ExchangeOrgDemandDto withheld(
       @NotNull Reason reason, @NotNull Instant updatedAt) {
-    return new ExchangeOrgDemandDto(List.of(), List.of(), updatedAt, reason);
+    return new ExchangeOrgDemandDto(List.of(), List.of(), updatedAt, reason, null);
   }
 
   /** Why a demand is withheld. */
