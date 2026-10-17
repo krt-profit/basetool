@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Lager-Übersicht: Umschalter „Globales Lager | Mein Lager“ ohne Leerraum.** Die Segmente sind wieder genau so breit wie ihre Beschriftung; die Kopfzeilen-Navigation vererbte ihren Abstand an jeden Segment-Umschalter, der als `<nav>` gesetzt ist (Design-System-CSS, REQ-UI-028).
+
 ## [v1.16.5](https://github.com/krt-profit/basetool/releases/tag/v1.16.5) - 2026-10-17
 
 ### Added
@@ -27,8 +31,6 @@
 - **Profil: Namen von verbundenen Anwendungen zurückhalten.** Der neue Schalter „Meinen Namen nicht an verbundene Anwendungen weitergeben" im Profil (standardmäßig aus) speichert in place, ist Teil des Datenexports und wird im Bereich „Verbundene Anwendungen" protokolliert; die Datenschutzerklärung nennt, welche Namen eine Anwendung erhält. Wirksam wird er mit dem Einheitsbestand für Logistiker (REQ-XCH-044, ADR-0257, Migration V294).
 
 ### Fixed
-
-- **Lager-Übersicht: Umschalter „Globales Lager | Mein Lager“ ohne Leerraum.** Die Segmente sind wieder genau so breit wie ihre Beschriftung; die Kopfzeilen-Navigation vererbte ihren Abstand an jeden Segment-Umschalter, der als `<nav>` gesetzt ist (Design-System-CSS, REQ-UI-028).
 
 - **Monitoring: SC-Wiki-Sync sprengt das `uri`-Limit nicht mehr.** Backend und Ingest bereinigen den `uri`-Tag ausgehender Anfragen schon beim Start; vorher legte der Laufzeit-Timer `http.client.requests.active` je Wiki-Seite oder Feed-Cursor einen neuen Tag-Wert an, bis Micrometer weitere Werte verwarf (REQ-OBS-006).
 
