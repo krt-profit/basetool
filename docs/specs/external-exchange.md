@@ -248,6 +248,9 @@ reserved: it joins the exchange as a registry client of its own at the go-live.
   reactivation — `ExchangeConnectionsE2eTest.anAdminSuspensionAndReactivationReachTheGateway`,
   which requires the first refusal and every refusal until the reactivation reaches the gateway
   to be `403 CLIENT_SUSPENDED`, whichever side gave it.*
+- [x] The registry table fits the page width on a desktop screen — its headers wrap and a row's
+  actions stack — and every capability checkbox in the form keeps one size, however long its
+  label. *Page stylesheet `admin-exchange-clients.css`; not gated by a test.*
 - [x] The backend's gate refuses a suspended or unregistered client and a switched-off exchange
   with the gateway's code and status, and the gateway relays them unchanged. *Backend
   `ExchangeGateTest`, `ExchangeCatalogControllerTest`; gateway `ExchangeRelayTest`,
