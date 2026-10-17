@@ -901,6 +901,7 @@ MaterialPriceDto.scuSell=integer/int32
 MaterialPriceDto.statusBuy=boolean
 MaterialPriceDto.statusSell=boolean
 MaterialPriceDto.terminalName=string
+MaterialPriceDto.uexUpdatedAt=string/date-time
 MaterialPriceOverviewDto.category=$MaterialCategoryDto
 MaterialPriceOverviewDto.id=string/uuid
 MaterialPriceOverviewDto.isIllegal=boolean
