@@ -23,8 +23,9 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * One part of a member's exchange stock lot: the member's personal rows of the lot, or their own
- * shared rows of it in one org-unit pool, summed (REQ-XCH-016).
+ * One part of a member's exchange stock lot: the member's personal rows of the lot with their
+ * shared rows outside any unit, or their own shared rows of it in one org-unit pool, summed
+ * (REQ-XCH-016).
  */
 public interface ExchangeStockSplitRow {
 

@@ -277,6 +277,22 @@ class ExchangeStockControllerTest {
   }
 
   @Test
+  void sharedStockOutsideAnyUnitCountsAsPersonalSoThePartsAddUpToTheLot() throws Exception {
+    UUID titanium = material("RAW", "SCU", null);
+    UUID area18 = location("Area18 " + UUID.randomUUID());
+    UUID pool = orgUnit("Split Unitless");
+    stock(member, titanium, null, area18, 1, 1, true, false, null);
+    stock(member, titanium, null, area18, 1, 2, false, false, null);
+    stock(member, titanium, null, area18, 1, 4, false, false, pool);
+
+    read(relayed(get(PATH)))
+        .andExpect(jsonPath("$.items[0].quantity.amount").value(7))
+        .andExpect(jsonPath("$.items[0].split.personal.amount").value(3))
+        .andExpect(jsonPath("$.items[0].split.pools.length()").value(1))
+        .andExpect(pool(pool, "amount").value(4));
+  }
+
+  @Test
   void aLotWithoutSharedStockCarriesAnEmptyPoolList() throws Exception {
     UUID helmet = item();
     stock(

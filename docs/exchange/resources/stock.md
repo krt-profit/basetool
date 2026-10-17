@@ -48,13 +48,13 @@ sits in each unit's pool. It counts only the member's own stock, never another m
 
 | Field | Meaning |
 | --- | --- |
-| `personal` | The member's personal stock of the lot; 0 when there is none. |
+| `personal` | The member's personal stock of the lot, with any shared stock outside a unit; 0 when there is none. |
 | `pools` | One entry per unit in whose pool the member holds stock of the lot: `orgUnit.id` and `quantity`. Ordered by unit id; empty when nothing is shared. |
 
 A pool of a unit the member has left stays in `pools` while they hold stock in it. Every amount
 is rounded like `quantity` on its own, so the parts may differ from `quantity` in the last decimal.
-`personal` plus the pools add up to `quantity` except for shared stock outside any unit, which
-neither part counts. `split` is optional: a client that ignores it
+Shared stock outside any unit counts as personal, so `personal` plus the pools always add up to
+`quantity`. `split` is optional: a client that ignores it
 keeps working.
 
 ### Material kind

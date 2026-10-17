@@ -162,7 +162,7 @@ public class ExchangeStockFeedService {
    *
    * @param member the member
    * @param keys the lot keys
-   * @return the parts per lot key; a lot without personal or pooled rows has none
+   * @return the parts per lot key
    */
   private @NotNull Map<String, List<ExchangeStockSplitRow>> splits(
       @NotNull UUID member, @NotNull Collection<String> keys) {
@@ -227,7 +227,7 @@ public class ExchangeStockFeedService {
    *
    * @param parts the lot's parts, the personal one with no unit
    * @param unit the lot's unit
-   * @return the split; personal is zero when the lot holds no personal rows
+   * @return the split; personal is zero when every row of the lot sits in a pool
    */
   private static @NotNull ExchangeStockSplitDto split(
       @NotNull List<ExchangeStockSplitRow> parts, @NotNull String unit) {

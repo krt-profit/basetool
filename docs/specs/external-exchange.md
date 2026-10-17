@@ -945,11 +945,11 @@ A lot carries an additive `split` (`exchange.stock.read`, no new scope): `person
 personal rows, and `pools`, one entry `{orgUnit: {id}, quantity}` per unit in whose pool the
 member holds shared rows of the lot, ordered by unit id — only the member's own rows, and a pool of
 a unit the member has left stays while they hold rows in it. Each amount is rounded like
-`quantity` on its own, so the parts may differ from `quantity` in the last decimal. `personal`
-plus the pools add up to `quantity`; the one exception is a shared row
-without a unit (the web's membershipless rebooking, REQ-INV-007), which neither part counts. A
-rebooking between personal and shared, or of a shared row to another pool, changes the lot's split
-but never its key or total, and brings the lot into the change feed whichever channel wrote it.
+`quantity` on its own, so the parts may differ from `quantity` in the last decimal. A
+shared row without a unit (the web's membershipless rebooking, REQ-INV-007) counts as personal,
+so `personal` plus the pools add up to `quantity`. A rebooking between personal and shared, or
+of a shared row to another pool, changes the lot's split but never its key or total, and brings the
+lot into the change feed whichever channel wrote it.
 Older clients that ignore `split` keep working (REQ-XCH-026).
 
 *Amended 2026-10-02 (ADR-0230, owner decision of the same day):* a lot covered the member's personal
@@ -984,8 +984,9 @@ production had landed at quality 0 (203 journal entries, 36 lots).
   out, and becomes a tombstone when its rows are gone. *`ExchangeStockControllerTest`. Amended
   2026-10-02 (ADR-0230): the lot left shared rows out, and a rebooking to the shared pool was a
   tombstone.*
-- [x] Every lot carries its `split`: the personal amount and the member's own amount in each pool,
-  a pool of a unit the member has left included, another member's shared rows never counted.
+- [x] Every lot carries its `split`: the personal amount, shared rows without a unit included, and
+  the member's own amount in each pool, a pool of a unit the member has left included, another
+  member's shared rows never counted.
   *`ExchangeStockControllerTest`.*
 - [x] A rebooking between personal and shared — in place, or the web's `personal-rebook` — and a
   shared row moved to another pool bring the lot into the feed with the same key and total and the

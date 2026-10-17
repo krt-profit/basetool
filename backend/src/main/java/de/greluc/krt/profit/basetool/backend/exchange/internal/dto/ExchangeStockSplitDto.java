@@ -27,7 +27,7 @@ import org.jetbrains.annotations.NotNull;
  * How a member's stock lot splits into their personal stock and their own shared stock in each
  * org-unit pool (REQ-XCH-016).
  *
- * @param personal the personal part, zero when the lot holds no personal rows
+ * @param personal the personal part with any shared stock outside a unit, zero when none
  * @param pools the member's part of each pool they hold rows of the lot in, ordered by unit id
  */
 public record ExchangeStockSplitDto(

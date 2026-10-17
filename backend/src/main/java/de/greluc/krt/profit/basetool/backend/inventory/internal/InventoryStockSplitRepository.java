@@ -32,7 +32,7 @@ public interface InventoryStockSplitRepository extends Repository<InventoryItem,
 
   /**
    * Returns the personal part and the member's own part of each org-unit pool of the member's lots
-   * with the given keys; shared rows without a unit are left out.
+   * with the given keys; shared rows without a unit count as personal.
    *
    * @param member the member
    * @param keys the lot keys; never empty
@@ -48,8 +48,7 @@ public interface InventoryStockSplitRepository extends Repository<InventoryItem,
                        CASE WHEN i.personal THEN NULL ELSE i.owning_org_unit_id END AS org_unit_id,
                        i.amount
                 FROM inventory_item i
-                WHERE i.user_id = :member
-                  AND (i.personal OR i.owning_org_unit_id IS NOT NULL)) parts
+                WHERE i.user_id = :member) parts
           WHERE parts.lot_key IN (:keys)
           GROUP BY parts.lot_key, parts.org_unit_id
           ORDER BY parts.lot_key, parts.org_unit_id NULLS FIRST

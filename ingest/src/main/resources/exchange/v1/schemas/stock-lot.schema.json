@@ -31,7 +31,7 @@
     },
     "split": {
       "type": "object",
-      "description": "How the lot splits into the member's personal stock and the member's own shared stock in each unit's pool, each in the lot's unit. A pool of a unit the member has left stays while they hold stock in it. Other members' shared stock is never counted. Personal plus the pools add up to quantity, up to the rounding of each amount, except for shared stock outside any unit, which neither part counts.",
+      "description": "How the lot splits into the member's personal stock and the member's own shared stock in each unit's pool, each in the lot's unit. A pool of a unit the member has left stays while they hold stock in it. Other members' shared stock is never counted. Shared stock outside any unit counts as personal, so personal plus the pools add up to quantity, up to the rounding of each amount.",
       "properties": {
         "personal": {
           "$ref": "quantity.schema.json"

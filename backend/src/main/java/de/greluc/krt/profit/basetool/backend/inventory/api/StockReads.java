@@ -100,7 +100,7 @@ public interface StockReads {
    * @param member the member
    * @param keys the lot keys; an empty collection yields an empty list
    * @return one part per lot and pool, the personal part with no unit; shared rows without a unit
-   *     are left out
+   *     count as personal
    */
   @NotNull
   List<ExchangeStockSplitRow> exchangeLotSplits(
