@@ -1307,6 +1307,17 @@ when `rootDir/.git` exists **and** a `git` executable is on `PATH`, and takes th
 when either is missing. The image build is unaffected either way: `docker/app/Dockerfile` passes
 `--no-configuration-cache`, which is why its git-less `eclipse-temurin` builder never hit this.
 
+**Nothing but a deliberate check reaches that path**, which is why one exists: an Actions runner
+always carries `git`, and the one git-less build this project runs is the image build, which has
+the configuration cache off. `scripts/check-gitless-config-cache.sh` therefore makes `git`
+unreachable itself. Two things about it are not obvious from reading it. It sets `PATH` to an empty
+directory and starts Gradle through `java -jar gradle/wrapper/gradle-wrapper.jar` rather than
+through `gradlew`, because the wrapper script resolves `xargs` and `uname` through `PATH` and would
+die before Gradle started. And it asserts `Configuration cache entry stored.` and `Configuration
+cache entry reused.` by name rather than the absence of a discard, so a `PATH` that still carries
+`git`, a stamp that is still `git describe`, or a Gradle release that renames the message fails the
+check rather than turning it green without having checked anything.
+
 Reuse is an optimisation, never a weakening of the supply chain. It applies only when **every** gate
 passes, and the doubt case is always a full build:
 
@@ -1438,11 +1449,14 @@ produced artifact.
   entry, reuses it on the second run and stamps the project version; with `git` present the stamp
   stays `git describe` and the entry is reused. Before the guard the same run failed because the
   `ProcessOutputValueSource` could not start `git`, which discarded the entry — with and without
-  `-PappVersion` (2026-10-17).
+  `-PappVersion` (2026-10-17). `scripts/check-gitless-config-cache.sh` asserts those four runs and
+  is a step of `ci.yml`'s `build` job, after the build that leaves the daemon and the Gradle caches
+  warm — 28 s for all four, measured locally.
 
 **Enforced by:** `.github/workflows/release-images.yml` (`plan`, `build`, `scan`, `merge`) ·
 `.github/scripts/image_reuse_plan.py` · `.github/workflows/promote.yml` (`sync-testing`) ·
-`frontend/build.gradle.kts` (`resolvedAppVersion`) · **Decision:** [ADR-0137](../adr/0137-one-image-build-per-commit-and-no-buildkit-layer-cache.md),
+`frontend/build.gradle.kts` (`resolvedAppVersion`) · `scripts/check-gitless-config-cache.sh`
+(`ci.yml`, `build`) · **Decision:** [ADR-0137](../adr/0137-one-image-build-per-commit-and-no-buildkit-layer-cache.md),
 [ADR-0210](../adr/0210-a-main-push-that-changes-no-image-input-re-tags-the-previous-build.md)
 
 ### REQ-OPS-022 — Non-production environments are fed by their own promotion channel
