@@ -9,7 +9,7 @@
 ## Context
 
 Issue #2662 asked to split the largest classes. ADR-0266 split two of them, but on `main` 27
-production Java files are longer than 1,000 lines, the longest at 1,820, and seven methods are longer
+production Java files are longer than 1,000 lines, the longest at 1,820, and six methods are longer
 than 150 lines, the longest at 186. Nothing stopped a file or a method from growing further, or a new
 one from starting out that large. Splitting everything at once was not the aim; stopping the growth
 was.
@@ -39,7 +39,7 @@ stop growth at all.
 
 - A file or method that is already too large can no longer grow, and no new one can pass the global
   ceilings.
-- The allow-list is the visible size debt: 27 files and 7 methods today.
+- The allow-list is the visible size debt: 27 files and 6 methods today.
 - Lowering an entry after a split is a manual step; nothing fails when an entry is looser than its
   file. A stale entry only allows regrowth up to the old size, never beyond it.
 - A rename or a move of a listed file drops its entry's match, so the renamed file falls under the

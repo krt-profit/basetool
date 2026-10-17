@@ -322,7 +322,7 @@
   <module name="FileLength">
     <property name="id" value="fileLengthMissionBackendClient"/>
     <property name="fileExtensions" value="java"/>
-    <property name="max" value="1124"/>
+    <property name="max" value="1110"/>
   </module>
   <module name="SuppressionSingleFilter">
     <property name="id" value="fileLength"/>
@@ -425,14 +425,6 @@
   <module name="SuppressionSingleFilter">
     <property name="id" value="methodLengthRefineryOrderPageController"/>
     <property name="files" value="^(?!.*basetool.frontend.refinery.web.RefineryOrderPageController\.java$)"/>
-  </module>
-  <module name="SuppressionSingleFilter">
-    <property name="id" value="methodLength"/>
-    <property name="files" value="basetool.frontend.mission.web.MissionPageController\.java$"/>
-  </module>
-  <module name="SuppressionSingleFilter">
-    <property name="id" value="methodLengthMissionPageController"/>
-    <property name="files" value="^(?!.*basetool.frontend.mission.web.MissionPageController\.java$)"/>
   </module>
   <module name="SuppressionSingleFilter">
     <property name="id" value="methodLength"/>
@@ -872,10 +864,6 @@
     <module name="MethodLength">
       <property name="id" value="methodLengthRefineryOrderPageController"/>
       <property name="max" value="178"/>
-    </module>
-    <module name="MethodLength">
-      <property name="id" value="methodLengthMissionPageController"/>
-      <property name="max" value="175"/>
     </module>
     <module name="MethodLength">
       <property name="id" value="methodLengthRefineryImportService"/>
