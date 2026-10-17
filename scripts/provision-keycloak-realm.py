@@ -183,7 +183,7 @@ class ClientSpec:
     wherever found; `withheld_scope_reason`, when set, names why for the scopes instead of
     `withheld_reason`. With `exact_mappers`, every client-level protocol mapper not in `mappers` is
     removed instead of reported. `value_env` names the environment variable that supplies a
-    confidential client's credential; only that name is ever printed. `secret_note`, when set,
+    confidential client's credential; only that name is ever printed. `credential_hint`, when set,
     replaces the host-.env instruction for where a generated secret goes.
     """
 
@@ -210,7 +210,7 @@ class ClientSpec:
     env_doc_hint: str = ""
     unmanaged_fields: set[str] = field(default_factory=set)
     value_env: str | None = None
-    secret_note: str = ""
+    credential_hint: str = ""
 
 
 def _flags(*, public: bool, standard: bool, service_accounts: bool, full_scope: bool,
@@ -301,7 +301,7 @@ def seed_client_spec(realm: str) -> ClientSpec:
             "realm-management": ["manage-users", "query-users", "view-realm", "view-users"],
         },
         env_vars_to_fill=["SEED_CLIENT_SECRET"],
-        secret_note=("scripts/seed-briefing.py reads it from $SEED_CLIENT_SECRET on the "
+        credential_hint=("scripts/seed-briefing.py reads it from $SEED_CLIENT_SECRET on the "
                      "workstation that runs the seed; it goes into no host .env"),
     )
 
@@ -1048,10 +1048,10 @@ class Planner:
                          for name in names)
 
     def _confidential_client_note(self, spec: ClientSpec) -> str:
-        if spec.secret_note:
+        if spec.credential_hint:
             return (f"'{spec.client_id}' is created confidential, so Keycloak generates its client "
                     f"secret. It is NOT printed here: read it in the Admin Console -> Clients -> "
-                    f"{spec.client_id} -> Credentials; {spec.secret_note}")
+                    f"{spec.client_id} -> Credentials; {spec.credential_hint}")
         return (f"'{spec.client_id}' is created confidential, so Keycloak generates its client "
                 f"secret. It is NOT printed here: read it in the Admin Console -> Clients -> "
                 f"{spec.client_id} -> Credentials, and put it into "
