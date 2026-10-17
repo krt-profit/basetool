@@ -3056,9 +3056,10 @@ go down (ADR-0267).
 - **Global ceilings.** A file has at most 1,000 lines (`FileLength`, id `fileLength`) and a method or
   constructor at most 150 (`MethodLength`, id `methodLength`), counted the way Checkstyle counts them.
 - **Allow-list at the current size.** A file that exceeded a ceiling when the ratchet was introduced
-  has its own entry in `config/checkstyle/google_checks.xml` — a check instance with the id
-  `fileLength<Class>` or `methodLength<Class>` and that file's maximum, confined to the file by a
-  `SuppressionSingleFilter`, with the global check lifted from it by another.
+  and still exceeds it has its own entry in `config/checkstyle/google_checks.xml` — a check instance
+  with the id `fileLength<Class>` or `methodLength<Class>` and that file's maximum, confined to the
+  file by a `SuppressionSingleFilter`, with the global check lifted from it by another. Removing an
+  entry removes all three modules, so the global check applies to the file again.
 - **Only down.** No entry is raised and no entry is added. A change that shrinks a listed file or
   method lowers its entry to the new size, or removes it once the file is under the global ceiling.
 - **No exemption by annotation.** A size finding is fixed by splitting, not by `@SuppressWarnings` or a
