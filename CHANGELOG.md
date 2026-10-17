@@ -6,11 +6,15 @@
 
 - **Audit: Änderung des Mitgliedsrangs wird protokolliert.** Ändert ein Admin den Rang 1–20 eines Mitglieds, schreibt das Audit-Log unter „Rollen & Mitglieder“ das Ereignis „Mitgliedsrang geändert“ mit altem und neuem Rang; ein unveränderter Rang erzeugt keinen Eintrag (REQ-AUDIT-001, REQ-ROLE-007).
 
+- **Profitberechnung: Sortieren per Spaltenkopf.** Material, je SCU, Marge, Kapital und Max Profit sortieren per Klick auf den Spaltenkopf, ein zweiter Klick dreht die Reihenfolge um – auch auf dem Handy über eine Leiste über der Liste. Die Platzziffer bleibt der Rang nach Max Profit; die Sortierung bleibt bei einer neuen Berechnung erhalten und wird pro Browser gemerkt (REQ-UI-030).
+
 - **Material-Detailseite: UEX-Stand je Preis.** Die Terminal-Tabelle zeigt in der neuen Spalte „UEX-Stand“, wann UEX den Preis des Terminals zuletzt aktualisiert hat; Preise, die älter als sieben Tage sind, sind als veraltet markiert. Die Kachel „Aktualisiert“ heißt jetzt „Letzter UEX-Sync“; `GET /api/v1/materials/{id}/prices` liefert dafür `uexUpdatedAt` (REQ-UI-015).
 
 - **Testsystem im Footer erkennbar.** Auf dem Testsystem zeigt der Footer jeder Seite ein gelbes „Testsystem"-Schild, damit niemand dort versehentlich echte Arbeit erledigt; Produktion bleibt unverändert. Geschaltet über die neue Umgebungsvariable `APP_INSTANCE_TEST_SYSTEM` (Frontend, REQ-UI-029).
 
 ### Changed
+
+- **Materialdetail: Sortieren über die Spaltenköpfe.** Die Tabelle „Preise und Terminals" sortiert per Klick auf Terminal, Ort, Verkauf oder Einkauf; ein zweiter Klick dreht die Richtung um – auch auf dem Handy über eine Leiste über der Liste. Der Umschalter „Verkauf · Einkauf" entfällt, Standard bleibt „Verkauf, höchster zuerst" (REQ-UI-015, REQ-UI-030).
 
 - **Monitoring: CSP-Verstöße nennen ihre Ursache.** Der Fehler-Beacon meldet bei einem `trusted-types`-Verstoß den versuchten Policy-Namen und bei jedem CSP-Verstoß, ob der Code von der eigenen Seite, einer Browser-Erweiterung oder anderswoher stammt; `basetool_client_csp_violation_total` trägt dafür das Label `code_origin` (Dashboard 07, Panel 85). Grundlage für die Trusted-Types-Umstellung auf `enforce` (REQ-SEC-064, REQ-FE-022).
 
