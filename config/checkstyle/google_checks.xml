@@ -54,6 +54,384 @@
     <property name="offCommentFormat" value='^""".?'/>
     <property name="onCommentFormat" value='.'/>
   </module>
+  <module name="FileLength">
+    <property name="id" value="fileLength"/>
+    <property name="fileExtensions" value="java"/>
+    <property name="max" value="1000"/>
+  </module>
+  <module name="FileLength">
+    <property name="id" value="fileLengthMissionWriteController"/>
+    <property name="fileExtensions" value="java"/>
+    <property name="max" value="1777"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLength"/>
+    <property name="files" value="basetool.frontend.mission.web.MissionWriteController\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLengthMissionWriteController"/>
+    <property name="files" value="^(?!.*basetool.frontend.mission.web.MissionWriteController\.java$)"/>
+  </module>
+  <module name="FileLength">
+    <property name="id" value="fileLengthP4kImportService"/>
+    <property name="fileExtensions" value="java"/>
+    <property name="max" value="1527"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLength"/>
+    <property name="files" value="basetool.backend.catalogue.internal.P4kImportService\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLengthP4kImportService"/>
+    <property name="files" value="^(?!.*basetool.backend.catalogue.internal.P4kImportService\.java$)"/>
+  </module>
+  <module name="FileLength">
+    <property name="id" value="fileLengthInventoryPageController"/>
+    <property name="fileExtensions" value="java"/>
+    <property name="max" value="1521"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLength"/>
+    <property name="files" value="basetool.frontend.inventory.web.InventoryPageController\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLengthInventoryPageController"/>
+    <property name="files" value="^(?!.*basetool.frontend.inventory.web.InventoryPageController\.java$)"/>
+  </module>
+  <module name="FileLength">
+    <property name="id" value="fileLengthInventoryItemRepository"/>
+    <property name="fileExtensions" value="java"/>
+    <property name="max" value="1512"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLength"/>
+    <property name="files" value="basetool.backend.inventory.internal.InventoryItemRepository\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLengthInventoryItemRepository"/>
+    <property name="files" value="^(?!.*basetool.backend.inventory.internal.InventoryItemRepository\.java$)"/>
+  </module>
+  <module name="FileLength">
+    <property name="id" value="fileLengthInventoryCheckoutService"/>
+    <property name="fileExtensions" value="java"/>
+    <property name="max" value="1483"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLength"/>
+    <property name="files" value="basetool.backend.inventory.internal.InventoryCheckoutService\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLengthInventoryCheckoutService"/>
+    <property name="files" value="^(?!.*basetool.backend.inventory.internal.InventoryCheckoutService\.java$)"/>
+  </module>
+  <module name="FileLength">
+    <property name="id" value="fileLengthMissionController"/>
+    <property name="fileExtensions" value="java"/>
+    <property name="max" value="1418"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLength"/>
+    <property name="files" value="basetool.backend.mission.web.MissionController\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLengthMissionController"/>
+    <property name="files" value="^(?!.*basetool.backend.mission.web.MissionController\.java$)"/>
+  </module>
+  <module name="FileLength">
+    <property name="id" value="fileLengthJobOrderWriteController"/>
+    <property name="fileExtensions" value="java"/>
+    <property name="max" value="1385"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLength"/>
+    <property name="files" value="basetool.frontend.joborder.web.JobOrderWriteController\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLengthJobOrderWriteController"/>
+    <property name="files" value="^(?!.*basetool.frontend.joborder.web.JobOrderWriteController\.java$)"/>
+  </module>
+  <module name="FileLength">
+    <property name="id" value="fileLengthInventoryItemService"/>
+    <property name="fileExtensions" value="java"/>
+    <property name="max" value="1312"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLength"/>
+    <property name="files" value="basetool.backend.inventory.internal.InventoryItemService\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLengthInventoryItemService"/>
+    <property name="files" value="^(?!.*basetool.backend.inventory.internal.InventoryItemService\.java$)"/>
+  </module>
+  <module name="FileLength">
+    <property name="id" value="fileLengthMissionService"/>
+    <property name="fileExtensions" value="java"/>
+    <property name="max" value="1301"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLength"/>
+    <property name="files" value="basetool.backend.mission.internal.MissionService\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLengthMissionService"/>
+    <property name="files" value="^(?!.*basetool.backend.mission.internal.MissionService\.java$)"/>
+  </module>
+  <module name="FileLength">
+    <property name="id" value="fileLengthExchangeController"/>
+    <property name="fileExtensions" value="java"/>
+    <property name="max" value="1293"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLength"/>
+    <property name="files" value="basetool.ingest.web.ExchangeController\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLengthExchangeController"/>
+    <property name="files" value="^(?!.*basetool.ingest.web.ExchangeController\.java$)"/>
+  </module>
+  <module name="FileLength">
+    <property name="id" value="fileLengthExchangeOrgStockWriteService"/>
+    <property name="fileExtensions" value="java"/>
+    <property name="max" value="1245"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLength"/>
+    <property name="files" value="basetool.backend.exchange.internal.ExchangeOrgStockWriteService\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLengthExchangeOrgStockWriteService"/>
+    <property name="files" value="^(?!.*basetool.backend.exchange.internal.ExchangeOrgStockWriteService\.java$)"/>
+  </module>
+  <module name="FileLength">
+    <property name="id" value="fileLengthInventoryItemController"/>
+    <property name="fileExtensions" value="java"/>
+    <property name="max" value="1228"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLength"/>
+    <property name="files" value="basetool.backend.inventory.web.InventoryItemController\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLengthInventoryItemController"/>
+    <property name="files" value="^(?!.*basetool.backend.inventory.web.InventoryItemController\.java$)"/>
+  </module>
+  <module name="FileLength">
+    <property name="id" value="fileLengthRefineryOrderPageController"/>
+    <property name="fileExtensions" value="java"/>
+    <property name="max" value="1204"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLength"/>
+    <property name="files" value="basetool.frontend.refinery.web.RefineryOrderPageController\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLengthRefineryOrderPageController"/>
+    <property name="files" value="^(?!.*basetool.frontend.refinery.web.RefineryOrderPageController\.java$)"/>
+  </module>
+  <module name="FileLength">
+    <property name="id" value="fileLengthBankBookingRequestService"/>
+    <property name="fileExtensions" value="java"/>
+    <property name="max" value="1169"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLength"/>
+    <property name="files" value="basetool.backend.bank.internal.BankBookingRequestService\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLengthBankBookingRequestService"/>
+    <property name="files" value="^(?!.*basetool.backend.bank.internal.BankBookingRequestService\.java$)"/>
+  </module>
+  <module name="FileLength">
+    <property name="id" value="fileLengthJobOrderPageController"/>
+    <property name="fileExtensions" value="java"/>
+    <property name="max" value="1167"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLength"/>
+    <property name="files" value="basetool.frontend.joborder.web.JobOrderPageController\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLengthJobOrderPageController"/>
+    <property name="files" value="^(?!.*basetool.frontend.joborder.web.JobOrderPageController\.java$)"/>
+  </module>
+  <module name="FileLength">
+    <property name="id" value="fileLengthJobOrderService"/>
+    <property name="fileExtensions" value="java"/>
+    <property name="max" value="1156"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLength"/>
+    <property name="files" value="basetool.backend.joborder.internal.JobOrderService\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLengthJobOrderService"/>
+    <property name="files" value="^(?!.*basetool.backend.joborder.internal.JobOrderService\.java$)"/>
+  </module>
+  <module name="FileLength">
+    <property name="id" value="fileLengthMetricNames"/>
+    <property name="fileExtensions" value="java"/>
+    <property name="max" value="1152"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLength"/>
+    <property name="files" value="basetool.backend.platform.api.MetricNames\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLengthMetricNames"/>
+    <property name="files" value="^(?!.*basetool.backend.platform.api.MetricNames\.java$)"/>
+  </module>
+  <module name="FileLength">
+    <property name="id" value="fileLengthOrgUnitMembershipService"/>
+    <property name="fileExtensions" value="java"/>
+    <property name="max" value="1127"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLength"/>
+    <property name="files" value="basetool.backend.orgunit.api.OrgUnitMembershipService\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLengthOrgUnitMembershipService"/>
+    <property name="files" value="^(?!.*basetool.backend.orgunit.api.OrgUnitMembershipService\.java$)"/>
+  </module>
+  <module name="FileLength">
+    <property name="id" value="fileLengthMissionBackendClient"/>
+    <property name="fileExtensions" value="java"/>
+    <property name="max" value="1110"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLength"/>
+    <property name="files" value="basetool.frontend.mission.client.MissionBackendClient\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLengthMissionBackendClient"/>
+    <property name="files" value="^(?!.*basetool.frontend.mission.client.MissionBackendClient\.java$)"/>
+  </module>
+  <module name="FileLength">
+    <property name="id" value="fileLengthJobOrderController"/>
+    <property name="fileExtensions" value="java"/>
+    <property name="max" value="1114"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLength"/>
+    <property name="files" value="basetool.backend.joborder.web.JobOrderController\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLengthJobOrderController"/>
+    <property name="files" value="^(?!.*basetool.backend.joborder.web.JobOrderController\.java$)"/>
+  </module>
+  <module name="FileLength">
+    <property name="id" value="fileLengthBankBackendClient"/>
+    <property name="fileExtensions" value="java"/>
+    <property name="max" value="1113"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLength"/>
+    <property name="files" value="basetool.frontend.bank.client.BankBackendClient\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLengthBankBackendClient"/>
+    <property name="files" value="^(?!.*basetool.frontend.bank.client.BankBackendClient\.java$)"/>
+  </module>
+  <module name="FileLength">
+    <property name="id" value="fileLengthCatalogueBackendClient"/>
+    <property name="fileExtensions" value="java"/>
+    <property name="max" value="1101"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLength"/>
+    <property name="files" value="basetool.frontend.catalogue.client.CatalogueBackendClient\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLengthCatalogueBackendClient"/>
+    <property name="files" value="^(?!.*basetool.frontend.catalogue.client.CatalogueBackendClient\.java$)"/>
+  </module>
+  <module name="FileLength">
+    <property name="id" value="fileLengthInventoryPoolEntryCommands"/>
+    <property name="fileExtensions" value="java"/>
+    <property name="max" value="1035"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLength"/>
+    <property name="files" value="basetool.backend.inventory.internal.InventoryPoolEntryCommands\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLengthInventoryPoolEntryCommands"/>
+    <property name="files" value="^(?!.*basetool.backend.inventory.internal.InventoryPoolEntryCommands\.java$)"/>
+  </module>
+  <module name="FileLength">
+    <property name="id" value="fileLengthExchangeShipWriteService"/>
+    <property name="fileExtensions" value="java"/>
+    <property name="max" value="1019"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLength"/>
+    <property name="files" value="basetool.backend.exchange.internal.ExchangeShipWriteService\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLengthExchangeShipWriteService"/>
+    <property name="files" value="^(?!.*basetool.backend.exchange.internal.ExchangeShipWriteService\.java$)"/>
+  </module>
+  <module name="FileLength">
+    <property name="id" value="fileLengthAdminMissionDataPageController"/>
+    <property name="fileExtensions" value="java"/>
+    <property name="max" value="1015"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLength"/>
+    <property name="files" value="basetool.frontend.catalogue.web.AdminMissionDataPageController\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="fileLengthAdminMissionDataPageController"/>
+    <property name="files" value="^(?!.*basetool.frontend.catalogue.web.AdminMissionDataPageController\.java$)"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="methodLength"/>
+    <property name="files" value="basetool.backend.app.api.SecurityConfig\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="methodLengthSecurityConfig"/>
+    <property name="files" value="^(?!.*basetool.backend.app.api.SecurityConfig\.java$)"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="methodLength"/>
+    <property name="files" value="basetool.frontend.refinery.web.RefineryOrderPageController\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="methodLengthRefineryOrderPageController"/>
+    <property name="files" value="^(?!.*basetool.frontend.refinery.web.RefineryOrderPageController\.java$)"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="methodLength"/>
+    <property name="files" value="basetool.backend.refinery.internal.RefineryImportService\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="methodLengthRefineryImportService"/>
+    <property name="files" value="^(?!.*basetool.backend.refinery.internal.RefineryImportService\.java$)"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="methodLength"/>
+    <property name="files" value="basetool.frontend.joborder.web.JobOrderPageController\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="methodLengthJobOrderPageController"/>
+    <property name="files" value="^(?!.*basetool.frontend.joborder.web.JobOrderPageController\.java$)"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="methodLength"/>
+    <property name="files" value="basetool.backend.joborder.internal.JobOrderItemProductionService\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="methodLengthJobOrderItemProductionService"/>
+    <property name="files" value="^(?!.*basetool.backend.joborder.internal.JobOrderItemProductionService\.java$)"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="methodLength"/>
+    <property name="files" value="basetool.backend.joborder.internal.JobOrderHandoverService\.java$"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="id" value="methodLengthJobOrderHandoverService"/>
+    <property name="files" value="^(?!.*basetool.backend.joborder.internal.JobOrderHandoverService\.java$)"/>
+  </module>
   <module name="TreeWalker">
     <module name="IllegalTokenText">
       <property name="id" value="whitespaceCharactersMustBeEscaped"/>
@@ -449,6 +827,34 @@
       <property name="tokens" value="SINGLE_LINE_COMMENT, BLOCK_COMMENT_BEGIN"/>
     </module>
     <module name="MultilineCommentLeadingAsteriskPresence"/>
+    <module name="MethodLength">
+      <property name="id" value="methodLength"/>
+      <property name="max" value="150"/>
+    </module>
+    <module name="MethodLength">
+      <property name="id" value="methodLengthSecurityConfig"/>
+      <property name="max" value="186"/>
+    </module>
+    <module name="MethodLength">
+      <property name="id" value="methodLengthRefineryOrderPageController"/>
+      <property name="max" value="178"/>
+    </module>
+    <module name="MethodLength">
+      <property name="id" value="methodLengthRefineryImportService"/>
+      <property name="max" value="174"/>
+    </module>
+    <module name="MethodLength">
+      <property name="id" value="methodLengthJobOrderPageController"/>
+      <property name="max" value="171"/>
+    </module>
+    <module name="MethodLength">
+      <property name="id" value="methodLengthJobOrderItemProductionService"/>
+      <property name="max" value="168"/>
+    </module>
+    <module name="MethodLength">
+      <property name="id" value="methodLengthJobOrderHandoverService"/>
+      <property name="max" value="164"/>
+    </module>
     <module name="SuppressionXpathSingleFilter">
       <property name="checks" value="MultilineCommentLeadingAsteriskPresence"/>
       <property name="query"

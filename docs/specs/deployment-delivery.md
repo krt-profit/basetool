@@ -2986,6 +2986,37 @@ application, is named `<app>-<name>` for `<app>` in `backend`, `frontend`, `inge
 [ADR-0249](../adr/0249-an-applications-library-modules-are-named-app-name-and-the-build-reads-the-name.md) ·
 **Related:** REQ-OPS-021, REQ-OPS-025, REQ-OPS-038, REQ-OPS-046
 
+### REQ-OPS-048 — Java files and methods may not grow past their current length
+
+The production Java sources of every module (`checkstyleMain`) are capped in size, and the caps only
+go down (ADR-0267).
+
+- **Global ceilings.** A file has at most 1,000 lines (`FileLength`, id `fileLength`) and a method or
+  constructor at most 150 (`MethodLength`, id `methodLength`), counted the way Checkstyle counts them.
+- **Allow-list at the current size.** A file that exceeded a ceiling when the ratchet was introduced
+  has its own entry in `config/checkstyle/google_checks.xml` — a check instance with the id
+  `fileLength<Class>` or `methodLength<Class>` and that file's maximum, confined to the file by a
+  `SuppressionSingleFilter`, with the global check lifted from it by another.
+- **Only down.** No entry is raised and no entry is added. A change that shrinks a listed file or
+  method lowers its entry to the new size, or removes it once the file is under the global ceiling.
+- **No exemption by annotation.** A size finding is fixed by splitting, not by `@SuppressWarnings` or a
+  suppression comment.
+
+**Acceptance**
+
+- [x] `checkstyleMain` of `backend`, `frontend`, `ingest`, `logging-support` and `keycloak-spi` passes
+  on `main` with every entry at its file's measured maximum.
+- [x] A probe file of 1,011 lines with a 162-line method in `ingest` (not committed) fails
+  `checkstyleMain` with a `fileLength` and a `methodLength` finding.
+- [x] Lowering the `MissionWriteController` file entry and the `SecurityConfig` method entry by one
+  line each fails `checkstyleMain` with `fileLengthMissionWriteController` and
+  `methodLengthSecurityConfig`.
+
+**Enforced by:** `config/checkstyle/google_checks.xml` (`checkstyleMain`, `maxWarnings = 0`) ·
+**Decision:**
+[ADR-0267](../adr/0267-a-size-ratchet-caps-java-files-and-methods-at-their-current-length.md) ·
+**Related:** REQ-OPS-046
+
 ## Open questions
 
 - Deepening the infra health gate beyond `redis-cli ping` / `pg_isready` (which do not

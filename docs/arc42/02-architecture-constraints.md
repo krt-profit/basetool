@@ -44,6 +44,9 @@ even though they are style rules on paper:
   goes into the commit message and the PR, durable facts into the spec, the ADR or the runbook.
   Nothing gates this beyond review.
 - **Google Java Style**, applied by Spotless and checked by Checkstyle; SpotBugs runs on `main`.
+- **Files and methods do not grow.** Checkstyle caps a production file at 1,000 lines and a method at
+  150; the larger ones are allow-listed at their current size, and an entry only goes down
+  (REQ-OPS-048, ADR-0267).
 - **Every user-visible string is translated**, and German umlauts are `\uXXXX`-escaped inside
   `.properties` and literal UTF-8 everywhere else.
 - **English for all developer-facing prose** — commits, PRs, issues, Javadoc. The German
