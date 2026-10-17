@@ -114,6 +114,6 @@ class PrivacyControllerTest {
       links++;
       assertThat(html).as("target of #%s", link.group(1)).contains("id=\"" + link.group(1) + "\"");
     }
-    assertThat(links).as("one jump link per section and subsection").isEqualTo(22);
+    assertThat(links).as("one jump link per section and subsection").isEqualTo(21);
   }
 }

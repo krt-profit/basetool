@@ -3,8 +3,8 @@
 This is the public record of the client applications approved to use the Basetool's Exchange API on a
 member's behalf (REQ-XCH-002, ADR-0217). Section 4 of the terms of use links this list and defines
 what it covers: every program that reaches the Basetool's interfaces and is not part of the platform
-itself (REQ-SEC-027). The web interface and the Android app are part of the platform and are not
-listed; the SC Extractor is a separate program, so it is listed although the operator publishes it.
+itself (REQ-SEC-027). The web interface, in a browser or installed as a web app, is part of the
+platform and is not listed; the SC Extractor is a separate program, so it is listed although the operator publishes it.
 A third-party client is approved when the owner merges the pull request that adds it here, following
 its public application issue; the criteria are in [`docs/exchange/onboarding.md`](../exchange/onboarding.md).
 
