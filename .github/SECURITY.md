@@ -38,8 +38,7 @@ a minimal public issue that says only *"I would like to report a security
 issue, please contact me"* — without any technical detail — and we will reach
 out privately to arrange a channel.
 
-Vulnerabilities in the Android app go to its own repository's advisory form
-([`krt-profit/basetool-android`](https://github.com/krt-profit/basetool-android/security/advisories/new)).
+The Android app is discontinued (ADR-0268) and no longer accepts reports.
 The desktop SC extractor's repository has no private reporting channel, so
 report extractor findings here and name the component. A finding that only
 shows up through a client but lives in the server — an API endpoint, the

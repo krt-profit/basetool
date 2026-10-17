@@ -4,11 +4,11 @@
 
 ### Security
 
-- **Die REST-API des Backends ist nicht mehr aus dem Internet erreichbar.** Der Vhost `api.profit-base.online` der eingestellten Android-App ist samt Netzwerk `net-proxy-api` entfernt; das Ingest-Gateway ist jetzt die einzige öffentliche API. `EDGE_HOST_API` entfällt aus `.env`, `ACME_HOSTS` verliert den Namen, und ein neues Zertifikat mit drei Namen wird ausgestellt (ADR-0268).
+- **Die REST-API des Backends ist nicht mehr aus dem Internet erreichbar.** Der Vhost `api.profit-base.online` der eingestellten Android-App ist samt Netzwerk `net-proxy-api` entfernt; das Ingest-Gateway ist jetzt die einzige öffentliche API. `EDGE_HOST_API` entfällt aus `.env`, `ACME_HOSTS` verliert den Namen, und die nächste Zertifikatserneuerung stellt ein Zertifikat mit drei Namen aus (ADR-0268).
 
 - **Neuer Alarm `PublicApiHostResolvesAgain`.** Er schlägt an, wenn `api.profit-base.online` wieder auflöst; der tägliche `edge-deny-probe`-Workflow prüft zusätzlich von außen, dass die Backend-Ports 11261/11271 zu sind und kein Vhost `/api/v1/**` beantwortet (REQ-OBS-012).
 
-- **Das Backend nimmt Token nur noch von bekannten Clients an.** Ein Zugriff auf `/api/v1` wird abgewiesen, wenn der Token nicht von `basetool-frontend` oder `basetool-ingest-gateway` ausgestellt wurde (Claim `azp`); ein neuer Realm-Client erhält damit nicht mehr automatisch API-Zugriff. Fehlt die Liste unter `prod`, startet das Backend nicht. Neue Variable `IRI_BACKEND_ACCEPTED_CLIENT_IDS` (ADR-0270, REQ-SEC-024).
+- **Das Backend nimmt Token nur noch von bekannten Clients an.** Ein Zugriff auf `/api/v1` wird abgewiesen, wenn der Token nicht von `basetool-frontend` oder `basetool-ingest-gateway` ausgestellt wurde (Claim `azp`); ein neuer Realm-Client erhält damit nicht mehr automatisch API-Zugriff. Fehlt die Liste unter `prod`, startet das Backend nicht. Die neue Variable `IRI_BACKEND_ACCEPTED_CLIENT_IDS` ist optional und nur bei umbenannten Realm-Clients zu setzen (ADR-0270, REQ-SEC-024).
 
 - **CSRF und CORS sind auf der Backend-Kette abgeschaltet.** Die Kette nimmt ausschließlich einen Bearer-JWT an und legt keine Session an, deshalb schützt CSRF dort nichts; ein neuer Test hält genau das fest, statt wie bisher eine Pfadliste zu pinnen. `app.cors.allowed-origin-patterns` entfällt. Der Prometheus-Scrape-Pfad bleibt unverändert (ADR-0271, REQ-SEC-044).
 
