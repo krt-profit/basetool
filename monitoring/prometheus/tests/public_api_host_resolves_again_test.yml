@@ -1,0 +1,83 @@
+rule_files:
+  - ../alerts/infrastructure.yml
+
+evaluation_interval: 30s
+
+tests:
+  - name: PublicApiHostResolvesAgain fires when the API host answers with an address record
+    interval: 30s
+    input_series:
+      - series: 'probe_success{job="blackbox-api-absent", instance="1.1.1.1"}'
+        values: "0x20"
+      - series: 'probe_success{job="blackbox-dns-a", instance="1.1.1.1"}'
+        values: "1x20"
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: PublicApiHostResolvesAgain
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: blackbox-api-absent
+              instance: "1.1.1.1"
+            exp_annotations:
+              summary: "The retired API host resolves again (api.profit-base.online)"
+              description: "api.profit-base.online answers with an address record again (A, AAAA or CNAME), while the apex still resolves — so this is the name coming back, not a DNS outage. The backend is internal-only and the ingest gateway is the only public API (ADR-0268): a resolving API host means the DNS record is back, and a vhost may be answering on it. Each record type is probed by its own job (blackbox-api-absent for A, -aaaa for AAAA), so an AAAA-only record is caught too. Check the zone at the DNS provider, then docker/edge/conf.d for a re-added vhost and the backend's networks in docker-compose.yml / quadlet for a re-joined edge network. The probe accepts NOERROR and NXDOMAIN and keys on the answer section, because a removed name in this zone answers NODATA rather than NXDOMAIN. The daily edge-deny-probe workflow asserts the same thing from a GitHub runner, plus that 11261 and 11271 are closed on the public address."
+
+  - name: PublicApiHostResolvesAgain stays silent while public DNS itself is failing
+    interval: 30s
+    input_series:
+      - series: 'probe_success{job="blackbox-api-absent", instance="1.1.1.1"}'
+        values: "0x20"
+      - series: 'probe_success{job="blackbox-dns-a", instance="1.1.1.1"}'
+        values: "0x20"
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: PublicApiHostResolvesAgain
+        exp_alerts: []
+
+  - name: PublicApiHostResolvesAgain is silent while the API host is gone
+    interval: 30s
+    input_series:
+      - series: 'probe_success{job="blackbox-api-absent", instance="1.1.1.1"}'
+        values: "1x20"
+      - series: 'probe_success{job="blackbox-dns-a", instance="1.1.1.1"}'
+        values: "1x20"
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: PublicApiHostResolvesAgain
+        exp_alerts: []
+
+  - name: PublicApiHostResolvesAgain fires on an AAAA-only record too
+    interval: 30s
+    input_series:
+      - series: 'probe_success{job="blackbox-api-absent", instance="1.1.1.1"}'
+        values: "1x20"
+      - series: 'probe_success{job="blackbox-api-absent-aaaa", instance="1.1.1.1"}'
+        values: "0x20"
+      - series: 'probe_success{job="blackbox-dns-a", instance="1.1.1.1"}'
+        values: "1x20"
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: PublicApiHostResolvesAgain
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: blackbox-api-absent-aaaa
+              instance: "1.1.1.1"
+            exp_annotations:
+              summary: "The retired API host resolves again (api.profit-base.online)"
+              description: "api.profit-base.online answers with an address record again (A, AAAA or CNAME), while the apex still resolves — so this is the name coming back, not a DNS outage. The backend is internal-only and the ingest gateway is the only public API (ADR-0268): a resolving API host means the DNS record is back, and a vhost may be answering on it. Each record type is probed by its own job (blackbox-api-absent for A, -aaaa for AAAA), so an AAAA-only record is caught too. Check the zone at the DNS provider, then docker/edge/conf.d for a re-added vhost and the backend's networks in docker-compose.yml / quadlet for a re-joined edge network. The probe accepts NOERROR and NXDOMAIN and keys on the answer section, because a removed name in this zone answers NODATA rather than NXDOMAIN. The daily edge-deny-probe workflow asserts the same thing from a GitHub runner, plus that 11261 and 11271 are closed on the public address."
+
+  - name: DnsResolutionFailed does not also claim the negative probe is a lost record
+    interval: 30s
+    input_series:
+      - series: 'probe_success{job="blackbox-api-absent", instance="1.1.1.1"}'
+        values: "0x20"
+      - series: 'probe_success{job="blackbox-dns-a", instance="1.1.1.1"}'
+        values: "1x20"
+      - series: 'probe_success{job="blackbox-dns-aaaa", instance="1.1.1.1"}'
+        values: "1x20"
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: DnsResolutionFailed
+        exp_alerts: []

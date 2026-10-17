@@ -359,7 +359,7 @@ section above.
 | **SudoAuthFailure** | A `sudo` failure on the host — investigate the source and session. |
 | **AuditdSshTamper** | An auditd watch hit inside `/etc/ssh/sshd_config(.d)` or `/root/.ssh`. Confirm the acting `auid`/`comm` was you. The watches are directory-wide, so a `known_hosts` append by an outbound `ssh` lands here too — attribute it (`ausearch -k sshd-authkeys`) before treating it as tampering. |
 | **EdgeServerErrorSpike / EdgeRateLimitSpike** | 5xx or 429 spike at the edge. Read `{app="edge"}` in Loki: upstream health and recent deploys for 5xx, source addresses for 429. If every line carries the same bridge address, the edge has lost the real client address (the PROXY-protocol trust list, ADR-0187) and the rate limiter sees one client. |
-| **EdgeActuatorDenyBroken** | **CRITICAL.** A public app host no longer answers 404 on `/actuator/*`. The deny is `location /actuator { return 404; }` in `docker/edge/conf.d/*.conf.template` and `include/api-allowlist.conf`; check what the last release changed there and whether the running edge carries it. |
+| **EdgeActuatorDenyBroken** | **CRITICAL.** A public app host no longer answers 404 on `/actuator/*`. The deny is `location /actuator { return 404; }` in `docker/edge/conf.d/*.conf.template`; check what the last release changed there and whether the running edge carries it. |
 | **EdgeForceSslRedirectBroken** | Port 80 of a public vhost stopped redirecting to HTTPS. Check the port-80 server blocks in the edge templates and the front end. |
 | **EdgeHstsHeaderMissing** | The first response lost its `Strict-Transport-Security` header. Check the app security config and the edge for a header-stripping change. |
 | **EdgeMembersOnlyRedirectBroken** | **CRITICAL.** `/missions`, `/operations` or `/orders` stopped redirecting an anonymous browser navigation to the login — member data may be public. Check the edge cache/`location` rules and the frontend's security chain. |
@@ -934,13 +934,15 @@ docker run --rm --entrypoint amtool -v "$PWD:/cfg" quay.io/prometheus/alertmanag
 
 # Blackbox — no `check-config` subcommand, so start it on the config and assert it logs
 # "Loaded config file". Then run the DNS modules against the LIVE zone: their regexps assert the
-# answer section's real shape, and a CNAME'd query name (api.profit-base.online is one) answers with
-# an alias RR next to the address RR — how the 2026-08-18 DnsResolutionFailed false alarm shipped.
+# answer section's real shape, and a CNAME'd query name answers with an alias RR next to the address
+# RR — how the 2026-08-18 DnsResolutionFailed false alarm shipped. `dns_api_absent` is the inverted
+# one: it asserts api.profit-base.online carries no address record, so it answers 1 only once that
+# record is gone (ADR-0268).
 docker run --rm -d --name bb-lint -p 19115:9115 \
   -v "$PWD/monitoring/blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro" \
   prom/blackbox-exporter:v0.29.0 --config.file=/etc/blackbox/blackbox.yml
 docker logs bb-lint 2>&1 | grep -E "Loaded config file|level=ERROR"
-for m in dns_apex_a dns_apex_aaaa dns_api_a dns_api_aaaa; do
+for m in dns_apex_a dns_apex_aaaa dns_api_absent dns_api_absent_aaaa; do
   echo "$m: $(curl -s "http://localhost:19115/probe?module=$m&target=1.1.1.1" \
     | awk '/^probe_success /{print $2}')"   # expect 1; add &debug=true to see the failing RR
 done

@@ -115,7 +115,7 @@ modules:
         fail_if_none_matches_regexp:
           - "\\s+\\d+\\s+IN\\s+AAAA\\s+[0-9a-fA-F:.]+$"
 
-  dns_api_a:
+  dns_api_absent:
     prober: dns
     timeout: 5s
     dns:
@@ -123,12 +123,12 @@ modules:
       ip_protocol_fallback: false
       query_name: "api.profit-base.online"
       query_type: "A"
-      valid_rcodes: ["NOERROR"]
+      valid_rcodes: ["NOERROR", "NXDOMAIN"]
       validate_answer_rrs:
-        fail_if_none_matches_regexp:
-          - "\\s+\\d+\\s+IN\\s+A\\s+\\d+\\.\\d+\\.\\d+\\.\\d+$"
+        fail_if_matches_regexp:
+          - "\\s+\\d+\\s+IN\\s+(A|AAAA|CNAME)\\s+"
 
-  dns_api_aaaa:
+  dns_api_absent_aaaa:
     prober: dns
     timeout: 5s
     dns:
@@ -136,10 +136,10 @@ modules:
       ip_protocol_fallback: false
       query_name: "api.profit-base.online"
       query_type: "AAAA"
-      valid_rcodes: ["NOERROR"]
+      valid_rcodes: ["NOERROR", "NXDOMAIN"]
       validate_answer_rrs:
-        fail_if_none_matches_regexp:
-          - "\\s+\\d+\\s+IN\\s+AAAA\\s+[0-9a-fA-F:.]+$"
+        fail_if_matches_regexp:
+          - "\\s+\\d+\\s+IN\\s+(A|AAAA|CNAME)\\s+"
 
   http_401:
     prober: http
@@ -213,24 +213,6 @@ modules:
     http:
       valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
       valid_status_codes: [200, 301, 302, 303, 307, 308]
-      method: GET
-      follow_redirects: false
-      fail_if_header_not_matches:
-        - header: Strict-Transport-Security
-          regexp: "max-age=\\d+"
-      fail_if_ssl: false
-      fail_if_not_ssl: false
-      preferred_ip_protocol: "ip4"
-      ip_protocol_fallback: false
-      tls_config:
-        insecure_skip_verify: false
-
-  http_2xx_or_401_hsts:
-    prober: http
-    timeout: 10s
-    http:
-      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
-      valid_status_codes: [200, 301, 302, 303, 307, 308, 401]
       method: GET
       follow_redirects: false
       fail_if_header_not_matches:

@@ -22,7 +22,6 @@ Network=net-proxy-frontend.network:ip=172.28.3.250
 Network=net-proxy-keycloak.network:ip=172.28.4.250
 Network=net-proxy-ingest.network:ip=172.28.7.250
 Network=net-proxy-grafana.network:ip=172.28.11.250
-Network=net-proxy-api.network:ip=172.28.13.250
 Volume=/var/iri/code/docker/edge:/etc/nginx/edge:ro
 Volume=edge-certs.volume:/etc/nginx/certs:ro
 Volume=edge-acme-webroot.volume:/var/www/acme:ro

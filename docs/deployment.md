@@ -835,66 +835,6 @@ none of this: the drift re-apply of the next tick brings it back the same way.
 
 `--check-only` doubles as the signature preflight in the real `deploy` context and writes no metric.
 
-### The Android app floor
-
-The minimum Android `versionCode`, the newest published one and the release page the update wall
-links to are **part of the release** (REQ-API-020): reviewed literals under
-`app.android.version-policy.release.*` in `backend/src/main/resources/application.yml`, baked into
-the backend image.
-
-- **Raising the floor** is a change to those literals in the hard-cut wave's pull request, together
-  with the re-cut operations, the ledger lines and the retired-operation list. Publish the app
-  release first, then promote as usual; no host step and no extra restart.
-- **A rollback restores the previous floor by itself** — the health gate's rollback and a promotion
-  of an older version both bring back that release's image and with it its literals. Nothing to
-  revert on the host first.
-- **Break-glass override** — only when a floor must change before a release can ship, for example a
-  committed floor that walls a build that works. A production write: it needs @greluc's explicit yes
-  to the exact command, and it restarts the backend (frontend and ingest through `Requires=`, about
-  a minute of web and app outage):
-
-  ```bash
-  cd /
-  ENVF=/var/iri/code/.env
-  sudo -u deploy cp -p "$ENVF" "$ENVF.backup-$(date +%Y%m%d-%H%M%S)-android-floor"
-  sudo -u deploy sed -i 's|^APP_ANDROID_MINIMUM_VERSION_CODE_OVERRIDE=.*|APP_ANDROID_MINIMUM_VERSION_CODE_OVERRIDE=<N>|' "$ENVF"
-  grep -c '^APP_ANDROID_MINIMUM_VERSION_CODE_OVERRIDE=<N>$' "$ENVF"
-  sudo -u deploy /var/iri/code/scripts/render-env-d.py \
-    --env /var/iri/code/.env --templates /var/iri/code/quadlet/env.d --out /var/iri/code/env.d
-  ${UCTL} restart backend.service
-  ${UCTL} start ingest.service frontend.service
-  ```
-
-  If `.env` has no such line yet, append it instead of the `sed`. `grep -c` must print `1`.
-  **Verify:** `curl -s https://api.profit-base.online/api/v1/app/version-policy` answers `<N>`, and
-  the backend's startup line reads `minimumVersionCode=<N> (emergency override)`. The same applies to
-  `APP_ANDROID_LATEST_VERSION_CODE_OVERRIDE` and `APP_ANDROID_RELEASES_URL_OVERRIDE`.
-  **An override does not roll back with a release.** Fold the value into the release literal in the
-  next pull request, release it, then empty the override (`…_OVERRIDE=`), render and restart the same
-  way. `AndroidVersionPolicyOverrideActive` fires while an override has been in force for a day.
-- **The retired variables** `APP_ANDROID_MINIMUM_VERSION_CODE`, `APP_ANDROID_LATEST_VERSION_CODE`
-  and `APP_ANDROID_RELEASES_URL` reach no container of a release with REQ-API-020. Leave their lines
-  in `.env` unchanged: a rollback to an older release renders its own templates, which still pass
-  them, and that release then runs with the floor it was built for. Remove them once no such release
-  is a rollback target; never edit them again.
-- **Before promoting the first release with REQ-API-020** (one-off, read-only): read the floor
-  production serves, `curl -s https://api.profit-base.online/api/v1/app/version-policy`. The release
-  commits **17 / 17**, the value S8 of
-  [`EXCHANGE_GO_LIVE_RUNBOOK.md`](archive/EXCHANGE_GO_LIVE_RUNBOOK.md) set on 2026-09-28. If production
-  answers anything else, the promotion would change the floor: correct the literal in a pull request
-  first, or accept the change deliberately.
-- **Before promoting the release that carries the API cut** (REQ-API-020, D-24): the release
-  commits **19 / 19**, so production answers 17 / 17 until it is promoted and every app below 19 meets
-  the update wall afterwards. Publish app 19 first; the floor, the retired answers and the new paths
-  arrive in one deploy, and a rollback takes all three back.
-- **Before promoting the release that raises the floor to 20** (REQ-API-020, D-17): the release
-  commits **20 / 20**, so every app below 20 meets the update wall afterwards. Build 19 is walled
-  because it echoes one version for the payout preference and the blueprint sharing, which have their
-  own counters since `V283`. App 20 (v0.6.1) is published; it needs this release's backend, because
-  against an older backend all but the last written settings row answer `409`. Read the floor
-  production serves first (`curl -s https://api.profit-base.online/api/v1/app/version-policy`), and
-  note that a rollback to a release with the old floor lets build 19 in again.
-
 ---
 
 ## Driving the stack
@@ -1551,9 +1491,10 @@ client ──► haproxy :80/:443 (host, v4+v6) ──send-proxy-v2──► edg
   loopback only, which is what makes that header unforgeable.
 - **The edge** is native nginx (ADR-0162). Its configuration is `docker/edge/` in the repository:
   `nginx.conf`, `conf.d/*.conf.template` (one per vhost, rendered at start by `render-and-run.sh`
-  from `EDGE_HOST_FRONTEND`, `EDGE_HOST_INGEST`, `EDGE_HOST_GRAFANA`, `EDGE_HOST_API` — it refuses to
-  start with one unset) and `include/`.
-- **`EDGE_TRUSTED_PROXY`** in `.env` must name the edge's six pinned addresses, space-separated —
+  from `EDGE_HOST_FRONTEND`, `EDGE_HOST_INGEST`, `EDGE_HOST_GRAFANA` — it refuses to start with one
+  unset) and `include/`. There is no `api` vhost since #2672: the backend is internal-only, and the
+  edge no longer joins `net-proxy-api` (ADR-0268).
+- **`EDGE_TRUSTED_PROXY`** in `.env` must name the edge's five pinned addresses, space-separated —
   the edge's own address on each of its networks, because rootless port forwarding presents the
   peer from whichever network it chooses. Empty, the listeners stay plain and every request fails
   with `wrong version number`; incomplete, nginx silently discards the header and the whole internet
@@ -1574,15 +1515,20 @@ client ──► haproxy :80/:443 (host, v4+v6) ──send-proxy-v2──► edg
   labels, JSON, problem+json, the manifest, SVG, plain text), `gzip_vary on`, from 1 KB. The event
   streams are deliberately not in the list, because gzip would buffer them. Until 2026-09-23 the
   list was missing and only HTML left the edge compressed; `check-edge-nginx.sh` now asserts it.
-- **The API vhost's admission** is the map `docker/edge/include/api-admission.conf`, generated from
-  the frozen contract set together with the server-level refusal `include/api-allowlist.conf` and
-  the API table of `edge-deny-probe.yml` (REQ-API-021, REQ-OPS-042). Never edit the three by hand:
-  change the frozen set, the declared-break ledger or the retired list, run
-  `./gradlew :backend:generateEdgeAdmission`, and review the diff; the backend tests fail when a
-  committed copy differs. It arrives like every edge change — with the promotion, applied by
-  `reconcile_edge`. `edge-deny-probe.yml` asserts the generated table from outside every day; after
-  an admission change is merged and before it is promoted, the rows that changed fail, which reports
-  the pending deploy, not drift.
+- **Nothing on the edge reaches the backend**, and that is asserted rather than assumed
+  (ADR-0268, REQ-OBS-012). The `api` vhost, its generated admission map and the `net-proxy-api`
+  network were removed in #2672; `edge-deny-probe.yml` now checks every day, from a GitHub runner,
+  that `api.profit-base.online` carries no address record, that `11261` and `11271` refuse a
+  connection on the public address, and that no live edge hostname answers `/api/v1/**`. The
+  `blackbox-api-absent` / `blackbox-api-absent-aaaa` jobs and `PublicApiHostResolvesAgain` carry
+  the DNS half continuously, one job per record type.
+
+  **Until the DNS record is deleted, both are red.** Removing it is rollout step 2 of #2672 and
+  happens at the DNS provider, outside this repository; the probe is reporting a pending rollout
+  until then, the way the admission table used to report a pending deploy. Afterwards two stale
+  certificate directories stay on the `edge-certs` volume — `api.<domain>` and the older
+  `keycloak.<domain>` — renewed by nothing, because `acme` writes only what `ACME_HOSTS` names
+  (arc42 §11.8).
 
 ### The edge verifies Grafana
 

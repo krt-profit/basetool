@@ -210,7 +210,7 @@ refuses() {
 
 check_mode plain ''
 check_mode frontend '172.28.15.10'
-check_mode frontend-rootless '172.28.15.10 172.28.3.250 172.28.4.250 172.28.7.250 172.28.11.250 172.28.13.250'
+check_mode frontend-rootless '172.28.15.10 172.28.3.250 172.28.4.250 172.28.7.250 172.28.11.250'
 check_mode grafana-verified '' on
 
 refuses 'an IPv4 wildcard'         '0.0.0.0/0'

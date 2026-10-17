@@ -212,16 +212,6 @@ tasks.named<Test>("test") {
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
   inputs
-    .files(
-      layout.settingsDirectory.file("docker/edge/include/api-admission.conf"),
-      layout.settingsDirectory.file("docker/edge/include/api-allowlist.conf"),
-      layout.settingsDirectory.file(".github/workflows/edge-deny-probe.yml"),
-      layout.settingsDirectory.file("docker-compose.yml"),
-    )
-    .withPropertyName("apiVhostAdmission")
-    .withPathSensitivity(PathSensitivity.RELATIVE)
-
-  inputs
     .file(
       layout.settingsDirectory.file(
         "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/kernel/livesync/LiveSyncTopicClass.java",
@@ -240,13 +230,4 @@ tasks.named<Test>("test") {
   jvmArgumentProviders.add(
     CommandLineArgumentProvider { listOf("-Dauthz.matrix.update=" + authzMatrixUpdate.get()) },
   )
-}
-
-tasks.register<JavaExec>("generateEdgeAdmission") {
-  description =
-    "Writes the API vhost's admission map, its include and the nightly probe table from the" +
-      " frozen contract set (REQ-API-021)."
-  classpath = sourceSets["test"].runtimeClasspath
-  mainClass.set("de.greluc.krt.profit.basetool.backend.api.EdgeAdmission")
-  args(rootDir.absolutePath)
 }

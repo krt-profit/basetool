@@ -142,7 +142,6 @@ scrape_configs:
     static_configs:
       - targets:
           - https://ingest.profit-base.online
-          - https://api.profit-base.online/api/v1/terms/status
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
@@ -180,8 +179,6 @@ scrape_configs:
           - https://profit-base.online/auth/metrics
           - https://ingest.profit-base.online/actuator/prometheus
           - https://ingest.profit-base.online/actuator/health
-          - https://api.profit-base.online/actuator/prometheus
-          - https://api.profit-base.online/actuator/health
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
@@ -258,7 +255,6 @@ scrape_configs:
           - http://profit-base.online
           - http://ingest.profit-base.online
           - http://grafana.profit-base.online
-          - http://api.profit-base.online
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
@@ -344,7 +340,6 @@ scrape_configs:
     static_configs:
       - targets:
           - https://ingest.profit-base.online
-          - https://api.profit-base.online/api/v1/terms/status
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
@@ -383,27 +378,11 @@ scrape_configs:
       - target_label: __address__
         replacement: blackbox-exporter:9115
 
-  - job_name: blackbox-hsts-auth
+  - job_name: blackbox-api-absent
     metrics_path: /probe
     scrape_timeout: 15s
     params:
-      module: [http_2xx_or_401_hsts]
-    static_configs:
-      - targets:
-          - https://api.profit-base.online/api/v1/terms/status
-    relabel_configs:
-      - source_labels: [__address__]
-        target_label: __param_target
-      - source_labels: [__param_target]
-        target_label: instance
-      - target_label: __address__
-        replacement: blackbox-exporter:9115
-
-  - job_name: blackbox-dns-api-a
-    metrics_path: /probe
-    scrape_timeout: 15s
-    params:
-      module: [dns_api_a]
+      module: [dns_api_absent]
     static_configs:
       - targets: ["1.1.1.1"]
     relabel_configs:
@@ -414,11 +393,11 @@ scrape_configs:
       - target_label: __address__
         replacement: blackbox-exporter:9115
 
-  - job_name: blackbox-dns-api-aaaa
+  - job_name: blackbox-api-absent-aaaa
     metrics_path: /probe
     scrape_timeout: 15s
     params:
-      module: [dns_api_aaaa]
+      module: [dns_api_absent_aaaa]
     static_configs:
       - targets: ["1.1.1.1"]
     relabel_configs:

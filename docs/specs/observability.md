@@ -699,8 +699,8 @@ it is invisible until something waits on the container's health.
 - `/actuator/health` is **unauthenticated at the app** (`permitAll`) so the container health check
   can reach it over `localhost` inside the container — but it is **not internet-reachable**: the
   same `location /actuator { return 404; }` edge deny that hides `/actuator/prometheus` also hides
-  `/actuator/health` (`docker/edge/conf.d/10-frontend.conf.template`, `30-ingest.conf.template`,
-  `include/api-allowlist.conf`), and `blackbox-edge-deny` asserts the 404 for **both** paths on
+  `/actuator/health` (`docker/edge/conf.d/10-frontend.conf.template`, `30-ingest.conf.template`),
+  and `blackbox-edge-deny` asserts the 404 for **both** paths on
   every public app host (REQ-OBS-012). "Public" here means unauthenticated-at-the-app, not edge-exposed. The
   frontend/ingest `BotProtectionFilter` whitelists `/actuator/health` (incl. its liveness/readiness
   sub-paths, case-insensitively) and `/actuator/prometheus` as an **exact, case-sensitive match
@@ -2651,6 +2651,32 @@ panel on dashboard `07` — 42 session evictions, 43 client errors by `kind`, 44
 
 ### REQ-OBS-012 — Edge posture assertions (deny / redirect / HSTS probes)
 
+> **Amended 2026-10-17 (ADR-0268, #2672).** The API vhost is gone, so the assertions that named it
+> are replaced by one that asserts it is **not there**. Removed: the `blackbox-hsts-auth` job and its
+> `http_2xx_or_401_hsts` module, the `blackbox-dns-api-a` / `-aaaa` jobs and their modules, the API
+> host's target in `blackbox-http-auth`, `blackbox-http-auth-ipv6`, `blackbox-edge-deny` and
+> `blackbox-force-ssl`, and the generated admission table of `edge-deny-probe.yml`. Added: the
+> `blackbox-api-absent` / `blackbox-api-absent-aaaa` jobs with the inverted `dns_api_absent` /
+> `dns_api_absent_aaaa` modules and the
+> `PublicApiHostResolvesAgain` alert, plus three steps in `edge-deny-probe.yml` — the API host must
+> not resolve, `11261` and `11271` must be closed on the public address, and no edge hostname may
+> answer the backend's API. `EdgeHstsHeaderMissing` is narrowed back from `job=~"blackbox-hsts.*"`
+> to the one remaining HSTS job.
+>
+> **The negative probe is red between this merge and the DNS removal.** `api.profit-base.online`
+> still resolves until the record is deleted (rollout step 2 of #2672, an owner action outside this
+> repository), so `PublicApiHostResolvesAgain` fires and the workflow's first new step fails until
+> then. That is the probe reporting a pending rollout, not drift — the same reading REQ-OPS-042 gave
+> its admission table between merge and promotion.
+>
+> **`NXDOMAIN` is not the assertion**, and this was measured rather than assumed: a name that does
+> not exist in `profit-base.online` answers `NOERROR` with an empty answer section (NODATA), not
+> `NXDOMAIN`, so a module keyed on the rcode alone could never go green. `dns_api_absent` accepts
+> both rcodes and fails if **any** answer RR is an `A`, `AAAA` or `CNAME` — which is also what makes
+> it catch the CNAME the record actually was. Verified against the live zone in all three states: the
+> name as it is today → `probe_success 0`, a name with no record → `1`, another live host's name →
+> `0`.
+
 When this requirement was written the security-relevant edge configuration lived only in the NPM
 admin database, not in git, so a UI misclick or a proxy-host recreate could silently undo it. Since
 ADR-0162 the edge is native nginx and its configuration is in git (`docker/edge/`, rendered at start
@@ -2660,8 +2686,8 @@ git only proves what was *meant*: a template that renders differently on a host,
 monitoring plane therefore **asserts** that posture continuously from where a client stands:
 
 - **`/actuator` edge deny** — the `blackbox-edge-deny` job probes **both** `/actuator/prometheus`
-  **and** `/actuator/health` on the three public app hosts (`profit-base.online`,
-  `ingest.profit-base.online`, `api.profit-base.online`), plus Keycloak's `/auth/health` and
+  **and** `/actuator/health` on the two public app hosts (`profit-base.online`,
+  `ingest.profit-base.online`), plus Keycloak's `/auth/health` and
   `/auth/metrics` management surface on the app origin, with the `http_deny_404` module: probe
   success means the edge answers exactly 404 (the live deny). The whole `/actuator` prefix is denied
   (`location /actuator { return 404; }` in the vhost templates), so neither the metrics surface nor
@@ -2672,7 +2698,7 @@ monitoring plane therefore **asserts** that posture continuously from where a cl
   drifts, the request reaches the app endpoint and `EdgeActuatorDenyBroken` (critical) fires — the
   continuous version of the ADR-0072 compensating control. The daily external `edge-deny-probe.yml`
   re-asserts the `/actuator` denies from a GitHub runner.
-- **Force-SSL redirect** — the `blackbox-force-ssl` job probes plain-HTTP port 80 of all four
+- **Force-SSL redirect** — the `blackbox-force-ssl` job probes plain-HTTP port 80 of all three
   public vhosts with `http_force_ssl_redirect` (301/308 + `Location: https://…`, redirects not
   followed); `EdgeForceSslRedirectBroken` (warning) fires on drift.
 - **Members-only redirect** — the `blackbox-members-only` job probes `/missions`, `/operations` and
@@ -2725,10 +2751,9 @@ monitoring plane therefore **asserts** that posture continuously from where a cl
   the edge access log, which carries the user agent. Both `/app/callback` and `/app/link-help` are
   therefore excluded from the `SsePushChannelDead` traffic guard alongside the other probe targets.
 - **HSTS** — the `blackbox-hsts` job asserts `Strict-Transport-Security` on the **first**
-  response of `https://profit-base.online` (app-side HSTS, security-audit finding H-9), and
-  `blackbox-hsts-auth` does the same for the API vhost's allow-listed 401 path
-  (`http_2xx_or_401_hsts`, REQ-OBS-018); `EdgeHstsHeaderMissing` (warning, `job=~"blackbox-hsts.*"`).
-  The grafana and ingest vhosts are not HSTS-asserted.
+  response of `https://profit-base.online` (app-side HSTS, security-audit finding H-9);
+  `EdgeHstsHeaderMissing` (warning, `job="blackbox-hsts"`). The grafana and ingest vhosts are not
+  HSTS-asserted.
 - **Keycloak `/admin` allow-list** — asserted **externally** by the daily
   `.github/workflows/edge-deny-probe.yml` run. The internal blackbox exporter cannot carry this
   signal: its probes never arrive from a public address — under Docker they were SNAT'd to the
@@ -2736,6 +2761,31 @@ monitoring plane therefore **asserts** that posture continuously from where a cl
   host-level front end — and the allow-list in `10-frontend.conf.template` names exactly the
   container-network gateways, so from inside the console can look reachable. The workflow also
   re-asserts the `/actuator` 404 from outside.
+- **The retired API surface is asserted absent** (ADR-0268 decision 4, the ADR-0173 rule applied to
+  a surface that was removed). A closed hole produces no signal of its own, so a regression — a
+  re-added vhost, a re-joined edge network, a published port — would be silent. Two halves, because
+  neither vantage point can carry both: the `blackbox-api-absent` and `blackbox-api-absent-aaaa`
+  jobs query `1.1.1.1` for the A and the AAAA record with the inverted `dns_api_absent` /
+  `dns_api_absent_aaaa` modules — one record type per module, so an AAAA-only re-add is caught
+  too — and `PublicApiHostResolvesAgain` (**critical**, 5 min) fires when
+  the name carries an address record again, guarded `and on()` against `blackbox-dns-a` so a DNS
+  outage pages as `DnsResolutionFailed` rather than as a re-exposure; and the daily
+  `edge-deny-probe.yml` run adds, from a GitHub runner, that the name does not resolve, that `11261`
+  and `11271` refuse a connection on the public address, and that no live edge hostname answers the
+  backend's API. The exporter cannot carry the last two: its probes never arrive from a public
+  address, which is the same reason the Keycloak `/admin` assertion lives in the workflow.
+
+  **The host checks carry their own positive control**, because each is an assertion that something
+  does *not* answer and would therefore pass for the wrong reason on a runner with no DNS or no
+  egress: the DNS step first requires the apex to resolve, the port step first requires `443` to answer,
+  and the hostname step requires at least one hostname to answer at all. Each aborts the job rather
+  than report a green absence.
+
+  **A status code cannot tell who answered, and that was measured.** `GET /api/v1/terms/status`
+  returns `401` on the ingest gateway *and* on Grafana, so "not 401" and "no `WWW-Authenticate:
+  Bearer`" are both permanent false positives. The workflow therefore keys on a `2xx` — nothing but
+  the backend serves that path — and on the backend's own RFC 7807 `type` URI under
+  `/problems/` (REQ-API-019), which neither of the other two emits.
 
 The posture jobs are separate from the `blackbox-http` liveness job; `BlackboxProbeFailed` is
 scoped to liveness, and every posture alert carries an `and on()` guard on the main-page probe so
@@ -2759,9 +2809,9 @@ match, for the reason ADR-0166 records about the edge's `location /auth`: a pref
 so the edge is also probed over IPv6 and for public DNS resolution: the `blackbox-http-ipv6` /
 `blackbox-http-auth-ipv6` jobs re-run the liveness probes pinned to IPv6 (no v4 fallback), and the
 `blackbox-dns-a` / `blackbox-dns-aaaa` jobs query a public resolver (1.1.1.1) for the apex's A and AAAA
-records, while `blackbox-dns-api-a` / `blackbox-dns-api-aaaa` do the same for the API vhost of the
-mobile-client exposure (ADR-0135) — its records are separate from the apex's, so the apex probes prove
-nothing about them (NODATA fails the probe, not only NXDOMAIN).
+records. The API vhost of the mobile-client exposure (ADR-0135) had the same pair until ADR-0268
+retired the host; `blackbox-api-absent` and its `-aaaa` twin now assert the opposite for that one
+name.
 
 The answer-RR assertion uses `fail_if_none_matches_regexp` (“at least ONE answer RR carries an address
 of the queried family”), never `fail_if_not_matches_regexp` (“EVERY answer RR matches”), and its regexp
@@ -2770,7 +2820,10 @@ to the apex — the answer section carries the alias RR *alongside* the address 
 “every RR” assertion can never hold and the probe fails while DNS is perfectly healthy. That shipped
 with the phase-F cut-over and fired `DnsResolutionFailed` for both api jobs from their first scrape on
 2026-08-18. The regexp stays anchored to an address literal, so the real failures still fail: NXDOMAIN
-(rcode), NODATA (empty answer), and a dangling CNAME whose target has no address record. For those v6-pinned probes to test the real edge,
+(rcode), NODATA (empty answer), and a dangling CNAME whose target has no address record. The same
+answer-section reading is what `dns_api_absent` inverts: it fails if any answer RR is an address or an
+alias, which is the only form that holds for a name whose removal yields NODATA rather than NXDOMAIN.
+For those v6-pinned probes to test the real edge,
 the `blackbox-exporter` container needs its own IPv6 egress: the two nets it otherwise joins
 (`net-monitoring-core`, `net-monitoring-scrape`) are IPv4-only, so before #1252 the container had **no
 v6 route** and every probe CONNECT-failed (`probe_success=0`) purely from the missing local route —
@@ -2784,15 +2837,17 @@ the v6 half of that alias plus pasta's v6 guest-address mapping
 (`basetool_host_public_name_aliases_v6`, `basetool_host_pasta_map_guest_addrs`). Without it the v6
 probes failed against themselves while IPv6 served correctly (fixed 2026-09-22, v1.9.2). `EdgeIpv6Unreachable` (warning) fires only when a
 vhost answers over IPv4 but not IPv6 (guarded `on(instance)` against the v4 probe, so a full outage
-pages once via `BlackboxProbeFailed`); `DnsResolutionFailed` (warning) fires when the apex or the API
-vhost stops resolving an A or AAAA record. These are reachability probes, not posture assertions — a v6-only or
+pages once via `BlackboxProbeFailed`); `DnsResolutionFailed` (warning) fires when the apex stops
+resolving an A or AAAA record. Its scope is `job=~"blackbox-dns-.*"`, which the negative probe's job
+name deliberately sits outside, so a returning API host pages once, as
+`PublicApiHostResolvesAgain`. These are reachability probes, not posture assertions — a v6-only or
 DNS-only regression is invisible to the IPv4 liveness job.
 
 **Probe scrape timeout + `TargetDown` scoping (probe-liveness semantics).** Every blackbox `/probe`
 job carries its own `scrape_timeout: 15s` (> the 10s module timeout, well under the 30s interval), and
 the generic `TargetDown` alert is scoped to
-`up{job!~"blackbox-(http|edge|force|members|public|hsts|internal|dns|app).*"} == 0` — excluding all
-17 `/probe` jobs while keeping the `blackbox-exporter` self-scrape and every non-probe target in
+`up{job!~"blackbox-(http|edge|force|members|public|hsts|internal|dns|app|api).*"} == 0` — excluding
+all 17 `/probe` jobs while keeping the `blackbox-exporter` self-scrape and every non-probe target in
 scope. A new probe job whose name matches none of those prefixes must widen the regex in the same
 change, or its scrape-timeout artifacts page as `TargetDown`. On a `/probe` job `up==0` is a **scrape-timeout artifact**, not a
 target-down signal: the module timeout previously equalled the global `scrape_timeout` (both 10s), so a
@@ -2801,7 +2856,8 @@ internal-TLS handshake under the host's designed memory pressure) tipped the Pro
 past the window → `up==0` → a false-critical `TargetDown`. A **genuine** probe failure is
 `probe_success==0` while `up` stays 1, caught fast by the dedicated probe alerts above
 (`BlackboxProbeFailed` / `EdgeActuatorDenyBroken` / `EdgeForceSslRedirectBroken` /
-`EdgeHstsHeaderMissing` / `EdgeIpv6Unreachable` / `DnsResolutionFailed`) and by `CertificateExpiringSoon`
+`EdgeHstsHeaderMissing` / `EdgeIpv6Unreachable` / `DnsResolutionFailed` /
+`PublicApiHostResolvesAgain`) and by `CertificateExpiringSoon`
 for the internal-TLS jobs; app-down liveness for the `blackbox-internal-tls` targets is paged by the
 `basetool-backend` / `-frontend` / `-ingest` scrape jobs, not by their probe. So scoping `TargetDown`
 off the probe jobs removes only the false page, not any real signal. (2026-07-12 false-critical fix.)
@@ -2815,6 +2871,13 @@ off the probe jobs removes only the false page, not any real signal. (2026-07-12
 - [ ] The scheduled `edge-deny-probe` workflow fails when
   `https://profit-base.online/auth/admin/` answers 2xx/3xx from a GitHub runner or the
   `/actuator` paths stop answering 404 externally.
+- [ ] `PublicApiHostResolvesAgain` fires when `api.profit-base.online` carries an address record
+  again while the apex still resolves, and stays silent while public DNS itself is failing
+  (`public_api_host_resolves_again_test.yml`); `DnsResolutionFailed` does not also fire for it.
+- [ ] The `edge-deny-probe` workflow fails when the API host resolves, when `11261` or `11271`
+  accepts a connection on the public address, or when a live edge hostname answers `/api/v1/**` with
+  a `2xx` or with the backend's own problem document — and aborts instead of passing when the runner
+  cannot resolve the apex or reach port `443`.
 - [ ] `TargetDown` does **not** fire for any blackbox `/probe` job whose `up==0` (scrape-timeout
   artifact), but still fires for the `blackbox-exporter` self-scrape and every non-probe job
   (`targetdown_probe_scope_test.yml`).
@@ -2823,13 +2886,15 @@ off the probe jobs removes only the false page, not any real signal. (2026-07-12
   answer and NXDOMAIN each still fail it.
 
 **Enforced by:** `monitoring/blackbox/blackbox.yml` (`http_deny_404` / `http_force_ssl_redirect` /
-`http_2xx_hsts`; the `http_2xx_ipv6` / `http_2xx_or_401_ipv6` / `dns_apex_a` / `dns_apex_aaaa` /
-`dns_api_a` / `dns_api_aaaa` reachability modules) · `monitoring/prometheus/prometheus.yml` (the three posture jobs; the
-`blackbox-http-ipv6` / `blackbox-http-auth-ipv6` / `blackbox-dns-a` / `blackbox-dns-aaaa` /
-`blackbox-dns-api-a` / `blackbox-dns-api-aaaa` reachability jobs; the per-`/probe`-job `scrape_timeout: 15s`) · `monitoring/prometheus/alerts/infrastructure.yml`
+`http_2xx_hsts`; the `http_2xx_ipv6` / `http_2xx_or_401_ipv6` / `dns_apex_a` / `dns_apex_aaaa`
+reachability modules; the inverted `dns_api_absent` / `dns_api_absent_aaaa`) · `monitoring/prometheus/prometheus.yml` (the three posture jobs; the
+`blackbox-http-ipv6` / `blackbox-http-auth-ipv6` / `blackbox-dns-a` / `blackbox-dns-aaaa`
+reachability jobs; `blackbox-api-absent` / `blackbox-api-absent-aaaa`; the per-`/probe`-job `scrape_timeout: 15s`) · `monitoring/prometheus/alerts/infrastructure.yml`
 (`EdgeActuatorDenyBroken`, `EdgeForceSslRedirectBroken`, `EdgeHstsHeaderMissing`, `EdgeIpv6Unreachable`,
-`DnsResolutionFailed`, scoped `BlackboxProbeFailed`, and the `TargetDown` regex that excludes the
-`/probe` jobs) · `monitoring/prometheus/tests/targetdown_probe_scope_test.yml` (promtool unit test) ·
+`DnsResolutionFailed`, `PublicApiHostResolvesAgain`, scoped `BlackboxProbeFailed`, and the
+`TargetDown` regex that excludes the
+`/probe` jobs) · `monitoring/prometheus/tests/targetdown_probe_scope_test.yml` and
+`public_api_host_resolves_again_test.yml` (promtool unit tests) ·
 `.github/workflows/edge-deny-probe.yml`
 
 ### REQ-OBS-013 — Telemetry-sink failures are not application errors
@@ -3600,10 +3665,11 @@ the presented token (REQ-OBS-004).
 > `invalid_token` at a flat zero. `no_credentials` is the fix (ADR-0173), and it leaves `other`
 > meaning what it always claimed: an unenumerated failure worth investigating.
 
-**The 401 volume on these surfaces is a designed constant, not a signal.** Three blackbox jobs probe
-`https://api.profit-base.online/api/v1/terms/status` every 30 s and the ingest gateway's root is
-probed the same way, all expecting a 401 — that is the whole point of the `http_2xx_or_401` module
-(below). The exchange service document `GET /exchange/v1` is probed every 30 s as well, with the
+**The 401 volume on these surfaces is a designed constant, not a signal.** The ingest gateway's root
+is probed every 30 s expecting a 401 — that is the whole point of the `http_2xx_or_401` module
+(below). Until ADR-0268 three further jobs probed
+`https://api.profit-base.online/api/v1/terms/status` the same way; they went with the vhost, so the
+backend's own share of this floor is gone. The exchange service document `GET /exchange/v1` is probed every 30 s as well, with the
 stricter `http_401` module (`blackbox-http-401`, REQ-XCH-028): a `200` there would mean the
 exchange answers without a token. It adds about 0.03/s of `no_credentials` in the `exchange`
 scope and of `unauthenticated` with `client_id="none"` to the exchange refusals, far below
@@ -3629,7 +3695,9 @@ re-measured in the same PR** (ADR-0173).
 > the edge access log. ADR-0173 states this deliberately rather than closing it; closing it means
 > either a bounded surface label on the counter or re-ordering the logging filter.
 
-**Probes for a host that does not resolve yet.** The API vhost's liveness, IPv6 twin, `/actuator`
+**Probes for a host that does not resolve yet.** *The probes this paragraph records were removed with
+the vhost on 2026-10-17 (ADR-0268, #2672); REQ-OBS-012 carries what replaced them. The rule below is
+why the paragraph stays.* The API vhost's liveness, IPv6 twin, `/actuator`
 edge deny, Force-SSL, HSTS and DNS A/AAAA probes were written, reviewed and deployed **staged** —
 present in `prometheus.yml` and the external `edge-deny-probe.yml` as commented targets — with the
 blackbox modules they need shipped live and inert, and all of them were enabled in one commit on
@@ -3643,11 +3711,22 @@ commented-out targets — and enables them all-or-nothing, widening the affected
 same edit; a partially enabled probe set reads as "monitored". Amended 2026-09-25 (ADR-0214): staging
 used to mean commented-out entries in the live files.
 
-The liveness probe deliberately targets an **allow-listed path that answers 401**
-(`/api/v1/terms/status`), not the vhost root: the vhost is a default-deny allow-list that 404s its
-own root, so a root probe would assert nothing about the backend behind it and would fail on a
-perfectly healthy edge. For the same reason HSTS uses the `http_2xx_or_401_hsts` module rather than
-loosening the frontend's `http_2xx_hsts` assertion.
+**Retiring a surface inverts the rule, it does not suspend it.** A probe that asserts a host is
+*absent* is the mirror image of one that asserts it is present, and it is red for the window between
+the merge that removes the surface from the repository and the owner action that removes it from
+production — here the DNS record (#2672 rollout step 2). That window is named in REQ-OBS-012's
+amendment so the red reads as a pending rollout rather than as drift, which is the same courtesy the
+staging rule extends in the other direction. What does **not** carry over is "ship it inert": the
+assertion is the point of the change, and a negative probe held back is a removal nobody is
+watching.
+
+The liveness probe deliberately targeted an **allow-listed path that answers 401**
+(`/api/v1/terms/status`), not the vhost root: the vhost was a default-deny allow-list that 404'd its
+own root, so a root probe would have asserted nothing about the backend behind it and would have
+failed on a perfectly healthy edge. For the same reason HSTS used the `http_2xx_or_401_hsts` module
+rather than loosening the frontend's `http_2xx_hsts` assertion. That choice of path outlived the
+probe: REQ-OBS-012's replacement assertion reuses it, because a `2xx` there is still something only
+the backend can produce.
 
 **Acceptance**
 

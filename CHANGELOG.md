@@ -4,6 +4,10 @@
 
 ### Security
 
+- **Die REST-API des Backends ist nicht mehr aus dem Internet erreichbar.** Der Vhost `api.profit-base.online` der eingestellten Android-App ist samt Netzwerk `net-proxy-api` entfernt; das Ingest-Gateway ist jetzt die einzige öffentliche API. `EDGE_HOST_API` entfällt aus `.env`, `ACME_HOSTS` verliert den Namen, und ein neues Zertifikat mit drei Namen wird ausgestellt (ADR-0268).
+
+- **Neuer Alarm `PublicApiHostResolvesAgain`.** Er schlägt an, wenn `api.profit-base.online` wieder auflöst; der tägliche `edge-deny-probe`-Workflow prüft zusätzlich von außen, dass die Backend-Ports 11261/11271 zu sind und kein Vhost `/api/v1/**` beantwortet (REQ-OBS-012).
+
 - **Management-Ports: Metriken nur noch mit Scrape-Zugang.** Auf den Management-Ports von Backend, Frontend und Ingest bleibt nur `/actuator/health` offen; `prometheus`, `info` und `loggers` verlangen den Basic-Auth-Zugang `MONITORING_SCRAPE_USER`/`MONITORING_SCRAPE_PASSWORD` und sind ohne ihn gesperrt. Vorher konnte jeder Nachbar-Container im selben Netz die Metriken lesen. Prometheus sendet `scrape_password`, das deshalb zu `MONITORING_SCRAPE_PASSWORD` passen muss (Benutzer `monitoring`) (REQ-OBS-005, ADR-0265).
 
 ### Added

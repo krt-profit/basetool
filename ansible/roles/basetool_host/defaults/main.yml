@@ -178,7 +178,6 @@ basetool_host_edge_trusted_proxies:
   - "172.28.4.250"
   - "172.28.7.250"
   - "172.28.11.250"
-  - "172.28.13.250"
 basetool_host_edge_loopback_ports: [8080, 8443]
 basetool_host_frontend_ports:
   - {public: 80, backend: 8080}

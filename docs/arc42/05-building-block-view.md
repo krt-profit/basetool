@@ -7,17 +7,17 @@
                                  │ PROXY protocol v2 → loopback :8080 / :8443
                                  ▼
       ┌──────────────────────────────────────────────────────────────────┐
-      │ edge (nginx-unprivileged) — TLS for the four public names        │
-      └───┬──────────────────┬────────────────┬──────────────┬─────────┬─┘
-          │ profit-base      │ profit-base    │ ingest.*     │ api.*   │ grafana.*
-          │ .online          │ .online/auth   │              │         │
-          ▼                  ▼                ▼              │         ▼
-    ┌──────────┐      ┌─────────────┐    ┌────────┐          │    ┌─────────┐
-    │ frontend │      │  keycloak   │    │ ingest │          │    │ grafana │
-    └────┬─────┘      │ SPI · theme │    └───┬────┘          │    └─────────┘
-         │ WebClient  └──────┬──────┘        │ service       │    + prometheus · loki · tempo
-         │ + bearer          │ OIDC · SPI    │ token         │      alertmanager · blackbox
-         ▼                   ▼               ▼               ▼      exporters — the monitoring plane
+      │ edge (nginx-unprivileged) — TLS for the three public names       │
+      └───┬──────────────────┬────────────────┬────────────────────────┬─┘
+          │ profit-base      │ profit-base    │ ingest.*               │ grafana.*
+          │ .online          │ .online/auth   │                        │
+          ▼                  ▼                ▼                        ▼
+    ┌──────────┐      ┌─────────────┐    ┌────────┐               ┌─────────┐
+    │ frontend │      │  keycloak   │    │ ingest │               │ grafana │
+    └────┬─────┘      │ SPI · theme │    └───┬────┘               └─────────┘
+         │ WebClient  └──────┬──────┘        │ service            + prometheus · loki · tempo
+         │ + bearer          │ OIDC · SPI    │ token                alertmanager · blackbox
+         ▼                   ▼               ▼                      exporters — the monitoring plane
     ┌─────────────────────────────────────────────────────────────────┐
     │ backend                                                         │
     └──────┬──────────────────────────┬───────────────────────────────┘
@@ -33,7 +33,7 @@ The drawing shows the request path only. Beside it: the frontend and ingest use 
 frontend and backend reach keycloak (OIDC, the admin API) and keycloak's SPI calls the backend back;
 keycloak alone owns `db-keycloak`.
 
-The connections run over **eighteen** container networks, each named for what it joins
+The connections run over **seventeen** container networks, each named for what it joins
 (`net-proxy-*`, `net-db-*`, `net-redis-*`, `net-backend-*`, `net-edge-ingress`, `net-acme-egress`,
 `net-monitoring-core`, `net-monitoring-scrape`, `net-blackbox-v6`). Apart from the two monitoring
 networks each joins a small named set — usually one pair, plus a data store's exporter — and a
@@ -43,10 +43,10 @@ container reaches exactly the containers it shares a network with. The units are
 | Building block | Responsibility | Deliberately does **not** |
 | --- | --- | --- |
 | **haproxy** (host service) | Bind the public `:80`/`:443`, forward bytes to the edge's loopback ports, and state the client address in a PROXY v2 header (ADR-0187) | Terminate TLS or hold a key |
-| **edge** (nginx-unprivileged) | TLS termination for four vhosts plus Keycloak under `/auth`, per-vhost rate limits, deny rules, header rewriting, the `X-Forwarded-*` family; trusts the PROXY header only from its own six pinned addresses | Hold any application logic or state |
+| **edge** (nginx-unprivileged) | TLS termination for three vhosts plus Keycloak under `/auth`, per-vhost rate limits, deny rules, header rewriting, the `X-Forwarded-*` family; trusts the PROXY header only from its own five pinned addresses | Hold any application logic or state |
 | **acme** (lego) | Issue and renew the certificates the edge serves | Serve traffic |
 | **frontend** | Render the UI, hold session state, drive live update | Talk to PostgreSQL or the Keycloak Admin API; contain business rules |
-| **backend** | The whole domain: REST API, persistence, authorisation, scheduled work | Serve HTML; be reachable from the internet except through the `api` vhost |
+| **backend** | The whole domain: REST API, persistence, authorisation, scheduled work | Serve HTML; be reachable from the internet at all — its callers are the frontend, the ingest gateway and the Keycloak SPI (ADR-0268) |
 | **ingest** | Gate, limit and relay the exchange API for approved clients, the SC Extractor included (§5.5); stage a returned draft in Redis for a one-time browser pickup | Own a database or save anything itself |
 | **keycloak** | Identity, OIDC tokens, the Discord provider and guild/role gate, the KRT theme, the device-grant consent for exchange clients and the `basetool-exchange` admin extension | Store domain data |
 | **db-backend / db-keycloak** | Two separate PostgreSQL instances | Share a cluster — a Keycloak upgrade must not be able to touch domain data |

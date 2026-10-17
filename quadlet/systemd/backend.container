@@ -15,7 +15,6 @@ Network=net-db-backend.network
 Network=net-backend-frontend.network
 Network=net-backend-keycloak.network
 Network=net-backend-ingest.network
-Network=net-proxy-api.network
 Network=net-redis-backend.network
 Network=net-monitoring-scrape.network
 Volume=/var/iri/backend/log:/app/logs
