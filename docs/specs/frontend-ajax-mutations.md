@@ -2755,7 +2755,8 @@ A backend failure is mapped once, by `BackendErrorMapper` (REQ-FE-029), and answ
   duplicated the central mapping and were removed — 43 AJAX arms after a `BackendServiceException`
   arm, the four org-chart position writes behind a local helper, and six endpoints without a backend
   arm that answered every failure with `500`/`502`. The other 333 are section fallbacks, form-post
-  fallbacks, silent fallbacks and translations, and stay frozen.
+  fallbacks, silent fallbacks and translations, and stay frozen; with the mission option lists
+  reporting their failures (REQ-MISSION-030) 326 remain.
 - [x] A backend refusal on the frequency-type reorder, the sync-report purge, the announcement
   read, the inventory merge probe and the stock attribution keeps its status; a failure that is no
   backend refusal reaches the global handler.

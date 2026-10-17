@@ -163,6 +163,28 @@ This timeline is curated, not exhaustive (checked against the directory on
 2026-09-27, tip V248). `ls | sort -V | tail -1` in this directory is the only reliable
 answer to "what is the current tip?".
 
+## Skipped version numbers
+
+No migration in `main` carries the numbers below, on purpose. Each was claimed by a pull
+request that gave it up before merging, and a later migration had already taken a higher
+number, so the free one could not be used any more (hard rule 1). The `Flyway Migrations`
+CI check reads this list: a gap in the sequence that is not listed here fails the build, and
+so does an entry that a migration claims after all or that lies above the tip.
+
+- **V87** — claimed by #134 for `tighten_squadron_id_not_null`; renumbered to V89 before
+  merging so it ran after the V88 stop-write of #132.
+- **V169** — a backfill linking the legacy AREA / CARTEL bank accounts to their Bereich / OL,
+  added and dropped again within #711: the production hierarchy did not exist yet, so a
+  run-once migration would have done nothing (ADR-0028 moved the step to an operator task).
+- **V266** — first number of #2370 (`drop_superseded_quality_columns`); given up when
+  #2436 took V267.
+- **V268** — second number of #2370; given up when #2439 took V269.
+- **V270** — third number of #2370; given up when V271–V281 had landed and the PR merged
+  as V282.
+
+A pull request that gives up a number after a higher one has merged adds the number here,
+with its reason, in the same change.
+
 ## Hard rules
 
 1. **One file per change, `V<n>__<snake_case_description>.sql`.** Pick the next
@@ -354,6 +376,7 @@ every existing database.
 - [ ] The change is mentioned in `CHANGELOG.md` under the right `### Added`
   / `### Changed` / `### Removed` heading when it is user-visible.
 - [ ] Version numbering passes the `Flyway Migrations` CI check (no duplicate
-  `V<n>`, new files numbered after the current tip on `main`). Run it
+  `V<n>`, new files numbered after the current tip on `main`, every gap listed
+  under [Skipped version numbers](#skipped-version-numbers)). Run it
   locally before pushing:
   `FLYWAY_BASE_REF=origin/main scripts/check-flyway-migrations.sh`.

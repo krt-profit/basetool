@@ -48,9 +48,29 @@ import org.springframework.beans.factory.annotation.Autowired;
     uses = {UserMapper.class, MaterialMapper.class, SquadronMapper.class})
 public abstract class InventoryItemMapper {
 
-  @Autowired protected StockViewerAccess stockAccess;
+  protected StockViewerAccess stockAccess;
 
-  @Autowired protected InventoryEarmarkLookup earmarkTargets;
+  protected InventoryEarmarkLookup earmarkTargets;
+
+  /**
+   * Receives the stock-viewer access seam that decides {@code canEdit} from the container.
+   *
+   * @param access the container's {@link StockViewerAccess}
+   */
+  @Autowired
+  void setStockAccess(StockViewerAccess access) {
+    this.stockAccess = access;
+  }
+
+  /**
+   * Receives the lookup that resolves each earmark's Auftrag, Mission or Spende from the container.
+   *
+   * @param lookup the container's {@link InventoryEarmarkLookup}
+   */
+  @Autowired
+  void setEarmarkTargets(InventoryEarmarkLookup lookup) {
+    this.earmarkTargets = lookup;
+  }
 
   /**
    * Resolves the caller-dependent {@code canEdit} projection of one Lager row: the row's scope

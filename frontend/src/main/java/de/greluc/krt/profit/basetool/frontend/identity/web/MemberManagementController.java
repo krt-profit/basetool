@@ -312,7 +312,11 @@ public class MemberManagementController {
       }
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "updateMember", id, e);
-      redirectAttributes.addFlashAttribute("errorToast", updateFailureKey(e));
+      if (isRankOutsideRoleRange(e)) {
+        redirectAttributes.addFlashAttribute("errorToast", "error.member.rank.outsideRoleRange");
+      } else {
+        redirectAttributes.addFlashAttribute("errorToast", "error.member.update.failed");
+      }
       return "redirect:/members/"
           + id
           + "/edit"
@@ -420,7 +424,8 @@ public class MemberManagementController {
       if (user != null && user.version() != null) {
         return user.version();
       }
-    } catch (Exception _) {
+    } catch (Exception e) {
+      log.warn("Could not re-read the user-row version of user {}; assuming the next one", id, e);
     }
     return (priorVersion == null ? 0L : priorVersion) + 1;
   }
@@ -434,20 +439,6 @@ public class MemberManagementController {
    */
   private static boolean isRankOutsideRoleRange(@NotNull BackendServiceException e) {
     return BackendServiceException.CODE_RANK_OUTSIDE_ROLE_RANGE.equals(e.getProblemCode());
-  }
-
-  /**
-   * Picks the error-toast key of a refused member save.
-   *
-   * @param e the backend failure
-   * @return the rank-range key for {@code RANK_OUTSIDE_ROLE_RANGE}, the generic update key
-   *     otherwise
-   */
-  @NotNull
-  private static String updateFailureKey(@NotNull BackendServiceException e) {
-    return isRankOutsideRoleRange(e)
-        ? "error.member.rank.outsideRoleRange"
-        : "error.member.update.failed";
   }
 
   /**

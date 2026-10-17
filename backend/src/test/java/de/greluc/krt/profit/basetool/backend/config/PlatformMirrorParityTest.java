@@ -105,9 +105,9 @@ class PlatformMirrorParityTest {
 
   /**
    * Each {@code ManagementPortSecurityConfig} is active only when a management port is set, opens
-   * nothing but the management chain, is stateless, keeps no request cache and leaves CSRF
-   * protection on. The backend enumerates the read endpoints it opens; the frontend and ingest
-   * match {@code /actuator/**}, which is safe only because CSRF stays armed there.
+   * only health, puts every other path it owns behind the scrape identity or denies it, is
+   * stateless, keeps no request cache and leaves CSRF protection on (REQ-OBS-005, ADR-0265). The
+   * backend enumerates the endpoints it owns; the frontend and ingest match {@code /actuator/**}.
    *
    * @throws IOException if a source file cannot be read
    */
@@ -123,13 +123,22 @@ class PlatformMirrorParityTest {
       assertThat(code)
           .as(file.toString())
           .contains("@ConditionalOnProperty(name = \"management.server.port\")");
-      assertThat(code).as(file.toString()).contains("anyRequest().permitAll()");
+      assertThat(code)
+          .as(file.toString())
+          .contains("HEALTH_ENDPOINTS = {\"/actuator/health\", \"/actuator/health/**\"}");
+      assertThat(code)
+          .as(file.toString())
+          .contains(
+              "requestMatchers(HEALTH_ENDPOINTS)",
+              "MonitoringScrapeSecurityConfig.scrapeUsers(properties)",
+              ".hasRole(MonitoringScrapeSecurityConfig.MONITORING_ROLE)",
+              "anyRequest().denyAll()");
+      assertThat(code).as(file.toString()).doesNotContain("anyRequest().permitAll()");
       assertThat(code).as(file.toString()).contains("SessionCreationPolicy.STATELESS");
       assertThat(code).as(file.toString()).contains("RequestCacheConfigurer::disable");
       assertThat(code).as(file.toString()).contains("securityMatcher(");
       assertThat(code).as(file.toString()).doesNotContain("csrf");
       assertThat(code).as(file.toString()).doesNotContain("CsrfConfigurer");
-      assertThat(code).as(file.toString()).doesNotContain("httpBasic");
     }
     assertThat(
             code(

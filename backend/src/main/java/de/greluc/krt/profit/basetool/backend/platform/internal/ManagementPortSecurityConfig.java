@@ -19,55 +19,74 @@
 
 package de.greluc.krt.profit.basetool.backend.platform.internal;
 
+import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
- * Opens the read-only Actuator endpoints without authentication on the backend's dedicated
- * management port (ADR-0134).
+ * Secures the read-only Actuator endpoints on the backend's dedicated management port (ADR-0134,
+ * REQ-OBS-005).
  *
- * <p>Active only when {@code management.server.port} is set. Only the read endpoints are matched,
- * so {@code POST /actuator/loggers/**} stays behind the main chain's {@code ROLE_ADMIN} gate
- * (REQ-OBS-016).
+ * <p>Active only when {@code management.server.port} is set. Health is open; metrics and info
+ * require the scrape identity of {@link MonitoringScrapeProperties} and are denied to everyone
+ * while it is not configured. Every other path, {@code /actuator/loggers/**} included, keeps the
+ * main chain's protection (REQ-OBS-016).
  */
 @Configuration
 @ConditionalOnProperty(name = "management.server.port")
+@RequiredArgsConstructor
 public class ManagementPortSecurityConfig {
 
+  /** The health probes the container health check and the frontend call without credentials. */
+  private static final String[] HEALTH_ENDPOINTS = {"/actuator/health", "/actuator/health/**"};
+
   /**
-   * The read-only Actuator surface the monitoring plane needs without credentials.
-   *
-   * <p>Deliberately enumerated rather than expressed as {@code /actuator/**}: every path absent
-   * from this list keeps whatever protection the main chain gives it, which is what preserves the
-   * {@code ROLE_ADMIN} gate on the log-level mutator.
+   * The Actuator surface this chain owns; every path absent from it keeps the main chain's
+   * protection, which is what preserves the {@code ROLE_ADMIN} gate on the log-level mutator.
    */
-  private static final String[] UNAUTHENTICATED_READ_ENDPOINTS = {
+  private static final String[] MANAGED_ENDPOINTS = {
     "/actuator/health", "/actuator/health/**", "/actuator/prometheus", "/actuator/info"
   };
 
+  /** The scrape credentials that unlock the metrics and info endpoints. */
+  private final MonitoringScrapeProperties properties;
+
   /**
-   * Permit-all, stateless chain for the read-only Actuator endpoints, ordered ahead of {@code
+   * Stateless chain for the management port's read endpoints, ordered ahead of {@link
    * MonitoringScrapeSecurityConfig} and the main chain.
    *
    * @param http the Spring Security builder for this chain
-   * @return the permit-all filter chain for the management port's read endpoints
+   * @return the chain: health open, the rest behind the scrape identity or denied
    * @throws Exception propagated from {@link HttpSecurity#build()}
    */
   @Bean
   @Order(0)
   public SecurityFilterChain managementPortActuatorFilterChain(@NotNull HttpSecurity http)
       throws Exception {
-    http.securityMatcher(UNAUTHENTICATED_READ_ENDPOINTS)
-        .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+    http.securityMatcher(MANAGED_ENDPOINTS)
         .requestCache(RequestCacheConfigurer::disable)
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+    if (properties.isConfigured()) {
+      http.userDetailsService(MonitoringScrapeSecurityConfig.scrapeUsers(properties))
+          .httpBasic(Customizer.withDefaults())
+          .authorizeHttpRequests(
+              auth ->
+                  auth.requestMatchers(HEALTH_ENDPOINTS)
+                      .permitAll()
+                      .anyRequest()
+                      .hasRole(MonitoringScrapeSecurityConfig.MONITORING_ROLE));
+    } else {
+      http.authorizeHttpRequests(
+          auth -> auth.requestMatchers(HEALTH_ENDPOINTS).permitAll().anyRequest().denyAll());
+    }
     return http.build();
   }
 }

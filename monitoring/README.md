@@ -478,8 +478,8 @@ prometheus-web.yml, alertmanager.yml}`, owner `own 65534`, mode 600.
   construction — do not mint new ones next to a restored `.env`.
 - **Without a usable backup:** mint them. `alertmanager.yml` cannot be minted — it carries the SMTP
   credential, the healthchecks.io ping URL and the Discord webhook — so re-render it (next section).
-  `scrape_password` is read by no scrape job since ADR-0134, but `prometheus.container` still mounts
-  it.
+  `scrape_password` is the password the three `basetool-*` scrape jobs send to the management ports
+  (ADR-0265).
 
   ```bash
   cd /var/iri/monitoring/secrets
@@ -496,7 +496,9 @@ prometheus-web.yml, alertmanager.yml}`, owner `own 65534`, mode 600.
 
   Then set the **same** values in `.env`: `PROMETHEUS_WEB_PASSWORD` (read by Grafana's datasource
   and Tempo's remote write — a mismatch makes every panel 401 and fires
-  `TempoGeneratorRemoteWriteFailing`) and `MONITORING_SCRAPE_PASSWORD`. The hash must start with
+  `TempoGeneratorRemoteWriteFailing`) and `MONITORING_SCRAPE_PASSWORD`, with
+  `MONITORING_SCRAPE_USER=monitoring` (a mismatch makes the three `basetool-*` targets 401 and fires
+  `TargetDown`). The hash must start with
   `$2y$`; if the shell ate the `$` signs, re-run it.
 
 **2. `certs/basetool-ca.crt`** — the public half of the shared keystore, which Prometheus pins for

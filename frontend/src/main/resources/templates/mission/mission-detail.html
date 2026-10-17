@@ -62,6 +62,12 @@
         </div>
     </div>
 
+    <div class="alert alert-warning" role="alert" data-testid="mission-option-lists-unavailable"
+         th:if="${optionListFailures != null and !optionListFailures.isEmpty()}">
+        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-warning"/></svg>
+        <p th:text="#{mission.options.unavailable(${#strings.listJoin(#messages.listMsg(optionListFailures), ', ')})}">Einige Auswahllisten konnten nicht geladen werden.</p>
+    </div>
+
     <div class="tab-panes">
         <section th:unless="${isNew}" id="pane-ueb" class="tab-pane" role="tabpanel" aria-labelledby="tab-ueb">
             <div id="overview-results"><th:block th:fragment="overviewSection">
