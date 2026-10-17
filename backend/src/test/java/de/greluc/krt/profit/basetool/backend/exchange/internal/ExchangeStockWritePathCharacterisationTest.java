@@ -45,7 +45,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -57,7 +56,6 @@ import org.springframework.transaction.annotation.Transactional;
  * Lager row's Java type and runs unchanged before and after that type changes.
  */
 @SpringBootTest
-@TestPropertySource(properties = "app.inventory.stolen-marking-enabled=true")
 @Transactional
 class ExchangeStockWritePathCharacterisationTest {
 

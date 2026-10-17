@@ -92,7 +92,7 @@ springdoc:
   auto-tag-classes: false
 app:
   inventory:
-    stolen-marking-enabled: ${APP_INVENTORY_STOLEN_MARKING_ENABLED:false}
+    stolen-marking-enabled: ${APP_INVENTORY_STOLEN_MARKING_ENABLED:true}
   security:
     ingest-gateway:
       client-ids: ${APP_SECURITY_INGEST_GATEWAY_CLIENT_IDS:}

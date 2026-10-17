@@ -1419,10 +1419,10 @@ Lager row — shared or personal, material or game item — carries a **„gesto
   not leave the row below the amount it offers on the Materialbörse (refused with a message naming
   the offer) or below its earmarks (`422`).
 - **Behind a server switch.** `app.inventory.stolen-marking-enabled`
-  (`APP_INVENTORY_STOLEN_MARKING_ENABLED`, default **off**) gates booking in as stolen and every
+  (`APP_INVENTORY_STOLEN_MARKING_ENABLED`, default **on**) gates booking in as stolen and every
   mark/unmark; it is advertised as `canMarkStolen` in `/api/v1/me/capabilities`. The switch waited
   for an Android release (#2092, #2097) that never shipped; with the app discontinued (ADR-0268) it
-  is a plain feature flag. Reading,
+  is a plain feature flag, on by default and switched off only by setting it to `false`. Reading,
   the chip and the filters work either way.
 - **Shown everywhere stock appears**: a danger chip „Gestohlen" on stack and entry rows of both
   Lager views, in the allocation pickers (REQ-INV-039), on an order's allocated stock and handover

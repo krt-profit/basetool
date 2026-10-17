@@ -62,7 +62,6 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.web.FilterChainProxy;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -76,7 +75,6 @@ import org.springframework.web.context.WebApplicationContext;
  * pool until the writer confirms it (REQ-XCH-046, REQ-XCH-021, REQ-XCH-034).
  */
 @SpringBootTest
-@TestPropertySource(properties = "app.inventory.stolen-marking-enabled=true")
 class ExchangeOrgStockUndoControllerTest {
 
   private static final String CHANGES = "/api/v1/exchange/org-stock/changes";
