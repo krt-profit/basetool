@@ -48,7 +48,7 @@
                 <h2 class="xc-heading" th:text="#{admin.exchangeClients.list}">Registrierte Anwendungen</h2>
                 <div class="card card--flush">
                     <div class="table-responsive" th:if="${!#lists.isEmpty(clients)}">
-                        <table id="xc-table" class="data-table data-table--stack"
+                        <table id="xc-table" class="data-table data-table--stack xc-table"
                                th:data-list-total="${#lists.size(clients)}">
                             <thead>
                             <tr>
@@ -77,7 +77,7 @@
                                 <td th:attr="data-label=#{admin.exchangeClients.column.members}" th:with="u=${usage[c.id]}" th:text="${u != null} ? ${u.connectedMembers} : 0" class="xc-members">3</td>
                                 <td th:attr="data-label=#{admin.exchangeClients.column.lastActivity}" th:with="u=${usage[c.id]}"
                                     th:text="${u != null and u.lastSeenAt != null} ? #{admin.exchangeClients.utc(${#temporals.format(u.lastSeenAt, 'dd.MM.yyyy HH:mm', 'UTC')})} : '–'">27.09.2026 09:30 UTC</td>
-                                <td th:attr="data-label=#{admin.exchangeClients.column.capabilities}">
+                                <td class="xc-capabilities-cell" th:attr="data-label=#{admin.exchangeClients.column.capabilities}">
                                     <ul class="xc-capabilities">
                                         <li th:each="cap : ${c.capabilities}"
                                             th:text="${#messages.msgOrNull('exchange.capability.' + cap) ?: cap}">Blueprints lesen</li>
