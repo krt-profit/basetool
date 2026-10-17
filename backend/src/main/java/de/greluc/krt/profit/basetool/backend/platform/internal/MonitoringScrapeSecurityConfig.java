@@ -73,13 +73,7 @@ public class MonitoringScrapeSecurityConfig {
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
     if (properties.isConfigured()) {
-      PasswordEncoder encoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
-      UserDetails scrapeUser =
-          User.withUsername(properties.username())
-              .password(encoder.encode(properties.password()))
-              .roles(MONITORING_ROLE)
-              .build();
-      http.userDetailsService(new InMemoryUserDetailsManager(scrapeUser))
+      http.userDetailsService(scrapeUsers(properties))
           .httpBasic(Customizer.withDefaults())
           .authorizeHttpRequests(auth -> auth.anyRequest().hasRole(MONITORING_ROLE));
       log.info(
@@ -91,5 +85,24 @@ public class MonitoringScrapeSecurityConfig {
               + " — /actuator/prometheus returns 403 to every caller.");
     }
     return http.build();
+  }
+
+  /**
+   * Builds the single in-memory scrape user with a BCrypt-hashed password and the {@link
+   * #MONITORING_ROLE}.
+   *
+   * @param properties the configured scrape credentials; {@link
+   *     MonitoringScrapeProperties#isConfigured()} must be {@code true}
+   * @return a user store holding only the scrape user
+   */
+  static @NotNull InMemoryUserDetailsManager scrapeUsers(
+      @NotNull MonitoringScrapeProperties properties) {
+    PasswordEncoder encoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
+    UserDetails scrapeUser =
+        User.withUsername(properties.username())
+            .password(encoder.encode(properties.password()))
+            .roles(MONITORING_ROLE)
+            .build();
+    return new InMemoryUserDetailsManager(scrapeUser);
   }
 }

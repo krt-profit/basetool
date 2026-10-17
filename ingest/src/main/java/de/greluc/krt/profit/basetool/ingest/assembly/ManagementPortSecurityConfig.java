@@ -19,32 +19,44 @@
 
 package de.greluc.krt.profit.basetool.ingest.assembly;
 
+import de.greluc.krt.profit.basetool.ingest.config.MonitoringScrapeProperties;
+import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
- * Opens {@code /actuator/**} without authentication on the dedicated management port (ADR-0090),
- * active only when {@code management.server.port} is set. That port is reachable only from the
- * monitoring scrape network and localhost.
+ * Secures {@code /actuator/**} on the dedicated management port (ADR-0090, REQ-OBS-005), active
+ * only when {@code management.server.port} is set.
+ *
+ * <p>Health is open; every other Actuator path requires the scrape identity of {@link
+ * MonitoringScrapeProperties} and is denied to everyone while it is not configured.
  */
 @Configuration
 @ConditionalOnProperty(name = "management.server.port")
+@RequiredArgsConstructor
 public class ManagementPortSecurityConfig {
 
+  /** The health probes the container health check calls without credentials. */
+  private static final String[] HEALTH_ENDPOINTS = {"/actuator/health", "/actuator/health/**"};
+
+  /** The scrape credentials that unlock every Actuator path but health. */
+  private final MonitoringScrapeProperties properties;
+
   /**
-   * Permit-all, stateless chain for {@code /actuator/**}, ordered before {@link
-   * MonitoringScrapeSecurityConfig} and {@link SecurityConfig}. CSRF protection stays enabled; the
-   * chain serves only GETs (REQ-OBS-016).
+   * Stateless chain for {@code /actuator/**}, ordered before {@link MonitoringScrapeSecurityConfig}
+   * and {@link SecurityConfig}. CSRF protection stays enabled; the chain serves only GETs
+   * (REQ-OBS-016).
    *
    * @param http the Spring Security builder for this chain
-   * @return the permit-all Actuator filter chain for the management port
+   * @return the chain: health open, the rest behind the scrape identity or denied
    * @throws Exception propagated from {@link HttpSecurity#build()}
    */
   @Bean
@@ -52,9 +64,21 @@ public class ManagementPortSecurityConfig {
   public SecurityFilterChain managementPortActuatorFilterChain(@NotNull HttpSecurity http)
       throws Exception {
     http.securityMatcher("/actuator/**")
-        .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
         .requestCache(RequestCacheConfigurer::disable)
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+    if (properties.isConfigured()) {
+      http.userDetailsService(MonitoringScrapeSecurityConfig.scrapeUsers(properties))
+          .httpBasic(Customizer.withDefaults())
+          .authorizeHttpRequests(
+              auth ->
+                  auth.requestMatchers(HEALTH_ENDPOINTS)
+                      .permitAll()
+                      .anyRequest()
+                      .hasRole(MonitoringScrapeSecurityConfig.MONITORING_ROLE));
+    } else {
+      http.authorizeHttpRequests(
+          auth -> auth.requestMatchers(HEALTH_ENDPOINTS).permitAll().anyRequest().denyAll());
+    }
     return http.build();
   }
 }

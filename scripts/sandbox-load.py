@@ -36,6 +36,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.parse
 import uuid
 from collections import Counter, defaultdict
 
@@ -163,10 +164,17 @@ class Docker:
         return len(keys)
 
     def metrics(self, container: str, port: int, prefixes: tuple[str, ...]) -> dict[str, float]:
-        """Reads a service's Prometheus exposition from inside its container, filtered by prefix."""
+        """Reads a service's Prometheus exposition from inside its container, filtered by prefix.
+
+        The scrape credential is the one the container runs with (`MONITORING_SCRAPE_*`).
+        """
         try:
+            out = self.run("inspect", "--format", "{{json .Config.Env}}", container)
+            env = dict(item.split("=", 1) for item in json.loads(out) if "=" in item)
+            user = urllib.parse.quote(env.get("MONITORING_SCRAPE_USER", ""), safe="")
+            password = urllib.parse.quote(env.get("MONITORING_SCRAPE_PASSWORD", ""), safe="")
             text = self.run("exec", container, "wget", "-q", "--no-check-certificate", "-O", "-",
-                            f"https://localhost:{port}/actuator/prometheus")
+                            f"https://{user}:{password}@localhost:{port}/actuator/prometheus")
         except RuntimeError as error:
             return {"unreachable": str(error)}
         values = {}
