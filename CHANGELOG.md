@@ -2,7 +2,13 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Monitoring: CSP-Verstöße nennen ihre Ursache.** Der Fehler-Beacon meldet bei einem `trusted-types`-Verstoß den versuchten Policy-Namen und bei jedem CSP-Verstoß, ob der Code von der eigenen Seite, einer Browser-Erweiterung oder anderswoher stammt; `basetool_client_csp_violation_total` trägt dafür das Label `code_origin` (Dashboard 07, Panel 85). Grundlage für die Trusted-Types-Umstellung auf `enforce` (REQ-SEC-064, REQ-FE-022).
+
 ### Fixed
+
+- **Lager-Übersicht: Umschalter „Globales Lager | Mein Lager“ ohne Leerraum.** Die Segmente sind wieder genau so breit wie ihre Beschriftung; die Kopfzeilen-Navigation vererbte ihren Abstand an jeden Segment-Umschalter, der als `<nav>` gesetzt ist (Design-System-CSS, REQ-UI-028).
 
 - **Verbundene Anwendungen (Admin): Layout.** Die Tabelle der registrierten Anwendungen passt wieder in die Seitenbreite, statt seitlich zu scrollen, und die Berechtigungs-Checkboxen im Formular sind bei langen Bezeichnungen alle gleich groß (REQ-XCH-003).
 
@@ -31,6 +37,8 @@
 - **Profil: Namen von verbundenen Anwendungen zurückhalten.** Der neue Schalter „Meinen Namen nicht an verbundene Anwendungen weitergeben" im Profil (standardmäßig aus) speichert in place, ist Teil des Datenexports und wird im Bereich „Verbundene Anwendungen" protokolliert; die Datenschutzerklärung nennt, welche Namen eine Anwendung erhält. Wirksam wird er mit dem Einheitsbestand für Logistiker (REQ-XCH-044, ADR-0257, Migration V294).
 
 ### Fixed
+
+- **Lager: Ausbuchen und Umbuchen zeigen Einsätze mit Name und Datum.** Unter „Herkunft der Menge" stand bei einem Einsatz statt seines Namens dessen interne ID, vor allem nach einer gerade erst vorgenommenen Zuordnung. Jetzt erscheinen Name und geplantes Datum, ein nicht mehr auffindbarer Einsatz als „Unbekannter Einsatz" (REQ-INV-027).
 
 - **Monitoring: SC-Wiki-Sync sprengt das `uri`-Limit nicht mehr.** Backend und Ingest bereinigen den `uri`-Tag ausgehender Anfragen schon beim Start; vorher legte der Laufzeit-Timer `http.client.requests.active` je Wiki-Seite oder Feed-Cursor einen neuen Tag-Wert an, bis Micrometer weitere Werte verwarf (REQ-OBS-006).
 

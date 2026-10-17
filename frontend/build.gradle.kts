@@ -761,6 +761,21 @@ val testTrustedTypesJs =
     outputs.upToDateWhen { false }
   }
 
+val testClientErrorCspJs =
+  tasks.register<NodeTask>("testClientErrorCspJs") {
+    group = "verification"
+    description =
+      "Regression tests for the client-error beacon's CSP violation report (REQ-SEC-064, REQ-FE-022)."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(layout.projectDirectory.file("scripts/client-error-csp.test.mjs").asFile)
+    ignoreExitValue.set(false)
+    inputs.file(layout.projectDirectory.file("scripts/client-error-csp.test.mjs"))
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-client-error.js"),
+    )
+    outputs.upToDateWhen { false }
+  }
+
 val testSafeUrl =
   tasks.register<NodeTask>("testSafeUrl") {
     group = "verification"
@@ -895,6 +910,7 @@ tasks.named("check").configure {
   dependsOn(
     testKrtFetchReadJs,
     testTrustedTypesJs,
+    testClientErrorCspJs,
     testSafeUrl,
     testEslintBans,
     testTypecheckRatchet,

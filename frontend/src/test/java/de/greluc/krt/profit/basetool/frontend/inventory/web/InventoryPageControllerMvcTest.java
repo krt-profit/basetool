@@ -74,6 +74,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -888,6 +889,144 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(containsString("assoc-chip--mission")))
         .andExpect(content().string(containsString("data-target-id=\"" + missionId + "\"")))
         .andExpect(content().string(containsString(missionName)));
+  }
+
+  /**
+   * A mission chip carries the Herkunft picker label as {@code data-target-label}: the mission name
+   * and its planned start date in the locale's date format (REQ-INV-027).
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER", username = "test-user-123")
+  void viewMyStackEntries_ShouldLabelMissionChipWithNameAndPlannedDate() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    MissionAllocationDto allocation =
+        new MissionAllocationDto(
+            missionId, "Op Nachtfalke", Instant.parse("2026-02-03T10:15:30Z"), 4.0);
+
+    performMyStackEntriesWithMission(allocation, "de")
+        .andExpect(status().isOk())
+        .andExpect(
+            content().string(containsString("data-target-label=\"Op Nachtfalke - 03.02.2026\"")))
+        .andExpect(
+            content().string(not(containsString("data-target-label=\"" + missionId + "\""))));
+  }
+
+  /**
+   * A mission chip whose mission the backend could not resolve shows and carries the localized
+   * unknown-mission label instead of the raw id (REQ-INV-027).
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER", username = "test-user-123")
+  void viewMyStackEntries_ShouldLabelUnresolvedMissionChipWithUnknownLabel() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    MissionAllocationDto allocation = new MissionAllocationDto(missionId, null, null, 4.0);
+
+    performMyStackEntriesWithMission(allocation, "en")
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-target-label=\"Unknown mission\"")))
+        .andExpect(content().string(containsString("<span>Unknown mission</span>")));
+  }
+
+  /** A job-order chip carries {@code #<displayId>} as its Herkunft picker label (REQ-INV-027). */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER", username = "test-user-123")
+  void viewMyStackEntries_ShouldLabelOrderChipWithDisplayId() throws Exception {
+    UUID itemId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    InventoryItemDto item =
+        new InventoryItemDto(
+            itemId,
+            new UserReferenceDto(UUID.randomUUID(), "tester", "Tester", "Tester", null),
+            new MaterialReferenceDto(materialId, "Quantanium", "SCU"),
+            null,
+            new LocationReferenceDto(locationId, "ARC-L1"),
+            90,
+            10.0,
+            false,
+            false,
+            List.of(new JobOrderAllocationDto(UUID.randomUUID(), 1042, 5.0)),
+            5.0,
+            List.of(),
+            10.0,
+            null,
+            null,
+            1L,
+            null,
+            Instant.parse("2026-02-03T10:15:30Z"));
+    stubMyStackEntries(item);
+
+    mockMvc
+        .perform(
+            get("/inventory/my/stack/entries")
+                .param("materialId", materialId.toString())
+                .param("locationId", locationId.toString())
+                .param("quality", "90")
+                .param("personal", "false"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-target-label=\"#1042\"")));
+  }
+
+  /**
+   * Renders the "Mein Lager" stack entries for one SCU entry earmarked to a single mission.
+   *
+   * @param allocation the entry's only mission allocation
+   * @param locale the {@code KRT_LOCALE} cookie value
+   * @return the MockMvc result
+   * @throws Exception when the request fails
+   */
+  private ResultActions performMyStackEntriesWithMission(
+      MissionAllocationDto allocation, String locale) throws Exception {
+    UUID materialId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    InventoryItemDto item =
+        new InventoryItemDto(
+            UUID.randomUUID(),
+            new UserReferenceDto(UUID.randomUUID(), "tester", "Tester", "Tester", null),
+            new MaterialReferenceDto(materialId, "Quantanium", "SCU"),
+            null,
+            new LocationReferenceDto(locationId, "ARC-L1"),
+            90,
+            10.0,
+            false,
+            false,
+            List.of(),
+            null,
+            List.of(allocation),
+            6.0,
+            null,
+            null,
+            1L,
+            null,
+            Instant.parse("2026-02-03T10:15:30Z"));
+    stubMyStackEntries(item);
+
+    return mockMvc.perform(
+        get("/inventory/my/stack/entries")
+            .cookie(new Cookie("KRT_LOCALE", locale))
+            .param("materialId", materialId.toString())
+            .param("locationId", locationId.toString())
+            .param("quality", "90")
+            .param("personal", "false"));
+  }
+
+  /**
+   * Stubs the backend so the "Mein Lager" stack-entries fragment receives exactly one entry.
+   *
+   * @param item the entry the fragment renders
+   */
+  private void stubMyStackEntries(InventoryItemDto item) {
+    when(backendApiClient.get(anyString(), anyTypeRef()))
+        .thenAnswer(
+            inv -> {
+              String url = inv.getArgument(0);
+              if (url.contains("/inventory/my-inventory/stack/entries")) {
+                return new PageResponse<>(List.of(item), 0, 20, 1, 1, Collections.emptyList());
+              }
+              return Collections.emptyList();
+            });
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
   }
 
   /**

@@ -686,8 +686,9 @@ class InventoryOperationsE2eTest {
 
   /**
    * Herkunft prefill (REQ-INV-027): with the whole row earmarked to one mission, the Umbuchen
-   * picker prefills and locks the mission field and re-syncs it on an amount change; transferring
-   * 40 shrinks the mission chip from 60 to 20.
+   * picker labels the in-place built chip's tag with the mission name and date, prefills and locks
+   * the mission field and re-syncs it on an amount change; transferring 40 shrinks the mission chip
+   * from 60 to 20.
    */
   @Test
   void herkunftPickerPrefillsAndLocksTheOnlyTagWhenThereIsNoRest() {
@@ -705,6 +706,10 @@ class InventoryOperationsE2eTest {
 
           assertThat(missionInput).hasValue("60");
           assertThat(missionInput).not().isEditable();
+          Locator missionTagName = page.locator(dimSelector + " .herkunft-tag-name");
+          assertThat(missionTagName)
+              .hasText(Pattern.compile("^E2E Inv Mission - \\d{2}[./]\\d{2}[./]\\d{4}$"));
+          assertThat(missionTagName).not().containsText(missionId);
           assertThat(page.locator(dimSelector + " [data-herkunft-auto-note]")).isVisible();
           assertThat(page.locator(dimSelector + " [data-herkunft-warn]")).isHidden();
           assertThat(page.locator("#umbuchenSubmitBtn")).isEnabled();

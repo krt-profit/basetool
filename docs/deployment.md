@@ -1215,15 +1215,34 @@ policy went live, no CSP violation was reported, and the dialog page walk of the
 sum(increase(basetool_client_error_total{kind="csp_violation"}[7d])) > 0
 ```
 
-A hit is a violation, not necessarily a Trusted Types one. The directive names it without a write:
-`sum by (directive) (increase(basetool_client_csp_violation_total[7d]))` (dashboard `07`, panel 85)
-— `require-trusted-types-for` and `trusted-types` are this policy, anything else is the enforced
-policy. To name the sink or the blocked origin, raise
+A hit is a violation, not necessarily a Trusted Types one. The directive and the origin of the
+violating code name it without a write:
+
+```text
+sum by (directive, code_origin) (increase(basetool_client_csp_violation_total[7d]))
+```
+
+(dashboard `07`, panel 85). `require-trusted-types-for` and `trusted-types` are this policy,
+anything else is the enforced policy. `code_origin` comes from the violation's source file:
+
+| `code_origin` | Meaning |
+| --- | --- |
+| `self` | A script on our origin, or inline script in our page. Ours unless an extension injected it as inline script. |
+| `extension` | A `chrome-extension:`, `moz-extension:`, `safari-web-extension:` or `webkit-masked-url:` script: a member's browser extension, not our code. |
+| `inline` | The browser named no source file, e.g. a parser-inserted element. Read the blocked origin. |
+| `other` | A script on another origin, or a report from a beacon older than this field. |
+
+To name the sink, the policy or the blocked origin, raise
 `de.greluc.krt.profit.basetool.frontend.shell.web.ClientErrorReportController` to DEBUG through
 `/actuator/loggers` (REQ-OBS-016; a production write as well) and read `{app="frontend"} |= "Client
 error reported [kind=csp_violation"`: a Trusted Types sink shows as `message=require-trusted-types-for
 Element innerHTML` (the directive and the sink, never the markup), an unlisted policy as
-`message=trusted-types`. Convert the sink in a PR and restart the week; do not enforce around it.
+`message=trusted-types <name>` (e.g. `trusted-types dompurify`; `trusted-types krt-html` is our own
+policy created twice), and every line ends in `codeOrigin=<value>`. A `self` violation is ours:
+convert the sink in a PR and restart the week; do not enforce around it. A violation with
+`code_origin="extension"` is not our code and no PR of ours can convert it; whether it still holds
+the switch back is the owner's decision on #2568, with the policy name from the DEBUG line as the
+evidence.
 
 **Apply** (as root, from `/`; `${UCTL}` from [Shell conventions](#shell-conventions-used-below)):
 

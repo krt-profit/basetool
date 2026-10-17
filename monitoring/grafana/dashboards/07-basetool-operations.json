@@ -2376,8 +2376,8 @@
         "y": 152
       },
       "type": "timeseries",
-      "title": "Browser CSP violations/hour by directive",
-      "description": "A csp_violation split by the violated Content-Security-Policy directive (basetool_client_csp_violation_total, directive = the CSP directive name, or other). require-trusted-types-for / trusted-types is the report-only Trusted Types policy: a DOM sink written without a policy value. script-src-* / style-src-* / img-src / connect-src is the enforced policy: an inline script or style without the nonce, or a host the policy does not allow; browser extensions that inject code land here as background. Read it beside panel 43 when ClientErrorSpike fires on csp_violation.",
+      "title": "Browser CSP violations/hour by directive and code origin",
+      "description": "A csp_violation split by the violated Content-Security-Policy directive and by where the violating code came from (basetool_client_csp_violation_total, directive = the CSP directive name, or other; code_origin = self (the page origin), extension (a browser extension), inline (no source file named) or other). require-trusted-types-for / trusted-types is the report-only Trusted Types policy: a DOM sink written without a policy value. script-src-* / style-src-* / img-src / connect-src is the enforced policy: an inline script or style without the nonce, or a host the policy does not allow; browser extensions that inject code land here as background, under code_origin = extension. Read it beside panel 43 when ClientErrorSpike fires on csp_violation.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -2406,9 +2406,9 @@
       },
       "targets": [
         {
-          "expr": "sum by (directive) (rate(basetool_client_csp_violation_total[1h])) * 3600",
+          "expr": "sum by (directive, code_origin) (rate(basetool_client_csp_violation_total[1h])) * 3600",
           "refId": "A",
-          "legendFormat": "{{directive}}",
+          "legendFormat": "{{directive}} / {{code_origin}}",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"

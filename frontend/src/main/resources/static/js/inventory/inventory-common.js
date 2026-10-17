@@ -1204,14 +1204,68 @@ function createLager(cfg) {
     }
 
     /**
+     * Collects the mission labels a split already knows, keyed by mission id: the target labels
+     * of its current chips, then the texts of its combobox options for the missions not yet
+     * earmarked. Both are rendered by the server as name and planned date.
+     *
+     * @param {Element} split the .assoc-split
+     * @returns {Map<string, string>} the known labels
+     */
+    function assocKnownMissionLabels(split) {
+        /** @type {Map<string, string>} */
+        const labels = new Map();
+        split
+            .querySelectorAll('[data-assoc-chip][data-target-id][data-target-label]')
+            .forEach((c) => {
+                const id = c.getAttribute('data-target-id');
+                const label = c.getAttribute('data-target-label');
+                if (id && label) labels.set(id, label);
+            });
+        split.querySelectorAll('[data-assoc-pop-pick] option[value]').forEach((o) => {
+            const option = /** @type {HTMLOptionElement} */ (o);
+            const text = (option.textContent || '').trim();
+            if (option.value && text && !labels.has(option.value)) labels.set(option.value, text);
+        });
+        return labels;
+    }
+
+    /**
+     * The label an allocation chip shows in the Herkunft picker: `#<displayId>` for an order; for
+     * a mission its known name-and-date label, else its name, else the localized unknown-mission
+     * label. Never the raw id.
+     *
+     * @param {boolean} isOrder whether the allocation is a job-order one
+     * @param {any} alloc the allocation DTO
+     * @param {Map<string, string>} known the split's known mission labels
+     * @returns {string} the label
+     */
+    function assocTargetLabel(isOrder, alloc, known) {
+        if (isOrder) return `#${alloc.jobOrderDisplayId}`;
+        const fromPage = alloc.missionId ? known.get(alloc.missionId) : undefined;
+        return fromPage || assocMissionName(alloc);
+    }
+
+    /**
+     * The mission name of an allocation, or the localized unknown-mission label when the backend
+     * could not resolve it.
+     *
+     * @param {any} alloc the allocation DTO
+     * @returns {string} the name
+     */
+    function assocMissionName(alloc) {
+        return alloc.missionName ? String(alloc.missionName) : assocI18n.missionUnknown;
+    }
+
+    /**
      * Builds one allocation chip element from a returned allocation DTO.
      *
      * @param {string | null} field `JOB_ORDER` or `MISSION`
      * @param {any} alloc the allocation DTO
      * @param {boolean} isPiece whether the material counts pieces
+     * @param {Map<string, string>} known the split's known mission labels
      * @returns {HTMLSpanElement} the chip
      */
-    function assocBuildChip(field, alloc, isPiece) {
+    function assocBuildChip(field, alloc, isPiece, known) {
         const isOrder = field === 'JOB_ORDER';
         const chip = document.createElement('span');
         chip.className = `assoc-chip ${isOrder ? 'assoc-chip--order' : 'assoc-chip--mission'}`;
@@ -1221,7 +1275,8 @@ function createLager(cfg) {
         chip.setAttribute('data-assoc-chip', isOrder ? 'jobOrder' : 'mission');
         chip.setAttribute('data-target-id', isOrder ? alloc.jobOrderId : alloc.missionId);
         chip.setAttribute('data-amount', alloc.amount);
-        const label = isOrder ? `#${alloc.jobOrderDisplayId}` : alloc.missionName;
+        chip.setAttribute('data-target-label', assocTargetLabel(isOrder, alloc, known));
+        const label = isOrder ? `#${alloc.jobOrderDisplayId}` : assocMissionName(alloc);
         chip.appendChild(document.createTextNode(`${label} · `));
         const amt = document.createElement('span');
         amt.className = 'assoc-chip__amt';
@@ -1266,6 +1321,7 @@ function createLager(cfg) {
         const isOrder = field === 'JOB_ORDER';
         const allocs = (isOrder ? dto.jobOrderAllocations : dto.missionAllocations) || [];
         const rest = isOrder ? dto.jobOrderRest : dto.missionRest;
+        const known = isOrder ? new Map() : assocKnownMissionLabels(split);
         split.querySelectorAll('[data-assoc-chip]').forEach((c) => {
             c.remove();
         });
@@ -1273,7 +1329,7 @@ function createLager(cfg) {
         allocs.forEach(
             /** @param {any} a */
             (a) => {
-                split.insertBefore(assocBuildChip(field, a, isPiece), addWrap);
+                split.insertBefore(assocBuildChip(field, a, isPiece, known), addWrap);
             },
         );
         assocUpdateRestChip(split.querySelector('[data-assoc-rest]'), rest, isPiece);
