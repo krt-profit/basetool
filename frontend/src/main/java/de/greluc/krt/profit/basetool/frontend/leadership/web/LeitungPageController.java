@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.leadership.web;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.leadership.client.LeadershipBackendClient;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.AddBereichLeaderRequest;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.AddOlMemberRequest;
@@ -117,17 +118,11 @@ public class LeitungPageController {
       @RequestParam(required = false) String unit,
       @RequestParam(required = false) String tab,
       Model model) {
-    LeitungViewDto view = null;
-    try {
-      view = leadershipClient.leitungView();
-      model.addAttribute("leitung", view);
-    } catch (BackendServiceException e) {
-      log.debug("Failed to load Leitung view", e);
-      model.addAttribute("error", "leitung.error.load");
-    } catch (Exception e) {
-      log.error("Failed to load Leitung view", e);
+    if (!SectionFallback.run(
+        log, "leitung-view", () -> model.addAttribute("leitung", leadershipClient.leitungView()))) {
       model.addAttribute("error", "leitung.error.load");
     }
+    LeitungViewDto view = model.getAttribute("leitung") instanceof LeitungViewDto v ? v : null;
     model.addAttribute("selectedTab", TAB_GROUPS.equals(tab) ? TAB_GROUPS : TAB_MEMBERS);
     if (view != null) {
       model.addAttribute("selectedUnitId", selectedUnitId(view, unit));
@@ -239,13 +234,8 @@ public class LeitungPageController {
   @NotNull
   private Map<UUID, LeitungUnitContext> unitContext() {
     Map<UUID, LeitungUnitContext> context = new HashMap<>();
-    OrgChartDto chart;
-    try {
-      chart = leadershipClient.orgChart();
-    } catch (RuntimeException e) {
-      log.debug("Org chart unavailable for the Leitung tree", e);
-      return context;
-    }
+    OrgChartDto chart =
+        SectionFallback.load(log, "leitung-org-chart", leadershipClient::orgChart, null);
     if (chart == null || chart.bereiche() == null) {
       return context;
     }
@@ -322,13 +312,9 @@ public class LeitungPageController {
    */
   @Nullable
   private Map<UUID, OrgUnitMembershipDto> skFlags(@NotNull UUID skId) {
-    List<OrgUnitMembershipDto> raw;
-    try {
-      raw = leadershipClient.specialCommandMembers(skId);
-    } catch (RuntimeException e) {
-      log.debug("Spezialkommando roster flags unavailable", e);
-      return null;
-    }
+    List<OrgUnitMembershipDto> raw =
+        SectionFallback.load(
+            log, "sk-roster-flags", () -> leadershipClient.specialCommandMembers(skId), null);
     if (raw == null) {
       return null;
     }
