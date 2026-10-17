@@ -55,7 +55,7 @@ public record AppHttpProperties(
     @NotNull @DefaultValue("H2") BackendProtocol backendProtocol,
     @Min(1) @Max(100) @DefaultValue("20") int maxConcurrentStreams,
     @NotNull @DefaultValue("CBOR") BackendCodec codec,
-    @DefaultValue("false") boolean verifyBackendHostname) {
+    @DefaultValue("true") boolean verifyBackendHostname) {
 
   /**
    * The wire protocol offered on the frontend-to-backend hop. {@code H2} also offers HTTP/1.1, so a

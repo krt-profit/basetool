@@ -1757,7 +1757,7 @@ states so a rollback can be read off it:
 
 | Knob | Where | Before the rollout | After the rollout (current) |
 |---|---|---|---|
-| `INTERNAL_TLS_VERIFY_HOSTNAME` | host `.env` → `env.d` (frontend, ingest) | `false` | `true` (the compose and `env.d` default since #2036) |
+| `INTERNAL_TLS_VERIFY_HOSTNAME` | host `.env` → `env.d` (frontend, ingest) | `false` | `true` (the compose and `env.d` default since #2036, and the default of both jars) |
 | `IRI_BACKEND_KEYSTORE_HOST_PATH` / `_FRONTEND_` / `_INGEST_` / `_KEYCLOAK_` | baked into the units by `generate-quadlet.py` (`PATH_VARS`) | `/var/iri/secrets/keystore.p12` | `/var/iri/secrets/tls/<service>.p12` |
 | `IRI_INTERNAL_TRUSTSTORE_HOST_PATH` → `/run/secrets/internal-truststore.p12` | baked, as above | `/var/iri/secrets/keystore.p12` | `/var/iri/secrets/tls/truststore.p12` |
 | `IRI_TRUSTSTORE_HOST_PATH` → `/run/secrets/truststore.p12` (REQ-OPS-022's JVM-truststore default; production's JVM truststore is the role's separate `jvm-truststore.p12` drop-in) | baked, as above | `/var/iri/secrets/keystore.p12` — the shared **private key**, mounted into all three apps | `/var/iri/secrets/tls/truststore.p12`, so no container holds the old key |
