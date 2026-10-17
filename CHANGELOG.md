@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Lager-Übersicht: Umschalter „Globales Lager | Mein Lager“ ohne Leerraum.** Die Segmente sind wieder genau so breit wie ihre Beschriftung; die Kopfzeilen-Navigation vererbte ihren Abstand an jeden Segment-Umschalter, der als `<nav>` gesetzt ist (Design-System-CSS, REQ-UI-028).
+
 ## [v1.16.5](https://github.com/krt-profit/basetool/releases/tag/v1.16.5) - 2026-10-17
 
 ### Added
