@@ -4,9 +4,9 @@
 
 ```
                          ┌───────────────────────────────────────────────┐
-   Member (browser) ────►│                                               │
-                         │                                               │◄──── Discord
-   Member (Android app) ►│              PROFIT BASETOOL                  │      (login identity +
+   Member (browser, ────►│                                               │
+    installed PWA)       │                                               │◄──── Discord
+                         │              PROFIT BASETOOL                  │      (login identity +
                          │                                               │       guild/role gate,
                          │   missions · hangar · Lager · job orders ·    │       via Keycloak)
                          │   refinery · Materialbörse · Kartellbank ·    │

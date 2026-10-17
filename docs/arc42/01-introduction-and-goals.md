@@ -44,7 +44,7 @@ page timeouts, not a scaling ambition.
 | **Bank officers** | A ledger that cannot silently lose or double a booking, with an approval ladder and statements |
 | **@greluc — maintainer, operator, data controller** | That one person can deploy it, diagnose it, restore it and answer a GDPR request with it |
 | **Data subjects** (including former members) | Export and erasure that actually reach the free-text surfaces no foreign key points at |
-| **The desktop extractor** and the Android app | A stable, restricted contract that does not break under them |
+| **The desktop extractor** | A stable, restricted contract that does not break under it |
 | **Approved exchange clients** (third-party desktop tools such as VerseKit) | A published, additive-only `/exchange/v1` contract, a sandbox to build against, and v1 served for at least twelve months beside a v2 (ADR-0219) |
 
 ## 1.4 How to read this alongside the rest

@@ -14,7 +14,8 @@ cannot: the anonymous terms client (same resilience chain, no bearer), the notif
 and the live-sync subscription probe (neither carries the resilience filters, by design).
 
 The point is not layering for its own sake — it is that the backend can then be kept off the
-internet, that the Android app and the web UI consume the *same* contract, and that timeouts,
+internet, that the web UI — in a browser tab or installed as a PWA — is its one interactive
+consumer, and that timeouts,
 retries, circuit breaking and bulkheads are configured in one place. ArchUnit tests enforce the
 direction: the frontend holds no JPA and no JDBC.
 

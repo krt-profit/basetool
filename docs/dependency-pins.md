@@ -1,6 +1,6 @@
 # Dependency pins, holds and floors
 
-> **Doc type:** Living reference — kept in sync with `main`. Last reviewed: 2026-10-12.
+> **Doc type:** Living reference — kept in sync with `main`. Last reviewed: 2026-10-17.
 
 This file records why a dependency version is **held** behind upstream, **pinned** to match another
 component, or **floored** / overridden for a security advisory — the standing reasons the version
@@ -22,8 +22,6 @@ script is named. "Dependabot #N" is the repository's Dependabot alert number.
 
 | Entry | Value | Must equal | Reason | Revisit when |
 |---|---|---|---|---|
-| `openapiGenerator` (plugin `org.openapi.generator`) | 7.26.0 | `basetool-android` `openapiGenerator` | Both generate from the one committed `openapi.json`; a version skew would give two readings of one contract (ADR-0161 §8.2). | Bump both repositories together. |
-| `licensee` (plugin `app.cash.licensee`) | 1.14.1 | `basetool-android` `licensee` | Both halves answer the same licence question with the same tool, so a differing verdict can only be version skew (REQ-UI-021, ADR-0197). | Bump both repositories together. |
 | `lombok` (keycloak-spi only) | 1.18.46 | Boot-managed Lombok (1.18.46 under Boot 4.1.1) | `lombok.config` is one shared file; two Lombok versions would read it two ways. Every other module takes Lombok from the Boot BOM. Check with `./gradlew :backend:dependencyInsight --configuration compileClasspath --dependency org.projectlombok:lombok`. | Move together with the Boot bump that moves the managed version. |
 | `keycloak` (keycloak-spi `compileOnly` SPI artifacts) | 26.8.0 | The Keycloak runtime image `quay.io/keycloak/keycloak:26.8` | Compile against the highest 26.8.x patch, the one the `26.8` line resolves to; SPIs are stable within a minor, and an exact match avoids load-time surprises. `scripts/check-keycloak-version.py` (`repo-lint.yml`, REQ-OPS-040) fails when the catalog and the three image pins name different minors. | A new 26.8.x patch, or the image moves to another minor. |
 | keycloak-spi `options.release` (`basetool { javaRelease = 21 }` in `keycloak-spi/build.gradle.kts`) | 21 | The JDK in the Keycloak 26.8 image (OpenJDK 21.0.12, read from the pinned image on 2026-10-01) | The provider JAR is loaded by Keycloak's JDK 21; Java 25 bytecode fails with `UnsupportedClassVersionError`. Compiled with the JDK 25 toolchain, emitted as `--release 21`. | Keycloak's image moves to a newer JDK. |

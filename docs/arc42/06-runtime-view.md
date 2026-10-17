@@ -59,8 +59,8 @@ missing one turns the next edit into a spurious 409.
    (`basetool:livesync:changed`), so every other frontend replica reaches its own members.
 4. Each receiving client re-reads the named sections and swaps them in place.
 
-The Android app takes a second door to the same relay: a backend **SSE** stream, bridged onto the
-same Redis channel in both directions (ADR-0143). Design: ADR-0094.
+An installed PWA is the frontend in its own window and takes the same `/ws/sync` door as any other
+tab; there is no second door (ADR-0274). Design: ADR-0094.
 
 ## 6.5 The desktop extractor sends a refinery order
 
