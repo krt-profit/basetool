@@ -10,15 +10,56 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'push' && github.sha || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
 jobs:
+  supersede:
+    name: Superseded check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      skip: ${{ steps.decide.outputs.skip }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Decide whether a newer commit has superseded this push
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          PUSHED_REF: ${{ github.ref }}
+          PUSHED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          decision="$(bash scripts/ci-superseded.sh --check \
+            "$EVENT_NAME" "$PUSHED_REF" "$PUSHED_SHA")" \
+            || decision="$(printf 'skip=false\nreason=the superseded check failed; building')"
+          printf '%s\n' "$decision"
+          skip="$(printf '%s\n' "$decision" | sed -n 's/^skip=//p')"
+          reason="$(printf '%s\n' "$decision" | sed -n 's/^reason=//p')"
+          printf 'skip=%s\n' "$skip" >> "$GITHUB_OUTPUT"
+          if [ "$skip" = true ]; then
+            {
+              printf '### CI: skipped -- superseded\n\n'
+              printf '%s.\n\n' "$reason"
+              printf 'Nothing is built, tested or linted by this run; the build job is skipped.\n'
+            } >> "$GITHUB_STEP_SUMMARY"
+            printf '::notice title=CI skipped::%s\n' "$reason"
+          fi
+
   build:
     name: Build, Test & Lint
+    needs: supersede
+    if: ${{ !cancelled() && needs.supersede.outputs.skip != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
