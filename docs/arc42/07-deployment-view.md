@@ -356,6 +356,12 @@ where they remain (ADR-0202, amended 2026-10-17) — and
 `scripts/keycloak-config-snapshot.sql` is the diff that shows whether two realms still agree
 (`REQ-OPS-033`, ADR-0202).
 
+**The testing host deliberately differs in one client and one setting.** Its realm carries the
+seed client `basetool-seed` (`--seed-client`) and its `.env` lets the backend accept that client, so
+`scripts/seed-briefing.py` can fill it with briefing data through the API; `scripts/testing-reset.sh`,
+copied to the host for the run and installed by no role, empties its Basetool database again
+(`REQ-OPS-050`, ADR-0279). Production has neither.
+
 ## 7.6 Backups leave the host
 
 `restic` through an `rclone` WebDAV remote to **Nextcloud**, on a GFS retention policy, with the

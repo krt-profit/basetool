@@ -45,6 +45,9 @@ BUILTIN_CLIENTS = frozenset({
     "security-admin-console",
 })
 
+SEED_CLIENT_ID = "basetool-seed"
+PRODUCTION_HOST_MARKERS = ("profit-base.online", "krt-profit.de")
+
 AUDIENCE_SCOPES = ("extractor-ingest", "extractor-ingest-only")
 
 OFFLINE_ACCESS = "offline_access"
@@ -180,7 +183,8 @@ class ClientSpec:
     wherever found; `withheld_scope_reason`, when set, names why for the scopes instead of
     `withheld_reason`. With `exact_mappers`, every client-level protocol mapper not in `mappers` is
     removed instead of reported. `value_env` names the environment variable that supplies a
-    confidential client's credential; only that name is ever printed.
+    confidential client's credential; only that name is ever printed. `credential_hint`, when set,
+    replaces the host-.env instruction for where a generated secret goes.
     """
 
     client_id: str
@@ -206,6 +210,7 @@ class ClientSpec:
     env_doc_hint: str = ""
     unmanaged_fields: set[str] = field(default_factory=set)
     value_env: str | None = None
+    credential_hint: str = ""
 
 
 def _flags(*, public: bool, standard: bool, service_accounts: bool, full_scope: bool,
@@ -271,14 +276,53 @@ def validate_origin(value: str, flag: str) -> str:
     return value
 
 
+def seed_client_spec(realm: str) -> ClientSpec:
+    """The testing-only seed client: password grant plus a user-managing service account (ADR-0279)."""
+    return ClientSpec(
+        client_id=SEED_CLIENT_ID,
+        kind="confidential, password grant + service account (testing only: the briefing seed, ADR-0279)",
+        fields={
+            **_flags(public=False, standard=False, service_accounts=True, full_scope=True,
+                     frontchannel_logout=True),
+            "directAccessGrantsEnabled": True,
+        },
+        create_only={"name": "Basetool Briefing Seed",
+                     "description": "Testing system only: seeds and removes the briefing test data"},
+        attributes={**_CONFIDENTIAL_ATTRIBUTES,
+                    "oauth2.jwt.authorization.grant.enabled": "false"},
+        redirect_uris=[],
+        web_origins=[],
+        default_scopes=[*_STANDARD_DEFAULT, "extractor-ingest", "service_account"],
+        optional_scopes=list(_OPTIONAL_WITHOUT_OFFLINE),
+        withheld_scopes=[OFFLINE_ACCESS],
+        withheld_scope_reason=_NO_OFFLINE_SESSION,
+        service_account_roles={
+            "<realm>": [f"default-roles-{realm}"],
+            "realm-management": ["manage-users", "query-users", "view-realm", "view-users"],
+        },
+        env_vars_to_fill=["SEED_CLIENT_SECRET"],
+        credential_hint=("scripts/seed-briefing.py reads it from $SEED_CLIENT_SECRET on the "
+                     "workstation that runs the seed; it goes into no host .env"),
+    )
+
+
+def reject_production_origin(public_origin: str) -> None:
+    """Exit when `--seed-client` targets an origin that belongs to production."""
+    host = public_origin.split("://", 1)[1].split(":", 1)[0]
+    if any(host == marker or host.endswith("." + marker) for marker in PRODUCTION_HOST_MARKERS):
+        raise SystemExit(f"--seed-client is for the testing system only; {public_origin} is a "
+                         f"production origin (ADR-0279)")
+
+
 def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
                  frontend_client: str | None = None,
-                 external_clients: list[dict] | None = None) -> list[ClientSpec]:
+                 external_clients: list[dict] | None = None,
+                 seed_client: bool = False) -> list[ClientSpec]:
     """Every Basetool client in its production shape, with the environment's origins filled in.
 
     The approved third-party clients follow the first-party ones and the Android client comes
     last. `frontend_client` is `public`, `confidential` or None; None leaves an existing frontend
-    client's type unmanaged (ADR-0001).
+    client's type unmanaged (ADR-0001). `seed_client` adds the testing-only seed client.
     """
     frontend_confidential = frontend_client == "confidential"
     if frontend_client is None:
@@ -495,6 +539,8 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
             env_vars_to_fill=["GRAFANA_OAUTH_CLIENT_SECRET"],
             env_doc_hint=" (Grafana's generic_oauth login reads it)",
         ))
+    if seed_client:
+        specs.append(seed_client_spec(realm))
     specs.extend(external_client_spec(entry) for entry in (external_clients or []))
     return specs
 
@@ -508,7 +554,8 @@ def load_external_clients(path: Path) -> list[dict]:
     if not isinstance(entries, list):
         raise SystemExit(f"{path}: expected a JSON list of clients")
     reserved = BUILTIN_CLIENTS | {"basetool-frontend", "backend-service", "basetool-ingest-gateway",
-                                  "basetool-sc-extractor", "grafana", RETIRED_CLIENT_ID}
+                                  "basetool-sc-extractor", "grafana", RETIRED_CLIENT_ID,
+                                  SEED_CLIENT_ID}
     seen: set[str] = set()
     for entry in entries:
         client_id = entry.get("clientId") if isinstance(entry, dict) else None
@@ -1001,6 +1048,10 @@ class Planner:
                          for name in names)
 
     def _confidential_client_note(self, spec: ClientSpec) -> str:
+        if spec.credential_hint:
+            return (f"'{spec.client_id}' is created confidential, so Keycloak generates its client "
+                    f"secret. It is NOT printed here: read it in the Admin Console -> Clients -> "
+                    f"{spec.client_id} -> Credentials; {spec.credential_hint}")
         return (f"'{spec.client_id}' is created confidential, so Keycloak generates its client "
                 f"secret. It is NOT printed here: read it in the Admin Console -> Clients -> "
                 f"{spec.client_id} -> Credentials, and put it into "
@@ -1375,6 +1426,10 @@ def main() -> int:
     parser.add_argument("--external-clients", type=Path, default=EXTERNAL_CLIENTS_FILE,
                         help="the approved third-party clients to create from the template "
                              "(default: scripts/keycloak/external-clients.json)")
+    parser.add_argument("--seed-client", action="store_true",
+                        help="also manage the testing-only `basetool-seed` client that "
+                             "scripts/seed-briefing.py signs in with; refused for a production "
+                             "origin (ADR-0279)")
     parser.add_argument("--apply", action="store_true",
                         help="write the planned changes (default: dry run, writes nothing)")
     parser.add_argument("--container", default="keycloak",
@@ -1387,11 +1442,13 @@ def main() -> int:
     public_origin = validate_origin(args.public_origin, "--public-origin")
     grafana_origin = (validate_origin(args.grafana_origin, "--grafana-origin")
                       if args.grafana_origin else None)
-    prefix = (shlex.split(args.kcadm_command) if args.kcadm_command
+    if args.seed_client:
+        reject_production_origin(public_origin)
+    prefix =(shlex.split(args.kcadm_command) if args.kcadm_command
               else ["docker", "exec", "-i", args.container, "/opt/keycloak/bin/kcadm.sh"])
     kc = RealmKcadm(prefix, args.realm, dry_run=False)
     specs = client_specs(args.realm, public_origin, grafana_origin, args.frontend_client,
-                         load_external_clients(args.external_clients))
+                         load_external_clients(args.external_clients), args.seed_client)
 
     mode = "APPLY" if args.apply else "DRY RUN — nothing is written"
     print(f"Keycloak realm '{args.realm}' -> production shape, public origin {public_origin} "

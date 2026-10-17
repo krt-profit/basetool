@@ -3128,6 +3128,76 @@ says so instead of disappearing (ADR-0276).
 [ADR-0276](../adr/0276-every-main-push-gets-its-own-ci-run-and-a-superseded-one-skips.md) ·
 **Related:** REQ-OPS-044, ADR-0137
 
+### REQ-OPS-050 — The testing system is seeded through its API and emptied by a database wipe
+
+The testing system can be filled with the briefing's test data and emptied again, repeatably, and
+neither tool can reach production (ADR-0279).
+
+- **The seed goes through the API.** `scripts/seed-briefing.py seed` creates its Keycloak accounts
+  through the Admin API and every Basetool row through `/api/v1`, signed in as the account the row
+  belongs to, so permissions, audit and optimistic locking apply as for real users. It writes no SQL.
+- **It signs in through a testing-only client.** `basetool-seed` (password grant, service account
+  with `manage-users`, `query-users`, `view-users`, `view-realm`) is created only by
+  `provision-keycloak-realm.py --seed-client`, which refuses a production origin before it reads the
+  realm. The testing backend accepts it through `IRI_BACKEND_ACCEPTED_CLIENT_IDS` in the testing
+  `.env` (REQ-SEC-024); the release default stays `basetool-frontend,basetool-ingest-gateway`.
+- **It refuses production.** `seed` and `purge` exit when `--keycloak-url` or `--api-url` names a
+  production host, and the client secret is read only from `$SEED_CLIENT_SECRET`.
+- **Its accounts are marked and synthetic.** Every seeded account carries an `@briefing.invalid`
+  address and a synthetic name; `seed` refuses to take over an account outside that domain, and
+  `purge` deletes exactly the accounts inside it.
+- **The data is the briefing's:** an Organisationsleitung, two Bereiche, three profit-eligible
+  Staffeln and a Spezialkommando with leads; five presenter accounts (`demo-mitglied`,
+  `demo-logistiker`, `demo-offizier`, `demo-staffelleitung` — responsible holder of Alpha's account —
+  and `demo-bereichsleitung`) and a numbered participant pool across the Logistiker, Einsatz-Manager,
+  officer and lead tracks; `supply.enabled` on and `purchasing.enabled` reported when on; missions in
+  every lifecycle state, internal and public, with crew, steps, objectives and frequencies, and an
+  operation with payouts of which one is marked paid; ships, blueprints, Lager stock at several
+  qualities with a stolen row and allocations; job orders open, in progress and done with priorities,
+  Bearbeiter and SK claims; refinery orders running, ready and stored plus an extractor sample;
+  Materialbörse offers and requests with a minimum quality and a delivery signal; needs, pledged and
+  received donations; an org-unit account per Staffel with balance, target and history and one open
+  deposit and one open withdrawal request; one registered connected-application client.
+- **It is repeatable.** A second run reuses the accounts and the passwords saved in `--out` and skips
+  the data once the test org structure exists; `--only` repeats chosen domains. A failing domain is
+  reported and the run goes on; the exit code is non-zero.
+- **Passwords stay out of the repository.** The handout (`teilnehmer.csv`), the presenter list and
+  the saved passwords go into `--out`, which the script refuses inside the repository.
+- **The reset empties the Basetool database only.** `scripts/testing-reset.sh
+  --wipe-testing-database` refuses without that flag and unless the host `.env` sets
+  `APP_INSTANCE_TEST_SYSTEM=true`; it takes the deploy lock, stops `frontend`, `ingest` and `backend`,
+  drops and recreates `$POSTGRES_DB`, and starts them again. A failed drop restarts the writers on the
+  old database; a failed create leaves them stopped. Keycloak, Redis and every other volume stay.
+- **The reset script is not installed on any host.** It is copied to the testing host for the run
+  and is not part of `host-scripts.list`.
+
+**Acceptance**
+
+- [x] `seed-briefing.py --selftest` covers the account plan (unique names, every track, the SK lead
+  outside every Staffel, the ranked accounts holding the Officer role, no admin among presenters and
+  participants), the production refusal, the out-directory refusal, the state round trip and the
+  handout. It runs in `repo-lint.yml`.
+- [x] `testing-reset.test.sh` covers the usage refusal, the host-marker refusal, the stop–drop–create–
+  start order, that only the Basetool database is touched, and both failure paths. It runs in
+  `repo-lint.yml`.
+- [x] `provision-keycloak-realm.test.sh` case 21: no seed client without the flag; with it a
+  confidential client with password grant, service account and the backend audience; the frontend
+  keeps the password grant off; a later run keeps the client; a production origin is refused before
+  kcadm runs.
+- [x] Against the local sandbox stack, a fresh seed of twelve participants builds every domain but
+  the refinery (no refinery location in the sandbox catalogue, reported), and with a refinery location
+  every domain; a second run skips the data and exits 0; `purge` deletes all nineteen accounts.
+- [ ] The seed runs against the testing host on the release of the briefing, and the reset and a
+  second seed restore the same state.
+
+**Enforced by:** `scripts/seed-briefing.py` · `scripts/testing-reset.sh` ·
+`scripts/provision-keycloak-realm.py` (`--seed-client`) · `scripts/testing-reset.test.sh`,
+`seed-briefing.py --selftest` (`repo-lint.yml`) · `scripts/provision-keycloak-realm.test.sh`
+(`keycloak-provisioner.yml`) · **Decision:**
+[ADR-0279](../adr/0279-the-testing-system-is-seeded-through-its-api-and-emptied-by-a-database-wipe.md) ·
+**Runbook:** [`deployment.md` → Seeding and emptying the testing system](../deployment.md#seeding-and-emptying-the-testing-system) ·
+**Related:** REQ-OPS-033, REQ-SEC-024, REQ-ORG-017
+
 ## Open questions
 
 - Deepening the infra health gate beyond `redis-cli ping` / `pg_isready` (which do not
