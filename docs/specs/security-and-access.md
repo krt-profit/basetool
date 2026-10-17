@@ -4064,11 +4064,11 @@ exchange routes require a DPoP-bound token and the exchange gates (REQ-XCH-006â€
 extractor's `/v1/**` endpoints were removed on 2026-09-28 (#2092 step 9).
 
 The prod-only **management-port chain** (`ManagementPortSecurityConfig`,
-`@ConditionalOnProperty("management.server.port")`, port `11271`) is `permitAll` on
-`/actuator/health(/**)`, `/actuator/prometheus` and `/actuator/info` **on the internal connector
-only** (ADR-0134), with basic auth added on `/actuator/prometheus` by
-`MonitoringScrapeSecurityConfig`. It is listed here so this requirement is exhaustive, not because
-it is anonymous access in the brief's sense.
+`@ConditionalOnProperty("management.server.port")`, port `11271`) owns `/actuator/health(/**)`,
+`/actuator/prometheus` and `/actuator/info` **on the internal connector only** (ADR-0134): health is
+`permitAll`, the other two require the scrape identity over basic auth and are denied while it is
+not configured (ADR-0265, REQ-OBS-005). It is listed here so this requirement is exhaustive, not
+because it is anonymous access in the brief's sense.
 
 **Acceptance**
 

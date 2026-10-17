@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Security
+
+- **Management-Ports: Metriken nur noch mit Scrape-Zugang.** Auf den Management-Ports von Backend, Frontend und Ingest bleibt nur `/actuator/health` offen; `prometheus`, `info` und `loggers` verlangen den Basic-Auth-Zugang `MONITORING_SCRAPE_USER`/`MONITORING_SCRAPE_PASSWORD` und sind ohne ihn gesperrt. Vorher konnte jeder Nachbar-Container im selben Netz die Metriken lesen. Prometheus sendet `scrape_password`, das deshalb zu `MONITORING_SCRAPE_PASSWORD` passen muss (Benutzer `monitoring`) (REQ-OBS-005, ADR-0265).
+
 ### Added
 
 - **Audit: Änderung des Mitgliedsrangs wird protokolliert.** Ändert ein Admin den Rang 1–20 eines Mitglieds, schreibt das Audit-Log unter „Rollen & Mitglieder“ das Ereignis „Mitgliedsrang geändert“ mit altem und neuem Rang; ein unveränderter Rang erzeugt keinen Eintrag (REQ-AUDIT-001, REQ-ROLE-007).
