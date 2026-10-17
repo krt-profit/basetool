@@ -27,12 +27,12 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceExcep
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.RelayParams;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.client.PersonalInventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryForm;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryItemCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryItemUpdateRequest;
-import de.greluc.krt.profit.basetool.logging.LogSafe;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -44,6 +44,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.event.Level;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -72,13 +73,6 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("isAuthenticated()")
 @Slf4j
 public class PersonalInventoryPageController {
-
-  /**
-   * Character budget for the type-ahead term when it is written to a log line. A location name that
-   * a user could plausibly be typing fits comfortably; anything longer is a paste or an attack and
-   * is truncated by {@link LogSafe#text(String, int)} rather than allowed to stretch the line.
-   */
-  private static final int MAX_LOGGED_QUERY = 80;
 
   /** Sends the page's item, blueprint-count and location requests. */
   private final PersonalInventoryBackendClient personalInventoryClient;
@@ -122,13 +116,10 @@ public class PersonalInventoryPageController {
    */
   @Nullable
   private Long countBlueprints() {
-    try {
-      PageResponse<PersonalBlueprintDto> owned = personalInventoryClient.blueprintCountPage();
-      return owned == null ? null : owned.totalElements();
-    } catch (Exception e) {
-      log.debug("Failed to count owned blueprints: {}", e.getMessage());
-      return null;
-    }
+    PageResponse<PersonalBlueprintDto> owned =
+        SectionFallback.load(
+            log, "blueprint-count", personalInventoryClient::blueprintCountPage, null);
+    return owned == null ? null : owned.totalElements();
   }
 
   /**
@@ -352,18 +343,16 @@ public class PersonalInventoryPageController {
   @ResponseBody
   public List<UexLocationDto> uexSearch(
       @RequestParam(required = false) String q, @RequestParam(required = false) Integer limit) {
-    try {
-      String query = q == null ? "" : q;
-      int effectiveLimit = limit == null ? 25 : Math.clamp(limit, 1, 2000);
-      List<UexLocationDto> result = personalInventoryClient.searchLocations(query, effectiveLimit);
-      return result == null ? Collections.emptyList() : result;
-    } catch (Exception e) {
-      log.debug(
-          "UEX location typeahead failed for query='{}': {}",
-          LogSafe.text(q, MAX_LOGGED_QUERY),
-          e.getMessage());
-      return Collections.emptyList();
-    }
+    String query = q == null ? "" : q;
+    int effectiveLimit = limit == null ? 25 : Math.clamp(limit, 1, 2000);
+    List<UexLocationDto> result =
+        SectionFallback.load(
+            log,
+            Level.DEBUG,
+            "uex-location-search",
+            () -> personalInventoryClient.searchLocations(query, effectiveLimit),
+            Collections.emptyList());
+    return result == null ? Collections.emptyList() : result;
   }
 
   /**
@@ -382,14 +371,14 @@ public class PersonalInventoryPageController {
 
   private PageResponse<PersonalInventoryItemDto> fetchItems(
       String q, Integer page, Integer size, String sort) {
-    try {
-      return personalInventoryClient.itemPage(
-          new PersonalInventoryBackendClient.ItemQuery(
-              page, size == null ? 50 : size, RelayParams.sortSpecOrNull(sort), q));
-    } catch (Exception e) {
-      log.error("Failed to fetch personal inventory items", e);
-      return new PageResponse<>(new ArrayList<>(), 0, size == null ? 50 : size, 0, 0, List.of());
-    }
+    return SectionFallback.load(
+        log,
+        "items",
+        () ->
+            personalInventoryClient.itemPage(
+                new PersonalInventoryBackendClient.ItemQuery(
+                    page, size == null ? 50 : size, RelayParams.sortSpecOrNull(sort), q)),
+        new PageResponse<>(new ArrayList<>(), 0, size == null ? 50 : size, 0, 0, List.of()));
   }
 
   /**

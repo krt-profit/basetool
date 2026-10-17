@@ -47,8 +47,7 @@ import org.springframework.ui.ExtendedModelMap;
 
 /**
  * Tests the logging of the type-ahead and search proxies: backend failures log at DEBUG
- * (REQ-OBS-001), and the query passes through {@code LogSafe} so it cannot forge log lines
- * (CWE-117).
+ * (REQ-OBS-001), and the query never reaches the log line, so it cannot forge one (CWE-117).
  */
 class TypeaheadQueryLoggingTest {
 
@@ -88,8 +87,8 @@ class TypeaheadQueryLoggingTest {
   }
 
   /**
-   * Asserts that the single captured record has the expected level and shows the sanitised query
-   * rather than the raw one.
+   * Asserts that the single captured record has the expected level and carries no part of the
+   * query.
    *
    * @param appender the capturing appender
    * @param expected the level the record must carry
@@ -101,13 +100,13 @@ class TypeaheadQueryLoggingTest {
             event -> {
               assertThat(event.getLevel()).isEqualTo(expected);
               assertThat(event.getFormattedMessage())
-                  .contains("quantanium?ERROR")
+                  .doesNotContain("quantanium")
                   .doesNotContain("\n");
             });
   }
 
   @Test
-  void uexTypeahead_logsSanitisedQueryAtDebugNotWarn() {
+  void uexTypeahead_logsWithoutTheQueryAtDebugNotWarn() {
     BackendApiClient client = mock(BackendApiClient.class);
     when(client.get(anyString(), anyTypeRef(), eq(FORGED_QUERY), eq(25)))
         .thenThrow(new RuntimeException("backend down"));
@@ -122,7 +121,7 @@ class TypeaheadQueryLoggingTest {
   }
 
   @Test
-  void personalBlueprintTypeahead_logsSanitisedQueryAtDebugNotWarn() {
+  void personalBlueprintTypeahead_logsWithoutTheQueryAtDebugNotWarn() {
     BackendApiClient client = mock(BackendApiClient.class);
     when(client.get(anyString(), anyTypeRef(), eq(FORGED_QUERY), eq(25)))
         .thenThrow(new RuntimeException("backend down"));
@@ -137,7 +136,7 @@ class TypeaheadQueryLoggingTest {
   }
 
   @Test
-  void defaultBlueprintTypeahead_logsSanitisedQueryAtDebugNotWarn() {
+  void defaultBlueprintTypeahead_logsWithoutTheQueryAtDebugNotWarn() {
     BackendApiClient client = mock(BackendApiClient.class);
     when(client.get(anyString(), anyTypeRef(), eq(FORGED_QUERY), eq(25)))
         .thenThrow(new RuntimeException("backend down"));
@@ -153,7 +152,7 @@ class TypeaheadQueryLoggingTest {
 
   /** A reachable-but-failing backend is an expected outcome, so it stays at DEBUG. */
   @Test
-  void adminBlueprintSearch_logsSanitisedQueryAtDebugOnBackendServiceException() {
+  void adminBlueprintSearch_logsWithoutTheQueryAtDebugOnBackendServiceException() {
     BackendApiClient client = mock(BackendApiClient.class);
     when(client.get(anyString(), anyTypeRef(), eq(25), eq(0), eq(FORGED_QUERY)))
         .thenThrow(new BackendServiceException("relay failed", null, 503));
@@ -165,10 +164,7 @@ class TypeaheadQueryLoggingTest {
     assertSanitisedAt(appender, Level.DEBUG);
   }
 
-  /**
-   * The {@code catch (Exception)} catch-all is a genuinely unexpected failure and keeps its ERROR
-   * level — REQ-OBS-001 sanctions exactly that. Only the sanitising changed here.
-   */
+  /** An unexpected failure of the admin search is logged at ERROR, as REQ-OBS-001 sanctions. */
   @Test
   void adminBlueprintSearch_keepsErrorLevelForTheUnexpectedCatchAll() {
     BackendApiClient client = mock(BackendApiClient.class);
