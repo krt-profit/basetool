@@ -1,6 +1,9 @@
 # ADR-0144 — CSRF is exempted for the whole bearer-only API, not per endpoint
 
-> **Status:** Accepted · **Date:** 2026-08-25 · **Deciders:** @greluc
+> **Status:** **Superseded by [ADR-0271](0271-csrf-and-cors-are-off-on-the-main-chain-and-a-guard-pins-bearer-only.md)**
+> (2026-10-17) — the exemption had grown to cover the whole writable surface, so CSRF and CORS are
+> disabled on the main chain and a guard test asserts the precondition this ADR could only state in
+> prose: bearer-only, no session. Previously: Accepted · **Date:** 2026-08-25 · **Deciders:** @greluc
 > **Related:** `REQ-SEC-044`, `REQ-SEC-037`, `REQ-SEC-022`, ADR-0012 (the frontend's CSRF model),
 > `krt-profit/basetool-android` (the client this broke)
 

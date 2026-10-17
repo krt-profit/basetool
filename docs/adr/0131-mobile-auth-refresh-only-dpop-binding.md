@@ -1,6 +1,11 @@
 # ADR-0131 — The mobile client binds only its refresh token to DPoP
 
-- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since v1.7.7 (2026-09-09) at the latest (`scripts/provision-keycloak-mobile-client.py` converges the `krt-mobile-dpop` profile, its policy and the `dpop-refresh-only` marker role).
+- **Status:** Accepted — amended by
+  [ADR-0268](0268-the-backend-is-internal-only-and-ingest-is-the-single-public-api-entry-point.md)
+  (2026-10-17): the `basetool-android` client this decides for is retired with the app (disabled
+  first, deleted after a grace period, #2674), so the profile, its policy and the marker role leave
+  the realm. The experiment's verdict — Keycloak can bind only the refresh token, and how — is why
+  this record stays. Previously: Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since v1.7.7 (2026-09-09) at the latest (`scripts/provision-keycloak-mobile-client.py` converges the `krt-mobile-dpop` profile, its policy and the `dpop-refresh-only` marker role).
 - **Date:** 2026-08-17
 - **Related:** spec `REQ-SEC-030` ([`security-and-access.md`](../specs/security-and-access.md)) ·
   `REQ-SEC-012` (refresh-token rotation is off realm-wide) ·

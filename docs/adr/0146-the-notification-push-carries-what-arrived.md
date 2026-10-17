@@ -1,6 +1,9 @@
 # ADR-0146 — The notification push carries what arrived, per notification type
 
-> **Status:** Accepted · **Date:** 2026-08-26 · **Deciders:** @greluc
+> **Status:** **Superseded by [ADR-0273](0273-the-notification-push-carries-no-typed-signal.md)**
+> (2026-10-17) — the app this payload exists for is discontinued and the web handler takes no
+> argument, so the event is an empty "something changed" push again. Previously: Accepted ·
+> **Date:** 2026-08-26 · **Deciders:** @greluc
 > **Related:** `REQ-NOTIF-021`, `REQ-NOTIF-010`, `REQ-NOTIF-018`, ADR-0094 (the Redis fan-out),
 > `krt-profit/basetool-android` `REQ-APP-UI-007` (the client this exists for)
 

@@ -55,7 +55,7 @@ worth reading even if you know the domain.
 | --- | --- |
 | **Audited area** | One of the fourteen areas (the bank and thirteen `AuditDomain` values) whose every state-mutating activity is written to the append-only trail (`REQ-AUDIT-001`). |
 | **Live update** | A single client's own mutation updating the DOM **in place**, with no full-page reload (`REQ-FE-*`). |
-| **Live sync** | A *peer's* change propagating to other viewers over `/ws/sync` (the app: a backend SSE stream), fanned across replicas by Redis pub/sub. Not the same thing as live update, and both are required. |
+| **Live sync** | A *peer's* change propagating to other viewers over `/ws/sync`, fanned across replicas by Redis pub/sub. Not the same thing as live update, and both are required. The backend's parallel SSE bridge for the app is discontinued (ADR-0274) — see §12.5. |
 | **Discord-Registrierung / approval queue** | A self-service sign-up through Discord waits here as `PENDING` and sees nothing until an admin approves, rejects or links it to an existing account. |
 | **Löschantrag** | A member's request to have their account deleted, decided in the admin area (GDPR erasure). |
 | **RSI-Handle** | A member's optional Star Citizen account handle, entered on their own profile, unique across members and seen only by them and `ADMIN` (REQ-SEC-072). It counts as one of the member's names for the Personensuche and the erasure, and it is what a connected application's account check compares against, without ever getting it back. |
@@ -66,7 +66,9 @@ worth reading even if you know the domain.
 | **Promotion** | Moving a `:stable` tag onto a chosen digest. A deliberate human act; the deploy timer only consumes it. |
 | **Front end (haproxy)** | The host service that binds `:80`/`:443` and hands connections to the edge with a PROXY v2 header naming the client (ADR-0187). Not to be confused with the `frontend` module. |
 | **Edge** | The nginx container terminating TLS for the four public names, behind the haproxy front end. **acme** is a separate container that issues and renews the certificates it serves. |
-| **Ingest** | The internet-facing gateway module serving the **Exchange (API)** of approved clients, the SC Extractor included; its former `/v1` extractor routes were removed on 2026-09-28. Owns no database; relays to the backend internally. |
+| **Ingest** | The internet-facing gateway module serving the **Exchange (API)** of approved clients, the SC Extractor included, and the single **public API entry point** (ADR-0268); its former `/v1` extractor routes were removed on 2026-09-28. Owns no database; relays to the backend internally. |
+| **Public API entry point** | The ingest gateway, alone (ADR-0268). Every API interface reachable from the internet is on it: `/exchange/v1/**` and the connected-apps surface. The backend API is internal-only and has no public hostname; the web UI, Keycloak and Grafana are public surfaces but not APIs. |
+| **Internal callers of the backend** | Exactly three (ADR-0268): the `frontend` module over `net-backend-frontend`, the `ingest` gateway over `net-backend-ingest`, and the **Keycloak SPI**, which calls `POST /internal/discord/account-existence` on a shared secret (REQ-SEC-022). A token is accepted only from the first two, matched on `azp` (ADR-0270); anything else reaching `/api/v1` is a defect, not a configuration option. |
 | **Handoff** | The single-use Redis entry through which ingest passes a matched draft to the member's browser for review. |
 | **Exchange (API)** | `/exchange/v1/**` on the ingest gateway: the capability-scoped contract through which approved external clients sync the member's own data and, for a Logistician, their units' org stock (`REQ-XCH-*`, ADR-0216, ADR-0257). Not the backend API, and not the **Materialbörse**, whose code is named `MaterialExchange*`. |
 | **Capability** | An OAuth scope such as `exchange.stock.write` — what an external client is approved for and a member consents to. A route passes only when its capability is both in the token and granted to the client in the registry. |
@@ -92,3 +94,19 @@ worth reading even if you know the domain.
 | `versions.properties` | Removed 2026-09-23. It held zero versions; `./gradlew refreshVersions -PrefreshVersions` recreates an empty one, which is gitignored. Versions live in `gradle/libs.versions.toml`. |
 | `keycloak.<domain>` in `edge-certs` | A fifth certificate directory that nothing serves and nothing renews, left from before ADR-0166. |
 | `IRI_COSIGN_VERIFY=false` | A break-glass for a Sigstore outage, **not** the way to run an unsigned image. The sanctioned override for a different signing identity is `IRI_COSIGN_IDENTITY_REGEXP`. |
+
+## 12.5 Discontinued with the Android app
+
+The native app is discontinued (issue #2638) and members use the installable web app instead, which
+is the frontend itself (ADR-0164). The six terms below named things the app was the only reason for.
+The decision to end each is recorded; the code and configuration follow in the sub-issues named, so
+until those land the artifacts are still there — and nothing new may be built on them.
+
+| Term | Actually |
+| --- | --- |
+| **API vhost** (`api.profit-base.online`) | The backend's public vhost (ADR-0135), **discontinued by ADR-0268**: the backend is internal-only and the ingest gateway is the only public API. Removed in #2672, together with the DNS record, the certificate SAN, `docker/edge/conf.d/50-api.conf.template`, the admission include and the `net-proxy-api` network — and replaced by a probe asserting the host does not resolve. |
+| **Frozen contract**, **contract tiers T0 / T1** | `contract-tiers.txt`, `ContractTiers`, `x-contract-tier`, `ExternalContractTest`, the app call lists and the declared-break ledger (ADR-0136, ADR-0234), which froze `/api/v1` because one client could not redeploy. **Discontinued by ADR-0269**, removed in #2673; `/api/v1` is back under REQ-API-001's atomic-deploy carve-out. The **Exchange (API)**'s freeze is a different thing and stays (ADR-0219). |
+| **App floor**, **version policy** | `GET /api/v1/app/version-policy` and the release-bound minimum app `versionCode` behind the non-dismissible update wall (ADR-0234). **Discontinued by ADR-0269**, removed in #2673: no release raises a floor, and no deploy waits on one. |
+| **Retired operation** | A path that answered `410 APP_UPDATE_REQUIRED` after a declared hard-cut break (`retired-operations.txt`, `RetiredOperationFilter`, REQ-API-020). **Discontinued by ADR-0269**, removed in #2673. |
+| **App live-sync bridge** | `GET /api/v1/live-sync/stream` and `POST /api/v1/live-sync/changed` in the backend, with their own topic registry, authorizer and buckets (ADR-0143). **Discontinued by ADR-0274**, removed in #2673: the installable web app is the frontend, so a PWA tab uses `/ws/sync` like any other tab. |
+| **App Link** | `/.well-known/assetlinks.json`, `/app/callback` and `/app/link-help` on the frontend, which made an Android App Link verifiable and caught a member mid-login (REQ-SEC-038). **Discontinued with the app (ADR-0268)**, removed in #2674 together with the `basetool-android` Keycloak client. |

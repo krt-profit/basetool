@@ -1,6 +1,6 @@
 # ADR-0136 — The endpoints a shipped client consumes are a frozen contract
 
-- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since v1.7.7 (2026-09-09) at the latest (`ExternalContractTest`, REQ-API-009).
+- **Status:** **Superseded by [ADR-0269](0269-the-frozen-external-contract-ends-with-its-only-client.md)** (2026-10-17) — the client that could not redeploy is gone, so `/api/v1` returns to REQ-API-001's atomic-deploy carve-out and the frozen set, the tiers and `ExternalContractTest` end. The exchange keeps its own freeze (ADR-0216, ADR-0219). Previously: Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since v1.7.7 (2026-09-09) at the latest (`ExternalContractTest`, REQ-API-009).
 - **Date:** 2026-08-18
 - **Amended:** 2026-09-02 (owner-approved) — "keeps every field it had" narrowed to "keeps every
   **recorded** field", matching `ExternalContractTest` and REQ-API-009's acceptance criteria (see

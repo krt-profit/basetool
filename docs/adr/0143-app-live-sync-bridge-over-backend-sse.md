@@ -1,6 +1,6 @@
 # ADR-0143 — The app's live sync: a backend SSE stream and a client-published `changed` relay
 
-- **Status:** Accepted — amended 2026-09-23 (frames written off the publishing thread, see the end)
+- **Status:** **Superseded by [ADR-0274](0274-the-backends-app-live-sync-bridge-ends-and-the-pwa-keeps-ws-sync.md)** (2026-10-17) — the app is discontinued and the PWA is the frontend, so the backend's bridge is removed and live sync is `/ws/sync` alone (ADR-0094). **The 2026-09-02 addendum below is not superseded:** `ResilientRedisMessageListenerContainer` still carries the notification fan-out, and that outage record stands. Previously: Accepted — amended 2026-09-23 (frames written off the publishing thread, see the end)
 - **Date:** 2026-08-23
 - **Deciders:** @greluc
 - **Related:** ADR-0094 (the tool-wide topic-room relay this bridges into) · ADR-0126 (presence gossip, deliberately not bridged) · ADR-0031 (the mission relay both generalize) · ADR-0016 (notification SSE, whose Redis deferral ADR-0094 discharged) · REQ-FE-010 · REQ-API-009 · REQ-SEC-037 · REQ-OBS-011 · basetool-android phase 4
