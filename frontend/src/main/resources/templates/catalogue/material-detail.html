@@ -65,36 +65,54 @@
 
         <div class="toolbar" th:unless="${terminalRows == null || terminalRows.isEmpty()}">
             <th:block th:replace="~{kernel/fragments/components :: toolbarSearch(id='terminalFilter', name='terminal', value=null, placeholderKey='materials.detail.filterPlaceholder')}"></th:block>
-            <th:block th:replace="~{kernel/fragments/components :: segmented(name='terminalSort', labelKey='materials.detail.sort.label', selected='sell',
-                options=${ {{value: 'sell', labelKey: 'materials.detail.sort.sell'}, {value: 'buy', labelKey: 'materials.detail.sort.buy'}} })}"></th:block>
         </div>
 
         <div class="card card--flush" th:unless="${terminalRows == null || terminalRows.isEmpty()}">
             <div class="table-responsive">
-                <table class="data-table data-table--stack md-terminals" id="priceTable" data-sort="sell">
+                <table class="data-table data-table--stack md-terminals" id="priceTable">
                     <thead>
                         <tr>
-                            <th scope="col" th:text="#{materials.detail.th.terminal}">Terminal</th>
-                            <th scope="col" th:text="#{materials.detail.th.location}">Ort</th>
-                            <th scope="col" class="num" aria-sort="descending" data-sort-col="sell">
-                                <span th:text="#{materials.detail.sort.sell}">Verkauf</span><span class="md-sort-mark" aria-hidden="true">↓</span>
+                            <th scope="col" data-sort-col="terminal" aria-sort="none">
+                                <button type="button" class="sort-header" data-sort-key="terminal" data-sort-first="asc"
+                                        data-testid="price-sort-terminal">
+                                    <span th:text="#{materials.detail.th.terminal}">Terminal</span>
+                                    <span class="sort-header__mark" aria-hidden="true"></span>
+                                </button>
                             </th>
-                            <th scope="col" class="num" aria-sort="none" data-sort-col="buy">
-                                <span th:text="#{materials.detail.sort.buy}">Einkauf</span><span class="md-sort-mark" aria-hidden="true">↑</span>
+                            <th scope="col" data-sort-col="location" aria-sort="none">
+                                <button type="button" class="sort-header" data-sort-key="location" data-sort-first="asc"
+                                        data-testid="price-sort-location">
+                                    <span th:text="#{materials.detail.th.location}">Ort</span>
+                                    <span class="sort-header__mark" aria-hidden="true"></span>
+                                </button>
+                            </th>
+                            <th scope="col" class="num" data-sort-col="sell" aria-sort="descending">
+                                <button type="button" class="sort-header" data-sort-key="sell" data-sort-first="desc"
+                                        data-testid="price-sort-sell">
+                                    <span th:text="#{materials.detail.th.sell}">Verkauf</span>
+                                    <span class="sort-header__mark" aria-hidden="true"></span>
+                                </button>
+                            </th>
+                            <th scope="col" class="num" data-sort-col="buy" aria-sort="none">
+                                <button type="button" class="sort-header" data-sort-key="buy" data-sort-first="asc"
+                                        data-testid="price-sort-buy">
+                                    <span th:text="#{materials.detail.th.buy}">Einkauf</span>
+                                    <span class="sort-header__mark" aria-hidden="true"></span>
+                                </button>
                             </th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr th:each="row : ${terminalRows}" class="md-terminal-row" th:classappend="${row.planetCssClass()}"
-                            th:data-terminal="${row.terminalName()}"
+                            th:data-terminal="${row.terminalName()}" th:data-location="${row.location()}"
                             th:data-sell="${row.priceSell()}" th:data-buy="${row.priceBuy()}">
                             <td>
                                 <span class="cell-title" th:text="${row.terminalName()}">Area18 TDD</span>
                             </td>
                             <td th:text="${row.location() != null ? row.location() : '–'}">ArcCorp · Area18</td>
-                            <td class="num md-price-sell" th:attr="data-label=#{materials.detail.sort.sell}"
+                            <td class="num md-price-sell" th:attr="data-label=#{materials.detail.th.sell}"
                                 th:classappend="${row.priceSell() == null} ? 'md-price--none'" th:text="${row.sellText()}">89,6</td>
-                            <td class="num md-price-buy" th:attr="data-label=#{materials.detail.sort.buy}"
+                            <td class="num md-price-buy" th:attr="data-label=#{materials.detail.th.buy}"
                                 th:classappend="${row.priceBuy() == null} ? 'md-price--none'" th:text="${row.buyText()}">–</td>
                         </tr>
                     </tbody>

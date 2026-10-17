@@ -8,6 +8,8 @@
 
 ### Changed
 
+- **Materialdetail: Sortieren über die Spaltenköpfe.** Die Tabelle „Preise und Terminals" sortiert per Klick auf Terminal, Ort, Verkauf oder Einkauf; ein zweiter Klick dreht die Richtung um – auch auf dem Handy über eine Leiste über der Liste. Der Umschalter „Verkauf · Einkauf" entfällt, Standard bleibt „Verkauf, höchster zuerst" (REQ-UI-015, REQ-UI-029).
+
 - **Monitoring: CSP-Verstöße nennen ihre Ursache.** Der Fehler-Beacon meldet bei einem `trusted-types`-Verstoß den versuchten Policy-Namen und bei jedem CSP-Verstoß, ob der Code von der eigenen Seite, einer Browser-Erweiterung oder anderswoher stammt; `basetool_client_csp_violation_total` trägt dafür das Label `code_origin` (Dashboard 07, Panel 85). Grundlage für die Trusted-Types-Umstellung auf `enforce` (REQ-SEC-064, REQ-FE-022).
 
 ### Fixed
