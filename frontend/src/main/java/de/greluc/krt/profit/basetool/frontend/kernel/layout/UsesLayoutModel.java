@@ -31,9 +31,9 @@ import org.springframework.stereotype.Controller;
  * model.
  *
  * <p>The layout advices ({@link OrgUnitContextAdvice}, {@link CapabilityFlagsAdvice}, {@link
- * LayoutMiscAdvice}, {@link AppVersionAdvice}, {@link SafeCsrfAdvice}) select on it, so REST
- * controllers skip their backend calls. Opt-in, applied alongside {@link Controller} rather than
- * meta-annotated with it.
+ * LayoutMiscAdvice}, {@link AppVersionAdvice}, {@link InstanceMarkerAdvice}, {@link
+ * SafeCsrfAdvice}) select on it, so REST controllers skip their backend calls. Opt-in, applied
+ * alongside {@link Controller} rather than meta-annotated with it.
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)

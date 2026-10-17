@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Testsystem im Footer erkennbar.** Auf dem Testsystem zeigt der Footer jeder Seite ein gelbes „Testsystem"-Schild, damit niemand dort versehentlich echte Arbeit erledigt; Produktion bleibt unverändert. Geschaltet über die neue Umgebungsvariable `APP_INSTANCE_TEST_SYSTEM` (Frontend, REQ-UI-029).
+
 ### Changed
 
 - **Monitoring: CSP-Verstöße nennen ihre Ursache.** Der Fehler-Beacon meldet bei einem `trusted-types`-Verstoß den versuchten Policy-Namen und bei jedem CSP-Verstoß, ob der Code von der eigenen Seite, einer Browser-Erweiterung oder anderswoher stammt; `basetool_client_csp_violation_total` trägt dafür das Label `code_origin` (Dashboard 07, Panel 85). Grundlage für die Trusted-Types-Umstellung auf `enforce` (REQ-SEC-064, REQ-FE-022).
