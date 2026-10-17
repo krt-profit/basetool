@@ -84969,6 +84969,10 @@
           },
           "terminalName" : {
             "type" : "string"
+          },
+          "uexUpdatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
           }
         }
       },

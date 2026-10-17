@@ -476,7 +476,7 @@ public class MaterialsPageController {
       List<MaterialPriceDto> priceList = new ArrayList<>(prices.items());
       model.addAttribute("prices", priceList);
       List<MaterialTerminalPrices.Row> rows =
-          MaterialTerminalPrices.rows(priceList, matrixItemsOf(id));
+          MaterialTerminalPrices.rows(priceList, matrixItemsOf(id), Instant.now());
       model.addAttribute("terminalRows", rows);
       model.addAttribute("priceSummary", MaterialTerminalPrices.summarize(rows));
     } catch (Exception e) {

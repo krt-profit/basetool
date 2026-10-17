@@ -25,6 +25,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -39,8 +41,8 @@ import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * The terminal table and the price figures of the material detail page: each terminal's prices with
- * its location and planet tint, sorted by sale price, and the best sale, best purchase and average
- * sale across them.
+ * its location, planet tint and UEX update age, sorted by sale price, and the best sale, best
+ * purchase and average sale across them.
  */
 public final class MaterialTerminalPrices {
 
@@ -49,6 +51,9 @@ public final class MaterialTerminalPrices {
 
   /** Separator between the parts of a location label. */
   private static final String LOCATION_SEPARATOR = " · ";
+
+  /** Age beyond which a price counts as stale on UEX (REQ-UI-015). */
+  static final Duration STALE_AFTER = Duration.ofDays(7);
 
   /** Utility class — not instantiable. */
   private MaterialTerminalPrices() {}
@@ -62,13 +67,17 @@ public final class MaterialTerminalPrices {
    * @param planetCssClass the planet tint class from {@link PlanetColorResolver}
    * @param priceBuy the purchase price per SCU, or {@code null} when the terminal sells none
    * @param priceSell the sale price per SCU, or {@code null} when the terminal buys none
+   * @param uexAge how long ago UEX last updated the terminal's price, or {@code null} when unknown
+   * @param uexStale whether that update is older than {@link #STALE_AFTER}
    */
   public record Row(
       @NotNull String terminalName,
       @Nullable String location,
       @NotNull String planetCssClass,
       @Nullable BigDecimal priceBuy,
-      @Nullable BigDecimal priceSell) {
+      @Nullable BigDecimal priceSell,
+      @Nullable UexAge uexAge,
+      boolean uexStale) {
 
     /**
      * The sale price as the table shows it.
@@ -147,12 +156,15 @@ public final class MaterialTerminalPrices {
    *
    * @param prices the material's complete price list
    * @param matrixItems the price-matrix rows of the material
+   * @param now the instant the UEX ages are measured against
    * @return the sorted rows
    */
   @NotNull
   @Unmodifiable
   public static List<Row> rows(
-      @NotNull List<MaterialPriceDto> prices, @NotNull List<MaterialMatrixItemDto> matrixItems) {
+      @NotNull List<MaterialPriceDto> prices,
+      @NotNull List<MaterialMatrixItemDto> matrixItems,
+      @NotNull Instant now) {
     Map<String, MaterialMatrixItemDto> byTerminal = new HashMap<>();
     for (MaterialMatrixItemDto item : matrixItems) {
       if (item.terminalName() != null) {
@@ -163,6 +175,7 @@ public final class MaterialTerminalPrices {
     for (MaterialPriceDto price : prices) {
       String name = price.terminalName() != null ? price.terminalName() : "";
       MaterialMatrixItemDto item = byTerminal.get(name);
+      Instant updatedAt = price.uexUpdatedAt();
       rows.add(
           new Row(
               name,
@@ -171,7 +184,9 @@ public final class MaterialTerminalPrices {
                   ? PlanetColorResolver.UNKNOWN_CLASS
                   : PlanetColorResolver.cssClassFor(item.starSystemName(), item.planetName()),
               positive(price.priceBuy()),
-              positive(price.priceSell())));
+              positive(price.priceSell()),
+              UexAge.of(updatedAt, now),
+              updatedAt != null && Duration.between(updatedAt, now).compareTo(STALE_AFTER) > 0));
     }
     rows.sort(
         Comparator.comparing(

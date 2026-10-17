@@ -119,14 +119,28 @@ Above the table the page head names the material with chips for its category and
 a danger chip, the two volatility flags as warning chips), followed by four figures: „Bester
 Verkauf" (highest sale price and its terminal), „Bester Einkauf" (lowest purchase price and its
 terminal), „Ø Verkauf" (mean of the positive sale prices, with the number of buying terminals) and
-„Aktualisiert" (age of the last UEX sweep). The table lists Terminal · Ort · Verkauf · Einkauf; the
-location and the planet stripe come from the cached price matrix's rows of the same material (a
-matrix failure only empties the location). Zero or negative prices show as „–". The rows are sorted
-by sale price, highest first, terminals buying nothing last by name; the segment „Verkauf ·
-Einkauf" re-sorts in the browser (purchase ascending) and the search narrows the rows by terminal.
+„Aktualisiert" (age of the last UEX sweep, labelled „Letzter UEX-Sync"). The table lists Terminal ·
+Ort · Verkauf · Einkauf · UEX-Stand; the location and the planet stripe come from the cached price
+matrix's rows of the same material (a matrix failure only empties the location). Zero or negative
+prices show as „–". The rows are sorted by sale price, highest first, terminals buying nothing last
+by name; the segment „Verkauf · Einkauf" re-sorts in the browser (purchase ascending) and the
+search narrows the rows by terminal.
+
+„UEX-Stand" is the time UEX last updated that terminal's price (`date_modified` of the UEX price
+row, stored by the commodity sync and returned as `uexUpdatedAt` by
+`GET /api/v1/materials/{id}/prices`). It is distinct from the sweep time in the „Aktualisiert"
+figure: a sweep can be minutes old while a terminal's price was last reported weeks ago. The cell
+shows the relative age in the same units as the figure („vor 3 Std", „vor 19 Tagen") with the
+absolute time in Europe/Berlin below it, inside a `<time datetime>` carrying the exact instant. An
+update **older than seven days** is stale: the age is shown in the warning colour with the warning
+icon and a visually hidden „veraltet", so colour is never the only signal. A row without an update
+time shows „–".
 
 *Amended 2026-10-03 (website overhaul phase 3): chips, the four figures, the location column, the
 sale-price sort with the „Verkauf · Einkauf" segment.*
+
+*Amended 2026-10-17 (#2649): the per-row „UEX-Stand" column with the seven-day stale mark; the
+sweep figure is labelled „Letzter UEX-Sync".*
 
 **Acceptance**
 
@@ -134,12 +148,18 @@ sale-price sort with the „Verkauf · Einkauf" segment.*
 - [ ] The rendered `prices` model attribute contains the concatenation of every page's content.
 - [ ] A backend failure leaves `prices` empty and surfaces the placeholder, never a half-assembled
   list.
+- [ ] Every price row carries `uexUpdatedAt` (or `null`), and every table row shows its relative UEX
+  age, the absolute time and a `<time datetime>`; a row without one shows „–".
+- [ ] A row whose UEX update is more than seven days old is marked stale by icon, warning colour and
+  hidden text; exactly seven days is not stale.
 
 **Enforced by:** `MaterialsPageControllerTest` /
-`MaterialsPageControllerMvcTest.getMaterialDetail_*` / `MaterialTerminalPricesTest` / `UexAgeTest` ·
+`MaterialsPageControllerMvcTest.getMaterialDetail_*` / `MaterialTerminalPricesTest` / `UexAgeTest` /
+`MaterialMatrixQueryDataTest.detailPriceList_carriesTheUexUpdateTimePerRow` ·
 **Code:** `MaterialsPageController.getMaterialDetail`, `CatalogPages.fetchAll`,
-`MaterialTerminalPrices`, `UexAge`, `catalogue/material-detail.html`, `static/js/catalogue/material-detail.js` ·
-**Issues:** —
+`MaterialPriceRepository.findPricesByMaterialId`, `MaterialTerminalPrices`, `UexAge`,
+`catalogue/material-detail.html`, `static/js/catalogue/material-detail.js` ·
+**Issues:** #2649
 
 ## Out of scope
 
