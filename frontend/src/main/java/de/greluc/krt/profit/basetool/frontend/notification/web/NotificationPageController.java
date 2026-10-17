@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.observability.MetricNames;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.TermsAcceptanceGateFilter;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.notification.client.NotificationBackendClient;
 import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationBulkResultDto;
 import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationCountResponse;
@@ -205,16 +206,16 @@ public class NotificationPageController {
   @org.jetbrains.annotations.NotNull
   @GetMapping
   public String page(Model model) {
-    try {
-      PageResponse<NotificationDto> firstPage = loadPage(0);
-      List<NotificationViewDto> views = toViews(firstPage);
-      model.addAttribute("notifications", views);
-      model.addAttribute("notifTotal", firstPage == null ? 0L : firstPage.totalElements());
-      model.addAttribute("notifHasMore", hasMore(firstPage));
-    } catch (ReauthenticationRequiredException e) {
-      throw e;
-    } catch (Exception e) {
-      log.debug("Failed to load notifications page", e);
+    if (!SectionFallback.run(
+        log,
+        "notifications",
+        () -> {
+          PageResponse<NotificationDto> firstPage = loadPage(0);
+          List<NotificationViewDto> views = toViews(firstPage);
+          model.addAttribute("notifications", views);
+          model.addAttribute("notifTotal", firstPage == null ? 0L : firstPage.totalElements());
+          model.addAttribute("notifHasMore", hasMore(firstPage));
+        })) {
       model.addAttribute("notifications", List.of());
       model.addAttribute("notifTotal", 0L);
       model.addAttribute("notifHasMore", false);
@@ -518,15 +519,9 @@ public class NotificationPageController {
   }
 
   private long currentUnreadCount() {
-    try {
-      NotificationCountResponse response = notificationClient.unreadCount();
-      return response != null && response.count() != null ? response.count() : 0L;
-    } catch (ReauthenticationRequiredException e) {
-      throw e;
-    } catch (Exception e) {
-      log.debug("Failed to load unread count", e);
-      return 0L;
-    }
+    NotificationCountResponse response =
+        SectionFallback.load(log, "unread-count", notificationClient::unreadCount, null);
+    return response != null && response.count() != null ? response.count() : 0L;
   }
 
   /**
