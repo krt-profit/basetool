@@ -2,23 +2,7 @@
 
 ## [Unreleased]
 
-### Security
-
-- **Die REST-API des Backends ist nicht mehr aus dem Internet erreichbar.** Der Vhost `api.profit-base.online` der eingestellten Android-App ist samt Netzwerk `net-proxy-api` entfernt; das Ingest-Gateway ist jetzt die einzige öffentliche API. `EDGE_HOST_API` entfällt aus `.env`, `ACME_HOSTS` verliert den Namen, und die nächste Zertifikatserneuerung stellt ein Zertifikat mit drei Namen aus (ADR-0268).
-
-- **Neuer Alarm `PublicApiHostResolvesAgain`.** Er schlägt an, wenn `api.profit-base.online` wieder auflöst; der tägliche `edge-deny-probe`-Workflow prüft zusätzlich von außen, dass die Backend-Ports 11261/11271 zu sind und kein Vhost `/api/v1/**` beantwortet (REQ-OBS-012).
-
-- **Das Backend nimmt Token nur noch von bekannten Clients an.** Ein Zugriff auf `/api/v1` wird abgewiesen, wenn der Token nicht von `basetool-frontend` oder `basetool-ingest-gateway` ausgestellt wurde (Claim `azp`); ein neuer Realm-Client erhält damit nicht mehr automatisch API-Zugriff. Fehlt die Liste unter `prod`, startet das Backend nicht. Die neue Variable `IRI_BACKEND_ACCEPTED_CLIENT_IDS` ist optional und nur bei umbenannten Realm-Clients zu setzen (ADR-0270, REQ-SEC-024).
-
-- **CSRF und CORS sind auf der Backend-Kette abgeschaltet.** Die Kette nimmt ausschließlich einen Bearer-JWT an und legt keine Session an, deshalb schützt CSRF dort nichts; ein neuer Test hält genau das fest, statt wie bisher eine Pfadliste zu pinnen. `app.cors.allowed-origin-patterns` entfällt. Der Prometheus-Scrape-Pfad bleibt unverändert (ADR-0271, REQ-SEC-044).
-
-- **Weitergeleitete Client-Adressen werden nur noch den eigenen Netzen geglaubt.** `app.rate-limit.trusted-proxies` nennt das Frontend- und das Ingest-Netz statt des ganzen Container-Adressraums, und Springs `ForwardedHeaderFilter` ist nicht mehr registriert. Ein Nachbar-Container kann damit nicht mehr behaupten, für ein beliebiges Mitglied zu sprechen (ADR-0272, REQ-SEC-011).
-
-- **Die Android-only-Fläche der API ist entfernt.** Es gibt kein `GET /api/v1/app/version-policy`, keine `app.android.version-policy.*`-Konfiguration und keine `410 APP_UPDATE_REQUIRED`-Antwort mehr; ein alter Pfad antwortet wie jeder unbekannte Pfad mit `404`. Die anonyme Fläche des Backends schrumpft damit auf `GET /api/v1/terms/document`, Health, `/internal/**` und `/error`. Entfallen sind außerdem die Variablen `APP_ANDROID_*_OVERRIDE`, der Alarm `AndroidVersionPolicyOverrideActive` und `docker-compose.android.yml` (ADR-0269, REQ-API-020/021, REQ-SEC-037).
-
-- **App Link und Keycloak-Client der Android-App sind entfernt.** `/.well-known/assetlinks.json`, `/app/callback` und `/app/link-help` gibt es nicht mehr, ebenso den Client `basetool-android`; der Realm-Provisioner löscht ihn samt DPoP-Policy und -Profil, wo sie noch existieren. Die Variablen `APP_ANDROID_PACKAGE_NAME` und `APP_ANDROID_CERT_FINGERPRINTS` entfallen (ADR-0268, ADR-0202, REQ-SEC-030/035/038).
-
-- **Management-Ports: Metriken nur noch mit Scrape-Zugang.** Auf den Management-Ports von Backend, Frontend und Ingest bleibt nur `/actuator/health` offen; `prometheus`, `info` und `loggers` verlangen den Basic-Auth-Zugang `MONITORING_SCRAPE_USER`/`MONITORING_SCRAPE_PASSWORD` und sind ohne ihn gesperrt. Vorher konnte jeder Nachbar-Container im selben Netz die Metriken lesen. Prometheus sendet `scrape_password`, das deshalb zu `MONITORING_SCRAPE_PASSWORD` passen muss (Benutzer `monitoring`) (REQ-OBS-005, ADR-0265).
+## [v1.17.0](https://github.com/krt-profit/basetool/releases/tag/v1.17.0) - 2026-10-17
 
 ### Added
 
@@ -67,7 +51,9 @@
 ### Fixed
 
 - **Hangar-Import bei mehreren Org-Einheiten.** „Schiffsliste importieren" brach mit „Einige Felder sind ungültig" ab, wenn man mehreren Einheiten angehört und keine Einheit in der Seitenleiste gewählt ist. Die Schiffe landen jetzt in der aktiven Einheit, sonst ohne Einheit und lassen sich mit „Einheit ändern" zuordnen (Backend, REQ-HANGAR-014).
+
 - **Fehler beim Speichern: richtige Meldung und erneute Anmeldung.** 53 AJAX-Aktionen (Lager, Aufträge, Raffinerie, Missionen, Benachrichtigungen, Mitglieder, Profil, Organigramm, Admin-Stammdaten u. a.) fangen Fehler nicht mehr selbst als pauschalen 500/502 ab: Konflikte wie „gleichzeitig geändert" (409) behalten ihren Status und ihre Meldung, und eine abgelaufene Anmeldung führt wieder zur Keycloak-Anmeldung statt zu einem Fehler-Toast (Frontend, REQ-FE-036).
+
 - **Abgelaufene Anmeldung beim Seitenaufruf.** Seiten, deren Abschnitte einzeln nachladen (Startseite, Lager, Aufträge, Raffinerie, Missionen, Bank, Blueprints, Admin-Seiten u. a.), leiten bei abgelaufener Anmeldung wieder zur Keycloak-Anmeldung weiter, statt die Seite mit Fehlerhinweisen in jedem Abschnitt anzuzeigen (Frontend, REQ-FE-036).
 
 - **Einsatz-Detailseite: nicht geladene Auswahllisten werden gemeldet.** Schlägt das Laden einer Auswahlliste (Jobtypen, Crew-Funktionen, Organisationseinheiten, Frequenz- oder Schiffstypen, Schiffe für Einheiten) fehl, nennt ein Hinweis über den Tabs die betroffenen Listen, statt die Auswahl stillschweigend leer zu lassen; das Frontend protokolliert jeden Fehlschlag als WARN. Die Listen laden jetzt parallel (Frontend, REQ-MISSION-030).
@@ -83,6 +69,24 @@
 - **Verbundene Anwendungen (Admin): Bestätigungen benennen ihre Aktion.** Die Bestätigungsdialoge der Seite beschriften ihren Knopf mit „Erweitern", „Sperren", „Ein-/Ausschalten" bzw. „Zurücknehmen" statt mit „Löschen", obwohl nichts gelöscht wird (REQ-XCH-003).
 
 - **Build: Build ohne erreichbares `git` scheitert nicht mehr.** Lief der Frontend-Build dort, wo kein `git` auf dem `PATH` liegt – etwa in einem schlanken Container –, verwarf Gradle den Konfigurations-Cache und beendete den Build mit Fehler, obwohl jeder Task durchlief; weder das Abfangen des Fehlers noch `-PappVersion` half. Der Build fragt `git describe` jetzt nur noch, wenn ein Git-Checkout und ein `git`-Programm vorhanden sind, und nimmt sonst die Projektversion (REQ-OPS-021).
+
+### Security
+
+- **Die REST-API des Backends ist nicht mehr aus dem Internet erreichbar.** Der Vhost `api.profit-base.online` der eingestellten Android-App ist samt Netzwerk `net-proxy-api` entfernt; das Ingest-Gateway ist jetzt die einzige öffentliche API. `EDGE_HOST_API` entfällt aus `.env`, `ACME_HOSTS` verliert den Namen, und die nächste Zertifikatserneuerung stellt ein Zertifikat mit drei Namen aus (ADR-0268).
+
+- **Neuer Alarm `PublicApiHostResolvesAgain`.** Er schlägt an, wenn `api.profit-base.online` wieder auflöst; der tägliche `edge-deny-probe`-Workflow prüft zusätzlich von außen, dass die Backend-Ports 11261/11271 zu sind und kein Vhost `/api/v1/**` beantwortet (REQ-OBS-012).
+
+- **Das Backend nimmt Token nur noch von bekannten Clients an.** Ein Zugriff auf `/api/v1` wird abgewiesen, wenn der Token nicht von `basetool-frontend` oder `basetool-ingest-gateway` ausgestellt wurde (Claim `azp`); ein neuer Realm-Client erhält damit nicht mehr automatisch API-Zugriff. Fehlt die Liste unter `prod`, startet das Backend nicht. Die neue Variable `IRI_BACKEND_ACCEPTED_CLIENT_IDS` ist optional und nur bei umbenannten Realm-Clients zu setzen (ADR-0270, REQ-SEC-024).
+
+- **CSRF und CORS sind auf der Backend-Kette abgeschaltet.** Die Kette nimmt ausschließlich einen Bearer-JWT an und legt keine Session an, deshalb schützt CSRF dort nichts; ein neuer Test hält genau das fest, statt wie bisher eine Pfadliste zu pinnen. `app.cors.allowed-origin-patterns` entfällt. Der Prometheus-Scrape-Pfad bleibt unverändert (ADR-0271, REQ-SEC-044).
+
+- **Weitergeleitete Client-Adressen werden nur noch den eigenen Netzen geglaubt.** `app.rate-limit.trusted-proxies` nennt das Frontend- und das Ingest-Netz statt des ganzen Container-Adressraums, und Springs `ForwardedHeaderFilter` ist nicht mehr registriert. Ein Nachbar-Container kann damit nicht mehr behaupten, für ein beliebiges Mitglied zu sprechen (ADR-0272, REQ-SEC-011).
+
+- **Die Android-only-Fläche der API ist entfernt.** Es gibt kein `GET /api/v1/app/version-policy`, keine `app.android.version-policy.*`-Konfiguration und keine `410 APP_UPDATE_REQUIRED`-Antwort mehr; ein alter Pfad antwortet wie jeder unbekannte Pfad mit `404`. Die anonyme Fläche des Backends schrumpft damit auf `GET /api/v1/terms/document`, Health, `/internal/**` und `/error`. Entfallen sind außerdem die Variablen `APP_ANDROID_*_OVERRIDE`, der Alarm `AndroidVersionPolicyOverrideActive` und `docker-compose.android.yml` (ADR-0269, REQ-API-020/021, REQ-SEC-037).
+
+- **App Link und Keycloak-Client der Android-App sind entfernt.** `/.well-known/assetlinks.json`, `/app/callback` und `/app/link-help` gibt es nicht mehr, ebenso den Client `basetool-android`; der Realm-Provisioner löscht ihn samt DPoP-Policy und -Profil, wo sie noch existieren. Die Variablen `APP_ANDROID_PACKAGE_NAME` und `APP_ANDROID_CERT_FINGERPRINTS` entfallen (ADR-0268, ADR-0202, REQ-SEC-030/035/038).
+
+- **Management-Ports: Metriken nur noch mit Scrape-Zugang.** Auf den Management-Ports von Backend, Frontend und Ingest bleibt nur `/actuator/health` offen; `prometheus`, `info` und `loggers` verlangen den Basic-Auth-Zugang `MONITORING_SCRAPE_USER`/`MONITORING_SCRAPE_PASSWORD` und sind ohne ihn gesperrt. Vorher konnte jeder Nachbar-Container im selben Netz die Metriken lesen. Prometheus sendet `scrape_password`, das deshalb zu `MONITORING_SCRAPE_PASSWORD` passen muss (Benutzer `monitoring`) (REQ-OBS-005, ADR-0265).
 
 ## [v1.16.5](https://github.com/krt-profit/basetool/releases/tag/v1.16.5) - 2026-10-17
 
