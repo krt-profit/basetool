@@ -7226,6 +7226,80 @@
         }
     }
 
+    .sort-header {
+        display: inline-flex;
+        gap: var(--space-2);
+        align-items: center;
+        width: 100%;
+        padding: 0;
+        background: none;
+        border: 0;
+        color: inherit;
+        font: inherit;
+        letter-spacing: inherit;
+        text-align: left;
+        text-transform: inherit;
+        cursor: pointer;
+    }
+    th.num .sort-header {
+        justify-content: flex-end;
+    }
+    .sort-header:hover {
+        color: var(--color-white);
+    }
+    .sort-header:focus-visible {
+        outline: 2px solid var(--color-primary);
+        outline-offset: 2px;
+    }
+    .sort-header__mark {
+        color: var(--color-gray-2-text);
+        font-size: 0.7rem;
+    }
+    .sort-header__mark::before {
+        content: '\2195';
+    }
+    th[aria-sort='ascending'] .sort-header__mark,
+    th[aria-sort='descending'] .sort-header__mark {
+        color: var(--color-primary);
+    }
+    th[aria-sort='ascending'] .sort-header__mark::before {
+        content: '\25b2';
+    }
+    th[aria-sort='descending'] .sort-header__mark::before {
+        content: '\25bc';
+    }
+    @media (width <= 768px) {
+        .data-table--stack thead:has(.sort-header) {
+            position: static;
+            display: block;
+            width: auto;
+            height: auto;
+            overflow: visible;
+            clip-path: none;
+        }
+        .data-table--stack thead:has(.sort-header) tr {
+            padding-block: var(--space-2);
+            background: var(--color-surface-input);
+            border-bottom: var(--border-heading);
+        }
+        .data-table--stack thead:has(.sort-header) tr::after {
+            content: none;
+        }
+        .data-table--stack thead:has(.sort-header) th {
+            display: block;
+            height: auto;
+            padding: 0;
+            border: 0;
+        }
+        .data-table--stack thead:has(.sort-header) th:not(:has(.sort-header)) {
+            display: none;
+        }
+        .data-table--stack thead .sort-header {
+            width: auto;
+            justify-content: flex-start;
+        }
+    }
+
     .form-layout {
         width: 100%;
         max-width: var(--content-max-form);

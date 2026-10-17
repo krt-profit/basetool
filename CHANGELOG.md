@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Profitberechnung: Sortieren per Spaltenkopf.** Material, je SCU, Marge, Kapital und Max Profit sortieren per Klick auf den Spaltenkopf, ein zweiter Klick dreht die Reihenfolge um – auch auf dem Handy über eine Leiste über der Liste. Die Platzziffer bleibt der Rang nach Max Profit; die Sortierung bleibt bei einer neuen Berechnung erhalten und wird pro Browser gemerkt (REQ-UI-029).
+
 ## [v1.16.5](https://github.com/krt-profit/basetool/releases/tag/v1.16.5) - 2026-10-17
 
 ### Added

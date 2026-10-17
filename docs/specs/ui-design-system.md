@@ -15,7 +15,7 @@
 > [0240](../adr/0240-navigation-is-a-structured-drawer-a-quick-access-and-a-phone-tab-bar.md) (REQ-UI-026) ·
 > [0242](../adr/0242-page-patterns-a-to-c-and-the-design-system-update-2026-10.md) (REQ-UI-027, REQ-UI-009) ·
 > [0243](../adr/0243-colours-and-stacking-layers-are-written-through-tokens.md) (REQ-UI-001, REQ-UI-023) ·
-> **Next free id:** `REQ-UI-029` · **Visual source of truth:** the design
+> **Next free id:** `REQ-UI-030` · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)),
 > read at the design system's latest `main` ([ADR-0259](../adr/0259-the-design-system-submodule-follows-its-main.md)).
@@ -604,7 +604,7 @@ rows — put 118 findings on surfaces that had never been measured.
   is not laziness: its three flags sit side by side in one row, so 44px cells would either widen the
   table by a third or, if the target were faked with an overlay, let one flag's overlay reach over
   its neighbours — and a mis-tap there grants the wrong *banking* right.
-- **`.demand-sort-btn` is NOT exempt** and is raised to 44px. A column-header sort control is one
+- **`.demand-sort-btn` and `.sort-header` are NOT exempt** and are raised to 44px. A column-header sort control is one
   per column, not one per row, so the density argument does not apply to it.
 - **The dense floor is the token `--touch-target-dense` (32px)**, mirrored by
   `TouchClassLayoutE2eTest.DENSE_ACTION_FLOOR`. The two must move together.
@@ -1675,7 +1675,7 @@ wide data view with the „UEX · vor n min" chip, dropdown filters that summari
 von 42"), „+ Filter" chips, the best sale/purchase rings, the spread and the legend; the material
 detail with category/flag chips, four figures and the terminal table sorted by sale price (segment
 „Verkauf · Einkauf"); the profit calculation with one input card, the Hull C chip and results ranked
-by max. profit with a two-line route „Kauf <Terminal> (<Ort>) · <Preis>" / „Verkauf <Terminal> (<Ort>)
+by max. profit, sortable by their column headers (REQ-UI-029), with a two-line route „Kauf <Terminal> (<Ort>) · <Preis>" / „Verkauf <Terminal> (<Ort>)
 · <Preis>", the terminal's location (planet or star system, then city, station or outpost) in
 brackets after its name; the lines wrap rather than cut off.
 Auftragsdetail: page head with kind and status badges and the admin overflow „Auftrag löschen", the
@@ -1771,6 +1771,47 @@ whole app.
 **Code:** `static/css/kernel/styles.css`, `kernel/fragments/components.html`,
 `kernel/fragments/page-head.html`, `static/js/kernel/krt-filter-panel.js` ·
 **Related:** REQ-UI-001, REQ-UI-006, REQ-UI-027
+
+### REQ-UI-029 — A table sorts by its column headers through one shared helper
+
+A results or price table whose order the user may choose sorts by clicking its column headers, and
+every such table uses the one kernel helper `krtTableSort` (`static/js/kernel/krt-table-sort.js`)
+instead of a page's own copy.
+
+1. **Markup.** A sortable column is a `th[data-sort-col]` carrying `aria-sort`, holding a real
+   `<button type="button" class="sort-header" data-sort-key>` with the label and a
+   `.sort-header__mark`. The mark is drawn by CSS from the header's `aria-sort` — ↕ in grey for an
+   inactive column, ▲ / ▼ in primary orange for the active one — so the script writes no marker
+   text. A number column's button aligns right. A column without a meaningful order (a route, a
+   free-text note) stays a plain `<th>`.
+2. **Cycle.** A click on an inactive column sorts it in its first direction — ascending, or
+   descending when the button carries `data-sort-first="desc"`, which a column where "more is better"
+   uses; a click on the active column reverses it. Exactly one column is active, and the page's
+   default order is that column's state at load.
+3. **Values.** Rows sort by raw values from `data-*` attributes, never the localised cell text; text
+   compares by locale ignoring case, and a row without a value sorts last in both directions. Ties
+   fall back to an order the page names (its default ranking), so a re-sort is stable.
+4. **In place.** Sorting moves the existing rows without a reload; a page that renders new rows
+   (a recalculation) re-applies the chosen order to them. A page that persists its filters per
+   browser (REQ-UI-017) stores the order with them, and a stored order that names no sortable
+   column falls back to the default.
+5. **Phones.** Below 768px a `.data-table--stack` hides its header row; a stacked table with
+   sortable headers keeps them instead, as a wrapping strip of sort buttons above the rows (the
+   unsortable headers stay hidden), so sorting works on a phone too. The buttons have the 44px
+   touch target of REQ-UI-009.
+
+The profit calculation sorts by Material, je SCU, Marge, Kapital and Max. Profit (default Max.
+Profit descending; Kapital starts ascending, Material A–Z, the others descending); its rank number
+`#` stays the profit rank of each material whatever the order, so a re-sort never renumbers it. The
+material-demand page keeps its own three-step cycle (REQ-ORDERS-034)
+until it moves onto the helper.
+
+**Enforced by:** `:frontend:testTableSort` (`scripts/krt-table-sort.test.mjs`),
+`MaterialsProfitCalculationRendersE2eTest` ·
+**Code:** `static/js/kernel/krt-table-sort.js`, `static/css/kernel/styles.css` (`.sort-header`),
+`templates/catalogue/materials-profit-calculation.html`,
+`static/js/catalogue/materials-profit-calculation.js` ·
+**Related:** REQ-UI-009, REQ-UI-017 · **Issues:** #2635, #2634
 
 ## Out of scope
 
