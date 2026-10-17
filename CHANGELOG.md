@@ -18,6 +18,8 @@
 
 - **Monitoring: CSP-Verstöße nennen ihre Ursache.** Der Fehler-Beacon meldet bei einem `trusted-types`-Verstoß den versuchten Policy-Namen und bei jedem CSP-Verstoß, ob der Code von der eigenen Seite, einer Browser-Erweiterung oder anderswoher stammt; `basetool_client_csp_violation_total` trägt dafür das Label `code_origin` (Dashboard 07, Panel 85). Grundlage für die Trusted-Types-Umstellung auf `enforce` (REQ-SEC-064, REQ-FE-022).
 
+- **Backend: keine Feldinjektion mehr.** `UserMapper`, `MissionMapper` und `InventoryItemMapper` erhalten ihre Abhängigkeiten über paketinterne `@Autowired`-Setter statt über Felder; die neue ArchUnit-Regel `noFieldIsAutowired` lässt kein `@Autowired`-Feld mehr zu (REQ-SEC-003). Kein Verhaltensunterschied.
+
 ### Fixed
 
 - **Frontend: Hostname-Prüfung zum Backend standardmäßig an.** Ohne gesetztes `INTERNAL_TLS_VERIFY_HOSTNAME` prüft das Webtool den Namen im Backend-Zertifikat jetzt wie der Ingest-Gateway, statt die Prüfung stillschweigend auszulassen; Compose und Quadlet setzten `true` bereits, `dev`/`test` bleiben unverändert (Frontend-Konfiguration, REQ-SEC-070).

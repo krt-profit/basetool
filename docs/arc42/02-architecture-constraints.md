@@ -32,7 +32,7 @@ so a later reader does not mistake a constraint for a preference and "improve" i
 These are written down in `CLAUDE.md` and enforced by gates, which makes them binding in practice
 even though they are style rules on paper:
 
-- **Constructor injection only**, Lombok maximised, records for DTOs, JetBrains nullity annotations
+- **Constructor injection only** (no `@Autowired` field, REQ-SEC-003), Lombok maximised, records for DTOs, JetBrains nullity annotations
   where the code establishes a contract (ADR-0192).
 - **One logging facade, enforced** — `@Slf4j` everywhere but `keycloak-spi`, where it is
   `@JBossLog`; every other logging annotation is a compile error, and a hand-written logger or a

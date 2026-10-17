@@ -56,9 +56,29 @@ import org.springframework.beans.factory.annotation.Autowired;
     uses = {SquadronMapper.class})
 public abstract class UserMapper {
 
-  @Autowired protected OrgUnitMembershipRepository membershipRepository;
+  protected OrgUnitMembershipRepository membershipRepository;
 
-  @Autowired protected StaffelMembershipResolver staffelMembershipResolver;
+  protected StaffelMembershipResolver staffelMembershipResolver;
+
+  /**
+   * Receives the repository the user's Staffel memberships are loaded from.
+   *
+   * @param repository the container's {@link OrgUnitMembershipRepository}
+   */
+  @Autowired
+  void setMembershipRepository(OrgUnitMembershipRepository repository) {
+    this.membershipRepository = repository;
+  }
+
+  /**
+   * Receives the resolver that turns Staffel memberships into name-sorted Staffel references.
+   *
+   * @param resolver the container's {@link StaffelMembershipResolver}
+   */
+  @Autowired
+  void setStaffelMembershipResolver(StaffelMembershipResolver resolver) {
+    this.staffelMembershipResolver = resolver;
+  }
 
   /**
    * Request-memo key for the per-user Staffel memberships loaded by {@link
