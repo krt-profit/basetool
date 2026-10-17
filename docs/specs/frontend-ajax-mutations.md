@@ -255,8 +255,19 @@ helper holds the codebase's single justified `eslint-disable-next-line`. The plu
 variable only when it is declared in the function that assigns it, which is why a few render helpers
 are nested inside their render function.
 
+**A Trusted Types violation names its cause** (REQ-SEC-064, ADR-0239). The client-error beacon
+reports a sink violation as `require-trusted-types-for <sink>` and a policy violation as
+`trusted-types <policy name>` — the name the code tried to create, at most 40 characters, each
+outside letters, digits and `_ . # = @ -` replaced by `?` — and every CSP violation with a
+`codeOrigin` taken from the event's `sourceFile`: `self` (the page's origin, which includes inline
+script in the page), `extension` (`chrome-extension:`, `moz-extension:`, `safari-web-extension:`,
+`webkit-masked-url:`), `inline` (no source file named) or `other`. Neither the sample's markup nor
+the source file's URL leaves the browser.
+
 **Acceptance**
 
+- [x] A `trusted-types` violation carries the attempted policy name and a `codeOrigin`;
+  `:frontend:testClientErrorCspJs`.
 - [ ] `:frontend:lintJs` reports no `no-unsanitized/*` finding.
 - [ ] No page defines its own HTML escaper.
 - [ ] `setTrustedHtml` / `replaceWithTrustedHtml` are called only with the body of a same-origin
@@ -267,9 +278,10 @@ are nested inside their render function.
   `/members` in DE and EN with a quote- and ampersand-laden translation.
 
 **Enforced by:** `:frontend:lintJs` (`no-unsanitized/method`, `no-unsanitized/property`),
-`MembersPageMessagesRenderTest` + review of
+`MembersPageMessagesRenderTest`, `:frontend:testClientErrorCspJs` + review of
 the trusted-helper call sites · **Code:** `escape-html.js`, `krt-fetch.js` (`setTrustedHtml`,
-`replaceWithTrustedHtml`, `swap`), `eslint.config.mjs`
+`replaceWithTrustedHtml`, `swap`), `krt-client-error.js` (`violationMessage`, `codeOriginOf`),
+`eslint.config.mjs`
 
 ### REQ-FE-003 — `syncVersion` propagates the optimistic-lock version
 

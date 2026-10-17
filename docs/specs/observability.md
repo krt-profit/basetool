@@ -2451,14 +2451,23 @@ Two frontend meters were added by the 2026-08 logging audit:
   permanent background, which is exactly what the step-change shape tolerates. Since 2026-10-04 it
   also carries the **Trusted Types** violations of the report-only policy (ADR-0239): `message` is
   `require-trusted-types-for` followed by the sink the browser names (`Element innerHTML`, never the
-  sample's markup), or `trusted-types` for a policy name the CSP does not list, and `source` is
-  `trusted-types-sink` / `trusted-types-policy`. The browser dispatches `securitypolicyviolation`
+  sample's markup), or `trusted-types` followed by the policy name the CSP does not list (at most 40
+  characters, each outside letters, digits and `_ . # = @ -` replaced by `?`), and `source` is
+  `trusted-types-sink` / `trusted-types-policy`. Every `csp_violation` also carries a sixth field,
+  `codeOrigin`, the class of the event's `sourceFile` — `self`, `extension`, `inline` (no source
+  file) or `other` — never the file's URL; the server logs it as `codeOrigin=` and, for this kind,
+  reduces `message` to those characters plus space (`ClientErrorReportController.cspMessage`), so a
+  URL path cannot reach the `DEBUG` line through it. The browser dispatches `securitypolicyviolation`
   for a report-only policy too, which is why the beacon needs no `report-uri` for this phase.
   `sum(increase(basetool_client_error_total{kind="csp_violation"}[7d]))` staying empty is the
   precondition for switching production to `enforce` (`deployment.md`).
-- `basetool_client_csp_violation_total{directive}` — counter minted by `ClientErrorReportController`
-  beside `basetool_client_error_total` for every accepted `csp_violation` beacon, so a spike names
-  its violated directive without raising the logger to `DEBUG` on production. `directive` is the
+- `basetool_client_csp_violation_total{directive,code_origin}` — counter minted by
+  `ClientErrorReportController` beside `basetool_client_error_total` for every accepted
+  `csp_violation` beacon, so a spike names its violated directive and whether a browser extension
+  caused it without raising the logger to `DEBUG` on production. `code_origin` is the beacon's
+  `codeOrigin`, kept only when it is `self`, `extension`, `inline` or `other`
+  (`ClientErrorReportController.CODE_ORIGINS`) and counted as `other` otherwise, an absent value
+  included — at most 23 × 4 series. `directive` is the
   first word of the beacon's `message`, kept only when it is a name in the server-side allow-list
   (`ClientErrorReportController.CSP_DIRECTIVES`: the `*-src` fetch directives, `base-uri`,
   `form-action`, `frame-ancestors`, `sandbox`, `require-trusted-types-for`, `trusted-types`) and
