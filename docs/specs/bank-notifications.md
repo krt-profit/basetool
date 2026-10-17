@@ -16,7 +16,7 @@ and has a seeded, admin-editable rule. Each can be muted (REQ-NOTIF-027).
 ### REQ-BANK-057 — An approved request is ready to confirm
 
 `BankBookingRequestService#applyOwnerApprovalWithinTransaction` (reached by
-`OrgUnitBankAccessService#grantOwnerApproval`) publishes `BANK_BOOKING_REQUEST_APPROVED` when the
+`OrgUnitBankRequestService#grantOwnerApproval`) publishes `BANK_BOOKING_REQUEST_APPROVED` when the
 approval is granted. The default rule notifies the bank management (`ROLE` `BANK_MANAGEMENT`), the
 bank employees granted on the account (`ACCOUNT_GRANT`) and the requester (`EVENT_RECIPIENT`), names
 the request, its amount, the account and the approver, and excludes the approver. Revoking the

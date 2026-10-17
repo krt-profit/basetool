@@ -49,7 +49,7 @@ class PurposeBoundRoutingTest {
 
   private BankAccountRepository accountRepository;
   private BankBookingRequestService requestService;
-  private OrgUnitBankAccessService service;
+  private OrgUnitBankRequestService service;
 
   private final UUID accountId = UUID.randomUUID();
   private final UUID recipient = UUID.randomUUID();
@@ -60,25 +60,7 @@ class PurposeBoundRoutingTest {
   void setUp() {
     accountRepository = mock(BankAccountRepository.class);
     requestService = mock(BankBookingRequestService.class);
-    service =
-        new OrgUnitBankAccessService(
-            null,
-            null,
-            accountRepository,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            requestService,
-            null,
-            null,
-            null,
-            null);
+    service = new OrgUnitBankRequestService(null, null, accountRepository, null, requestService);
   }
 
   private BankAccount account(BankAccountType type, BankAccountStatus status) {

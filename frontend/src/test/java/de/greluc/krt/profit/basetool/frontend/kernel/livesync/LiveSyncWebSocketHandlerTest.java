@@ -378,12 +378,12 @@ class LiveSyncWebSocketHandlerTest {
     bob.sent.clear();
     FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
 
-    int emitted = LiveSyncWebSocketHandler.CHANGED_BURST + 40;
+    int emitted = LiveSyncRateLimiter.CHANGED_BURST + 40;
     for (int i = 0; i < emitted; i++) {
       handler.handleTextMessage(alice, changedFrame(topic, "crew"));
     }
 
-    assertThat(bob.sent.size()).isEqualTo(LiveSyncWebSocketHandler.CHANGED_BURST);
+    assertThat(bob.sent.size()).isEqualTo(LiveSyncRateLimiter.CHANGED_BURST);
   }
 
   @Test
@@ -431,7 +431,7 @@ class LiveSyncWebSocketHandlerTest {
     openSubscribed(topic, oidcUser("user-2", "Bob"));
     FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
 
-    int emitted = LiveSyncWebSocketHandler.CHANGED_BURST + 40;
+    int emitted = LiveSyncRateLimiter.CHANGED_BURST + 40;
     for (int i = 0; i < emitted; i++) {
       handler.handleTextMessage(alice, changedFrame(topic, "crew"));
     }
@@ -998,8 +998,8 @@ class LiveSyncWebSocketHandlerTest {
     subscribe(subscriber, topic);
     subscriber.sent.clear();
 
-    int perPublisher = LiveSyncWebSocketHandler.CHANGED_BURST;
-    int publishers = (LiveSyncWebSocketHandler.TOPIC_CHANGED_BURST / perPublisher) + 2;
+    int perPublisher = LiveSyncRateLimiter.CHANGED_BURST;
+    int publishers = (LiveSyncRateLimiter.TOPIC_CHANGED_BURST / perPublisher) + 2;
     for (int p = 0; p < publishers; p++) {
       FakeSession pub = openMultiplexedSession(oidcUser("pub-" + p, "P" + p));
       for (int i = 0; i < perPublisher; i++) {
@@ -1008,8 +1008,8 @@ class LiveSyncWebSocketHandlerTest {
     }
     int emitted = publishers * perPublisher;
 
-    assertThat(emitted).isGreaterThan(LiveSyncWebSocketHandler.TOPIC_CHANGED_BURST);
-    assertThat(subscriber.sent.size()).isEqualTo(LiveSyncWebSocketHandler.TOPIC_CHANGED_BURST);
+    assertThat(emitted).isGreaterThan(LiveSyncRateLimiter.TOPIC_CHANGED_BURST);
+    assertThat(subscriber.sent.size()).isEqualTo(LiveSyncRateLimiter.TOPIC_CHANGED_BURST);
     assertThat(dropCounter(MetricNames.DROPPED_TOPIC_THROTTLED, "operation")).isGreaterThan(0.0);
   }
 
@@ -1021,7 +1021,7 @@ class LiveSyncWebSocketHandlerTest {
     assertThat(handler.topicBucketCount()).isEqualTo(1);
 
     handler.reapIdleTopicBuckets(
-        nanoClock.get() + LiveSyncWebSocketHandler.TOPIC_BUCKET_IDLE_REAP_NANOS * 3);
+        nanoClock.get() + LiveSyncRateLimiter.TOPIC_BUCKET_IDLE_REAP_NANOS * 3);
     assertThat(handler.topicBucketCount()).isZero();
   }
 
@@ -1031,7 +1031,7 @@ class LiveSyncWebSocketHandlerTest {
     FakeSession alice = openSubscribed(topic, oidcUser("user-1", "Alice"));
     openSubscribed(topic, oidcUser("user-2", "Bob"));
 
-    int emitted = LiveSyncWebSocketHandler.PRESENCE_BURST + 20;
+    int emitted = LiveSyncRateLimiter.PRESENCE_BURST + 20;
     for (int i = 0; i < emitted; i++) {
       handler.handleTextMessage(alice, presenceFrame("focus", topic, "sec-" + i));
     }
@@ -1312,16 +1312,16 @@ class LiveSyncWebSocketHandlerTest {
     FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
     bob.sent.clear();
 
-    int emitted = LiveSyncWebSocketHandler.SUBSCRIBE_BURST + 20;
+    int emitted = LiveSyncRateLimiter.SUBSCRIBE_BURST + 20;
     for (int i = 0; i < emitted; i++) {
       subscribe(bob, topic);
     }
 
-    verify(authorizer, times(LiveSyncWebSocketHandler.SUBSCRIBE_BURST))
+    verify(authorizer, times(LiveSyncRateLimiter.SUBSCRIBE_BURST))
         .authorize(any(), any(), any(), any(), any());
     assertThat(dropCounter(MetricNames.DROPPED_THROTTLED, "operation"))
-        .isEqualTo(emitted - LiveSyncWebSocketHandler.SUBSCRIBE_BURST);
-    assertThat(bob.sent).hasSize(LiveSyncWebSocketHandler.SUBSCRIBE_BURST);
+        .isEqualTo(emitted - LiveSyncRateLimiter.SUBSCRIBE_BURST);
+    assertThat(bob.sent).hasSize(LiveSyncRateLimiter.SUBSCRIBE_BURST);
   }
 
   @Test

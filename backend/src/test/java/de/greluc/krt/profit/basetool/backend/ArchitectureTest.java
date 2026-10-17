@@ -65,7 +65,9 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankApprovalLi
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankBalanceDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankLiveSyncTopicAuthorizer;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankRecipientDirectory;
+import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankRequestService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankResponsibilityService;
+import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankSettingsService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankViewUserDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankVisibilityService;
 import de.greluc.krt.profit.basetool.backend.bank.web.OrgUnitBankController;
@@ -530,7 +532,9 @@ class ArchitectureTest {
           OrgUnitBankApprovalLimitService.class,
           OrgUnitBankLiveSyncTopicAuthorizer.class,
           OrgUnitBankRecipientDirectory.class,
+          OrgUnitBankRequestService.class,
           OrgUnitBankResponsibilityService.class,
+          OrgUnitBankSettingsService.class,
           OrgUnitBankVisibilityService.class);
 
   /**
@@ -982,7 +986,8 @@ class ArchitectureTest {
   @Test
   void orgUnitBankSettingsMutationsMustCallAnAuthorizationHelper() {
     DescribedPredicate<JavaMethod> selection =
-        bankSettingsMutations(OrgUnitBankAccessService.class, OrgUnitBankAccountSettingsDto.class);
+        bankSettingsMutations(
+            OrgUnitBankSettingsService.class, OrgUnitBankAccountSettingsDto.class);
     assertMethodFloor("orgUnitBankSettingsMutationsMustCallAnAuthorizationHelper", selection, 15);
     orgUnitBankSettingsMutationsRule(selection).check(CLASSES);
   }

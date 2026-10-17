@@ -32,7 +32,7 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.BankTransferFeeRateDt
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankTransferFeeService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankTransferRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankWithdrawalRequest;
-import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankAccessService;
+import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankRequestService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.ReverseBankTransactionRequest;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import io.swagger.v3.oas.annotations.Operation;
@@ -69,7 +69,7 @@ public class BankBookingController {
   private final BankBookingGuards bankBookingGuards;
   private final BankSecurityService bankSecurityService;
   private final BankTransferFeeService bankTransferFeeService;
-  private final OrgUnitBankAccessService orgUnitBankAccessService;
+  private final OrgUnitBankRequestService orgUnitBankRequestService;
   private final BankDirectBookingNotifier bankDirectBookingNotifier;
 
   /**
@@ -132,7 +132,7 @@ public class BankBookingController {
     if (bankBookingGuards.exceedsCartelDirectBookingCeiling(
         request.accountId(), request.amount())) {
       BankBookingRequestDto raised =
-          orgUnitBankAccessService.raiseCartelDirectBookingRequest(
+          orgUnitBankRequestService.raiseCartelDirectBookingRequest(
               request.accountId(),
               BankBookingRequestType.WITHDRAWAL,
               request.amount(),
@@ -174,7 +174,7 @@ public class BankBookingController {
     if (bankBookingGuards.exceedsCartelDirectBookingCeiling(
         request.sourceAccountId(), request.amount())) {
       BankBookingRequestDto raised =
-          orgUnitBankAccessService.raiseCartelDirectBookingRequest(
+          orgUnitBankRequestService.raiseCartelDirectBookingRequest(
               request.sourceAccountId(),
               BankBookingRequestType.TRANSFER,
               request.amount(),

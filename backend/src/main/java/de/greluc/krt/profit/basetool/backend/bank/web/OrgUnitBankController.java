@@ -30,6 +30,8 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankAccessServ
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankAccountDetailDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankAccountSettingsDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankBalanceDto;
+import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankRequestService;
+import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankSettingsService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.SetBankApprovalLimitRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.UpdateBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
@@ -69,8 +71,9 @@ import org.springframework.web.bind.annotation.RestController;
  * service and not by a bank role, for the officers and leads who oversee an org unit (REQ-BANK-021,
  * REQ-BANK-022).
  *
- * <p>Only relays to {@link OrgUnitBankAccessService}, which scopes every call to the caller's
- * oversight; a caller who oversees nothing gets an empty result.
+ * <p>Only relays to {@link OrgUnitBankAccessService} and the {@link OrgUnitBankSettingsService} and
+ * {@link OrgUnitBankRequestService} behind it, which scope every call to the caller's oversight; a
+ * caller who oversees nothing gets an empty result.
  */
 @RestController
 @RequestMapping("/api/v1/bank/org-units")
@@ -83,6 +86,8 @@ public class OrgUnitBankController {
   private static final Set<String> BOOKING_SORT_FIELDS = Set.of("createdAt", "id");
 
   private final OrgUnitBankAccessService orgUnitBankAccessService;
+  private final OrgUnitBankSettingsService orgUnitBankSettingsService;
+  private final OrgUnitBankRequestService orgUnitBankRequestService;
 
   /**
    * Returns the balance-only view of every org-unit account the caller oversees (REQ-BANK-021); a
@@ -215,7 +220,7 @@ public class OrgUnitBankController {
   @Operation(summary = "Read an org-unit account's responsibility settings (holder/OL)")
   @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "Account settings")})
   public OrgUnitBankAccountSettingsDto getAccountSettings(@PathVariable @NotNull UUID id) {
-    return orgUnitBankAccessService.getAccountSettings(id);
+    return orgUnitBankSettingsService.getAccountSettings(id);
   }
 
   /**
@@ -232,7 +237,7 @@ public class OrgUnitBankController {
   public OrgUnitBankAccountSettingsDto setBalanceTarget(
       @PathVariable @NotNull UUID id,
       @NotNull @RequestBody @Valid OrgUnitBalanceTargetRequest request) {
-    return orgUnitBankAccessService.setBalanceTarget(id, request.target(), request.version());
+    return orgUnitBankSettingsService.setBalanceTarget(id, request.target(), request.version());
   }
 
   /**
@@ -248,7 +253,7 @@ public class OrgUnitBankController {
   @Operation(summary = "Grant a role bucket view access to an org-unit account")
   public OrgUnitBankAccountSettingsDto addRoleVisibility(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull String roleCode) {
-    return orgUnitBankAccessService.addRoleVisibility(id, roleCode);
+    return orgUnitBankSettingsService.addRoleVisibility(id, roleCode);
   }
 
   /**
@@ -263,7 +268,7 @@ public class OrgUnitBankController {
   @Operation(summary = "Revoke a role bucket's view access to an org-unit account")
   public OrgUnitBankAccountSettingsDto removeRoleVisibility(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull String roleCode) {
-    return orgUnitBankAccessService.removeRoleVisibility(id, roleCode);
+    return orgUnitBankSettingsService.removeRoleVisibility(id, roleCode);
   }
 
   /**
@@ -278,7 +283,7 @@ public class OrgUnitBankController {
   @Operation(summary = "Toggle the all-members view grant of an org-unit account")
   public OrgUnitBankAccountSettingsDto setAllMembersVisibility(
       @PathVariable @NotNull UUID id, @PathVariable boolean enabled) {
-    return orgUnitBankAccessService.setAllMembersVisibility(id, enabled);
+    return orgUnitBankSettingsService.setAllMembersVisibility(id, enabled);
   }
 
   /**
@@ -295,7 +300,7 @@ public class OrgUnitBankController {
   @Operation(summary = "Toggle the area-members (Mitglieder des Bereichs) view grant")
   public OrgUnitBankAccountSettingsDto setAreaMembersVisibility(
       @PathVariable @NotNull UUID id, @PathVariable boolean enabled) {
-    return orgUnitBankAccessService.setAreaMembersVisibility(id, enabled);
+    return orgUnitBankSettingsService.setAreaMembersVisibility(id, enabled);
   }
 
   /**
@@ -310,7 +315,7 @@ public class OrgUnitBankController {
   @Operation(summary = "Grant an individual user view access to an org-unit account")
   public OrgUnitBankAccountSettingsDto addUserVisibility(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
-    return orgUnitBankAccessService.addUserVisibility(id, userId);
+    return orgUnitBankSettingsService.addUserVisibility(id, userId);
   }
 
   /**
@@ -325,7 +330,7 @@ public class OrgUnitBankController {
   @Operation(summary = "Revoke an individual user's view access to an org-unit account")
   public OrgUnitBankAccountSettingsDto removeUserVisibility(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
-    return orgUnitBankAccessService.removeUserVisibility(id, userId);
+    return orgUnitBankSettingsService.removeUserVisibility(id, userId);
   }
 
   /**
@@ -344,7 +349,7 @@ public class OrgUnitBankController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull String roleCode,
       @NotNull @RequestBody @Valid SetBankApprovalLimitRequest request) {
-    return orgUnitBankAccessService.setRoleApprovalLimit(id, roleCode, request.limit());
+    return orgUnitBankSettingsService.setRoleApprovalLimit(id, roleCode, request.limit());
   }
 
   /**
@@ -359,7 +364,7 @@ public class OrgUnitBankController {
   @Operation(summary = "Clear a role-bucket approval limit on an org-unit account")
   public OrgUnitBankAccountSettingsDto clearRoleApprovalLimit(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull String roleCode) {
-    return orgUnitBankAccessService.clearRoleApprovalLimit(id, roleCode);
+    return orgUnitBankSettingsService.clearRoleApprovalLimit(id, roleCode);
   }
 
   /**
@@ -375,7 +380,7 @@ public class OrgUnitBankController {
   public OrgUnitBankAccountSettingsDto setAllMembersApprovalLimit(
       @PathVariable @NotNull UUID id,
       @NotNull @RequestBody @Valid SetBankApprovalLimitRequest request) {
-    return orgUnitBankAccessService.setAllMembersApprovalLimit(id, request.limit());
+    return orgUnitBankSettingsService.setAllMembersApprovalLimit(id, request.limit());
   }
 
   /**
@@ -389,7 +394,7 @@ public class OrgUnitBankController {
   @Operation(summary = "Clear the all-members approval limit on an org-unit account")
   public OrgUnitBankAccountSettingsDto clearAllMembersApprovalLimit(
       @PathVariable @NotNull UUID id) {
-    return orgUnitBankAccessService.clearAllMembersApprovalLimit(id);
+    return orgUnitBankSettingsService.clearAllMembersApprovalLimit(id);
   }
 
   /**
@@ -406,7 +411,7 @@ public class OrgUnitBankController {
   public OrgUnitBankAccountSettingsDto setAreaMembersApprovalLimit(
       @PathVariable @NotNull UUID id,
       @NotNull @RequestBody @Valid SetBankApprovalLimitRequest request) {
-    return orgUnitBankAccessService.setAreaMembersApprovalLimit(id, request.limit());
+    return orgUnitBankSettingsService.setAreaMembersApprovalLimit(id, request.limit());
   }
 
   /**
@@ -420,7 +425,7 @@ public class OrgUnitBankController {
   @Operation(summary = "Clear the area-members (Mitglieder des Bereichs) approval limit")
   public OrgUnitBankAccountSettingsDto clearAreaMembersApprovalLimit(
       @PathVariable @NotNull UUID id) {
-    return orgUnitBankAccessService.clearAreaMembersApprovalLimit(id);
+    return orgUnitBankSettingsService.clearAreaMembersApprovalLimit(id);
   }
 
   /**
@@ -438,7 +443,7 @@ public class OrgUnitBankController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID userId,
       @NotNull @RequestBody @Valid SetBankApprovalLimitRequest request) {
-    return orgUnitBankAccessService.setUserApprovalLimit(id, userId, request.limit());
+    return orgUnitBankSettingsService.setUserApprovalLimit(id, userId, request.limit());
   }
 
   /**
@@ -453,7 +458,7 @@ public class OrgUnitBankController {
   @Operation(summary = "Clear an individual user's approval limit on an org-unit account")
   public OrgUnitBankAccountSettingsDto clearUserApprovalLimit(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
-    return orgUnitBankAccessService.clearUserApprovalLimit(id, userId);
+    return orgUnitBankSettingsService.clearUserApprovalLimit(id, userId);
   }
 
   /**
@@ -477,7 +482,7 @@ public class OrgUnitBankController {
   @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "Request created")})
   public BankBookingRequestDto createBookingRequest(
       @Valid @RequestBody CreateBankBookingRequest request) {
-    return orgUnitBankAccessService.createBookingRequest(request);
+    return orgUnitBankRequestService.createBookingRequest(request);
   }
 
   /**
@@ -491,7 +496,7 @@ public class OrgUnitBankController {
   @Operation(summary = "List the caller's own booking requests and their status")
   @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "The caller's requests")})
   public List<BankBookingRequestDto> listOwnBookingRequests() {
-    return orgUnitBankAccessService.listOwnBookingRequests();
+    return orgUnitBankRequestService.listOwnBookingRequests();
   }
 
   /**
@@ -508,7 +513,7 @@ public class OrgUnitBankController {
   @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "Request cancelled")})
   public BankBookingRequestDto cancelOwnBookingRequest(
       @PathVariable UUID id, @NotNull @Valid @RequestBody CancelBankBookingRequest request) {
-    return orgUnitBankAccessService.cancelOwnBookingRequest(id, request.version());
+    return orgUnitBankRequestService.cancelOwnBookingRequest(id, request.version());
   }
 
   /**
@@ -526,7 +531,7 @@ public class OrgUnitBankController {
   @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "Request updated")})
   public BankBookingRequestDto updateOwnBookingRequest(
       @PathVariable UUID id, @Valid @RequestBody UpdateBankBookingRequest request) {
-    return orgUnitBankAccessService.updateOwnBookingRequest(id, request);
+    return orgUnitBankRequestService.updateOwnBookingRequest(id, request);
   }
 
   /**
@@ -542,7 +547,7 @@ public class OrgUnitBankController {
   @ApiResponses(
       value = {@ApiResponse(responseCode = "200", description = "Requests on own accounts")})
   public List<BankBookingRequestDto> listForeignRequests() {
-    return orgUnitBankAccessService.listRequestsForResponsibleAccounts();
+    return orgUnitBankRequestService.listRequestsForResponsibleAccounts();
   }
 
   /**
@@ -556,7 +561,7 @@ public class OrgUnitBankController {
   @Operation(summary = "List all active accounts as transfer-request destinations")
   @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "Active accounts")})
   public List<BankAccountRefDto> listTransferTargets() {
-    return orgUnitBankAccessService.listTransferTargetAccounts();
+    return orgUnitBankRequestService.listTransferTargetAccounts();
   }
 
   /**
@@ -572,7 +577,7 @@ public class OrgUnitBankController {
   @Operation(summary = "Grant the responsible holder's in-app approval for a booking request")
   @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "Approval granted")})
   public BankBookingRequestDto grantOwnerApproval(@PathVariable @NotNull UUID id) {
-    return orgUnitBankAccessService.grantOwnerApproval(id);
+    return orgUnitBankRequestService.grantOwnerApproval(id);
   }
 
   /**
@@ -586,6 +591,6 @@ public class OrgUnitBankController {
   @Operation(summary = "Revoke the responsible holder's in-app approval for a booking request")
   @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "Approval revoked")})
   public BankBookingRequestDto revokeOwnerApproval(@PathVariable @NotNull UUID id) {
-    return orgUnitBankAccessService.revokeOwnerApproval(id);
+    return orgUnitBankRequestService.revokeOwnerApproval(id);
   }
 }

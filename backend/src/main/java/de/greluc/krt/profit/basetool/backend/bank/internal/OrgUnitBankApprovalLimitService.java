@@ -37,7 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Persists and audits the per-tier bank approval limits (role bucket, all members, area members,
- * individual user) on behalf of {@link OrgUnitBankAccessService} (REQ-BANK-041).
+ * individual user) on behalf of {@link OrgUnitBankSettingsService} (REQ-BANK-041).
  *
  * <p>Callers resolve and authorize the account first. {@link BankAccountRepository} is used only
  * for the row lock in {@link #upsertLimit}; {@link OwnerScopeService} is deliberately not injected

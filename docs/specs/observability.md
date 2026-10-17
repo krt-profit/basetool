@@ -2147,7 +2147,7 @@ Spring reports as `WebClientRequestException`. Both halves of one lost connectio
 > transport failures they absorbed. The push-channel surfaces (#1041 item 17) add `basetool_notification_relay_connections`
 (open browser→backend notification SSE relays, `NotificationPageController`) and
 `basetool_presence_ws_sessions` (live live-sync WebSocket sessions summed across all topic rooms,
-`LiveSyncWebSocketHandler`) gauges, plus the `basetool_presence_relay_frames_total{type,topic_class}`
+`LiveSyncRooms` behind `LiveSyncWebSocketHandler`) gauges, plus the `basetool_presence_relay_frames_total{type,topic_class}`
 (`type` = `changed` / `snapshot`) and `basetool_presence_relay_dropped_total{reason,topic_class}`
 (`reason` = `throttled` / `send_failed` / `topic_cap` / `authorize_saturated` / `topic_throttled` /
 `section_filtered`)
