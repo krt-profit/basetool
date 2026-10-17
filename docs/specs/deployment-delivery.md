@@ -1295,6 +1295,18 @@ into the CHANGELOG, on the very commit being built. `.github/scripts/app_version
 prefers the newest dated CHANGELOG section *when it carries no tag yet*, and falls back to
 `git describe` in every other case, so only the release commit is affected.
 
+**A build without `git` still has a version, and still stores its configuration-cache entry.** The
+frontend stamps `build-info.properties` from `-PappVersion` when that property is set and from
+`git describe --tags --always --dirty` otherwise, falling back to the project version. That `git`
+call is a `providers.exec` value source, and a value source whose process cannot start is a
+configuration-cache **problem**, not a caught exception: Gradle discards the entry and fails the
+build although the version fell back and every task succeeded. Neither `runCatching` around the
+read nor `-PappVersion` prevents it, because the source is computed when the entry is stored rather
+than when the value is read. `frontend/build.gradle.kts` therefore registers the value source only
+when `rootDir/.git` exists **and** a `git` executable is on `PATH`, and takes the project version
+when either is missing. The image build is unaffected either way: `docker/app/Dockerfile` passes
+`--no-configuration-cache`, which is why its git-less `eclipse-temurin` builder never hit this.
+
 Reuse is an optimisation, never a weakening of the supply chain. It applies only when **every** gate
 passes, and the doubt case is always a full build:
 
@@ -1422,9 +1434,15 @@ produced artifact.
   never skip. `image_reuse_plan.py --selftest` covers each branch of the skip decision and of the
   reuse-base search; the plan script was exercised against stubbed git/registry answers for both
   (2026-09-23).
+- [x] With no `git` on `PATH`, `:frontend:bootBuildInfo --configuration-cache` succeeds, stores its
+  entry, reuses it on the second run and stamps the project version; with `git` present the stamp
+  stays `git describe` and the entry is reused. Before the guard the same run failed because the
+  `ProcessOutputValueSource` could not start `git`, which discarded the entry — with and without
+  `-PappVersion` (2026-10-17).
 
 **Enforced by:** `.github/workflows/release-images.yml` (`plan`, `build`, `scan`, `merge`) ·
-`.github/scripts/image_reuse_plan.py` · `.github/workflows/promote.yml` (`sync-testing`) · **Decision:** [ADR-0137](../adr/0137-one-image-build-per-commit-and-no-buildkit-layer-cache.md),
+`.github/scripts/image_reuse_plan.py` · `.github/workflows/promote.yml` (`sync-testing`) ·
+`frontend/build.gradle.kts` (`resolvedAppVersion`) · **Decision:** [ADR-0137](../adr/0137-one-image-build-per-commit-and-no-buildkit-layer-cache.md),
 [ADR-0210](../adr/0210-a-main-push-that-changes-no-image-input-re-tags-the-previous-build.md)
 
 ### REQ-OPS-022 — Non-production environments are fed by their own promotion channel

@@ -3,6 +3,7 @@ import com.github.gradle.node.npm.task.NpxTask
 import com.github.gradle.node.task.NodeTask
 import de.greluc.krt.profit.basetool.conventions.OssLicensePolicy
 import de.greluc.krt.profit.basetool.conventions.backendModuleDirectories
+import java.io.File
 
 buildscript {
   dependencies {
@@ -65,27 +66,40 @@ spotless { java { target("src/**/*.java") } }
 tasks.named<JavaCompile>("compileTestJava") { dependsOn(tasks.openApiGenerate) }
 
 val projectVersion = project.version.toString()
-val gitDescribe = providers.exec {
-  commandLine("git", "describe", "--tags", "--always", "--dirty")
-  workingDir = rootDir
-  isIgnoreExitValue = true
-}
+val gitIsReachable =
+  rootDir.resolve(".git").exists() &&
+    (System.getenv("PATH") ?: "").split(File.pathSeparator).any { entry ->
+      entry.isNotBlank() &&
+        sequenceOf("git", "git.exe", "git.cmd").any { name -> File(entry, name).isFile }
+    }
+val gitDescribe =
+  if (gitIsReachable) {
+    providers.exec {
+      commandLine("git", "describe", "--tags", "--always", "--dirty")
+      workingDir = rootDir
+      isIgnoreExitValue = true
+    }
+  } else {
+    null
+  }
 val resolvedAppVersion: Provider<String> =
   providers
     .gradleProperty("appVersion")
     .filter { it.isNotBlank() }
     .orElse(
       provider {
-        runCatching {
-          gitDescribe.result
-            .get()
-            .exitValue
-            .takeIf { it == 0 }
-            ?.let {
-              gitDescribe.standardOutput.asText.get().trim().takeIf { out -> out.isNotBlank() }
-            }
-        }
-          .getOrNull() ?: projectVersion
+        gitDescribe?.let { describe ->
+          runCatching {
+            describe.result
+              .get()
+              .exitValue
+              .takeIf { it == 0 }
+              ?.let {
+                describe.standardOutput.asText.get().trim().takeIf { out -> out.isNotBlank() }
+              }
+          }
+            .getOrNull()
+        } ?: projectVersion
       },
     )
     .map { it.removePrefix("v") }
