@@ -38,9 +38,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
-/**
- * The material detail price table sorts in place by clicking its column headers (REQ-UI-015).
- */
+/** The material detail price table sorts in place by clicking its column headers (REQ-UI-015). */
 @Tag("e2e")
 class MaterialDetailPriceSortE2eTest {
 
@@ -84,8 +82,8 @@ class MaterialDetailPriceSortE2eTest {
 
   /**
    * The table opens sorted by sale price, highest first; a header click sorts by that column in its
-   * first direction, a second click reverses it, rows without a price stay last, and the sort
-   * keeps working on a filtered table.
+   * first direction, a second click reverses it, rows without a price stay last, and the sort keeps
+   * working on a filtered table.
    */
   @Test
   void columnHeadersSortThePriceTableInPlace() {

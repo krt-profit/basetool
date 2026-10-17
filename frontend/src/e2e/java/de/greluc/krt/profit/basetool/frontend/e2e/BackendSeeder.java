@@ -2012,14 +2012,12 @@ public final class BackendSeeder {
    * @param buy the purchase price, or {@code null} when the terminal does not sell the material
    */
   public void seedTerminalPrice(
-      String materialId,
-      String terminalName,
-      @Nullable BigDecimal sell,
-      @Nullable BigDecimal buy) {
+      String materialId, String terminalName, @Nullable BigDecimal sell, @Nullable BigDecimal buy) {
     UUID terminalId = UUID.randomUUID();
     try (Connection connection = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASSWORD)) {
       try (PreparedStatement ps =
-          connection.prepareStatement("INSERT INTO terminal (id, name, hidden) VALUES (?, ?, false)")) {
+          connection.prepareStatement(
+              "INSERT INTO terminal (id, name, hidden) VALUES (?, ?, false)")) {
         ps.setObject(1, terminalId);
         ps.setString(2, terminalName);
         ps.executeUpdate();
