@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.TerminalDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -65,41 +66,45 @@ public class ProfitCalculationPageController {
       "hasAnyRole('" + Roles.KRT_MEMBER + "', '" + Roles.OFFICER + "', '" + Roles.ADMIN + "')")
   public String showProfitCalculationPage(Model model) {
     log.debug("Showing profit calculation page");
-    try {
-      PageResponse<ShipTypeDto> shipTypesPage = catalogueClient.shipTypesSorted();
-
-      List<ShipTypeDto> shipTypes =
-          (shipTypesPage != null && shipTypesPage.content() != null)
-              ? shipTypesPage.content().stream()
-                  .filter(s -> s.scu() != null && s.scu() > 0)
-                  .toList()
-              : List.of();
-
-      model.addAttribute("shipTypes", shipTypes);
-
-      shipTypes.stream()
-          .filter(s -> s.name().contains("C2 Hercules Starlifter"))
-          .findFirst()
-          .ifPresent(c2 -> model.addAttribute("defaultShipId", c2.id()));
-
-      PageResponse<TerminalDto> terminalsPage = catalogueClient.terminalCatalogue();
-
-      Set<String> starSystems = new TreeSet<>();
-      if (terminalsPage != null && terminalsPage.content() != null) {
-        for (TerminalDto terminal : terminalsPage.content()) {
-          String system = terminal.starSystemName();
-          if (system != null && !system.isBlank()) {
-            starSystems.add(system);
-          }
-        }
-      }
-      model.addAttribute("starSystems", starSystems);
-
-    } catch (Exception e) {
-      log.error("Error loading data for profit calculation page", e);
+    if (!SectionFallback.run(log, "profit-calculation", () -> addCalculationSources(model))) {
       model.addAttribute("error", "error.profit_calculation.load");
     }
 
     return "catalogue/materials-profit-calculation";
+  }
+
+  /**
+   * Adds the ships with cargo capacity, the C2 Hercules as default ship and the star systems that
+   * have terminals.
+   *
+   * @param model the profit-calculation model
+   */
+  private void addCalculationSources(@NotNull Model model) {
+    PageResponse<ShipTypeDto> shipTypesPage = catalogueClient.shipTypesSorted();
+
+    List<ShipTypeDto> shipTypes =
+        (shipTypesPage != null && shipTypesPage.content() != null)
+            ? shipTypesPage.content().stream().filter(s -> s.scu() != null && s.scu() > 0).toList()
+            : List.of();
+
+    model.addAttribute("shipTypes", shipTypes);
+
+    shipTypes.stream()
+        .filter(s -> s.name().contains("C2 Hercules Starlifter"))
+        .findFirst()
+        .ifPresent(c2 -> model.addAttribute("defaultShipId", c2.id()));
+
+    PageResponse<TerminalDto> terminalsPage = catalogueClient.terminalCatalogue();
+
+    Set<String> starSystems = new TreeSet<>();
+    if (terminalsPage != null && terminalsPage.content() != null) {
+      for (TerminalDto terminal : terminalsPage.content()) {
+        String system = terminal.starSystemName();
+        if (system != null && !system.isBlank()) {
+          starSystems.add(system);
+        }
+      }
+    }
+    model.addAttribute("starSystems", starSystems);
   }
 }

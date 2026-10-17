@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogPages.Comple
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -106,53 +107,57 @@ public class AdminUexPageController {
   @NotNull
   @GetMapping
   public String listData(Model model) {
-    try {
-      CompleteCatalog<CityDto> citiesCatalog = CatalogPages.fetchAll(catalogueClient::cityPage);
-      CompleteCatalog<SpaceStationDto> stationsCatalog =
-          CatalogPages.fetchAll(catalogueClient::spaceStationPage);
-      CompleteCatalog<OutpostDto> outpostsCatalog =
-          CatalogPages.fetchAll(catalogueClient::outpostPage);
-      CompleteCatalog<PoiDto> poisCatalog = CatalogPages.fetchAll(catalogueClient::poiPage);
-      CompleteCatalog<TerminalDto> terminalsCatalog =
-          CatalogPages.fetchAll(catalogueClient::terminalPage);
-
-      List<CityDto> cities = sortedByName(citiesCatalog.items(), CityDto::name);
-      List<SpaceStationDto> stations = sortedByName(stationsCatalog.items(), SpaceStationDto::name);
-      List<OutpostDto> outposts = sortedByName(outpostsCatalog.items(), OutpostDto::name);
-      List<PoiDto> pois = sortedByName(poisCatalog.items(), PoiDto::name);
-      List<TerminalDto> terminals = sortedByName(terminalsCatalog.items(), TerminalDto::name);
-
-      List<StarSystemGroup> systems = buildHierarchy(cities, stations, outposts, pois, terminals);
-
-      Instant latestSync =
-          terminals.stream()
-              .map(TerminalDto::uexSyncedAt)
-              .filter(Objects::nonNull)
-              .max(Comparator.naturalOrder())
-              .orElse(null);
-
-      model.addAttribute("starSystems", systems);
-      model.addAttribute("latestUexSync", latestSync);
-      model.addAttribute("totalCities", citiesCatalog.totalElements());
-      model.addAttribute("totalStations", stationsCatalog.totalElements());
-      model.addAttribute("totalOutposts", outpostsCatalog.totalElements());
-      model.addAttribute("totalPois", poisCatalog.totalElements());
-      model.addAttribute("totalTerminals", terminalsCatalog.totalElements());
-      model.addAttribute(
-          "catalogTruncated",
-          citiesCatalog.truncated()
-              || stationsCatalog.truncated()
-              || outpostsCatalog.truncated()
-              || poisCatalog.truncated()
-              || terminalsCatalog.truncated());
-    } catch (BackendServiceException e) {
-      log.debug("Error loading UEX admin data", e);
-      model.addAttribute("error", "error.admin.uex.load");
-    } catch (Exception e) {
-      log.error("Error loading UEX admin data", e);
+    if (!SectionFallback.run(log, "admin-uex-data", () -> addUexData(model))) {
       model.addAttribute("error", "error.admin.uex.load");
     }
     return "catalogue/admin/uex";
+  }
+
+  /**
+   * Adds the star-system tree, the last UEX sweep time, the per-kind totals and whether any page
+   * walk hit its cap.
+   *
+   * @param model the admin UEX model
+   */
+  private void addUexData(@NotNull Model model) {
+    CompleteCatalog<CityDto> citiesCatalog = CatalogPages.fetchAll(catalogueClient::cityPage);
+    CompleteCatalog<SpaceStationDto> stationsCatalog =
+        CatalogPages.fetchAll(catalogueClient::spaceStationPage);
+    CompleteCatalog<OutpostDto> outpostsCatalog =
+        CatalogPages.fetchAll(catalogueClient::outpostPage);
+    CompleteCatalog<PoiDto> poisCatalog = CatalogPages.fetchAll(catalogueClient::poiPage);
+    CompleteCatalog<TerminalDto> terminalsCatalog =
+        CatalogPages.fetchAll(catalogueClient::terminalPage);
+
+    List<CityDto> cities = sortedByName(citiesCatalog.items(), CityDto::name);
+    List<SpaceStationDto> stations = sortedByName(stationsCatalog.items(), SpaceStationDto::name);
+    List<OutpostDto> outposts = sortedByName(outpostsCatalog.items(), OutpostDto::name);
+    List<PoiDto> pois = sortedByName(poisCatalog.items(), PoiDto::name);
+    List<TerminalDto> terminals = sortedByName(terminalsCatalog.items(), TerminalDto::name);
+
+    List<StarSystemGroup> systems = buildHierarchy(cities, stations, outposts, pois, terminals);
+
+    Instant latestSync =
+        terminals.stream()
+            .map(TerminalDto::uexSyncedAt)
+            .filter(Objects::nonNull)
+            .max(Comparator.naturalOrder())
+            .orElse(null);
+
+    model.addAttribute("starSystems", systems);
+    model.addAttribute("latestUexSync", latestSync);
+    model.addAttribute("totalCities", citiesCatalog.totalElements());
+    model.addAttribute("totalStations", stationsCatalog.totalElements());
+    model.addAttribute("totalOutposts", outpostsCatalog.totalElements());
+    model.addAttribute("totalPois", poisCatalog.totalElements());
+    model.addAttribute("totalTerminals", terminalsCatalog.totalElements());
+    model.addAttribute(
+        "catalogTruncated",
+        citiesCatalog.truncated()
+            || stationsCatalog.truncated()
+            || outpostsCatalog.truncated()
+            || poisCatalog.truncated()
+            || terminalsCatalog.truncated());
   }
 
   /**
