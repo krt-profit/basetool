@@ -1433,32 +1433,25 @@ public class InventoryPageController {
     return options != null ? options : List.of();
   }
 
+  /** Loads a reference catalog as a mutable list, empty when the read fails or returns none. */
+  @NotNull
+  private <T> List<T> loadCatalog(@NotNull String section, @NotNull Supplier<List<T>> read) {
+    List<T> content = SectionFallback.load(log, section, read, null);
+    return content != null ? new ArrayList<>(content) : new ArrayList<>();
+  }
+
   private List<UserReferenceDto> fetchUsers() {
-    List<UserReferenceDto> content =
-        SectionFallback.load(log, "user-catalog", inventoryClient::users, null);
-    return content != null ? content : new ArrayList<>();
+    return loadCatalog("user-catalog", inventoryClient::users);
   }
 
   @NotNull
   private List<MaterialReferenceDto> fetchMaterials() {
-    List<MaterialReferenceDto> materials = new ArrayList<>();
-    List<MaterialReferenceDto> content =
-        SectionFallback.load(log, "material-catalog", inventoryClient::materials, null);
-    if (content != null) {
-      materials.addAll(content);
-    }
-    return materials;
+    return loadCatalog("material-catalog", inventoryClient::materials);
   }
 
   @NotNull
   private List<LocationReferenceDto> fetchLocations() {
-    List<LocationReferenceDto> locations = new ArrayList<>();
-    List<LocationReferenceDto> content =
-        SectionFallback.load(log, "location-catalog", inventoryClient::locations, null);
-    if (content != null) {
-      locations.addAll(content);
-    }
-    return locations;
+    return loadCatalog("location-catalog", inventoryClient::locations);
   }
 
   @NotNull
@@ -1475,20 +1468,11 @@ public class InventoryPageController {
    */
   @NotNull
   private List<JobOrderReferenceDto> fetchActiveJobOrders(boolean withNeeds) {
-    List<JobOrderReferenceDto> orders = new ArrayList<>();
-    List<JobOrderReferenceDto> content =
-        SectionFallback.load(
-            log, "job-order-catalog", () -> inventoryClient.activeJobOrders(withNeeds), null);
-    if (content != null) {
-      orders.addAll(content);
-    }
-    return orders;
+    return loadCatalog("job-order-catalog", () -> inventoryClient.activeJobOrders(withNeeds));
   }
 
   private List<MissionReferenceDto> fetchMissions() {
-    List<MissionReferenceDto> content =
-        SectionFallback.load(log, "mission-catalog", inventoryClient::missions, null);
-    return content != null ? content : new ArrayList<>();
+    return loadCatalog("mission-catalog", inventoryClient::missions);
   }
 
   @Nullable

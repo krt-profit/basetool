@@ -417,23 +417,7 @@ public class JobOrderPageController {
     if (requesterView) {
       model.addAttribute("materials", fetchMaterials());
       if (!model.containsAttribute("jobOrderForm")) {
-        JobOrderForm form = new JobOrderForm();
-        form.setComment(order.comment());
-        form.setVersion(order.version());
-        form.getMaterials().clear();
-        if (order.materials() != null) {
-          for (JobOrderMaterialDto mat : order.materials()) {
-            JobOrderForm.JobOrderMaterialForm mf = new JobOrderForm.JobOrderMaterialForm();
-            mf.setMaterialId(mat.material().id());
-            mf.setMinQuality(mat.minQuality());
-            mf.setAmount(mat.amount());
-            form.getMaterials().add(mf);
-          }
-        }
-        if (form.getMaterials().isEmpty()) {
-          form.getMaterials().add(new JobOrderForm.JobOrderMaterialForm());
-        }
-        model.addAttribute("jobOrderForm", form);
+        model.addAttribute("jobOrderForm", JobOrderForm.forEdit(order));
       }
     }
 
@@ -450,25 +434,10 @@ public class JobOrderPageController {
       applyOwnerPickerOptions(model, requestingOptionsFuture.join());
 
       if (!model.containsAttribute("jobOrderForm")) {
-        JobOrderForm form = new JobOrderForm();
+        JobOrderForm form = JobOrderForm.forEdit(order);
         form.setRequestingOrgUnitId(
             order.requestingOrgUnit() != null ? order.requestingOrgUnit().id() : null);
         form.setHandle(order.handle());
-        form.setComment(order.comment());
-        form.setVersion(order.version());
-        form.getMaterials().clear();
-        if (order.materials() != null) {
-          for (JobOrderMaterialDto mat : order.materials()) {
-            JobOrderForm.JobOrderMaterialForm mf = new JobOrderForm.JobOrderMaterialForm();
-            mf.setMaterialId(mat.material().id());
-            mf.setMinQuality(mat.minQuality());
-            mf.setAmount(mat.amount());
-            form.getMaterials().add(mf);
-          }
-        }
-        if (form.getMaterials().isEmpty()) {
-          form.getMaterials().add(new JobOrderForm.JobOrderMaterialForm());
-        }
         model.addAttribute("jobOrderForm", form);
       }
     }
