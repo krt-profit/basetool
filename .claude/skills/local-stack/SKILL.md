@@ -13,7 +13,6 @@ docker compose --profile dev up -d                                              
 docker compose --profile prod up -d                                                         # prod-equivalent stack behind the nginx edge (needs the prod .env)
 docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml \
     --profile dev up -d                                                                     # isolated test stack with throwaway credentials
-docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml \
 ```
 
 Further overrides, layered on top in this order when needed: `docker-compose.build.yml` (build the
@@ -31,24 +30,6 @@ Host ports (dev profile only, bound to `127.0.0.1`): backend `11261`, frontend `
 
 The backend always serves HTTPS (`server.ssl.enabled: true`, key alias `basetool`); the frontend reaches it at `https://backend:11261` by default (`BACKEND_URL`), so a frontend run from Gradle against a backend run from Gradle needs `BACKEND_URL=https://localhost:11261`. There is no Swagger UI — the backend's OpenAPI document is served at `https://localhost:11261/v3/api-docs` in the `dev`/`test` profiles only (disabled in `prod`), and the committed `backend/src/main/resources/api/openapi.json` is its API-documentation artifact. The ingest gateway has no generated document; its exchange contract `ingest/src/main/resources/api/exchange-v1.openapi.json` is served at `https://localhost:11262/exchange/v1/openapi.json` in every profile.
 
-## Driving the Android emulator against this stack
-
-The override pins the issuer to `127.0.0.1:18080` — which is what the app's `dev` flavour already
-expects — republishes Keycloak and the backend on all interfaces, and gives the backend a
-split-horizon `KEYCLOAK_JWK_SET_URI` so it can still validate tokens whose issuer names a host that
-is *itself* from inside the container. The file's own header explains each part.
-
-Three things to know before reaching for it:
-
-- The **web frontend's own login stops working** while it is in effect. This is an app-work
-  override, not a general one.
-- The emulator needs the reverse tunnels or nothing reaches the host:
-  `adb reverse tcp:18080 tcp:18080`, then `tcp:11261` and `tcp:18081`. They do **not** survive an
-  emulator restart, and their absence looks exactly like "you are offline".
-- A refresh token from a **previous** stack survives on the device and fails against the new realm
-  (`REFRESH_TOKEN_ERROR / Invalid refresh token`). After a `down --volumes`, clear the app first:
-  `adb shell pm clear de.greluc.krt.profit.basetool.android.dev` — and re-apply the German locale
-  afterwards, because `pm clear` drops it.
 
 ## Credentials
 

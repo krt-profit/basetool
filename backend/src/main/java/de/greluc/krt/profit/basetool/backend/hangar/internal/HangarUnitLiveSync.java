@@ -94,19 +94,12 @@ public class HangarUnitLiveSync {
   }
 
   /**
-   * Publishes one frame; a failed publish only delays a page's refresh and never fails the write.
+   * Publishes one frame.
    *
    * @param topic the room
    */
   private void send(@NotNull LiveSyncTopic topic) {
-    try {
-      publisher.publish(topic, List.of(SHIPS));
-    } catch (RuntimeException e) {
-      log.warn(
-          "Live-sync frame for {} after a hangar write was not published",
-          topic.topicClass().metricLabel(),
-          e);
-    }
+    publisher.publish(topic, List.of(SHIPS));
   }
 
   /**

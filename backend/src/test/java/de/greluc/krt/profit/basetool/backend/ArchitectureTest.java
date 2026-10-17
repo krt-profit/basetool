@@ -828,7 +828,7 @@ class ArchitectureTest {
 
   @Test
   void noFieldIsAutowired() {
-    assertFieldFloor("noFieldIsAutowired", INSTANCE_FIELDS, 8727);
+    assertFieldFloor("noFieldIsAutowired", INSTANCE_FIELDS, 8725);
     noFieldIsAutowiredRule().check(CLASSES);
   }
 

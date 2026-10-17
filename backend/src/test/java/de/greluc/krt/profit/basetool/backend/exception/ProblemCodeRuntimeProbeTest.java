@@ -109,7 +109,8 @@ class ProblemCodeRuntimeProbeTest {
   }
 
   /**
-   * A request whose path variable does not convert is a 400, and a response no accepted media type
+   * A request whose path variable does not convert is a 400 carrying {@code TYPE_MISMATCH}, an
+   * unreadable body is a 400 carrying {@code BAD_REQUEST}, and a response no accepted media type
    * can carry is a 406, through the real chain.
    *
    * @throws Exception if a request cannot be performed
@@ -126,6 +127,19 @@ class ProblemCodeRuntimeProbeTest {
     assertThat(malformed.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
     assertThat(new ObjectMapper().readTree(malformed.getContentAsString()).path("code").asString())
         .isEqualTo(CoreProblemCode.TYPE_MISMATCH.code());
+
+    MockHttpServletResponse unreadable =
+        mockMvc
+            .perform(
+                post("/api/v1/missions")
+                    .with(member)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{not json"))
+            .andReturn()
+            .getResponse();
+    assertThat(unreadable.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+    assertThat(new ObjectMapper().readTree(unreadable.getContentAsString()).path("code").asString())
+        .isEqualTo(CoreProblemCode.BAD_REQUEST.code());
 
     MockHttpServletResponse unacceptable =
         mockMvc

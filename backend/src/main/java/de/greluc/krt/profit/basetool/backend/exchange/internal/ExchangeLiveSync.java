@@ -105,19 +105,12 @@ public class ExchangeLiveSync {
   }
 
   /**
-   * Publishes one frame; a failed publish only delays a page's refresh and never fails the write.
+   * Publishes one frame.
    *
    * @param topic the room
    * @param section the section
    */
   private void publish(@NotNull LiveSyncTopic topic, @NotNull String section) {
-    try {
-      publisher.publish(topic, List.of(section));
-    } catch (RuntimeException e) {
-      log.warn(
-          "Live-sync frame for {} after an exchange write was not published",
-          topic.topicClass().metricLabel(),
-          e);
-    }
+    publisher.publish(topic, List.of(section));
   }
 }

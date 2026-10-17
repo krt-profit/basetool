@@ -20,21 +20,18 @@
 package de.greluc.krt.profit.basetool.backend.app.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.greluc.krt.profit.basetool.backend.platform.api.JwtAuthorizedPartyStartupCheck;
 import java.time.Instant;
 import java.util.List;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.mock.env.MockEnvironment;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
- * The {@code azp} allow-list: which client a token may have been minted for, and what a blank list
- * does at startup (ADR-0270, REQ-SEC-024).
+ * The {@code azp} allow-list: which client a token may have been minted for (ADR-0270,
+ * REQ-SEC-024). What the list does at startup is {@code JwtAuthorizedPartyStartupCheckTest}.
  */
 class JwtAuthorizedPartyValidatorTest {
 
@@ -113,32 +110,5 @@ class JwtAuthorizedPartyValidatorTest {
                 .validate(tokenFrom("basetool-frontend"))
                 .hasErrors())
         .isTrue();
-  }
-
-  @Test
-  @DisplayName("a blank list aborts the start under prod and only warns elsewhere")
-  void aBlankListAbortsTheStartUnderProd() {
-    MockEnvironment prod = new MockEnvironment();
-    prod.setActiveProfiles("prod");
-
-    assertThatThrownBy(() -> new JwtAuthorizedPartyStartupCheck(prod, List.of(" ")))
-        .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining(JwtAuthorizedPartyStartupCheck.PROPERTY);
-
-    MockEnvironment dev = new MockEnvironment();
-    dev.setActiveProfiles("dev");
-    assertThat(new JwtAuthorizedPartyStartupCheck(dev, List.of()).getClientIds()).isEmpty();
-  }
-
-  @Test
-  @DisplayName("the configured ids are trimmed and blanks dropped")
-  void theConfiguredIdsAreTrimmed() {
-    MockEnvironment dev = new MockEnvironment();
-    dev.setActiveProfiles("dev");
-
-    assertThat(
-            new JwtAuthorizedPartyStartupCheck(dev, List.of(" basetool-frontend ", "", " "))
-                .getClientIds())
-        .containsExactly("basetool-frontend");
   }
 }

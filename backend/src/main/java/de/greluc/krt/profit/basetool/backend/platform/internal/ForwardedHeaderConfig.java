@@ -31,11 +31,9 @@ import org.springframework.core.Ordered;
  * Puts {@link ClientIpContextFilter} at the front of the chain, so client-IP attribution reads the
  * raw proxy headers of the actual TCP peer (REQ-SEC-011).
  *
- * <p>Requires {@code server.forward-headers-strategy: none}. Spring's {@code ForwardedHeaderFilter}
- * is deliberately not registered (ADR-0272): its only effect here would be a host/scheme/port
- * rewrite nothing reads, against a documented side effect — a client-chosen {@code getRemoteAddr()}
- * for everything downstream. A backend that ever has to build an absolute URL from a request must
- * build it from configuration instead, or re-open that question.
+ * <p>Requires {@code server.forward-headers-strategy: none}, and registers no {@code
+ * ForwardedHeaderFilter} (ADR-0272) — downstream of that filter {@code getRemoteAddr()} is
+ * client-chosen. A caller needing an absolute URL must build it from configuration.
  */
 @Configuration
 public class ForwardedHeaderConfig {

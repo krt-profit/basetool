@@ -35,6 +35,11 @@ import org.springframework.util.StringUtils;
  * <p>Under the {@code prod} profile a blank {@code app.security.jwt.accepted-client-ids} aborts the
  * start. Unlike the audience list, blank is never "no check": an empty list names no client, so
  * every token is refused.
+ *
+ * <p>The validator lives on {@code SecurityConfig}'s decoder, which exists only while an expected
+ * audience or an internal JWKS URL is configured. The check therefore reports whether the list is
+ * actually enforced, rather than whether it is set — a distinction {@code prod} never has, because
+ * {@link JwtAudienceStartupCheck} refuses a blank audience list there.
  */
 @Slf4j
 @Component
@@ -54,15 +59,30 @@ public class JwtAuthorizedPartyStartupCheck {
    *
    * @param environment the environment, queried for the active profiles
    * @param acceptedClientIds the raw comma-separated client-id list; blank entries are ignored
+   * @param expectedAudiences the audience list, read only to tell whether the decoder that carries
+   *     the validator exists
+   * @param jwkSetUri the internal JWKS URL, read for the same reason
    * @throws IllegalStateException when {@code prod} is active and no client id is configured
    */
   public JwtAuthorizedPartyStartupCheck(
       @NotNull Environment environment,
-      @Value("${" + PROPERTY + ":}") @NotNull List<String> acceptedClientIds) {
+      @Value("${" + PROPERTY + ":}") @NotNull List<String> acceptedClientIds,
+      @Value("${app.security.jwt.expected-audiences:}") @NotNull List<String> expectedAudiences,
+      @Value("${app.security.jwt.jwk-set-uri:}") @NotNull String jwkSetUri) {
     this.clientIds =
         acceptedClientIds.stream().filter(StringUtils::hasText).map(String::trim).toList();
+    boolean decoderPresent =
+        expectedAudiences.stream().anyMatch(StringUtils::hasText) || StringUtils.hasText(jwkSetUri);
     if (!clientIds.isEmpty()) {
-      log.info("JWT azp check enforced; accepted client ids: {}", clientIds);
+      if (decoderPresent) {
+        log.info("JWT azp check enforced; accepted client ids: {}", clientIds);
+      } else {
+        log.warn(
+            "JWT azp check is configured ({}) but NOT enforced: the resource-server decoder that"
+                + " carries the validator is only built when an expected audience or an internal"
+                + " JWKS URL is set, and neither is. Allowed outside the prod profile only.",
+            clientIds);
+      }
       return;
     }
     if (environment.matchesProfiles(PROD_PROFILE)) {

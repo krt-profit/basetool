@@ -110,10 +110,7 @@ public enum CoreProblemCode implements ProblemCode {
   RATE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS),
 
   /** The request body exceeds the path's size limit. */
-  REQUEST_BODY_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE),
-
-  /** Reserved, not emitted yet: the path was retired by a hard-cut wave; update the app (D-11). */
-  APP_UPDATE_REQUIRED(HttpStatus.GONE);
+  REQUEST_BODY_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE);
 
   /** The status the code is answered with. */
   private final HttpStatus status;

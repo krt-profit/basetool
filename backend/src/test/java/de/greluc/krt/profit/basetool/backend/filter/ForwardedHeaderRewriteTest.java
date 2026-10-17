@@ -37,15 +37,12 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Pins what holds now that Spring's {@code ForwardedHeaderFilter} is not registered (ADR-0272,
- * REQ-SEC-011): the real TCP peer reaches the application unrewritten, the {@code X-Forwarded-For}
- * chain is still readable, and {@link ClientIpContextFilter} honours a forwarded entry only when
- * the peer is a trusted relay.
+ * Pins the client-IP attribution of a chain without Spring's {@code ForwardedHeaderFilter}
+ * (ADR-0272, REQ-SEC-011): the real TCP peer reaches the application unrewritten, the {@code
+ * X-Forwarded-For} chain stays readable, and {@link ClientIpContextFilter} honours a forwarded
+ * entry only when the peer is a trusted relay.
  *
- * <p>This exists so the framework behaviour behind that decision is not re-discovered: with the
- * filter registered, {@code getRemoteAddr()} downstream is the leftmost entry of the chain, which
- * any client can set, and the original chain is gone. The test therefore asserts the attribution a
- * spoofed header must <em>not</em> move.
+ * <p>A spoofed leftmost entry must not move the attribution.
  */
 class ForwardedHeaderRewriteTest {
 

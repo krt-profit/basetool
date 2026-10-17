@@ -39,7 +39,7 @@ import org.springframework.web.bind.annotation.RestController;
  * ADR-0138).
  *
  * <p>Kept apart from {@link TermsController}, whose consent endpoints require authentication. This
- * is the single source for the web frontend and the Android app.
+ * is the single source for every client.
  */
 @RestController
 @RequestMapping("/api/v1/terms/document")

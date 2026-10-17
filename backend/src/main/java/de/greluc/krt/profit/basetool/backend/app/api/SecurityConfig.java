@@ -123,14 +123,6 @@ public class SecurityConfig {
   private List<String> expectedAudiences;
 
   /**
-   * Client ids a token's {@code azp} must name (ADR-0270). Blank names no client and therefore
-   * refuses every token; {@link JwtAuthorizedPartyStartupCheck} refuses to start on a blank list
-   * under the {@code prod} profile.
-   */
-  @Value("${app.security.jwt.accepted-client-ids:}")
-  private List<String> acceptedClientIds;
-
-  /**
    * Creates the resource-server {@link JwtDecoder} when an expected audience or an internal JWKS
    * URL is configured (REQ-SEC-024); otherwise Spring Boot's auto-configured decoder is used.
    *
@@ -142,6 +134,7 @@ public class SecurityConfig {
    * @param issuerUri the Keycloak issuer location used for {@code iss} validation
    * @param jwkSetUri the internal JWKS URL, or blank to derive keys from the issuer
    * @param sslBundles the SSL bundles holding the {@code keycloak-trust} pin
+   * @param authorizedParties the client ids a token's {@code azp} must name
    * @return a Nimbus decoder wired for the configured checks
    */
   @Bean
@@ -151,16 +144,15 @@ public class SecurityConfig {
   JwtDecoder resourceServerJwtDecoder(
       @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") String issuerUri,
       @Value("${app.security.jwt.jwk-set-uri:}") String jwkSetUri,
-      SslBundles sslBundles) {
+      SslBundles sslBundles,
+      JwtAuthorizedPartyStartupCheck authorizedParties) {
     List<OAuth2TokenValidator<Jwt>> validators = new ArrayList<>();
     validators.add(JwtValidators.createDefaultWithIssuer(issuerUri));
     List<String> audiences = expectedAudiences.stream().filter(StringUtils::hasText).toList();
     if (!audiences.isEmpty()) {
       validators.add(audienceValidator(audiences));
     }
-    validators.add(
-        authorizedPartyValidator(
-            acceptedClientIds.stream().filter(StringUtils::hasText).map(String::trim).toList()));
+    validators.add(authorizedPartyValidator(authorizedParties.getClientIds()));
     NimbusJwtDecoder decoder = buildDecoder(issuerUri, jwkSetUri, sslBundles);
     decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(validators));
     return decoder;
@@ -211,10 +203,7 @@ public class SecurityConfig {
    * Builds the {@code azp}-claim validator: a token passes only when its authorized party names one
    * of the accepted clients (ADR-0270).
    *
-   * <p>It runs on the decoder, so it refuses before any authentication is built and nothing
-   * downstream can read a caller this gate would have rejected. A token without {@code azp} is
-   * refused too — Keycloak sets the claim on every token it issues to a client, service accounts
-   * included, so its absence is not a shape this deployment produces.
+   * <p>Refuses before any authentication is built. A token carrying no {@code azp} is refused.
    *
    * @param acceptedClientIds the accepted {@code azp} values; an empty list matches no token
    * @return a validator that fails unless the JWT's {@code azp} is in the accepted set

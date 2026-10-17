@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -92,9 +91,7 @@ class ExchangeLiveSyncTest {
   }
 
   @Test
-  void aFailedPublishDoesNotFailTheWrite() {
-    doThrow(new IllegalStateException("redis down")).when(publisher).publish(any(), anyList());
-
+  void aBlueprintWriteRefreshesOnlyTheMembersOwnBlueprints() {
     liveSync.blueprintsChanged(MEMBER);
 
     verify(publisher)

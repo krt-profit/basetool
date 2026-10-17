@@ -17,14 +17,14 @@ tests:
               severity: warning
             exp_annotations:
               summary: "Unregistered client software is calling the backend API"
-              description: "A token whose azp names no known client drove /api/** for 10 minutes. Either a first-party client was added to the realm without being added to app.monitoring.api-clients.known-client-ids, or something nobody approved is using the API. Identify it from the Keycloak client sessions and the api vhost access log; the label is deliberately bounded to 'other' and will never name it."
+              description: "A token whose azp names no known client drove /api/** for 10 minutes. Either a first-party client was added to the realm without being added to app.monitoring.api-clients.known-client-ids, or something nobody approved is using the API. Identify it from the Keycloak client sessions and the frontend's and gateway's access logs; the label is deliberately bounded to 'other' and will never name it. Since ADR-0270 the backend also refuses a token whose azp is not in app.security.jwt.accepted-client-ids, so a caller that reaches /api/** at all is one of the named clients or the gateway acting for a member."
 
   - name: silent - only known clients, at high volume
     interval: 1m
     input_series:
       - series: 'basetool_api_client_requests_total{client_id="basetool-frontend", application="basetool-backend"}'
         values: "0+250x60"
-      - series: 'basetool_api_client_requests_total{client_id="basetool-android", application="basetool-backend"}'
+      - series: 'basetool_api_client_requests_total{client_id="basetool-frontend", application="basetool-backend"}'
         values: "0+40x60"
     alert_rule_test:
       - eval_time: 30m

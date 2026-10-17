@@ -20,10 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -98,16 +96,6 @@ class HangarUnitLiveSyncTest {
     liveSync.shipsChanged(Arrays.asList((OrgUnit) null));
 
     assertThat(publishedTopics()).containsExactly("hangar-units");
-  }
-
-  @Test
-  @DisplayName("a failed publish never fails the write")
-  void failedPublishIsSwallowed() {
-    doThrow(new IllegalStateException("redis down")).when(relayService).publish(any(), any());
-
-    liveSync.unitsChanged(List.of(UNIT_A));
-
-    assertThat(publishedTopics()).hasSize(2);
   }
 
   /**

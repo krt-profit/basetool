@@ -23,16 +23,17 @@ import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 
 /**
  * Announces a committed backend write to the frontend's live-sync rooms (ADR-0274, REQ-FE-010).
  *
- * <p>The only frames the backend raises come from a write it performed itself — an exchange or
- * ingest call that no browser made — so no bucket applies: the write that raised the frame is
- * bounded already.
+ * <p>Unbounded by design: the write that raises a frame is itself bounded. Never throws, so a
+ * caller needs no guard of its own.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class LiveSyncPublisher {
@@ -42,7 +43,7 @@ public class LiveSyncPublisher {
 
   /**
    * Publishes one frame to the room's listeners, dropping it when no named section survives the
-   * class whitelist.
+   * class whitelist. A failed publish costs an open page its refresh and is never raised.
    *
    * @param topic the room
    * @param sections the sections that changed, as the caller names them
@@ -52,7 +53,12 @@ public class LiveSyncPublisher {
     if (clipped.isEmpty()) {
       return;
     }
-    fanout.publish(topic, clipped);
+    try {
+      fanout.publish(topic, clipped);
+    } catch (RuntimeException e) {
+      log.warn("Live-sync frame for {} was not published", topic.topicClass().metricLabel(), e);
+      return;
+    }
     meterRegistry
         .counter(
             MetricNames.LIVESYNC_PUBLISH_ACCEPTED,

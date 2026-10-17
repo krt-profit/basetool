@@ -32,6 +32,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpMethod;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.FilterChainProxy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -49,11 +50,8 @@ import org.springframework.web.filter.CorsFilter;
  * exempted (ADR-0271, REQ-SEC-044): the chain accepts <strong>nothing but a bearer JWT</strong> and
  * creates no session.
  *
- * <p>ADR-0144 stated that precondition in prose and pinned the exemption list instead, so nothing
- * checked it. This fails on the cause — an ambient credential a browser could be made to attach —
- * rather than on a path somebody forgot to add. The Prometheus scrape chain is HTTP basic by design
- * (ADR-0265) and is asserted separately, so a future change cannot satisfy this test by relaxing
- * that one.
+ * <p>The Prometheus scrape chain is HTTP basic by design (ADR-0265) and is asserted separately, so
+ * relaxing that one cannot satisfy this test.
  */
 @SpringBootTest
 class SecurityChainBearerOnlyTest {
@@ -104,7 +102,7 @@ class SecurityChainBearerOnlyTest {
 
     assertThat(filters)
         .as("the API is authenticated by a bearer JWT, so its filter must be on the chain")
-        .anyMatch(type -> type.getSimpleName().equals("BearerTokenAuthenticationFilter"));
+        .anyMatch(BearerTokenAuthenticationFilter.class::isAssignableFrom);
 
     for (Class<? extends Filter> ambient : AMBIENT_CREDENTIAL_FILTERS) {
       assertThat(filters)
@@ -114,11 +112,12 @@ class SecurityChainBearerOnlyTest {
               ambient.getSimpleName())
           .noneMatch(ambient::isAssignableFrom);
     }
-    assertThat(filters)
-        .as("no OAuth2 or SAML login flow belongs on a resource server's chain")
-        .noneMatch(type -> type.getSimpleName().startsWith("OAuth2Login"))
-        .noneMatch(type -> type.getSimpleName().startsWith("OAuth2AuthorizationRequest"))
-        .noneMatch(type -> type.getSimpleName().startsWith("Saml2"));
+    assertThat(filters.stream().map(Class::getName).toList())
+        .as(
+            "no login flow belongs on a resource server's chain; the OAuth2 client and SAML2"
+                + " packages are not even on this module's classpath, and this keeps it that way")
+        .noneMatch(name -> name.startsWith("org.springframework.security.oauth2.client."))
+        .noneMatch(name -> name.startsWith("org.springframework.security.saml2."));
   }
 
   @Test

@@ -34,9 +34,7 @@ import org.springframework.web.context.WebApplicationContext;
  * Proves every mapping of every registry lies inside the surface the chain's matchers and the
  * {@code /api}-scoped filters actually cover (REQ-SEC-078).
  *
- * <p>Formerly the CSRF-exemption coverage gate: with CSRF off unconditionally (ADR-0271) the
- * exemption it measured no longer exists, while the finding underneath it does — a mapping outside
- * the served roots is reached by no path-scoped filter and by no matcher anyone reviewed.
+ * <p>A mapping outside the served roots is reached by no path-scoped filter.
  */
 @SpringBootTest
 class ServedSurfaceCoverageTest {

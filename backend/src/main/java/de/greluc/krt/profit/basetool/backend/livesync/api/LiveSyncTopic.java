@@ -24,18 +24,38 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A live-sync room the backend publishes into: its class, the resource it names, and the canonical
- * wire string the frontend matches its own rooms against (ADR-0274).
+ * A live-sync room the backend publishes into: its class and the resource it names (ADR-0274).
  *
  * @param topicClass the room class
  * @param resourceId the resource named, or {@code null} for a global room
- * @param canonical the canonical wire form, with the id lower-cased
  */
-public record LiveSyncTopic(
-    @NotNull LiveSyncTopicClass topicClass, @Nullable UUID resourceId, @NotNull String canonical) {
+public record LiveSyncTopic(@NotNull LiveSyncTopicClass topicClass, @Nullable UUID resourceId) {
 
   /** Separator between a topic's prefix and its resource id. */
   private static final char SEPARATOR = ':';
+
+  /**
+   * Rejects a pairing the room model does not have: a per-resource class without an id, or a global
+   * class with one.
+   *
+   * @throws IllegalArgumentException if the class and the id disagree on arity
+   */
+  public LiveSyncTopic {
+    if (topicClass.perResource() != (resourceId != null)) {
+      throw new IllegalArgumentException(
+          "Topic class " + topicClass + " does not take resource id " + resourceId);
+    }
+  }
+
+  /**
+   * The canonical wire form the frontend matches its own rooms against, with the id lower-cased.
+   *
+   * @return the prefix, followed by {@code :} and the resource id for a per-resource room
+   */
+  @NotNull
+  public String canonical() {
+    return resourceId == null ? topicClass.prefix() : topicClass.prefix() + SEPARATOR + resourceId;
+  }
 
   /**
    * The room of one resource, e.g. one member's own hangar or one org unit's overview.
@@ -47,10 +67,7 @@ public record LiveSyncTopic(
    */
   @NotNull
   public static LiveSyncTopic of(@NotNull LiveSyncTopicClass topicClass, @NotNull UUID resourceId) {
-    if (!topicClass.perResource()) {
-      throw new IllegalArgumentException("Topic class " + topicClass + " names no resource");
-    }
-    return new LiveSyncTopic(topicClass, resourceId, topicClass.prefix() + SEPARATOR + resourceId);
+    return new LiveSyncTopic(topicClass, resourceId);
   }
 
   /**
@@ -62,9 +79,6 @@ public record LiveSyncTopic(
    */
   @NotNull
   public static LiveSyncTopic global(@NotNull LiveSyncTopicClass topicClass) {
-    if (topicClass.perResource()) {
-      throw new IllegalArgumentException("Topic class " + topicClass + " names a resource");
-    }
-    return new LiveSyncTopic(topicClass, null, topicClass.prefix());
+    return new LiveSyncTopic(topicClass, null);
   }
 }

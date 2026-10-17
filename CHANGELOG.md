@@ -34,7 +34,7 @@
 
 - **Monitoring: CSP-Verstöße nennen ihre Ursache.** Der Fehler-Beacon meldet bei einem `trusted-types`-Verstoß den versuchten Policy-Namen und bei jedem CSP-Verstoß, ob der Code von der eigenen Seite, einer Browser-Erweiterung oder anderswoher stammt; `basetool_client_csp_violation_total` trägt dafür das Label `code_origin` (Dashboard 07, Panel 85). Grundlage für die Trusted-Types-Umstellung auf `enforce` (REQ-SEC-064, REQ-FE-022).
 
-- **Benachrichtigungs-Push ohne Inhalt.** Das SSE-Ereignis `notification` trägt wieder nur „etwas hat sich geändert“ statt Typ, Entität und Textparametern – die App, für die der Inhalt gebaut wurde, ist eingestellt, und der Browser hat ihn nie gelesen. Ein Ereignis löst pro Empfänger genau einen Push aus. Für Mitglieder ändert sich nichts: Glocke und Zähler aktualisieren wie bisher (ADR-0273, REQ-NOTIF-010/021).
+- **Benachrichtigungs-Push ohne Inhalt.** Das SSE-Ereignis `notification` trägt wieder nur „etwas hat sich geändert“ statt Typ, Entität und Textparametern, und ein Ereignis löst pro Empfänger genau einen Push aus. Für Mitglieder ändert sich nichts: Glocke und Zähler aktualisieren wie bisher (ADR-0273, REQ-NOTIF-010/021).
 
 - **Live-Sync: die App-Brücke im Backend ist weg.** `GET /api/v1/live-sync/stream` und `POST /api/v1/live-sync/changed` sind entfernt; Live-Sync zwischen Browsern läuft wie vor der App allein über `/ws/sync` im Frontend. Schreibzugriffe über die Exchange-API und aus dem Hangar melden offenen Seiten weiterhin, dass sich etwas geändert hat – an dieser Stelle ändert sich für Mitglieder nichts (ADR-0274, REQ-FE-010, REQ-XCH-013).
 

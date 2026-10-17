@@ -36,9 +36,8 @@ import org.springframework.web.filter.ForwardedHeaderFilter;
  * Asserts that {@link ClientIpContextFilter} sits at the very front of the chain and that Spring's
  * {@link ForwardedHeaderFilter} reaches it from nowhere (ADR-0272, REQ-SEC-011).
  *
- * <p>The second assertion is the load-bearing one: that filter replaces {@code getRemoteAddr()}
- * with the leftmost entry of the forwarded chain, which any client can set, for every component
- * downstream of it. Its only benefit here would be a host/scheme rewrite nothing reads.
+ * <p>Downstream of that filter {@code getRemoteAddr()} is the leftmost entry of the forwarded
+ * chain, which any client can set.
  */
 class ForwardedHeaderConfigTest {
 
