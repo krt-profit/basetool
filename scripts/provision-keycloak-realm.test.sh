@@ -63,7 +63,7 @@ data = {
     "scope_role_mappings": {},
     "clients": [realm_management, account],
     "client_roles": {"c-rm": [{"id": f"rm-{n}", "name": n} for n in
-                              ("manage-users", "view-realm", "view-users", "manage-clients")]},
+                              ("manage-users", "query-users", "view-realm", "view-users", "manage-clients")]},
     "client_mappers": {},
     "client_default_scopes": {},
     "client_optional_scopes": {},
@@ -1076,6 +1076,33 @@ assert_contains "$output" "  ${REALM_DEFAULT_LINE}" "as a realm DEFAULT client s
 run_provisioner "$state" --apply >/dev/null
 assert_eq "$(cat "${state}/rc")" "0" "and the apply verifies clean"
 assert_eq "$(query "$state" "'s-offline_access' in d['realm_default_scopes']")" "False" "it is gone from the realm defaults"
+rm -rf "$state"
+
+echo "21. the testing-only seed client exists only with --seed-client and never for a production origin"
+state="$(mktemp -d)"
+make_stub "$state" empty
+run_provisioner "$state" --apply >/dev/null
+assert_eq "$(query "$state" "client('basetool-seed') is None")" "True" "without --seed-client no seed client is created"
+output="$(run_provisioner "$state" --seed-client --apply)"
+assert_eq "$(cat "${state}/rc")" "0" "the apply with --seed-client verifies clean"
+assert_eq "$(query "$state" "[client('basetool-seed')['directAccessGrantsEnabled'], client('basetool-seed')['serviceAccountsEnabled'], client('basetool-seed')['publicClient']]")" \
+  "[True, True, False]" "the seed client is confidential with password grant and a service account"
+assert_eq "$(query "$state" "client('basetool-frontend')['directAccessGrantsEnabled']")" "False" \
+  "the frontend client keeps the password grant off"
+assert_contains "$(query "$state" "scope_names('default', 'basetool-seed')")" "'extractor-ingest'" \
+  "the seed client's tokens carry the backend audience"
+assert_contains "$output" "SEED_CLIENT_SECRET" "the operator is told where the seed secret goes"
+assert_not_contains "$output" "re-render env.d" "the seed secret goes into no host .env"
+output="$(run_provisioner "$state")"
+assert_contains "$output" "client 'basetool-seed' is not in the production shape" \
+  "a later run without --seed-client reports the seed client and keeps it"
+assert_eq "$(query "$state" "client('basetool-seed') is None")" "False" "the provisioner never deletes it"
+: >"${state}/calls.log"
+rc=0
+KCADM_STUB_STATE="$state" "$PYTHON" "$PROVISIONER" --realm iri --public-origin https://profit-base.online \
+  --seed-client --kcadm-command "${PYTHON} $(to_child_path "${state}/kcadm_stub.py")" >/dev/null 2>&1 || rc=$?
+assert_eq "$([[ $rc -ne 0 ]] && echo refused || echo accepted)" "refused" "--seed-client refuses a production origin"
+assert_eq "$(wc -l <"${state}/calls.log" | tr -d ' ')" "0" "and refuses before kcadm is called"
 rm -rf "$state"
 
 echo

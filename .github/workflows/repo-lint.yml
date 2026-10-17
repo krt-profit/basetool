@@ -191,6 +191,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/build-sandbox-realm.py --check
 
+      - name: briefing-seed / Self-test the testing-system seed
+        if: ${{ !cancelled() }}
+        run: python3 scripts/seed-briefing.py --selftest
+
+      - name: briefing-seed / Self-test the testing-host database reset
+        if: ${{ !cancelled() }}
+        run: bash scripts/testing-reset.test.sh
+
       - name: realm-reference / Self-test the realm export sanitizer
         if: ${{ !cancelled() }}
         run: python3 scripts/sanitize-realm-export.py --selftest

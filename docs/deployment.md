@@ -781,6 +781,82 @@ frontend as in [Trusted Types](#trusted-types-report-then-enforce), with that li
 Trusted Types one; `grep -c '^APP_INSTANCE_TEST_SYSTEM=true$' /var/iri/code/env.d/frontend.env`
 prints `1`.
 
+### Seeding and emptying the testing system
+
+`scripts/seed-briefing.py` fills the testing system with the briefing's test data through the API;
+`scripts/testing-reset.sh` empties its Basetool database again (REQ-OPS-050, ADR-0278). Neither
+runs against production: the seed refuses a production URL, the provisioner refuses `--seed-client`
+for a production origin, and the reset refuses a host whose `.env` lacks
+`APP_INSTANCE_TEST_SYSTEM=true`. Everything below is a write on the **testing** host only.
+
+**Once per testing host**
+
+1. Create the seed client with the realm provisioner, as in [Keycloak realm shape](#keycloak-realm-shape)
+   (the kcadm session of `docs/keycloak/README.md`), adding `--seed-client`: dry run first, then
+   `--apply`. Read the secret in the Admin Console → Clients → `basetool-seed` → Credentials and keep
+   it in the password manager. It goes into no host `.env`.
+2. Let the testing backend accept the client: set
+   `IRI_BACKEND_ACCEPTED_CLIENT_IDS=basetool-frontend,basetool-ingest-gateway,basetool-seed` in
+   `/var/iri/code/.env`, render `env.d/` and restart the backend as in
+   [Trusted Types](#trusted-types-report-then-enforce). The backend logs
+   `JWT azp check enforced; accepted client ids: [basetool-frontend, basetool-ingest-gateway, basetool-seed]`.
+
+**Seeding**
+
+The backend publishes no port, so the seed reaches it through a short-lived forwarder on its
+network and an SSH tunnel:
+
+```bash
+sudo -u iri podman run -d --rm --name seed-tunnel --network net-backend-frontend \
+  -p 127.0.0.1:11299:11299 docker.io/alpine/socat TCP-LISTEN:11299,fork,reuseaddr TCP:backend:11261
+```
+
+On the workstation (PowerShell), one window holds the tunnel and a second one runs the seed:
+
+```powershell
+ssh -N -L 11299:127.0.0.1:11299 root@<testing-host>
+```
+
+```powershell
+$env:SEED_CLIENT_SECRET = '<from the password manager>'
+python scripts/seed-briefing.py seed --keycloak-url https://<testing-domain>/auth `
+  --api-url https://127.0.0.1:11299 --api-insecure --participants 30 --out <folder outside the repo>
+```
+
+`--api-insecure` skips the certificate check for the tunnelled backend only, and only for a loopback
+URL; Keycloak is checked as usual. The run prints one block per domain and ends with the paths of
+`teilnehmer.csv` (the handout), `praesentation.csv` and `extractor-beispiel.json`; a failed domain is
+listed at the end and the exit code is 1. Repeat a domain with `--only raffinerie,bank`. A second
+plain run keeps the accounts and passwords and skips the data. Stop the forwarder afterwards:
+`sudo -u iri podman stop seed-tunnel`.
+
+Two things stay manual: switch Ankauf off in the admin area if the run warns that it is on, and
+connect the test application `briefing-test-app` once from a device-grant client as
+`demo-mitglied`, so the profile demo has consent, activity and something to undo.
+
+**Emptying**
+
+Copy the script and its libraries to the testing host — they are not installed there (ADR-0278) —
+and run it as root:
+
+```bash
+install -d -m 0700 /root/testing-reset
+install -m 0700 testing-reset.sh /root/testing-reset/
+install -d -m 0700 /root/testing-reset/lib
+install -m 0600 lib/common.sh lib/container-runtime.sh /root/testing-reset/lib/
+/root/testing-reset/testing-reset.sh --wipe-testing-database
+```
+
+It takes the deploy lock, stops `frontend`, `ingest` and `backend`, drops and recreates the Basetool
+database and starts them again; Flyway rebuilds the schema on the backend's start. Keycloak, Redis
+and every other volume stay. Then delete the seed accounts from the workstation:
+
+```powershell
+python scripts/seed-briefing.py purge --keycloak-url https://<testing-domain>/auth
+```
+
+Delete the `--out` folder once the handout is no longer needed; it holds every seeded password.
+
 ### Manual deploy, rollback and checks
 
 All as `deploy`, from `/`:

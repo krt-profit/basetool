@@ -32,6 +32,8 @@
 
 - **Testsystem im Footer erkennbar.** Auf dem Testsystem zeigt der Footer jeder Seite ein gelbes „Testsystem"-Schild, damit niemand dort versehentlich echte Arbeit erledigt; Produktion bleibt unverändert. Geschaltet über die neue Umgebungsvariable `APP_INSTANCE_TEST_SYSTEM` (Frontend, REQ-UI-029).
 
+- **Testsystem: Testdaten für die Einweisung per Skript.** `scripts/seed-briefing.py` legt über die API Testkonten (Präsentation und Teilnehmer mit Ausgabeliste), Org-Struktur und Daten in allen Bereichen an; `scripts/testing-reset.sh` leert danach die Basetool-Datenbank des Testsystems. Beides verweigert Produktion; der Seed meldet sich über den neuen, nur im Testsystem angelegten Keycloak-Client `basetool-seed` an (`provision-keycloak-realm.py --seed-client`, REQ-OPS-050, ADR-0278).
+
 ### Changed
 
 - **Lager: die Markierung „gestohlen" ist standardmäßig freigeschaltet.** `APP_INVENTORY_STOLEN_MARKING_ENABLED` steht jetzt auf `true`; Mitglieder können Bestand als gestohlen einbuchen, markieren und die Markierung aufheben, ohne dass der Host den Schalter setzen muss. `false` schaltet es weiterhin ab (REQ-INV-053).

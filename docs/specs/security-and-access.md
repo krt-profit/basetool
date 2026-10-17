@@ -1440,6 +1440,10 @@ ADR-0112, ADR-0162, ADR-0187, ADR-0256 · **Runbook:** [`deployment.md` → Edge
 > (ADR-0202), so an accidental mapper persists. Adding a client to the realm no longer grants API
 > access; a new caller is a reviewed change to the release's configuration.
 >
+> **One environment adds a caller.** The testing host's `.env` sets `IRI_BACKEND_ACCEPTED_CLIENT_IDS`
+> to the default plus `basetool-seed`, the testing-only seed client (ADR-0278, REQ-OPS-050).
+> Production and the release default stay `basetool-frontend,basetool-ingest-gateway`.
+>
 > **Mechanics that are part of the decision.** The check is a token validator **on the decoder**,
 > beside the audience validator, not a filter: it refuses before any authentication is built, so no
 > filter ordering has to be maintained to keep that true. A token with **no** `azp` is refused —
