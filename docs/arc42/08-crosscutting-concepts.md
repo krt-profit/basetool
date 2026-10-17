@@ -188,6 +188,7 @@ Two binding rules shape every UI change:
   `replaceChildren()`. No `default` policy exists. The CSP carries `require-trusted-types-for
   'script'; trusted-types krt-html krt-fragment`, report-only by default and enforced by
   `APP_SECURITY_TRUSTED_TYPES=enforce`; violations reach the client-error beacon as `csp_violation`
+  with the sink or policy name and whether the code came from our origin or a browser extension
   (REQ-SEC-064). The dialog page walk fails on any violation. Enforcing in production is the one
   open step, an owner-approved configuration change.
 - **Scripts are ES modules behind a per-page import map** (ADR-0250, REQ-FE-035, 2026-10-12). Every

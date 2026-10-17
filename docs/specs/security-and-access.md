@@ -5238,7 +5238,10 @@ set is shaped by what the module serves.
   separate `Content-Security-Policy-Report-Only` header, so a violation is reported — the
   client-error beacon's `securitypolicyviolation` listener counts it as
   `basetool_client_error_total{kind="csp_violation"}` with the directive as its message — and the
-  page keeps working; `enforce` appends them to the enforced `Content-Security-Policy` and sends no
+  page keeps working. The report names its cause (REQ-FE-022): a sink violation carries the sink, a
+  `trusted-types` violation the attempted policy name, and every CSP violation is counted in
+  `basetool_client_csp_violation_total{directive,code_origin}`, where `code_origin` (`self`,
+  `extension`, `inline`, `other`) tells our code from a browser extension's; `enforce` appends them to the enforced `Content-Security-Policy` and sends no
   report-only header, so an unconverted sink throws. The effective mode is the gauge
   `basetool_trusted_types_mode{mode}`. Switching production to `enforce` is a production
   configuration change the owner approves after a quiet period in which the dialog page walk and
@@ -5273,7 +5276,8 @@ this requirement first. An inline script is only ever a data bootstrap (REQ-FE-0
 - [x] The public edge sends HSTS on its first response; its absence raises `EdgeHstsHeaderMissing`.
 
 **Enforced by:** `SecurityHeadersTest` (frontend and backend),
-`TrustedTypesModeTest`, the Trusted Types collector of `DialogA11yE2eTest`, ingest
+`TrustedTypesModeTest`, the Trusted Types collector of `DialogA11yE2eTest`,
+`ClientErrorReportControllerTest`, `:frontend:testClientErrorCspJs`, ingest
 `SecurityConfigTest`, the `blackbox-hsts*` probes behind `EdgeHstsHeaderMissing` · **Code:**
 `frontend/…/kernel/security/SecurityHeaders`, `frontend/…/kernel/security/TrustedTypesMode`,
 `frontend/…/kernel/security/TrustedTypesModeMetric`, `frontend/…/kernel/security/CspNonceFilter`, the `headers(...)` blocks of the backend and ingest

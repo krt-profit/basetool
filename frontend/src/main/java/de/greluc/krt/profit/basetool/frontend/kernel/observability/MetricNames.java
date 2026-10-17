@@ -178,11 +178,13 @@ public final class MetricNames {
   public static final String CLIENT_ERROR = "basetool.client.error";
 
   /**
-   * Counter {@code basetool_client_csp_violation_total}, tag {@link #TAG_DIRECTIVE}: the {@link
-   * #CLIENT_ERROR_CSP_VIOLATION} reports by the violated Content-Security-Policy directive.
+   * Counter {@code basetool_client_csp_violation_total}, tags {@link #TAG_DIRECTIVE} and {@link
+   * #TAG_CODE_ORIGIN}: the {@link #CLIENT_ERROR_CSP_VIOLATION} reports by the violated
+   * Content-Security-Policy directive and by where the violating code came from.
    *
    * <p>The directive is the first word of the beacon's message, kept only when it is a name in the
-   * server-side allow-list and counted as {@link #DIRECTIVE_OTHER} otherwise (REQ-OBS-006).
+   * server-side allow-list and counted as {@link #DIRECTIVE_OTHER} otherwise; the code origin is
+   * kept only when it is a {@code CODE_ORIGIN_*} value (REQ-OBS-006).
    */
   public static final String CLIENT_CSP_VIOLATION = "basetool.client.csp.violation";
 
@@ -262,6 +264,24 @@ public final class MetricNames {
 
   /** {@link #TAG_DIRECTIVE} value for a report whose directive is not in the allow-list. */
   public static final String DIRECTIVE_OTHER = "other";
+
+  /**
+   * Tag key: where the violating code of a {@link #CLIENT_CSP_VIOLATION} came from, one of the
+   * {@code CODE_ORIGIN_*} values (REQ-OBS-006).
+   */
+  public static final String TAG_CODE_ORIGIN = "code_origin";
+
+  /** {@link #TAG_CODE_ORIGIN} value: the violation's source file is on the page's own origin. */
+  public static final String CODE_ORIGIN_SELF = "self";
+
+  /** {@link #TAG_CODE_ORIGIN} value: the violation's source file is a browser extension's. */
+  public static final String CODE_ORIGIN_EXTENSION = "extension";
+
+  /** {@link #TAG_CODE_ORIGIN} value: the browser named no source file for the violation. */
+  public static final String CODE_ORIGIN_INLINE = "inline";
+
+  /** {@link #TAG_CODE_ORIGIN} value: any other source file, or a value outside the allow-list. */
+  public static final String CODE_ORIGIN_OTHER = "other";
 
   /** Tag key: the HTTP verb of the failed backend call ({@code GET}/{@code POST}/…). */
   public static final String TAG_METHOD = "method";
@@ -465,7 +485,8 @@ public final class MetricNames {
 
   /**
    * Browser error kind: a Content-Security-Policy violation caught on the {@code
-   * securitypolicyviolation} event. Only the violated directive and the blocked origin are sent.
+   * securitypolicyviolation} event. Only the violated directive, a Trusted Types sink or policy
+   * name, the blocked origin and the code origin are sent.
    */
   public static final String CLIENT_ERROR_CSP_VIOLATION = "csp_violation";
 

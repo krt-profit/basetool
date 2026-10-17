@@ -1759,6 +1759,8 @@ whole app.
 3. **Toggles.** Every period, status or view toggle is `.krt-segmented` with `.krt-segmented__item`
    (and `.krt-segmented__count`): the `segmented` fragment's radios, or links with `aria-current`.
    Selected = tint, orange border and a 3px underline, never a filled orange block.
+   Each segment is as wide as its label plus the segment padding; the toggle keeps no gap between
+   segments and does not grow in a flex row, also when it is a `<nav>` in the page head.
    On/off options are `label.krt-switch` with `role="switch"`.
 4. **List pages.** The head's count is `.count-badge`; toolbar, filter chips, table and pagination sit
    on one `section.list-panel`. An active filter puts `.is-filtered` on the „Filter" button and shows
@@ -1767,7 +1769,7 @@ whole app.
    for identity and actions.
 
 **Enforced by:** `PagePatternFragmentsRenderTest`, the per-page pattern render tests,
-`AccessibleTextTintTest`, `ColourTokenCopyTest`, `CustomPropertyExistenceTest`, Stylelint ·
+`SegmentedControlLayoutTest`, `AccessibleTextTintTest`, `ColourTokenCopyTest`, `CustomPropertyExistenceTest`, Stylelint ·
 **Code:** `static/css/kernel/styles.css`, `kernel/fragments/components.html`,
 `kernel/fragments/page-head.html`, `static/js/kernel/krt-filter-panel.js` ·
 **Related:** REQ-UI-001, REQ-UI-006, REQ-UI-027

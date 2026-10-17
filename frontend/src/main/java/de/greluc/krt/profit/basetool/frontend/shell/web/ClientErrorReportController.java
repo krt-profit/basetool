@@ -42,9 +42,10 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Receives the browser error beacon from {@code krt-client-error.js} and records it as the {@code
  * basetool_client_error_total{kind}} counter plus a DEBUG log line; a {@code csp_violation} is also
- * counted by directive in {@code basetool_client_csp_violation_total{directive}}.
+ * counted by directive and code origin in {@code
+ * basetool_client_csp_violation_total{directive,code_origin}}.
  *
- * <p>The payload is untrusted: only the five {@link ClientErrorReport} fields are bound, free text
+ * <p>The payload is untrusted: only the six {@link ClientErrorReport} fields are bound, free text
  * is sanitised via {@link LogSafe#text(String, int)}, {@code source} loses its query and fragment,
  * {@code kind} must be one of {@link #ALLOWED_KINDS} (REQ-OBS-006), and the user identity comes
  * from the MDC only (REQ-OBS-004). Logging stays at DEBUG because callers can trigger it at will.
@@ -107,6 +108,17 @@ public class ClientErrorReportController {
           "require-trusted-types-for",
           "trusted-types");
 
+  /**
+   * The {@code codeOrigin} values that become a {@code code_origin} tag value on a {@code
+   * csp_violation} report; anything else, an absent value included, is counted as {@code other}.
+   */
+  static final Set<String> CODE_ORIGINS =
+      Set.of(
+          MetricNames.CODE_ORIGIN_SELF,
+          MetricNames.CODE_ORIGIN_EXTENSION,
+          MetricNames.CODE_ORIGIN_INLINE,
+          MetricNames.CODE_ORIGIN_OTHER);
+
   private final MeterRegistry meterRegistry;
 
   /**
@@ -117,13 +129,16 @@ public class ClientErrorReportController {
    * @param line the 1-based line number within {@code source}, or {@code null}
    * @param column the 1-based column number within {@code source}, or {@code null}
    * @param kind the browser-error class; must be one of {@link #ALLOWED_KINDS}
+   * @param codeOrigin where a {@code csp_violation}'s code came from; resolved against {@link
+   *     #CODE_ORIGINS}, ignored for every other kind
    */
   public record ClientErrorReport(
       @Nullable String message,
       @Nullable String source,
       @Nullable Integer line,
       @Nullable Integer column,
-      @Nullable String kind) {}
+      @Nullable String kind,
+      @Nullable String codeOrigin) {}
 
   /**
    * Records one browser-side failure: increments {@code basetool_client_error_total} with the
@@ -145,22 +160,28 @@ public class ClientErrorReportController {
     }
     meterRegistry.counter(MetricNames.CLIENT_ERROR, MetricNames.TAG_KIND, kind).increment();
     if (MetricNames.CLIENT_ERROR_CSP_VIOLATION.equals(kind)) {
+      String codeOrigin = codeOriginOf(report.codeOrigin());
       meterRegistry
           .counter(
               MetricNames.CLIENT_CSP_VIOLATION,
               MetricNames.TAG_DIRECTIVE,
-              directiveOf(report.message()))
+              directiveOf(report.message()),
+              MetricNames.TAG_CODE_ORIGIN,
+              codeOrigin)
           .increment();
+      log.debug(
+          "Client error reported [kind={}, message={}, source={}, codeOrigin={}]",
+          kind,
+          LogSafe.text(cspMessage(report.message()), MAX_FIELD_LENGTH),
+          LogSafe.text(originOnly(report.source()), MAX_FIELD_LENGTH),
+          codeOrigin);
+      return ResponseEntity.noContent().build();
     }
     log.debug(
         "Client error reported [kind={}, message={}, source={}, line={}, column={}]",
         kind,
         LogSafe.text(report.message(), MAX_FIELD_LENGTH),
-        LogSafe.text(
-            MetricNames.CLIENT_ERROR_CSP_VIOLATION.equals(kind)
-                ? originOnly(report.source())
-                : stripQuery(report.source()),
-            MAX_FIELD_LENGTH),
+        LogSafe.text(stripQuery(report.source()), MAX_FIELD_LENGTH),
         report.line(),
         report.column());
     return ResponseEntity.noContent().build();
@@ -197,6 +218,52 @@ public class ClientErrorReportController {
     int space = stripped.indexOf(' ');
     String first = space < 0 ? stripped : stripped.substring(0, space);
     return CSP_DIRECTIVES.contains(first) ? first : MetricNames.DIRECTIVE_OTHER;
+  }
+
+  /**
+   * Resolves the code origin of a {@code csp_violation} report against {@link #CODE_ORIGINS}.
+   *
+   * @param codeOrigin the reported code origin, possibly {@code null}
+   * @return the allow-listed value, or {@link MetricNames#CODE_ORIGIN_OTHER}
+   */
+  static @NotNull String codeOriginOf(@Nullable String codeOrigin) {
+    return codeOrigin != null && CODE_ORIGINS.contains(codeOrigin)
+        ? codeOrigin
+        : MetricNames.CODE_ORIGIN_OTHER;
+  }
+
+  /**
+   * Keeps a {@code csp_violation} message to the characters a directive, a sink or a policy name
+   * uses: letters, digits, space and {@code _ . # = @ -}; every other character becomes {@code ?},
+   * so no URL path or markup reaches the log.
+   *
+   * @param message the reported message, possibly {@code null}
+   * @return the reduced message, or {@code null} when {@code message} was {@code null}
+   */
+  @Contract("null -> null")
+  static @Nullable String cspMessage(@Nullable String message) {
+    if (message == null) {
+      return null;
+    }
+    StringBuilder kept = new StringBuilder(message.length());
+    for (int i = 0; i < message.length(); i++) {
+      char c = message.charAt(i);
+      kept.append(isCspMessageChar(c) ? c : '?');
+    }
+    return kept.toString();
+  }
+
+  /**
+   * Tells whether {@code c} may stand in a reduced {@code csp_violation} message.
+   *
+   * @param c the character
+   * @return whether it is an ASCII letter or digit, a space or one of {@code _ . # = @ -}
+   */
+  private static boolean isCspMessageChar(char c) {
+    return (c >= 'a' && c <= 'z')
+        || (c >= 'A' && c <= 'Z')
+        || (c >= '0' && c <= '9')
+        || " _.#=@-".indexOf(c) >= 0;
   }
 
   /**

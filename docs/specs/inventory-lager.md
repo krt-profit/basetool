@@ -606,6 +606,13 @@ assigned to tags when the deduction exceeds a dimension's rest. For a `SELL` it 
 per-mission proceeds estimate. A submit sends only the non-zero inputs as the plan; an entry with no
 earmarks hides the picker and submits the legacy `null` plan.
 
+**A tag is labelled from the chip's `data-target-label`, never from its markup.** Every allocation
+chip — the server-rendered one and the one `inventory-common.js` builds after an in-place allocation
+write — carries the picker label as `data-target-label`: `#<displayId>` for a job order, the mission
+name and its planned start date (`format.date`, as in the mission combobox) for a mission. A mission
+the backend cannot resolve is labelled with the localized `inventory.assoc.mission.unknown`; the
+raw target id is never shown.
+
 **A determined dimension is prefilled, not demanded.** A dimension the entry splits across exactly
 one tag with **no not-yet-assigned rest** admits a single applyable plan: the deduction has to come
 out of that one tag in full, so every other value trips the "assign at least X" gate. The picker
@@ -658,6 +665,10 @@ there is no separate income-attribution input.
 - [ ] The Ausbuchen and Umbuchen modals render the "Herkunft" picker (one input per tag per
   dimension, defaulting to 0 = from the rest), block the submit while the plan is invalid, and send
   only the non-zero inputs; an entry with no earmarks hides the picker.
+- [x] Each picker tag shows `#<displayId>` for an order and the mission name with its planned date
+  for a mission, also for a chip built in place after an allocation write; an unresolved mission
+  shows the localized unknown-mission label, never its id (`InventoryPageControllerMvcTest`, e2e
+  `InventoryOperationsE2eTest`).
 - [ ] A dimension with exactly one tag and no rest is prefilled with the deducted amount, locked and
   labelled as auto-filled: the modal is submittable without touching the picker, the field follows
   every later change of the amount, and the submitted plan deducts the full amount from that tag.

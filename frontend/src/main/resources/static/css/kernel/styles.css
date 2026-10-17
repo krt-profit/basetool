@@ -6825,7 +6825,9 @@
 
     .krt-segmented {
         display: inline-flex;
+        flex: 0 1 auto;
         align-items: stretch;
+        gap: 0;
         background-color: var(--control-bg);
         border: 1px solid var(--control-border);
         max-width: 100%;

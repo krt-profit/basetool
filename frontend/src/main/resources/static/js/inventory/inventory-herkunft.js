@@ -76,6 +76,7 @@ function i18n() {
         personal: krtI18nText(d.personal, 'herkunftI18n.personal'),
         auec: krtI18nText(d.auec, 'herkunftI18n.auec'),
         auto: krtI18nText(d.auto, 'herkunftI18n.auto'),
+        unknown: krtI18nText(d.unknown, 'herkunftI18n.unknown'),
     };
 }
 
@@ -213,7 +214,8 @@ function sellContext(prefix) {
 }
 
 /**
- * Reads one dimension's earmark tags from the source leaf row's allocation chips.
+ * Reads one dimension's earmark tags from the source leaf row's allocation chips. A tag's name
+ * is the chip's data-target-label, or the localized unknown label when the chip carries none.
  *
  * @param {HTMLElement} leaf the source entry's leaf row
  * @param {string} field the dimension ('JOB_ORDER' / 'MISSION')
@@ -235,8 +237,8 @@ function readDimension(leaf, field) {
             return;
         }
         const allocated = parseFloat(/** @type {string} */ (chip.getAttribute('data-amount'))) || 0;
-        const nameEl = chip.querySelector('span:not(.assoc-chip__amt)');
-        const name = nameEl ? /** @type {string} */ (nameEl.textContent).trim() : targetId;
+        const label = (chip.getAttribute('data-target-label') || '').trim();
+        const name = label || i18n().unknown;
         tags.push({ targetId, allocated, name });
         sumAllocated += allocated;
     });
