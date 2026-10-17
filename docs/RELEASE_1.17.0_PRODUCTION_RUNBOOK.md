@@ -2,9 +2,9 @@
 
 > **Doc type:** Operator runbook for **one** release — the move of production (and, through
 > `promote.yml`'s `sync-testing`, the testing host) from **v1.16.5 to v1.17.0**, the first release of
-> #2638 (backend API internal-only, Android app discontinued). Written 2026-10-17 from an audit of the
-> 42 pull requests between `v1.16.5` and `527151e7d` and from read-only reads of production the same
-> day. **Historical once 1.17.0 is live and §5 is done**: move it to `docs/archive/` then and let
+> #2638 (backend API internal-only, Android app discontinued), together with #2693 (VerseKit: share
+> own stock into a unit pool). Written 2026-10-17 from an audit of the 45 pull requests between
+> `v1.16.5` and `61a692bc7` and from read-only reads of production the same day. **Historical once 1.17.0 is live and §5 is done**: move it to `docs/archive/` then and let
 > [`deployment.md`](deployment.md) stay the living truth.
 >
 > **Every step that writes to a host is a production write**: it waits for @greluc's explicit yes,
@@ -20,16 +20,17 @@ Shell conventions (`cd /`, `${UCTL}`, `${UPOD}`) are the ones in
 
 | | Value |
 |---|---|
-| Range | `v1.16.5` (2026-10-17) to `527151e7d`, 42 pull requests |
+| Range | `v1.16.5` (2026-10-17) to `61a692bc7`, 45 pull requests |
 | #2638 | parts 1–4 merged: #2681 (ADRs), #2686 (API vhost and `net-proxy-api` gone, absence probes), #2692 (Android-only API surface gone, `azp` gate, CSRF/CORS off, forwarded headers narrowed), #2700 (`basetool-android` client and App Link surface gone), plus #2701, #2703, #2704, #2706. Part 5 (#2675) runs 7 days **after** this release |
+| #2693 | #2702 (Lager `RebookCommands`), #2708 (`split` on `GET /exchange/v1/me/stock`), #2709 (`share` op), #2711 (`unshare` op). No new scope: both ops ride `exchange.stock.write`, which VerseKit's approval already lists |
 | Other security | #2669: the management ports require the scrape credential; #2667: frontend hostname check on by default |
-| Flyway | none (head stays `V303`) |
+| Flyway | three, `V304`–`V306` (head before: `V303`): `V304` replaces the trigger function `exchange_inventory_item_changed()`; `V305` and `V306` swap `exchange_journal`'s `ck_exchange_journal_action` for one that also admits `STOCK_SHARE` and `STOCK_UNSHARE`. The `ADD CONSTRAINT` validates every journal row under an exclusive lock while the apps are stopped; expected seconds |
 | Stateful infra | no image bump; the stateful-infra gate does not trigger |
 | Keycloak SPI / theme | unchanged |
 | Host scripts | none of `scripts/host-scripts.list` changed; no Ansible role run needed |
 | One restart window | backend, frontend, ingest, the edge (unit and config changed), the monitoring reconcile (`prometheus.yml`, `blackbox.yml`, alert rules) |
-| Expected maintenance page | about two minutes, once |
-| Rollback | code-only: `promote.yml -f version=1.16.5`, **as long as §5 has not started** |
+| Expected maintenance page | about two minutes, once, plus the three migrations |
+| Rollback | code-only: `promote.yml -f version=1.16.5`, **as long as §5 has not started**. `V304`–`V306` stay applied and are compatible with v1.16.5 (the constraint only widens, the trigger reads existing columns); see §4 for the one exception |
 
 ---
 
@@ -120,12 +121,18 @@ Rollout step 1 of #2638: tell the members the Android app is gone and point them
   `basetool_auth_failures_total{reason="invalid_token"}`).
 - An exchange or SC-extractor relay succeeds: no `ExchangeRelayFailing`,
   `basetool_ingest_exchange_relay_total{outcome="failed"}` flat.
+- The backend log shows Flyway at `V306` (`Successfully applied 3 migrations`).
 - Run the `edge-deny-probe` workflow once by hand; it asserts the API host does not resolve and that
   `11261`/`11271` refuse from outside.
 
 **Rollback** is `gh workflow run promote.yml -f version=1.16.5`. It works only while the host still
 holds what v1.16.5 needs: its `render-and-run.sh` refuses to start the edge without `EDGE_HOST_API`,
 and its edge joins `net-proxy-api` and expects the sixth trusted-proxy address. That is why §5 waits.
+Flyway in v1.16.5 ignores the applied `V304`–`V306` as future migrations (no
+`ignore-migration-patterns` override), so the backend starts. The one exception: v1.16.5 maps
+`exchange_journal.action` to an enum without `STOCK_SHARE` / `STOCK_UNSHARE`, so once a client has
+used `share` or `unshare`, reading those journal entries (undo of that change set) fails on the old
+release. Members' pages are not affected.
 
 ---
 
