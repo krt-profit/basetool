@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-17.
 > **Owner area:** MISSION/UI · **Related ADRs:** [ADR-0044](../adr/0044-mission-ablauf-procedure-steps.md),
 > [ADR-0057](../adr/0057-mission-goals-classified-ordered-children.md)
 
@@ -725,3 +725,21 @@ safely can.
 **Code:** backend `MissionListDto.registeredCount`, `MissionMapper.toListDto(Mission, long)`,
 `MissionController.withRegisteredCounts`, `MissionService.registeredCounts`,
 `MissionParticipantRepository.countByMissions`, `MissionParticipantCount`.
+
+### REQ-MISSION-030 — A failed option list is logged and named on the page
+
+The detail page's select options — job types, crew roles, org units, frequency types, ship types
+and, for an editor, the ships a unit can be assigned — are independent backend reads. The frontend
+runs them in parallel through `ParallelPageLoader` (REQ-FE-030), and a failed read does not fail
+the page:
+
+- the list renders empty, so the rest of the page stays usable;
+- the frontend logs **one WARN line per failed list**, naming the list by its model attribute and
+  carrying no user data;
+- the full render shows a warning above the tabs (`mission.options.unavailable`) that names every
+  list that could not be loaded, so a user can tell a backend fault from a catalogue that really
+  has no entries before saving a field from it. Fragment refetches carry no hint.
+
+**Enforced by:** `MissionPageControllerTest` (one failing source: WARN line, empty list, hint key;
+all sources loading: no hint key) · **Code:** frontend `MissionPageController.addOptionListsToModel`,
+`mission-detail.html` (`mission-option-lists-unavailable`).
