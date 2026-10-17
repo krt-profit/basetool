@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.identity.api.MembershipOperations;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
@@ -41,6 +42,7 @@ class UserJoinDateServiceTest {
 
   @Mock private UserRepository userRepository;
   @Mock private MembershipOperations membershipOperations;
+  @Mock private AuditRecorder auditRecorder;
 
   @InjectMocks private UserService userService;
 

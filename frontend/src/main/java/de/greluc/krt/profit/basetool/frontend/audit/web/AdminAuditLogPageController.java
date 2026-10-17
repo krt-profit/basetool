@@ -279,6 +279,7 @@ public class AdminAuditLogPageController {
                   "ROLE_REVOKED",
                   "CAPABILITY_FLAGS_CHANGED",
                   "ROLE_PERMISSIONS_CHANGED",
+                  "MEMBER_RANK_CHANGED",
                   "KOMMANDO_GROUP_CREATED",
                   "KOMMANDO_GROUP_UPDATED",
                   "KOMMANDO_GROUP_DELETED",

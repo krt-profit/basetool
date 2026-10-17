@@ -4,6 +4,8 @@
 
 ### Added
 
+- **Audit: Änderung des Mitgliedsrangs wird protokolliert.** Ändert ein Admin den Rang 1–20 eines Mitglieds, schreibt das Audit-Log unter „Rollen & Mitglieder“ das Ereignis „Mitgliedsrang geändert“ mit altem und neuem Rang; ein unveränderter Rang erzeugt keinen Eintrag (REQ-AUDIT-001, REQ-ROLE-007).
+
 - **Profitberechnung: Sortieren per Spaltenkopf.** Material, je SCU, Marge, Kapital und Max Profit sortieren per Klick auf den Spaltenkopf, ein zweiter Klick dreht die Reihenfolge um – auch auf dem Handy über eine Leiste über der Liste. Die Platzziffer bleibt der Rang nach Max Profit; die Sortierung bleibt bei einer neuen Berechnung erhalten und wird pro Browser gemerkt (REQ-UI-030).
 
 - **Material-Detailseite: UEX-Stand je Preis.** Die Terminal-Tabelle zeigt in der neuen Spalte „UEX-Stand“, wann UEX den Preis des Terminals zuletzt aktualisiert hat; Preise, die älter als sieben Tage sind, sind als veraltet markiert. Die Kachel „Aktualisiert“ heißt jetzt „Letzter UEX-Sync“; `GET /api/v1/materials/{id}/prices` liefert dafür `uexUpdatedAt` (REQ-UI-015).
