@@ -1890,4 +1890,126 @@ class OrgUnitBankAccessServiceTest {
         0L,
         null);
   }
+
+  @Test
+  void getViewableAccountDetail_byOverseer_isReadOnlyWithTheCallersControls() {
+    UUID staffelId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(ownerScopeService.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of(staffelId)));
+
+    OrgUnitBankAccountDetailDto detail = service.getViewableAccountDetail(accountId);
+
+    assertThat(detail.canRequest()).isTrue();
+    assertThat(detail.canSetTarget()).isFalse();
+    assertThat(detail.canConfigureVisibility()).isFalse();
+    assertThat(detail.approvalExempt()).isFalse();
+    verify(bankAccountService)
+        .getAccountDetail(accountId, new BankCapabilitiesDto(false, false, false, false));
+  }
+
+  @Test
+  void getViewableAccountDetail_outOfScope_throwsAccessDenied() {
+    UUID accountId = UUID.randomUUID();
+    BankAccount account =
+        account(accountId, "KB-0002", squadron(UUID.randomUUID(), "Foreign", "FRG"));
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(ownerScopeService.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
+
+    assertThrows(AccessDeniedException.class, () -> service.getViewableAccountDetail(accountId));
+    verifyNoInteractions(bankAccountService);
+  }
+
+  @Test
+  void getAccountSettings_byHolder_returnsTheSnapshot() {
+    UUID staffelId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(ownerScopeService.currentUserHoldsRoleOnOrgUnit(staffelId, MembershipRole.STAFFELLEITER))
+        .thenReturn(true);
+
+    OrgUnitBankAccountSettingsDto settings = settingsService.getAccountSettings(accountId);
+
+    assertThat(settings.accountId()).isEqualTo(accountId);
+    assertThat(settings.canSetTarget()).isTrue();
+    assertThat(settings.canConfigureVisibility()).isTrue();
+  }
+
+  @Test
+  void getAccountSettings_byPlainViewer_throwsAccessDenied() {
+    UUID accountId = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(UUID.randomUUID(), "Own", "OWN"));
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+
+    assertThrows(AccessDeniedException.class, () -> settingsService.getAccountSettings(accountId));
+  }
+
+  @Test
+  void setRoleApprovalLimit_byPlainViewer_throwsAccessDenied() {
+    UUID accountId = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(UUID.randomUUID(), "Own", "OWN"));
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+
+    assertThrows(
+        AccessDeniedException.class,
+        () ->
+            settingsService.setRoleApprovalLimit(
+                accountId, MembershipRole.ENSIGN.name(), new BigDecimal("1000")));
+    verifyNoInteractions(bankAuditService);
+  }
+
+  @Test
+  void setAllMembersVisibility_onCartelAccountByAdmin_throwsAccessDenied() {
+    UUID accountId = UUID.randomUUID();
+    BankAccount account = typedAccount(accountId, "KB-0099", BankAccountType.CARTEL, null);
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(authHelperService.isAdmin()).thenReturn(true);
+
+    assertThrows(
+        AccessDeniedException.class,
+        () -> settingsService.setAllMembersVisibility(accountId, true));
+    verifyNoInteractions(bankAuditService);
+  }
+
+  @Test
+  void listTransferTargetAccounts_listsOnlyActiveAccounts() {
+    BankAccount active = account(UUID.randomUUID(), "KB-0001", null);
+    BankAccount closed = account(UUID.randomUUID(), "KB-0002", null);
+    closed.setStatus(BankAccountStatus.CLOSED);
+    when(bankAccountRepository.findAllByOrderByAccountNoAsc()).thenReturn(List.of(active, closed));
+
+    List<BankAccountRefDto> targets = requestService.listTransferTargetAccounts();
+
+    assertThat(targets).extracting(BankAccountRefDto::accountNo).containsExactly("KB-0001");
+  }
+
+  @Test
+  void cancelOwnBookingRequest_delegatesWithTheEchoedVersion() {
+    UUID requestId = UUID.randomUUID();
+
+    requestService.cancelOwnBookingRequest(requestId, 4L);
+
+    verify(bankBookingRequestService).cancelOwn(requestId, 4L);
+  }
+
+  @Test
+  void revokeOwnerApproval_byAdmin_delegatesARevoke() {
+    UUID requestId = UUID.randomUUID();
+    BankBookingRequest bookingRequest = new BankBookingRequest();
+    bookingRequest.setAccount(
+        account(UUID.randomUUID(), "KB-0001", squadron(UUID.randomUUID(), "Own", "OWN")));
+    bookingRequest.setStatus(BankBookingRequestStatus.PENDING);
+    bookingRequest.setRequiresOwnerApproval(true);
+    when(bankBookingRequestRepository.findByIdForUpdate(requestId))
+        .thenReturn(Optional.of(bookingRequest));
+    when(authHelperService.isAdmin()).thenReturn(true);
+
+    requestService.revokeOwnerApproval(requestId);
+
+    verify(bankBookingRequestService).applyOwnerApprovalWithinTransaction(bookingRequest, false);
+  }
 }
