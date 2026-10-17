@@ -35,6 +35,7 @@ import org.jetbrains.annotations.Nullable;
  * @param quality the quality, {@code 0} for an item
  * @param stolen whether the lot is marked stolen
  * @param quantity the summed amount with its unit
+ * @param split how the amount splits into personal stock and the member's part of each pool
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ExchangeStockLotDto(
@@ -44,4 +45,5 @@ public record ExchangeStockLotDto(
     @NotNull ExchangeLocationDto location,
     int quality,
     boolean stolen,
-    @NotNull ExchangeQuantityDto quantity) {}
+    @NotNull ExchangeQuantityDto quantity,
+    @Nullable ExchangeStockSplitDto split) {}

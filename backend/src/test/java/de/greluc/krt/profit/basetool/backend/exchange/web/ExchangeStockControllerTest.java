@@ -54,11 +54,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.web.FilterChainProxy;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.result.JsonPathResultMatchers;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -90,6 +92,7 @@ class ExchangeStockControllerTest {
   private final List<UUID> materials = new ArrayList<>();
   private final List<UUID> items = new ArrayList<>();
   private final List<UUID> locations = new ArrayList<>();
+  private final List<UUID> orgUnits = new ArrayList<>();
 
   @BeforeEach
   void setUp() {
@@ -122,12 +125,14 @@ class ExchangeStockControllerTest {
     jdbc.update("DELETE FROM exchange_client WHERE client_id = ?", client);
     for (UUID id : List.of(member, other)) {
       jdbc.update("DELETE FROM inventory_item WHERE user_id = ?", id);
+      jdbc.update("DELETE FROM org_unit_membership WHERE user_id = ?", id);
       jdbc.update("DELETE FROM user_roles WHERE user_id = ?", id);
       jdbc.update("DELETE FROM app_user WHERE id = ?", id);
     }
     materials.forEach(id -> jdbc.update("DELETE FROM material WHERE id = ?", id));
     items.forEach(id -> jdbc.update("DELETE FROM game_item WHERE id = ?", id));
     locations.forEach(id -> jdbc.update("DELETE FROM location WHERE id = ?", id));
+    orgUnits.forEach(id -> jdbc.update("DELETE FROM org_unit WHERE id = ?", id));
     ExchangeSettings settings =
         settingsRepository.findById(ExchangeSettings.SINGLETON_ID).orElseThrow();
     settings.setEnabled(wasEnabled);
@@ -247,20 +252,123 @@ class ExchangeStockControllerTest {
   }
 
   @Test
-  void aRowRebookedToTheSharedPoolStaysInItsLotAndChangesNothingInTheFeed() throws Exception {
+  void aSnapshotSplitsEachLotIntoPersonalStockAndTheMembersShareOfEachPool() throws Exception {
     UUID titanium = material("RAW", "SCU", null);
     UUID area18 = location("Area18 " + UUID.randomUUID());
-    UUID row = stock(member, titanium, null, area18, 1, 4, true, false, null);
+    UUID alpha = orgUnit("Split Alpha");
+    UUID bravo = orgUnit("Split Bravo");
+    stock(member, titanium, null, area18, 1, 1.5, true, false, null);
+    stock(member, titanium, null, area18, 1, 2, true, false, alpha);
+    stock(member, titanium, null, area18, 1, 3, false, false, alpha);
+    stock(member, titanium, null, area18, 1, 0.25, false, false, alpha);
+    stock(member, titanium, null, area18, 1, 4, false, false, bravo);
+    stock(other, titanium, null, area18, 1, 20, false, false, alpha);
+
+    read(relayed(get(PATH)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items.length()").value(1))
+        .andExpect(jsonPath("$.items[0].quantity.amount").value(10.75))
+        .andExpect(jsonPath("$.items[0].split.personal.amount").value(3.5))
+        .andExpect(jsonPath("$.items[0].split.personal.unit").value("SCU"))
+        .andExpect(jsonPath("$.items[0].split.pools.length()").value(2))
+        .andExpect(pool(alpha, "amount").value(3.25))
+        .andExpect(pool(alpha, "unit").value("SCU"))
+        .andExpect(pool(bravo, "amount").value(4));
+  }
+
+  @Test
+  void aLotWithoutSharedStockCarriesAnEmptyPoolList() throws Exception {
+    UUID helmet = item();
+    stock(
+        member, null, helmet, location("Orison " + UUID.randomUUID()), null, 2, true, false, null);
+
+    read(relayed(get(PATH)))
+        .andExpect(jsonPath("$.items[0].split.personal.amount").value(2))
+        .andExpect(jsonPath("$.items[0].split.personal.unit").value("PIECE"))
+        .andExpect(jsonPath("$.items[0].split.pools.length()").value(0));
+  }
+
+  @Test
+  void aPoolOfAUnitTheMemberHasLeftStaysInTheSplitWhileTheyHoldRowsInIt() throws Exception {
+    UUID titanium = material("RAW", "SCU", null);
+    UUID area18 = location("Area18 " + UUID.randomUUID());
+    UUID left = orgUnit("Split Left");
+    join(left);
+    stock(member, titanium, null, area18, 1, 5, false, false, left);
+    jdbc.update("DELETE FROM org_unit_membership WHERE user_id = ?", member);
+
+    read(relayed(get(PATH)))
+        .andExpect(jsonPath("$.items[0].split.personal.amount").value(0))
+        .andExpect(pool(left, "amount").value(5));
+  }
+
+  @Test
+  void aRowRebookedToTheSharedPoolKeepsItsLotAndReachesTheFeedWithTheNewSplit() throws Exception {
+    UUID titanium = material("RAW", "SCU", null);
+    UUID area18 = location("Area18 " + UUID.randomUUID());
+    UUID pool = orgUnit("Split Flip");
+    UUID row = stock(member, titanium, null, area18, 1, 4, true, false, pool);
+    String key = "m:" + titanium + "|l:" + area18 + "|q:1|s:0";
     String cursor = snapshotEnd();
 
     jdbc.update("UPDATE inventory_item SET personal = false WHERE id = ?", row);
 
     read(relayed(get(PATH).param("cursor", cursor)))
-        .andExpect(jsonPath("$.items.length()").value(0))
-        .andExpect(jsonPath("$.removed.length()").value(0));
-    read(relayed(get(PATH)))
         .andExpect(jsonPath("$.items.length()").value(1))
-        .andExpect(jsonPath("$.items[0].quantity.amount").value(4));
+        .andExpect(jsonPath("$.items[0].key").value(key))
+        .andExpect(jsonPath("$.items[0].quantity.amount").value(4))
+        .andExpect(jsonPath("$.items[0].split.personal.amount").value(0))
+        .andExpect(pool(pool, "amount").value(4))
+        .andExpect(jsonPath("$.removed.length()").value(0));
+  }
+
+  @Test
+  void aSharedRowMovedToAnotherPoolReachesTheFeed() throws Exception {
+    UUID titanium = material("RAW", "SCU", null);
+    UUID area18 = location("Area18 " + UUID.randomUUID());
+    UUID from = orgUnit("Split From");
+    UUID to = orgUnit("Split To");
+    UUID row = stock(member, titanium, null, area18, 1, 4, false, false, from);
+    String cursor = snapshotEnd();
+
+    jdbc.update("UPDATE inventory_item SET owning_org_unit_id = ? WHERE id = ?", to, row);
+
+    read(relayed(get(PATH).param("cursor", cursor)))
+        .andExpect(jsonPath("$.items.length()").value(1))
+        .andExpect(jsonPath("$.items[0].split.pools.length()").value(1))
+        .andExpect(pool(to, "amount").value(4));
+  }
+
+  @Test
+  void aWebRebookingReachesTheFeedWithTheSameKeyAndTotalAndTheNewSplit() throws Exception {
+    UUID titanium = material("RAW", "SCU", null);
+    UUID area18 = location("Area18 " + UUID.randomUUID());
+    UUID pool = orgUnit("Split Web");
+    join(pool);
+    UUID row = stock(member, titanium, null, area18, 1, 10, true, false, null);
+    String key = "m:" + titanium + "|l:" + area18 + "|q:1|s:0";
+    String cursor = snapshotEnd();
+
+    mockMvc
+        .perform(
+            post("/api/v1/inventory/" + row + "/personal-rebook")
+                .with(
+                    jwt()
+                        .jwt(t -> t.subject(member.toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"amount\":4,\"version\":0,\"targetOwningOrgUnitId\":\"%s\"}"
+                        .formatted(pool)))
+        .andExpect(status().isOk());
+
+    read(relayed(get(PATH).param("cursor", cursor)))
+        .andExpect(jsonPath("$.items.length()").value(1))
+        .andExpect(jsonPath("$.items[0].key").value(key))
+        .andExpect(jsonPath("$.items[0].quantity.amount").value(10))
+        .andExpect(jsonPath("$.items[0].split.personal.amount").value(6))
+        .andExpect(pool(pool, "amount").value(4))
+        .andExpect(jsonPath("$.removed.length()").value(0));
   }
 
   @Test
@@ -332,6 +440,47 @@ class ExchangeStockControllerTest {
   private @NotNull String snapshotEnd() throws Exception {
     String body = read(relayed(get(PATH))).andReturn().getResponse().getContentAsString();
     return JsonPath.read(body, "$.nextCursor");
+  }
+
+  /**
+   * Selects a field of the first lot's split entry for one pool.
+   *
+   * @param pool the pool's unit
+   * @param field the quantity field
+   * @return the matcher
+   */
+  private static @NotNull JsonPathResultMatchers pool(@NotNull UUID pool, @NotNull String field) {
+    return jsonPath("$.items[0].split.pools[?(@.orgUnit.id == '" + pool + "')].quantity." + field);
+  }
+
+  /**
+   * Seeds an active squadron, removed after the test.
+   *
+   * @param name the name prefix
+   * @return its id
+   */
+  private @NotNull UUID orgUnit(@NotNull String name) {
+    UUID id = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO org_unit (id, kind, name, shorthand, active, is_promotion_enabled,"
+            + " is_profit_eligible) VALUES (?, 'SQUADRON', ?, ?, TRUE, FALSE, FALSE)",
+        id,
+        name + " " + id,
+        "S" + id.toString().substring(0, 8));
+    orgUnits.add(id);
+    return id;
+  }
+
+  /**
+   * Makes the member a direct member of a unit.
+   *
+   * @param unit the unit
+   */
+  private void join(@NotNull UUID unit) {
+    jdbc.update(
+        "INSERT INTO org_unit_membership (user_id, org_unit_id, role) VALUES (?, ?, 'MEMBER')",
+        member,
+        unit);
   }
 
   /**

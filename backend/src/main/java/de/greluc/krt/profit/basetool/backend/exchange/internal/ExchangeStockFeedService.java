@@ -27,12 +27,15 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeMater
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeQuantityDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStockLotDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStockPageDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStockSplitDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeTombstoneDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.ExchangeStockLotRow;
+import de.greluc.krt.profit.basetool.backend.inventory.api.ExchangeStockSplitRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -111,8 +114,15 @@ public class ExchangeStockFeedService {
         more
             ? ExchangeFeedCursor.snapshot(at, delivered.getLast().getAnchor()).format()
             : ExchangeFeedCursor.feed(at).format();
+    Map<String, List<ExchangeStockSplitRow>> splits =
+        splits(member, delivered.stream().map(ExchangeStockLotRow::getLotKey).toList());
     return new ExchangeStockPageDto(
-        delivered.stream().map(ExchangeStockFeedService::toDto).toList(), List.of(), next, more);
+        delivered.stream()
+            .map(lot -> toDto(lot, splits.getOrDefault(lot.getLotKey(), List.of())))
+            .toList(),
+        List.of(),
+        next,
+        more);
   }
 
   /**
@@ -133,12 +143,13 @@ public class ExchangeStockFeedService {
             ? Map.of()
             : stockReads.exchangeLotsByKeys(member, changes.keys()).stream()
                 .collect(Collectors.toMap(ExchangeStockLotRow::getLotKey, Function.identity()));
+    Map<String, List<ExchangeStockSplitRow>> splits = splits(member, current.keySet());
     List<ExchangeStockLotDto> items = new ArrayList<>();
     List<ExchangeTombstoneDto> removed = new ArrayList<>();
     for (String key : changes.keys()) {
       ExchangeStockLotRow lot = current.get(key);
       if (lot != null) {
-        items.add(toDto(lot));
+        items.add(toDto(lot, splits.getOrDefault(key, List.of())));
       } else {
         removed.add(changes.tombstone(key, key));
       }
@@ -147,12 +158,38 @@ public class ExchangeStockFeedService {
   }
 
   /**
-   * Maps a lot.
+   * Reads the parts the member's lots split into: personal stock and their part of each pool.
+   *
+   * @param member the member
+   * @param keys the lot keys
+   * @return the parts per lot key; a lot without personal or pooled rows has none
+   */
+  private @NotNull Map<String, List<ExchangeStockSplitRow>> splits(
+      @NotNull UUID member, @NotNull Collection<String> keys) {
+    return stockReads.exchangeLotSplits(member, keys).stream()
+        .collect(Collectors.groupingBy(ExchangeStockSplitRow::getLotKey));
+  }
+
+  /**
+   * Maps a lot without its split, as the org-stock feed reuses it.
    *
    * @param lot the lot
    * @return the feed entry
    */
   static @NotNull ExchangeStockLotDto toDto(@NotNull ExchangeStockLotRow lot) {
+    return toDto(lot, null);
+  }
+
+  /**
+   * Maps a lot with its split.
+   *
+   * @param lot the lot
+   * @param parts the lot's split parts, ordered by unit with the personal one first, or {@code
+   *     null} to leave the split out
+   * @return the feed entry
+   */
+  static @NotNull ExchangeStockLotDto toDto(
+      @NotNull ExchangeStockLotRow lot, @Nullable List<ExchangeStockSplitRow> parts) {
     boolean material = lot.getMaterialId() != null;
     ExchangeItemRefDto ref =
         material
@@ -181,7 +218,33 @@ public class ExchangeStockFeedService {
         new ExchangeLocationDto(cut(lot.getLocationName()), uex(lot)),
         lot.getQuality(),
         lot.getStolen(),
-        new ExchangeQuantityDto(amount(lot.getAmount(), unit), unit));
+        new ExchangeQuantityDto(amount(lot.getAmount(), unit), unit),
+        parts == null ? null : split(parts, unit));
+  }
+
+  /**
+   * Builds a lot's split, each part rounded to the lot's unit.
+   *
+   * @param parts the lot's parts, the personal one with no unit
+   * @param unit the lot's unit
+   * @return the split; personal is zero when the lot holds no personal rows
+   */
+  private static @NotNull ExchangeStockSplitDto split(
+      @NotNull List<ExchangeStockSplitRow> parts, @NotNull String unit) {
+    double personal = 0;
+    List<ExchangeStockSplitDto.ExchangeStockSplitPool> pools = new ArrayList<>();
+    for (ExchangeStockSplitRow part : parts) {
+      UUID orgUnit = part.getOrgUnitId();
+      if (orgUnit == null) {
+        personal += part.getAmount();
+      } else {
+        pools.add(
+            new ExchangeStockSplitDto.ExchangeStockSplitPool(
+                new ExchangeStockSplitDto.ExchangeStockSplitUnit(orgUnit),
+                new ExchangeQuantityDto(amount(part.getAmount(), unit), unit)));
+      }
+    }
+    return new ExchangeStockSplitDto(new ExchangeQuantityDto(amount(personal, unit), unit), pools);
   }
 
   /**

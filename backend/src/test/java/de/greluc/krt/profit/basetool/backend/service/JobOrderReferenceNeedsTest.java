@@ -128,7 +128,7 @@ class JobOrderReferenceNeedsTest {
         new JobOrderQueryService(
             jobOrderRepository,
             null,
-            new InventoryStockReads(inventoryItemRepository, null),
+            new InventoryStockReads(inventoryItemRepository, null, null),
             ownerScopeService,
             jobOrderAccessPolicy,
             jobOrderMapper,

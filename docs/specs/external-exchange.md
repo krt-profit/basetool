@@ -847,9 +847,10 @@ purged position as the horizon, below which a cursor has expired.
   (the org stock of REQ-XCH-042), `app_user`, `exchange_name_withholding` and `mission` (a holder's
   name, its withholding and an earmarked mission's name in the details of REQ-XCH-043), `ship` and
   `org_unit` (the ships and lots of a renamed unit) — to their triggers and runs bulk deletes,
-  owner reassignment, a move to another place, a rebooking between personal and shared that leaves
-  the lot unchanged, and user deletion through them. `V260` announced every lot holding shared rows
-  once, as a `system` change, so a cursor taken before it still sees them (ADR-0230).*
+  owner reassignment, a move to another place, a rebooking between personal and shared or between
+  pools that keeps the lot's key and changes its split (`V304`), and user deletion through them.
+  `V260` announced every lot holding shared rows once, as a `system` change, so a cursor taken
+  before it still sees them (ADR-0230).*
 - [x] A default-set change emits entries for every affected member.
   *`ExchangeChangeFeedTriggerIntegrationTest`.*
 - [x] Every writing transaction is attributed to its channel. *`ChangeSourceTransactionManagerIntegrationTest`.*
@@ -940,6 +941,17 @@ quality 0. `materialKind` classifies a material for the client's own lists — `
 `mineral`, `harvestable`, `raw`, `refined`, `buyable`, `sellable` where UEX knows them — and never
 decides the quality. Writes are audited in the Lager domain with the external client.
 
+A lot carries an additive `split` (`exchange.stock.read`, no new scope): `personal`, the member's
+personal rows, and `pools`, one entry `{orgUnit: {id}, quantity}` per unit in whose pool the
+member holds shared rows of the lot, ordered by unit id — only the member's own rows, and a pool of
+a unit the member has left stays while they hold rows in it. Each amount is rounded like
+`quantity` on its own, so the parts may differ from `quantity` in the last decimal. `personal`
+plus the pools add up to `quantity`; the one exception is a shared row
+without a unit (the web's membershipless rebooking, REQ-INV-007), which neither part counts. A
+rebooking between personal and shared, or of a shared row to another pool, changes the lot's split
+but never its key or total, and brings the lot into the change feed whichever channel wrote it.
+Older clients that ignore `split` keep working (REQ-XCH-026).
+
 *Amended 2026-10-02 (ADR-0230, owner decision of the same day):* a lot covered the member's personal
 rows only, and a material carrying a UEX commodity id — nearly the whole catalogue, every ore and
 refined metal included — was stored at quality 0 whatever the client sent. Three lots of one
@@ -969,9 +981,17 @@ production had landed at quality 0 (203 journal entries, 36 lots).
 - [x] A book-out below an offered amount lowers the offer and records the audit event.
   *`ExchangeStockWriteControllerTest`.*
 - [x] A lot sums the member's personal and shared rows across pools, leaves other members' rows
-  out, stays unchanged when a row is rebooked between personal and shared, and becomes a tombstone
-  when its rows are gone. *`ExchangeStockControllerTest`. Amended 2026-10-02 (ADR-0230): the lot
-  left shared rows out, and a rebooking to the shared pool was a tombstone.*
+  out, and becomes a tombstone when its rows are gone. *`ExchangeStockControllerTest`. Amended
+  2026-10-02 (ADR-0230): the lot left shared rows out, and a rebooking to the shared pool was a
+  tombstone.*
+- [x] Every lot carries its `split`: the personal amount and the member's own amount in each pool,
+  a pool of a unit the member has left included, another member's shared rows never counted.
+  *`ExchangeStockControllerTest`.*
+- [x] A rebooking between personal and shared — in place, or the web's `personal-rebook` — and a
+  shared row moved to another pool bring the lot into the feed with the same key and total and the
+  new `split`; restamping the unit of a personal row does not. *`ExchangeStockControllerTest`,
+  `ExchangeChangeFeedTriggerIntegrationTest`. Amended 2026-10-17 (#2695): a rebooking left the lot
+  unchanged and out of the feed.*
 - [x] A material lot is stored at the quality the op sends, a UEX commodity included; three
   qualities of one material stay three lots; a lot booked in the web is written at its own quality.
   *`ExchangeStockWriteControllerTest`.*
