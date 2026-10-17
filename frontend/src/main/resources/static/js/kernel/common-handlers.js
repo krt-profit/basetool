@@ -239,6 +239,30 @@ function initCommonHandlers() {
         event.preventDefault();
         krtModal.close(id);
     });
+
+    revealActiveTabs();
+}
+
+/**
+ * Scrolls every horizontally scrolling tab strip so its current tab is in view, without moving the
+ * page itself.
+ */
+function revealActiveTabs() {
+    const current = document.querySelectorAll(
+        '.tab-nav > .active, .tab-nav > [aria-current="page"], .krt-segmented > [aria-current="page"]',
+    );
+    for (const tab of current) {
+        const strip = tab.parentElement;
+        if (!(tab instanceof HTMLElement) || !strip || strip.scrollWidth <= strip.clientWidth) {
+            continue;
+        }
+        const tabRect = tab.getBoundingClientRect();
+        const stripRect = strip.getBoundingClientRect();
+        if (tabRect.left >= stripRect.left && tabRect.right <= stripRect.right) {
+            continue;
+        }
+        strip.scrollLeft += tabRect.left - stripRect.left - (stripRect.width - tabRect.width) / 2;
+    }
 }
 
 initCommonHandlers();

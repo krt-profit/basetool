@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Handy und Tablet: Checkboxen, Eingabefelder und schwebende Elemente.** Checkboxen und Radio-Buttons bleiben auf Touch-Geräten kleine Kästchen statt hoher Balken, das Label ist die 44-px-Tippfläche; Schalter behalten ihre Form. Eingabefelder sind dort mindestens 16 px groß, damit iOS beim Antippen nicht mehr hineinzoomt; Toast und „Aktualisierungen verfügbar" liegen über statt auf der Tab-Leiste (Frontend, REQ-UI-009).
+
+- **Tablet im Querformat voll bedienbar.** Auf Touch-Geräten gelten die 44-px-Tippflächen und die 16-px-Eingabefelder jetzt unabhängig von der Breite, also auch auf einem quer gehaltenen iPad (Frontend, REQ-UI-009).
+
+- **Installierte App (PWA) auf iPhone und iPad.** Tab-Leiste, Kopfzeile, Menü und Footer halten Abstand zu Home-Indikator und Notch; Dialoge passen auch bei eingeblendeter Browserleiste auf den Bildschirm (Frontend, REQ-UI-020).
+
+- **Kleine Bildschirme: Umbrüche und Überlappungen.** Segment-Umschalter (Einsatz-Status, Raffinerie-Ansichten) brechen auf dem Handy in Reihen um, statt dass sich Beschriftungen überlagern; Dialog-Titel lassen den Schließen-Knopf in der Zeile; Suchfelder in Filterleisten werden nicht mehr gequetscht; eine scrollende Tab-Leiste zeigt den aktiven Tab (Frontend, REQ-UI-009).
+
+- **Lesbarkeit auf Handy und Tablet.** Terminal- und Materialnamen in der Preis-Übersicht brechen auf zwei Zeilen um statt abgeschnitten zu werden; Kennzahlen stehen auf dem Handy zu zweit nebeneinander; Abschnittsüberschriften sind kleiner als der Seitentitel; der Star-Citizen-Hinweis, die Profil-Kachel und die Benachrichtigungs-Einstellungen umbrechen sauber (Frontend, REQ-UI-009).
+
 ## [v1.17.0](https://github.com/krt-profit/basetool/releases/tag/v1.17.0) - 2026-10-17
 
 ### Added

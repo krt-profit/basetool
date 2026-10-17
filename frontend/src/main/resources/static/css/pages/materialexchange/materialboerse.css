@@ -91,6 +91,8 @@
         .mb-dp-back {
             display: inline-flex;
         }
+    }
+    @media (width <= 1024px), (pointer: coarse) {
         .mb-sort {
             min-height: var(--touch-target);
         }

@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-04.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-17.
 > **Owner area:** UI · **Related ADRs:**
 > [0053](../adr/0053-standardize-user-selection-on-searchable-combobox.md) (searchable user pickers, REQ-UI-012) ·
 > [0093](../adr/0093-eliminate-inline-style-attributes-csp-style-src-attr-none.md) (no inline `style=""`, REQ-UI-013) ·
@@ -15,6 +15,7 @@
 > [0240](../adr/0240-navigation-is-a-structured-drawer-a-quick-access-and-a-phone-tab-bar.md) (REQ-UI-026) ·
 > [0242](../adr/0242-page-patterns-a-to-c-and-the-design-system-update-2026-10.md) (REQ-UI-027, REQ-UI-009) ·
 > [0243](../adr/0243-colours-and-stacking-layers-are-written-through-tokens.md) (REQ-UI-001, REQ-UI-023) ·
+> [0280](../adr/0280-touch-ergonomics-follow-the-pointer-and-the-tablet-is-supported-in-both-orientations.md) (REQ-UI-009, REQ-UI-020) ·
 > **Next free id:** `REQ-UI-031` · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)),
@@ -508,7 +509,9 @@ all of them, so the latter is a forward-looking invariant, not a reproduction.
 Every layout change and new component works on **four** classes:
 
 - **Smartphone** (≤768px) and **Tablet** (768–1024px) — touch first; minimum click target
-  **44px**; collapse multi-column grids to one column; wide tables scroll horizontally.
+  **44px**; collapse multi-column grids to one column; wide tables scroll horizontally. A phone is
+  supported held portrait; a tablet in portrait **and** landscape, where it is wider than 1024px and
+  its touch ergonomics come from `(pointer: coarse)`.
 - **Desktop** (1024–1440px) and **Wide** (1440px+) — exploit space (docked sidebars,
   auto-fit card/dashboard grids) but cap long-form text at `max-width: 80ch` on `<p>`. From
   1440px `main` widens to `--content-max-data` (1600px).
@@ -668,6 +671,54 @@ control or a link wraps, matched structurally with `:has()` rather than by class
 was hopeless there for an additional reason — many rows then carried a generated, content-hashed
 class from `inline-migration.css` (retired 2026-10-04).
 
+**A fifth round, 2026-10-17: a visual walk of every page, modal and the drawer** on the phone and
+the tablet class, with the guard green throughout. Each finding was a defect a person sees at once and
+a geometric check had no rule for:
+
+- **A checkbox or radio is a 24px box, and its label carries the 44px.** The default floor reached
+  `input`, so on the touch classes every checkbox grew into a 44px-tall empty slab and every radio
+  into a 44px disc, and a `.krt-switch` lost its track. The control is now `1.5rem` square with no
+  floor of its own, and a label that wraps it or follows it is an `inline-flex` row of at least
+  `--touch-target` — the effective hit area this requirement already counts. A checkbox with no
+  label is therefore measured on its own box and fails, which is the point.
+- **A text-entry control renders at 16px or more on the touch classes.** iOS zooms the whole page in
+  when a field below 16px takes focus and does not zoom back out. Page rules set fields as small as
+  `0.78rem`, so the floor is one declaration in the touch block that wins over them
+  (`max(1rem, 16px) !important`, the same kind of platform override as the reduced-motion block).
+  Disabling the zoom with `maximum-scale` instead would also disable pinch-zoom on Android, which
+  WCAG 1.4.4 forbids.
+- **A `.krt-segmented--block` wraps on the phone class.** Its items shared one row with `min-width:
+  0`, so a word wider than its share — „Abgeschlossen" in the mission status — painted over its
+  neighbour. On the phone the items keep their content width and wrap, separated by a 1px hairline
+  gap.
+- **Floating elements sit above the tab bar.** The live-sync pill and the toast were placed from the
+  viewport bottom and covered three of the five tabs; both now add `--krt-tabbar-height` (and the
+  pill `--krt-footer-height`).
+- **A dialog is capped at `90dvh`**, so a browser toolbar that slides in cannot push its foot below
+  the visible area.
+- **The tablet is fully usable in both orientations; the phone in portrait** (owner decision
+  2026-10-17). A tablet held landscape is 1080–1366px wide, above the Tablet class, and so it used
+  to get the mouse layout's control sizes and iOS's focus zoom. The touch ergonomics — the 44px
+  default floor, the checkbox and label sizing, the 16px text entry, the dense exemptions — now apply
+  under `(width <= 1024px), (pointer: coarse)`: by width for a narrow window, and by the input device
+  for every touch screen whatever its width. Layout (columns, the tab bar, the drawer) still follows
+  the width classes only. The sweep measures a landscape tablet at 1180×820 as its own touch class.
+- **Rows that must not wrap say so.** The phone rule that wraps every row holding a control also
+  wrapped the dialog head (the ✕ dropped below a long title) and `.check-row` (a long label dropped
+  below its checkbox). Both declare `flex-wrap: nowrap`, and the part beside the control shrinks and
+  wraps inside itself. Conversely a `.flex-1` / `.flex-2` child of a `.flex-gap-*` row takes a 12rem
+  basis on the phone, so two pickers that cannot share a row each take one.
+- **Headings keep their order on the phone.** An unstyled `h2` / `h3` defaulted to 24px and outgrew
+  the 22.4px page title; on the phone they are 1.2rem and 1.05rem. A heading hyphenates only with five
+  letters on each side of the break (`hyphenate-limit-chars: 12 5 5`), so a compound breaks at its
+  joint („Benachrichtigungs-regeln") rather than one syllable from the end.
+- **A name is not cut where a touch cannot reveal it.** A truncated name with a `title` tooltip is
+  unreadable on a touch screen; the price matrix's terminal and material names wrap onto a second
+  line instead of ending in an ellipsis.
+- **A scrolling tab strip shows its current tab.** On `/purchasing/report` the active tab was the
+  fourth of four and loaded off-screen; `common-handlers.js` scrolls the strip, never the page, so
+  the current `.tab-nav` or `.krt-segmented` item is in view.
+
 **Acceptance**
 
 - [ ] Verified at all four breakpoints; interactive targets have an **effective hit area** (own box,
@@ -722,13 +773,20 @@ class from `inline-migration.css` (retired 2026-10-04).
   `rgb(100, 100, 100)`, the retired `--color-gray-2` that failed contrast as text (DS-1). A finding
   names the card's widest box outside a nested scroller, the primary's position against the
   viewport, the crowded buttons, both boxes, or the gray element.
+- [ ] A tablet is fully usable held portrait and landscape: at 1180×820 with touch the 44px floor
+  and the 16px text entry hold exactly as at 1024px.
+- [ ] On the touch classes no text-entry control (`input` other than a toggle, button or file
+  picker, `select`, `textarea`) renders its text below 16px.
+- [ ] A checkbox or radio keeps its small square or disc on every class; its label, not the box,
+  reaches the 44px floor.
+- [ ] No floating element (toast, live-sync pill) overlaps the phone tab bar.
 - [ ] **A hidden overlay takes no room.** A hidden tooltip bubble still counts toward the page's
   scrollable width, and on a phone it widens the layout viewport: the hidden `.scu-hint__bubble`
   beside a toolbar's right edge widened `/personal-inventory/blueprints` to 487 px at 375 px and
   scrolled it 104 px sideways at 810 px. The hidden bubble is scaled to nothing
   (`transform: … scale(0)`, restored at once on hover or focus and only after the fade-out).
 
-**Enforced by:** [ADR-0172](../adr/0172-the-phone-class-gets-its-own-layout-contract.md) · `TouchClassLayoutE2eTest` (all five device classes — 375×812, 810×1080, 1024×768, 1280×800, 1600×900 — over the page routes of the shared `FrontendPageRoutes.PAGES` catalogue, plus a real detail view per
+**Enforced by:** [ADR-0172](../adr/0172-the-phone-class-gets-its-own-layout-contract.md) · `TouchClassLayoutE2eTest` (six device classes — 375×812, 810×1080, 1024×768 and the landscape tablet 1180×820 with touch, 1280×800 and 1600×900 without — over the page routes of the shared `FrontendPageRoutes.PAGES` catalogue, plus a real detail view per
 list and every modal on the page — 96 `.krt-modal-overlay` roots, the one shape `MODAL_SHAPES` holds
 since ADR-0177: page-level overflow, cut-off elements, unscrollable tables, control floors, footer
 behaviour, chrome share, and the five page-pattern checks of REQ-UI-027 — cards scrolling sideways
@@ -1181,6 +1239,11 @@ Binding details:
   locking orientation would make a tablet worse.
 - **Status bar `black`, not `black-translucent`.** Translucent draws the page under the status bar and
   needs safe-area padding throughout the layout, which this requirement does not ship.
+- **The viewport is `viewport-fit=cover`, and the chrome keeps clear of the safe areas.** Without it
+  iOS reports every `env(safe-area-inset-*)` as `0` in the installed app, so the phone tab bar's
+  labels sat under the home indicator and a landscape phone drew content under the notch. The body
+  pads left and right by the side insets; the header adds the top inset, and the tab bar, the pinned
+  footer and the drawer pad by the insets of the edges they touch.
 
 **Acceptance**
 
@@ -1196,6 +1259,8 @@ Binding details:
 - [ ] The rendered page carries the manifest link **with `?locale=` and without any `crossorigin`
   attribute**, the `theme-color` meta matching both the controller constant **and**
   `--color-bg-dark-gray` in `styles.css`, and both standalone hints.
+- [ ] The viewport meta carries `viewport-fit=cover`, and no fixed chrome element lies inside a
+  safe-area inset.
 - [ ] No service worker is registered anywhere in the frontend.
 - [ ] The path is probed from outside by `blackbox-public-surface` with `follow_redirects: false`,
   and `EdgePublicSurfaceNot200` alerts when it stops answering `200` (REQ-OBS-012).

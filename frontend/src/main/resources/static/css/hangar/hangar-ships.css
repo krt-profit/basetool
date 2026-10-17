@@ -25,6 +25,13 @@
         align-items: center;
         justify-content: center;
         min-height: var(--touch-target-dense);
+        cursor: pointer;
+    }
+    @media (width <= 1024px), (pointer: coarse) {
+        .hangar-row__pick {
+            flex-basis: var(--touch-target);
+            min-height: var(--touch-target);
+        }
     }
     .hangar-table tbody tr:has(.hangar-ship-check:checked) {
         background-color: var(--control-selected-bg);
@@ -122,7 +129,12 @@
         font-weight: 700;
     }
     .form-group label.ship-fitted-label {
+        display: inline-flex;
+        align-items: center;
         margin-bottom: 0;
+    }
+    .form-group:has(> .ship-fitted-label) {
+        align-items: center;
     }
     .ship-insurance {
         min-width: 0;

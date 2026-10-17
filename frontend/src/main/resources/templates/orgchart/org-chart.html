@@ -159,7 +159,7 @@
 <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
 <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='oc-modal', titleKey='orgChart.modal.title', variant='krt-modal--wide', titleId='oc-modal-title', closeTrigger='oc-modal-cancel', body=~{::oc-modal-body})}">
     <th:block th:ref="oc-modal-body">
-        <div class="krt-modal-body">
+        <div class="krt-modal-body form-layout">
         <input type="hidden" id="oc-mode">
         <input type="hidden" id="oc-position-type">
         <input type="hidden" id="oc-org-unit-id">
@@ -169,19 +169,19 @@
         <input type="hidden" id="oc-user-optional">
         <input type="hidden" id="oc-staff-choice">
         <div class="form-group" id="oc-stafftype-group">
-            <label for="oc-stafftype" th:text="#{orgChart.modal.staffType}">Funktion im Stab</label>
+            <label for="oc-stafftype" class="form-label" th:text="#{orgChart.modal.staffType}">Funktion im Stab</label>
             <select id="oc-stafftype">
                 <option value="AREA_COORDINATOR" th:text="#{orgChart.rank.AREA_COORDINATOR}">Bereichskoordinator</option>
                 <option value="AREA_OPERATOR" th:text="#{orgChart.rank.AREA_OPERATOR}">Bereichsoperator</option>
             </select>
         </div>
         <div class="form-group" id="oc-name-group">
-            <label for="oc-name" th:text="#{orgChart.modal.commandName}">Name der Kommandogruppe</label>
+            <label for="oc-name" class="form-label" th:text="#{orgChart.modal.commandName}">Name der Kommandogruppe</label>
             <input type="text" id="oc-name" maxlength="120"
                    th:placeholder="#{orgChart.modal.commandNamePlaceholder}">
         </div>
         <div class="form-group" id="oc-user-group">
-            <label for="oc-display-name" th:text="#{orgChart.modal.displayName}">Name</label>
+            <label for="oc-display-name" class="form-label" th:text="#{orgChart.modal.displayName}">Name</label>
             <input type="text" id="oc-display-name" maxlength="120"
                    th:placeholder="#{orgChart.modal.displayNamePlaceholder}">
             <p class="oc-modal-hint" th:text="#{orgChart.modal.accountHint}">Konten werden unter Leitung verwaltet.</p>
