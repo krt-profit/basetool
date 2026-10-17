@@ -55,6 +55,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.web.FilterChainProxy;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -67,6 +68,7 @@ import org.springframework.web.context.WebApplicationContext;
  * transactions.
  */
 @SpringBootTest
+@TestPropertySource(properties = "app.inventory.stolen-marking-enabled=false")
 class ExchangeStockControllerTest {
 
   private static final String PATH = "/api/v1/exchange/me/stock";

@@ -63,7 +63,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.web.FilterChainProxy;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -77,7 +76,6 @@ import tools.jackson.databind.json.JsonMapper;
  * and unlisted holder is refused per op (REQ-XCH-045, REQ-XCH-046, REQ-XCH-044).
  */
 @SpringBootTest
-@TestPropertySource(properties = "app.inventory.stolen-marking-enabled=true")
 class ExchangeOrgStockWriteControllerTest {
 
   private static final String CHANGES = "/api/v1/exchange/org-stock/changes";

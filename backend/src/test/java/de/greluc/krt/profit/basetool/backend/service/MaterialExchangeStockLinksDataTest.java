@@ -52,7 +52,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -61,7 +60,6 @@ import org.springframework.transaction.annotation.Transactional;
  * on is never merged into another (REQ-MARKET-013, REQ-INV-047).
  */
 @SpringBootTest
-@TestPropertySource(properties = "app.inventory.stolen-marking-enabled=true")
 @Transactional
 @WithMockUser(roles = "ADMIN")
 class MaterialExchangeStockLinksDataTest {

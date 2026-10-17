@@ -1004,7 +1004,8 @@ lot emptied by another channel or installation is refilled only with `override`
 (`REMOVED_ELSEWHERE`); stock reserved for a job order or mission is never taken (`STOCK_EARMARKED`,
 owner decision 2026-09-27; the reservations sit on the lot's shared rows, and a book-out takes
 from each row only what its reservations leave free);
-a stolen lot waits for `APP_INVENTORY_STOLEN_MARKING_ENABLED` (`STOLEN_MARKING_DISABLED`). The
+a stolen lot is refused while `APP_INVENTORY_STOLEN_MARKING_ENABLED` is `false`
+(`STOLEN_MARKING_DISABLED`). The
 mass-change guard counts a lot set to 0 or cut to a tenth of what it held when the client's window
 opened, unless the batch's rises of the same material cover the whole fall (REQ-XCH-021). A fall and
 a rise of the lot's stolen or not-stolen twin — same material, place and quality — are a marking,
