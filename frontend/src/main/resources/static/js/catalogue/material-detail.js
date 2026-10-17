@@ -72,13 +72,11 @@ function initMaterialDetail() {
         );
     }
 
-    krtTableSort
-        .attach(priceTable, {
-            initial: { key: 'sell', dir: 'desc' },
-            valueOf,
-            tiebreak: byTerminal,
-        })
-        .apply();
+    krtTableSort.attach(priceTable, {
+        initial: { key: 'sell', dir: 'desc' },
+        valueOf,
+        tiebreak: byTerminal,
+    });
 
     /** Shows the rows whose terminal name contains the search text. */
     function filterTerminals() {
