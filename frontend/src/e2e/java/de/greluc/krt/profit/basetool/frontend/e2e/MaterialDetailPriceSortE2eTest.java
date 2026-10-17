@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.e2e;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
@@ -128,6 +129,42 @@ class MaterialDetailPriceSortE2eTest {
         assertEquals(Boolean.TRUE, page.evaluate("() => window.__noReload === true"));
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "material-detail-price-sort");
+        throw failure;
+      }
+    }
+  }
+
+  /**
+   * At phone width the stacked table keeps its sort buttons visible as a strip, and a tap sorts the
+   * rows.
+   */
+  @Test
+  void sortButtonsStayUsableAtPhoneWidth() {
+    String baseUrl = STACK.baseUrl();
+    Path storageState = E2eSupport.authenticatedStorageState(browser, baseUrl, USERNAME, PASSWORD);
+    try (BrowserContext context =
+        browser.newContext(
+            new Browser.NewContextOptions()
+                .setIgnoreHTTPSErrors(true)
+                .setViewportSize(375, 812)
+                .setStorageStatePath(storageState))) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.navigate(page, baseUrl + "/materials/" + materialId);
+
+        Locator buyButton = page.locator("[data-testid='price-sort-buy']");
+        for (String key : List.of("terminal", "location", "sell", "buy")) {
+          assertThat(page.locator("[data-testid='price-sort-" + key + "']")).isVisible();
+        }
+        assertTrue(
+            buyButton.boundingBox().height >= 44,
+            "a sort button must keep the 44px touch target at phone width");
+
+        buyButton.click();
+        assertThat(page.locator("th[data-sort-col='buy']")).hasAttribute("aria-sort", "ascending");
+        assertEquals(List.of(CHARLIE, ALPHA, BRAVO), order(page));
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "material-detail-price-sort-phone");
         throw failure;
       }
     }

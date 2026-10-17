@@ -126,7 +126,9 @@ by sale price, highest first, terminals buying nothing last by name. Each of the
 is a sort button of the shared sortable header: a click on an inactive column sorts by it in its
 first direction (Terminal and Ort A–Z, Verkauf highest first, Einkauf lowest first), a second click
 reverses it; rows without a value stay last, ties go by terminal name, and the header carries the
-matching `aria-sort`. Sorting happens in the browser and keeps the terminal search's narrowing.
+matching `aria-sort`. Sorting happens in the browser and keeps the terminal search's narrowing. On a
+phone, where the stacked table hides its header row, the four sort buttons stay visible as a strip
+above the rows, so the table sorts on every device class.
 
 *Amended 2026-10-03 (website overhaul phase 3): chips, the four figures, the location column, the
 sale-price sort. Amended 2026-10-17 (#2634): the column headers sort, the „Verkauf · Einkauf"
@@ -140,6 +142,7 @@ segment is gone.*
   list.
 - [ ] Every column header of the price table is a sort `<button>`; the sale column starts active and
   descending, and no separate sort segment is rendered.
+- [ ] At phone width the sort buttons are visible and sort the table.
 
 **Enforced by:** `MaterialsPageControllerTest` /
 `MaterialsPageControllerMvcTest.getMaterialDetail_*` / `MaterialTerminalPricesTest` / `UexAgeTest` ·
