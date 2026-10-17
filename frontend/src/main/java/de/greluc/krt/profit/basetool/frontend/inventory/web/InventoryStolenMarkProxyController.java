@@ -81,9 +81,6 @@ public class InventoryStolenMarkProxyController {
           e.getStatusCode(),
           e.getMessage());
       return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Failed to change the stolen marker of an inventory item", e);
-      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -108,9 +105,6 @@ public class InventoryStolenMarkProxyController {
     } catch (BackendServiceException e) {
       log.debug("Failed to bulk-change the stolen marker: {}", e.getMessage());
       return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Failed to bulk-change the stolen marker", e);
-      return ResponseEntity.internalServerError().build();
     }
   }
 

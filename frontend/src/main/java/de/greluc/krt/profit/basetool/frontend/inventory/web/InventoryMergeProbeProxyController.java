@@ -24,9 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryMergeCand
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -42,7 +40,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/inventory")
 @PreAuthorize("isAuthenticated()")
 @RequiredArgsConstructor
-@Slf4j
 public class InventoryMergeProbeProxyController {
 
   /** The inventory domain's typed backend client. */
@@ -58,7 +55,7 @@ public class InventoryMergeProbeProxyController {
    * @param personal whether the row would be personal
    * @param stolen whether the row would be marked „gestohlen"
    * @param owningOrgUnitId the picked owning org unit, or {@code null} for the auto-stamp
-   * @return {@code 200} with {@code {exists}}, or {@code 502} when the backend did not answer
+   * @return {@code 200} with {@code {exists}}; a failure is answered by the global handler
    */
   @NotNull
   @GetMapping(value = "/merge-candidates", headers = "X-Requested-With=XMLHttpRequest")
@@ -70,14 +67,9 @@ public class InventoryMergeProbeProxyController {
       @RequestParam(required = false, defaultValue = "false") boolean personal,
       @RequestParam(required = false, defaultValue = "false") boolean stolen,
       @RequestParam(required = false) UUID owningOrgUnitId) {
-    try {
-      InventoryMergeCandidatesDto answer =
-          inventoryClient.mergeCandidates(
-              userId, materialId, locationId, quality, personal, stolen, owningOrgUnitId);
-      return ResponseEntity.ok(Map.of("exists", answer != null && answer.exists()));
-    } catch (Exception e) {
-      log.warn("Failed to probe inventory merge candidates", e);
-      return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
-    }
+    InventoryMergeCandidatesDto answer =
+        inventoryClient.mergeCandidates(
+            userId, materialId, locationId, quality, personal, stolen, owningOrgUnitId);
+    return ResponseEntity.ok(Map.of("exists", answer != null && answer.exists()));
   }
 }

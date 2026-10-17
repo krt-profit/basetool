@@ -800,16 +800,31 @@ class InventoryPageControllerTest {
   }
 
   @Test
-  void updateInventoryItemNote_shouldReturn500OnGenericException() {
+  void updateInventoryItemNote_leavesAGenericExceptionToTheGlobalHandler() {
     UUID id = UUID.randomUUID();
     InventoryItemNoteUpdateRequest request = new InventoryItemNoteUpdateRequest("hello", 1L);
     when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class), any(Object[].class)))
         .thenThrow(new RuntimeException("boom"));
 
-    org.springframework.http.ResponseEntity<InventoryItemDto> response =
-        writeController.updateInventoryItemNote(id, request);
+    assertThrows(
+        RuntimeException.class, () -> writeController.updateInventoryItemNote(id, request));
+  }
 
-    assertEquals(500, response.getStatusCode().value());
+  @Test
+  void updateDelivered_letsALostSessionReachTheGlobalHandler() {
+    UUID id = UUID.randomUUID();
+    when(backendApiClient.patch(
+            anyString(), any(), eq(InventoryItemDto.class), any(Object[].class)))
+        .thenThrow(
+            new de.greluc.krt.profit.basetool.frontend.kernel.backend
+                .ReauthenticationRequiredException("token gone", null));
+
+    assertThrows(
+        de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException
+            .class,
+        () ->
+            writeController.updateDelivered(
+                id, new UpdateDeliveredRequest(true, UUID.randomUUID(), 1L)));
   }
 
   @Test

@@ -2727,6 +2727,60 @@ head's first, synchronous script. The list only shrinks.
 `templates/kernel/fragments/head.html`, `module-ratchet.json` · **Related:** REQ-FE-018, REQ-FE-023,
 REQ-FE-033, REQ-FE-034, ADR-0250
 
+### REQ-FE-036 — A web handler leaves an unexpected failure to the central error mapping
+
+A backend failure is mapped once, by `BackendErrorMapper` (REQ-FE-029), and answered once, by
+`GlobalExceptionHandler`. A handler in a `web` package does not map it a second time.
+
+- **No local catch-all in an AJAX handler.** A JSON or fragment endpoint catches
+  `BackendServiceException` only to relay it with `BackendErrorResponses.propagateBackendError` (or
+  its own documented body), or not at all. It does not add a `catch (Exception …)` that turns every
+  other failure into a bare `500` or `502`: such an arm also caught a
+  `ReauthenticationRequiredException`, so the caller never got the `401` + `X-Reauthenticate` of
+  REQ-SEC-012, and on an endpoint without its own backend arm it turned a backend `403`, `404` or
+  `409` (an `OPTIMISTIC_LOCK` or `PESSIMISTIC_LOCK`) into a `500`/`502`. An unexpected failure
+  reaches the global handler, which answers `500`; `krtFetch` shows the page's own error text for a
+  `500` either way.
+- **What stays local is a decision, not a default.** A broad catch in a `web` package is one of:
+  a section fallback (one part of a page fails, the page still renders with the part empty or marked
+  unavailable), a form-post fallback (a non-AJAX write flashes its error toast and redirects back),
+  or a translation into another exception.
+- **A section fallback goes through `SectionFallback`.** A page section whose backend call may
+  fail without failing the page calls `kernel.web.SectionFallback.load(log, section, call, fallback)`,
+  or `SectionFallback.run(log, section, work)` and marks the section unavailable when it answers
+  `false`, instead of its own `catch (Exception …)`. The helper lets a
+  `ReauthenticationRequiredException` through, also when it arrives wrapped, so a page GET with an
+  expired session redirects to the login instead of rendering its sections' error banners. It logs
+  every other failure once and answers the fallback. A pure parse fallback (`Instant.parse`,
+  `Long.parseLong`, `UUID.fromString`, `RoundingMode.valueOf`) catches its specific exception.
+- **The number only shrinks.** The broad catch clauses (`Exception`, `RuntimeException`,
+  `Throwable`, alone or in a multi-catch) of every file in a `web` package are frozen per file in
+  `frontend/src/test/resources/architecture/broad-catch-ratchet.properties`. A file above its count
+  fails the build, and so does a file below it until the count is lowered.
+
+**Acceptance**
+
+- [x] The broad catch clauses of the `web` packages were classified on 2026-10-17: of 386, 53
+  duplicated the central mapping and were removed — 43 AJAX arms after a `BackendServiceException`
+  arm, the four org-chart position writes behind a local helper, and six endpoints without a backend
+  arm that answered every failure with `500`/`502`. The other 333 are section fallbacks, form-post
+  fallbacks, silent fallbacks and translations, and stay frozen. After the
+  `SectionFallback` migration and the mission option lists reporting their failures
+  (REQ-MISSION-030), 150 remain in 42 files.
+- [x] A backend refusal on the frequency-type reorder, the sync-report purge, the announcement
+  read, the inventory merge probe and the stock attribution keeps its status; a failure that is no
+  backend refusal reaches the global handler.
+- [x] A file with one broad clause more than frozen, and one with one less, each fail the ratchet; a
+  narrow clause and an `…Error` type are not counted.
+- [x] The section and silent fallbacks of the page controllers run through `SectionFallback`, and
+  each migrated controller answers a page GET with an expired session with the redirect to
+  `/oauth2/authorization/keycloak`.
+
+**Enforced by:** `BroadCatchRatchetTest`, `SectionFallbackTest`, the `…ReauthMvcTest` of each
+migrated page controller, the controller tests of the changed handlers · **Code:**
+`kernel/web/GlobalExceptionHandler`, `kernel/web/BackendErrorResponses`, `kernel/web/SectionFallback` · **Related:** REQ-FE-029,
+REQ-SEC-012, ADR-0032
+
 ## Out of scope
 
 - The per-area conversions themselves (one issue per area, #573–#582) — this spec is the contract

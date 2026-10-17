@@ -24,9 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.LinkedStockAttribut
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -42,7 +40,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/orders")
 @PreAuthorize("isAuthenticated()")
 @RequiredArgsConstructor
-@Slf4j
 public class JobOrderStockAttributionProxyController {
 
   /** Reads the attribution from the backend. */
@@ -53,8 +50,8 @@ public class JobOrderStockAttributionProxyController {
    *
    * @param id the job order
    * @param matId the material
-   * @return {@code 200} with one entry per row and bucket, or {@code 502} when the backend did not
-   *     answer
+   * @return {@code 200} with one entry per row and bucket; a failure is answered by the global
+   *     handler
    */
   @NotNull
   @GetMapping(
@@ -62,11 +59,6 @@ public class JobOrderStockAttributionProxyController {
       headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<List<LinkedStockAttributionDto>> stockAttribution(
       @PathVariable UUID id, @PathVariable UUID matId) {
-    try {
-      return ResponseEntity.ok(jobOrderClient.stockAttribution(id, matId));
-    } catch (Exception e) {
-      log.warn("Failed to load stock attribution for job order {} and material {}", id, matId, e);
-      return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
-    }
+    return ResponseEntity.ok(jobOrderClient.stockAttribution(id, matId));
   }
 }

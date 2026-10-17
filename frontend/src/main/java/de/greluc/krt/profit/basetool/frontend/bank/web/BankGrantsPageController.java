@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.bank.model.BankAccountDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankGrantDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -91,12 +92,10 @@ public class BankGrantsPageController {
 
     BankAccountDto selectedAccount = null;
     if (!byEmployee && accountId != null) {
-      try {
-        BankAccountDetailDto detail = bankClient.account(accountId);
-        selectedAccount = detail == null ? null : detail.account();
-      } catch (RuntimeException e) {
-        log.debug("Could not resolve selected grant-filter account {} for seeding", accountId, e);
-      }
+      BankAccountDetailDto detail =
+          SectionFallback.load(
+              log, "bank-grants-selected-account", () -> bankClient.account(accountId), null);
+      selectedAccount = detail == null ? null : detail.account();
     }
 
     model.addAttribute("selectedAccount", selectedAccount);

@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendErrorLogging
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.StringNormalization;
 import java.util.List;
 import java.util.UUID;
@@ -72,11 +73,13 @@ public class AdminMaterialAliasesPageController {
   @NotNull
   @GetMapping
   public String list(Model model) {
-    try {
-      List<MaterialExternalAliasDto> aliases = catalogueClient.materialAliases();
-      model.addAttribute("aliases", aliases == null ? List.of() : aliases);
-    } catch (Exception e) {
-      log.error("Failed to load material-alias admin page", e);
+    if (!SectionFallback.run(
+        log,
+        "material-aliases",
+        () -> {
+          List<MaterialExternalAliasDto> aliases = catalogueClient.materialAliases();
+          model.addAttribute("aliases", aliases == null ? List.of() : aliases);
+        })) {
       model.addAttribute("error", "error.admin.materialAlias.load");
       model.addAttribute("aliases", List.of());
     }
@@ -93,11 +96,10 @@ public class AdminMaterialAliasesPageController {
   @NotNull
   @GetMapping("/{id}")
   public String edit(@PathVariable @NotNull UUID id, Model model) {
-    try {
-      MaterialExternalAliasDto alias = catalogueClient.materialAlias(id);
-      model.addAttribute("aliasToEdit", alias);
-    } catch (Exception e) {
-      log.error("Failed to load alias {} for edit", id, e);
+    if (!SectionFallback.run(
+        log,
+        "material-alias-edit",
+        () -> model.addAttribute("aliasToEdit", catalogueClient.materialAlias(id)))) {
       model.addAttribute("error", "error.admin.materialAlias.load");
     }
     return list(model);

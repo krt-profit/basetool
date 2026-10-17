@@ -418,8 +418,9 @@ is `DEBUG`, because at any higher level it is a log-flood vector; an operator-ac
   it carries type-ahead terms.
 - **Type-ahead catalogue-fetch failures** (the personal-inventory, personal-blueprint and
   admin-default-blueprint page controllers) — demoted from `WARN` to `DEBUG`. These fire once per
-  keystroke on a search field, which is the textbook flood vector. The admin catch-all
-  `catch (Exception)` branch stays `ERROR`; the query is wrapped in `LogSafe`.
+  keystroke on a search field, which is the textbook flood vector. The admin blueprint search's
+  unexpected failure stays `ERROR`. Each runs through `SectionFallback` with that level
+  (REQ-FE-036), whose line names the section and never the query.
 - **Live-sync section filtering** (`LiveSyncWebSocketHandler`) — `DEBUG`, **one line per frame**,
   carrying the reject count and the first rejected key through `LogSafe`; an unknown changed-topic
   likewise gets one sanitised `DEBUG` line where it previously returned silently. Both are keyed on

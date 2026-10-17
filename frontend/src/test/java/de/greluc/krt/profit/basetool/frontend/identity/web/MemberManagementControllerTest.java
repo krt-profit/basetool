@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.frontend.identity.model.UserAttributesUpdat
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserRsiHandleResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.MembershipDeltaResponse;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitKind;
@@ -141,7 +142,7 @@ class MemberManagementControllerTest {
               eq("/api/v1/users/sync"),
               any(),
               eq(de.greluc.krt.profit.basetool.frontend.identity.model.UserSyncResultDto.class)))
-          .thenThrow(new RuntimeException("Keycloak unreachable"));
+          .thenThrow(new BackendServiceException("Keycloak unreachable", null, 503));
 
       controller.syncMembersAjax();
 
@@ -161,7 +162,7 @@ class MemberManagementControllerTest {
 
     @Test
     void deleteMemberAjax_onBackendFailure_doesNotPublish() {
-      doThrow(new RuntimeException("API Error"))
+      doThrow(new BackendServiceException("API Error", null, 503))
           .when(backendApiClient)
           .delete(anyString(), any(), any(Object[].class));
 

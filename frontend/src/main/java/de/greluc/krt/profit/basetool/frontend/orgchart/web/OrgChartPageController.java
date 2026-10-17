@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.orgchart.web;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.orgchart.client.OrgChartBackendClient;
 import de.greluc.krt.profit.basetool.frontend.orgchart.model.OrgChartPositionCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.orgchart.model.OrgChartPositionUpdateRequest;
@@ -74,10 +75,8 @@ public class OrgChartPageController {
   @GetMapping
   @PreAuthorize("isAuthenticated()")
   public String orgChart(@RequestParam(required = false) String fragment, Model model) {
-    try {
-      model.addAttribute("orgChart", orgChartClient.orgChart());
-    } catch (Exception e) {
-      log.error("Failed to load org chart", e);
+    if (!SectionFallback.run(
+        log, "org-chart", () -> model.addAttribute("orgChart", orgChartClient.orgChart()))) {
       model.addAttribute("error", "error.orgChart.load");
     }
     if ("chartBody".equals(fragment)) {
@@ -102,8 +101,6 @@ public class OrgChartPageController {
       return ResponseEntity.ok(orgChartClient.createPosition(body));
     } catch (BackendServiceException e) {
       return relayError("Create org-chart position failed", e);
-    } catch (Exception e) {
-      return unexpectedError("Create org-chart position failed", e);
     }
   }
 
@@ -123,8 +120,6 @@ public class OrgChartPageController {
       return ResponseEntity.ok(orgChartClient.updatePosition(id, body));
     } catch (BackendServiceException e) {
       return relayError("Update org-chart position failed", e);
-    } catch (Exception e) {
-      return unexpectedError("Update org-chart position failed", e);
     }
   }
 
@@ -147,8 +142,6 @@ public class OrgChartPageController {
       return ResponseEntity.ok().build();
     } catch (BackendServiceException e) {
       return relayError("Vacate org-chart Kommandoleiter failed", e);
-    } catch (Exception e) {
-      return unexpectedError("Vacate org-chart Kommandoleiter failed", e);
     }
   }
 
@@ -167,8 +160,6 @@ public class OrgChartPageController {
       return ResponseEntity.ok().build();
     } catch (BackendServiceException e) {
       return relayError("Delete org-chart position failed", e);
-    } catch (Exception e) {
-      return unexpectedError("Delete org-chart position failed", e);
     }
   }
 
@@ -179,12 +170,5 @@ public class OrgChartPageController {
     payload.put("detail", e.getProblemDetail());
     int status = e.getStatusCode() > 0 ? e.getStatusCode() : 500;
     return ResponseEntity.status(status).body(payload);
-  }
-
-  private ResponseEntity<Object> unexpectedError(String logMessage, Exception e) {
-    log.error(logMessage, e);
-    Map<String, Object> payload = new HashMap<>();
-    payload.put("code", "INTERNAL_ERROR");
-    return ResponseEntity.status(500).body(payload);
   }
 }

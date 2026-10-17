@@ -1046,9 +1046,6 @@ public class JobOrderWriteController {
     } catch (BackendServiceException bse) {
       BackendErrorLogging.warn(log, "POST /api/v1/orders/{id}/handovers (ajax)", id, bse);
       return propagateBackendError(bse);
-    } catch (Exception e) {
-      log.error("Failed to create handover (ajax) for order {}", id, e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }
 
@@ -1091,9 +1088,6 @@ public class JobOrderWriteController {
     } catch (BackendServiceException bse) {
       BackendErrorLogging.warn(log, "POST /api/v1/orders/{id}/item-handovers (ajax)", id, bse);
       return propagateBackendError(bse);
-    } catch (Exception e) {
-      log.error("Failed to create item handover (ajax) for order {}", id, e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }
 
@@ -1130,9 +1124,6 @@ public class JobOrderWriteController {
       BackendErrorLogging.warn(
           log, "POST /api/v1/orders/{id}/items/{itemId}/production (ajax)", id, bse);
       return propagateBackendError(bse);
-    } catch (Exception e) {
-      log.error("Failed to book production (ajax) for order {} item {}", id, itemId, e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }
 

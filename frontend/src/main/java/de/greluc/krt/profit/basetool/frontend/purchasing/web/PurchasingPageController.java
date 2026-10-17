@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.purchasing.client.PurchasingBackendClient;
 import de.greluc.krt.profit.basetool.frontend.purchasing.model.DealDto;
@@ -41,6 +42,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.http.HttpStatus;
@@ -63,6 +65,7 @@ import org.springframework.web.server.ResponseStatusException;
 @UsesLayoutModel
 @RequestMapping
 @RequiredArgsConstructor
+@Slf4j
 @PreAuthorize("isAuthenticated()")
 public class PurchasingPageController {
 
@@ -103,12 +106,9 @@ public class PurchasingPageController {
    */
   @ModelAttribute("purchasingState")
   public @NotNull PurchasingStateDto purchasingState() {
-    try {
-      PurchasingStateDto state = purchasingClient.state();
-      return state == null ? NO_STATE : state;
-    } catch (RuntimeException _) {
-      return NO_STATE;
-    }
+    PurchasingStateDto state =
+        SectionFallback.load(log, "purchasing-state", purchasingClient::state, NO_STATE);
+    return state == null ? NO_STATE : state;
   }
 
   /**
@@ -348,12 +348,9 @@ public class PurchasingPageController {
   }
 
   private @NotNull PauseStateDto pauseStateOrNone() {
-    try {
-      PauseStateDto state = purchasingClient.pauseState();
-      return state == null ? new PauseStateDto(false, null, null, List.of()) : state;
-    } catch (RuntimeException _) {
-      return new PauseStateDto(false, null, null, List.of());
-    }
+    PauseStateDto state =
+        SectionFallback.load(log, "purchasing-pause-state", purchasingClient::pauseState, null);
+    return state == null ? new PauseStateDto(false, null, null, List.of()) : state;
   }
 
   private @NotNull List<NeedDto> purchasableNeeds() {
@@ -367,14 +364,11 @@ public class PurchasingPageController {
   }
 
   private @NotNull List<SupplyUnitDto> pausableUnits() {
-    try {
-      List<SupplyUnitDto> units = supplyClient.units();
-      return units == null
-          ? List.of()
-          : units.stream().filter(u -> u.canManage() && u.mayRaiseNeeds()).toList();
-    } catch (RuntimeException _) {
-      return List.of();
-    }
+    List<SupplyUnitDto> units =
+        SectionFallback.load(log, "purchasing-pausable-units", supplyClient::units, List.of());
+    return units == null
+        ? List.of()
+        : units.stream().filter(u -> u.canManage() && u.mayRaiseNeeds()).toList();
   }
 
   private static @Nullable String month(@Nullable String value) {

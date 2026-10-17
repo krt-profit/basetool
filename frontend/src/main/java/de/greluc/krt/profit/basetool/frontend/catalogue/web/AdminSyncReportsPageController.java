@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.SyncReportPurgeRes
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -33,7 +34,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -142,8 +142,8 @@ public class AdminSyncReportsPageController {
    *
    * @param source active source tab ({@code "SCWIKI"} / {@code "UEX"}), or blank for both
    * @param days minimum age in days a report must exceed to be deleted
-   * @return {@code 200 {"deleted": <n>}} on success, {@code 400} when {@code days < 1}, {@code 500}
-   *     on a backend failure
+   * @return {@code 200 {"deleted": <n>}} on success, {@code 400} when {@code days < 1}; a backend
+   *     failure is answered by the global handler with the backend's status
    */
   @ResponseBody
   @PostMapping(
@@ -155,15 +155,10 @@ public class AdminSyncReportsPageController {
       return ResponseEntity.badRequest().build();
     }
     String canonicalSource = canonicalSource(source);
-    try {
-      SyncReportPurgeResultDto result = catalogueClient.purgeSyncReports(canonicalSource, days);
-      Map<String, Object> body = new LinkedHashMap<>();
-      body.put("deleted", result == null ? 0 : result.deleted());
-      return ResponseEntity.ok(body);
-    } catch (Exception e) {
-      log.error("Failed to delete old sync reports (ajax) (source={}, days={})", source, days, e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    SyncReportPurgeResultDto result = catalogueClient.purgeSyncReports(canonicalSource, days);
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("deleted", result == null ? 0 : result.deleted());
+    return ResponseEntity.ok(body);
   }
 
   /**
@@ -220,19 +215,7 @@ public class AdminSyncReportsPageController {
   private String render(
       String source, String activeTab, String basePath, int page, String fragment, Model model) {
     int safePage = Math.max(page, 0);
-    try {
-      PageResponse<SyncReportDto> events = catalogueClient.syncReportPage(safePage, source);
-      if (events != null) {
-        model.addAttribute("events", events.content() == null ? List.of() : events.content());
-        model.addAttribute("currentPage", events.page());
-        model.addAttribute("totalPages", events.totalPages());
-        model.addAttribute("totalElements", events.totalElements());
-        model.addAttribute("eventsPage", events);
-      } else {
-        populateEmpty(model);
-      }
-    } catch (Exception e) {
-      log.error("Failed to load sync reports (source={})", source, e);
+    if (!SectionFallback.run(log, "sync-reports", () -> addEvents(source, safePage, model))) {
       model.addAttribute("error", "error.admin.syncReports.load");
       populateEmpty(model);
     }
@@ -241,6 +224,27 @@ public class AdminSyncReportsPageController {
     return "results".equals(fragment)
         ? "catalogue/admin/sync-reports :: results"
         : "catalogue/admin/sync-reports";
+  }
+
+  /**
+   * Adds one page of sync-report events and its paging figures, or the empty paging attributes when
+   * the backend sent no page.
+   *
+   * @param source backend source filter, or {@code null} for both
+   * @param page non-negative zero-based page index
+   * @param model Thymeleaf model to fill
+   */
+  private void addEvents(@Nullable String source, int page, @NotNull Model model) {
+    PageResponse<SyncReportDto> events = catalogueClient.syncReportPage(page, source);
+    if (events != null) {
+      model.addAttribute("events", events.content() == null ? List.of() : events.content());
+      model.addAttribute("currentPage", events.page());
+      model.addAttribute("totalPages", events.totalPages());
+      model.addAttribute("totalElements", events.totalElements());
+      model.addAttribute("eventsPage", events);
+    } else {
+      populateEmpty(model);
+    }
   }
 
   /**

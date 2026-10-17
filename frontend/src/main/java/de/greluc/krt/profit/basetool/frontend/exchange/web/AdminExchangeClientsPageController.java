@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientDto;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientUsageDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -102,12 +103,14 @@ public class AdminExchangeClientsPageController {
   @NotNull
   @GetMapping
   public String page(@Nullable @RequestParam(required = false) String fragment, Model model) {
-    try {
-      List<ExchangeClientDto> clients = exchangeClient.clients();
-      model.addAttribute("clients", clients == null ? List.of() : clients);
-      model.addAttribute("settings", exchangeClient.settings());
-    } catch (Exception e) {
-      log.debug("Failed to load the exchange registry", e);
+    if (!SectionFallback.run(
+        log,
+        "exchange-registry",
+        () -> {
+          List<ExchangeClientDto> clients = exchangeClient.clients();
+          model.addAttribute("clients", clients == null ? List.of() : clients);
+          model.addAttribute("settings", exchangeClient.settings());
+        })) {
       model.addAttribute("clients", List.of());
       model.addAttribute("settings", null);
       model.addAttribute("error", "admin.exchangeClients.error.load");
@@ -132,13 +135,9 @@ public class AdminExchangeClientsPageController {
    * @return the runs, newest first
    */
   private @NotNull List<ExchangeBulkUndoRunDto> undoRuns() {
-    try {
-      List<ExchangeBulkUndoRunDto> runs = exchangeClient.undoRuns();
-      return runs == null ? List.of() : runs;
-    } catch (Exception e) {
-      log.debug("Failed to load the bulk undo runs", e);
-      return List.of();
-    }
+    List<ExchangeBulkUndoRunDto> runs =
+        SectionFallback.load(log, "exchange-undo-runs", exchangeClient::undoRuns, List.of());
+    return runs == null ? List.of() : runs;
   }
 
   /**
@@ -148,16 +147,17 @@ public class AdminExchangeClientsPageController {
    * @return the usage by registry id, empty when it cannot be read
    */
   private @NotNull Map<UUID, ExchangeClientUsageDto> usage() {
-    try {
-      List<ExchangeClientUsageDto> rows = exchangeClient.usage();
-      Map<UUID, ExchangeClientUsageDto> byId = new HashMap<>();
-      if (rows != null) {
-        rows.forEach(row -> byId.put(row.id(), row));
-      }
-      return byId;
-    } catch (Exception e) {
-      log.debug("Failed to load the exchange client usage", e);
-      return Map.of();
-    }
+    return SectionFallback.load(
+        log,
+        "exchange-client-usage",
+        () -> {
+          List<ExchangeClientUsageDto> rows = exchangeClient.usage();
+          Map<UUID, ExchangeClientUsageDto> byId = new HashMap<>();
+          if (rows != null) {
+            rows.forEach(row -> byId.put(row.id(), row));
+          }
+          return byId;
+        },
+        Map.of());
   }
 }

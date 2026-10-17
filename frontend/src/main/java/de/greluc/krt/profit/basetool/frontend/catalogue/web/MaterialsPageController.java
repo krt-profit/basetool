@@ -25,10 +25,10 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialMatrixItem
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialPriceDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialPriceOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MatrixGridDto;
-import de.greluc.krt.profit.basetool.frontend.catalogue.model.TerminalDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogPages;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -172,42 +172,49 @@ public class MaterialsPageController {
   @NotNull
   @GetMapping
   public String listMaterials(Model model) {
-    try {
-      PageResponse<MaterialPriceOverviewDto> page = catalogueClient.materialPriceOverview();
-
-      List<MaterialPriceOverviewDto> materials = new ArrayList<>();
-      if (page != null && page.content() != null) {
-        materials = new ArrayList<>(page.content());
-      }
-
-      Map<String, List<MaterialPriceOverviewDto>> materialsByKind = new TreeMap<>();
-      for (MaterialPriceOverviewDto mat : materials) {
-        String kind =
-            mat.category() != null
-                    && mat.category().name() != null
-                    && !mat.category().name().isBlank()
-                ? mat.category().name()
-                : "Unsortiert";
-        materialsByKind.computeIfAbsent(kind, _ -> new ArrayList<>()).add(mat);
-      }
-      materialsByKind
-          .values()
-          .forEach(
-              list ->
-                  list.sort(
-                      Comparator.comparing(
-                          MaterialPriceOverviewDto::name, String.CASE_INSENSITIVE_ORDER)));
-
-      model.addAttribute("materials", materials);
-      model.addAttribute("materialsByKind", materialsByKind);
-    } catch (Exception e) {
-      log.error("Error loading materials overview", e);
+    if (!SectionFallback.run(log, "materials-overview", () -> addMaterialsByKind(model))) {
       model.addAttribute("error", "error.materials.load");
       model.addAttribute("materials", new ArrayList<>());
       model.addAttribute("materialsByKind", new TreeMap<>());
     }
 
     return "catalogue/materials";
+  }
+
+  /**
+   * Adds the price overview of all materials and the same materials grouped by category, each group
+   * sorted by name.
+   *
+   * @param model the materials page model
+   */
+  private void addMaterialsByKind(@NotNull Model model) {
+    PageResponse<MaterialPriceOverviewDto> page = catalogueClient.materialPriceOverview();
+
+    List<MaterialPriceOverviewDto> materials = new ArrayList<>();
+    if (page != null && page.content() != null) {
+      materials = new ArrayList<>(page.content());
+    }
+
+    Map<String, List<MaterialPriceOverviewDto>> materialsByKind = new TreeMap<>();
+    for (MaterialPriceOverviewDto mat : materials) {
+      String kind =
+          mat.category() != null
+                  && mat.category().name() != null
+                  && !mat.category().name().isBlank()
+              ? mat.category().name()
+              : "Unsortiert";
+      materialsByKind.computeIfAbsent(kind, _ -> new ArrayList<>()).add(mat);
+    }
+    materialsByKind
+        .values()
+        .forEach(
+            list ->
+                list.sort(
+                    Comparator.comparing(
+                        MaterialPriceOverviewDto::name, String.CASE_INSENSITIVE_ORDER)));
+
+    model.addAttribute("materials", materials);
+    model.addAttribute("materialsByKind", materialsByKind);
   }
 
   /**
@@ -222,26 +229,32 @@ public class MaterialsPageController {
   @GetMapping("/overview")
   public String getMatrixOverview(Model model) {
     model.addAttribute("uexAge", uexAge());
-    try {
-      List<MaterialMatrixItemDto> items = fetchMatrixItems();
-      model.addAttribute(
-          "starSystems",
-          items.stream()
-              .map(item -> item.starSystemName() != null ? item.starSystemName() : "")
-              .filter(s -> !s.isEmpty())
-              .collect(Collectors.toCollection(TreeSet::new)));
-      model.addAttribute(
-          "materialNames",
-          items.stream()
-              .map(MaterialMatrixItemDto::materialName)
-              .collect(Collectors.toCollection(TreeSet::new)));
-    } catch (Exception e) {
-      log.error("Error loading materials matrix filters", e);
+    if (!SectionFallback.run(log, "materials-matrix-filters", () -> addMatrixFilters(model))) {
       model.addAttribute("error", "error.materials.matrix.load");
       model.addAttribute("starSystems", new TreeSet<>());
       model.addAttribute("materialNames", new TreeSet<>());
     }
     return "catalogue/materials-overview";
+  }
+
+  /**
+   * Adds the sorted star-system and material-name filter lists taken from the cached matrix.
+   *
+   * @param model the matrix-overview model
+   */
+  private void addMatrixFilters(@NotNull Model model) {
+    List<MaterialMatrixItemDto> items = fetchMatrixItems();
+    model.addAttribute(
+        "starSystems",
+        items.stream()
+            .map(item -> item.starSystemName() != null ? item.starSystemName() : "")
+            .filter(s -> !s.isEmpty())
+            .collect(Collectors.toCollection(TreeSet::new)));
+    model.addAttribute(
+        "materialNames",
+        items.stream()
+            .map(MaterialMatrixItemDto::materialName)
+            .collect(Collectors.toCollection(TreeSet::new)));
   }
 
   /**
@@ -262,18 +275,17 @@ public class MaterialsPageController {
       @RequestParam(required = false) List<String> systems,
       @RequestParam(defaultValue = "false") boolean loadingDock,
       @RequestParam(defaultValue = "false") boolean autoLoad) {
-    try {
-      boolean unfiltered =
-          isEmptySelection(materials) && isEmptySelection(systems) && !loadingDock && !autoLoad;
-      List<MaterialMatrixItemDto> items =
-          unfiltered
-              ? fetchMatrixItems()
-              : fetchFilteredMatrixItems(materials, systems, loadingDock, autoLoad);
-      return buildGrid(items);
-    } catch (Exception e) {
-      log.error("Error loading materials matrix data", e);
-      return new MatrixGridDto(List.of(), List.of(), List.of());
-    }
+    boolean unfiltered =
+        isEmptySelection(materials) && isEmptySelection(systems) && !loadingDock && !autoLoad;
+    return SectionFallback.load(
+        log,
+        "materials-matrix-data",
+        () ->
+            buildGrid(
+                unfiltered
+                    ? fetchMatrixItems()
+                    : fetchFilteredMatrixItems(materials, systems, loadingDock, autoLoad)),
+        new MatrixGridDto(List.of(), List.of(), List.of()));
   }
 
   /**
@@ -460,27 +472,7 @@ public class MaterialsPageController {
   @GetMapping("/{id}")
   public String getMaterialDetail(@PathVariable @NotNull UUID id, Model model) {
     model.addAttribute("uexAge", uexAge());
-    try {
-      MaterialDto material = catalogueClient.material(id);
-      model.addAttribute("material", material);
-
-      CatalogPages.CompleteCatalog<MaterialPriceDto> prices =
-          CatalogPages.fetchAll(page -> catalogueClient.materialPricePage(id, page));
-      if (prices.truncated()) {
-        log.warn(
-            "Material {} price list hit the page-walk safety cap of {} pages — the detail table is"
-                + " incomplete",
-            id,
-            CatalogPages.MAX_CATALOG_PAGES);
-      }
-      List<MaterialPriceDto> priceList = new ArrayList<>(prices.items());
-      model.addAttribute("prices", priceList);
-      List<MaterialTerminalPrices.Row> rows =
-          MaterialTerminalPrices.rows(priceList, matrixItemsOf(id), Instant.now());
-      model.addAttribute("terminalRows", rows);
-      model.addAttribute("priceSummary", MaterialTerminalPrices.summarize(rows));
-    } catch (Exception e) {
-      log.error("Error loading material detail for id {}", id, e);
+    if (!SectionFallback.run(log, "material-detail", () -> addMaterialDetail(id, model))) {
       model.addAttribute("error", "error.material.details.load");
       model.addAttribute("material", null);
       model.addAttribute("prices", new ArrayList<>());
@@ -488,6 +480,33 @@ public class MaterialsPageController {
       model.addAttribute("priceSummary", MaterialTerminalPrices.summarize(List.of()));
     }
     return "catalogue/material-detail";
+  }
+
+  /**
+   * Adds the material, its complete price list, the terminal rows and the price summary.
+   *
+   * @param id the material
+   * @param model the detail page model
+   */
+  private void addMaterialDetail(@NotNull UUID id, @NotNull Model model) {
+    MaterialDto material = catalogueClient.material(id);
+    model.addAttribute("material", material);
+
+    CatalogPages.CompleteCatalog<MaterialPriceDto> prices =
+        CatalogPages.fetchAll(page -> catalogueClient.materialPricePage(id, page));
+    if (prices.truncated()) {
+      log.warn(
+          "Material {} price list hit the page-walk safety cap of {} pages — the detail table is"
+              + " incomplete",
+          id,
+          CatalogPages.MAX_CATALOG_PAGES);
+    }
+    List<MaterialPriceDto> priceList = new ArrayList<>(prices.items());
+    model.addAttribute("prices", priceList);
+    List<MaterialTerminalPrices.Row> rows =
+        MaterialTerminalPrices.rows(priceList, matrixItemsOf(id), Instant.now());
+    model.addAttribute("terminalRows", rows);
+    model.addAttribute("priceSummary", MaterialTerminalPrices.summarize(rows));
   }
 
   /**
@@ -499,12 +518,11 @@ public class MaterialsPageController {
    */
   @NotNull
   private List<MaterialMatrixItemDto> matrixItemsOf(@NotNull UUID id) {
-    try {
-      return MaterialTerminalPrices.forMaterial(fetchMatrixItems(), id);
-    } catch (Exception e) {
-      log.warn("Price matrix unavailable for the locations of material {}", id, e);
-      return List.of();
-    }
+    return SectionFallback.load(
+        log,
+        "material-locations",
+        () -> MaterialTerminalPrices.forMaterial(fetchMatrixItems(), id),
+        List.of());
   }
 
   /**
@@ -514,12 +532,10 @@ public class MaterialsPageController {
    */
   @Nullable
   private UexAge uexAge() {
-    try {
-      PageResponse<TerminalDto> terminals = catalogueClient.terminalCatalogue();
-      return UexAge.of(UexAge.latestSync(terminals), Instant.now());
-    } catch (Exception e) {
-      log.warn("Terminal catalogue unavailable for the UEX freshness hint", e);
-      return null;
-    }
+    return SectionFallback.load(
+        log,
+        "uex-age",
+        () -> UexAge.of(UexAge.latestSync(catalogueClient.terminalCatalogue()), Instant.now()),
+        null);
   }
 }

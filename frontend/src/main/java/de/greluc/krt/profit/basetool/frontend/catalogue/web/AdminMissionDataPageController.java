@@ -722,19 +722,14 @@ public class AdminMissionDataPageController {
    * UI. Backend uses pessimistic locking to serialize concurrent reorders.
    *
    * @param ids frequency-type ids in the desired new order
-   * @return 200 on success, 500 on backend failure
+   * @return 200 on success; a failure is answered by the global handler with the backend's status
    */
   @PostMapping("/frequency-types/reorder")
   @ResponseBody
   public ResponseEntity<Void> reorderFrequencyTypes(@RequestBody List<UUID> ids) {
-    try {
-      catalogueClient.reorderFrequencyTypes(ids);
-      cacheEviction.clearStaticDataCache();
-      return ResponseEntity.ok().build();
-    } catch (Exception e) {
-      log.error("Reorder FrequencyTypes failed", e);
-      return ResponseEntity.status(500).build();
-    }
+    catalogueClient.reorderFrequencyTypes(ids);
+    cacheEviction.clearStaticDataCache();
+    return ResponseEntity.ok().build();
   }
 
   /**

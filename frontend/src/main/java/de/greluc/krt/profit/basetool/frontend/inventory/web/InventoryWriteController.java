@@ -64,7 +64,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
@@ -184,9 +183,6 @@ public class InventoryWriteController {
     } catch (BackendServiceException e) {
       log.debug("Failed to add inventory item (ajax): {}", e.getMessage());
       return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Failed to add inventory item (ajax)", e);
-      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -482,9 +478,6 @@ public class InventoryWriteController {
       log.debug(
           "Failed to transfer inventory item: status={}, {}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Failed to transfer inventory item", e);
-      return ResponseEntity.status(500).build();
     }
   }
 
@@ -507,9 +500,6 @@ public class InventoryWriteController {
       log.debug(
           "Failed to rebook inventory item: status={}, {}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Failed to rebook inventory item", e);
-      return ResponseEntity.status(500).build();
     }
   }
 
@@ -532,9 +522,6 @@ public class InventoryWriteController {
     } catch (BackendServiceException e) {
       log.debug("Failed to bulk-checkout inventory items (ajax): {}", e.getMessage());
       return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Failed to bulk-checkout inventory items (ajax)", e);
-      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -562,9 +549,6 @@ public class InventoryWriteController {
     } catch (BackendServiceException e) {
       log.debug("Failed to bulk-rebook inventory items (ajax): {}", e.getMessage());
       return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Failed to bulk-rebook inventory items (ajax)", e);
-      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -587,12 +571,6 @@ public class InventoryWriteController {
       log.debug(
           "Failed to add inventory allocation: status={}, {}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
-    } catch (WebClientResponseException e) {
-      log.error("Failed to add inventory allocation: {}", e.getMessage());
-      return ResponseEntity.status(e.getStatusCode()).build();
-    } catch (Exception e) {
-      log.error("Failed to add inventory allocation", e);
-      return ResponseEntity.status(500).build();
     }
   }
 
@@ -617,12 +595,6 @@ public class InventoryWriteController {
           e.getStatusCode(),
           e.getMessage());
       return propagateBackendError(e);
-    } catch (WebClientResponseException e) {
-      log.error("Failed to change inventory allocation: {}", e.getMessage());
-      return ResponseEntity.status(e.getStatusCode()).build();
-    } catch (Exception e) {
-      log.error("Failed to change inventory allocation", e);
-      return ResponseEntity.status(500).build();
     }
   }
 
@@ -647,12 +619,6 @@ public class InventoryWriteController {
           e.getStatusCode(),
           e.getMessage());
       return propagateBackendError(e);
-    } catch (WebClientResponseException e) {
-      log.error("Failed to remove inventory allocation: {}", e.getMessage());
-      return ResponseEntity.status(e.getStatusCode()).build();
-    } catch (Exception e) {
-      log.error("Failed to remove inventory allocation", e);
-      return ResponseEntity.status(500).build();
     }
   }
 
@@ -673,12 +639,6 @@ public class InventoryWriteController {
       log.debug(
           "Failed to update inventory item note: status={}, {}", e.getStatusCode(), e.getMessage());
       return ResponseEntity.status(e.getStatusCode()).build();
-    } catch (WebClientResponseException e) {
-      log.error("Failed to update inventory item note: {}", e.getMessage());
-      return ResponseEntity.status(e.getStatusCode()).build();
-    } catch (Exception e) {
-      log.error("Failed to update inventory item note", e);
-      return ResponseEntity.status(500).build();
     }
   }
 
@@ -698,12 +658,6 @@ public class InventoryWriteController {
       log.debug(
           "Failed to update delivered status: status={}, {}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
-    } catch (WebClientResponseException e) {
-      log.error("Failed to update delivered status: {}", e.getMessage());
-      return ResponseEntity.status(e.getStatusCode()).build();
-    } catch (Exception e) {
-      log.error("Failed to update delivered status", e);
-      return ResponseEntity.status(500).build();
     }
   }
 }

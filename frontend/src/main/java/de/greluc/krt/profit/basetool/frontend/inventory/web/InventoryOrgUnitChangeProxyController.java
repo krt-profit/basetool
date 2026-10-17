@@ -79,9 +79,6 @@ public class InventoryOrgUnitChangeProxyController {
           e.getStatusCode(),
           e.getMessage());
       return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Failed to change inventory item org unit", e);
-      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -103,9 +100,6 @@ public class InventoryOrgUnitChangeProxyController {
     } catch (BackendServiceException e) {
       log.debug("Failed to bulk-change inventory org units: {}", e.getMessage());
       return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Failed to bulk-change inventory org units", e);
-      return ResponseEntity.internalServerError().build();
     }
   }
 

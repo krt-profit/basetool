@@ -376,10 +376,6 @@ public class MemberManagementController {
             .body(Map.of("rank", rankRefusalMessage(e, locale)));
       }
       return relayBackendError("AJAX member update failed", e);
-    } catch (Exception e) {
-      log.error("AJAX member update failed", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(Map.of("code", "INTERNAL_ERROR"));
     }
   }
 
@@ -533,10 +529,6 @@ public class MemberManagementController {
       return ResponseEntity.ok(Map.of());
     } catch (BackendServiceException e) {
       return relayBackendError("AJAX member delete failed", e);
-    } catch (Exception e) {
-      log.error("AJAX member delete failed", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(Map.of("code", "INTERNAL_ERROR"));
     }
   }
 
@@ -556,10 +548,6 @@ public class MemberManagementController {
       return ResponseEntity.ok(Map.of("syncedCount", syncedCount));
     } catch (BackendServiceException e) {
       return relayBackendError("AJAX member sync failed", e);
-    } catch (Exception e) {
-      log.error("AJAX member sync failed", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(Map.of("code", "INTERNAL_ERROR"));
     }
   }
 
@@ -583,10 +571,6 @@ public class MemberManagementController {
       return ResponseEntity.ok(survivor);
     } catch (BackendServiceException e) {
       return relayBackendError("AJAX member consolidate failed", e);
-    } catch (Exception e) {
-      log.error("AJAX member consolidate failed", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(Map.of("code", "INTERNAL_ERROR"));
     }
   }
 }

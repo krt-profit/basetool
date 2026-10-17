@@ -21,9 +21,9 @@ package de.greluc.krt.profit.basetool.frontend.identity.web;
 
 import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.identity.model.PersonSearchResultDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -74,19 +74,7 @@ public class AdminPersonSearchPageController {
     model.addAttribute("searched", false);
 
     if (term.length() >= 3) {
-      try {
-        PersonSearchResultDto result = identityClient.personSearch(term);
-        model.addAttribute("hits", result == null ? List.of() : result.hits());
-        model.addAttribute("truncated", result != null && result.truncated());
-        model.addAttribute(
-            "cappedColumns",
-            result == null || result.cappedColumns() == null ? List.of() : result.cappedColumns());
-        model.addAttribute("searched", true);
-      } catch (BackendServiceException e) {
-        log.debug("Person search failed with status {}", e.getStatusCode());
-        model.addAttribute("error", "admin.personSearch.error.load");
-      } catch (Exception e) {
-        log.error("Person search failed unexpectedly", e);
+      if (!SectionFallback.run(log, "person-search", () -> addResults(term, model))) {
         model.addAttribute("error", "admin.personSearch.error.load");
       }
     } else if (!term.isEmpty()) {
@@ -96,5 +84,21 @@ public class AdminPersonSearchPageController {
     return "results".equals(fragment)
         ? "identity/admin/person-search :: results"
         : "identity/admin/person-search";
+  }
+
+  /**
+   * Runs the search and adds its hits, the truncation flag and the capped columns.
+   *
+   * @param term the trimmed search term, at least three characters long
+   * @param model the view model
+   */
+  private void addResults(@NotNull String term, @NotNull Model model) {
+    PersonSearchResultDto result = identityClient.personSearch(term);
+    model.addAttribute("hits", result == null ? List.of() : result.hits());
+    model.addAttribute("truncated", result != null && result.truncated());
+    model.addAttribute(
+        "cappedColumns",
+        result == null || result.cappedColumns() == null ? List.of() : result.cappedColumns());
+    model.addAttribute("searched", true);
   }
 }
