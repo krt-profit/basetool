@@ -31,7 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Persists and audits the bank balance-visibility grants (role bucket, all members, area members,
- * individual user) on behalf of {@link OrgUnitBankAccessService} (REQ-BANK-035).
+ * individual user) on behalf of {@link OrgUnitBankSettingsService} (REQ-BANK-035).
  *
  * <p>Callers pass an already-loaded, already-authorized {@link BankAccount}; the service depends on
  * neither {@link OwnerScopeService} nor {@link BankAccountRepository} (ADR-0020). Each mutation

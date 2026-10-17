@@ -275,6 +275,9 @@ the grant table.
 > (pinned by `ArchitectureTest.orgUnitAwareBankSeamIsContainedToOneClass`). The officer/lead
 > surface lives beside the bank-employee one at `/api/v1/bank/org-units/**` (moved there from
 > `/api/v1/org-units/bank/**` in wave 4 of the API cut) and is decided in that seam, not by a bank role.
+> The settings and booking-request flows of that surface run in `OrgUnitBankSettingsService` and
+> `OrgUnitBankRequestService`, which take every verdict from the seam and depend on no scope class
+> themselves (ADR-0266).
 >
 > **Amendment (epic #692, REQ-BANK-027):** the same seam — still the only org-unit bridge — extends this
 > narrow capability **up the hierarchy**: a Bereichsleitung over its `AREA` account, the OL over the
@@ -1584,7 +1587,7 @@ The bank-staff write is `PUT /api/v1/bank/accounts/{id}/balance-target` (full re
 target, `{target, version}` as the org-unit twin `PUT /api/v1/bank/org-units/accounts/{id}/balance-target`;
 it was a `PATCH` before wave 4 of the API cut). Both echo the version and write the same audit events.
 
-**Enforced by:** `OrgUnitBankAccessServiceTest` (holder-only set, version check), `BankAccountServiceTest` (bank-staff set/clear + audit) · **Code:** `bank/internal/BankAccount#balanceTarget`, `bank/internal/OrgUnitBankAccessService#setBalanceTarget`, `bank/internal/BankAccountService#setBalanceTarget`, `bank/web/OrgUnitBankController` / `BankAccountController`, `db/migration/V189` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
+**Enforced by:** `OrgUnitBankAccessServiceTest` (holder-only set, version check), `BankAccountServiceTest` (bank-staff set/clear + audit) · **Code:** `bank/internal/BankAccount#balanceTarget`, `bank/internal/OrgUnitBankSettingsService#setBalanceTarget`, `bank/internal/BankAccountService#setBalanceTarget`, `bank/web/OrgUnitBankController` / `BankAccountController`, `db/migration/V189` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
 
 ### REQ-BANK-037 — Fixed cartel/special visibility (KRT account & Sonderkonten)
 
@@ -1695,7 +1698,8 @@ at all. The bank stays org-unit-blind: eligibility is decided in the `OrgUnitBan
 
 **Enforced by:** `OrgUnitBankAccessServiceTest` (canView gate replaces own-level on create; a
 view-granted member may request), `ArchitectureTest` (`bankClassesMustNotConsultOrgUnitScope`) ·
-**Code:** `bank/internal/OrgUnitBankAccessService#createBookingRequest` / `#isRequestCapable` ·
+**Code:** `bank/internal/OrgUnitBankRequestService#createBookingRequest` /
+`OrgUnitBankAccessService#isRequestCapable` ·
 **ADR:** [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md) · **Issues:** —
 
 ### REQ-BANK-040 — User-initiated transfer requests
@@ -1954,7 +1958,7 @@ withdrawal/transfer, and no approval-limit warning is shown for a deposit.
 without consulting oversight scope or the limit rows; deposit never flags approval; destination
 rejected), `OrgUnitBankPageControllerMvcTest` (deposit picker lists all active accounts; CTA shown),
 `ArchitectureTest` (`bankClassesMustNotConsultOrgUnitScope`), e2e `BankOrgUnitRequestsE2eTest` ·
-**Code:** `bank/internal/OrgUnitBankAccessService#createBookingRequest`, `bank/web/OrgUnitBankController`,
+**Code:** `bank/internal/OrgUnitBankRequestService#createBookingRequest`, `bank/web/OrgUnitBankController`,
 frontend `bank/web/OrgUnitBankPageController`, `templates/bank/org-unit-bank.html`, `static/js/bank/bank.js` ·
 **ADR:** [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md) (amendment) ·
 **Issues:** —
@@ -2786,7 +2790,7 @@ frontend `OrgUnitBankPageControllerMvcTest`, `BankOrgUnitRequestsE2eTest` (the s
 real UI) · **Code:** `bank/internal/BankBookingRequest`, `bank/internal/CreateBankBookingRequest`,
 `bank/internal/BankBookingRequestDto`, `bank/internal/BankBookingRequestService`
 (`resolveRequestCounterparty`, `applyCounterparty`, `confirmCounterpartyOrgUnitId`),
-`bank/internal/OrgUnitBankAccessService#createBookingRequest`, `db/migration/V232`, frontend
+`bank/internal/OrgUnitBankRequestService#createBookingRequest`, `db/migration/V232`, frontend
 `bank/web/OrgUnitBankPageController`, `templates/bank/fragments/bank-counterparty.html`
 (`requestCounterpartyBlock`), `templates/bank/org-unit-bank.html`, `static/js/bank/bank.js`
 (`syncRequestCounterparty`)
@@ -2866,7 +2870,7 @@ already-approved 409, not-pending 409, foreign 404, version 409, mandatory-Begr�
 frontend `OrgUnitBankPageControllerMvcTest` (modal renders after the table, withheld once approved),
 `BankOrgUnitRequestsE2eTest` · **Code:** `bank/internal/BankBookingRequest` (relaxed `updatable`),
 `bank/internal/UpdateBankBookingRequest`, `bank/internal/BankBookingRequestService#updateOwn`,
-`bank/internal/OrgUnitBankAccessService#updateOwnBookingRequest` / `#resolveApprovalRouting`,
+`bank/internal/OrgUnitBankRequestService#updateOwnBookingRequest` / `#resolveApprovalRouting`,
 `bank/web/OrgUnitBankController`, `bank/api/BankConflictException`,
 `bank/internal/BankAuditEventType`, frontend `bank/web/OrgUnitBankProxyController`,
 `audit/web/AdminAuditLogPageController` (audit filter), `templates/bank/org-unit-bank.html` ·
@@ -2927,7 +2931,7 @@ staff queue shows a chip for the kind. The booked transaction is reached through
 
 **Enforced by:** `PurposeBoundRoutingTest`, `BankPurposeBoundRequestServiceTest` · **Code:**
 `bank/api/PurposeBoundRequests`, `bank/internal/BankPurposeBoundRequestsService`,
-`bank/internal/OrgUnitBankAccessService#raisePurposeBoundRequest`, `V287__bank_booking_request_purpose.sql`
+`bank/internal/OrgUnitBankRequestService#raisePurposeBoundRequest`, `V287__bank_booking_request_purpose.sql`
 · **ADR:** [ADR-0254](../adr/0254-a-bank-booking-request-may-carry-an-opaque-purpose.md)
 
 ### REQ-BANK-063 — Purpose observer

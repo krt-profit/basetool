@@ -1,6 +1,6 @@
 # ADR-0065 — Split `OwnerScopeService` into a scope/gate/stamping trio and extract the org-unit-bank write mechanics
 
-- **Status:** Accepted — implemented; amended 2026-10-02 by [ADR-0236](0236-each-domain-owns-an-access-policy-over-the-scope-kernel.md) (access policies per domain, see below). *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-07-02 (`9e37776bf`: `RequestScopeResolver`, `AccessGateService`, `OrgUnitStampingService`, `OrgUnitBankVisibilityService`, `OrgUnitBankApprovalLimitService`).
+- **Status:** Accepted — implemented; amended 2026-10-02 by [ADR-0236](0236-each-domain-owns-an-access-policy-over-the-scope-kernel.md) (access policies per domain, see below); bank half amended 2026-10-17 by [ADR-0266](0266-the-org-unit-bank-seam-and-the-live-sync-relay-split-by-responsibility.md). *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-07-02 (`9e37776bf`: `RequestScopeResolver`, `AccessGateService`, `OrgUnitStampingService`, `OrgUnitBankVisibilityService`, `OrgUnitBankApprovalLimitService`).
 - **Date:** 2026-07-02
 - **Deciders:** Repository owner (@greluc)
 - **Related:** issue #922 (L3, epic #905) · ADR-0061 / ADR-0062 (the `MissionService` / `JobOrderService` splits, same delegating-facade pattern) · ADR-0020 (org-unit-aware bank seam) · REQ-BANK-008 / REQ-AUDIT-001 · the ArchUnit invariants `orgUnitAwareBankSeamIsContainedToOneClass`, `bankClassesMustNotConsultOrgUnitScope`, `staffelScopedServicesMustWireOwnerScopeOrAuthHelper`
@@ -55,3 +55,11 @@ explicitly first, the SpEL of one domain is re-pointed per pull request, the bod
 a differential verdict test proves identical verdicts, and the facade methods are deleted last.
 `RequestScopeResolver` and `OrgUnitStampingService` stay in the `scope` kernel. The bank half of
 this decision is unchanged.
+
+## Amendment — 2026-10-17: the org-unit bank flows leave the seam
+
+[ADR-0266](0266-the-org-unit-bank-seam-and-the-live-sync-relay-split-by-responsibility.md).
+The seam keeps the whole authorization brain and the read flows, as decided here; the settings
+flows move into `OrgUnitBankSettingsService` and the booking-request flows into
+`OrgUnitBankRequestService`. Both ask the seam for every verdict and depend on neither
+`OwnerScopeService` nor any other scope class, so the seam stays the one bridge.

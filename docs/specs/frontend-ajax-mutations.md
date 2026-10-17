@@ -1576,8 +1576,9 @@ and **only** on success) · `AdminOrgStructurePageControllerMvcTest` (the `units
 seams render their own section and nothing else) · `RefineryOrderDetailFragmentMvcTest` (the
 `refinery-order:{id}` sections render section-sized, gate their catalog lookups, and degrade to an
 inline error rather than a redirect) · **Code:**
-`LiveSyncWebSocketHandler`, `LiveSyncTopicClass`, `LiveSyncSubscriptionAuthorizer`,
-`LiveSyncLocalBus`, `RedisLiveSyncFanout`, `LiveSyncPresenceService` (local + mirrored halves),
+`LiveSyncWebSocketHandler` (with its collaborators `LiveSyncSessionRegistry`,
+`LiveSyncSubscriptions`, `LiveSyncRooms`, `LiveSyncRateLimiter` and `LiveSyncSections`, ADR-0266),
+`LiveSyncTopicClass`, `LiveSyncSubscriptionAuthorizer`, `LiveSyncLocalBus`, `RedisLiveSyncFanout`, `LiveSyncPresenceService` (local + mirrored halves),
 `LiveSyncProperties` (`app.livesync.redis.presence-channel`), `krt-live-sync.js`, the per-page seam
 maps
 (`MISSION_SECTIONS`, `OPERATION_SECTIONS`, `ORDER_SECTIONS`, orders-queue seam, bank
@@ -1930,7 +1931,7 @@ to fall out of sync after a reconnect. Three events: `subscribed` once, naming t
 for the same proxy and NAT reasons.
 
 **The per-stream topic cap is therefore a per-client budget, and it is 16** —
-`LiveSyncController.MAX_TOPICS_PER_STREAM`, matching `LiveSyncWebSocketHandler.MAX_TOPICS_PER_SESSION`
+`LiveSyncController.MAX_TOPICS_PER_STREAM`, matching `LiveSyncSubscriptions.MAX_TOPICS_PER_SESSION`
 for the web relay's identical union shape. It was 8, sized against "what the busiest screen needs",
 and the number was wrong because the shape was: screens left on the back stack keep their rooms, so a
 member moving through the app accumulates them. In production one member crossed 8, and because the

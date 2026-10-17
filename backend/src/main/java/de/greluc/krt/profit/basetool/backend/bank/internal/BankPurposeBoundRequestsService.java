@@ -41,7 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class BankPurposeBoundRequestsService implements PurposeBoundRequests {
 
-  private final OrgUnitBankAccessService accessService;
+  private final OrgUnitBankRequestService orgUnitBankRequestService;
   private final BankBookingRequestService requestService;
 
   @Override
@@ -52,7 +52,7 @@ public class BankPurposeBoundRequestsService implements PurposeBoundRequests {
       @NotNull UUID recipientUserId,
       @NotNull BankPurpose purpose,
       @NotNull String justification) {
-    return accessService
+    return orgUnitBankRequestService
         .raisePurposeBoundRequest(
             accountId,
             BankBookingRequestType.WITHDRAWAL,
@@ -67,7 +67,7 @@ public class BankPurposeBoundRequestsService implements PurposeBoundRequests {
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull UUID requestDeposit(
       @NotNull UUID accountId, @NotNull BigDecimal amount, @NotNull BankPurpose purpose) {
-    return accessService
+    return orgUnitBankRequestService
         .raisePurposeBoundRequest(
             accountId, BankBookingRequestType.DEPOSIT, amount, null, null, purpose)
         .id();
