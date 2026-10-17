@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.frontend.blueprint.model.DefaultBlueprintDt
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -39,6 +40,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.event.Level;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -119,18 +121,16 @@ public class AdminDefaultBlueprintsPageController {
   @ResponseBody
   public List<BlueprintProductDto> search(
       @RequestParam(required = false) String q, @RequestParam(required = false) Integer limit) {
-    try {
-      String query = q == null ? "" : q;
-      int effectiveLimit = limit == null ? 25 : Math.clamp(limit, 1, 200);
-      List<BlueprintProductDto> result = blueprintClient.searchProducts(query, effectiveLimit);
-      return result == null ? Collections.emptyList() : result;
-    } catch (Exception e) {
-      log.debug(
-          "Default-blueprint product type-ahead failed for query='{}': {}",
-          LogSafe.text(q, MAX_LOGGED_QUERY),
-          e.getMessage());
-      return Collections.emptyList();
-    }
+    String query = q == null ? "" : q;
+    int effectiveLimit = limit == null ? 25 : Math.clamp(limit, 1, 200);
+    List<BlueprintProductDto> result =
+        SectionFallback.load(
+            log,
+            Level.DEBUG,
+            "default-blueprint-product-search",
+            () -> blueprintClient.searchProducts(query, effectiveLimit),
+            null);
+    return result == null ? Collections.emptyList() : result;
   }
 
   /**
@@ -232,25 +232,39 @@ public class AdminDefaultBlueprintsPageController {
         continue;
       }
       String key = raw.trim();
-      try {
-        blueprintClient.addDefault(new DefaultBlueprintCreateRequest(key));
-        added++;
-      } catch (BackendServiceException e) {
-        if (e.getStatusCode() == HttpStatus.CONFLICT.value()) {
-          skipped++;
-          continue;
-        }
-        log.debug(
-            "Failed to add default blueprint '{}': {}",
-            LogSafe.text(key, MAX_LOGGED_QUERY),
-            e.getMessage());
-        failedKeys.add(key);
-      } catch (Exception e) {
-        log.error("Failed to add default blueprint '{}'", LogSafe.text(key, MAX_LOGGED_QUERY), e);
-        failedKeys.add(key);
+      AddOutcome outcome =
+          SectionFallback.load(log, "default-blueprint-add", () -> addOne(key), AddOutcome.FAILED);
+      switch (outcome) {
+        case ADDED -> added++;
+        case SKIPPED -> skipped++;
+        case FAILED -> failedKeys.add(key);
+        case null -> failedKeys.add(key);
       }
     }
     return new DefaultBlueprintAddResultDto(added, skipped, failedKeys);
+  }
+
+  /**
+   * Adds one product key to the default set; a backend {@code 409} means it is already there.
+   *
+   * @param key the trimmed, non-blank product key
+   * @return the outcome for this key
+   */
+  @NotNull
+  private AddOutcome addOne(@NotNull String key) {
+    try {
+      blueprintClient.addDefault(new DefaultBlueprintCreateRequest(key));
+      return AddOutcome.ADDED;
+    } catch (BackendServiceException e) {
+      if (e.getStatusCode() == HttpStatus.CONFLICT.value()) {
+        return AddOutcome.SKIPPED;
+      }
+      log.debug(
+          "Failed to add default blueprint '{}': {}",
+          LogSafe.text(key, MAX_LOGGED_QUERY),
+          e.getMessage());
+      return AddOutcome.FAILED;
+    }
   }
 
   /**
@@ -260,15 +274,18 @@ public class AdminDefaultBlueprintsPageController {
    * @return the default set, or an empty list on failure
    */
   private List<DefaultBlueprintDto> fetchDefaults() {
-    try {
-      List<DefaultBlueprintDto> result = blueprintClient.defaults();
-      return result == null ? Collections.emptyList() : result;
-    } catch (BackendServiceException e) {
-      log.debug("Failed to fetch default blueprints", e);
-      return Collections.emptyList();
-    } catch (Exception e) {
-      log.error("Failed to fetch default blueprints", e);
-      return Collections.emptyList();
-    }
+    List<DefaultBlueprintDto> result =
+        SectionFallback.load(log, "default-blueprints", blueprintClient::defaults, null);
+    return result == null ? Collections.emptyList() : result;
+  }
+
+  /** The outcome of adding one staged product key to the default set. */
+  private enum AddOutcome {
+    /** The key was added. */
+    ADDED,
+    /** The key was already in the default set. */
+    SKIPPED,
+    /** The backend refused or failed the add. */
+    FAILED
   }
 }

@@ -34,10 +34,11 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceExcep
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.StringNormalization;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryItemDto;
-import de.greluc.krt.profit.basetool.logging.LogSafe;
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -46,6 +47,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.event.Level;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -84,13 +86,6 @@ public class PersonalInventoryBlueprintsPageController {
    * #FETCH_PAGE_SIZE} per page this matches the backend's own {@code size} clamp ({@code 100000}).
    */
   private static final int MAX_PAGES = 200;
-
-  /**
-   * Character budget for the type-ahead term when it is written to a log line. A product name a
-   * user could plausibly be typing fits comfortably; anything longer is a paste or an attack and is
-   * truncated by {@link LogSafe#text(String, int)} rather than allowed to stretch the line.
-   */
-  private static final int MAX_LOGGED_QUERY = 80;
 
   /** Sends the page's blueprint and item-count requests. */
   private final BlueprintBackendClient blueprintClient;
@@ -143,13 +138,10 @@ public class PersonalInventoryBlueprintsPageController {
    */
   @Nullable
   private Long countItems() {
-    try {
-      PageResponse<PersonalInventoryItemDto> page = blueprintClient.inventoryItemCountPage();
-      return page == null ? null : page.totalElements();
-    } catch (Exception e) {
-      log.debug("Failed to count personal inventory items: {}", e.getMessage());
-      return null;
-    }
+    PageResponse<PersonalInventoryItemDto> page =
+        SectionFallback.load(
+            log, "personal-inventory-item-count", blueprintClient::inventoryItemCountPage, null);
+    return page == null ? null : page.totalElements();
   }
 
   /**
@@ -166,18 +158,16 @@ public class PersonalInventoryBlueprintsPageController {
   @ResponseBody
   public List<BlueprintProductDto> search(
       @RequestParam(required = false) String q, @RequestParam(required = false) Integer limit) {
-    try {
-      String query = q == null ? "" : q;
-      int effectiveLimit = limit == null ? 25 : Math.clamp(limit, 1, 200);
-      List<BlueprintProductDto> result = blueprintClient.searchProducts(query, effectiveLimit);
-      return result == null ? Collections.emptyList() : result;
-    } catch (Exception e) {
-      log.debug(
-          "Blueprint product type-ahead failed for query='{}': {}",
-          LogSafe.text(q, MAX_LOGGED_QUERY),
-          e.getMessage());
-      return Collections.emptyList();
-    }
+    String query = q == null ? "" : q;
+    int effectiveLimit = limit == null ? 25 : Math.clamp(limit, 1, 200);
+    List<BlueprintProductDto> result =
+        SectionFallback.load(
+            log,
+            Level.DEBUG,
+            "blueprint-product-search",
+            () -> blueprintClient.searchProducts(query, effectiveLimit),
+            null);
+    return result == null ? Collections.emptyList() : result;
   }
 
   /**
@@ -192,13 +182,9 @@ public class PersonalInventoryBlueprintsPageController {
   @GetMapping("/{id}/recipe")
   @ResponseBody
   public PersonalBlueprintRecipeDto recipe(@PathVariable @NotNull UUID id) {
-    try {
-      PersonalBlueprintRecipeDto result = blueprintClient.recipe(id);
-      return result == null ? emptyRecipe() : result;
-    } catch (Exception e) {
-      log.warn("Failed to fetch blueprint recipe {}: {}", id, e.getMessage());
-      return emptyRecipe();
-    }
+    PersonalBlueprintRecipeDto result =
+        SectionFallback.load(log, "blueprint-recipe", () -> blueprintClient.recipe(id), null);
+    return result == null ? emptyRecipe() : result;
   }
 
   /**
@@ -213,13 +199,13 @@ public class PersonalInventoryBlueprintsPageController {
   @ResponseBody
   public List<BlueprintCraftabilityDto> craftability(
       @RequestParam(required = false, defaultValue = "false") boolean includeRefinery) {
-    try {
-      List<BlueprintCraftabilityDto> result = blueprintClient.craftability(includeRefinery);
-      return result == null ? Collections.emptyList() : result;
-    } catch (Exception e) {
-      log.warn("Failed to fetch blueprint craftability: {}", e.getMessage());
-      return Collections.emptyList();
-    }
+    List<BlueprintCraftabilityDto> result =
+        SectionFallback.load(
+            log,
+            "blueprint-craftability",
+            () -> blueprintClient.craftability(includeRefinery),
+            null);
+    return result == null ? Collections.emptyList() : result;
   }
 
   /**
@@ -250,14 +236,13 @@ public class PersonalInventoryBlueprintsPageController {
     if (keys.isEmpty()) {
       return new PersonalBlueprintBatchResultDto(0, 0, 0);
     }
-    try {
-      PersonalBlueprintBatchResultDto result =
-          blueprintClient.addOwned(new PersonalBlueprintBatchCreateRequest(keys));
-      return result == null ? new PersonalBlueprintBatchResultDto(0, 0, 0) : result;
-    } catch (Exception e) {
-      log.error("Batch blueprint add failed for {} key(s)", keys.size(), e);
-      return new PersonalBlueprintBatchResultDto(0, 0, 0);
-    }
+    PersonalBlueprintBatchResultDto result =
+        SectionFallback.load(
+            log,
+            "blueprint-batch-add",
+            () -> blueprintClient.addOwned(new PersonalBlueprintBatchCreateRequest(keys)),
+            null);
+    return result == null ? new PersonalBlueprintBatchResultDto(0, 0, 0) : result;
   }
 
   /**
@@ -423,23 +408,30 @@ public class PersonalInventoryBlueprintsPageController {
   @NotNull
   private List<PersonalBlueprintDto> fetchAllOwned(String q) {
     List<PersonalBlueprintDto> all = new ArrayList<>();
-    try {
-      int page = 0;
-      while (page < MAX_PAGES) {
-        PageResponse<PersonalBlueprintDto> response = fetchOwnedPage(q, page);
-        if (response == null || response.content() == null || response.content().isEmpty()) {
-          break;
-        }
-        all.addAll(response.content());
-        if (page + 1 >= response.totalPages()) {
-          break;
-        }
-        page++;
-      }
-    } catch (Exception e) {
-      log.error("Failed to fetch owned blueprints", e);
-    }
+    SectionFallback.run(log, "owned-blueprints", () -> collectOwnedPages(q, all));
     return all;
+  }
+
+  /**
+   * Appends the caller's owned blueprints page by page until the last page, an empty page or {@link
+   * #MAX_PAGES}.
+   *
+   * @param q optional case-insensitive product-name filter applied server-side
+   * @param all the list receiving each page's blueprints; keeps what was gathered when a call fails
+   */
+  private void collectOwnedPages(@Nullable String q, @NotNull List<PersonalBlueprintDto> all) {
+    int page = 0;
+    while (page < MAX_PAGES) {
+      PageResponse<PersonalBlueprintDto> response = fetchOwnedPage(q, page);
+      if (response == null || response.content() == null || response.content().isEmpty()) {
+        break;
+      }
+      all.addAll(response.content());
+      if (page + 1 >= response.totalPages()) {
+        break;
+      }
+      page++;
+    }
   }
 
   /**
@@ -469,7 +461,7 @@ public class PersonalInventoryBlueprintsPageController {
     }
     try {
       return Instant.parse(iso.trim());
-    } catch (Exception _) {
+    } catch (DateTimeParseException _) {
       log.debug("Ignoring unparseable acquiredAt '{}'", iso);
       return null;
     }
