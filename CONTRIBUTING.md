@@ -781,7 +781,9 @@ that — promotion to `:stable` and the host rollout — is in
 - **SpotBugs** runs as part of `check`. Same rule: no new findings on
   top of pre-existing ones.
 - **Constructor injection only**, ideally via Lombok
-  `@RequiredArgsConstructor`. No field `@Autowired`.
+  `@RequiredArgsConstructor`. No field `@Autowired`
+  (`ArchitectureTest.noFieldIsAutowired`); a MapStruct abstract mapper
+  takes its collaborators through package-private `@Autowired` setters.
 - **Records** for DTOs and immutable config wrappers; no equivalent
   POJOs.
 - **Lombok** — lean on it (`@Slf4j`, `@Getter`, `@Setter`, `@Builder`,

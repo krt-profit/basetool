@@ -23,6 +23,9 @@ scrape_configs:
 
   - job_name: basetool-backend
     metrics_path: /actuator/prometheus
+    basic_auth:
+      username: monitoring
+      password_file: /etc/prometheus/secrets/scrape_password
     scheme: https
     tls_config:
       ca_file: /etc/prometheus/certs/basetool-ca.crt
@@ -34,6 +37,9 @@ scrape_configs:
 
   - job_name: basetool-frontend
     metrics_path: /actuator/prometheus
+    basic_auth:
+      username: monitoring
+      password_file: /etc/prometheus/secrets/scrape_password
     scheme: https
     tls_config:
       ca_file: /etc/prometheus/certs/basetool-ca.crt
@@ -45,6 +51,9 @@ scrape_configs:
 
   - job_name: basetool-ingest
     metrics_path: /actuator/prometheus
+    basic_auth:
+      username: monitoring
+      password_file: /etc/prometheus/secrets/scrape_password
     scheme: https
     tls_config:
       ca_file: /etc/prometheus/certs/basetool-ca.crt

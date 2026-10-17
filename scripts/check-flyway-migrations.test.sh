@@ -96,7 +96,7 @@ scenario_squash_merge_race() {
   repo="$(mktmp)"
   init_repo "$repo"
 
-  write_migration "$repo" "V100__m100.sql"
+  write_migration "$repo" "V192__m192.sql"
   write_migration "$repo" "V193__m193.sql"
   commit_all "$repo" "base up to V193"
 
@@ -246,6 +246,97 @@ scenario_partial_skip_evaluates_new() {
   rm -rf "$repo"
 }
 
+write_readme() {
+  local repo="$1" content="$2"
+  mkdir -p "${repo}/${MIG_SUBDIR}"
+  printf '%b' "$content" >"${repo}/${MIG_SUBDIR}/README.md"
+}
+
+scenario_unexplained_gap() {
+  echo "Scenario: gap not listed in the README (must FAIL)"
+  local repo rc=0
+  repo="$(mktmp)"
+  init_repo "$repo"
+
+  write_migration "$repo" "V193__m193.sql"
+  write_migration "$repo" "V195__m195.sql"
+  write_readme "$repo" "# Migrations\n\n## Skipped version numbers\n\n- **V190** — elsewhere\n"
+  commit_all "$repo" "V194 missing"
+
+  run_checker "$repo" "main" || rc=$?
+  assert_exit 1 "$rc" "an unlisted gap is flagged"
+  assert_contains "Unexplained Flyway gap::No migration claims V194" "it names the missing version"
+  rm -rf "$repo"
+}
+
+scenario_listed_gap() {
+  echo "Scenario: gap listed in the README (must PASS)"
+  local repo rc=0
+  repo="$(mktmp)"
+  init_repo "$repo"
+
+  write_migration "$repo" "V193__m193.sql"
+  write_migration "$repo" "V195__m195.sql"
+  write_readme "$repo" "# Migrations\r\n\r\n## Skipped version numbers\r\n\r\n- **V194** — renumbered before merge\r\n\r\n## Hard rules\r\n"
+  commit_all "$repo" "V194 skipped on purpose"
+
+  run_checker "$repo" "main" || rc=$?
+  assert_exit 0 "$rc" "a listed gap passes, CRLF line endings included"
+  assert_contains "1 listed gap(s)" "the entry was read"
+  assert_excludes "::error" "no error annotation is emitted"
+  rm -rf "$repo"
+}
+
+scenario_entry_outside_section() {
+  echo "Scenario: gap listed under another heading (must FAIL)"
+  local repo rc=0
+  repo="$(mktmp)"
+  init_repo "$repo"
+
+  write_migration "$repo" "V193__m193.sql"
+  write_migration "$repo" "V195__m195.sql"
+  write_readme "$repo" "# Migrations\n\n## Skipped version numbers\n\n## Timeline\n\n- **V194** — some feature\n"
+  commit_all "$repo" "V194 only in the timeline"
+
+  run_checker "$repo" "main" || rc=$?
+  assert_exit 1 "$rc" "only the skipped-numbers section counts"
+  assert_contains "No migration claims V194" "the gap is still reported"
+  rm -rf "$repo"
+}
+
+scenario_stale_entry() {
+  echo "Scenario: listed number is claimed by a migration (must FAIL)"
+  local repo rc=0
+  repo="$(mktmp)"
+  init_repo "$repo"
+
+  write_migration "$repo" "V193__m193.sql"
+  write_migration "$repo" "V194__m194.sql"
+  write_readme "$repo" "## Skipped version numbers\n\n- **V194** — claimed after all\n"
+  commit_all "$repo" "V194 listed and present"
+
+  run_checker "$repo" "main" || rc=$?
+  assert_exit 1 "$rc" "a listed number that a file claims is flagged"
+  assert_contains "Stale skipped Flyway version::V194" "it names the stale entry"
+  rm -rf "$repo"
+}
+
+scenario_entry_above_tip() {
+  echo "Scenario: listed number above the tip (must FAIL)"
+  local repo rc=0
+  repo="$(mktmp)"
+  init_repo "$repo"
+
+  write_migration "$repo" "V193__m193.sql"
+  write_readme "$repo" "## Skipped version numbers\n\n- **V200** — reserved\n"
+  commit_all "$repo" "V200 reserved ahead"
+
+  run_checker "$repo" "main" || rc=$?
+  assert_exit 1 "$rc" "a listed number above the tip is flagged"
+  assert_contains "above the highest migration" "it fails for the reservation reason"
+  rm -rf "$repo"
+}
+
 scenario_squash_merge_race
 scenario_genuine_collision
 scenario_in_order
@@ -253,6 +344,11 @@ scenario_out_of_order
 scenario_duplicate_in_tree
 scenario_partial_skip_still_flags
 scenario_partial_skip_evaluates_new
+scenario_unexplained_gap
+scenario_listed_gap
+scenario_entry_outside_section
+scenario_stale_entry
+scenario_entry_above_tip
 
 echo
 if [[ "$tests_failed" -eq 0 ]]; then

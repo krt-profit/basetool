@@ -85,7 +85,7 @@ app:
     package-name: ${APP_ANDROID_PACKAGE_NAME:de.greluc.krt.profit.basetool.android}
     sha256-cert-fingerprints: "${APP_ANDROID_CERT_FINGERPRINTS:E8:40:20:5E:EC:16:F5:FD:CD:BA:8B:44:81:18:06:3C:4A:37:E6:16:20:99:CC:49:00:DF:23:80:C1:AF:50:64}"
   http:
-    verify-backend-hostname: ${INTERNAL_TLS_VERIFY_HOSTNAME:false}
+    verify-backend-hostname: ${INTERNAL_TLS_VERIFY_HOSTNAME:true}
     connect-timeout: 2s
     response-timeout: 5s
     export-response-timeout: ${APP_HTTP_EXPORT_RESPONSE_TIMEOUT:120s}

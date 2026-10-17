@@ -312,11 +312,11 @@ public class MemberManagementController {
       }
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "updateMember", id, e);
-      redirectAttributes.addFlashAttribute(
-          "errorToast",
-          isRankOutsideRoleRange(e)
-              ? "error.member.rank.outsideRoleRange"
-              : "error.member.update.failed");
+      if (isRankOutsideRoleRange(e)) {
+        redirectAttributes.addFlashAttribute("errorToast", "error.member.rank.outsideRoleRange");
+      } else {
+        redirectAttributes.addFlashAttribute("errorToast", "error.member.update.failed");
+      }
       return "redirect:/members/"
           + id
           + "/edit"
@@ -428,7 +428,8 @@ public class MemberManagementController {
       if (user != null && user.version() != null) {
         return user.version();
       }
-    } catch (Exception _) {
+    } catch (Exception e) {
+      log.warn("Could not re-read the user-row version of user {}; assuming the next one", id, e);
     }
     return (priorVersion == null ? 0L : priorVersion) + 1;
   }
