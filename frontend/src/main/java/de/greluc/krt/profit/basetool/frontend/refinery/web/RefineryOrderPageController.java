@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.HandoffKind;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionListDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.client.RefineryBackendClient;
@@ -200,8 +201,13 @@ public class RefineryOrderPageController {
         parallelPageLoader.loadAsync(() -> countOrders(mine, segmentQuery(VIEW_COMPLETED, null)));
     CompletableFuture<Long> allFuture =
         parallelPageLoader.loadAsync(() -> countOrders(mine, segmentQuery(VIEW_ALL, null)));
-    CompletableFuture.allOf(listFuture, runningFuture, readyFuture, completedFuture, allFuture)
-        .join();
+    SectionFallback.run(
+        log,
+        "refinery-order-list",
+        () ->
+            CompletableFuture.allOf(
+                    listFuture, runningFuture, readyFuture, completedFuture, allFuture)
+                .join());
     model.addAttribute(
         "refineryCounts",
         new RefineryProgress.Counts(
@@ -347,19 +353,19 @@ public class RefineryOrderPageController {
   @Nullable
   private PageResponse<RefineryOrderListDto> fetchOrderPage(
       boolean mine, @NotNull ListQuery listQuery, int page, int size) {
-    try {
-      return refineryClient.orderPage(
-          mine,
-          listQuery.statuses(),
-          listQuery.ready(),
-          listQuery.query(),
-          listQuery.sort(),
-          page,
-          size);
-    } catch (Exception e) {
-      log.error("Failed to fetch refinery orders", e);
-      return null;
-    }
+    return SectionFallback.load(
+        log,
+        "refinery-order-page",
+        () ->
+            refineryClient.orderPage(
+                mine,
+                listQuery.statuses(),
+                listQuery.ready(),
+                listQuery.query(),
+                listQuery.sort(),
+                page,
+                size),
+        null);
   }
 
   /**
@@ -516,16 +522,20 @@ public class RefineryOrderPageController {
         parallelPageLoader.loadAsync(() -> fetchYieldsForLocation(preselectedLocationId));
     var ownerFuture =
         parallelPageLoader.loadAsync(() -> fetchOwnerPickerOptions(boundForm, principal));
-    CompletableFuture.allOf(
-            materialsFuture,
-            methodsFuture,
-            locationsFuture,
-            missionsFuture,
-            seedNamesFuture,
-            roundingFuture,
-            yieldsFuture,
-            ownerFuture)
-        .join();
+    SectionFallback.run(
+        log,
+        "refinery-create-form",
+        () ->
+            CompletableFuture.allOf(
+                    materialsFuture,
+                    methodsFuture,
+                    locationsFuture,
+                    missionsFuture,
+                    seedNamesFuture,
+                    roundingFuture,
+                    yieldsFuture,
+                    ownerFuture)
+                .join());
     model.addAttribute("materials", materialsFuture.join());
     model.addAttribute("methods", methodsFuture.join());
     model.addAttribute("locations", locationsFuture.join());
@@ -664,130 +674,16 @@ public class RefineryOrderPageController {
     boolean isLogistician = isLogistician(principal);
     model.addAttribute("isLogistician", isLogistician);
 
-    if (!model.containsAttribute("refineryOrderForm") || !model.containsAttribute("storeForm")) {
-      try {
-        RefineryOrderDto orderDto = Objects.requireNonNull(refineryClient.order(id));
-        UUID currentUserId = getCurrentUserId(principal);
-
-        boolean isOwner =
-            currentUserId != null
-                && orderDto.owner() != null
-                && orderDto.owner().id() != null
-                && orderDto.owner().id().equals(currentUserId);
-
-        boolean canEdit = isLogistician || isOwner;
-        model.addAttribute("canEdit", canEdit);
-        model.addAttribute("order", orderDto);
-        addOrderProgress(model, orderDto);
-
-        model.addAttribute("storeOrgUnitOptions", fetchUserOrgUnitOptions(currentUserId));
-        model.addAttribute("orderOwningOrgUnitId", orderDto.owningOrgUnitId());
-
-        if (!model.containsAttribute("refineryOrderForm")) {
-          RefineryOrderForm form = new RefineryOrderForm();
-
-          if (orderDto.startedAt() != null) {
-            form.setStartedAt(orderDto.startedAt().toString());
-          }
-          if (orderDto.durationMinutes() != null) {
-            form.setDurationHours((int) (orderDto.durationMinutes() / 60));
-            form.setDurationMinutes((int) (orderDto.durationMinutes() % 60));
-          }
-          form.setExpenses(orderDto.expenses() != null ? orderDto.expenses() : 0d);
-          form.setOtherExpenses(orderDto.otherExpenses() != null ? orderDto.otherExpenses() : 0d);
-          form.setOreSales(orderDto.oreSales() != null ? orderDto.oreSales() : 0d);
-          if (orderDto.location() != null) {
-            form.setLocationId(orderDto.location().id());
-          }
-          if (orderDto.mission() != null) {
-            form.setMissionId(orderDto.mission().id());
-          }
-          if (orderDto.refiningMethod() != null) {
-            form.setRefiningMethodId(orderDto.refiningMethod().id());
-          }
-          if (orderDto.owner() != null) {
-            form.setOwnerId(orderDto.owner().id());
-          }
-          form.setStatus(orderDto.status());
-          form.setVersion(orderDto.version());
-
-          if (orderDto.goods() != null && !orderDto.goods().isEmpty()) {
-            List<RefineryGoodForm> goodsForm = new ArrayList<>();
-            for (RefineryGoodDto goodDto : orderDto.goods()) {
-              RefineryGoodForm goodForm = new RefineryGoodForm();
-              if (goodDto.inputMaterial() != null) {
-                goodForm.setInputMaterialId(goodDto.inputMaterial().id());
-              }
-              if (goodDto.outputMaterial() != null) {
-                goodForm.setOutputMaterialId(goodDto.outputMaterial().id());
-              }
-              goodForm.setInputQuantity(goodDto.inputQuantity());
-              goodForm.setOutputQuantity(goodDto.outputQuantity());
-              goodForm.setQuality(goodDto.quality());
-              goodsForm.add(goodForm);
-            }
-            form.setGoods(goodsForm);
-          }
-
-          model.addAttribute("refineryOrderForm", form);
-        }
-
-        if (!model.containsAttribute("storeForm")) {
-          RefineryOrderStoreForm storeForm = new RefineryOrderStoreForm();
-          if (orderDto.goods() != null) {
-            String roundingMode = fetchRoundingMode();
-            for (RefineryGoodDto good : orderDto.goods()) {
-              if (good.outputMaterial() != null) {
-                RefineryOrderStoreItemForm storeItem = new RefineryOrderStoreItemForm();
-                storeItem.setMaterialId(good.outputMaterial().id());
-                storeItem.setMaterialName(good.outputMaterial().name());
-
-                double amount = 0.0;
-                String materialQuantityType = good.outputMaterial().quantityType();
-                if (good.outputQuantity() != null) {
-                  if ("PIECE".equals(materialQuantityType)) {
-                    amount = good.outputQuantity();
-                  } else {
-                    RoundingMode rm;
-                    try {
-                      rm = RoundingMode.valueOf(roundingMode);
-                    } catch (Exception _) {
-                      rm = RoundingMode.HALF_UP;
-                    }
-                    amount =
-                        BigDecimal.valueOf(good.outputQuantity() / 100.0)
-                            .setScale(3, rm)
-                            .doubleValue();
-                  }
-                  storeItem.setAmountFixed(true);
-                } else {
-                  storeItem.setAmountFixed(false);
-                }
-                storeItem.setAmount(amount);
-                storeItem.setQuantityType("PIECE".equals(materialQuantityType) ? "PIECE" : "SCU");
-
-                storeItem.setQuality(good.quality() != null ? good.quality() : 0);
-                if (orderDto.location() != null) {
-                  storeItem.setLocationId(orderDto.location().id());
-                }
-                if (currentUserId != null) {
-                  storeItem.setUserId(currentUserId);
-                }
-                storeItem.setOwningOrgUnitId(orderDto.owningOrgUnitId());
-                storeForm.getItems().add(storeItem);
-              }
-            }
-          }
-          model.addAttribute("storeForm", storeForm);
-        }
-      } catch (Exception e) {
-        log.error("Failed to fetch refinery order details", e);
-        if (section != null) {
-          return "refinery/refinery-orders-details :: fragmentError";
-        }
-        model.addAttribute("errorToast", "error.refineryorder.load");
-        return "redirect:/refinery-orders";
+    if ((!model.containsAttribute("refineryOrderForm") || !model.containsAttribute("storeForm"))
+        && !SectionFallback.run(
+            log,
+            "refinery-order-detail",
+            () -> addOrderAndForms(id, isLogistician, model, principal))) {
+      if (section != null) {
+        return "refinery/refinery-orders-details :: fragmentError";
       }
+      model.addAttribute("errorToast", "error.refineryorder.load");
+      return "redirect:/refinery-orders";
     }
     model.addAttribute("orderId", id);
     model.addAttribute("materials", fetchMaterials());
@@ -833,6 +729,143 @@ public class RefineryOrderPageController {
       return "refinery/refinery-orders-details :: refineryStoreSection";
     }
     return "refinery/refinery-orders-details";
+  }
+
+  /**
+   * Adds the order, its edit and store flags, and the edit and store forms not already flashed.
+   *
+   * @param id the refinery order id
+   * @param isLogistician whether the caller may edit any order
+   * @param model the detail model
+   * @param principal the caller, for the owner flag and the store defaults
+   */
+  private void addOrderAndForms(
+      @NotNull UUID id, boolean isLogistician, @NotNull Model model, @Nullable OidcUser principal) {
+    RefineryOrderDto orderDto = Objects.requireNonNull(refineryClient.order(id));
+    UUID currentUserId = getCurrentUserId(principal);
+
+    boolean isOwner =
+        currentUserId != null
+            && orderDto.owner() != null
+            && orderDto.owner().id() != null
+            && orderDto.owner().id().equals(currentUserId);
+
+    boolean canEdit = isLogistician || isOwner;
+    model.addAttribute("canEdit", canEdit);
+    model.addAttribute("order", orderDto);
+    addOrderProgress(model, orderDto);
+
+    model.addAttribute("storeOrgUnitOptions", fetchUserOrgUnitOptions(currentUserId));
+    model.addAttribute("orderOwningOrgUnitId", orderDto.owningOrgUnitId());
+
+    if (!model.containsAttribute("refineryOrderForm")) {
+      RefineryOrderForm form = new RefineryOrderForm();
+
+      if (orderDto.startedAt() != null) {
+        form.setStartedAt(orderDto.startedAt().toString());
+      }
+      if (orderDto.durationMinutes() != null) {
+        form.setDurationHours((int) (orderDto.durationMinutes() / 60));
+        form.setDurationMinutes((int) (orderDto.durationMinutes() % 60));
+      }
+      form.setExpenses(orderDto.expenses() != null ? orderDto.expenses() : 0d);
+      form.setOtherExpenses(orderDto.otherExpenses() != null ? orderDto.otherExpenses() : 0d);
+      form.setOreSales(orderDto.oreSales() != null ? orderDto.oreSales() : 0d);
+      if (orderDto.location() != null) {
+        form.setLocationId(orderDto.location().id());
+      }
+      if (orderDto.mission() != null) {
+        form.setMissionId(orderDto.mission().id());
+      }
+      if (orderDto.refiningMethod() != null) {
+        form.setRefiningMethodId(orderDto.refiningMethod().id());
+      }
+      if (orderDto.owner() != null) {
+        form.setOwnerId(orderDto.owner().id());
+      }
+      form.setStatus(orderDto.status());
+      form.setVersion(orderDto.version());
+
+      if (orderDto.goods() != null && !orderDto.goods().isEmpty()) {
+        List<RefineryGoodForm> goodsForm = new ArrayList<>();
+        for (RefineryGoodDto goodDto : orderDto.goods()) {
+          RefineryGoodForm goodForm = new RefineryGoodForm();
+          if (goodDto.inputMaterial() != null) {
+            goodForm.setInputMaterialId(goodDto.inputMaterial().id());
+          }
+          if (goodDto.outputMaterial() != null) {
+            goodForm.setOutputMaterialId(goodDto.outputMaterial().id());
+          }
+          goodForm.setInputQuantity(goodDto.inputQuantity());
+          goodForm.setOutputQuantity(goodDto.outputQuantity());
+          goodForm.setQuality(goodDto.quality());
+          goodsForm.add(goodForm);
+        }
+        form.setGoods(goodsForm);
+      }
+
+      model.addAttribute("refineryOrderForm", form);
+    }
+
+    if (!model.containsAttribute("storeForm")) {
+      RefineryOrderStoreForm storeForm = new RefineryOrderStoreForm();
+      if (orderDto.goods() != null) {
+        String roundingMode = fetchRoundingMode();
+        for (RefineryGoodDto good : orderDto.goods()) {
+          if (good.outputMaterial() != null) {
+            RefineryOrderStoreItemForm storeItem = new RefineryOrderStoreItemForm();
+            storeItem.setMaterialId(good.outputMaterial().id());
+            storeItem.setMaterialName(good.outputMaterial().name());
+
+            double amount = 0.0;
+            String materialQuantityType = good.outputMaterial().quantityType();
+            if (good.outputQuantity() != null) {
+              if ("PIECE".equals(materialQuantityType)) {
+                amount = good.outputQuantity();
+              } else {
+                RoundingMode rm = parseRoundingMode(roundingMode);
+                amount =
+                    BigDecimal.valueOf(good.outputQuantity() / 100.0).setScale(3, rm).doubleValue();
+              }
+              storeItem.setAmountFixed(true);
+            } else {
+              storeItem.setAmountFixed(false);
+            }
+            storeItem.setAmount(amount);
+            storeItem.setQuantityType("PIECE".equals(materialQuantityType) ? "PIECE" : "SCU");
+
+            storeItem.setQuality(good.quality() != null ? good.quality() : 0);
+            if (orderDto.location() != null) {
+              storeItem.setLocationId(orderDto.location().id());
+            }
+            if (currentUserId != null) {
+              storeItem.setUserId(currentUserId);
+            }
+            storeItem.setOwningOrgUnitId(orderDto.owningOrgUnitId());
+            storeForm.getItems().add(storeItem);
+          }
+        }
+      }
+      model.addAttribute("storeForm", storeForm);
+    }
+  }
+
+  /**
+   * Parses the configured rounding mode of the SCU conversion.
+   *
+   * @param name the configured mode name, or {@code null}
+   * @return the named mode, or {@link RoundingMode#HALF_UP} when the name is absent or unknown
+   */
+  @NotNull
+  private static RoundingMode parseRoundingMode(@Nullable String name) {
+    if (name == null) {
+      return RoundingMode.HALF_UP;
+    }
+    try {
+      return RoundingMode.valueOf(name);
+    } catch (IllegalArgumentException _) {
+      return RoundingMode.HALF_UP;
+    }
   }
 
   /**
@@ -891,52 +924,31 @@ public class RefineryOrderPageController {
     if (locationId == null) {
       return Map.of();
     }
-    try {
-      Map<String, Integer> yields = refineryClient.yields(locationId);
-      return yields != null ? yields : Map.of();
-    } catch (Exception e) {
-      log.warn("Failed to fetch refinery yields for location {}: {}", locationId, e.getMessage());
-      return Map.of();
-    }
+    Map<String, Integer> yields =
+        SectionFallback.load(
+            log, "refinery-location-yields", () -> refineryClient.yields(locationId), null);
+    return yields != null ? yields : Map.of();
   }
 
   @NotNull
   private List<MaterialDto> fetchMaterials() {
-    try {
-      PageResponse<MaterialDto> p = refineryClient.materials();
-      if (p != null && p.content() != null) {
-        return new ArrayList<>(p.content());
-      }
-    } catch (Exception e) {
-      log.error("Failed to fetch materials", e);
-    }
-    return new ArrayList<>();
+    PageResponse<MaterialDto> p =
+        SectionFallback.load(log, "refinery-materials", refineryClient::materials, null);
+    return p != null && p.content() != null ? new ArrayList<>(p.content()) : new ArrayList<>();
   }
 
   @NotNull
   private List<RefiningMethodDto> fetchMethods() {
-    try {
-      PageResponse<RefiningMethodDto> p = refineryClient.refiningMethods();
-      if (p != null && p.content() != null) {
-        return new ArrayList<>(p.content());
-      }
-    } catch (Exception e) {
-      log.error("Failed to fetch refining methods", e);
-    }
-    return new ArrayList<>();
+    PageResponse<RefiningMethodDto> p =
+        SectionFallback.load(log, "refinery-methods", refineryClient::refiningMethods, null);
+    return p != null && p.content() != null ? new ArrayList<>(p.content()) : new ArrayList<>();
   }
 
   @NotNull
   private List<LocationDto> fetchAllLocations() {
-    try {
-      PageResponse<LocationDto> p = refineryClient.allLocations();
-      if (p != null && p.content() != null) {
-        return new ArrayList<>(p.content());
-      }
-    } catch (Exception e) {
-      log.error("Failed to fetch all locations", e);
-    }
-    return new ArrayList<>();
+    PageResponse<LocationDto> p =
+        SectionFallback.load(log, "refinery-all-locations", refineryClient::allLocations, null);
+    return p != null && p.content() != null ? new ArrayList<>(p.content()) : new ArrayList<>();
   }
 
   private List<LocationDto> fetchLocations() {
@@ -951,15 +963,9 @@ public class RefineryOrderPageController {
    * @return mutable list of selectable locations; empty on backend failure
    */
   private List<LocationDto> fetchLocations(LocationDto preserveLocation) {
-    List<LocationDto> locs = new ArrayList<>();
-    try {
-      List<LocationDto> fetched = refineryClient.refineryLocations();
-      if (fetched != null) {
-        locs = new ArrayList<>(fetched);
-      }
-    } catch (Exception e) {
-      log.error("Failed to fetch refinery locations", e);
-    }
+    List<LocationDto> fetched =
+        SectionFallback.load(log, "refinery-locations", refineryClient::refineryLocations, null);
+    List<LocationDto> locs = fetched != null ? new ArrayList<>(fetched) : new ArrayList<>();
     return withPreservedLocation(locs, preserveLocation);
   }
 
@@ -995,17 +1001,18 @@ public class RefineryOrderPageController {
    */
   @NotNull
   private List<MissionListDto> fetchMissions(UUID preserveMissionId) {
-    try {
-      PageResponse<MissionListDto> p = refineryClient.missions();
-      if (p == null) {
-        return new ArrayList<>();
-      }
-      Instant cutoff = OffsetDateTime.now(ZoneOffset.UTC).minusMonths(3).toInstant();
-      return filterAndSortMissionsForDropdown(p.content(), cutoff, preserveMissionId);
-    } catch (Exception e) {
-      log.error("Failed to fetch missions", e);
-    }
-    return new ArrayList<>();
+    return SectionFallback.load(
+        log,
+        "refinery-missions",
+        () -> {
+          PageResponse<MissionListDto> p = refineryClient.missions();
+          if (p == null) {
+            return new ArrayList<>();
+          }
+          Instant cutoff = OffsetDateTime.now(ZoneOffset.UTC).minusMonths(3).toInstant();
+          return filterAndSortMissionsForDropdown(p.content(), cutoff, preserveMissionId);
+        },
+        new ArrayList<>());
   }
 
   /**
@@ -1065,13 +1072,10 @@ public class RefineryOrderPageController {
    * @return the caller's pickable options; empty on failure, never {@code null}
    */
   private List<OrgUnitMembershipOptionDto> fetchMyPickableOrgUnits() {
-    try {
-      List<OrgUnitMembershipOptionDto> options = refineryClient.pickableOrgUnits();
-      return options != null ? options : List.of();
-    } catch (Exception e) {
-      log.warn("Failed to fetch pickable org units for refinery-order owner-picker", e);
-      return List.of();
-    }
+    List<OrgUnitMembershipOptionDto> options =
+        SectionFallback.load(
+            log, "refinery-pickable-org-units", refineryClient::pickableOrgUnits, null);
+    return options != null ? options : List.of();
   }
 
   /**
@@ -1084,13 +1088,10 @@ public class RefineryOrderPageController {
     if (userId == null) {
       return List.of();
     }
-    try {
-      List<OrgUnitMembershipOptionDto> options = refineryClient.memberships(userId);
-      return options != null ? options : List.of();
-    } catch (Exception e) {
-      log.warn("Failed to fetch memberships for refinery org-unit picker", e);
-      return List.of();
-    }
+    List<OrgUnitMembershipOptionDto> options =
+        SectionFallback.load(
+            log, "refinery-user-org-units", () -> refineryClient.memberships(userId), null);
+    return options != null ? options : List.of();
   }
 
   /**
@@ -1107,13 +1108,10 @@ public class RefineryOrderPageController {
       if (id == null || names.containsKey(id)) {
         continue;
       }
-      try {
-        UserDto user = refineryClient.user(id);
-        if (user != null) {
-          names.put(id, user.effectiveName() != null ? user.effectiveName() : user.username());
-        }
-      } catch (Exception e) {
-        log.warn("Failed to resolve seed user name for refinery picker (id {})", id, e);
+      UserDto user =
+          SectionFallback.load(log, "refinery-seed-user", () -> refineryClient.user(id), null);
+      if (user != null) {
+        names.put(id, user.effectiveName() != null ? user.effectiveName() : user.username());
       }
     }
     return names;
@@ -1128,24 +1126,17 @@ public class RefineryOrderPageController {
    */
   @NotNull
   private List<JobOrderReferenceDto> fetchActiveJobOrders() {
-    try {
-      List<JobOrderReferenceDto> content = refineryClient.activeJobOrders();
-      if (content != null) {
-        return new ArrayList<>(content);
-      }
-    } catch (Exception e) {
-      log.error("Failed to fetch job orders", e);
-    }
-    return new ArrayList<>();
+    List<JobOrderReferenceDto> content =
+        SectionFallback.load(log, "refinery-job-orders", refineryClient::activeJobOrders, null);
+    return content != null ? new ArrayList<>(content) : new ArrayList<>();
   }
 
   private String fetchRoundingMode() {
-    try {
-      return Objects.requireNonNull(refineryClient.settings()).roundingMode();
-    } catch (Exception _) {
-      log.warn("Failed to fetch refinery rounding mode, using default UP");
-      return "UP";
-    }
+    return SectionFallback.load(
+        log,
+        "refinery-rounding-mode",
+        () -> Objects.requireNonNull(refineryClient.settings()).roundingMode(),
+        "UP");
   }
 
   @Contract("null -> null")
@@ -1154,17 +1145,7 @@ public class RefineryOrderPageController {
     if (principal == null) {
       return null;
     }
-    try {
-      return CurrentUser.userId(principal);
-    } catch (Exception _) {
-      try {
-        UserDto me = refineryClient.currentUser();
-        return me != null ? me.id() : null;
-      } catch (Exception ex) {
-        log.warn("Failed to get current user ID from backend: {}", ex.getMessage());
-        return null;
-      }
-    }
+    return CurrentUser.userId(principal);
   }
 
   private boolean isLogistician(OidcUser principal) {
@@ -1188,14 +1169,11 @@ public class RefineryOrderPageController {
                         || a.getAuthority().equals(Roles.authority(Roles.ADMIN))
                         || a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
     if (!result) {
-      try {
-        UserDto me = refineryClient.currentUser();
-        if (me != null && Boolean.TRUE.equals(me.isLogistician())) {
-          log.info("Granting logistician by backend flag");
-          result = true;
-        }
-      } catch (Exception e) {
-        log.debug("Fallback check for logistician via /users/me failed: {}", e.getMessage());
+      UserDto me =
+          SectionFallback.load(log, "refinery-logistician-flag", refineryClient::currentUser, null);
+      if (me != null && Boolean.TRUE.equals(me.isLogistician())) {
+        log.info("Granting logistician by backend flag");
+        result = true;
       }
     }
     log.debug("Is logistician (final): {}", result);
