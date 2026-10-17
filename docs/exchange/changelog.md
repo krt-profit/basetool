@@ -3,6 +3,14 @@
 Changes to the Exchange API contract, newest first. Every change within `v1` is additive
 ([versioning](versioning.md)).
 
+## 2026-10-17
+
+- **New: a stock lot's split.** Every `/me/stock` lot carries the optional `split`: the member's
+  personal amount and their own amount in each unit's pool, a pool of a unit they have left
+  included. A rebooking between personal and shared, or to another pool, now brings the lot into
+  the feed with the same `key` and `quantity` ([stock](resources/stock.md#split)).
+  `stock-lot.schema.json` gains `split`.
+
 ## 2026-10-16
 
 - **New: order details in the org demand.** Under the new scope `exchange.demand.details`, in

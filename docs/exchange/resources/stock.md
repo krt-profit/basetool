@@ -8,7 +8,7 @@ The member's stock in the warehouse, as lots. Reading needs `exchange.stock.read
 A [`stock-lot`](../schemas/) is the member's stock of one material or item at one warehouse
 location, quality and stolen state: everything the member holds there, **personal and shared**,
 **summed across the org-unit pools** it is booked in — what the member's own warehouse page in the web
-shows. It has no org unit and no row id. Stock another member holds is never in a lot.
+shows. It has no row id. Stock another member holds is never in a lot.
 
 | Field | Meaning |
 | --- | --- |
@@ -19,6 +19,7 @@ shows. It has no org unit and no row id. Stock another member holds is never in 
 | `quality` | 0 to 1000. Every material lot has the quality it is booked at; an item lot has 0. |
 | `stolen` | Whether the stock is marked stolen. |
 | `quantity` | `{amount, unit}` in the material's own unit; SCU to three decimals, items in whole `PIECE`s. |
+| `split` | How `quantity` splits into personal stock and each pool, see [below](#split). |
 
 ```json
 {
@@ -27,9 +28,34 @@ shows. It has no org unit and no row id. Stock another member holds is never in 
   "location": {"name": "Area18", "uex": {"kind": "CITY", "id": 4}},
   "quality": 712,
   "stolen": false,
-  "quantity": {"amount": 12.5, "unit": "SCU"}
+  "quantity": {"amount": 12.5, "unit": "SCU"},
+  "split": {
+    "personal": {"amount": 4.5, "unit": "SCU"},
+    "pools": [
+      {
+        "orgUnit": {"id": "0c2f8a51-7d3e-4b9a-9f10-5a6b7c8d9e01"},
+        "quantity": {"amount": 8, "unit": "SCU"}
+      }
+    ]
+  }
 }
 ```
+
+### Split
+
+`split` shows how much of a lot is the member's personal stock and how much of their own stock
+sits in each unit's pool. It counts only the member's own stock, never another member's.
+
+| Field | Meaning |
+| --- | --- |
+| `personal` | The member's personal stock of the lot, with any shared stock outside a unit; 0 when there is none. |
+| `pools` | One entry per unit in whose pool the member holds stock of the lot: `orgUnit.id` and `quantity`. Ordered by unit id; empty when nothing is shared. |
+
+A pool of a unit the member has left stays in `pools` while they hold stock in it. Every amount
+is rounded like `quantity` on its own, so the parts may differ from `quantity` in the last decimal.
+Shared stock outside any unit counts as personal, so `personal` plus the pools always add up to
+`quantity`. `split` is optional: a client that ignores it
+keeps working.
 
 ### Material kind
 
@@ -53,8 +79,9 @@ The six UEX flags are left out for a material UEX does not know.
 
 A snapshot without `cursor`, the changes since it with one: the same `cursor`, `limit`, paging and
 tombstones as [blueprints](blueprints.md#reading-the-set--get-exchangev1meblueprints). A lot whose
-stock is all booked out, or moved to another member, arrives as a tombstone; rebooking stock between
-personal and shared does not change its lot. A lot whose stock
+stock is all booked out, or moved to another member, arrives as a tombstone. Rebooking stock between
+personal and shared, in the web or anywhere else, or moving shared stock to another pool, keeps the
+lot's `key` and `quantity` and brings the lot into the feed with its new `split`. A lot whose stock
 changes while a snapshot is read may move to a later page; its change follows in the feed either way.
 
 ## Setting quantities — `POST /exchange/v1/me/stock/changes`

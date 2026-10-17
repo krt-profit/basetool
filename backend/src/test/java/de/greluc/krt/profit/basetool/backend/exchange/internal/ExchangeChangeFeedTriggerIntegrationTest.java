@@ -211,16 +211,37 @@ class ExchangeChangeFeedTriggerIntegrationTest {
   }
 
   @Test
-  void rebookingStockBetweenPersonalAndSharedLeavesTheLotUnchanged() {
+  void rebookingStockBetweenPersonalAndSharedSequencesItsLotUnderTheSameKey() {
     UUID material = material("feed-quantainium");
     UUID location = location("feed-orison");
+    String lot = "m:" + material + "|l:" + location + "|q:1|s:1";
     UUID row = stock(alice, material, location, 1, true, true);
     int before = changes(alice).size();
 
     jdbc.update("UPDATE inventory_item SET personal = false WHERE id = ?", row);
     jdbc.update("UPDATE inventory_item SET personal = true WHERE id = ?", row);
 
-    assertThat(changes(alice)).hasSize(before);
+    assertThat(changes(alice).subList(before, changes(alice).size()))
+        .extracting(ExchangeChange::getEntityKey)
+        .containsExactly(lot, lot);
+  }
+
+  @Test
+  void movingASharedRowToAnotherPoolSequencesItsLotButRestampingAPersonalRowDoesNot() {
+    UUID from = orgUnit("feed-split-from");
+    UUID to = orgUnit("feed-split-to");
+    UUID material = material("feed-stileron");
+    UUID location = location("feed-pyro");
+    UUID shared = stock(alice, material, location, 1, false, false, from);
+    UUID personal = stock(alice, material, location, 1, true, false, from);
+    int before = changes(alice).size();
+
+    jdbc.update("UPDATE inventory_item SET owning_org_unit_id = ? WHERE id = ?", to, shared);
+    jdbc.update("UPDATE inventory_item SET owning_org_unit_id = ? WHERE id = ?", to, personal);
+
+    assertThat(changes(alice).subList(before, changes(alice).size()))
+        .extracting(ExchangeChange::getEntityKey)
+        .containsExactly("m:" + material + "|l:" + location + "|q:1|s:0");
   }
 
   @Test

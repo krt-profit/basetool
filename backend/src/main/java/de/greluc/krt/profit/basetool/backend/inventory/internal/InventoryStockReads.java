@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.inventory.api.ExchangeOrgStockEntryRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.ExchangeOrgStockLotRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.ExchangeStockLotRow;
+import de.greluc.krt.profit.basetool.backend.inventory.api.ExchangeStockSplitRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderAllocationDto;
@@ -62,6 +63,7 @@ public class InventoryStockReads implements StockReads, OrderLinkedStockRows {
 
   private final InventoryItemRepository inventoryRepository;
   private final InventoryItemMapper inventoryItemMapper;
+  private final InventoryStockSplitRepository splitRepository;
 
   @Override
   public @NotNull List<ExchangeStockLotRow> exchangeLots(
@@ -172,6 +174,12 @@ public class InventoryStockReads implements StockReads, OrderLinkedStockRows {
   public @NotNull List<ExchangeStockLotRow> exchangeLotsByKeys(
       @NotNull UUID member, @NotNull Collection<String> keys) {
     return inventoryRepository.findExchangeLotsByKeys(member, keys);
+  }
+
+  @Override
+  public @NotNull List<ExchangeStockSplitRow> exchangeLotSplits(
+      @NotNull UUID member, @NotNull Collection<String> keys) {
+    return keys.isEmpty() ? List.of() : splitRepository.findExchangeLotSplits(member, keys);
   }
 
   @Override
