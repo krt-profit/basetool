@@ -613,13 +613,46 @@ scrape (epic #936, ADR-0072). The endpoint is **never public**:
 >
 > - [x] `/actuator/health` and `/actuator/prometheus` answer 404 on the backend's application
 >   connector in prod, independent of any edge deny.
-> - [x] Prometheus scrapes `backend:11271` over HTTPS with the pinned CA and **no** credentials.
+> - [x] Prometheus scrapes `backend:11271` over HTTPS with the pinned CA (credential: see the
+>   ADR-0265 amendment below).
 > - [x] `POST /actuator/loggers/**` on the management port is refused without `ROLE_ADMIN`.
 > - [x] Dev, test and e2e are unchanged: no management port, Actuator on the app port, fail-closed.
 >
 > **Enforced by:** `ManagementPortIsolationTest` (backend, frontend, ingest) · **Code:**
 > `ManagementPortSecurityConfig`, `application-prod.yml`, `docker-compose.yml` (healthcheck
 > override), `monitoring/prometheus/prometheus.yml`
+
+> **Amended by ADR-0265 (all three modules, prod):** the management port is **not** reachable only
+> from `net-monitoring-scrape` and `localhost`. No `management.server.address` is set, so every
+> container that shares any network with the service reaches it. The amendments above therefore no
+> longer rest on network isolation alone:
+>
+> - On the management port only `/actuator/health` and `/actuator/health/**` are open — the
+>   container health check and the frontend's `BackendHealthIndicator` send no credential.
+> - Every other Actuator path the management chain owns — `/actuator/**` in frontend and ingest,
+>   `/actuator/prometheus` and `/actuator/info` in the backend — requires the scrape identity
+>   (`MONITORING_SCRAPE_USER` / `MONITORING_SCRAPE_PASSWORD`, HTTP basic, role
+>   `MONITORING_SCRAPE`). The `ManagementPortSecurityConfig` chain authenticates it itself, against
+>   the same in-memory user `MonitoringScrapeSecurityConfig` builds.
+> - Without a configured scrape identity those paths are denied to everyone; health stays open.
+> - The backend's `/actuator/loggers/**` stays with the main chain (authenticated `GET`,
+>   `ROLE_ADMIN` `POST`, REQ-OBS-016).
+> - The three `basetool-*` Prometheus jobs send `basic_auth` (username `monitoring`,
+>   `password_file: /etc/prometheus/secrets/scrape_password`), so the prod `.env` value of
+>   `MONITORING_SCRAPE_PASSWORD` must equal that file and `MONITORING_SCRAPE_USER` must be
+>   `monitoring`.
+>
+> **Acceptance**
+>
+> - [x] A caller without the scrape credential gets `401` for `/actuator/prometheus` on every
+>   management port, and also for `/actuator/info` (backend) and `/actuator/loggers` (frontend,
+>   ingest); a wrong password gets `401`.
+> - [x] The scrape identity reads `/actuator/prometheus` on every management port.
+> - [x] Without a configured scrape identity, health stays open and the other paths are refused.
+>
+> **Enforced by:** `ManagementPortIsolationTest`, `ManagementPortFailClosedTest` (backend,
+> frontend, ingest), `PlatformMirrorParityTest` · **Code:** `ManagementPortSecurityConfig`,
+> `MonitoringScrapeSecurityConfig`, `monitoring/prometheus/prometheus.yml`
 
 **"Dev/test/e2e are unchanged" is a claim about the compose stacks, not just about the YAML files,
 and it has to be kept true on purpose.** A service running the `prod` Spring profile serves
@@ -675,13 +708,13 @@ it is invisible until something waits on the container's health.
 - **The edge deny was the prod precondition for these credentials** while prod still scraped the
   app port (ADR-0072, before ADR-0090/-0134): the `/actuator` deny had to be live on every public
   host before `MONITORING_SCRAPE_*` was deployed, as the compensating control for the per-request
-  BCrypt cost of basic auth (residual-risk record in ADR-0072). Since ADR-0134 no prod scrape uses
-  the credentials, and since ADR-0162 the deny is a line in the edge's own configuration in git
-  rather than an NPM setting. It still returns HTTP **404** (not 403) so it does not reveal that the
-  Actuator endpoints exist behind the edge, and every probe asserting it expects 404. The
-  `scrape_password` secret is still provisioned even though no scrape job reads it: the generated
-  `prometheus.container` still bind-mounts it, and Podman refuses to start a unit whose bind source
-  is missing (`monitoring/README.md` → *Rebuilding the monitoring plane on a new host*).
+  BCrypt cost of basic auth (residual-risk record in ADR-0072). Since ADR-0265 the prod scrape uses
+  the credentials again, on the management port, and since ADR-0162 the deny is a line in the
+  edge's own configuration in git rather than an NPM setting. It still returns HTTP **404** (not
+  403) so it does not reveal that the Actuator endpoints exist behind the edge, and every probe
+  asserting it expects 404. The `scrape_password` secret is what the three `basetool-*` scrape jobs
+  send as their password, and it must equal `MONITORING_SCRAPE_PASSWORD` in the `.env`
+  (`monitoring/README.md` → *Rebuilding the monitoring plane on a new host*).
 - Every meter carries the common tag `application=basetool-{backend,frontend,ingest}` so
   dashboards can select the module.
 
@@ -3281,13 +3314,14 @@ raised:
 
 ```bash
 # backend, in prod: on the management port 11271 since ADR-0134, and STILL ROLE_ADMIN-gated there
-# — its permit-all chain enumerates the read endpoints only, so the write keeps the main gate.
+# — its management chain enumerates health, prometheus and info only, so loggers keeps the main gate.
 curl -X POST -H 'Content-Type: application/json' -H "Authorization: Bearer ${ADMIN_TOKEN}" \
   -d '{"configuredLevel":"DEBUG"}' \
   https://backend:11271/actuator/loggers/de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient
 
-# frontend / ingest, in prod: read only — the write operation is not registered
-curl https://localhost:11272/actuator/loggers/de.greluc.krt.profit.basetool.ingest.edge
+# frontend / ingest, in prod: read only, as the scrape identity — the write is not registered
+curl -u "monitoring:${MONITORING_SCRAPE_PASSWORD}" \
+  https://localhost:11272/actuator/loggers/de.greluc.krt.profit.basetool.ingest.edge
 ```
 
 Without it, every DEBUG diagnosis costs a config edit, a redeploy and — because each config is a
@@ -3306,15 +3340,14 @@ posture now turns on is **how wide the permit-all chain on that port is** — an
 has an identity to gate a write on at all:
 
 - **`frontend` + `ingest`, prod — the mutator does not exist.** In prod these two serve Actuator on
-  the internal-only management port (frontend `18091`, ingest `11272`) behind an
-  unauthenticated permit-all chain (ADR-0090), because the port is reachable only from
-  `net-monitoring-scrape` and `localhost`. That chain matches `/actuator/**` by **path** and cannot
-  distinguish a read operation from a write one, so exposing `loggers` there exposed the level change
-  too: anything on the monitoring plane could set `ROOT` to `TRACE`, at which point Spring Security,
+  the management port (frontend `18091`, ingest `11272`; ADR-0090). Its chain matches
+  `/actuator/**` by **path** and cannot distinguish a read operation from a write one; when it was
+  still an unauthenticated permit-all chain, exposing `loggers` there exposed the level change too:
+  anything that reached the port could set `ROOT` to `TRACE`, at which point Spring Security,
   WebClient and Netty write bearer tokens and request bodies into a Loki stream retained 744 h. The
   fix removes the operation rather than gating it — `management.endpoint.loggers.access: read-only` in
-  each `application-prod.yml`, so the write is never registered and there is nothing for the
-  permit-all chain to guard. `GET /actuator/loggers` still answers on the management port.
+  each `application-prod.yml`, so the write is never registered. `GET /actuator/loggers` still
+  answers on the management port, to the scrape identity only (ADR-0265, REQ-OBS-005).
 - **`backend`, prod — the mutator survives, gated on `ROLE_ADMIN`.** Since ADR-0134 the backend has a
   management port too (`11271`), so the difference is no longer *whether* there is one — it is how
   wide the chain on it is. The backend's `ManagementPortSecurityConfig` scopes its `securityMatcher`
@@ -3353,8 +3386,7 @@ redeploy.
   (`KRT_MEMBER` **and** `OFFICER`), 204 for `ADMIN`, and the change takes effect without a restart;
   `GET /actuator/loggers` stays reachable for any authenticated user.
 - [x] Frontend + ingest under the **prod** profile: the `loggers` write operation is not registered,
-  so no caller can change a level — including a caller already inside `net-monitoring-scrape` or on
-  `localhost`, where the management port answers without authentication.
+  so no caller can change a level — including the scrape identity and a caller on `localhost`.
 - [x] No actuator **write** operation is reachable unauthenticated on **any** connector of any
   module — neither the public app connector (404 / authenticated) nor the internal management port
   (operation removed).
@@ -3362,7 +3394,7 @@ redeploy.
 - [ ] Every endpoint later added to the frontend/ingest `management.endpoints.web.exposure.include`
   list is checked for write operations, and any it has is set `access: read-only` in
   `application-prod.yml` in the same change. **Open** — a convention, asserted by no test today; the
-  management port's permit-all chain cannot enforce it.
+  management port's chain gates by path, not by operation, so it cannot enforce it.
 
 **Enforced by:** the module `application.yml` exposure lists ·
 `{frontend,ingest}/src/main/resources/application-prod.yml`

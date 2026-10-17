@@ -467,5 +467,7 @@ only through the edge's `net-proxy-grafana`: **prometheus**,
 **grafana**, **loki**, **tempo**, **alertmanager**, **blackbox-exporter**, two
 **postgres-exporters** and a **redis-exporter** as containers — and **node-exporter**, **alloy** and
 **podman-exporter** as *host* services. §7.3 says why those three are not containers, and what was
-deleted instead of being carried across. Rules, dashboards and probes:
+deleted instead of being carried across. Every container that shares a network with an application
+reaches its management port, so health there is open and everything else answers only to the scrape
+identity Prometheus sends (ADR-0265, REQ-OBS-005). Rules, dashboards and probes:
 [`monitoring/`](../../monitoring/README.md).

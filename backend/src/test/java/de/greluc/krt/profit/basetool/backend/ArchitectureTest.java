@@ -24,6 +24,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.fields;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noFields;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -228,6 +229,7 @@ import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.Mapper;
 import org.mapstruct.MapperConfig;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.Modifying;
@@ -828,6 +830,28 @@ class ArchitectureTest {
             "Mappers must stay pure transformers; route any auth lookup through a dependency-leaf "
                 + "SPI (e.g. MissionViewerAccess) so the mapper depends on neither the "
                 + "request-scoped SecurityContextHolder nor the service layer.");
+  }
+
+  @Test
+  void noFieldIsAutowired() {
+    assertFieldFloor("noFieldIsAutowired", INSTANCE_FIELDS, 8780);
+    noFieldIsAutowiredRule().check(CLASSES);
+  }
+
+  /** Every non-static field, the population a field injection could hide in. */
+  static final DescribedPredicate<JavaField> INSTANCE_FIELDS =
+      DescribedPredicate.describe(
+          "are instance fields", f -> !f.getModifiers().contains(JavaModifier.STATIC));
+
+  static ArchRule noFieldIsAutowiredRule() {
+    return noFields()
+        .that(INSTANCE_FIELDS)
+        .should()
+        .beAnnotatedWith(Autowired.class)
+        .because(
+            "dependencies arrive through the constructor; a MapStruct abstract mapper, which"
+                + " MapStruct instantiates itself, takes them through a package-private"
+                + " @Autowired setter instead");
   }
 
   @Test

@@ -1,6 +1,8 @@
 # ADR-0090 — Isolate frontend + ingest actuator on an internal-only management port
 
-- **Status:** Accepted
+- **Status:** Accepted — amended by
+  [ADR-0265](0265-the-management-ports-require-the-scrape-credential.md): the port is reachable from
+  every network the container joins, so only health stays unauthenticated on it.
 - **Date:** 2026-07-10
 - **Deciders:** @greluc
 - **Related:** `frontend`/`ingest` `application-prod.yml` (`management.server.*`) · `docker-compose.yml` (prod `frontend`/`ingest` healthcheck override) · `monitoring/prometheus/prometheus.yml` (scrape targets) · `ManagementPortSecurityConfig` · `ManagementPortIsolationTest` · `MonitoringScrapeSecurityConfig` · `BotProtectionFilter` · `SecurityConfig` (backend, the `ROLE_ADMIN` matcher on `POST /actuator/loggers/**`) · `ActuatorLoggersAuthorizationTest` · REQ-OBS-005 · REQ-OBS-008 · REQ-OBS-012 · REQ-OBS-016 · REQ-SEC-014 · REQ-INGEST-001 · ADR-0072 · ADR-0018

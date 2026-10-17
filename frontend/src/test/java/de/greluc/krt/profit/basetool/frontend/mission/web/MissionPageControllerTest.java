@@ -25,19 +25,28 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
+import de.greluc.krt.profit.basetool.frontend.mission.model.MissionDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionForm;
 import de.greluc.krt.profit.basetool.frontend.mission.model.ParticipantForm;
 import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.MessageSource;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.ui.ConcurrentModel;
@@ -560,7 +569,7 @@ class MissionPageControllerTest {
     verify(backendApiClient).get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(id));
     verify(backendApiClient).getCached(eq(CachedCatalog.JOB_TYPES_MISSION), anyTypeRef());
     verify(backendApiClient).getCached(eq(CachedCatalog.JOB_TYPES_CREW), anyTypeRef());
-    verify(backendApiClient).getCached(eq(CachedCatalog.SQUADRONS_UNSORTED), anyTypeRef());
+    verify(backendApiClient, never()).getCached(eq(CachedCatalog.SQUADRONS_UNSORTED), anyTypeRef());
   }
 
   @Test
@@ -718,5 +727,119 @@ class MissionPageControllerTest {
             eq("/api/v1/missions/{id}/finance-entries?size={size}"), anyTypeRef(), eq(id), eq(200));
     verify(backendApiClient)
         .get(eq("/api/v1/refinery-orders?missionId={id}"), anyTypeRef(), eq(id));
+  }
+
+  @Test
+  void missionDetail_FailingOptionList_LogsWarnAndExposesHintKey() {
+    UUID id = UUID.randomUUID();
+    BackendApiClient backendApiClient = optionListBackend(id);
+    when(backendApiClient.getCached(eq(CachedCatalog.SHIP_TYPES), anyTypeRef()))
+        .thenThrow(new BackendServiceException("unavailable", null, 503));
+    MissionPageController controller =
+        new MissionPageController(
+            new MissionBackendClient(backendApiClient),
+            mock(FrontendAuthHelperService.class),
+            PARALLEL);
+    Model model = new ConcurrentModel();
+    Logger logger = (Logger) LoggerFactory.getLogger(MissionPageController.class);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+
+    String view;
+    try {
+      view = controller.missionDetail(id, model, null, null);
+    } finally {
+      logger.detachAppender(appender);
+    }
+
+    assertEquals("mission/mission-detail", view);
+    assertEquals(
+        List.of("mission.options.list.allShipTypes"),
+        model.getAttribute(MissionPageController.OPTION_LIST_FAILURES));
+    assertEquals(List.of(), model.getAttribute("allShipTypes"));
+    assertEquals(List.of(), model.getAttribute("jobTypes"));
+    List<ILoggingEvent> warnings =
+        appender.list.stream()
+            .filter(e -> e.getLevel() == Level.WARN)
+            .filter(e -> e.getFormattedMessage().contains("option list"))
+            .toList();
+    assertEquals(1, warnings.size());
+    assertTrue(warnings.getFirst().getFormattedMessage().endsWith("allShipTypes"));
+  }
+
+  @Test
+  void missionDetail_AllOptionListsLoad_ExposesNoHintKey() {
+    UUID id = UUID.randomUUID();
+    BackendApiClient backendApiClient = optionListBackend(id);
+    MissionPageController controller =
+        new MissionPageController(
+            new MissionBackendClient(backendApiClient),
+            mock(FrontendAuthHelperService.class),
+            PARALLEL);
+    Model model = new ConcurrentModel();
+
+    controller.missionDetail(id, model, null, null);
+
+    assertEquals(List.of(), model.getAttribute(MissionPageController.OPTION_LIST_FAILURES));
+    assertTrue(model.containsAttribute("crewJobTypes"));
+    assertTrue(model.containsAttribute("frequencyTypes"));
+    assertTrue(model.containsAttribute("orgUnits"));
+  }
+
+  /**
+   * Builds a backend mock serving one editable planned mission and empty option catalogues.
+   *
+   * @param id the mission id
+   * @return the stubbed backend
+   */
+  private static BackendApiClient optionListBackend(UUID id) {
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    MissionDto mission =
+        new MissionDto(
+            id,
+            "Test Mission",
+            null,
+            null,
+            "PLANNED",
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            Collections.emptySet(),
+            Collections.emptyList(),
+            Collections.emptyList(),
+            null,
+            null,
+            Collections.emptySet(),
+            true,
+            true,
+            1L,
+            1L,
+            1L,
+            1L,
+            0,
+            0,
+            null,
+            null,
+            null,
+            null,
+            0L,
+            List.of(),
+            0L,
+            List.of(),
+            0L,
+            null,
+            null);
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(id)))
+        .thenReturn(mission);
+    PageResponse<Object> emptyPage =
+        new PageResponse<>(List.of(), 0, 1000, 0, 0, Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
+    when(backendApiClient.getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE), anyTypeRef()))
+        .thenReturn(List.of());
+    return backendApiClient;
   }
 }

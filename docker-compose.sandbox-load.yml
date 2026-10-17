@@ -6,6 +6,8 @@ services:
       MANAGEMENT_SERVER_SSL_KEY_STORE: file:/run/secrets/keystore.p12
       MANAGEMENT_SERVER_SSL_KEY_STORE_PASSWORD: basetool-test
       MANAGEMENT_SERVER_SSL_KEY_STORE_TYPE: PKCS12
+      MONITORING_SCRAPE_USER: sandbox-scrape
+      MONITORING_SCRAPE_PASSWORD: sandbox-scrape-pw-do-not-use-in-prod
     healthcheck:
       test: ["CMD-SHELL", "wget -q --no-check-certificate -O /dev/null https://localhost:11271/actuator/health/readiness || exit 1"]
 
@@ -20,6 +22,8 @@ services:
       MANAGEMENT_SERVER_SSL_KEY_STORE: file:/run/secrets/keystore.p12
       MANAGEMENT_SERVER_SSL_KEY_STORE_PASSWORD: basetool-test
       MANAGEMENT_SERVER_SSL_KEY_STORE_TYPE: PKCS12
+      MONITORING_SCRAPE_USER: sandbox-scrape
+      MONITORING_SCRAPE_PASSWORD: sandbox-scrape-pw-do-not-use-in-prod
       APP_EXCHANGE_STORE_MEMBERBYTES: ${SANDBOX_LOAD_MEMBER_BYTES:-1048576}
       APP_EXCHANGE_STORE_CLIENTBYTES: ${SANDBOX_LOAD_CLIENT_BYTES:-16777216}
       APP_EXCHANGE_STORE_TOTALBYTES: ${SANDBOX_LOAD_TOTAL_BYTES:-67108864}

@@ -27,6 +27,8 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -34,14 +36,24 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * Integration tests for the management-port isolation (ADR-0090): with {@code
- * management.server.port} set, Actuator is served only on that port, unauthenticated, and not on
- * the public connector.
+ * Integration tests for the management-port isolation (ADR-0090, REQ-OBS-005): with {@code
+ * management.server.port} set, Actuator is served only on that port, health there is open, and
+ * every other Actuator path needs the scrape identity.
  */
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = {"management.server.port=0"})
+    properties = {
+      "management.server.port=0",
+      "app.monitoring.scrape.username=" + ManagementPortIsolationTest.SCRAPE_USER,
+      "app.monitoring.scrape.password=" + ManagementPortIsolationTest.SCRAPE_PASSWORD
+    })
 class ManagementPortIsolationTest {
+
+  /** Test-only scrape username. */
+  static final String SCRAPE_USER = "scrape-test";
+
+  /** Test-only scrape password. */
+  static final String SCRAPE_PASSWORD = "scrape-test-password";
 
   @MockitoBean private JwtDecoder jwtDecoder;
   @MockitoBean private HandoffStagingService handoffStagingService;
@@ -104,13 +116,57 @@ class ManagementPortIsolationTest {
   }
 
   @Test
-  void actuatorPrometheusIsServedUnauthenticatedOnTheManagementPort() throws Exception {
-    HttpResponse<String> response = get(managementPort, "/actuator/prometheus");
+  void actuatorPrometheusIsServedToTheScrapeIdentityOnTheManagementPort() throws Exception {
+    HttpResponse<String> response = getAs("/actuator/prometheus", SCRAPE_USER, SCRAPE_PASSWORD);
     assertThat(response.statusCode())
-        .as("Prometheus scrapes /actuator/prometheus on the internal management port without auth")
+        .as("Prometheus scrapes /actuator/prometheus on the management port with the credential")
         .isEqualTo(200);
     assertThat(response.body())
         .as("the management-port scrape returns the Micrometer exposition payload")
         .contains("# HELP");
+  }
+
+  @Test
+  void actuatorPrometheusRefusesAnUnauthenticatedCallerOnTheManagementPort() throws Exception {
+    assertThat(get(managementPort, "/actuator/prometheus").statusCode())
+        .as("a neighbour on a shared network must not read the metrics without the credential")
+        .isEqualTo(401);
+  }
+
+  @Test
+  void actuatorPrometheusRefusesAWrongPasswordOnTheManagementPort() throws Exception {
+    assertThat(getAs("/actuator/prometheus", SCRAPE_USER, "wrong").statusCode())
+        .as("only the configured scrape password unlocks the metrics")
+        .isEqualTo(401);
+  }
+
+  @Test
+  void actuatorLoggersRefusesAnUnauthenticatedCallerOnTheManagementPort() throws Exception {
+    assertThat(get(managementPort, "/actuator/loggers").statusCode())
+        .as("logger levels are not part of the open health surface")
+        .isEqualTo(401);
+  }
+
+  /**
+   * Issues a GET against the management port with HTTP basic credentials.
+   *
+   * @param path the request path (leading slash included)
+   * @param user the basic-auth username
+   * @param password the basic-auth password
+   * @return the HTTP response with a string body
+   * @throws IOException if the request fails to send
+   * @throws InterruptedException if the send is interrupted
+   */
+  private HttpResponse<String> getAs(String path, String user, String password)
+      throws IOException, InterruptedException {
+    String token =
+        Base64.getEncoder()
+            .encodeToString((user + ":" + password).getBytes(StandardCharsets.UTF_8));
+    return http.send(
+        HttpRequest.newBuilder(URI.create("http://localhost:" + managementPort + path))
+            .header("Authorization", "Basic " + token)
+            .GET()
+            .build(),
+        HttpResponse.BodyHandlers.ofString());
   }
 }
