@@ -28,21 +28,6 @@
         font-size: var(--fs-h3);
     }
 
-    .md-terminals th[data-sort-col] {
-        white-space: nowrap;
-    }
-
-    .md-sort-mark {
-        display: none;
-        margin-left: 0.25rem;
-        color: var(--color-primary);
-    }
-
-    .md-terminals th[aria-sort='descending'] .md-sort-mark,
-    .md-terminals th[aria-sort='ascending'] .md-sort-mark {
-        display: inline;
-    }
-
     .md-terminals td.md-price-sell {
         color: var(--color-success-text);
         font-weight: var(--fw-bold);

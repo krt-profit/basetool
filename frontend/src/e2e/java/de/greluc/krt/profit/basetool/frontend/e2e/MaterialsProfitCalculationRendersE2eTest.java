@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.ConsoleMessage;
+import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.assertions.LocatorAssertions;
@@ -32,6 +33,7 @@ import com.microsoft.playwright.options.SelectOption;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -124,5 +126,126 @@ class MaterialsProfitCalculationRendersE2eTest {
         throw failure;
       }
     }
+  }
+
+  /**
+   * Sorts a ready results table through its column headers (REQ-UI-030): the default order is Max.
+   * Profit descending, a click on Marge orders the rows by margin with the highest first and marks
+   * that header, a second click reverses it, and every row keeps its profit rank.
+   */
+  @Test
+  void resultsSortByClickingTheColumnHeaders() {
+    String baseUrl = STACK.baseUrl();
+    Path storageState = E2eSupport.authenticatedStorageState(browser, baseUrl, USERNAME, PASSWORD);
+    try (BrowserContext context =
+        browser.newContext(
+            new Browser.NewContextOptions()
+                .setIgnoreHTTPSErrors(true)
+                .setStorageStatePath(storageState))) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.navigate(page, baseUrl + "/materials/profit-calculation");
+        page.evaluate("() => localStorage.removeItem('profit_calculation_filters')");
+        E2eSupport.navigate(page, baseUrl + "/materials/profit-calculation");
+        Locator profitHeader = page.locator("#resultsTable th[data-sort-col='profit']");
+        Locator marginHeader = page.locator("#resultsTable th[data-sort-col='margin']");
+        assertThat(profitHeader).hasAttribute("aria-sort", "descending");
+        assertThat(marginHeader).hasAttribute("aria-sort", "none");
+        assertThat(page.locator("#resultsTable th[data-sort-col='route']")).hasCount(0);
+
+        if (page.locator("#shipSelect option").count() < 2) {
+          return;
+        }
+        page.locator("#shipSelect").selectOption(new SelectOption().setIndex(1));
+        assertThat(
+                page.locator(
+                    "#profitResults[data-state='ready'], #profitResults[data-state='empty'],"
+                        + " #profitResults[data-state='error']"))
+            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(15_000));
+        Locator rows = page.locator("[data-testid='profit-row']");
+        if (page.locator("#profitResults[data-state='ready']").count() == 0 || rows.count() < 2) {
+          return;
+        }
+        List<Double> defaultProfits = numbers(rows, "data-profit");
+        assertTrue(isOrdered(defaultProfits, false), "default order is Max. Profit descending");
+        assertThat(rows.first()).hasAttribute("data-rank", "1");
+
+        page.locator("[data-testid='profit-sort-margin']").click();
+        assertThat(marginHeader).hasAttribute("aria-sort", "descending");
+        assertThat(profitHeader).hasAttribute("aria-sort", "none");
+        assertTrue(isOrdered(numbers(rows, "data-margin"), false), "margin descending");
+
+        page.locator("[data-testid='profit-sort-margin']").click();
+        assertThat(marginHeader).hasAttribute("aria-sort", "ascending");
+        assertTrue(isOrdered(numbers(rows, "data-margin"), true), "margin ascending");
+        assertTrue(
+            ranks(rows).stream().sorted().toList().equals(rankRange(rows.count())),
+            "every row keeps its profit rank");
+
+        page.locator("[data-testid='profit-sort-profit']").click();
+        assertThat(profitHeader).hasAttribute("aria-sort", "descending");
+        assertThat(rows.first()).hasAttribute("data-rank", "1");
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "materials-profit-calculation-sort");
+        throw failure;
+      }
+    }
+  }
+
+  /**
+   * Reads one numeric data attribute from every row, in document order, skipping rows without it.
+   *
+   * @param rows the result rows
+   * @param attribute the data attribute
+   * @return the values in row order
+   */
+  private static List<Double> numbers(Locator rows, String attribute) {
+    return rows.evaluateAll(
+                "(els, name) => els.map((el) => el.getAttribute(name)).filter((v) => v !== '')",
+                attribute)
+            instanceof List<?> raw
+        ? raw.stream().map(value -> Double.parseDouble(String.valueOf(value))).toList()
+        : List.of();
+  }
+
+  /**
+   * Reads the profit rank of every row.
+   *
+   * @param rows the result rows
+   * @return the ranks in row order
+   */
+  private static List<Integer> ranks(Locator rows) {
+    return rows.evaluateAll("els => els.map((el) => el.getAttribute('data-rank'))")
+            instanceof List<?> raw
+        ? raw.stream().map(value -> Integer.parseInt(String.valueOf(value))).toList()
+        : List.of();
+  }
+
+  /**
+   * The ranks one to {@code count}.
+   *
+   * @param count the number of rows
+   * @return the expected ranks in ascending order
+   */
+  private static List<Integer> rankRange(int count) {
+    return IntStream.rangeClosed(1, count).boxed().toList();
+  }
+
+  /**
+   * Whether the values never fall (ascending) or never rise (descending).
+   *
+   * @param values the values in row order
+   * @param ascending the direction to check
+   * @return true when the values follow the direction
+   */
+  private static boolean isOrdered(List<Double> values, boolean ascending) {
+    for (int i = 1; i < values.size(); i++) {
+      double previous = values.get(i - 1);
+      double current = values.get(i);
+      if (ascending ? current < previous : current > previous) {
+        return false;
+      }
+    }
+    return true;
   }
 }

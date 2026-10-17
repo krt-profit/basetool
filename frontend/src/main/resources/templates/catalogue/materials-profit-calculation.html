@@ -75,12 +75,37 @@
             <table id="resultsTable" class="data-table data-table--stack profit-table">
                 <thead>
                     <tr>
-                        <th scope="col"><span class="profit-rank" aria-hidden="true">#</span><span th:text="#{profit.col.material}">Material</span></th>
+                        <th scope="col" data-sort-col="material" aria-sort="none">
+                            <button type="button" class="sort-header" data-sort-key="material" data-testid="profit-sort-material">
+                                <span class="profit-rank" aria-hidden="true">#</span><span th:text="#{profit.col.material}">Material</span>
+                                <span class="sort-header__mark" aria-hidden="true"></span>
+                            </button>
+                        </th>
                         <th scope="col" th:text="#{profit.col.route}">Route</th>
-                        <th scope="col" class="num" th:text="#{profit.col.per_scu}">je SCU</th>
-                        <th scope="col" class="num" th:text="#{profit.col.margin}">Marge</th>
-                        <th scope="col" class="num" th:text="#{profit.col.capital}">Kapital</th>
-                        <th scope="col" class="num" th:text="#{profit.col.total_profit}">Max. Profit</th>
+                        <th scope="col" class="num" data-sort-col="per-scu" aria-sort="none">
+                            <button type="button" class="sort-header" data-sort-key="per-scu" data-sort-first="desc" data-testid="profit-sort-per-scu">
+                                <span th:text="#{profit.col.per_scu}">je SCU</span>
+                                <span class="sort-header__mark" aria-hidden="true"></span>
+                            </button>
+                        </th>
+                        <th scope="col" class="num" data-sort-col="margin" aria-sort="none">
+                            <button type="button" class="sort-header" data-sort-key="margin" data-sort-first="desc" data-testid="profit-sort-margin">
+                                <span th:text="#{profit.col.margin}">Marge</span>
+                                <span class="sort-header__mark" aria-hidden="true"></span>
+                            </button>
+                        </th>
+                        <th scope="col" class="num" data-sort-col="capital" aria-sort="none">
+                            <button type="button" class="sort-header" data-sort-key="capital" data-testid="profit-sort-capital">
+                                <span th:text="#{profit.col.capital}">Kapital</span>
+                                <span class="sort-header__mark" aria-hidden="true"></span>
+                            </button>
+                        </th>
+                        <th scope="col" class="num" data-sort-col="profit" aria-sort="descending">
+                            <button type="button" class="sort-header" data-sort-key="profit" data-sort-first="desc" data-testid="profit-sort-profit">
+                                <span th:text="#{profit.col.total_profit}">Max. Profit</span>
+                                <span class="sort-header__mark" aria-hidden="true"></span>
+                            </button>
+                        </th>
                     </tr>
                 </thead>
                 <tbody id="profitBody"></tbody>

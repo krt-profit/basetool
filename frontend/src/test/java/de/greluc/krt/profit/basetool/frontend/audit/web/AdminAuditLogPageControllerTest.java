@@ -209,6 +209,24 @@ class AdminAuditLogPageControllerTest {
   }
 
   @Test
+  void roleTab_offersMemberRankChangedFilterWithLabel() throws Exception {
+    Model model = new ConcurrentModel();
+    stubEveryTrailRead(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+
+    controller.auditLog("ROLE", null, null, null, null, null, 0, null, model);
+
+    List<String> eventTypes = (List<String>) model.getAttribute("eventTypes");
+    assertNotNull(eventTypes);
+    assertTrue(
+        eventTypes.contains("MEMBER_RANK_CHANGED"),
+        "ROLE audit filter list is missing MEMBER_RANK_CHANGED");
+    Properties labels = loadDefaultBundle();
+    assertTrue(
+        labels.containsKey("admin.audit.event.MEMBER_RANK_CHANGED"),
+        "Missing i18n label admin.audit.event.MEMBER_RANK_CHANGED");
+  }
+
+  @Test
   void unknownDomain_fallsBackToBankTab() {
     Model model = new ConcurrentModel();
     stubEveryTrailRead(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));

@@ -317,8 +317,9 @@ the role the member holds and what has to change in Keycloak first. The problem 
 `minRank` and `maxRank`. The member-edit page shows the member's role and its range under the rank
 select; a refusal is shown on the rank field (the AJAX save answers `422 {rank: detail}`, the
 form post flashes `error.member.rank.outsideRoleRange`), so the admin can reset the rank and save
-the Staffel change in the same form. A rank change is not one of the audited role or membership
-mutations of this spec.
+the Staffel change in the same form. A rank that differs from the stored one records
+`MEMBER_RANK_CHANGED` in the Rollen & Mitglieder audit area, with only the old and new rank in its
+details (REQ-AUDIT-001); an unchanged or refused rank records nothing.
 
 **Acceptance**
 
@@ -328,6 +329,8 @@ mutations of this spec.
 - [x] The member-edit page names the refusal on the rank field and no membership change is sent with
   it; a save with an unchanged, fitting rank sends the Staffel set as usual.
 - [x] The page shows the member's role and its permitted range under the rank select.
+- [x] A changed rank writes one `MEMBER_RANK_CHANGED` audit row; an unchanged or refused rank writes
+  none.
 
 **Enforced by:** `UserServiceRankTest`, `UserServiceAttributesTest`, `DomainProblemContractTest`,
 `ProblemCodeRegistryTest`, `MemberManagementControllerTest` · **Code:** `UserService#updateUserAttributes`,

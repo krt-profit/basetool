@@ -458,6 +458,12 @@ public enum AuditEventType {
    */
   ROLE_PERMISSIONS_CHANGED(AuditDomain.ROLE),
 
+  /**
+   * An admin changed a member's numeric member rank (1–20). The subject and the target are the
+   * member; the details carry only the {@code from} and {@code to} ranks.
+   */
+  MEMBER_RANK_CHANGED(AuditDomain.ROLE),
+
   /** A Kommandogruppe was created within a squadron. */
   KOMMANDO_GROUP_CREATED(AuditDomain.ROLE),
 

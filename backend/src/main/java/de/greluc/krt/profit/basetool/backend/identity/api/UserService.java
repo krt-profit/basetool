@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.identity.api;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
@@ -77,6 +80,7 @@ public class UserService {
   private final AuthHelperService authHelperService;
   private final SquadronVisibility squadronVisibility;
   private final MembershipOperations membershipOperations;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Returns whether the caller is a non-admin who can see none of the user's Staffeln through the
@@ -153,7 +157,8 @@ public class UserService {
    * Updates a user's rank, description, display name and join date. The version is checked when
    * non-null; a {@code null} version (admin override) skips it. Rank must lie in the stored role's
    * range (officers 1–12, members 13–20, REQ-ROLE-007); {@code joinDate} may be cleared with {@code
-   * null}, the other fields change only when supplied.
+   * null}, the other fields change only when supplied. A rank that differs from the stored one
+   * records {@link AuditEventType#MEMBER_RANK_CHANGED} in the same transaction (REQ-AUDIT-001).
    *
    * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the user is unknown
    * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
@@ -175,7 +180,16 @@ public class UserService {
 
     if (rank != null) {
       requireRankFitsStoredRole(user, rank);
-      user.setRank(rank);
+      Integer previousRank = user.getRank();
+      if (!rank.equals(previousRank)) {
+        user.setRank(rank);
+        auditRecorder.record(
+            AuditEventType.MEMBER_RANK_CHANGED,
+            id,
+            null,
+            id,
+            AuditDetails.of("from", previousRank).with("to", rank));
+      }
     }
     if (description != null) {
       user.setDescription(description);

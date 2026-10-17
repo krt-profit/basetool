@@ -26,11 +26,17 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.identity.api.MembershipOperations;
+import de.greluc.krt.profit.basetool.backend.identity.api.RankOutsideRoleRangeException;
 import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.api.SquadronVisibility;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -48,6 +54,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -80,6 +87,7 @@ class UserServiceAttributesTest {
   @Mock private AuthHelperService authHelperService;
   @Mock private SquadronVisibility squadronVisibility;
   @Mock private MembershipOperations membershipOperations;
+  @Mock private AuditRecorder auditRecorder;
 
   @InjectMocks private UserService userService;
 
@@ -211,6 +219,91 @@ class UserServiceAttributesTest {
 
       assertEquals(
           10, user.getRank(), "existing rank must be preserved when the update doesn't touch rank");
+    }
+
+    @Test
+    void changedRank_recordsOneMemberRankChangedEventWithFromAndTo() {
+      User user = newUser(USER_ID);
+      user.setVersion(1L);
+      user.setRank(15);
+      user.setRoles(new HashSet<>(Set.of(roleNamed("KRT_MEMBER"))));
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+      when(userRepository.save(user)).thenReturn(user);
+
+      userService.updateUserAttributes(USER_ID, 14, null, null, 1L, null);
+
+      ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
+      verify(auditRecorder)
+          .record(
+              eq(AuditEventType.MEMBER_RANK_CHANGED),
+              eq(USER_ID),
+              isNull(),
+              eq(USER_ID),
+              details.capture());
+      assertEquals("from=15 to=14", details.getValue().toString());
+      assertEquals(14, user.getRank());
+    }
+
+    @Test
+    void firstRank_recordsFromNull() {
+      User user = newUser(USER_ID);
+      user.setVersion(1L);
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+      when(userRepository.save(user)).thenReturn(user);
+
+      userService.updateUserAttributes(USER_ID, 17, null, null, 1L, null);
+
+      ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
+      verify(auditRecorder)
+          .record(
+              eq(AuditEventType.MEMBER_RANK_CHANGED),
+              eq(USER_ID),
+              isNull(),
+              eq(USER_ID),
+              details.capture());
+      assertEquals("from=null to=17", details.getValue().toString());
+    }
+
+    @Test
+    void unchangedRank_recordsNoAuditEvent() {
+      User user = newUser(USER_ID);
+      user.setVersion(1L);
+      user.setRank(15);
+      user.setRoles(new HashSet<>(Set.of(roleNamed("KRT_MEMBER"))));
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+      when(userRepository.save(user)).thenReturn(user);
+
+      userService.updateUserAttributes(USER_ID, 15, "desc", null, 1L, null);
+
+      verifyNoInteractions(auditRecorder);
+    }
+
+    @Test
+    void omittedRank_recordsNoAuditEvent() {
+      User user = newUser(USER_ID);
+      user.setVersion(1L);
+      user.setRank(15);
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+      when(userRepository.save(user)).thenReturn(user);
+
+      userService.updateUserAttributes(USER_ID, null, "desc", null, 1L, null);
+
+      verifyNoInteractions(auditRecorder);
+    }
+
+    @Test
+    void rejectedRank_recordsNoAuditEvent() {
+      User user = newUser(USER_ID);
+      user.setVersion(1L);
+      user.setRank(15);
+      user.setRoles(new HashSet<>(Set.of(roleNamed("KRT_MEMBER"))));
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+
+      assertThrows(
+          RankOutsideRoleRangeException.class,
+          () -> userService.updateUserAttributes(USER_ID, 5, null, null, 1L, null));
+
+      verifyNoInteractions(auditRecorder);
     }
 
     @Test
