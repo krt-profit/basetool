@@ -113,8 +113,9 @@ function initMaterialsMatrix() {
     const collapsed = {};
     const GROUP_PREF_KEY = 'materials_matrix_group_by_category';
     const FILTER_PREF_KEY = 'materials_matrix_filters';
-    const BOOL_FILTERS = ['filterLoadingDock', 'filterAutoLoad'];
+    const BOOL_FILTERS = ['filterLoadingDock', 'filterAutoLoad', 'filterHasBuy'];
     let grouped = true;
+    let onlyWithBuy = false;
 
     let rowHeight = 0;
     let calibrated = false;
@@ -286,6 +287,7 @@ function initMaterialsMatrix() {
             systems: selectedValues('sysCheck'),
             loadingDock: isChecked('filterLoadingDock'),
             autoLoad: isChecked('filterAutoLoad'),
+            hasBuy: isChecked('filterHasBuy'),
         });
     }
 
@@ -297,7 +299,9 @@ function initMaterialsMatrix() {
             applySavedSelection('sysCheck', 'sysAll', saved.systems);
             setCheckedById('filterLoadingDock', saved.loadingDock);
             setCheckedById('filterAutoLoad', saved.autoLoad);
+            setCheckedById('filterHasBuy', saved.hasBuy);
         }
+        onlyWithBuy = isChecked('filterHasBuy');
         updateSelectedText('matCheck', 'materialHeader');
         updateSelectedText('sysCheck', 'systemHeader');
     }
@@ -437,35 +441,54 @@ function initMaterialsMatrix() {
     }
 
     /**
-     * Flattens the groups into render lines, grouped or name-sorted.
+     * The row lines of one category, without the rows that offer no purchase when that filter is on.
+     *
+     * @param {MatrixGroup} group the category
+     * @param {string | null} kind the category to stamp on the lines
+     * @returns {FlatItem[]} the row lines
+     */
+    function rowItems(group, kind) {
+        return group.rows
+            .map((r) => {
+                return rowItem(r, kind);
+            })
+            .filter((item) => {
+                return !onlyWithBuy || item.bestBuy !== null;
+            });
+    }
+
+    /**
+     * Flattens the groups into render lines, grouped or name-sorted; a category left empty is dropped.
      *
      * @param {MatrixGroup[]} groups the categories
      */
     function buildFlat(groups) {
         flat = [];
         if (!grouped) {
-            /** @type {MatrixRow[]} */
-            const rows = [];
+            /** @type {FlatItem[]} */
+            const items = [];
             groups.forEach((g) => {
-                for (let i = 0; i < g.rows.length; i++) {
-                    rows.push(g.rows[i]);
-                }
-            });
-            rows.sort((a, b) => {
-                return String(a.materialName).localeCompare(String(b.materialName), undefined, {
-                    sensitivity: 'base',
+                rowItems(g, null).forEach((item) => {
+                    items.push(item);
                 });
             });
-            rows.forEach((r) => {
-                flat.push(rowItem(r, null));
+            items.sort((a, b) => {
+                const an = a.row ? String(a.row.materialName) : '';
+                const bn = b.row ? String(b.row.materialName) : '';
+                return an.localeCompare(bn, undefined, { sensitivity: 'base' });
             });
+            flat = items;
             return;
         }
         groups.forEach((g) => {
+            const items = rowItems(g, g.kind);
+            if (items.length === 0) {
+                return;
+            }
             flat.push({ type: 'kind', kind: g.kind, row: null, bestSell: null, bestBuy: null });
             if (!collapsed[g.kind]) {
-                g.rows.forEach((r) => {
-                    flat.push(rowItem(r, g.kind));
+                items.forEach((item) => {
+                    flat.push(item);
                 });
             }
         });
@@ -756,6 +779,9 @@ function initMaterialsMatrix() {
         const picked = checks.filter((c) => {
             return c.checked;
         });
+        if (header) {
+            header.classList.toggle('is-filtered', picked.length !== checks.length);
+        }
         if (picked.length === checks.length) {
             textEl.textContent = I18N.all;
         } else if (picked.length === 1) {
@@ -838,6 +864,15 @@ function initMaterialsMatrix() {
 
         document.querySelectorAll('.mtx-bool-filter').forEach((b) => {
             b.addEventListener('change', scheduleRefetch);
+        });
+
+        document.querySelectorAll('.mtx-view-filter').forEach((b) => {
+            b.addEventListener('change', () => {
+                onlyWithBuy = isChecked('filterHasBuy');
+                persistFilters();
+                renderChips();
+                render();
+            });
         });
 
         if (chipBox) {

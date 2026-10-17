@@ -442,11 +442,14 @@ class MaterialsPageControllerMvcTest {
         .containsPattern("id=\"systemHeader\"[^>]*aria-controls=\"systemOptions\"")
         .containsPattern("id=\"materialOptions\"[^>]*data-filter-transient")
         .containsPattern(
-            "class=\"filter-add filter-toggle\" data-testid=\"materials-filter-toggle\"")
+            "class=\"btn btn-ghost filter-toggle\"[^>]*data-testid=\"materials-filter-toggle\"")
+        .doesNotContain("filter-add")
         .containsPattern(
-            "class=\"filter-panel filter-popover__panel\" id=\"materials-filter-panel\"")
+            "class=\"filter-panel filter-popover__panel\"[^>]*id=\"materials-filter-panel\"")
         .contains("id=\"filterLoadingDock\"")
         .contains("id=\"filterAutoLoad\"")
+        .contains("id=\"filterHasBuy\"")
+        .contains(">Nur mit Einkaufsmöglichkeit<")
         .containsPattern(
             "<label class=\"krt-switch\"[^>]*>\\s*<input type=\"checkbox\" role=\"switch\""
                 + " id=\"filterGroupByCategory\"")

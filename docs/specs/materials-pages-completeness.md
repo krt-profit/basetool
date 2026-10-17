@@ -53,6 +53,17 @@ title carries the freshness chip „UEX · vor n min" (minutes, hours or days si
 dropdown buttons with a selection summary plus „+ Filter" chips, best-sale/best-purchase markers,
 the spread and the legend.*
 
+„+ Filter" also holds „Nur mit Einkaufsmöglichkeit": it hides every material row that has no
+positive purchase price in any of the shown terminals, and a category left without rows disappears
+with its head. Like the grouping switch it is client-side presentation over the fetched grid and
+triggers no re-fetch; it has a removable chip like the boolean filters. Every toolbar control
+follows the design system's control rule (REQ-UI-001): the two dropdown buttons and the „Filter"
+button (the shared `filterPopover`, `.btn-ghost` with its active-filter count) carry the control
+fill and the Grau-2 border, and a dropdown with a narrowed selection is marked like a selected
+control (orange tint and border).
+
+*Amended 2026-10-17: the purchase-option row filter and the readable toolbar controls.*
+
 **Acceptance**
 
 - [ ] `GET /api/v1/materials/matrix` accepts optional `materialNames`, `starSystems`,
@@ -92,6 +103,9 @@ picked name, or „n von N") are synchronised with the restored state.
 
 *Amended 2026-10-03 (website overhaul phase 3): the dropdown summary reads „n von N" instead of „N
 ausgewählt"; the boolean filters also appear as removable chips.*
+
+*Amended 2026-10-17: the purchase-option row filter of REQ-UI-014 is persisted in the same object
+(`hasBuy`, default off).*
 
 **Acceptance**
 

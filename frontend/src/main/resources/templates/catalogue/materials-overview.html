@@ -85,15 +85,9 @@
 
         <div class="mtx-active-chips" id="mtxActiveChips" data-testid="filter-chips"></div>
 
-        <div class="filter-popover">
-            <button type="button" class="filter-add filter-toggle" data-testid="materials-filter-toggle"
-                    aria-controls="materials-filter-panel" aria-expanded="false">
-                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
-                <span th:text="#{filter.add}">Filter</span>
-            </button>
-            <div class="filter-panel filter-popover__panel" id="materials-filter-panel"
-                 role="group" data-filter-panel="materials-overview" data-filter-transient
-                 th:attr="aria-label=#{filter.add}">
+        <th:block th:replace="~{kernel/fragments/components :: filterPopover(panelId='materials-filter-panel',
+            testid='materials-filter-toggle', panelName='materials-overview', body=~{::materials-filter-body})}">
+            <th:block th:ref="materials-filter-body">
                 <label class="mtx-option">
                     <input type="checkbox" id="filterLoadingDock" class="mtx-bool-filter">
                     <span th:text="#{filter.hasLoadingDock}">Hat Loading Dock</span>
@@ -102,8 +96,12 @@
                     <input type="checkbox" id="filterAutoLoad" class="mtx-bool-filter">
                     <span th:text="#{filter.hasAutoLoad}">Hat Auto Load</span>
                 </label>
-            </div>
-        </div>
+                <label class="mtx-option">
+                    <input type="checkbox" id="filterHasBuy" class="mtx-view-filter" data-testid="materials-filter-has-buy">
+                    <span th:text="#{materials.matrix.filter.hasBuy}">Nur mit Einkaufsmöglichkeit</span>
+                </label>
+            </th:block>
+        </th:block>
 
         <label class="krt-switch" data-testid="materials-overview-group-switch">
             <input type="checkbox" role="switch" id="filterGroupByCategory" checked data-filter-ignore>

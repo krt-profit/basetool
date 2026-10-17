@@ -18,9 +18,13 @@
 
 - **Material-Detailseite: UEX-Stand je Preis.** Die Terminal-Tabelle zeigt in der neuen Spalte „UEX-Stand“, wann UEX den Preis des Terminals zuletzt aktualisiert hat; Preise, die älter als sieben Tage sind, sind als veraltet markiert. Die Kachel „Aktualisiert“ heißt jetzt „Letzter UEX-Sync“; `GET /api/v1/materials/{id}/prices` liefert dafür `uexUpdatedAt` (REQ-UI-015).
 
+- **Preis-Übersicht: Filter „Nur mit Einkaufsmöglichkeit".** Unter „Filter" blendet er alle Materialien aus, die an keinem angezeigten Terminal gekauft werden können; leere Kategorien entfallen. Der Filter erscheint als entfernbarer Chip und wird pro Browser gemerkt (REQ-UI-014, REQ-UI-016).
+
 - **Testsystem im Footer erkennbar.** Auf dem Testsystem zeigt der Footer jeder Seite ein gelbes „Testsystem"-Schild, damit niemand dort versehentlich echte Arbeit erledigt; Produktion bleibt unverändert. Geschaltet über die neue Umgebungsvariable `APP_INSTANCE_TEST_SYSTEM` (Frontend, REQ-UI-029).
 
 ### Changed
+
+- **Preis-Übersicht: besser lesbare Filterleiste.** Die Dropdowns „Materialien" und „System" sowie der Button „Filter" haben jetzt Füllung und sichtbaren Rand nach dem Design-System; eine eingeschränkte Auswahl ist orange markiert, „Filter" zeigt die Zahl aktiver Filter (REQ-UI-014).
 
 - **Materialdetail: Sortieren über die Spaltenköpfe.** Die Tabelle „Preise und Terminals" sortiert per Klick auf Terminal, Ort, Verkauf oder Einkauf; ein zweiter Klick dreht die Richtung um – auch auf dem Handy über eine Leiste über der Liste. Der Umschalter „Verkauf · Einkauf" entfällt, Standard bleibt „Verkauf, höchster zuerst" (REQ-UI-015, REQ-UI-030).
 
