@@ -3079,6 +3079,50 @@ go down (ADR-0267).
 [ADR-0267](../adr/0267-a-size-ratchet-caps-java-files-and-methods-at-their-current-length.md) ·
 **Related:** REQ-OPS-046
 
+### REQ-OPS-049 — Every commit on `main` gets a CI verdict or an explicit skip
+
+No push to `main` may have its CI run cancelled by a later push, and a run that is not worth finishing
+says so instead of disappearing (ADR-0276).
+
+- **The concurrency group is per commit for a push.** `ci.yml` groups on
+  `ci-<workflow>-<github.sha>` for a `push` and on `ci-<workflow>-<github.ref>` for every other event,
+  so one `main` merge can never evict another's pending run. Pull requests keep `cancel-in-progress`,
+  which is theirs alone.
+- **A superseded `main` push skips, green.** The `Superseded check` job runs
+  `scripts/ci-superseded.sh --check`; a push to `refs/heads/main` whose commit is a strict ancestor of
+  `main`'s current tip skips `Build, Test & Lint`, and the run ends successful with a `::notice` and a
+  job-summary line naming the tip. The tip's own run carries the verdict for a tree that contains the
+  skipped commit.
+- **The decision fails open.** Anything but a confirmed `ahead` comparison builds — an unreadable tip,
+  an unreadable comparison, a non-ancestor (force push), any event that is not a `main` push, and the
+  gate job's own failure or cancellation. `Build, Test & Lint` is skipped only on an explicit
+  `skip=true`, so no failure mode of the gate can leave a required context unreported and wedge the
+  merge queue (REQ-OPS-044).
+- **It detects, it does not prevent.** A breakage that only appears once two pull requests are
+  combined is kept off `main` by the merge queue (REQ-OPS-044), not by this run; and nothing here
+  announces a red `main` or stops a merge onto one.
+
+**Acceptance**
+
+- [x] `scripts/ci-superseded.test.sh` covers every decision branch plus three usage errors, sixteen
+  cases: a superseded `main` push skips, the tip builds, and a pull request, a merge group, a
+  `workflow_dispatch`, a push to another branch, an unreadable tip, a malformed tip, a `diverged`, a
+  `behind`, an `identical` and an unreadable comparison all build. A comparison value that is not one
+  of GitHub's four reaches the reason text as `unknown`, so an error body cannot leak into it. It runs
+  in `repo-lint.yml`'s `Self-tests` job.
+- [x] `ci.yml`'s concurrency group resolves to the commit for a `push` and to the ref for every other
+  event, and `actionlint`, `zizmor` and `shellcheck` pass on the workflow and the script.
+- [ ] A burst of `main` merges leaves every commit's run either with a verdict or with a
+  "skipped — superseded" summary, and none `cancelled`.
+- [ ] `Build, Test & Lint` still reports on every pull request and on every merge group, including one
+  whose `Superseded check` job failed.
+
+**Enforced by:** `.github/workflows/ci.yml` (`concurrency`, the `supersede` job) ·
+`scripts/ci-superseded.sh` · `scripts/ci-superseded.test.sh` (`repo-lint.yml`, `Self-tests`) ·
+**Decision:**
+[ADR-0276](../adr/0276-every-main-push-gets-its-own-ci-run-and-a-superseded-one-skips.md) ·
+**Related:** REQ-OPS-044, ADR-0137
+
 ## Open questions
 
 - Deepening the infra health gate beyond `redis-cli ping` / `pg_isready` (which do not

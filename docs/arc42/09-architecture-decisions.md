@@ -3,7 +3,7 @@
 ## 9.1 How decisions are recorded
 
 Every architecturally significant decision is an **ADR** in [`docs/adr/`](../adr/README.md), written
-before or with the change that implements it. There are **274** of them (ADR-0001 to ADR-0274,
+before or with the change that implements it. There are **276** of them (ADR-0001 to ADR-0276,
 as of 2026-10-17). They are numbered
 sequentially, carry a status, and are amended in place with a dated `## Amendment N` section rather
 than silently rewritten — a decision log that edits its own history teaches its readers
