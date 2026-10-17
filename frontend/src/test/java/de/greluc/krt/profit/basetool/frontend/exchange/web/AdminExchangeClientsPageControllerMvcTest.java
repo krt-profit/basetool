@@ -270,6 +270,7 @@ class AdminExchangeClientsPageControllerMvcTest {
         .doesNotContain("hud-box")
         .doesNotContain("colspan")
         .contains("id=\"xc-table\" class=\"data-table data-table--stack xc-table\"")
+        .contains("class=\"xc-capabilities-cell\"")
         .contains("data-list-total=\"1\"")
         .containsPattern(
             "class=\"cell-status\">\\s*<span class=\"chip chip--success\">Freigegeben<")
