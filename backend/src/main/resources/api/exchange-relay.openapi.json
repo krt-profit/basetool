@@ -135,7 +135,6 @@
         },
         "summary" : "Exchange: the Lager's locations",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -251,7 +250,6 @@
         },
         "summary" : "Exchange: resolve item references",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -367,7 +365,6 @@
         },
         "summary" : "Exchange: does this RSI handle belong to the member",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -508,7 +505,6 @@
         },
         "summary" : "Exchange: my blueprints and their changes",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -624,7 +620,6 @@
         },
         "summary" : "Exchange: add or remove my blueprints",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -740,7 +735,6 @@
         },
         "summary" : "Exchange: preview blueprints for review",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -856,7 +850,6 @@
         },
         "summary" : "Exchange: build a refinery draft for review",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -970,7 +963,6 @@
         },
         "summary" : "Exchange: the calling installation",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       },
       "post" : {
@@ -1084,7 +1076,6 @@
         },
         "summary" : "Exchange: label the calling installation",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -1198,7 +1189,6 @@
         },
         "summary" : "Exchange: the open demand of my units",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -1312,7 +1302,6 @@
         },
         "summary" : "Exchange: my org units",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -1453,7 +1442,6 @@
         },
         "summary" : "Exchange: my ships and their changes",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -1569,7 +1557,6 @@
         },
         "summary" : "Exchange: change my ships",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -1710,7 +1697,6 @@
         },
         "summary" : "Exchange: my stock lots and their changes",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -1826,7 +1812,6 @@
         },
         "summary" : "Exchange: set my stock lots",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -1967,7 +1952,6 @@
         },
         "summary" : "Exchange: the shared stock of my units",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -2083,7 +2067,6 @@
         },
         "summary" : "Exchange: book stock into and out of my units' pools",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -2206,7 +2189,6 @@
         },
         "summary" : "Exchange: the roster of one of my Logistician units",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -2337,7 +2319,6 @@
         },
         "summary" : "Exchange: the earmark targets of one of my Logistician units",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     }
@@ -4114,7 +4095,7 @@
           "code" : {
             "type" : "string",
             "description" : "The stable reason, one of the values in x-problem-codes (the ProblemCode registry, REQ-API-019). The exchange operations under /api/v1/exchange answer the codes of the frozen exchange contract instead (ExchangeProblemException). The list grows; a client treats an unknown code by its status.",
-            "x-problem-codes" : [ "ACCESS_DENIED", "ACTING_MEMBER_REFUSED", "APP_UPDATE_REQUIRED", "BAD_REQUEST", "BANK_ACCOUNT_CLOSED", "BANK_ACCOUNT_HAS_PENDING_REQUESTS", "BANK_ACCOUNT_NOT_EMPTY", "BANK_ALREADY_REVERSED", "BANK_CARTEL_APPROVAL_REQUIRED", "BANK_FEE_EXCEEDS_AMOUNT", "BANK_FOUR_EYES_REQUIRED", "BANK_GRANTEE_MISSING_ROLE", "BANK_HOLDER_INACTIVE", "BANK_HOLDER_OVERDRAFT", "BANK_JUSTIFICATION_REQUIRED", "BANK_NOT_REVERSIBLE", "BANK_OVERDRAFT", "BANK_OWNER_APPROVAL_REQUIRED", "BANK_REQUEST_ALREADY_APPROVED", "BANK_REQUEST_NOT_PENDING", "BANK_SELF_TRANSFER", "BANK_SPLIT_NO_TARGETS", "BANK_SPLIT_TOO_SMALL", "BUSINESS_CONFLICT", "CONSTRAINT_VIOLATION", "DATA_INTEGRITY_VIOLATION", "DUPLICATE_ENTITY", "ENTITY_IN_USE", "EXTERNAL_SERVICE_ERROR", "ILLEGAL_ARGUMENT", "INTERNAL_ERROR", "METHOD_NOT_ALLOWED", "MISSION_PARTICIPANT_REQUIRED", "NOT_ACCEPTABLE", "NOT_FOUND", "NO_ROLE", "OPTIMISTIC_LOCK", "OVER_ALLOCATION", "OWNER_ORG_UNIT_REQUIRED", "PENDING_APPROVAL", "PESSIMISTIC_LOCK", "PRODUCTION_ALLOCATION", "PURCHASING_ADVANCE_ABOVE_CLASS_SHARE", "PURCHASING_AMOUNT_EXCEEDS_NEED", "PURCHASING_BUDGET_EXCEEDED", "PURCHASING_COUNTERPARTY_IS_MEMBER", "PURCHASING_DEAL_STATE", "PURCHASING_DELEGATE_ACTIVE", "PURCHASING_DELIVERY_EXCEEDS_UNDELIVERED", "PURCHASING_DISABLED", "PURCHASING_FUNDING_ACCOUNT_MISSING", "PURCHASING_LIMIT_EXCEEDED", "PURCHASING_NEED_NOT_OPEN", "PURCHASING_NEED_NOT_PURCHASABLE", "PURCHASING_PARTNER_BLOCKED", "PURCHASING_PARTNER_NOT_KNOWN", "PURCHASING_PAUSED", "PURCHASING_PRICE_ABOVE_MAXIMUM", "PURCHASING_QUALITY_BELOW_TIER", "PURCHASING_SELF_ACCEPTANCE", "PURCHASING_SETTLEMENT_INVALID", "PURCHASING_TIER_NOT_ALLOWED", "PURCHASING_TOTAL_ABOVE_CLASS_MAXIMUM", "PURCHASING_TRANCHE_EXCEEDS_TOTAL", "RANK_OUTSIDE_ROLE_RANGE", "RATE_LIMIT_EXCEEDED", "REPORT_GENERATION_FAILED", "REQUEST_BODY_TOO_LARGE", "SERVICE_UNAVAILABLE", "SUPPLY_DISABLED", "SUPPLY_DONATION_DOES_NOT_FIT_NEED", "SUPPLY_DONATION_NOT_PLEDGED", "SUPPLY_NEED_NOT_OPEN", "SUPPLY_NEED_UNIT_MISMATCH", "SUPPLY_ROW_NOT_OWNED", "SUPPLY_UNIT_CANNOT_RAISE", "SUPPLY_UNIT_CANNOT_RECEIVE", "TERMS_NOT_ACCEPTED", "TYPE_MISMATCH", "UNAUTHENTICATED", "UNSUPPORTED_MEDIA_TYPE", "VALIDATION_FAILED" ]
+            "x-problem-codes" : [ "ACCESS_DENIED", "ACTING_MEMBER_REFUSED", "BAD_REQUEST", "BANK_ACCOUNT_CLOSED", "BANK_ACCOUNT_HAS_PENDING_REQUESTS", "BANK_ACCOUNT_NOT_EMPTY", "BANK_ALREADY_REVERSED", "BANK_CARTEL_APPROVAL_REQUIRED", "BANK_FEE_EXCEEDS_AMOUNT", "BANK_FOUR_EYES_REQUIRED", "BANK_GRANTEE_MISSING_ROLE", "BANK_HOLDER_INACTIVE", "BANK_HOLDER_OVERDRAFT", "BANK_JUSTIFICATION_REQUIRED", "BANK_NOT_REVERSIBLE", "BANK_OVERDRAFT", "BANK_OWNER_APPROVAL_REQUIRED", "BANK_REQUEST_ALREADY_APPROVED", "BANK_REQUEST_NOT_PENDING", "BANK_SELF_TRANSFER", "BANK_SPLIT_NO_TARGETS", "BANK_SPLIT_TOO_SMALL", "BUSINESS_CONFLICT", "CONSTRAINT_VIOLATION", "DATA_INTEGRITY_VIOLATION", "DUPLICATE_ENTITY", "ENTITY_IN_USE", "EXTERNAL_SERVICE_ERROR", "ILLEGAL_ARGUMENT", "INTERNAL_ERROR", "METHOD_NOT_ALLOWED", "MISSION_PARTICIPANT_REQUIRED", "NOT_ACCEPTABLE", "NOT_FOUND", "NO_ROLE", "OPTIMISTIC_LOCK", "OVER_ALLOCATION", "OWNER_ORG_UNIT_REQUIRED", "PENDING_APPROVAL", "PESSIMISTIC_LOCK", "PRODUCTION_ALLOCATION", "PURCHASING_ADVANCE_ABOVE_CLASS_SHARE", "PURCHASING_AMOUNT_EXCEEDS_NEED", "PURCHASING_BUDGET_EXCEEDED", "PURCHASING_COUNTERPARTY_IS_MEMBER", "PURCHASING_DEAL_STATE", "PURCHASING_DELEGATE_ACTIVE", "PURCHASING_DELIVERY_EXCEEDS_UNDELIVERED", "PURCHASING_DISABLED", "PURCHASING_FUNDING_ACCOUNT_MISSING", "PURCHASING_LIMIT_EXCEEDED", "PURCHASING_NEED_NOT_OPEN", "PURCHASING_NEED_NOT_PURCHASABLE", "PURCHASING_PARTNER_BLOCKED", "PURCHASING_PARTNER_NOT_KNOWN", "PURCHASING_PAUSED", "PURCHASING_PRICE_ABOVE_MAXIMUM", "PURCHASING_QUALITY_BELOW_TIER", "PURCHASING_SELF_ACCEPTANCE", "PURCHASING_SETTLEMENT_INVALID", "PURCHASING_TIER_NOT_ALLOWED", "PURCHASING_TOTAL_ABOVE_CLASS_MAXIMUM", "PURCHASING_TRANCHE_EXCEEDS_TOTAL", "RANK_OUTSIDE_ROLE_RANGE", "RATE_LIMIT_EXCEEDED", "REPORT_GENERATION_FAILED", "REQUEST_BODY_TOO_LARGE", "SERVICE_UNAVAILABLE", "SUPPLY_DISABLED", "SUPPLY_DONATION_DOES_NOT_FIT_NEED", "SUPPLY_DONATION_NOT_PLEDGED", "SUPPLY_NEED_NOT_OPEN", "SUPPLY_NEED_UNIT_MISMATCH", "SUPPLY_ROW_NOT_OWNED", "SUPPLY_UNIT_CANNOT_RAISE", "SUPPLY_UNIT_CANNOT_RECEIVE", "TERMS_NOT_ACCEPTED", "TYPE_MISMATCH", "UNAUTHENTICATED", "UNSUPPORTED_MEDIA_TYPE", "VALIDATION_FAILED" ]
           },
           "correlationId" : {
             "type" : "string",

@@ -187,9 +187,9 @@ class BankAuditServiceTest {
   @Test
   void record_stampsAKnownClientVerbatim() {
     when(authHelperService.currentAuthentication())
-        .thenReturn(Optional.of(tokenFrom("basetool-android")));
+        .thenReturn(Optional.of(tokenFrom("basetool-frontend")));
 
-    assertEquals("basetool-android", recordAndCapture().getClientId());
+    assertEquals("basetool-frontend", recordAndCapture().getClientId());
   }
 
   @Test

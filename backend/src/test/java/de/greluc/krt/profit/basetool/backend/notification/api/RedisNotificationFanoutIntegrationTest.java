@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.notification.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -97,7 +96,7 @@ class RedisNotificationFanoutIntegrationTest {
               return null;
             })
         .when(streamB)
-        .publish(anyCollection(), any());
+        .publish(anyCollection());
     RedisNotificationFanout instanceB =
         new RedisNotificationFanout(
             streamB, template, new SimpleMeterRegistry(), CHANNEL, "backend-B");
@@ -111,13 +110,13 @@ class RedisNotificationFanoutIntegrationTest {
     listenerContainer.addMessageListener(instanceA, new ChannelTopic(CHANNEL));
     Thread.sleep(300);
 
-    instanceA.publish(List.of(user), NotificationSignal.refreshOnly());
+    instanceA.publish(List.of(user));
 
     assertThat(peerDelivered.await(5, TimeUnit.SECONDS))
-        .as("peer instance B delivered the signal to its emitters")
+        .as("peer instance B delivered the push to its emitters")
         .isTrue();
     assertThat(peerRecipients).containsExactly(List.of(user));
     Thread.sleep(300);
-    verify(streamA, times(1)).publish(List.of(user), NotificationSignal.refreshOnly());
+    verify(streamA, times(1)).publish(List.of(user));
   }
 }

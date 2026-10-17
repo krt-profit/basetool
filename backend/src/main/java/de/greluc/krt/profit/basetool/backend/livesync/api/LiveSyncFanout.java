@@ -23,17 +23,18 @@ import java.util.List;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Carries an app-originated {@code changed} frame beyond this JVM (ADR-0143).
+ * Carries a backend-raised {@code changed} frame beyond this JVM, onto the channel the frontend's
+ * sessions listen on (ADR-0274).
  *
- * <p>Implementations must not throw: a fan-out failure only leaves peers with a stale view and must
- * never fail the originating request.
+ * <p>Implementations must not throw: a fan-out failure only leaves open pages with a stale view and
+ * must never fail the write that raised the frame.
  */
 public interface LiveSyncFanout {
 
   /**
-   * Carries one frame to peers.
+   * Carries one frame to the room's listeners.
    *
-   * @param topic the room, already parsed and canonical
+   * @param topic the room, canonical
    * @param sections the section keys, already clipped to the topic class's whitelist and non-empty
    */
   void publish(@NotNull LiveSyncTopic topic, @NotNull List<String> sections);

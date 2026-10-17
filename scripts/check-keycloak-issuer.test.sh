@@ -22,7 +22,6 @@ COMPOSE_FILES=(
   docker-compose.test.yml
   docker-compose.build.yml
   docker-compose.e2e.yml
-  docker-compose.android.yml
   docker-compose.localtest.yml
   docker-compose.monitoring.yml
 )

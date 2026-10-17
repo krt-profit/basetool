@@ -59,11 +59,7 @@ class AnonymousSurfaceSweepTest {
 
   /** The mappings REQ-SEC-052 serves without a token, with the status each must answer. */
   private static final Set<String> ANONYMOUS_OK =
-      Set.of(
-          "GET /api/v1/app/version-policy",
-          "GET /api/v1/terms/document",
-          "GET /actuator/health",
-          "GET /error");
+      Set.of("GET /api/v1/terms/document", "GET /actuator/health", "GET /error");
 
   /**
    * Path prefixes excluded from the sweep, matched per path segment: {@code /internal}, which is
@@ -77,10 +73,7 @@ class AnonymousSurfaceSweepTest {
    * registration status and the two anonymous reads.
    */
   private static final Set<String> REACHABLE_WHILE_REFUSED =
-      Set.of(
-          "/api/v1/users/me/registration-status",
-          "/api/v1/app/version-policy",
-          "/api/v1/terms/document");
+      Set.of("/api/v1/users/me/registration-status", "/api/v1/terms/document");
 
   @Autowired private WebApplicationContext context;
 

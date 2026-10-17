@@ -20,29 +20,19 @@
 package de.greluc.krt.profit.basetool.backend.livesync.internal;
 
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncFanout;
-import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncStreamService;
 import de.greluc.krt.profit.basetool.backend.livesync.api.RedisLiveSyncFanout;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
-import de.greluc.krt.profit.basetool.backend.platform.api.ResilientRedisMessageListenerContainer;
-import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.UUID;
-import java.util.concurrent.ThreadPoolExecutor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.listener.ChannelTopic;
-import org.springframework.data.redis.listener.RedisMessageListenerContainer;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 /**
- * Wires the app live-sync fan-out (ADR-0143): the Redis bridge when {@code
+ * Wires the live-sync fan-out (ADR-0274): the Redis publisher when {@code
  * app.live-sync.redis-fanout.enabled=true}, otherwise the local no-op, so the backend starts
  * without Redis (ADR-0084).
  */
@@ -51,13 +41,12 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 public class LiveSyncRedisConfig {
 
   /**
-   * The Redis bridge, when it is switched on.
+   * The Redis publisher, when it is switched on.
    *
-   * @param streamService the local emitter registry a consumed frame is delivered to
    * @param redisTemplate the string template used to publish
    * @param meterRegistry registry the counters bind to
    * @param properties the channel and the on/off switch
-   * @return the bridge, registered both as the fan-out and as the channel's message listener
+   * @return the publisher, registered as the fan-out
    */
   @NotNull
   @Bean
@@ -66,21 +55,19 @@ public class LiveSyncRedisConfig {
       name = "enabled",
       havingValue = "true")
   public RedisLiveSyncFanout redisLiveSyncFanout(
-      LiveSyncStreamService streamService,
       StringRedisTemplate redisTemplate,
       MeterRegistry meterRegistry,
       LiveSyncFanoutProperties properties) {
     String instanceId = UUID.randomUUID().toString();
     log.info(
-        "App live-sync Redis bridge enabled (channel={}, instanceId={})",
+        "Live-sync Redis publisher enabled (channel={}, instanceId={})",
         properties.channel(),
         instanceId);
-    return new RedisLiveSyncFanout(
-        streamService, redisTemplate, meterRegistry, properties.channel(), instanceId);
+    return new RedisLiveSyncFanout(redisTemplate, meterRegistry, properties.channel(), instanceId);
   }
 
   /**
-   * The fallback fan-out, used whenever the Redis bridge is absent.
+   * The fallback fan-out, used whenever the Redis publisher is absent.
    *
    * @return a fan-out that carries nothing beyond this JVM
    */
@@ -88,62 +75,7 @@ public class LiveSyncRedisConfig {
   @Bean
   @ConditionalOnMissingBean(LiveSyncFanout.class)
   public LiveSyncFanout localLiveSyncFanout() {
-    log.info("App live-sync Redis bridge disabled — frames stay on this instance");
+    log.info("Live-sync Redis publisher disabled — open pages will not see backend writes");
     return new LocalLiveSyncFanout();
-  }
-
-  /**
-   * The bounded, caller-runs listener pool the Redis container dispatches consumed frames on.
-   *
-   * @return the initialised executor
-   */
-  @NotNull
-  @Bean(destroyMethod = "shutdown")
-  @ConditionalOnProperty(
-      prefix = "app.live-sync.redis-fanout",
-      name = "enabled",
-      havingValue = "true")
-  public ThreadPoolTaskExecutor liveSyncRedisListenerExecutor() {
-    ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-    executor.setCorePoolSize(4);
-    executor.setMaxPoolSize(16);
-    executor.setQueueCapacity(2000);
-    executor.setThreadNamePrefix("livesync-redis-");
-    executor.setDaemon(true);
-    executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
-    executor.initialize();
-    return executor;
-  }
-
-  /**
-   * Subscribes the bridge to its channel through a {@link ResilientRedisMessageListenerContainer},
-   * so a failed first subscription does not abort context startup.
-   *
-   * @param connectionFactory the Redis connection factory
-   * @param fanout the bridge, acting as the message listener
-   * @param listenerExecutor the bounded pool messages are dispatched on
-   * @param meterRegistry registry the subscription gauge binds to
-   * @return the listener container
-   */
-  @NotNull
-  @Bean
-  @ConditionalOnProperty(
-      prefix = "app.live-sync.redis-fanout",
-      name = "enabled",
-      havingValue = "true")
-  public RedisMessageListenerContainer liveSyncRedisMessageListenerContainer(
-      RedisConnectionFactory connectionFactory,
-      RedisLiveSyncFanout fanout,
-      @Qualifier("liveSyncRedisListenerExecutor") ThreadPoolTaskExecutor listenerExecutor,
-      MeterRegistry meterRegistry) {
-    ResilientRedisMessageListenerContainer container = new ResilientRedisMessageListenerContainer();
-    container.setConnectionFactory(connectionFactory);
-    container.setTaskExecutor(listenerExecutor);
-    container.addMessageListener(fanout, new ChannelTopic(fanout.channel()));
-    Gauge.builder(MetricNames.REDIS_FANOUT_SUBSCRIBED, container, c -> c.isListening() ? 1d : 0d)
-        .tag(MetricNames.TAG_FANOUT, MetricNames.FANOUT_LIVESYNC)
-        .description("1 while this instance is subscribed to the live-sync fan-out channel")
-        .register(meterRegistry);
-    return container;
   }
 }

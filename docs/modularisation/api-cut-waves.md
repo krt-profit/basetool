@@ -6,6 +6,27 @@
 
 # REST API cut: waves, mechanics, decisions
 
+> [!important] Amended 2026-10-17 (ADR-0269, #2673) — the hard-cut machinery is gone; the waves are
+> not
+> The per-domain cut of ADR-0231 **continues**, and every wave table, path and target below still
+> holds. What ended is the machinery a wave used to carry, because the client it protected is
+> discontinued: the contract tiers (`contract-tiers.txt`, `ContractTiers`, `x-contract-tier`),
+> `ExternalContractTest`, the app call lists under `api/app-calls/`, the declared-break ledger
+> `declared-breaks.txt` with `DeclaredBreaks`, `retired-operations.txt` with its filter and the
+> `410 APP_UPDATE_REQUIRED` answer, the release-bound app floor, and the generated edge admission
+> (already removed in #2672 with the vhost).
+>
+> **A wave is now an ordinary atomic deploy of frontend and backend.** No app release, no floor
+> raise, no ledger line, no retired path: an old path answers `404`, and the wave's own path-cut
+> test asserts exactly that (`SmallRestPathCutTest`, `OrgUnitBankPathCutTest`,
+> `GameItemPathCutTest`). The cut map `api-cut-map.txt` keeps its six columns, but the tier and app
+> columns are a historical record — `ApiCutMapTest` no longer compares them with anything, and only
+> checks that a moved operation stands at its new path.
+>
+> Read every mention of a tier, a frozen set, an app call list, a floor or a forced update below as
+> the record of how the waves were planned, not as a step a wave still takes.
+
+
 ## 1 What changed since the appendix was measured
 
 | Fact | Appendix (`95e945326`) | Today (`110e16def`) |

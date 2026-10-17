@@ -59,12 +59,25 @@ Beyond roles there are three mechanisms that are easy to miss:
   explicit names, the SpEL stays constant (REQ-SEC-075), no class calls its own gated method past
   the proxy (REQ-SEC-076), and one that still fails at runtime stays a fail-closed 400 that is
   counted and alerted (REQ-OBS-020).
-- **Path-keyed controls check themselves against the real mappings** (guard G-07) — the CSRF
-  exemption, the `no-store` classification of every API family, the rate-limit rules and the
-  pending, terms and acting-member exemptions are all keyed on paths, so a moved path would lose
-  them silently. Tests over the real handler mappings fail on a write outside the CSRF exemption, a
-  mapping outside `/api`, `/internal` and the actuator, an unclassified family, a rule that names no
-  operation, and an exemption that is not an exact list of real paths (REQ-SEC-031, REQ-SEC-078…080).
+- **Path-keyed controls check themselves against the real mappings** (guard G-07) — the `no-store`
+  classification of every API family, the rate-limit rules and the pending, terms and acting-member
+  exemptions are all keyed on paths, so a moved path would lose them silently. Tests over the real
+  handler mappings fail on a mapping outside `/api`, `/internal` and the actuator, an unclassified
+  family, a rule that names no operation, and an exemption that is not an exact list of real paths
+  (REQ-SEC-031, REQ-SEC-078…080).
+- **The bearer-only posture is a test, not a path list** ([ADR-0271](../adr/0271-csrf-and-cors-are-off-on-the-main-chain-and-a-guard-pins-bearer-only.md)).
+  CSRF and CORS are off on the backend's main chain in every profile, which is safe for exactly one
+  reason: the chain accepts nothing but a bearer JWT and creates no session, so there is no ambient
+  credential for a cross-site request to ride. `SecurityChainBearerOnlyTest` asserts that cause —
+  no form login, no HTTP basic, no remember-me, no OAuth2 login, no session — instead of the
+  exemption list it replaces (REQ-SEC-044). The Prometheus scrape chain is HTTP basic by design and
+  keeps Spring's CSRF default (ADR-0265).
+- **A token is accepted only from a named client** ([ADR-0270](../adr/0270-the-backend-accepts-tokens-only-from-named-clients.md)).
+  `aud` says the token was minted for this API; `azp` says which client asked for it, and only
+  `basetool-frontend` and `basetool-ingest-gateway` are accepted. The check is a validator on the
+  decoder, so it refuses before an authentication exists, and a blank list aborts the start under
+  `prod` (REQ-SEC-024). Adding a client to the realm no longer grants API access — which matters
+  because the realm is converged by a provisioner that never deletes (ADR-0202).
 
 Authority: [`security-and-access.md`](../specs/security-and-access.md) (`REQ-SEC-*`),
 [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md), `ArchitectureTest`.
@@ -145,22 +158,29 @@ tier T0) off into its own internal document, `exchange-relay.openapi.json`, with
 check; `openapi.json` is what the app and the frontend read, the relay document is read only by the
 contract guards and served to no one (REQ-XCH-039, ADR-0216).
 
-A breaking change is a **hard cut**, not a second version: every operation carries a contract tier
-(T0 never breaks, T1 is what a released app calls and breaks only in a declared wave with a forced
-update, T2 is web-only), and the minimum app version is to be bound to the release
-([ADR-0234](../adr/0234-the-api-is-re-cut-by-hard-cut-with-a-forced-app-update.md), REQ-API-001,
--009, -010; decided 2026-10-02, implementation pending).
+`/api/v1` is **evolvable in place**: an operation consumed solely by the in-repo frontend may change
+its response shape, because frontend and backend ship from one repository and promote as one digest
+set (REQ-API-001). The hard-cut machinery that narrowed that carve-out — contract tiers, the frozen
+set, the app call lists, the declared-break ledger, the release-bound app floor and the retired-path
+`410` — ended with the client it was built for
+([ADR-0269](../adr/0269-the-frozen-external-contract-ends-with-its-only-client.md), #2673;
+REQ-API-016/017/020/021, superseded). A per-domain re-cut wave
+([ADR-0231](../adr/0231-the-backend-becomes-a-modular-monolith-one-package-per-domain.md)) is now an
+ordinary atomic deploy: an old path answers `404`, not an update wall.
 
-What the Android app calls is a contract of its own: the frozen set of `ExternalContractTest` must
-cover the call list each app release publishes (committed under
-`backend/src/test/resources/api/app-calls/`), and a frozen operation or field breaks only by a line
-of the declared-break ledger, checked against the previous release's document, which CI must fetch
-(REQ-API-016, REQ-API-017). Every operation of the document carries one domain tag (`x-domain`,
-22 domains) and one contract tier (`x-contract-tier`: T0 never breaks, T1 the Android contract,
-T2 web-only), and every schema name belongs to one Java type (REQ-API-018). The public API vhost
-admits exactly the frozen set, by verb and path, through a map generated from it, plus the two
-anonymous reads and the retired operations; everything else stops at the edge with `404`
-(REQ-API-021).
+Two compatibility constraints outlive it and are named rather than framed. The **exchange relay
+operations** are frozen where their external clients consume them, on the gateway, under a
+path-major version (ADR-0216, ADR-0219, REQ-XCH-039) — not a second time here. And
+`POST /internal/discord/account-existence` is called by the **Keycloak SPI**, whose provider JAR is a
+separately promotable artifact (ADR-0055), so backend and caller do not deploy atomically and a
+shape change there can break a login while both artifacts look healthy. That one operation is the
+only genuine cross-artifact contract the backend has, and the machinery never covered it: the tiers
+were keyed to the OpenAPI document, which does not describe `/internal/**`.
+
+Every operation of the document carries one domain tag (`x-domain`, 23 domains) and every schema
+name belongs to one Java type (REQ-API-018); `CommittedOpenApi` and the committed `openapi.json`
+stay, because they are the input the frontend's generated DTO types and the DTO mirror tests read
+(REQ-API-007) — drift between our own two modules, not a promise to a third party.
 
 Authority: [`api-conventions.md`](../specs/api-conventions.md) (`REQ-API-*`).
 

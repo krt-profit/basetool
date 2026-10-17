@@ -24,7 +24,6 @@ import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.tags.Tag;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import org.jetbrains.annotations.NotNull;
@@ -35,22 +34,17 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.method.HandlerMethod;
 
 /**
- * Tags every operation of the OpenAPI document with its domain and its contract tier (REQ-API-018,
- * ADR-0234).
+ * Tags every operation of the OpenAPI document with its domain (REQ-API-018).
  *
  * <p>Each operation carries exactly one tag, its domain from {@link ApiDomains}, mirrored as the
- * {@code x-domain} extension, and the {@code x-contract-tier} extension from {@link ContractTiers}.
- * The document's tag list holds the domains and nothing else; springdoc's class-name tags are off
- * ({@code springdoc.auto-tag-classes: false}).
+ * {@code x-domain} extension. The document's tag list holds the domains and nothing else;
+ * springdoc's class-name tags are off ({@code springdoc.auto-tag-classes: false}).
  */
 @Configuration
 public class OpenApiDomainConfig {
 
   /** The extension naming an operation's domain. */
   public static final String DOMAIN_EXTENSION = "x-domain";
-
-  /** The extension naming an operation's contract tier. */
-  public static final String TIER_EXTENSION = "x-contract-tier";
 
   /**
    * Creates the customizer that replaces an operation's tags with its controller's domain.
@@ -68,32 +62,26 @@ public class OpenApiDomainConfig {
   }
 
   /**
-   * Creates the customizer that marks every operation with its contract tier and replaces the
-   * document's tag list with the domains its operations use.
+   * Creates the customizer that replaces the document's tag list with the domains its operations
+   * use.
    *
    * @return the document customizer
    */
   @Bean
-  public OpenApiCustomizer contractTierCustomizer() {
-    ContractTiers tiers = ContractTiers.load();
-    return openApi -> customize(openApi, tiers);
+  public OpenApiCustomizer domainTagListCustomizer() {
+    return OpenApiDomainConfig::customize;
   }
 
   /**
-   * Applies the tiers and the domain tag list to a document.
+   * Applies the domain tag list to a document.
    *
    * @param openApi the document under construction
-   * @param tiers the tier list
    */
-  private static void customize(@NotNull OpenAPI openApi, @NotNull ContractTiers tiers) {
+  private static void customize(@NotNull OpenAPI openApi) {
     Set<String> domains = new TreeSet<>();
     if (openApi.getPaths() != null) {
-      for (Map.Entry<String, PathItem> path : openApi.getPaths().entrySet()) {
-        for (Map.Entry<PathItem.HttpMethod, Operation> entry :
-            path.getValue().readOperationsMap().entrySet()) {
-          Operation operation = entry.getValue();
-          operation.addExtension(
-              TIER_EXTENSION, tiers.tierOf(entry.getKey().name(), path.getKey()));
+      for (PathItem path : openApi.getPaths().values()) {
+        for (Operation operation : path.readOperationsMap().values()) {
           if (operation.getTags() != null) {
             domains.addAll(operation.getTags());
           }

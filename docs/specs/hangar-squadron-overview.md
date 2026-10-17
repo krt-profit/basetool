@@ -155,10 +155,10 @@ REQ-XCH-013 pattern) reaches the tab as well ([ADR-0260](../adr/0260-the-unit-ha
 - [x] The all-units view holds one subscription and still refreshes.
 
 **Enforced by:** `HangarUnitLiveSyncTest`, `HangarServiceTest`, `HangarUserErasureTest`,
-`LiveSyncTopicAuthorizersTest`, `LiveSyncSubscriptionAuthorizerTest` (backend and frontend),
+`LiveSyncSubscriptionAuthorizerTest` (frontend),
 `LiveSyncSectionMapParityTest`, `LiveSyncTopicRegistryParityTest`, `ExchangeShipWriteControllerTest`,
 `HangarPageControllerMvcTest`, `AuthorizationMatrixTest` · **Code:** `HangarUnitLiveSync`,
-`HangarUnitLiveSyncTopicAuthorizer`, `HangarAccessPolicy#canSeeUnitHangar`,
+`HangarAccessPolicy#canSeeUnitHangar`,
 `HangarController#unitOverviewAccess`, both `LiveSyncTopicClass` registries,
 `HangarPageController#unitLiveSyncTopic`, `hangar/hangar-squadron.js` · **Issues:** #2606 (epic
 #2595, #2581).

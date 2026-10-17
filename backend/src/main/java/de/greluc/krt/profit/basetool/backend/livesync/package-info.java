@@ -18,7 +18,8 @@
  */
 
 /**
- * The live-sync module: the topic rooms, their relay and fan-out, and who may join them (ADR-0143).
+ * The live-sync module: the rooms the backend announces its own committed writes into, and the
+ * fan-out that carries those frames to the frontend's sessions (ADR-0274).
  */
 @ApplicationModule(allowedDependencies = {"kernel", "platform::api"})
 package de.greluc.krt.profit.basetool.backend.livesync;

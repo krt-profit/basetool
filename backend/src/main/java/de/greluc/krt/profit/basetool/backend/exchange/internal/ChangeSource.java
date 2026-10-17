@@ -83,8 +83,8 @@ public class ChangeSource {
    * Returns the source of the writes made under an authentication.
    *
    * @param authentication the authentication, or {@code null} outside a request
-   * @return {@code client|<clientId>|<key>} for a relayed exchange client, {@code web} or {@code
-   *     app} for their clients, otherwise {@code system}
+   * @return {@code client|<clientId>|<key>} for a relayed exchange client, {@code web} for a
+   *     browser session's client, otherwise {@code system}
    */
   public @NotNull String of(@Nullable Authentication authentication) {
     if (authentication instanceof SubjectAuthentication subject
@@ -95,9 +95,6 @@ public class ChangeSource {
     Optional<String> party = AuthenticatedSubject.authorizedParty(authentication);
     if (party.filter(properties.webClientIds()::contains).isPresent()) {
       return "web";
-    }
-    if (party.filter(properties.appClientIds()::contains).isPresent()) {
-      return "app";
     }
     return "system";
   }

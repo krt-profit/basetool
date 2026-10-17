@@ -21,50 +21,62 @@ package de.greluc.krt.profit.basetool.backend.livesync.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncStreamService;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncFanout;
+import de.greluc.krt.profit.basetool.backend.livesync.api.RedisLiveSyncFanout;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
-import org.springframework.data.redis.RedisConnectionFailureException;
-import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 
 /**
- * Verifies that the context starts with the {@link LiveSyncRedisConfig} fan-out enabled while Redis
- * refuses every connection, with the listener container's auto-start left on.
+ * Which fan-out {@link LiveSyncRedisConfig} wires, and that the backend subscribes to nothing
+ * (ADR-0274).
  */
 class LiveSyncRedisConfigContextTest {
 
   /**
-   * Starts the enabled configuration against a connection factory that always refuses, and asserts
-   * the context comes up anyway with the fan-out container still present.
+   * Builds a runner with the collaborators the configuration needs.
    *
-   * <p>The second assertion is what rules out the cheap fix: simply not creating (or disabling) the
-   * container would satisfy "the context starts" while silently ending cross-instance live sync.
+   * @param enabled what {@code app.live-sync.redis-fanout.enabled} is set to
+   * @return the configured runner
    */
-  @Test
-  void contextStarts_whenRedisRefusesTheSubscription() {
-    RedisConnectionFactory refusing = mock(RedisConnectionFactory.class);
-    when(refusing.getConnection())
-        .thenThrow(new RedisConnectionFailureException("Connection refused"));
-
-    new ApplicationContextRunner()
-        .withPropertyValues("app.live-sync.redis-fanout.enabled=true")
-        .withBean(LiveSyncStreamService.class, () -> mock(LiveSyncStreamService.class))
+  private static ApplicationContextRunner runner(boolean enabled) {
+    return new ApplicationContextRunner()
+        .withPropertyValues("app.live-sync.redis-fanout.enabled=" + enabled)
         .withBean(StringRedisTemplate.class, () -> mock(StringRedisTemplate.class))
         .withBean(SimpleMeterRegistry.class, SimpleMeterRegistry::new)
         .withBean(
             LiveSyncFanoutProperties.class,
-            () -> new LiveSyncFanoutProperties(true, "basetool:livesync:published"))
-        .withBean(RedisConnectionFactory.class, () -> refusing)
-        .withUserConfiguration(LiveSyncRedisConfig.class)
+            () -> new LiveSyncFanoutProperties(enabled, "basetool:livesync:changed"))
+        .withUserConfiguration(LiveSyncRedisConfig.class);
+  }
+
+  @Test
+  @DisplayName("the enabled configuration wires the Redis publisher and no listener container")
+  void enabledWiresThePublisherOnly() {
+    runner(true)
         .run(
             context ->
                 assertThat(context)
                     .hasNotFailed()
-                    .hasSingleBean(RedisMessageListenerContainer.class));
+                    .hasSingleBean(RedisLiveSyncFanout.class)
+                    .doesNotHaveBean(
+                        org.springframework.data.redis.listener.RedisMessageListenerContainer
+                            .class));
+  }
+
+  @Test
+  @DisplayName("the disabled configuration falls back to the local no-op, so the backend starts")
+  void disabledFallsBackToTheLocalNoop() {
+    runner(false)
+        .run(
+            context ->
+                assertThat(context)
+                    .hasNotFailed()
+                    .doesNotHaveBean(RedisLiveSyncFanout.class)
+                    .getBean(LiveSyncFanout.class)
+                    .isInstanceOf(LocalLiveSyncFanout.class));
   }
 }

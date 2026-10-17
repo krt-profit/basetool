@@ -120,12 +120,12 @@ class ApiClientMetricsChainTest {
 
   @Test
   void aRequestThroughTheRealChainIsAttributedToItsClient() throws Exception {
-    double before = requests("basetool-android");
+    double before = requests("basetool-frontend");
 
     mockMvc.perform(
-        get("/api/v1/missions").with(jwt().jwt(token -> token.claim("azp", "basetool-android"))));
+        get("/api/v1/missions").with(jwt().jwt(token -> token.claim("azp", "basetool-frontend"))));
 
-    assertThat(requests("basetool-android") - before).isEqualTo(1.0d);
+    assertThat(requests("basetool-frontend") - before).isEqualTo(1.0d);
   }
 
   @Test

@@ -46,8 +46,7 @@ class OpenApiAnonymousOperationsTest {
    * that gains an empty {@code security} list without appearing here is a widening of the public
    * surface that nobody wrote down.
    */
-  private static final Set<String> ANONYMOUS_OPERATIONS =
-      Set.of("get /api/v1/app/version-policy", "get /api/v1/terms/document");
+  private static final Set<String> ANONYMOUS_OPERATIONS = Set.of("get /api/v1/terms/document");
 
   /** The HTTP verbs an OpenAPI path item may carry. */
   private static final List<String> VERBS =

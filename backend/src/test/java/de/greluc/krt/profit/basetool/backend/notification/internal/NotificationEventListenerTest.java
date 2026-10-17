@@ -22,14 +22,12 @@ package de.greluc.krt.profit.basetool.backend.notification.internal;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationPendingEvent;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationFanout;
-import de.greluc.krt.profit.basetool.backend.notification.api.NotificationSignal;
-import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -40,8 +38,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * Unit tests for {@link NotificationEventListener}: the SSE push follows {@link
- * NotificationCreationService#createFromEvent} for exactly its recipients, and is skipped when none
- * matched or creation failed (REQ-NOTIF-010).
+ * NotificationCreationService#createFromEvent} for exactly its recipients, once each, and is
+ * skipped when none matched or creation failed (REQ-NOTIF-010, ADR-0273).
  */
 @ExtendWith(MockitoExtension.class)
 class NotificationEventListenerTest {
@@ -58,22 +56,21 @@ class NotificationEventListenerTest {
   void publishesToResolvedRecipients_afterCreateReturns() {
     NotificationEvent event = event();
     Set<UUID> recipients = Set.of(UUID.randomUUID(), UUID.randomUUID());
-    when(notificationCreationService.createFromEvent(event))
-        .thenReturn(Map.of(NotificationSignal.refreshOnly(), recipients));
+    when(notificationCreationService.createFromEvent(event)).thenReturn(recipients);
 
     listener.onNotificationEvent(event);
 
-    verify(notificationFanout).publish(recipients, NotificationSignal.refreshOnly());
+    verify(notificationFanout).publish(recipients);
   }
 
   @Test
   void doesNotPublish_whenNoRecipientsResolved() {
     NotificationEvent event = event();
-    when(notificationCreationService.createFromEvent(event)).thenReturn(Map.of());
+    when(notificationCreationService.createFromEvent(event)).thenReturn(Set.of());
 
     listener.onNotificationEvent(event);
 
-    verify(notificationFanout, never()).publish(any(), any());
+    verify(notificationFanout, never()).publish(any());
   }
 
   @Test
@@ -84,24 +81,19 @@ class NotificationEventListenerTest {
 
     listener.onNotificationEvent(event);
 
-    verify(notificationFanout, never()).publish(any(), any());
+    verify(notificationFanout, never()).publish(any());
   }
 
   @Test
-  void onNotificationEvent_publishesOncePerSignal_soEachAudienceIsToldItsOwnKind() {
+  void onNotificationEvent_publishesOnce_forEveryAudienceOfOneEventTogether() {
     NotificationEvent event = event();
-    Set<UUID> officers = Set.of(UUID.randomUUID());
-    Set<UUID> members = Set.of(UUID.randomUUID(), UUID.randomUUID());
-    NotificationSignal toOfficers =
-        new NotificationSignal(
-            NotificationType.DISCORD_REGISTRATION_PENDING, "USER", UUID.randomUUID(), Map.of());
-    NotificationSignal toMembers = NotificationSignal.refreshOnly();
-    when(notificationCreationService.createFromEvent(event))
-        .thenReturn(Map.of(toOfficers, officers, toMembers, members));
+    UUID officer = UUID.randomUUID();
+    UUID member = UUID.randomUUID();
+    when(notificationCreationService.createFromEvent(event)).thenReturn(Set.of(officer, member));
 
     listener.onNotificationEvent(event);
 
-    verify(notificationFanout).publish(officers, toOfficers);
-    verify(notificationFanout).publish(members, toMembers);
+    verify(notificationFanout).publish(Set.of(officer, member));
+    verifyNoMoreInteractions(notificationFanout);
   }
 }

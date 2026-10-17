@@ -36,15 +36,15 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Proves the runtime log-level change (REQ-OBS-016) works with CSRF enabled, as in production: the
- * bearer-only {@code /actuator/loggers/**} write must not demand a CSRF token, while an anonymous
- * caller and a non-exempt path stay refused.
+ * Proves the runtime log-level change (REQ-OBS-016) is reachable through the real chain and gated
+ * by the admin role: the write succeeds for an admin and stays refused for an anonymous and a
+ * non-admin caller.
  *
- * <p>Re-arms CSRF via {@code app.security.csrf.armed-in-test}; the {@code test} profile otherwise
- * disables it.
+ * <p>No CSRF token takes part: the chain holds no ambient credential and CSRF is off in every
+ * profile (ADR-0271), which {@code SecurityChainBearerOnlyTest} is what pins.
  */
-@SpringBootTest(properties = "app.security.csrf.armed-in-test=true")
-class ActuatorLoggersCsrfArmedTest {
+@SpringBootTest
+class ActuatorLoggersAccessTest {
 
   private static final String PROBE_PATH =
       "/actuator/loggers/de.greluc.krt.profit.basetool.backend.test.CsrfArmedProbe";
@@ -63,7 +63,7 @@ class ActuatorLoggersCsrfArmedTest {
 
   @Test
   @WithMockUser(roles = Roles.ADMIN)
-  void adminLoggerWriteWithoutCsrfTokenSucceeds() throws Exception {
+  void adminLoggerWriteSucceeds() throws Exception {
     mockMvc
         .perform(post(PROBE_PATH).contentType(MediaType.APPLICATION_JSON).content(LEVEL_BODY))
         .andExpect(status().isNoContent());
@@ -71,7 +71,7 @@ class ActuatorLoggersCsrfArmedTest {
 
   @Test
   @WithAnonymousUser
-  void anonymousLoggerWriteWithoutTokenIsStillRefused() throws Exception {
+  void anonymousLoggerWriteIsRefused() throws Exception {
     mockMvc
         .perform(post(PROBE_PATH).contentType(MediaType.APPLICATION_JSON).content(LEVEL_BODY))
         .andExpect(status().isUnauthorized());
@@ -79,17 +79,9 @@ class ActuatorLoggersCsrfArmedTest {
 
   @Test
   @WithMockUser(roles = Roles.KRT_MEMBER)
-  void nonAdminLoggerWriteWithoutTokenIsStillForbidden() throws Exception {
+  void nonAdminLoggerWriteIsForbidden() throws Exception {
     mockMvc
         .perform(post(PROBE_PATH).contentType(MediaType.APPLICATION_JSON).content(LEVEL_BODY))
-        .andExpect(status().isForbidden());
-  }
-
-  @Test
-  @WithMockUser(roles = Roles.ADMIN)
-  void nonExemptPathStillDemandsACsrfToken() throws Exception {
-    mockMvc
-        .perform(post("/actuator/shutdown").contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isForbidden());
   }
 }

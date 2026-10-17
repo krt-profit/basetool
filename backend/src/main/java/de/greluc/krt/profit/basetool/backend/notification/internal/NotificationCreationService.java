@@ -23,7 +23,6 @@ import de.greluc.krt.profit.basetool.backend.notification.api.Notification;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationMuteService;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationParamsCodec;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRepository;
-import de.greluc.krt.profit.basetool.backend.notification.api.NotificationSignal;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
@@ -66,27 +65,22 @@ public class NotificationCreationService {
    * <p>Pushes no SSE signal itself; the caller pushes after this transaction commits.
    *
    * @param event the fired event
-   * @return the recipients whose inbox changed, grouped by signal; cleared-only recipients appear
-   *     under {@link NotificationSignal#refreshOnly()}
+   * @return the recipients whose inbox changed, those who only had stale items cleared included
    */
   @Transactional
   @NotNull
-  public Map<NotificationSignal, Set<UUID>> createFromEvent(@NotNull NotificationEvent event) {
+  public Set<UUID> createFromEvent(@NotNull NotificationEvent event) {
     if (!event.reconcileRecipients().isEmpty()) {
       return reconcile(event);
     }
-    Map<NotificationSignal, Set<UUID>> bySignal = new LinkedHashMap<>();
-    Set<UUID> cleared = removeSupersededNotifications(event);
-    if (!cleared.isEmpty()) {
-      bySignal.put(NotificationSignal.refreshOnly(), new HashSet<>(cleared));
-    }
+    Set<UUID> changed = new HashSet<>(removeSupersededNotifications(event));
 
     Map<NotificationType, Set<UUID>> recipientsByType =
         notificationMuteService.withoutMuted(ruleEvaluationService.resolveRecipients(event));
     if (recipientsByType.isEmpty()) {
       log.debug(
           "Event {} for entity {} resolved no recipients", event.eventType(), event.entityId());
-      return bySignal;
+      return changed;
     }
     String paramsJson = notificationParamsCodec.serialize(event.renderParams());
     List<Notification> toCreate = new ArrayList<>();
@@ -111,13 +105,8 @@ public class NotificationCreationService {
         toCreate.size(),
         event.eventType(),
         event.entityId());
-    for (Map.Entry<NotificationType, Set<UUID>> entry : recipientsByType.entrySet()) {
-      NotificationSignal signal =
-          new NotificationSignal(
-              entry.getKey(), event.entityType(), event.entityId(), event.renderParams());
-      bySignal.computeIfAbsent(signal, _ -> new HashSet<>()).addAll(entry.getValue());
-    }
-    return bySignal;
+    recipientsByType.values().forEach(changed::addAll);
+    return changed;
   }
 
   private void recordCreated(@NotNull List<Notification> created) {
@@ -142,16 +131,16 @@ public class NotificationCreationService {
    * candidate the rules no longer resolve loses theirs, and everyone else is left alone.
    *
    * @param event the reconciling event
-   * @return the candidates whose inbox changed, grouped by signal
+   * @return the candidates whose inbox changed
    */
   @NotNull
-  private Map<NotificationSignal, Set<UUID>> reconcile(@NotNull NotificationEvent event) {
-    Map<NotificationSignal, Set<UUID>> bySignal = new LinkedHashMap<>();
+  private Set<UUID> reconcile(@NotNull NotificationEvent event) {
+    Set<UUID> changed = new HashSet<>();
     Set<UUID> candidates = event.reconcileRecipients();
     Set<NotificationType> noticeTypes = event.resolvesNotificationTypes();
     if (noticeTypes.isEmpty() || event.entityType() == null || event.entityId() == null) {
       log.warn("Event {} reconciles without notice types or entity; ignored", event.eventType());
-      return bySignal;
+      return changed;
     }
     Set<UUID> holders =
         new HashSet<>(
@@ -178,7 +167,7 @@ public class NotificationCreationService {
           deleted,
           stale.size(),
           event.eventType());
-      bySignal.put(NotificationSignal.refreshOnly(), stale);
+      changed.addAll(stale);
     }
 
     String paramsJson = notificationParamsCodec.serialize(event.renderParams());
@@ -201,12 +190,7 @@ public class NotificationCreationService {
                 .read(false)
                 .build());
       }
-      bySignal
-          .computeIfAbsent(
-              new NotificationSignal(
-                  entry.getKey(), event.entityType(), event.entityId(), event.renderParams()),
-              _ -> new HashSet<>())
-          .addAll(missing);
+      changed.addAll(missing);
     }
     if (!toCreate.isEmpty()) {
       notificationRepository.saveAll(toCreate);
@@ -218,7 +202,7 @@ public class NotificationCreationService {
           toCreate.size(),
           event.eventType());
     }
-    return bySignal;
+    return changed;
   }
 
   /**

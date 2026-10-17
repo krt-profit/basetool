@@ -20,10 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.notification.internal;
 
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationFanout;
-import de.greluc.krt.profit.basetool.backend.notification.api.NotificationSignal;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
 import de.greluc.krt.profit.basetool.backend.platform.api.AsyncConfig;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -48,19 +46,21 @@ public class NotificationEventListener {
   private final NotificationFanout notificationFanout;
 
   /**
-   * Creates notifications for an event, then pushes the real-time SSE signal to the recipients once
+   * Creates notifications for an event, then pushes the real-time SSE event to the recipients once
    * that creation has committed.
    *
-   * <p>The push is best-effort; polling keeps the badge correct (REQ-NOTIF-010).
+   * <p>One push per recipient, whatever the event raised for them: the event carries no payload, so
+   * two pushes would say the same thing twice (ADR-0273). The push is best-effort; polling keeps
+   * the badge correct (REQ-NOTIF-010).
    *
    * @param event the published notification event
    */
   @Async(AsyncConfig.NOTIFICATION_EXECUTOR)
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void onNotificationEvent(NotificationEvent event) {
-    Map<NotificationSignal, Set<UUID>> recipientsBySignal;
+    Set<UUID> recipients;
     try {
-      recipientsBySignal = notificationCreationService.createFromEvent(event);
+      recipients = notificationCreationService.createFromEvent(event);
     } catch (RuntimeException e) {
       log.error(
           "Failed to create notifications for event {} entity {}",
@@ -69,13 +69,11 @@ public class NotificationEventListener {
           e);
       return;
     }
-    if (recipientsBySignal.isEmpty()) {
+    if (recipients.isEmpty()) {
       return;
     }
     try {
-      for (Map.Entry<NotificationSignal, Set<UUID>> entry : recipientsBySignal.entrySet()) {
-        notificationFanout.publish(entry.getValue(), entry.getKey());
-      }
+      notificationFanout.publish(recipients);
     } catch (RuntimeException e) {
       log.debug("Real-time notification push failed; polling fallback remains", e);
     }

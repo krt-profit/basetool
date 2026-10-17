@@ -57,7 +57,7 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>Runs after {@link ActingMemberFilter}, so ingest-gateway requests are judged as the acting
  * member. Exempt are the consent endpoints, the registration-status endpoint and {@code
- * /api/v1/app/version-policy}. Shaped like {@link PendingApprovalAccessFilter}.
+ * /api/v1/terms/document}. Shaped like {@link PendingApprovalAccessFilter}.
  */
 @Slf4j
 @RequiredArgsConstructor
@@ -86,8 +86,7 @@ public class TermsAcceptanceAccessFilter extends OncePerRequestFilter {
           "/api/v1/terms/document",
           "/api/v1/terms/status",
           "/api/v1/terms/acceptance",
-          "/api/v1/users/me/registration-status",
-          "/api/v1/app/version-policy");
+          "/api/v1/users/me/registration-status");
 
   /** {@link #EXEMPT_PATHS} parsed once, matched on the decoded path. */
   private static final List<PathPattern> EXEMPT_PATTERNS =

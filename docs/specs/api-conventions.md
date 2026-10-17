@@ -1068,10 +1068,22 @@ because the build fails when they differ.
   APP_UPDATE_REQUIRED` ahead of authentication, and the API vhost's generated admission admits
   every retired operation so the answer reaches the app there (REQ-API-021).
 
-**Enforced by:** `ExternalContractTest` (backend) · the *Fail if a committed openapi.json is stale*
-step in `ci.yml` (since 2026-09-23), which is what keeps the document `ExternalContractTest` reads
-equal to the one the controllers produce (REQ-API-007) ·
-**Related:** ADR-0136, ADR-0234, ADR-0135, ADR-0003, REQ-API-001, REQ-API-007, REQ-SEC-027
+> [!important] Amended 2026-10-17 (ADR-0269, #2673) — the freeze ends with the client it was for
+> `ExternalContractTest`, the contract tiers and the app call lists are removed: the only client that
+> could not redeploy is discontinued, so `/api/v1` is back under REQ-API-001's atomic-deploy
+> carve-out, unnarrowed. The two compatibility constraints that outlive the freeze are named rather
+> than framed — the exchange relay operations stay frozen on the gateway where their external clients
+> consume them (ADR-0216, ADR-0219, REQ-XCH-039), and `POST /internal/discord/account-existence` is
+> called by the Keycloak SPI, a separately promotable artifact (ADR-0055), so a shape change there
+> can break a login while both artifacts look healthy. That one operation is the only genuine
+> cross-artifact contract the backend has, and the tier file never covered it: the tiers were keyed
+> to the OpenAPI document, which does not describe `/internal/**`.
+
+**Enforced by:** the *Fail if a committed openapi.json is stale* step in `ci.yml` (since
+2026-09-23), which keeps the committed document equal to the one the controllers produce
+(REQ-API-007) · `CommittedOpenApi`, `OpenApiGeneratorTest`, the frontend's DTO mirror tests ·
+**Related:** ADR-0136 (superseded by ADR-0269), ADR-0234, ADR-0135, ADR-0003, REQ-API-001,
+REQ-API-007, REQ-SEC-027
 
 ---
 
@@ -1145,9 +1157,15 @@ reading "no floor" and carrying on against a contract that no longer exists.
 distribution is GitHub Releases plus Obtainium (plan Q1), so `releasesUrl` names the release page
 instead. Recorded here rather than left as a silent difference between design and build.
 
-**Enforced by:** `AppVersionPolicyControllerTest`, `ExternalContractTest`,
-`ApiVhostAnonymousSurfaceTest` (backend) ·
-**Related:** REQ-API-009, REQ-SEC-037, ADR-0136, ADR-0234, app issue krt-profit/basetool-android#67
+> [!note] Amended 2026-10-17 (ADR-0269, #2673) — nothing serves this any more
+> `GET /api/v1/app/version-policy` is removed with the app floor (REQ-API-020, superseded), together
+> with `AppVersionPolicyController`, `AppVersionPolicyDto` and their tests. The requirement is kept
+> for the finding it records: *a version gate that answers only after a login is silent in the one
+> case it exists for* — which is why the endpoint was anonymous and `GET`-scoped, and is the shape
+> any future client-floor endpoint should take.
+
+**Related:** REQ-API-009, REQ-SEC-037, ADR-0136, ADR-0234, app issue
+krt-profit/basetool-android#67
 
 ---
 
@@ -1333,7 +1351,19 @@ to leave the annotation off.
 
 ---
 
-### REQ-API-016 — The frozen set covers every call the app publishes
+### REQ-API-016 — The frozen set covers every call the app publishes *(superseded)*
+
+> **Superseded 2026-10-17 (ADR-0269, #2673).** The app this covered is discontinued, so the call
+> lists under `backend/src/test/resources/api/app-calls/` describe a client that no longer exists.
+> Removed with them: `AppCallList`, `AppCallListTest`, `CommittedAppCallListTest` and the coverage
+> assertions of `ExternalContractTest`.
+>
+> **What it got right outlives it.** A list of the calls a client really makes is the only honest
+> answer to "may this operation change?", and nothing replaces it — because the question now has
+> one answer everywhere: `/api/v1` is consumed by the in-repo frontend, which promotes with the
+> backend, so REQ-API-001's carve-out applies unnarrowed. The exchange relay operations are frozen
+> where their clients consume them (ADR-0216, ADR-0219), not here.
+
 
 The frozen set of REQ-API-009 was assembled by hand and missed operations the app calls: eleven, one
 of them refused by the edge (2026-10-03, below). The Android app therefore publishes, with every
@@ -1397,12 +1427,21 @@ under-stated), `s=` the app's own call sites, which the server ignores. No comme
   released tag v0.6.1 (versionCode 20), byte-identical to the one of v0.6.0 (versionCode 19), which
   the floor of 20 walls off, so `19.txt` is deleted (2026-10-13).
 
-**Enforced by:** `ExternalContractTest`, `AppCallListTest` (backend) · `AppCallListTest` (app) ·
+**Enforced by:** nothing — the tests and the lists were removed with the app (ADR-0269) ·
 **Related:** REQ-API-009, REQ-API-010, REQ-API-017, REQ-SEC-037, ADR-0136
 
 ---
 
-### REQ-API-017 — A frozen operation breaks only by a declared line, against a mandatory baseline
+### REQ-API-017 — A frozen operation breaks only by a declared line, against a mandatory baseline *(superseded)*
+
+> **Superseded 2026-10-17 (ADR-0269, #2673).** With no client that cannot redeploy, every intended
+> shape change became a failure that had to be declared, which turns the ledger into a changelog
+> maintained under build pressure — and a gate that fires on intended changes teaches people to
+> feed it. Removed: `DeclaredBreaks`, `DeclaredBreaksTest`, the ledger
+> `backend/src/test/resources/api/declared-breaks.txt` and the previous-release comparison in
+> `ExternalContractTest`. The ledger's contents stay in git, where a question about a past break is
+> answered by the commit that declared it.
+
 
 A break of a frozen operation or field is either declared or a defect. The declaration is a line in
 **the declared-break ledger**, `backend/src/test/resources/api/declared-breaks.txt`, one line per
@@ -1465,13 +1504,29 @@ changed or removed (ADR-0234).
   previous document marks `T0` or `T1` (REQ-API-018, 2026-10-03), the relay operations in the
   release's relay document included (REQ-XCH-039).
 
-**Enforced by:** `ExternalContractTest`, `DeclaredBreaksTest`, `AppCallListTest` (backend) · the
+**Enforced by:** nothing — removed with the app (ADR-0269). It used to be `ExternalContractTest`,
+`DeclaredBreaksTest` and `AppCallListTest` (backend) plus the
 *Fetch the previous release's API contract* step of `ci.yml` ·
 **Related:** REQ-API-009, REQ-API-010, REQ-API-016, ADR-0136
 
 ---
 
-### REQ-API-020 — The app floor rides the release, and a retired path tells the app to update
+### REQ-API-020 — The app floor rides the release, and a retired path tells the app to update *(superseded)*
+
+> **Superseded 2026-10-17 (ADR-0269, #2673).** Both halves lose their subject with the app. Removed:
+> `GET /api/v1/app/version-policy` with `AppVersionPolicyController` and `AppVersionPolicyDto`, the
+> `app.android.version-policy.*` configuration with `AndroidClientProperties` and
+> `AndroidVersionPolicyReport`, the `basetool_android_version_policy_override` gauge and its
+> `AndroidVersionPolicyOverrideActive` alert and rule test, and the retired-path answer —
+> `RetiredOperations`, `RetiredOperationFilter`, `RetiredOperationsConfig`,
+> `backend/src/main/resources/api/retired-operations.txt` and the `410 APP_UPDATE_REQUIRED` body.
+> An operation a wave retired now answers `404` like any other path the server does not serve.
+>
+> **The deploy-seam finding outlives the mechanism.** "A value that gates an API must deploy and
+> roll back with that API, not sit in a host file" is why the floor was a reviewed literal in
+> `application.yml` rather than an env var, and it is the shape every later release-bound value
+> should keep.
+
 
 Owner decision D-11 (ADR-0234): the minimum app version deploys and rolls back together with the API
 it protects, and an operation a hard-cut wave retired answers the app's update wall rather than a
@@ -1570,7 +1625,8 @@ and retired answers at once, and a rollback takes all three back.
   closed by REQ-API-021 (2026-10-03): `EdgeAdmission` reads `retired-operations.txt` into the
   generated map.
 
-**Enforced by:** `AndroidClientPropertiesTest`, `AppVersionPolicyDeploySeamTest`,
+**Enforced by:** nothing — removed with the app (ADR-0269). It used to be
+`AndroidClientPropertiesTest`, `AppVersionPolicyDeploySeamTest`,
 `AndroidVersionPolicyReportTest`, `AppVersionPolicyControllerTest`, `RetiredOperationsTest`,
 `RetiredOperationFilterTest`, `RetiredOperationsContractTest`, `RetiredOperationChainTest` (backend) ·
 `scripts/render-env-d.test.sh` · `monitoring/prometheus/tests/android_version_policy_override_test.yml` ·
@@ -1578,7 +1634,15 @@ and retired answers at once, and a rollback takes all three back.
 
 ---
 
-### REQ-API-021 — The API vhost admits exactly the frozen operations, by verb and path, from a generated map
+### REQ-API-021 — The API vhost admits exactly the frozen operations, by verb and path, from a generated map *(superseded)*
+
+> **Superseded 2026-10-17 (ADR-0268/ADR-0269, #2672 and #2673).** #2672 removed the vhost and its
+> generated admission (REQ-OPS-042); #2673 removed the two things the map was rendered from — the
+> frozen set and the retired-operations list — so nothing is left to generate it out of. ADR-0135
+> had already recorded the deeper finding: an allow-list in front of an authorizing API proves
+> admission, not authorisation, and keeping a second copy of an authorisation rule is how the two
+> drift.
+
 
 The public API vhost admits **exactly** these operations, each by its verb and its whole path:
 

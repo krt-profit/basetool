@@ -36,7 +36,7 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "app.monitoring.api-clients")
 public record ApiClientMetricsProperties(
-    @DefaultValue({"basetool-frontend", "basetool-android"}) List<String> knownClientIds) {
+    @DefaultValue({"basetool-frontend"}) List<String> knownClientIds) {
 
   /**
    * Whether {@code azp} names a client listed in this configuration. Does not consult the ingest

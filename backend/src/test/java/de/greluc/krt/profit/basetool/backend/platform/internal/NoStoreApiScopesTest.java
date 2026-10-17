@@ -59,7 +59,6 @@ class NoStoreApiScopesTest {
         "/api/v1/connected-apps",
         "/api/v1/exchange/me/stock",
         "/api/v1/org-chart/leadership",
-        "/api/v1/live-sync/stream",
         "/api/v1/material-exchange/offers",
         "/api/v1/material-exchange/releasable-items",
         "/api/v1/material-exchange/requests",
@@ -190,7 +189,7 @@ class NoStoreApiScopesTest {
         .as(
             "the number of no-store families. Raise it here when you add one, and add the path to"
                 + " sensitiveFamiliesMatch in the same change")
-        .isEqualTo(34);
-    assertThat(NoStoreApiScopes.revalidateFamilies()).hasSize(30);
+        .isEqualTo(33);
+    assertThat(NoStoreApiScopes.revalidateFamilies()).hasSize(29);
   }
 }

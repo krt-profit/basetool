@@ -153,8 +153,7 @@ class AdminExchangeRegistryControllerTest {
 
   @Test
   void aFirstPartyClientIdIsRefused() throws Exception {
-    for (String firstParty :
-        new String[] {"basetool-frontend", "basetool-android", "test-client"}) {
+    for (String firstParty : new String[] {"basetool-frontend", "test-client"}) {
       mockMvc
           .perform(
               post(CLIENTS)

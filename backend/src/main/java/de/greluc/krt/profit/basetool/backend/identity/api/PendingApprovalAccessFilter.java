@@ -81,11 +81,10 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
   public static final String SELF_STATUS_PATH = "/api/v1/users/me/registration-status";
 
   /**
-   * The two reads served without any token (REQ-SEC-052), exempt so a signed-in pending or
-   * role-less member can still read them.
+   * The one read served without any token (REQ-SEC-052), exempt so a signed-in pending or role-less
+   * member can still read it.
    */
-  public static final List<String> ANONYMOUS_READ_PATHS =
-      List.of("/api/v1/app/version-policy", "/api/v1/terms/document");
+  public static final List<String> ANONYMOUS_READ_PATHS = List.of("/api/v1/terms/document");
 
   /** Shared parser for this filter's path patterns. */
   private static final PathPatternParser PATH_PARSER = PathPatternParser.defaultInstance;

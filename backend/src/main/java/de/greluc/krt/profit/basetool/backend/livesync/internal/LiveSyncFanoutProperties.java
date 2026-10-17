@@ -25,11 +25,11 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Settings of the app live-sync bridge's Redis fan-out (ADR-0143); off by default.
+ * Settings of the live-sync Redis fan-out (ADR-0274); off by default.
  *
- * @param enabled whether to publish and consume {@code changed} frames over Redis
- * @param channel the channel the frames cross; must be the frontend's channel, or web-to-app
- *     propagation silently stops
+ * @param enabled whether to publish {@code changed} frames over Redis
+ * @param channel the channel the frames cross; must be the frontend's channel, or a backend write
+ *     silently stops reaching open pages
  */
 @Validated
 @ConfigurationProperties("app.live-sync.redis-fanout")

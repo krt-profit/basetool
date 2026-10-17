@@ -35,7 +35,6 @@ import de.greluc.krt.profit.basetool.backend.notification.api.NotificationReposi
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRule;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRuleRepository;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRuleSelector;
-import de.greluc.krt.profit.basetool.backend.notification.api.NotificationSignal;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.OrgRelativeRole;
 import de.greluc.krt.profit.basetool.backend.notification.api.SelectorKind;
@@ -44,7 +43,6 @@ import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationC
 import de.greluc.krt.profit.basetool.backend.notification.internal.RecipientResolutionService;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -209,7 +207,7 @@ class NotificationRuleEngineIntegrationTest {
 
     try {
       JobOrderCreatedEvent event = eventForRandomUnits();
-      Set<UUID> recipients = flatten(notificationCreationService.createFromEvent(event));
+      Set<UUID> recipients = notificationCreationService.createFromEvent(event);
 
       assertThat(recipients).isNotEmpty();
       assertThat(notificationRepository.findAllByRecipientUserId(recipient, Pageable.unpaged()))
@@ -263,9 +261,8 @@ class NotificationRuleEngineIntegrationTest {
               });
 
       Set<UUID> recipients =
-          flatten(
-              notificationCreationService.createFromEvent(
-                  new DiscordRegistrationPendingEvent(newUserId, "newbie")));
+          notificationCreationService.createFromEvent(
+              new DiscordRegistrationPendingEvent(newUserId, "newbie"));
 
       assertThat(recipients).isNotEmpty();
       assertThat(notificationRepository.findAllByRecipientUserId(adminSub, Pageable.unpaged()))
@@ -280,9 +277,8 @@ class NotificationRuleEngineIntegrationTest {
               });
 
       Set<UUID> cleared =
-          flatten(
-              notificationCreationService.createFromEvent(
-                  new DiscordRegistrationDecidedEvent(newUserId, UUID.randomUUID())));
+          notificationCreationService.createFromEvent(
+              new DiscordRegistrationDecidedEvent(newUserId, UUID.randomUUID()));
 
       assertThat(cleared).contains(adminSub);
       assertThat(notificationRepository.findAllByRecipientUserId(adminSub, Pageable.unpaged()))
@@ -325,17 +321,5 @@ class NotificationRuleEngineIntegrationTest {
     transactionTemplate.executeWithoutResult(status -> notificationRuleRepository.deleteById(id));
 
     assertThat(notificationRuleRepository.findById(id)).isEmpty();
-  }
-
-  /**
-   * Every recipient the call reached, whatever they were told.
-   *
-   * @param bySignal the call's result, keyed by what each group was told
-   * @return the union of its recipient sets
-   */
-  private static Set<UUID> flatten(Map<NotificationSignal, Set<UUID>> bySignal) {
-    Set<UUID> all = new HashSet<>();
-    bySignal.values().forEach(all::addAll);
-    return all;
   }
 }

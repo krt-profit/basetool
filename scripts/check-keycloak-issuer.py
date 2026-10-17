@@ -41,7 +41,6 @@ FAKE_BASE = "https://basetool.example.test/auth"
 FAKE_ISSUER_OVERRIDE = "https://identity.example.test/auth/realms/" + REALM
 
 TEST_ISSUER = "http://host.docker.internal:18080/auth/realms/" + REALM
-ANDROID_ISSUER = "http://127.0.0.1:18080/auth/realms/" + REALM
 
 REQUIRED_VAR = re.compile(r"\$\{([A-Z0-9_]+):\?")
 PLACEHOLDER = "placeholder-not-a-real-value"
@@ -76,7 +75,6 @@ BASE = "docker-compose.yml"
 TEST = "docker-compose.test.yml"
 BUILD = "docker-compose.build.yml"
 E2E = "docker-compose.e2e.yml"
-ANDROID = "docker-compose.android.yml"
 LOCALTEST = "docker-compose.localtest.yml"
 MONITORING = "docker-compose.monitoring.yml"
 PROMETHEUS = "monitoring/prometheus/prometheus.yml"
@@ -157,20 +155,6 @@ SCENARIOS = [
         {},
         None,
         "the isolated local test stack: bare hostname plus /auth",
-    ),
-    Scenario(
-        "android-stack",
-        [BASE, TEST, ANDROID],
-        "dev",
-        {},
-        {
-            "backend-dev": ANDROID_ISSUER,
-            "frontend-dev": TEST_ISSUER,
-            "ingest-dev": TEST_ISSUER,
-        },
-        "the emulator split-horizon override (the app repo's three-file stack)",
-        require_agreement=False,
-        pair_services=["backend-dev"],
     ),
     Scenario(
         "e2e-stack",

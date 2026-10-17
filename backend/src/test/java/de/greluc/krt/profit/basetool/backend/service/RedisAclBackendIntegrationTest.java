@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -29,7 +28,6 @@ import static org.mockito.Mockito.mock;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientStatus;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeRegistrySnapshot;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.RedisExchangeRegistryMirror;
-import de.greluc.krt.profit.basetool.backend.notification.api.NotificationSignal;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationStreamService;
 import de.greluc.krt.profit.basetool.backend.notification.api.RedisNotificationFanout;
 import de.greluc.krt.profit.basetool.testsupport.containers.TestImages;
@@ -127,7 +125,7 @@ class RedisAclBackendIntegrationTest {
               return null;
             })
         .when(peerStream)
-        .publish(anyCollection(), any());
+        .publish(anyCollection());
     RedisNotificationFanout peer =
         new RedisNotificationFanout(
             peerStream, template, new SimpleMeterRegistry(), NOTIFY_CHANNEL, "backend-B");
@@ -141,11 +139,9 @@ class RedisAclBackendIntegrationTest {
     listenerContainer.addMessageListener(peer, new ChannelTopic(NOTIFY_CHANNEL));
     waitUntilListening();
 
-    origin.publish(
-        List.of(UUID.fromString("5f1d2c3b-0000-0000-0000-000000000042")),
-        NotificationSignal.refreshOnly());
+    origin.publish(List.of(UUID.fromString("5f1d2c3b-0000-0000-0000-000000000042")));
 
-    assertThat(delivered.await(5, TimeUnit.SECONDS)).as("the peer received the signal").isTrue();
+    assertThat(delivered.await(5, TimeUnit.SECONDS)).as("the peer received the push").isTrue();
   }
 
   @Test
