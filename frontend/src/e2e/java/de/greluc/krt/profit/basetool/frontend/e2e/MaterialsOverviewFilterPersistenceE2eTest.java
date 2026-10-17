@@ -98,6 +98,7 @@ class MaterialsOverviewFilterPersistenceE2eTest {
             () -> {
               page.locator("#filterLoadingDock").check();
               page.locator("#filterAutoLoad").check();
+              page.locator("#filterHasBuy").check();
               if (narrowMaterials) {
                 page.locator("#materialHeader").click();
                 page.locator("input.matCheck").first().uncheck();
@@ -120,6 +121,8 @@ class MaterialsOverviewFilterPersistenceE2eTest {
 
         assertThat(page.locator("#filterLoadingDock")).isChecked();
         assertThat(page.locator("#filterAutoLoad")).isChecked();
+        assertThat(page.locator("#filterHasBuy")).isChecked();
+        assertThat(page.locator("[data-testid='filter-chip-filterHasBuy']")).isVisible();
         if (narrowMaterials) {
           Locator firstMaterial = page.locator("input.matCheck").first();
           assertThat(firstMaterial).not().isChecked();
