@@ -12,6 +12,8 @@
 
 - **Verbundene Anwendungen (Admin): Layout.** Die Tabelle der registrierten Anwendungen passt wieder in die Seitenbreite, statt seitlich zu scrollen, und die Berechtigungs-Checkboxen im Formular sind bei langen Bezeichnungen alle gleich groß (REQ-XCH-003).
 
+- **Verbundene Anwendungen (Admin): Bestätigungen benennen ihre Aktion.** Die Bestätigungsdialoge der Seite beschriften ihren Knopf mit „Erweitern", „Sperren", „Ein-/Ausschalten" bzw. „Zurücknehmen" statt mit „Löschen", obwohl nichts gelöscht wird (REQ-XCH-003).
+
 ## [v1.16.5](https://github.com/krt-profit/basetool/releases/tag/v1.16.5) - 2026-10-17
 
 ### Added

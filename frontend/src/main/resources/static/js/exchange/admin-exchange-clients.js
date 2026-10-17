@@ -121,16 +121,19 @@ function initAdminExchangeClients() {
                 activated: text('activated'),
                 switched: text('switched'),
                 error: text('error'),
-                confirmOk: text('confirmOk'),
                 confirmCancel: text('confirmCancel'),
                 confirmSuspendTitle: text('confirmSuspendTitle'),
                 confirmSuspendBody: text('confirmSuspendBody'),
+                confirmSuspendOk: text('confirmSuspendOk'),
                 confirmWidenTitle: text('confirmWidenTitle'),
                 confirmWidenBody: text('confirmWidenBody'),
+                confirmWidenOk: text('confirmWidenOk'),
                 confirmOffTitle: text('confirmOffTitle'),
                 confirmOffBody: text('confirmOffBody'),
+                confirmOffOk: text('confirmOffOk'),
                 confirmOnTitle: text('confirmOnTitle'),
                 confirmOnBody: text('confirmOnBody'),
+                confirmOnOk: text('confirmOnOk'),
                 formCreate: text('formCreate'),
                 formEdit: text('formEdit'),
             };
@@ -255,10 +258,11 @@ function initAdminExchangeClients() {
          * Runs `action` after the member confirmed, or at once where no confirm dialog exists.
          * @param {string} titleText
          * @param {string} bodyText
+         * @param {string} okText the confirm button's label, naming the action it confirms
          * @param {() => void} action
          */
-        function confirmThen(titleText, bodyText, action) {
-            showKrtConfirm(titleText, bodyText, i18n.confirmOk, i18n.confirmCancel).then((ok) => {
+        function confirmThen(titleText, bodyText, okText, action) {
+            showKrtConfirm(titleText, bodyText, okText, i18n.confirmCancel).then((ok) => {
                 if (ok) {
                     action();
                 }
@@ -290,7 +294,12 @@ function initAdminExchangeClients() {
             };
             const widened = checkedCapabilities().some((cap) => !loadedCapabilities.includes(cap));
             if (id && widened) {
-                confirmThen(i18n.confirmWidenTitle, i18n.confirmWidenBody, save);
+                confirmThen(
+                    i18n.confirmWidenTitle,
+                    i18n.confirmWidenBody,
+                    i18n.confirmWidenOk,
+                    save,
+                );
             } else {
                 save();
             }
@@ -322,7 +331,12 @@ function initAdminExchangeClients() {
                 });
             };
             if (action === 'suspend') {
-                confirmThen(i18n.confirmSuspendTitle, i18n.confirmSuspendBody, send);
+                confirmThen(
+                    i18n.confirmSuspendTitle,
+                    i18n.confirmSuspendBody,
+                    i18n.confirmSuspendOk,
+                    send,
+                );
             } else {
                 send();
             }
@@ -339,6 +353,7 @@ function initAdminExchangeClients() {
             confirmThen(
                 enabled ? i18n.confirmOffTitle : i18n.confirmOnTitle,
                 enabled ? i18n.confirmOffBody : i18n.confirmOnBody,
+                enabled ? i18n.confirmOffOk : i18n.confirmOnOk,
                 () => {
                     krtFetch.write({
                         method: 'PUT',
@@ -485,7 +500,7 @@ function initAdminExchangeClients() {
                 more: text(data, 'more'),
                 unnamed: text(data, 'unnamed'),
                 error: text(commonData, 'error'),
-                confirmOk: text(commonData, 'confirmOk'),
+                confirmOk: text(data, 'confirmOk'),
                 confirmCancel: text(commonData, 'confirmCancel'),
                 /** @type {Record<string, string>} */
                 reasons: {
