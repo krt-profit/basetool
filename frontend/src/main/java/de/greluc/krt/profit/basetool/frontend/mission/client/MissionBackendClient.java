@@ -66,7 +66,6 @@ import de.greluc.krt.profit.basetool.frontend.mission.model.UpdateParticipantReq
 import de.greluc.krt.profit.basetool.frontend.mission.model.UpdatePayoutPreferenceRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.UpdateUnitRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
-import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderListDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefinerySettingsDto;
 import java.time.Instant;
@@ -103,9 +102,6 @@ public class MissionBackendClient {
 
   private static final ParameterizedTypeReference<PageResponse<JobTypeDto>> JOB_TYPE_PAGE =
       new ParameterizedTypeReference<PageResponse<JobTypeDto>>() {};
-
-  private static final ParameterizedTypeReference<PageResponse<SquadronDto>> SQUADRON_PAGE =
-      new ParameterizedTypeReference<PageResponse<SquadronDto>>() {};
 
   private static final ParameterizedTypeReference<PageResponse<FrequencyTypeDto>>
       FREQUENCY_TYPE_PAGE = new ParameterizedTypeReference<PageResponse<FrequencyTypeDto>>() {};
@@ -263,16 +259,6 @@ public class MissionBackendClient {
   @Nullable
   public PageResponse<JobTypeDto> crewJobTypes() {
     return backendApiClient.getCached(CachedCatalog.JOB_TYPES_CREW, JOB_TYPE_PAGE);
-  }
-
-  /**
-   * Reads the cached squadron catalogue.
-   *
-   * @return the catalogue page, or {@code null} when the backend sent no body
-   */
-  @Nullable
-  public PageResponse<SquadronDto> squadrons() {
-    return backendApiClient.getCached(CachedCatalog.SQUADRONS_UNSORTED, SQUADRON_PAGE);
   }
 
   /**

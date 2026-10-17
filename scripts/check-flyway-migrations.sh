@@ -4,6 +4,7 @@ set -euo pipefail
 
 MIGRATION_DIR="${FLYWAY_MIGRATION_DIR:-backend/src/main/resources/db/migration}"
 BASE_REF="${FLYWAY_BASE_REF:-}"
+SKIP_SECTION="## Skipped version numbers"
 
 if repo_root=$(git rev-parse --show-toplevel 2>/dev/null); then
   cd "$repo_root"
@@ -13,6 +14,8 @@ if [[ ! -d "$MIGRATION_DIR" ]]; then
   echo "::error title=Flyway check::Migration directory not found: ${MIGRATION_DIR}"
   exit 1
 fi
+
+SKIP_LIST="${FLYWAY_SKIP_LIST:-${MIGRATION_DIR}/README.md}"
 
 flyway_version() {
   local name="$1"
@@ -26,6 +29,15 @@ version_gt() {
   local highest
   highest=$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -n1)
   [[ "$highest" == "$1" ]]
+}
+
+skipped_versions() {
+  [[ -f "$SKIP_LIST" ]] || return 0
+  awk -v section="$SKIP_SECTION" '
+    { sub(/\r$/, "") }
+    /^## / { in_section = ($0 == section); next }
+    in_section && match($0, /^- \*\*V[0-9]+\*\*/) { print substr($0, 6, RLENGTH - 7) }
+  ' "$SKIP_LIST"
 }
 
 mapfile -t files < <(
@@ -47,6 +59,41 @@ for f in "${files[@]}"; do
     failed=1
   else
     version_to_file[$v]="$f"
+  fi
+done
+
+declare -A present=()
+min_version=""
+max_version=""
+for v in "${!version_to_file[@]}"; do
+  [[ "$v" =~ ^[0-9]+$ ]] || continue
+  n=$((10#$v))
+  present[$n]="${version_to_file[$v]}"
+  if [[ -z "$min_version" || $n -lt $min_version ]]; then min_version=$n; fi
+  if [[ -z "$max_version" || $n -gt $max_version ]]; then max_version=$n; fi
+done
+
+declare -A skipped=()
+while IFS= read -r s; do
+  [[ -n "$s" ]] && skipped[$((10#$s))]=1
+done < <(skipped_versions)
+
+if [[ -n "$max_version" ]]; then
+  for ((n = min_version; n <= max_version; n++)); do
+    if [[ -z "${present[$n]:-}" && -z "${skipped[$n]:-}" ]]; then
+      echo "::error title=Unexplained Flyway gap::No migration claims V${n}, and '${SKIP_LIST}' does not list it under '${SKIP_SECTION}'. If the number was given up (renumbered or dropped before its PR merged), add '- **V${n}** — <reason>' to that section; if an open PR still claims it, merge that PR first."
+      failed=1
+    fi
+  done
+fi
+
+for s in "${!skipped[@]}"; do
+  if [[ -n "${present[$s]:-}" ]]; then
+    echo "::error title=Stale skipped Flyway version::V${s} is listed under '${SKIP_SECTION}' in '${SKIP_LIST}', but '${present[$s]}' claims it. Remove the entry."
+    failed=1
+  elif [[ -z "$max_version" || $s -gt $max_version ]]; then
+    echo "::error title=Stale skipped Flyway version::V${s} is listed under '${SKIP_SECTION}' in '${SKIP_LIST}', but it lies above the highest migration. List only numbers below the tip."
+    failed=1
   fi
 done
 
@@ -116,4 +163,4 @@ if [[ $failed -eq 1 ]]; then
 fi
 
 echo
-echo "Flyway migration numbering OK: ${#files[@]} migration(s), no duplicates, all additions in order."
+echo "Flyway migration numbering OK: ${#files[@]} migration(s), no duplicates, ${#skipped[@]} listed gap(s) and no other, all additions in order."

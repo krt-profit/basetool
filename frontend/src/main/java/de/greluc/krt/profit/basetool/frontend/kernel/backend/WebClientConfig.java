@@ -163,7 +163,7 @@ public class WebClientConfig {
    *
    * <p>TLS: {@code dev}/{@code test} trust any certificate; other profiles pin the {@code
    * backend-trust} SSL bundle when configured, otherwise use the JVM trust store. On the pinned
-   * paths hostname verification is off unless {@code app.http.verify-backend-hostname} is set
+   * paths hostname verification is on unless {@code app.http.verify-backend-hostname} is false
    * (REQ-SEC-070, ADR-0211).
    *
    * <p>Protocol: request/response clients use {@code app.http.backend-protocol} (default HTTP/2)
