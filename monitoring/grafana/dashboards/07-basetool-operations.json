@@ -2149,7 +2149,7 @@
       },
       "type": "timeseries",
       "title": "Redis fan-out pub/sub & errors/hour",
-      "description": "Cross-replica Redis fan-out for live delivery (ADR-0094/ADR-0126): the live-sync changed-relay (basetool_livesync_redis_*), the editor-presence gossip (basetool_livesync_presence_*) and the notification SSE fan-out (basetool_sse_redis_*). Publishing is fire-and-forget after the local relay/broadcast, so a rising `errors` stream means cross-replica delivery is silently degraded to single-instance — watched by the LiveSyncRedisFanoutBroken alert, which covers the changed relay and the SSE fan-out only (a lost changed frame costs correctness; a lost presence gossip costs a cosmetic dot, so it is a panel row, not a page). Note the presence rows are a PERIODIC gossip — one message per actively-edited topic per 10 s per replica — so a steady non-zero floor is normal there and a flat zero simply means nobody has a mission panel focused. Which rows CAN populate depends on how many processes sit on the channel, and the difference is invisible in the panel: basetool_sse_redis_consumed_total counts peer-origin messages only (own-origin excluded), and production runs a single backend replica -- so that row, and its errors row, are permanently absent here and their absence is correct. The live-sync rows do populate on the same single-replica host, because backend and frontend are two DIFFERENT processes on one channel. Read side by side, one bridge looks alive and the other looks dead while both are healthy; a genuinely broken SSE fan-out shows up as `published` continuing while notifications stop arriving, not as this row going flat (the #1488 lesson, on a second metric).",
+      "description": "Cross-replica Redis fan-out for live delivery (ADR-0094/ADR-0126): the live-sync changed-relay (basetool_livesync_redis_*), the editor-presence gossip (basetool_livesync_presence_*) and the notification SSE fan-out (basetool_sse_redis_*). Publishing is fire-and-forget after the local relay/broadcast, so a rising `errors` stream means cross-replica delivery is silently degraded to single-instance — watched by the LiveSyncRedisFanoutBroken alert, which covers the changed relay and the SSE fan-out only (a lost changed frame costs correctness; a lost presence gossip costs a cosmetic dot, so it is a panel row, not a page). Note the presence rows are a PERIODIC gossip — one message per actively-edited topic per 10 s per replica — so a steady non-zero floor is normal there and a flat zero simply means nobody has a mission panel focused. Which rows CAN populate depends on how many processes sit on the channel, and the difference is invisible in the panel: basetool_sse_redis_consumed_total counts peer-origin messages only (own-origin excluded), and production runs a single backend replica -- so that row, and its errors row, are permanently absent here and their absence is correct. The live-sync `published` row populates from both processes on the same single-replica host, because backend and frontend are two DIFFERENT processes on one channel; `consumed` is the frontend's alone, since the backend publishes without subscribing (ADR-0274). Read side by side, one bridge looks alive and the other looks dead while both are healthy; a genuinely broken SSE fan-out shows up as `published` continuing while notifications stop arriving, not as this row going flat (the #1488 lesson, on a second metric).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -2820,82 +2820,6 @@
       ]
     },
     {
-      "id": 53,
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 192
-      },
-      "type": "timeseries",
-      "title": "App live-sync streams (open)",
-      "description": "Open app live-sync SSE streams (ADR-0143). The app holds one per screen, so this tracks how many members are on a live surface. Evictions should sit at zero: a non-zero rate means a client is leaking streams on navigation rather than a member using four devices. Frames are written off the publishing thread through a bounded per-stream queue (BE-PERF-13): `queued` hovers near zero, and `dropped` counts frames refused by a full queue (AppLiveSyncFramesDropped).",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum(basetool_livesync_streams)",
-          "legendFormat": "open streams",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        },
-        {
-          "refId": "B",
-          "expr": "sum(rate(basetool_livesync_streams_evicted_total[1h])) * 3600",
-          "legendFormat": "evicted at the per-member cap/h",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        },
-        {
-          "refId": "C",
-          "expr": "sum(basetool_livesync_frames_queued)",
-          "legendFormat": "frames queued for delivery",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        },
-        {
-          "refId": "D",
-          "expr": "sum(rate(basetool_livesync_frames_dropped_total[1h])) * 3600",
-          "legendFormat": "frames dropped at a full queue/h",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        }
-      ]
-    },
-    {
       "id": 54,
       "gridPos": {
         "h": 8,
@@ -2904,8 +2828,8 @@
         "y": 192
       },
       "type": "timeseries",
-      "title": "App live-sync publish outcomes/hour",
-      "description": "What the app announces after its own writes, and what was refused (ADR-0143). `no_known_sections` is a client bug; the two bucket reasons are the re-fetch-herd bounds doing their job. `consumed but not served` is the frontend's staff rooms crossing the shared channel — expected at a low steady rate, which is why it is not counted as an error.",
+      "title": "Backend live-sync frames published/hour",
+      "description": "Live-sync frames the backend raised after a committed write of its own and put on the frontend's channel (ADR-0274): an exchange or ingest write that no browser made, announced so the member's open pages refresh. A flatline while the exchange API is taking writes means those pages stay stale with nothing broken and nothing logged — the REQ-FE-010 defect class. Read it beside the Redis fan-out panel: `published` there is the same traffic one hop further on. The backend subscribes to nothing, so it has no consume row at all and that absence is correct.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -2937,24 +2861,6 @@
           "refId": "A",
           "expr": "sum by (topic_class) (rate(basetool_livesync_publish_accepted_total[1h])) * 3600",
           "legendFormat": "accepted · {{topic_class}}",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        },
-        {
-          "refId": "B",
-          "expr": "sum by (reason) (rate(basetool_livesync_publish_rejected_total[1h])) * 3600",
-          "legendFormat": "rejected · {{reason}}",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        },
-        {
-          "refId": "C",
-          "expr": "sum by (reason) (rate(basetool_livesync_redis_skipped_total[1h])) * 3600",
-          "legendFormat": "consumed but not served · {{reason}}",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"

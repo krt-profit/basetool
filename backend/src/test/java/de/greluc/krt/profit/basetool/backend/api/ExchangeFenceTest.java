@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.backend.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.greluc.krt.profit.basetool.backend.platform.internal.ContractTiers;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -150,7 +149,7 @@ class ExchangeFenceTest {
     assertThat(split.published()).isEqualTo(published);
     assertThat(split.relay()).isEqualTo(relay);
     assertThat(ExchangeFence.operationCount(relay)).isEqualTo(ExchangeFence.RELAY_OPERATIONS);
-    assertThat(OpenApiDocumentAssertions.relayProblems(relay, ContractTiers.load())).isEmpty();
+    assertThat(OpenApiDocumentAssertions.relayProblems(relay)).isEmpty();
     assertThat(relay.path("components").path("schemas").size())
         .as("the relay document's schemas")
         .isGreaterThanOrEqualTo(64);

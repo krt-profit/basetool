@@ -31,11 +31,10 @@ import de.greluc.krt.profit.basetool.backend.platform.api.ApiClientMetricsFilter
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientAttribution;
 import de.greluc.krt.profit.basetool.backend.platform.api.IdentityProviderUnavailableFilter;
 import de.greluc.krt.profit.basetool.backend.platform.api.JwtAudienceStartupCheck;
+import de.greluc.krt.profit.basetool.backend.platform.api.JwtAuthorizedPartyStartupCheck;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.RateLimitProperties;
 import de.greluc.krt.profit.basetool.backend.platform.api.RefusedSubjectWindow;
-import de.greluc.krt.profit.basetool.backend.platform.api.RetiredOperationFilter;
-import de.greluc.krt.profit.basetool.backend.platform.api.RetiredOperations;
 import de.greluc.krt.profit.basetool.backend.platform.api.SecurityProblemResponseHandler;
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectRateLimitingFilter;
 import io.micrometer.core.instrument.Gauge;
@@ -65,6 +64,7 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
@@ -79,28 +79,25 @@ import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
-import org.springframework.security.web.csrf.CsrfFilter;
-import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
 import org.springframework.security.web.header.writers.StaticHeadersWriter;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Backend security configuration: JWT resource server, role hierarchy, CSRF policy and the request
- * authorization matrix.
+ * Backend security configuration: JWT resource server, role hierarchy and the request authorization
+ * matrix.
  *
  * <p>The matrix in {@link #filterChain} is the exhaustive source of which endpoints are public or
  * require a role; method-level {@code @PreAuthorize} only narrows it. Only {@code /error}, {@code
- * /actuator/health(/**)}, {@code /internal/**} and the {@code GET} reads {@code
- * /api/v1/terms/document} and {@code /api/v1/app/version-policy} answer without a token
- * (REQ-SEC-052), and a token mapping to no application role is refused with {@code 403 NO_ROLE}
- * (REQ-SEC-053).
+ * /actuator/health(/**)}, {@code /internal/**} and the {@code GET} read {@code
+ * /api/v1/terms/document} answer without a token (REQ-SEC-037, REQ-SEC-052), and a token mapping to
+ * no application role is refused with {@code 403 NO_ROLE} (REQ-SEC-053).
+ *
+ * <p>The chain accepts nothing but a bearer JWT and creates no session, which is what makes CSRF
+ * and CORS unnecessary rather than merely exempted (ADR-0271); {@code SecurityChainBearerOnlyTest}
+ * asserts that precondition.
  */
 @Configuration
 @EnableWebSecurity
@@ -115,25 +112,8 @@ public class SecurityConfig {
    */
   static final String TERMS_GATE_ARMED_IN_TEST = "app.security.terms.armed-in-test";
 
-  /**
-   * Paths exempt from cookie-based CSRF, because this stateless chain authenticates only with a
-   * bearer JWT, which a browser never attaches by itself.
-   */
-  static final String[] CSRF_EXEMPT_PATHS = {"/api/v1/**", "/internal/**", "/actuator/loggers/**"};
-
-  /**
-   * Re-arms CSRF under the {@code test} profile for a single test class.
-   *
-   * <p>Only honoured when the {@code test} profile is active; production is armed regardless.
-   */
-  static final String CSRF_ARMED_IN_TEST = "app.security.csrf.armed-in-test";
-
-  /**
-   * Cross-origin allowlist for the backend API; empty by default, so every cross-origin browser
-   * call is rejected with {@code 403}.
-   */
-  @Value("${app.cors.allowed-origin-patterns:}")
-  private List<String> allowedOriginPatterns;
+  /** The Keycloak claim naming the client a token was issued to (ADR-0270). */
+  static final String AUTHORIZED_PARTY_CLAIM = "azp";
 
   /**
    * Expected JWT {@code aud} values for the opt-in audience check; empty disables it. Under the
@@ -146,12 +126,15 @@ public class SecurityConfig {
    * Creates the resource-server {@link JwtDecoder} when an expected audience or an internal JWKS
    * URL is configured (REQ-SEC-024); otherwise Spring Boot's auto-configured decoder is used.
    *
-   * <p>Validates signature, issuer and timestamps, plus {@code aud} when audiences are configured;
-   * {@code iss} is always checked against the public issuer.
+   * <p>Validates signature, issuer and timestamps, the {@code azp} allow-list (ADR-0270), and
+   * {@code aud} when audiences are configured; {@code iss} is always checked against the public
+   * issuer. The two claim checks answer different questions and both stay: {@code aud} says the
+   * token was minted for this API, {@code azp} says which client asked for it.
    *
    * @param issuerUri the Keycloak issuer location used for {@code iss} validation
    * @param jwkSetUri the internal JWKS URL, or blank to derive keys from the issuer
    * @param sslBundles the SSL bundles holding the {@code keycloak-trust} pin
+   * @param authorizedParties the client ids a token's {@code azp} must name
    * @return a Nimbus decoder wired for the configured checks
    */
   @Bean
@@ -161,14 +144,16 @@ public class SecurityConfig {
   JwtDecoder resourceServerJwtDecoder(
       @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") String issuerUri,
       @Value("${app.security.jwt.jwk-set-uri:}") String jwkSetUri,
-      SslBundles sslBundles) {
-    NimbusJwtDecoder decoder = buildDecoder(issuerUri, jwkSetUri, sslBundles);
+      SslBundles sslBundles,
+      JwtAuthorizedPartyStartupCheck authorizedParties) {
     List<OAuth2TokenValidator<Jwt>> validators = new ArrayList<>();
     validators.add(JwtValidators.createDefaultWithIssuer(issuerUri));
     List<String> audiences = expectedAudiences.stream().filter(StringUtils::hasText).toList();
     if (!audiences.isEmpty()) {
       validators.add(audienceValidator(audiences));
     }
+    validators.add(authorizedPartyValidator(authorizedParties.getClientIds()));
+    NimbusJwtDecoder decoder = buildDecoder(issuerUri, jwkSetUri, sslBundles);
     decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(validators));
     return decoder;
   }
@@ -212,6 +197,21 @@ public class SecurityConfig {
   static OAuth2TokenValidator<Jwt> audienceValidator(List<String> expectedAudiences) {
     return new JwtClaimValidator<List<String>>(
         JwtClaimNames.AUD, aud -> aud != null && !Collections.disjoint(aud, expectedAudiences));
+  }
+
+  /**
+   * Builds the {@code azp}-claim validator: a token passes only when its authorized party names one
+   * of the accepted clients (ADR-0270).
+   *
+   * <p>Refuses before any authentication is built. A token carrying no {@code azp} is refused.
+   *
+   * @param acceptedClientIds the accepted {@code azp} values; an empty list matches no token
+   * @return a validator that fails unless the JWT's {@code azp} is in the accepted set
+   */
+  @NotNull
+  static OAuth2TokenValidator<Jwt> authorizedPartyValidator(List<String> acceptedClientIds) {
+    return new JwtClaimValidator<String>(
+        AUTHORIZED_PARTY_CLAIM, azp -> azp != null && acceptedClientIds.contains(azp));
   }
 
   /**
@@ -287,14 +287,16 @@ public class SecurityConfig {
   }
 
   /**
-   * Builds the main {@link SecurityFilterChain}: CSRF policy, CORS, security response headers, the
-   * profile-independent request-authorization matrix and the JWT resource server.
+   * Builds the main {@link SecurityFilterChain}: security response headers, the profile-independent
+   * request-authorization matrix and the JWT resource server.
+   *
+   * <p>CSRF and CORS are off in every profile (ADR-0271): the chain holds no ambient credential for
+   * a cross-site request to ride, and no browser can reach this backend at all.
    *
    * @param http the Spring Security builder
    * @param jwtAuthenticationConverter the converter from {@link #jwtAuthenticationConverter}
-   * @param env the environment; the {@code test} profile disables CSRF and stands the consent gate
-   *     down unless {@link #TERMS_GATE_ARMED_IN_TEST} re-arms it; {@link #CSRF_ARMED_IN_TEST} keeps
-   *     CSRF on
+   * @param env the environment; the {@code test} profile stands the consent gate down unless {@link
+   *     #TERMS_GATE_ARMED_IN_TEST} re-arms it
    * @param securityProblemResponseHandler renders filter-level 401/403 as problem+json
    * @param messageSource localizes the 403 bodies of the refusing filters
    * @param problemResponseFactory assembles the RFC&nbsp;7807 body for those filters
@@ -304,8 +306,6 @@ public class SecurityConfig {
    * @param actingMemberFilterProvider supplies the acting-member filter, placed after the
    *     bearer-token filter (ADR-0129)
    * @param clientAttribution bounds the {@code client_id} label of the API client request counter
-   * @param retiredOperations the retired Android operations answered ahead of CSRF and
-   *     authentication with {@code 410 APP_UPDATE_REQUIRED} (REQ-API-020)
    * @return the configured security filter chain
    * @throws Exception propagated from {@link HttpSecurity#build()}
    */
@@ -324,8 +324,7 @@ public class SecurityConfig {
       RefusedSubjectWindow noRoleRefusedSubjectWindow,
       ActingMemberFilterProvider actingMemberFilterProvider,
       RateLimitProperties rateLimitProperties,
-      ClientAttribution clientAttribution,
-      RetiredOperations retiredOperations)
+      ClientAttribution clientAttribution)
       throws Exception {
 
     boolean isTest = env.matchesProfiles("test");
@@ -335,21 +334,8 @@ public class SecurityConfig {
         !isTest || env.getProperty(TERMS_GATE_ARMED_IN_TEST, Boolean.class, Boolean.FALSE);
     TermsConsentCheck effectiveConsentCheck = armed ? termsConsentCheck : _ -> true;
 
-    if (isTest && !env.getProperty(CSRF_ARMED_IN_TEST, Boolean.class, Boolean.FALSE)) {
-      http.csrf(
-          org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer
-              ::disable);
-    } else {
-      CookieCsrfTokenRepository csrfRepo = CookieCsrfTokenRepository.withHttpOnlyFalse();
-      csrfRepo.setCookieCustomizer(c -> c.sameSite("Strict").secure(true));
-      http.csrf(
-          csrf ->
-              csrf.csrfTokenRepository(csrfRepo)
-                  .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
-                  .ignoringRequestMatchers(CSRF_EXEMPT_PATHS));
-    }
-
-    http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
+    http.csrf(AbstractHttpConfigurer::disable)
+        .cors(AbstractHttpConfigurer::disable)
         .headers(
             headers -> {
               headers.contentSecurityPolicy(
@@ -396,8 +382,6 @@ public class SecurityConfig {
                     .requestMatchers("/internal/**")
                     .permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/terms/document")
-                    .permitAll()
-                    .requestMatchers(HttpMethod.GET, "/api/v1/app/version-policy")
                     .permitAll()
                     .requestMatchers(
                         "/api/v1/*/admin/**",
@@ -496,14 +480,6 @@ public class SecurityConfig {
                 meterRegistry),
             TermsAcceptanceAccessFilter.class)
         .addFilterBefore(
-            new RetiredOperationFilter(
-                retiredOperations,
-                messageSource,
-                problemResponseFactory,
-                objectMapper,
-                meterRegistry),
-            CsrfFilter.class)
-        .addFilterBefore(
             new IdentityProviderUnavailableFilter(
                 messageSource, problemResponseFactory, objectMapper, meterRegistry),
             org.springframework.security.oauth2.server.resource.web.authentication
@@ -511,33 +487,5 @@ public class SecurityConfig {
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
     return http.build();
-  }
-
-  /**
-   * Builds the CORS source from {@code app.cors.allowed-origin-patterns}, with credentials never
-   * allowed.
-   *
-   * @return the CORS source applied to all paths
-   */
-  @NotNull
-  @Bean
-  public CorsConfigurationSource corsConfigurationSource() {
-    CorsConfiguration configuration = new CorsConfiguration();
-    configuration.setAllowedOriginPatterns(allowedOriginPatterns);
-    configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-    configuration.setAllowedHeaders(
-        List.of(
-            "Authorization",
-            "Content-Type",
-            "Accept",
-            "Accept-Language",
-            "X-Correlation-Id",
-            "X-Requested-With",
-            "X-XSRF-TOKEN"));
-    configuration.setAllowCredentials(false);
-
-    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-    source.registerCorsConfiguration("/**", configuration);
-    return source;
   }
 }

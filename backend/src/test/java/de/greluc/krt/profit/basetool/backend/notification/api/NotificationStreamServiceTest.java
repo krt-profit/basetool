@@ -41,7 +41,6 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -152,7 +151,7 @@ class NotificationStreamServiceTest {
     service.subscribe(recipientUserId);
     clearInvocations(service.emitter);
 
-    service.publish(List.of(recipientUserId), NotificationSignal.refreshOnly());
+    service.publish(List.of(recipientUserId));
 
     ArgumentCaptor<SseEmitter.SseEventBuilder> captor =
         ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
@@ -161,13 +160,13 @@ class NotificationStreamServiceTest {
   }
 
   @Test
-  void publish_refreshOnlySignal_keepsTheHistoricPayload() throws Exception {
+  void publish_carriesTheBarePayloadEveryClientHadBeforeTheTypedSignal() throws Exception {
     CapturingStreamService service = new CapturingStreamService();
     UUID recipientUserId = UUID.randomUUID();
     service.subscribe(recipientUserId);
     clearInvocations(service.emitter);
 
-    service.publish(List.of(recipientUserId), NotificationSignal.refreshOnly());
+    service.publish(List.of(recipientUserId));
 
     ArgumentCaptor<SseEmitter.SseEventBuilder> captor =
         ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
@@ -176,29 +175,23 @@ class NotificationStreamServiceTest {
   }
 
   @Test
-  void publish_signalWithAType_carriesKindEntityAndParams() throws Exception {
+  void publish_carriesNoNotificationTypeEntityOrParams() throws Exception {
     CapturingStreamService service = new CapturingStreamService();
     UUID recipientUserId = UUID.randomUUID();
-    UUID entityId = UUID.randomUUID();
     service.subscribe(recipientUserId);
     clearInvocations(service.emitter);
 
-    service.publish(
-        List.of(recipientUserId),
-        new NotificationSignal(
-            NotificationType.DISCORD_REGISTRATION_PENDING,
-            "USER",
-            entityId,
-            Map.of("username", "newbie")));
+    service.publish(List.of(recipientUserId));
 
     ArgumentCaptor<SseEmitter.SseEventBuilder> captor =
         ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
     verify(service.emitter).send(captor.capture());
     String rendered = render(captor.getValue());
     assertTrue(rendered.contains("event:notification"));
-    assertTrue(rendered.contains("DISCORD_REGISTRATION_PENDING"));
-    assertTrue(rendered.contains(entityId.toString()));
-    assertTrue(rendered.contains("newbie"));
+    assertTrue(rendered.contains("data:new"));
+    assertFalse(
+        rendered.contains("DISCORD_REGISTRATION_PENDING"),
+        "the event is a bare 'something changed' marker (ADR-0273)");
   }
 
   @Test
@@ -233,7 +226,7 @@ class NotificationStreamServiceTest {
         .when(service.emitter)
         .send(any(SseEmitter.SseEventBuilder.class));
 
-    service.publish(List.of(recipientUserId), NotificationSignal.refreshOnly());
+    service.publish(List.of(recipientUserId));
 
     assertEquals(
         1.0,
@@ -323,8 +316,7 @@ class NotificationStreamServiceTest {
     doThrow(brokenPipe).when(service.emitter).send(any(SseEmitter.SseEventBuilder.class));
 
     List<ILoggingEvent> events =
-        withStreamLogAppender(
-            () -> service.publish(List.of(recipientUserId), NotificationSignal.refreshOnly()));
+        withStreamLogAppender(() -> service.publish(List.of(recipientUserId)));
 
     assertEquals(
         1.0,

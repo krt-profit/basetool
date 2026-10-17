@@ -29,7 +29,6 @@ import de.greluc.krt.profit.basetool.backend.api.CommittedOpenApi;
 import de.greluc.krt.profit.basetool.backend.api.ExchangeFence;
 import de.greluc.krt.profit.basetool.backend.api.ExposedTypes;
 import de.greluc.krt.profit.basetool.backend.api.OpenApiDocumentAssertions;
-import de.greluc.krt.profit.basetool.backend.platform.internal.ContractTiers;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
@@ -85,18 +84,16 @@ class OpenApiGeneratorTest {
 
     JsonNode full = objectMapper.readTree(result.getResponse().getContentAsString());
     ExchangeFence.Split split = ExchangeFence.split(full);
-    ContractTiers tiers = ContractTiers.load();
 
     assertThat(
             OpenApiDocumentAssertions.problems(
-                split.published(), tiers, OpenApiDocumentAssertions.DOMAIN_FLOOR))
+                split.published(), OpenApiDocumentAssertions.DOMAIN_FLOOR))
         .as(
             "the generated document is wrong and is not written (REQ-API-007, REQ-API-018): the"
-                + " security scheme, the two anonymous operations, one domain tag and one contract"
-                + " tier per operation, each domain's operation-count floor, no relay path and no"
-                + " dangling reference")
+                + " security scheme, the one anonymous operation, one domain tag per operation,"
+                + " each domain's operation-count floor, no relay path and no dangling reference")
         .isEmpty();
-    assertThat(OpenApiDocumentAssertions.relayProblems(split.relay(), tiers))
+    assertThat(OpenApiDocumentAssertions.relayProblems(split.relay()))
         .as(
             "the generated exchange relay document is wrong and is not written (REQ-XCH-039):"
                 + " exactly the 19 relay operations, all exchange, all T0, complete schemas")

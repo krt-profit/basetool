@@ -24,7 +24,6 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.io.IOException;
@@ -50,8 +49,8 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 /**
  * Holds wave 4 of the REST API cut (the org-unit bank prefix) to the running application: the
  * controller serves exactly the new paths of the map, no handler answers the old prefix any more,
- * the new paths demand authentication, and the old ones answer {@code 410 APP_UPDATE_REQUIRED}
- * (frozen operations) or {@code 404} (the five that were never frozen).
+ * the new paths demand authentication, and the old ones answer {@code 404} (frozen operations) or
+ * {@code 404} (the five that were never frozen).
  */
 @SpringBootTest
 class OrgUnitBankPathCutTest {
@@ -116,27 +115,17 @@ class OrgUnitBankPathCutTest {
   }
 
   @Test
-  @DisplayName("a frozen old path meets the update wall and an unfrozen one is gone")
+  @DisplayName("every old path is gone, frozen or not")
   void theOldPathsAreGone() throws Exception {
-    List<String> frozenAnswers = new ArrayList<>();
     for (Moved m : wave4()) {
       HttpMethod method = HttpMethod.valueOf(m.verb());
-      if (m.frozen()) {
-        mockMvc
-            .perform(request(method, concrete(m.oldPath())).with(csrf()))
-            .andExpect(status().isGone())
-            .andExpect(jsonPath("$.code").value("APP_UPDATE_REQUIRED"));
-        frozenAnswers.add(m.verb() + " " + m.oldPath());
-      } else {
-        mockMvc
-            .perform(
-                request(method, concrete(m.oldPath()))
-                    .with(user("member").roles("ADMIN"))
-                    .with(csrf()))
-            .andExpect(status().isNotFound());
-      }
+      mockMvc
+          .perform(
+              request(method, concrete(m.oldPath()))
+                  .with(user("member").roles("ADMIN"))
+                  .with(csrf()))
+          .andExpect(status().isNotFound());
     }
-    assertThat(frozenAnswers).as("the frozen operations of wave 4").hasSize(24);
   }
 
   private static Set<String> verbs(RequestMappingInfo info) {

@@ -566,6 +566,31 @@ away, and `ArchitectureTest.everyControllerCarriesAGateOfItsOwn` now holds every
 
 ### REQ-SEC-011 — Rate-limit client-IP attribution
 
+> [!important] Amended 2026-10-17 (ADR-0272, #2673) — the trust list is two networks, and Spring's
+> `ForwardedHeaderFilter` is no longer registered
+> `app.rate-limit.trusted-proxies` names the **frontend network** (`172.28.2.0/24`) and the **ingest
+> network** (`172.28.8.0/24`) instead of `172.28.0.0/16`. The /16 was the whole container address
+> space — the monitoring network, the database networks and every network a future service joins,
+> each trusted to speak for any member. After ADR-0268 the backend's possible HTTP peers are exactly
+> those two, so the list is now something a reviewer can read against arc42 §7, and a third internal
+> caller is a deliberate addition in the change that introduces it.
+>
+> **`ForwardedHeaderFilter` is removed from `ForwardedHeaderConfig`.** Its only effect here was a
+> host/scheme/port rewrite nothing reads, against its documented side effect: a client-chosen
+> `getRemoteAddr()` for every component downstream of it. The backend builds **no absolute URL from
+> a request** — no `ServletUriComponentsBuilder`, no `fromCurrentRequest*`, no
+> `ResponseEntity.created(...)`, no `Location` header, and no read of `getRequestURL()`,
+> `getScheme()` or `getServerName()` in `backend/src/main` — and the connector is HTTPS, so
+> `isSecure()` is true without a rewrite and HSTS keeps being written. `ClientIpContextFilter` stays
+> at the front of the chain with the narrowed list.
+>
+> **The constraint this creates is written here, because a build failure will not state it.** If the
+> backend ever has to produce an absolute URL from a request — a redirect, a `Location` on a 201, a
+> link in a payload — it must build it from configuration, or re-register the filter and re-open the
+> attribution ordering this decision simplified. `ForwardedHeaderRewriteTest` pins what holds now:
+> the peer reaches the application unrewritten, the chain is still readable, and a forwarded header
+> from an untrusted peer does not move attribution.
+
 The backend's per-IP / per-endpoint rate limiter (`RateLimitingFilter`) is only meaningful if it can
 tell clients apart. Because the backend is a pure resource server reached **only** server-side by the
 frontend (no browser hits it directly), the frontend MUST relay the originating client IP on every
@@ -1402,6 +1427,37 @@ ADR-0112, ADR-0162, ADR-0187, ADR-0256 · **Runbook:** [`deployment.md` → Edge
 
 ### REQ-SEC-024 — Keycloak resilience: internal JWKS + retryable 503 on IdP outage
 
+> [!important] Amended 2026-10-17 (ADR-0270, #2673) — the decoder also answers *which client*
+> A token is accepted only when its **`azp` names a configured client**. The list is
+> `app.security.jwt.accepted-client-ids` — `basetool-frontend` and `basetool-ingest-gateway` — and
+> `JwtAuthorizedPartyStartupCheck` aborts the start under the `prod` profile while it is blank,
+> exactly as `JwtAudienceStartupCheck` does for `aud`.
+>
+> **Both checks stay, because they answer different questions.** `aud` says the token was minted for
+> this API; `azp` says which client asked for it. An audience arrives through a mapper on a client's
+> dedicated scope, so *every* realm client carrying the `basetool-backend` audience mapper produced
+> tokens this backend accepted — and the realm is converged by a provisioner that never deletes
+> (ADR-0202), so an accidental mapper persists. Adding a client to the realm no longer grants API
+> access; a new caller is a reviewed change to the release's configuration.
+>
+> **Mechanics that are part of the decision.** The check is a token validator **on the decoder**,
+> beside the audience validator, not a filter: it refuses before any authentication is built, so no
+> filter ordering has to be maintained to keep that true. A token with **no** `azp` is refused —
+> Keycloak sets the claim on every token it issues to a client, service accounts included. An empty
+> list names no client and therefore refuses every token; it is not a disable. `/internal/**` is out
+> of scope and stays out (it carries no token; REQ-SEC-022), and the Prometheus scrape chain is HTTP
+> basic and untouched.
+>
+> **The gate rides on the decoder bean, which is conditional — and that is only safe because of the
+> audience check.** `resourceServerJwtDecoder` exists only while `app.security.jwt.expected-audiences`
+> or `app.security.jwt.jwk-set-uri` is set; without it Boot's auto-configured decoder serves and
+> carries no `azp` validator. Under `prod` that cannot happen, because `JwtAudienceStartupCheck`
+> aborts the start on a blank audience list, so a *running* production backend always has the
+> custom decoder and therefore the gate. Outside `prod` the gate can be unarmed, exactly as the
+> audience check can be, and the startup check logs it at `WARN`. Anyone who removes the audience
+> requirement has to move this condition in the same change.
+
+
 Both JWT resource servers — the backend and the ingest gateway (REQ-SEC-001) — fetch Keycloak's
 JWKS to validate every token. Two hardening rules keep a transient Keycloak / edge / container-DNS blip
 from masquerading as an application outage (the failure mode that drove the frontend
@@ -1995,7 +2051,15 @@ filter runs, so such a test passes against the broken code.
 `RequestBodySizeLimitFilter`, `ApiCacheControlFilter`, `RateLimitingFilter` (backend + ingest),
 `PayloadSizeLimitFilter`, `RequestLoggingFilter` (ingest), `PublicPaths` (frontend)
 
-### REQ-SEC-030 — The native mobile client's refresh token MUST be sender-constrained, its access token MUST NOT be
+### REQ-SEC-030 — The native mobile client's refresh token MUST be sender-constrained, its access token MUST NOT be *(superseded)*
+
+> **Superseded 2026-10-17 (ADR-0268, #2674).** The Android app is discontinued and its Keycloak
+> client `basetool-android` is deleted, so no client in the realm holds a DPoP-bound refresh token.
+> `scripts/provision-keycloak-realm.py` now deletes the `krt-mobile-dpop-policy` policy, the
+> `krt-mobile-dpop` profile and the client wherever they remain (REQ-OPS-033, ADR-0202), and
+> `scripts/provision-keycloak-mobile-client.py` and `scripts/verify-dpop-binding.py` are gone. The
+> finding that the per-client switch re-binds the access token, and that the password grant
+> mis-reports the binding, stays true of Keycloak and is kept below for the next public client.
 
 The public Android client (`basetool-android`) MUST hold a **DPoP-bound refresh token** and MUST
 receive **plain Bearer access tokens** carrying no `cnf` claim. RFC 9700 §2.2.2 requires a public
@@ -2044,15 +2108,21 @@ nor the provisioning service account.
 - [x] Verification fails loudly when `dpop.bound.access.tokens` is flipped on, when the marker role
   is missing, or when the policy is present but unscoped.
 
-**Enforced by:** `provision-keycloak-mobile-client.test.sh` and, for the whole realm,
-`provision-keycloak-realm.test.sh` section 4 (configuration and write order) and
-`scripts/verify-dpop-binding.py` (behaviour) · **Code:**
-`scripts/provision-keycloak-mobile-client.py`, which `scripts/provision-keycloak-realm.py` imports
-for the client, profile and policy (`REQ-OPS-033`) · **Decision:**
+**Enforced by:** `provision-keycloak-realm.test.sh` section 4, which pins the retirement — policy
+detached before the profile is removed, profile removed before the client is deleted, foreign
+policies and profiles kept · **Code:** `scripts/provision-keycloak-realm.py` (`plan_retired`,
+`REQ-OPS-033`) · **Decision:**
 [ADR-0131](../adr/0131-mobile-auth-refresh-only-dpop-binding.md) · **Measurements:**
 [`ANDROID_API_EXPOSURE_PLAN.md`](../archive/ANDROID_API_EXPOSURE_PLAN.md) section 7
 
 ### REQ-SEC-031 — Sensitive GET families MUST be uncacheable, not merely revalidatable
+
+> [!note] Amended 2026-10-17 (#2673) — two families leave with their operations
+> `/api/v1/live-sync/**` leaves the `no-store` list with the bridge (ADR-0274) and `/api/v1/app/**`
+> leaves the revalidatable list with the app floor (REQ-API-020, superseded): 33 `no-store` families
+> and 29 revalidatable ones. The classification rule is unchanged, and so is the property that
+> matters most about it — an `/api` path no family classifies answers `no-store` at runtime, so an
+> omission still fails safe.
 
 > [!note] Amended 2026-10-03 (plan D-18, guard G-07) — every family is classified
 > Every API family is now classified **explicitly**, in one place (`NoStoreApiScopes`), as
@@ -2187,6 +2257,21 @@ answer from it identically for seventeen paths.
 
 ### REQ-SEC-032 — The anonymous surface MUST NOT be an amplification lever
 
+> [!note] Amended 2026-10-17 (ADR-0272, #2673) — the limiter stays, and its reason is now a smaller
+> one
+> Both rate limiters are **kept**. The per-IP budget was written when the API vhost put `/api/v1` on
+> the internet; with the backend internal-only (ADR-0268) it no longer faces an anonymous internet
+> caller, and what it still does is the part that was always load-bearing: it bounds *one member's
+> browser* rather than one container, which is why the frontend relays the member's address at all
+> (REQ-SEC-011). Narrowing `trusted-proxies` to the frontend and ingest networks is what keeps that
+> key honest — a peer on an internal network that is not a relay can no longer claim to speak for an
+> arbitrary member. The edge keeps the budgets that protect the surfaces still facing the internet
+> (ADR-0256).
+>
+> **A relay that stops sending the header degrades attribution, not authorisation.** The per-`sub`
+> budget of REQ-SEC-033 is unaffected; the per-IP budget would key on the calling container, which
+> makes it coarse rather than wrong.
+
 > [!note] Amended 2026-09-06 (ADR-0159) — the lesson outlived the surface
 > There is no anonymous surface left to bound: `AnonymousPageSizeFilter` and its page-size ceiling
 > are gone, and no paginated endpoint answers an unauthenticated caller. The two that do
@@ -2297,6 +2382,14 @@ Authenticated callers are clamped by the kernel page policy of REQ-API-005: 1 00
 the verb-agnostic lesson forward) · **Code:** `SecurityConfig`
 
 ### REQ-SEC-033 — An authenticated account MUST have a budget of its own
+
+> [!note] Amended 2026-10-17 (ADR-0274, #2673) — one stream connect, not two
+> The budget counted two SSE connects: the notification stream and the app's live-sync stream. The
+> latter is removed with the bridge, so `SubjectRateLimitingFilter.LIVE_SYNC_CONNECT` is gone and
+> `SSE_CONNECT` — `/api/v1/notifications/stream` — is the only read that spends from the write
+> bucket. The reason is unchanged and is the reason the budget keys on `sub` at all: an SSE connect
+> holds a server-side emitter open, so a reconnect loop is worth bounding by identity rather than by
+> network position.
 
 Every `/api/**` write (`POST`, `PUT`, `PATCH`, `DELETE`) and the notification SSE connect MUST be
 bounded by a per-authenticated-subject token bucket, keyed on the JWT `sub`, in addition to the
@@ -2442,7 +2535,13 @@ from the original registration.
 `ApprovalDecision#REOPENED`, `AdminDiscordRegistrationsPageController`, `discord-registrations.js`,
 `V233__allow_reopened_user_approval_decision.sql` · **Decision:** ADR-0140
 
-### REQ-SEC-035 — The mobile client's scope MUST carry the member realm roles, `Admin` included
+### REQ-SEC-035 — The mobile client's scope MUST carry the member realm roles, `Admin` included *(superseded)*
+
+> **Superseded 2026-10-17 (ADR-0268, #2674).** The client this requirement scoped, `basetool-android`,
+> is deleted with the app, and the realm provisioner removes it wherever it remains instead of
+> converging its scope. The durable finding is REQ-SEC-036's: a narrowed client's role claim must
+> never rewrite the stored role set, and the record below shows what withholding `Admin` from one
+> client did to the member it applied to.
 
 The Keycloak client `basetool-android` runs with `fullScopeAllowed: false`, so the realm roles its
 tokens carry are exactly the ones mapped onto its client scope. That list MUST be
@@ -2566,15 +2665,27 @@ not one that also silently changes what a post-incident review can reconstruct.
   unit; and the Lager under it reads **1403.4 SCU** (102.93 + 700 + 180 + 420.5), the org-wide
   total, against the 784.8 the same screen shows a member of one Staffel.
 
-**Enforced by:** `provision-keycloak-mobile-client.test.sh` section 7 and
-`provision-keycloak-realm.test.sh` sections 2 and 4 · **Code:**
-`scripts/provision-keycloak-mobile-client.py` (`MEMBER_REALM_ROLES`, `FORBIDDEN_REALM_ROLES`,
-`upsert_realm_role_scope`), `scripts/provision-keycloak-realm.py` (`_converge_role_scope`, which
-converges the same list in both directions), `UserReconciliationService#syncUser`,
-`CustomJwtGrantedAuthoritiesConverter`, `OrgUnitViewModel` (app) · **Decision:**
+**Enforced by:** `provision-keycloak-realm.test.sh` section 4, which pins that the client is deleted
+rather than scoped · **Code:** `scripts/provision-keycloak-realm.py`
+(`plan_retired`), `UserReconciliationService#syncUser`, `CustomJwtGrantedAuthoritiesConverter` ·
+**Decision:**
 [ADR-0131](../adr/0131-mobile-auth-refresh-only-dpop-binding.md), and the 2026-09-02 reversal above
 
-### REQ-SEC-036 — A client's role claim is authoritative only if its scope is complete
+### REQ-SEC-036 — A client's role claim is authoritative only if its scope is complete *(superseded)*
+
+> **Superseded 2026-10-17 (ADR-0268, #2673).** The one partial-scope client in the realm was the
+> Android app's, and it is retired with the app: `app.security.partial-role-scope.client-ids`
+> defaults to empty, so no client is treated as partial-scope and `UserReconciliationService`
+> mirrors every token's roles again. `PartialRoleScopeProperties` and the guard stay in place
+> unarmed, because the trap they close is a property of Keycloak's `fullScopeAllowed`, not of that
+> client: the next narrowed client is a one-line configuration change away, and the gate is cheaper
+> to keep than to rediscover from a corrupted `app_user.roles`.
+>
+> **The finding is the durable part.** *A token describes the member as the client that minted it
+> was allowed to see them.* Persisting that description lets whichever client a member used last
+> decide what the database says they are — and because the mirror is a replacement, not a merge, one
+> login through a narrowed client silently demotes an account.
+
 
 `UserReconciliationService#syncUser(Jwt)` mirrors a member's realm roles into `app_user` on **every**
 authentication, and it does so by **replacement**: `user.setRoles(mapRoles(realm_access.roles))`.
@@ -2659,7 +2770,16 @@ membership authority is minted; the demand feed reads the member's memberships i
 `CustomJwtGrantedAuthoritiesConverter#assembleFor(User, Collection)` · **Configuration:**
 `app.security.partial-role-scope.client-ids`
 
-### REQ-SEC-038 — The Android App Link is verifiable, or the login is broken
+### REQ-SEC-038 — The Android App Link is verifiable, or the login is broken *(superseded)*
+
+> **Superseded 2026-10-17 (ADR-0268, #2674).** The Android app is discontinued and its Keycloak
+> client deleted, so no login ends at an App Link any more. `/.well-known/assetlinks.json`,
+> `/app/callback` and `/app/link-help` have no handler and no anonymous matcher: a member past the
+> session gates gets `404`, and an anonymous request is sent to the login like any member page
+> (`RetiredAppLinkRoutesTest`). The `blackbox-app-link` probe and `EdgeAppLinkFallbackBroken` are
+> removed with them (REQ-OBS-012). What stays true is the trap: a machine-fetched document behind the
+> authenticated catch-all answers `302` into the login, which is why `/manifest.webmanifest` keeps
+> its own `permitAll` entry (REQ-UI-020).
 
 The Android app's production redirect URI is an **App Link** —
 `https://profit-base.online/app/callback` — rather than a custom scheme, so that no other installed
@@ -2759,17 +2879,35 @@ replaces rather than appends breaks every installed copy for the length of the r
 > is the half of this requirement that can regress in production without any test noticing. The
 > fallback is not vestigial: it was used from the wild on 2026-09-16, the day after it shipped.
 
-**Code:** `frontend/…/shell/web/AssetLinksController.java`,
-`frontend/…/shell/web/AppLinkController.java`,
-`frontend/…/shell/web/AndroidAppLinkProperties.java`, `SecurityConfig` (anonymous matchers),
-`frontend/…/templates/shell/app-link-help.html`.
-**Test:** `AssetLinksControllerTest` — asserts the three response conditions through the real
-security chain, and that the digests are an array. `AppLinkControllerTest` — the fallback's redirect,
-its dropped query and the page behind it. `AnonymousSurfaceSweepMvcTest` — that both stay anonymous.
+**Code:** none since #2674 — the controllers, their properties and the help page are removed.
+**Test:** `RetiredAppLinkRoutesTest` — the three paths carry no anonymous access and no handler.
 
 ---
 
-### REQ-SEC-044 — Cookie CSRF MUST NOT gate the bearer-only API
+### REQ-SEC-044 — Cookie CSRF MUST NOT gate the bearer-only API *(amended)*
+
+> [!important] Amended 2026-10-17 (ADR-0271, #2673) — the exemption became a disable, and the
+> precondition became a test
+> CSRF and CORS are now **off on the main chain in every profile**: `http.csrf(disable)`,
+> `http.cors(disable)`, with `SecurityConfig.CSRF_EXEMPT_PATHS`, the `app.security.csrf.armed-in-test`
+> re-arm, the `CorsConfigurationSource` bean and `app.cors.allowed-origin-patterns` all removed. The
+> exemption had grown to cover the whole writable surface, so it read as a narrow carve-out while
+> being a total one a reader had to compute; and the one branch production ran was the one no
+> integration test ever observed, because the `test` profile disabled CSRF outright.
+>
+> **What replaces the list is the precondition it stood for.** `SecurityChainBearerOnlyTest` asserts
+> that the main chain accepts nothing but a bearer JWT — no form login, no HTTP basic, no
+> remember-me, no OAuth2 login — and that an authenticated request creates no HTTP session. It fails
+> on the *cause*, an ambient credential, rather than on a path somebody forgot to add. The
+> Prometheus scrape chain is untouched: HTTP basic is precisely the credential a browser can be made
+> to attach, so it keeps Spring's CSRF default (ADR-0265).
+>
+> **The cost is named.** CodeQL's `java/spring-disabled-csrf-protection` now flags the backend's
+> call site. The alert is dismissed per alert with a reason pointing at ADR-0271; the query is
+> **not** excluded repo-wide, because it must keep watching the frontend, whose cookie-CSRF model
+> (ADR-0012) is real and load-bearing. Everything below is the record of how the exemption got
+> there.
+
 
 The backend's filter chain is `SessionCreationPolicy.STATELESS` and authenticates with exactly one
 mechanism: a bearer JWT. No form login, no HTTP basic, no session cookie — **no ambient credential
@@ -2801,17 +2939,43 @@ for an anonymous write and getting `403`, because the CSRF filter runs ahead of 
 
 **Acceptance**
 
-- [x] Every write path the native app uses is CSRF-exempt (`SecurityConfigCsrfExemptionTest`).
-- [x] The exemption is expressed as `/api/v1/**`, not as a list of endpoints (same test).
-- [x] A path outside the bearer API is not exempt (same test).
-- [ ] `edge-deny-probe` answers `401` for the four anonymous writes. **Open** — verified only by the
-  nightly run after the next deploy.
+- [x] The main chain accepts nothing but a bearer JWT and creates no session
+  (`SecurityChainBearerOnlyTest`).
+- [x] CSRF and CORS are absent from the main chain in every profile (same test).
+- [x] The Prometheus scrape chain keeps Spring's CSRF default (same test).
+- [x] No mapping exists outside the served surface, so none escapes the path-scoped filters
+  (`ServedSurfaceCoverageTest`).
+- [x] The CodeQL alert is dismissed per alert with a reason naming ADR-0271, and the query stays
+  armed for the frontend.
 
 ---
 
-### REQ-SEC-037 — The public API vhost's anonymous surface is enumerated, not incidental
+### REQ-SEC-037 — The backend's anonymous surface is enumerated, not incidental
 
-> [!important] Amended 2026-10-17 (ADR-0268, #2672) — the vhost this requirement is named for is gone
+> [!important] Amended 2026-10-17 (ADR-0268/ADR-0274, #2673) — the surface is four entries, and the
+> list is now the whole requirement
+> The anonymous surface of the backend is, exhaustively:
+>
+> | Path | Why it answers without a token |
+> | --- | --- |
+> | `GET /api/v1/terms/document` | the Terms of Use a member must read *before* they can consent, so the consent gate cannot gate it (REQ-SEC-028) |
+> | `GET /actuator/health`, `/actuator/health/**` | the container health probe, which holds no credential |
+> | `/internal/**` | machine-to-machine, gated by the constant-time shared-secret header instead (REQ-SEC-022) |
+> | `/error` | reached only by the container's error dispatch, after the original request has already passed the chain |
+>
+> **What #2673 removed from it.** `GET /api/v1/app/version-policy` went with the app floor
+> (REQ-API-020, superseded) and `/api/v1/live-sync/*` with the app's live-sync bridge (ADR-0274) —
+> the latter was never anonymous, but it was the other `/api/v1` family the enumeration had to carry.
+> The surface is therefore one `/api/v1` read, down from two, and `/v3/api-docs` stays ADMIN-only.
+>
+> **Where it is pinned, now that the edge no longer holds a second copy.** `ApiVhostAnonymousSurfaceTest`
+> is gone with the vhost it was named for; `AnonymousSurfaceSweepTest` (REQ-SEC-052) and
+> `OpenApiAnonymousOperationsTest` pin the surface against the real filter chain and the generated
+> document, and `OpenApiDocumentAssertions.ANONYMOUS` refuses to write a document whose
+> `security: []` set is anything but that one read. A new anonymous path therefore fails three tests
+> before it fails a review — which is what has to carry the weight the edge allow-list used to share.
+
+> [!note] Amended 2026-10-17 (ADR-0268, #2672) — the vhost this requirement was named for is gone
 > The backend is internal-only and the ingest gateway is the single public API entry point, so there
 > is no public API vhost and no admission map to enumerate an anonymous surface *on*. Removed in
 > #2672: `docker/edge/conf.d/50-api.conf.template`, `include/api-admission.conf`,
@@ -2825,9 +2989,9 @@ for an anonymous write and getting `403`, because the CSRF filter runs ahead of 
 > chain alone, where `SecurityConfig` and `ApiVhostAnonymousSurfaceTest` answer it, with no edge
 > allow-list as a second opinion. Losing that second opinion is the cost of the change and was
 > accepted with it: an anonymous path is now one review away from the internet-facing surfaces that
-> remain, instead of two. #2673 shrinks the surface to `terms/document`, health, `/internal/**` and
-> `/error` and rewrites the statements below; until it lands, read everything about the vhost, the
-> allow-list and the generated map as a record.
+> remain, instead of two. Everything below about the vhost, the allow-list and the generated map is
+> a record of how the surface was kept, not a statement of how it is kept now — read the table above
+> for that.
 
 > [!note] Amended 2026-09-12 (ADR-0162) — the allow-list lives in this repository
 > Until 2026-09-12 the allow-list was a block in the rollout runbook that a human pasted into Nginx
@@ -3970,6 +4134,14 @@ one is a `400` instead of the `500` an unguarded `UUID.fromString` produced. **E
 
 ### REQ-SEC-052 — No anonymous surface beyond the landing page and the enumerated infrastructure paths
 
+> [!note] Amended 2026-10-17 (#2673) — the backend's half is one `/api/v1` read
+> `GET /api/v1/app/version-policy` is gone with the app floor (REQ-API-020, superseded), so the
+> backend's anonymous `/api/v1` surface is `GET /api/v1/terms/document` alone, beside
+> `/actuator/health(/**)`, `/internal/**` and `/error`. The full table is in REQ-SEC-037;
+> `AnonymousSurfaceSweepTest`, `OpenApiAnonymousOperationsTest` and
+> `OpenApiDocumentAssertions.ANONYMOUS` pin it.
+
+
 The public surface is a **list**, not a policy. Everything on it is here because somebody argued for
 it and the argument is written down; everything else requires authentication at the URL layer **and**
 a method gate.
@@ -3983,9 +4155,7 @@ a method gate.
 | `/licenses`                                                                     | The third-party licence notice (REQ-UI-021, ADR-0197): owed to whoever receives the software, and the landing page already serves the bundled font to a visitor with no session. No backend call, no data. |
 | `/error`, `/error/**`                                                           | Error pages carry no data, and an error view that needs a session cannot render the outage that broke it.                                                                                                                                                                                                                       |
 | the asset trees, `/favicon.ico`, `/robots.txt`, `/sm/**`, `/**/*.map`           | Assets. The three mechanical entries keep the OAuth2 saved-request replay off a 404 (REQ-SEC-025, ADR-0088).                                                                                                                                                                                                                    |
-| `/.well-known/assetlinks.json`                                                  | Android App Links verification is fetched by the platform with no session (REQ-SEC-038).                                                                                                                                                                                                                                        |
-| `/manifest.webmanifest`                                                         | The web app manifest, read by a browser on the landing page before any login (REQ-UI-020, ADR-0164). Three localised strings, two colours and the path of an already-public icon; behind the catch-all it would answer `302` into OAuth and installs would name the app after the login page. Same class as the entry above it. |
-| `/app/callback`, `/app/link-help`                                               | The Android App Link fallback (REQ-SEC-038): a member mid-login may hold no session, and behind the catch-all the callback would loop into OAuth and park its authorization code in the saved-request cache. `/app/callback` only answers `303` to the help page, dropping the query.                                          |
+| `/manifest.webmanifest`                                                         | The web app manifest, read by a browser on the landing page before any login (REQ-UI-020, ADR-0164). Three localised strings, two colours and the path of an already-public icon; behind the catch-all it would answer `302` into OAuth and installs would name the app after the login page.                                   |
 | `/actuator/health`, `/actuator/health/**`                                       | The container health check (the image's `HEALTHCHECK`, rendered into the Quadlet `HealthCmd` in prod); in prod Actuator lives on the internal management port (ADR-0090).                                                                                                                                                     |
 | `/oauth2/authorization/keycloak`, `/login/oauth2/code/keycloak`, `POST /logout` | Spring Security's own login and logout endpoints — filters, not matrix entries.                                                                                                                                                                                                                                                 |
 
@@ -4020,22 +4190,21 @@ a method gate.
 > one to the waiting page and reconciles roles against the backend on the way.
 >
 > For a **page** that is correct. For a **document** — one an external verifier or a browser fetches
-> on its own schedule — it turns the document into a login page. `/.well-known/assetlinks.json`
-> shipped exactly that way: `permitAll` here, exempt in neither gate, so a signed-in member was
-> answered with the consent page and each hit paid a `/api/v1/users/me` round trip.
+> on its own schedule — it turns the document into a login page. The Android App Links descriptor
+> (REQ-SEC-038, superseded) shipped exactly that way: `permitAll` here, exempt in neither gate, so a
+> signed-in member was answered with the consent page and each hit paid a `/api/v1/users/me` round
+> trip.
 >
 > The exemption therefore lives in **one** place, `frontend/kernel/security/PublicPaths`, which both gates
 > read: `isStaticAsset` (the asset trees, the favicon, `/sm/`, `*.map`), `isPublicDocument`
-> (`/robots.txt`, `/.well-known/assetlinks.json`, `/manifest.webmanifest`), `isAuthInfrastructure`
+> (`/robots.txt`, `/manifest.webmanifest`), `isAuthInfrastructure`
 > (login, logout, OAuth, error, actuator) and `isLegalPage` (`/impressum`, `/privacy`, `/terms` — the
 > pages a gate may never hold a member away from, REQ-SEC-028). **A new public document goes in both
 > this table and `isPublicDocument`.** Pinned by `PublicPathsTest` plus a case in each gate's own test.
-> The App Link fallback pages are `permitAll` but deliberately in none of these sets: they are pages
-> for a member, not documents a verifier fetches, so a signed-in member still meets the gates there.
 >
 > **Both halves match the same way, so both accept the same spellings.** Spring Security matches
 > `permitAll` with a `PathPatternRequestMatcher`, which decides on the percent-**decoded**
-> segment. `PublicPaths` compared the raw `getRequestURI()`, so `/.well-known/assetlink%73.json`
+> segment. `PublicPaths` compared the raw `getRequestURI()`, so `/robot%73.txt`
 > was `permitAll` here and exempt in neither gate — admitted by the URL layer, then redirected by
 > the one below it. Fail-closed, so a consistency defect rather than a hole, but the same defect
 > as the drifted copies above, one layer down. Every predicate in `PublicPaths` matches a parsed
@@ -5708,23 +5877,32 @@ while every test passes, because the `test` profile disables CSRF. So:
 - The one reviewed write outside the exemption is `/error`: it answers every verb but is reached
   only by the container's error dispatch, after the original request passed the chain.
 
+> [!note] Amended 2026-10-17 (ADR-0271, #2673) — the CSRF half of this gate has no subject left
+> With CSRF off unconditionally there is no exemption to measure every write mapping against, so
+> `CsrfExemptionCoverageTest` and `SecurityConfigCsrfExemptionTest` are removed. The finding
+> underneath survives and keeps its test: a mapping outside `/api`, `/internal` and the actuator is
+> reached by none of the path-scoped filters and by no matcher anyone reviewed, which
+> `ServedSurfaceCoverageTest` still asserts over the real handler mappings. What replaces the CSRF
+> assertion is the precondition it stood for, in `SecurityChainBearerOnlyTest` (REQ-SEC-044).
+
 **Acceptance**
 
-- [x] All 331 write mappings pass the armed filter without a token (selection floor 331).
-- [x] A planted write at `/legacy/…` and at `/api/v2/…` is refused by the same filter, and
-  `/api/v1/missions` passes — the check can fail.
 - [x] The 583 mappings of every registry lie inside the surface; a planted `/legacy/write` is
   reported (`PathControlInventoryTest`).
+- [x] The 331 write mappings are still selected, so the inventory is not silently empty
+  (selection floor 331).
+- [x] The main chain holds no ambient credential and creates no session
+  (`SecurityChainBearerOnlyTest`).
 
-**Enforced by:** `CsrfExemptionCoverageTest`, `PathControlInventoryTest`,
-`SecurityConfigCsrfExemptionTest`, `ActuatorLoggersCsrfArmedTest` · **Code:** `SecurityConfig`,
-`MonitoringScrapeSecurityConfig` · **Decision:** ADR-0144
+**Enforced by:** `ServedSurfaceCoverageTest`, `PathControlInventoryTest`,
+`SecurityChainBearerOnlyTest`, `ActuatorLoggersAccessTest` · **Code:** `SecurityConfig`,
+`MonitoringScrapeSecurityConfig` · **Decision:** ADR-0144, ADR-0271
 
 ### REQ-SEC-079 — Every rate-limit rule names a real operation
 
-The per-IP rules (`app.rate-limit.rules` in `application.yml`), the two stream connects the
-per-subject budget counts (`SubjectRateLimitingFilter.SSE_CONNECT`, `LIVE_SYNC_CONNECT`) and the
-export segments (`SubjectRateLimitingFilter.EXPORT_SEGMENTS`) are keyed on paths. A path that moves
+The per-IP rules (`app.rate-limit.rules` in `application.yml`), the stream connect the
+per-subject budget counts (`SubjectRateLimitingFilter.SSE_CONNECT`; the app's `LIVE_SYNC_CONNECT`
+went with the bridge, ADR-0274) and the export segments (`SubjectRateLimitingFilter.EXPORT_SEGMENTS`) are keyed on paths. A path that moves
 without its rule keeps the rule configured and applying to nothing. So every path of every rule
 MUST match at least one operation of the real dispatcher that answers one of the rule's verbs, both
 stream connects MUST be `GET` operations, and every export segment MUST occur in at least one

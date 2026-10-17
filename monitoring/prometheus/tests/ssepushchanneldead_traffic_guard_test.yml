@@ -69,12 +69,6 @@ tests:
         values: "0+2x180"
       - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="/manifest.webmanifest"}'
         values: "0+2x180"
-      - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="/.well-known/assetlinks.json"}'
-        values: "0+2x180"
-      - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="/app/link-help"}'
-        values: "0+2x180"
-      - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="/app/callback"}'
-        values: "0+2x180"
       - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="REDIRECTION"}'
         values: "0+2x180"
       - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="/**"}'
@@ -96,12 +90,6 @@ tests:
       - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="/notifications/unread-count"}'
         values: "0+2x180"
       - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="/**"}'
-        values: "0+2x180"
-      - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="/.well-known/assetlinks.json"}'
-        values: "0+2x180"
-      - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="/app/callback"}'
-        values: "0+2x180"
-      - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="/app/link-help"}'
         values: "0+2x180"
     alert_rule_test:
       - eval_time: 150m

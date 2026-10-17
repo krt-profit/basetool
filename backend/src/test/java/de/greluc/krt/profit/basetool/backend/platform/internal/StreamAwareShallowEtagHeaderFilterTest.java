@@ -44,7 +44,7 @@ class StreamAwareShallowEtagHeaderFilterTest {
       new StreamAwareShallowEtagHeaderFilter();
 
   @ParameterizedTest
-  @ValueSource(strings = {"/api/v1/notifications/stream", "/api/v1/live-sync/stream"})
+  @ValueSource(strings = {"/api/v1/notifications/stream"})
   @DisplayName("a streaming endpoint is not filtered, so its bytes are never buffered")
   void streamingEndpointsBypassTheFilter(String path) {
     assertThat(filter.shouldNotFilter(get(path))).isTrue();
@@ -80,7 +80,6 @@ class StreamAwareShallowEtagHeaderFilterTest {
         "/api/v1/personal-inventory",
         "/api/v1/refinery-orders/all",
         "/api/v1/promotion/eligibility",
-        "/api/v1/live-sync/changed",
         "/api/v1/material-exchange/offers",
         "/api/v1/orders"
       })
@@ -184,7 +183,7 @@ class StreamAwareShallowEtagHeaderFilterTest {
   @DisplayName("both streams' unnormalised spellings are covered, by the no-store list")
   void theNoStoreListNarrowsTheUnnormalisedHole() {
     assertThat(filter.shouldNotFilter(get("/api/v1/notifications/./stream"))).isTrue();
-    assertThat(filter.shouldNotFilter(get("/api/v1/live-sync/./stream"))).isTrue();
+    assertThat(filter.shouldNotFilter(get("/api/v1/notifications/./stream"))).isTrue();
   }
 
   @Test
@@ -208,7 +207,7 @@ class StreamAwareShallowEtagHeaderFilterTest {
   @Test
   @DisplayName("a stream's bytes reach the response untouched")
   void streamBytesAreNotSwallowed() throws Exception {
-    MockHttpServletRequest request = get("/api/v1/live-sync/stream");
+    MockHttpServletRequest request = get("/api/v1/notifications/stream");
     request.setAsyncSupported(true);
     MockHttpServletResponse response = new MockHttpServletResponse();
     MockFilterChain chain = new StreamingChain();

@@ -63,9 +63,6 @@ class RouteGateSnapshotTest {
    */
   static final Set<String> PUBLIC_HANDLERS =
       Set.of(
-          "AppLinkController#callback",
-          "AppLinkController#linkHelp",
-          "AssetLinksController#assetLinks",
           "HomeController#home",
           "ImpressumController#showImpressum",
           "OssLicensesController#showLicenses",

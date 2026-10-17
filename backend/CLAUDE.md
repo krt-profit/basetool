@@ -44,10 +44,15 @@ its target module, first matching rule wins (REQ-MOD-001…006).
 - **The platform modules (`audit`, `notification`, `livesync`, `platform`) never name a domain
   class.** When they need a domain's data, they own an SPI and the domain implements it (plan
   §5.3): `ActorHandleResolver` and `RetentionParticipant` (audit), the three
-  `*RecipientDirectory` interfaces (notification), `LiveSyncTopicAuthorizer` (livesync),
-  `ActiveOrgUnitProvider` (platform). A new live-sync room kind needs exactly one
-  `LiveSyncTopicAuthorizer` that asks the module's read gate, or the backend refuses to start; a new
-  audit trail outside the audit module joins retention as a `RetentionParticipant`. A platform SPI
+  `*RecipientDirectory` interfaces (notification), `ActiveOrgUnitProvider` (platform). A new
+  audit trail outside the audit module joins retention as a `RetentionParticipant`. The
+  `livesync` module owns no SPI any more: the `LiveSyncTopicAuthorizer` seam went with the app's
+  subscribe path (ADR-0274), because the backend publishes into the frontend's rooms and authorises
+  no subscriber of its own. A domain announces its own committed write through
+  `livesync.api.LiveSyncPublisher`, and a room it publishes into must exist in the **frontend's**
+  `LiveSyncTopicClass` with the same prefix, arity and section keys —
+  `LiveSyncTopicRegistryParityTest` fails otherwise, and a key only the backend knows is a frame the
+  browser clips away on arrival. A platform SPI
   in a layer package sits in a package its implementations already live in (`ActiveOrgUnitProvider`
   in `service`, not `logging`), or the implementation closes a layer cycle.
 - **A Spring Data fragment implementation lies in the package of its fragment interface.** Spring Data looks

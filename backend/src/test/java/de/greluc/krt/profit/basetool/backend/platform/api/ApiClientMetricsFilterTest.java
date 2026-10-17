@@ -64,7 +64,8 @@ class ApiClientMetricsFilterTest {
 
   @BeforeEach
   void setUp() {
-    properties = new ApiClientMetricsProperties(List.of("basetool-frontend", "basetool-android"));
+    properties =
+        new ApiClientMetricsProperties(List.of("basetool-frontend", "basetool-ingest-gateway"));
     gatewayClientIds = new ArrayList<>();
     gatewayProperties = new IngestGatewayProperties(gatewayClientIds);
     meterRegistry = new SimpleMeterRegistry();
@@ -139,11 +140,11 @@ class ApiClientMetricsFilterTest {
 
   @Test
   void aKnownClientKeepsItsName() throws Exception {
-    authenticateWithAzp("basetool-android");
+    authenticateWithAzp("basetool-ingest-gateway");
 
     send("/api/v1/missions");
 
-    assertEquals(1.0d, requests("basetool-android"));
+    assertEquals(1.0d, requests("basetool-ingest-gateway"));
   }
 
   @Test
@@ -217,11 +218,11 @@ class ApiClientMetricsFilterTest {
   void aRelayHeaderFromAnyoneButTheGatewayIsIgnored() throws Exception {
     gatewayClientIds.add("basetool-ingest");
     Mockito.when(knownExchangeClients.isRegistered("versekit")).thenReturn(true);
-    authenticateWithAzp("basetool-android");
+    authenticateWithAzp("basetool-ingest-gateway");
 
     send("/api/v1/missions", "versekit");
 
-    assertEquals(1.0d, requests("basetool-android"));
+    assertEquals(1.0d, requests("basetool-ingest-gateway"));
     assertEquals(0.0d, requests("versekit"));
   }
 
@@ -255,10 +256,10 @@ class ApiClientMetricsFilterTest {
 
   @Test
   void anEncodedSpellingCannotEscapeTheCount() throws Exception {
-    authenticateWithAzp("basetool-android");
+    authenticateWithAzp("basetool-ingest-gateway");
 
     send("/%61pi/v1/missions");
 
-    assertEquals(1.0d, requests("basetool-android"));
+    assertEquals(1.0d, requests("basetool-ingest-gateway"));
   }
 }

@@ -95,7 +95,7 @@ class PageChromeSnapshotTest {
 
   /** Pages the layout-level planted changes render: full chrome, no toast, and the bare shell. */
   private static final List<String> LAYOUT_PROBES =
-      List.of(FULL_PAGE, "shell/app-link-help.html", "error.html");
+      List.of(FULL_PAGE, "shell/sc-links.html", "error.html");
 
   private static final Path TEMPLATE_ROOT = Path.of("src", "main", "resources", "templates");
 

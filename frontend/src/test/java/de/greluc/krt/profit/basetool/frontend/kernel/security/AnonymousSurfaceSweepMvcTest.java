@@ -56,24 +56,13 @@ class AnonymousSurfaceSweepMvcTest {
 
   /** The page paths REQ-SEC-052 serves without a session. */
   private static final Set<String> PUBLIC_PAGES =
-      Set.of("/", "/impressum", "/privacy", "/terms", "/licenses", "/app/link-help");
-
-  /**
-   * The Android App Link's web-side fallback (REQ-SEC-038), which is public and must answer {@code
-   * 303} to {@link #APP_LINK_HELP} rather than redirect to the OAuth2 entry point.
-   */
-  private static final String APP_LINK_CALLBACK = "/app/callback";
-
-  /** Where {@link #APP_LINK_CALLBACK} must send an anonymous caller. */
-  private static final String APP_LINK_HELP = "/app/link-help";
+      Set.of("/", "/impressum", "/privacy", "/terms", "/licenses");
 
   /**
    * Public non-page resources that must answer {@code 200} without a session and are swept only in
-   * the background shape: the App Links descriptor (REQ-SEC-038) and the web app manifest
-   * (REQ-UI-020).
+   * the background shape: the web app manifest (REQ-UI-020).
    */
-  private static final Set<String> PUBLIC_RESOURCES =
-      Set.of("/.well-known/assetlinks.json", "/manifest.webmanifest");
+  private static final Set<String> PUBLIC_RESOURCES = Set.of("/manifest.webmanifest");
 
   /**
    * Mappings this sweep does not own, matched as whole path segments rather than string prefixes.
@@ -177,27 +166,6 @@ class AnonymousSurfaceSweepMvcTest {
         }
         continue;
       }
-      if (APP_LINK_CALLBACK.equals(call.path())) {
-        String target =
-            mockMvc
-                .perform(
-                    MockMvcRequestBuilders.request(call.method(), call.path())
-                        .accept(MediaType.TEXT_HTML)
-                        .with(csrf()))
-                .andReturn()
-                .getResponse()
-                .getRedirectedUrl();
-        if (!APP_LINK_HELP.equals(target)) {
-          served.add(
-              call
-                  + " -> "
-                  + target
-                  + " (REQ-SEC-038: the App Link fallback must redirect anonymously to "
-                  + APP_LINK_HELP
-                  + ", never into the OAuth2 entry point and never with the query attached)");
-        }
-        continue;
-      }
       if (PUBLIC_PAGES.contains(call.path())) {
         try {
           int rendered =
@@ -255,9 +223,7 @@ class AnonymousSurfaceSweepMvcTest {
     List<String> served = new ArrayList<>();
     for (Call call : allCalls()) {
       if (call.method() == HttpMethod.GET
-          && (PUBLIC_PAGES.contains(call.path())
-              || PUBLIC_RESOURCES.contains(call.path())
-              || APP_LINK_CALLBACK.equals(call.path()))) {
+          && (PUBLIC_PAGES.contains(call.path()) || PUBLIC_RESOURCES.contains(call.path()))) {
         continue;
       }
       int status = issue(call, MediaType.APPLICATION_JSON);

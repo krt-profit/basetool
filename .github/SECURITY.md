@@ -128,8 +128,8 @@ Particularly interesting classes of issue, given the project's architecture:
   orders/items to a member who may not see it is in scope).
 - Anything reachable without a login beyond the surface REQ-SEC-052 enumerates
   (the tool is members-only, ADR-0159): the landing page, the legal pages, the
-  assets, `/error`, `/actuator/health`, the Android App Link and web-manifest
-  entries, and two documented backend `GET` reads.
+  assets, `/error`, `/actuator/health`, the web-manifest entry, and one
+  documented backend `GET` read.
 - Authentication or authorisation bypass against any `@RestController` or
   Thymeleaf view, including missing `@PreAuthorize` annotations.
 - Optimistic-locking bypass leading to lost writes or privilege escalation.

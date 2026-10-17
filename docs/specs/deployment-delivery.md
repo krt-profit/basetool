@@ -2266,8 +2266,7 @@ there.
 - **The desired state is production's**, read with the secret-free
   `scripts/keycloak-config-snapshot.sql` and written into the script: the Basetool's clients and
   their flags, attributes, redirect URIs, web origins, scope assignments and mappers; the
-  `extractor-ingest` / `extractor-ingest-only` scopes and their audience mappers; the Android
-  client's marker role and realm-role scope; the DPoP client profile and policy; the
+  `extractor-ingest` / `extractor-ingest-only` scopes and their audience mappers; the
   service-account roles; the realm's token and session settings. What production carries that looks
   unintended is reproduced and marked `PROD-AS-IS`, and changes in production first.
 - **Environment-specific values are arguments** (`--public-origin`, `--grafana-origin`). No
@@ -2275,9 +2274,8 @@ there.
 - **Dry run by default.** `--apply` writes, then re-plans; the apply fails unless the second plan is
   empty. A realm in shape produces no write at all.
 - **Additive.** An object only the target realm has is reported and left alone. The exceptions are
-  owner decisions, each named in the script — the Android client's realm-role scope
-  (`REQ-SEC-035`), its withheld `offline_access` (ADR-0131), the three retirements of
-  2026-09-22 (below), every client-level protocol mapper on `basetool-sc-extractor` and on a
+  owner decisions, each named in the script — the retired Android client (below), the
+  retirements of 2026-09-22 (below), every client-level protocol mapper on `basetool-sc-extractor` and on a
   third-party client (2026-09-28, ADR-0202 amendment 4), and `offline_access` on
   `basetool-frontend`, `backend-service`, `basetool-ingest-gateway` and `grafana` (2026-09-28,
   ADR-0202 amendment 5) — and the scope lists of a client the same run created.
@@ -2286,20 +2284,23 @@ there.
   dry run lists it and exits `2`, the apply deletes it, and the verify pass fails while one is left.
   A hand-added `basetool-backend` audience mapper therefore cannot outlive an apply that verifies
   clean (owner decision 2026-09-28, finding G5-L4 of #2092).
-- **Three production entries are retired and converge away wherever they are found** (owner
+- **Production entries retired on 2026-09-22 converge away wherever they are found** (owner
   decision 2026-09-22, ADR-0202 amendment): `basetool-sc-extractor`'s authorization-code flow and
-  its two loopback wildcard redirect URIs (`REQ-INGEST-002`); both ingest scopes on
-  `basetool-android` (`REQ-INGEST-011`); `basetool-frontend`'s `http://frontend:18081` redirect URI
-  and web origin. Gone from production since the owner-approved provisioner apply of 2026-09-23;
+  its two loopback wildcard redirect URIs (`REQ-INGEST-002`); `basetool-frontend`'s
+  `http://frontend:18081` redirect URI and web origin. Gone from production since the owner-approved provisioner apply of 2026-09-23;
   the testing realm keeps them until it is provisioned.
 - **`basetool-frontend` carries `baseUrl` = `<--public-origin>/`** (2026-09-25, ADR-0202
   amendment 3, `REQ-SEC-071`) — an added field, not in the 2026-09-22 production snapshot, so that
   Keycloak's error pages for the web login link back to the app. *(Updated 2026-09-25: production
   carries it — the owner set Home URL `https://profit-base.online/` by hand in the Admin Console,
   not through an `--apply`; it equals what the provisioner converges to.)*
-- **The DPoP write order holds** (`REQ-SEC-030`): when the Android client or the DPoP profile has to
-  change, the policy is detached first and re-attached last, and both client-policy lists are merged
-  by name so no other policy or profile is lost.
+- **The retired Android client is deleted wherever it is found** (owner decision 2026-10-17,
+  ADR-0268, ADR-0202 amendment 7, #2674): the client policy `krt-mobile-dpop-policy` is detached
+  first, the client profile `krt-mobile-dpop` removed next, and the client `basetool-android` —
+  with its marker role, mappers and scope mappings — deleted last. Each is a planned `-` line in
+  the dry run, both client-policy lists are rewritten without only that entry, so no other policy
+  or profile is lost, and the verify pass fails while one is left. The client is never reported as
+  “not in the production shape”, and the id stays reserved for third-party clients.
 - **No secret is printed, logged or sent back.** A confidential client the run creates is reported
   with the Admin Console path to its generated secret and the `.env` variables that need it.
 - **Built-in Keycloak objects are never touched**; realm-wide hardening stays in
@@ -2313,7 +2314,7 @@ there.
   `basetool-frontend`, `backend-service`, `basetool-ingest-gateway` and `grafana` (when managed)
   have it withheld — a planned `- optional scope 'offline_access' withheld (offline sessions are
   for the exchange clients only, ADR-0202 amendment 5)` line wherever found, never offered to one
-  the run creates — as `basetool-android` already had (ADR-0131); owner decision 2026-09-28.
+  the run creates; owner decision 2026-09-28.
   **`offline_access` is no realm default client scope either** (a second exception to „built-in
   objects are never touched", owner decision the same day): the provisioner removes it from the
   realm's default and optional client scopes wherever it is listed —
@@ -2335,14 +2336,17 @@ there.
 **Acceptance**
 
 - [ ] `provision-keycloak-realm.test.sh` passes: a dry run writes nothing; an apply from an empty
-  realm builds the shape and verifies clean; a second apply sends no write; an Android edit detaches,
-  writes and re-attaches in that order and keeps every foreign policy; target-only objects are
+  realm builds the shape and verifies clean; a second apply sends no write; target-only objects are
   reported and still present; no secret appears in the output or in any payload.
 - [ ] After provisioning, `keycloak-config-snapshot.sql` run on the environment and on production
   diffs only in the lines its header lists as environment-specific.
-- [ ] `provision-keycloak-realm.test.sh` section 8: against a realm still carrying the three retired
-  entries, the plan removes exactly those (plus the DPoP detach/re-attach the app's scope removal
-  needs) and a second apply is empty.
+- [ ] `provision-keycloak-realm.test.sh` section 8: against a realm still carrying the entries
+  retired on 2026-09-22, the plan removes exactly those and a second apply is empty.
+- [x] Section 4: a realm still holding `basetool-android`, its marker role, the DPoP policy and
+  profile plans exactly the three deletions in order (policy, profile, client), writes nothing in
+  the dry run, deletes them on apply while every foreign policy and profile survives, verifies
+  clean, and a second apply sends no write; a client whose policy is already gone is deleted on
+  its own.
 - [x] Section 17: a stray audience and claim mapper on the extractor and a role mapper on a
   third-party client are planned as removals and removed by the apply, which verifies clean; a stray
   mapper on `basetool-frontend` is still only reported and kept.
@@ -3056,9 +3060,10 @@ go down (ADR-0267).
 - **Global ceilings.** A file has at most 1,000 lines (`FileLength`, id `fileLength`) and a method or
   constructor at most 150 (`MethodLength`, id `methodLength`), counted the way Checkstyle counts them.
 - **Allow-list at the current size.** A file that exceeded a ceiling when the ratchet was introduced
-  has its own entry in `config/checkstyle/google_checks.xml` — a check instance with the id
-  `fileLength<Class>` or `methodLength<Class>` and that file's maximum, confined to the file by a
-  `SuppressionSingleFilter`, with the global check lifted from it by another.
+  and still exceeds it has its own entry in `config/checkstyle/google_checks.xml` — a check instance
+  with the id `fileLength<Class>` or `methodLength<Class>` and that file's maximum, confined to the
+  file by a `SuppressionSingleFilter`, with the global check lifted from it by another. Removing an
+  entry removes all three modules, so the global check applies to the file again.
 - **Only down.** No entry is raised and no entry is added. A change that shrinks a listed file or
   method lowers its entry to the new size, or removes it once the file is under the global ceiling.
 - **No exemption by annotation.** A size finding is fixed by splitting, not by `@SuppressWarnings` or a
@@ -3078,6 +3083,50 @@ go down (ADR-0267).
 **Decision:**
 [ADR-0267](../adr/0267-a-size-ratchet-caps-java-files-and-methods-at-their-current-length.md) ·
 **Related:** REQ-OPS-046
+
+### REQ-OPS-049 — Every commit on `main` gets a CI verdict or an explicit skip
+
+No push to `main` may have its CI run cancelled by a later push, and a run that is not worth finishing
+says so instead of disappearing (ADR-0276).
+
+- **The concurrency group is per commit for a push.** `ci.yml` groups on
+  `ci-<workflow>-<github.sha>` for a `push` and on `ci-<workflow>-<github.ref>` for every other event,
+  so one `main` merge can never evict another's pending run. Pull requests keep `cancel-in-progress`,
+  which is theirs alone.
+- **A superseded `main` push skips, green.** The `Superseded check` job runs
+  `scripts/ci-superseded.sh --check`; a push to `refs/heads/main` whose commit is a strict ancestor of
+  `main`'s current tip skips `Build, Test & Lint`, and the run ends successful with a `::notice` and a
+  job-summary line naming the tip. The tip's own run carries the verdict for a tree that contains the
+  skipped commit.
+- **The decision fails open.** Anything but a confirmed `ahead` comparison builds — an unreadable tip,
+  an unreadable comparison, a non-ancestor (force push), any event that is not a `main` push, and the
+  gate job's own failure or cancellation. `Build, Test & Lint` is skipped only on an explicit
+  `skip=true`, so no failure mode of the gate can leave a required context unreported and wedge the
+  merge queue (REQ-OPS-044).
+- **It detects, it does not prevent.** A breakage that only appears once two pull requests are
+  combined is kept off `main` by the merge queue (REQ-OPS-044), not by this run; and nothing here
+  announces a red `main` or stops a merge onto one.
+
+**Acceptance**
+
+- [x] `scripts/ci-superseded.test.sh` covers every decision branch plus three usage errors, sixteen
+  cases: a superseded `main` push skips, the tip builds, and a pull request, a merge group, a
+  `workflow_dispatch`, a push to another branch, an unreadable tip, a malformed tip, a `diverged`, a
+  `behind`, an `identical` and an unreadable comparison all build. A comparison value that is not one
+  of GitHub's four reaches the reason text as `unknown`, so an error body cannot leak into it. It runs
+  in `repo-lint.yml`'s `Self-tests` job.
+- [x] `ci.yml`'s concurrency group resolves to the commit for a `push` and to the ref for every other
+  event, and `actionlint`, `zizmor` and `shellcheck` pass on the workflow and the script.
+- [ ] A burst of `main` merges leaves every commit's run either with a verdict or with a
+  "skipped — superseded" summary, and none `cancelled`.
+- [ ] `Build, Test & Lint` still reports on every pull request and on every merge group, including one
+  whose `Superseded check` job failed.
+
+**Enforced by:** `.github/workflows/ci.yml` (`concurrency`, the `supersede` job) ·
+`scripts/ci-superseded.sh` · `scripts/ci-superseded.test.sh` (`repo-lint.yml`, `Self-tests`) ·
+**Decision:**
+[ADR-0276](../adr/0276-every-main-push-gets-its-own-ci-run-and-a-superseded-one-skips.md) ·
+**Related:** REQ-OPS-044, ADR-0137
 
 ## Open questions
 

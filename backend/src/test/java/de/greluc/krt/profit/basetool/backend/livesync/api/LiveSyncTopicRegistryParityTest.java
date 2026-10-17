@@ -38,8 +38,12 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Build gate that keeps the backend's live-sync topic registry a subset of the frontend's
- * (ADR-0143), by parsing the frontend's source. Reads only the first three constructor arguments of
+ * (ADR-0274), by parsing the frontend's source. Reads only the first three constructor arguments of
  * each enum constant.
+ *
+ * <p>The backend publishes into these rooms and never listens on them, so a prefix or section key
+ * only this side knows is a frame the browser clips away on arrival: the page simply stays old,
+ * with nothing broken and nothing logged.
  */
 class LiveSyncTopicRegistryParityTest {
 
@@ -70,9 +74,9 @@ class LiveSyncTopicRegistryParityTest {
       String key = key(backendClass.prefix(), backendClass.perResource());
       assertThat(frontend)
           .as(
-              "backend class %s (prefix '%s', per-resource %s) must exist in the frontend registry"
-                  + " — the two publish onto one Redis channel, so a room only this side knows is a"
-                  + " room whose frames nobody sends",
+              "backend class %s (prefix '%s', per-resource %s) must exist in the frontend"
+                  + " registry — the backend publishes onto the frontend's channel, so a room only"
+                  + " this side knows is a room whose frames nobody receives",
               backendClass, backendClass.prefix(), backendClass.perResource())
           .containsKey(key);
     }
@@ -91,16 +95,16 @@ class LiveSyncTopicRegistryParityTest {
       assertThat(peer.sections())
           .as(
               "sections of backend class %s must all exist in the frontend's %s — a key only this"
-                  + " side knows is clipped away on arrival there, so the web never refreshes that"
-                  + " region after an app write",
+                  + " side knows is clipped away on arrival there, so the page never refreshes that"
+                  + " region after an exchange or ingest write",
               backendClass, peer.name())
           .containsAll(backendClass.allowedSections());
     }
   }
 
   @Test
-  @DisplayName("the frontend's staff-only rooms stay out of the backend registry")
-  void staffOnlyRoomsAreNotBridged() throws IOException {
+  @DisplayName("the registry holds only rooms the backend actually publishes into")
+  void onlyRoomsTheBackendPublishesIntoAreDeclared() throws IOException {
     Map<String, FrontendClass> frontend = parseFrontendRegistry();
     assertThat(frontend).containsKey(key("bank", false));
 
@@ -110,11 +114,20 @@ class LiveSyncTopicRegistryParityTest {
     }
     assertThat(backendKeys)
         .as(
-            "the bank staff room, the members room, the org-structure room and the admin"
-                + " exchange-clients room are web-only")
+            "a room the backend never publishes into is a room this registry should not name; the"
+                + " frontend owns every surface a browser edits (ADR-0274)")
         .doesNotContain(
             key("bank", false),
+            key("bank", true),
             key("members", false),
+            key("mission", true),
+            key("missions", false),
+            key("operation", true),
+            key("order", true),
+            key("orders", false),
+            key("refinery", false),
+            key("refinery-order", true),
+            key("orgunit-bank", false),
             key("org-structure", false),
             key("exchange-clients", false));
   }

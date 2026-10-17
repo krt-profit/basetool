@@ -95,7 +95,7 @@ public class BankAdminController {
    * @param accountId filter on the affected account, or absent
    * @param eventType filter on the event type, or absent
    * @param clientId filter on the originating client (REQ-AUDIT-005) — a bounded label such as
-   *     {@code basetool-android}, {@code other} or {@code none}, or absent
+   *     {@code basetool-android} (historical rows only), {@code other} or {@code none}, or absent
    * @param page zero-based page index
    * @param size page size
    * @param sort whitelisted sort spec

@@ -75,7 +75,6 @@ public class FirstPartyClientIds {
     addAll(ids, ingestGatewayProperties.clientIds());
     addAll(ids, connectedAppsProperties.webClientIds());
     addAll(ids, changeSourceProperties.webClientIds());
-    addAll(ids, changeSourceProperties.appClientIds());
     addAll(ids, partialRoleScopeProperties.clientIds());
     if (keycloakSyncProperties.clientId() != null && !keycloakSyncProperties.clientId().isBlank()) {
       ids.add(keycloakSyncProperties.clientId());

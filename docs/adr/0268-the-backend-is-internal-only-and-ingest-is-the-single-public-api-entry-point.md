@@ -5,7 +5,8 @@
   [ADR-0131](0131-mobile-auth-refresh-only-dpop-binding.md),
   [ADR-0134](0134-backend-joins-the-management-port-isolation.md) and
   [ADR-0202](0202-a-realm-is-brought-to-the-production-shape-by-a-provisioner-that-never-deletes.md),
-  each of which rests on the exposure this ends.
+  each of which rests on the exposure this ends. Amended 2026-10-17 (*Amendment 1*): the Android
+  client is deleted without a disabled grace period, and the realm provisioner deletes it.
 - **Date:** 2026-10-17
 - **Deciders:** @greluc (issue #2638)
 - **Related:** [ADR-0164](0164-an-installable-web-app-without-a-service-worker.md) (the PWA that
@@ -85,9 +86,9 @@ reason that has nothing to do with the vhost. Reverting it would be work in the 
 
 **ADR-0131 loses its client, and ADR-0202 loses part of the shape it converges.** DPoP
 refresh-token-only binding, the `krt-mobile-dpop` profile, its policy and the `dpop-refresh-only`
-marker role exist for `basetool-android` and nothing else. The client is disabled first and deleted
-after a grace period (#2674); because the provisioner never deletes, both are deliberate production
-writes, each needing @greluc's explicit per-action approval. The *decision* in ADR-0131 — that
+marker role exist for `basetool-android` and nothing else. They are deleted in #2674, without a
+disabled grace period, and the realm provisioner removes them wherever they remain (*Amendment 1*).
+The *decision* in ADR-0131 — that
 Keycloak can bind only the refresh token, and how — remains the record of an experiment nobody
 should have to repeat.
 
@@ -119,3 +120,23 @@ start on work nobody has scheduled.
 which ADR-0129 settled first: a gateway buys no authorisation it could not get wrong twice, and its
 only non-trivial variant is the token relay the project refused to build. With no public caller the
 question does not even arise.
+
+## Amendment 1 — 2026-10-17: the Android client is deleted outright, and the provisioner deletes it
+
+- **Deciders:** @greluc (owner decision in #2674)
+
+The first version planned to disable `basetool-android` first and delete it after a grace period,
+each step a separate production write. The owner decided against the grace period, and production's
+client was deleted by hand on 2026-10-17.
+
+The realm provisioner now carries the retirement as an explicit, named section (`plan_retired` in
+`scripts/provision-keycloak-realm.py`): it detaches and removes the `krt-mobile-dpop-policy` policy,
+removes the `krt-mobile-dpop` profile, and deletes the client with its `dpop-refresh-only` marker
+role, mappers and scope mappings, in that order and wherever any of them still exists. Every other
+client policy and profile is carried forward. This is the one exception to ADR-0202's decision 4,
+recorded there as well. The App Link surface on the frontend that the client's redirect URI needed
+(REQ-SEC-038) is removed in the same change. `scripts/provision-keycloak-mobile-client.py` and
+`scripts/verify-dpop-binding.py` are deleted; the kcadm wrapper both provisioners used lives in
+`scripts/keycloak_kcadm.py`. Requirements: `REQ-OPS-033`, `REQ-SEC-030`, `REQ-SEC-035` and
+`REQ-SEC-038` (the last three superseded); pinned by case 4 of
+`scripts/provision-keycloak-realm.test.sh`.

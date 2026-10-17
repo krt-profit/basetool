@@ -34,8 +34,7 @@ public final class MissionParticipantRequiredException extends DomainProblem {
 
   /**
    * Creates the exception. The message is the i18n key of the localized detail, so the RFC 7807
-   * {@code detail} reaches every client — the web frontend and the Android app alike — in the
-   * caller's language.
+   * {@code detail} reaches every client in the caller's language.
    */
   public MissionParticipantRequiredException() {
     super("problem.mission_participant_required.detail");

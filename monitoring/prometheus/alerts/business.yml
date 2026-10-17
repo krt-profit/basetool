@@ -564,7 +564,7 @@ groups:
           (basetool_sse_connections == 0)
           and on()
           (sum(rate(http_server_requests_seconds_count{job="basetool-frontend",
-          uri!~"/|/\\*\\*|/actuator.*|/impressum|/privacy|/terms|/licenses|/manifest.webmanifest|/robots.txt|/\\.well-known/.*|/app/callback|/app/link-help|NOT_FOUND|UNKNOWN|REDIRECTION"}[15m])) > 0.01)
+          uri!~"/|/\\*\\*|/actuator.*|/impressum|/privacy|/terms|/licenses|/manifest.webmanifest|/robots.txt|/\\.well-known/.*|NOT_FOUND|UNKNOWN|REDIRECTION"}[15m])) > 0.01)
         for: 30m
         labels:
           severity: warning
@@ -776,15 +776,6 @@ groups:
           summary: "Ingest gateway runs without its JWT audience check"
           description: "basetool_ingest_gate_enforcing{gate=\"audience\"} is 0: the ingest gateway accepts any valid realm token at the decoder, including frontend session tokens. Set IRI_INGEST_EXPECTED_AUDIENCES=basetool-ingest (never the backend's audience), the audience the exchange.* client scopes stamp — docs/archive/INGEST_KEYCLOAK_SETUP.md step 7a — then re-render env.d and restart ingest."
 
-      - alert: AndroidVersionPolicyOverrideActive
-        expr: max by (application, field) (basetool_android_version_policy_override{application="basetool-backend"}) == 1
-        for: 24h
-        labels:
-          severity: warning
-        annotations:
-          summary: "The Android version policy runs on an emergency override"
-          description: "basetool_android_version_policy_override{field=\"{{ $labels.field }}\"} has been 1 for a day: the host's APP_ANDROID_*_OVERRIDE replaces the release default committed in application.yml, so this value no longer deploys or rolls back with the release (REQ-API-020). Raise the release default in a PR to the overridden value, release it, then empty the override in .env and re-render env.d — docs/deployment.md, The Android app floor."
-
       - alert: ApiUnknownClient
         expr: sum (rate(basetool_api_client_requests_total{client_id="other"}[10m])) > 0
         for: 10m
@@ -792,7 +783,7 @@ groups:
           severity: warning
         annotations:
           summary: "Unregistered client software is calling the backend API"
-          description: "A token whose azp names no known client drove /api/** for 10 minutes. Either a first-party client was added to the realm without being added to app.monitoring.api-clients.known-client-ids, or something nobody approved is using the API. Identify it from the Keycloak client sessions and the api vhost access log; the label is deliberately bounded to 'other' and will never name it."
+          description: "A token whose azp names no known client drove /api/** for 10 minutes. Either a first-party client was added to the realm without being added to app.monitoring.api-clients.known-client-ids, or something nobody approved is using the API. Identify it from the Keycloak client sessions and the frontend's and gateway's access logs; the label is deliberately bounded to 'other' and will never name it. Since ADR-0270 the backend also refuses a token whose azp is not in app.security.jwt.accepted-client-ids, so a caller that reaches /api/** at all is one of the named clients or the gateway acting for a member."
 
       - alert: IngestServiceAccountTokenFailing
         expr: >-
@@ -916,20 +907,6 @@ groups:
           summary: "Redis live-sync/notification fan-out publish errors (cross-replica delivery degraded)"
           description: "The live-sync and/or notification Redis fan-out has failed to publish for 10 minutes — cross-replica live delivery is silently degraded to single-instance (a viewer on one replica stops seeing another replica's changes/notifications; same-replica delivery still works, no user-facing error). Check Redis reachability from the app replicas and the basetool:livesync:changed / basetool:notify:published pub/sub channels in each service's own ACL user (basetool-backend is granted both, basetool-frontend basetool:livesync:changed; a service whose REDIS_<SVC>_USERNAME is unset runs as the default user). RedisAclDenials fires alongside when a missing grant is the cause."
 
-      - alert: AppLiveSyncBridgeSilent
-        expr: |
-          (sum(rate(basetool_livesync_redis_published_total{job="basetool-frontend"}[30m])) > 0)
-          and on()
-          (sum(basetool_livesync_streams) > 0)
-          and on()
-          ((sum(rate(basetool_livesync_redis_consumed_total{job="basetool-backend"}[30m])) or vector(0)) == 0)
-        for: 30m
-        labels:
-          severity: warning
-        annotations:
-          summary: "App live-sync bridge silent (web changes are not reaching the app)"
-          description: "The web frontend has been publishing live-sync changed frames for 30 minutes and the backend has consumed none, while app live-sync streams are open — so a browser edit never reaches the app and an app write never reaches a browser, with no error on either side. Check app.live-sync.redis-fanout.enabled on the backend (must be true in prod), that its channel is the frontend's basetool:livesync:changed and not a channel of its own, and that the basetool-backend ACL user is granted that channel with PUBLISH/SUBSCRIBE (the default user while REDIS_BACKEND_USERNAME is unset)."
-
       - alert: LiveSyncRelayDropsSustained
         expr: sum by (topic_class, reason) (increase(basetool_presence_relay_dropped_total{reason!="section_filtered"}[1h])) > 3
         for: 15m
@@ -947,12 +924,3 @@ groups:
         annotations:
           summary: "Live-sync section-key skew on {{ $labels.topic_class }} (peers going stale)"
           description: "The live-sync relay has been filtering unknown section keys out of `changed` frames on topic class {{ $labels.topic_class }} for over 2 hours — a broadcast key is missing from the relay's accept-list, so peers' matching panels stay stale with no visible error (the REQ-FE-010 defect class). A section key must exist at all three mirror points at once: the acting page's seam map, LiveSyncTopicClass.allowedSections, and the receiving client's apply map. Check what the last frontend deploy changed on that surface and raise LiveSyncWebSocketHandler to DEBUG to see the rejected key (logged sanitised, never a metric tag)."
-
-      - alert: AppLiveSyncFramesDropped
-        expr: sum by (event) (increase(basetool_livesync_frames_dropped_total{job="basetool-backend"}[1h])) > 3
-        for: 15m
-        labels:
-          severity: warning
-        annotations:
-          summary: "App live-sync dropping {{ $labels.event }} frames (full delivery queues)"
-          description: "The backend dropped more than 3 app live-sync `{{ $labels.event }}` frames in an hour because a stream's bounded delivery queue was full, sustained for 15m — some app subscribers are not reading their SSE stream fast enough, so their screens miss updates until the next frame or navigation. Check basetool_livesync_frames_queued (a standing value names stalled streams), basetool_livesync_send_failures_total, and the edge's proxy_read_timeout / buffering for /api/v1/live-sync/stream."

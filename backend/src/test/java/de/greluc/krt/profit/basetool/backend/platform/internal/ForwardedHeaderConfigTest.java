@@ -23,46 +23,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.RateLimitProperties;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
+import jakarta.servlet.Filter;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.web.server.autoconfigure.servlet.ForwardedHeaderFilterCustomizer;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.core.Ordered;
 import org.springframework.web.filter.ForwardedHeaderFilter;
 
 /**
- * Asserts that {@link ForwardedHeaderFilter} is registered strictly after {@link
- * ClientIpContextFilter}, so the latter still sees the raw peer and {@code X-Forwarded-For} chain
- * (REQ-SEC-011). Reads the registration order, which is the order the container applies.
+ * Asserts that {@link ClientIpContextFilter} sits at the very front of the chain and that Spring's
+ * {@link ForwardedHeaderFilter} reaches it from nowhere (ADR-0272, REQ-SEC-011).
+ *
+ * <p>Downstream of that filter {@code getRemoteAddr()} is the leftmost entry of the forwarded
+ * chain, which any client can set.
  */
 class ForwardedHeaderConfigTest {
 
   private final ForwardedHeaderConfig config = new ForwardedHeaderConfig();
-
-  /** A provider that offers no customizer, mirroring a context where no bean is defined. */
-  private static final ObjectProvider<ForwardedHeaderFilterCustomizer> NO_CUSTOMIZER =
-      new ObjectProvider<>() {
-        @Override
-        public ForwardedHeaderFilterCustomizer getObject() {
-          throw new UnsupportedOperationException("no customizer bean in this context");
-        }
-
-        @Override
-        public ForwardedHeaderFilterCustomizer getObject(Object... args) {
-          throw new UnsupportedOperationException("no customizer bean in this context");
-        }
-
-        @Override
-        public ForwardedHeaderFilterCustomizer getIfAvailable() {
-          return null;
-        }
-
-        @Override
-        public ForwardedHeaderFilterCustomizer getIfUnique() {
-          return null;
-        }
-      };
 
   /**
    * Builds the client-IP registration the way the application context does.
@@ -70,65 +49,65 @@ class ForwardedHeaderConfigTest {
    * @return the registration under test.
    */
   private FilterRegistrationBean<ClientIpContextFilter> clientIpRegistration() {
-    RateLimitProperties properties =
-        BoundProperties.bind(RateLimitProperties.class, "trusted-proxies", List.of("10.0.0.0/24"));
-    return config.clientIpContextFilter(properties);
+    return config.clientIpContextFilter(boundProperties());
+  }
+
+  /**
+   * The rate-limit settings the configuration reads its trusted-proxy list from.
+   *
+   * @return settings trusting one fixture network
+   */
+  private static RateLimitProperties boundProperties() {
+    return BoundProperties.bind(
+        RateLimitProperties.class, "trusted-proxies", List.of("10.0.0.0/24"));
   }
 
   @Test
-  void forwardedHeaderFilterRunsExactlyOneSlotAfterClientIpResolution() {
-    int resolverOrder = clientIpRegistration().getOrder();
-    int forwardedOrder = config.forwardedHeaderFilter(NO_CUSTOMIZER).getOrder();
+  @DisplayName("client-IP resolution runs at the very highest precedence, over the whole URI space")
+  void clientIpResolutionRunsFirst() {
+    FilterRegistrationBean<ClientIpContextFilter> registration = clientIpRegistration();
 
-    assertThat(resolverOrder)
-        .as("client-IP resolution must be at the very highest precedence")
-        .isEqualTo(Ordered.HIGHEST_PRECEDENCE);
-    assertThat(forwardedOrder)
-        .as(
-            "ForwardedHeaderFilter must run strictly after it, or the resolver reads a rewritten "
-                + "request and the trusted-proxy walk becomes dead code again")
-        .isEqualTo(Ordered.HIGHEST_PRECEDENCE + 1)
-        .isGreaterThan(resolverOrder);
+    assertThat(registration.getOrder()).isEqualTo(Ordered.HIGHEST_PRECEDENCE);
+    assertThat(registration.getUrlPatterns()).containsExactly("/*");
   }
 
   @Test
-  void bothRegistrationsCoverTheWholeUriSpaceAndTheSameDispatcherTypes() {
-    assertThat(clientIpRegistration().getUrlPatterns()).containsExactly("/*");
-    assertThat(config.forwardedHeaderFilter(NO_CUSTOMIZER).getFilter())
-        .as("mirrors Boot's own registration, so scheme/host rewriting is unchanged")
-        .isInstanceOf(ForwardedHeaderFilter.class);
+  @DisplayName("the configuration puts no ForwardedHeaderFilter in front of the application")
+  void noForwardedHeaderFilterReachesTheChain() {
+    new ApplicationContextRunner()
+        .withBean(RateLimitProperties.class, ForwardedHeaderConfigTest::boundProperties)
+        .withUserConfiguration(ForwardedHeaderConfig.class)
+        .run(
+            context ->
+                assertThat(context)
+                    .as(
+                        "registering Spring's ForwardedHeaderFilter hands every downstream"
+                            + " component a client-chosen getRemoteAddr(); the backend builds no"
+                            + " absolute URL from a request, so there is nothing to buy with that"
+                            + " (ADR-0272)")
+                    .hasNotFailed()
+                    .doesNotHaveBean(ForwardedHeaderFilter.class)
+                    .getBeans(FilterRegistrationBean.class)
+                    .values()
+                    .allSatisfy(
+                        registration ->
+                            assertThat(((FilterRegistrationBean<?>) registration).getFilter())
+                                .isNotInstanceOf(ForwardedHeaderFilter.class)));
   }
 
   @Test
-  void theCustomizerHookBootAppliesIsHonoured() {
-    boolean[] applied = {false};
-    ObjectProvider<ForwardedHeaderFilterCustomizer> provider =
-        new ObjectProvider<>() {
-          @Override
-          public ForwardedHeaderFilterCustomizer getObject() {
-            return filter -> applied[0] = true;
-          }
-
-          @Override
-          public ForwardedHeaderFilterCustomizer getObject(Object... args) {
-            return getObject();
-          }
-
-          @Override
-          public ForwardedHeaderFilterCustomizer getIfAvailable() {
-            return getObject();
-          }
-
-          @Override
-          public ForwardedHeaderFilterCustomizer getIfUnique() {
-            return getObject();
-          }
-        };
-
-    config.forwardedHeaderFilter(provider);
-
-    assertThat(applied[0])
-        .as("a customizer bean must reach the hand-rolled registration as it reaches Boot's")
-        .isTrue();
+  @DisplayName("the only filter the configuration registers is the client-IP resolution")
+  void theOnlyRegisteredFilterIsTheClientIpResolution() {
+    new ApplicationContextRunner()
+        .withBean(RateLimitProperties.class, ForwardedHeaderConfigTest::boundProperties)
+        .withUserConfiguration(ForwardedHeaderConfig.class)
+        .run(
+            context -> {
+              List<Filter> filters =
+                  context.getBeansOfType(FilterRegistrationBean.class).values().stream()
+                      .map(registration -> (Filter) registration.getFilter())
+                      .toList();
+              assertThat(filters).singleElement().isInstanceOf(ClientIpContextFilter.class);
+            });
   }
 }

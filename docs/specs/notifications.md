@@ -380,7 +380,31 @@ which is the question a half that has quietly stopped raises (REQ-OBS-011).
 `notification/api/NotificationService#purgeReadOlderThan` / `#purgeUnreadOlderThan`,
 `platform/api/ScheduledJob#NOTIFICATION_RETENTION`, `platform/api/MetricNames#NOTIFICATION_RETENTION_DELETED`
 
-### REQ-NOTIF-021 — The `notification` event says what arrived
+### REQ-NOTIF-021 — The `notification` event says what arrived *(superseded)*
+
+> **Superseded 2026-10-17 (ADR-0273, #2673).** The payload existed for the Android app's two
+> requirements — filing a shade entry under one of five channels and opening the right screen on a
+> tap — and the web client was unaffected by construction, because its handler takes no argument.
+> With the app discontinued the payload has no reader, so the `notification` event is a bare
+> "something changed" marker again: `data: new`.
+>
+> Removed: `NotificationSignal`, the `signal` parameter of `NotificationFanout.publish` and
+> `NotificationStreamService.publish`, the optional `signal` field of the Redis message at the
+> unchanged payload version, and three degrade-to-`new` fallbacks — an unserialisable signal, a peer
+> on an older build, an unknown notification type — each of which protected a client that is gone
+> from a payload it no longer receives. `createFromEvent` returns the union of the recipients whose
+> inbox changed, and the listener publishes **once per recipient per event**: where the payload made
+> two pushes say two different things, an empty push would say the same thing twice.
+>
+> **The per-type grouping upstream stays**, because muting needs it: `NotificationMuteService.withoutMuted`
+> takes recipients keyed by `NotificationType` (ADR-0245), and the inbox rows are per type
+> regardless. What ended is the signal as a payload and as the fan-out's parameter, not the
+> knowledge of which type reached whom.
+>
+> **The event name is still frozen** ([api-conventions.md](api-conventions.md)), so if a future
+> client ever needs to know *what* arrived, the event can carry data again — a new decision, with a
+> reader attached.
+
 
 The push carried the literal string `new`. That is enough for the web app, whose handler takes no
 argument and refetches the unread count, and not enough for the Android app: without a kind it
@@ -429,6 +453,13 @@ it had before.
 ---
 
 ### REQ-NOTIF-010 — Real-time push (SSE)
+
+> [!note] Amended 2026-10-17 (ADR-0273, #2673) — the event carries no data again
+> The `notification` event's `data` is the literal `new` for every push (REQ-NOTIF-021,
+> superseded), and one event raises at most one push per recipient. Nothing changes in the browser,
+> in the frontend's relay or in the SSE health handling: the client's handler takes no argument and
+> never read the payload. The event is now a pure liveness-plus-dirty signal, which is what
+> ADR-0016 specified in the first place.
 
 Beyond the in-app polling baseline (REQ-NOTIF-006), real-time server push uses Server-Sent
 Events: a backend in-memory emitter registry keyed by `sub` (`NotificationStreamService`) with a
@@ -722,6 +753,12 @@ into the recipient set the after-commit listener pushes to, so their unread badg
 dropdown refresh **live** (REQ-NOTIF-010) the moment the item is cleared — the in-app poll
 (REQ-NOTIF-006) remains the guaranteed fallback. Removal and creation touch disjoint rows (different
 type, different recipients), so no notification is created and immediately deleted.
+
+> [!note] Amended 2026-10-17 (ADR-0273, #2673) — a refresh-only push stopped being a special case
+> The cleared holders used to be pushed under a signal carrying no type, so that a badge would move
+> with nothing to file. With no payload at all, that is simply what every push is: the holders are
+> unioned into the one recipient set the after-commit listener publishes to, and the badge moves the
+> same way it does for a new message.
 
 **First wired use case:** the bank booking-request lifecycle (REQ-BANK-026, REQ-NOTIF-011). The three
 lifecycle-terminating events — `BANK_BOOKING_REQUEST_CONFIRMED`, `BANK_BOOKING_REQUEST_REJECTED`

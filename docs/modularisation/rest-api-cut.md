@@ -4,6 +4,21 @@
 
 # REST API cut
 
+> [!important] Superseded in part 2026-10-17 (ADR-0269, #2673) — this appendix is a snapshot, not
+> current truth
+> Everything below about the **contract tiers**, the frozen set, the app call lists, the
+> declared-break ledger, the release-bound app floor, `GET /api/v1/app/version-policy`, the retired
+> `410 APP_UPDATE_REQUIRED` answer, `POST /api/v1/live-sync/changed`, `AndroidClientProperties` and
+> the generated edge admission describes machinery that no longer exists: it ended with the client
+> it was built for. The per-domain cut it measures **continues** — a wave is now an ordinary atomic
+> deploy of frontend and backend, and an old path answers `404`.
+>
+> Current truth: [`api-cut-waves.md`](api-cut-waves.md) (the living work plan, which carries the
+> same note), `docs/specs/api-conventions.md` (REQ-API-016/017/020/021, superseded) and
+> [ADR-0269](../adr/0269-the-frozen-external-contract-ends-with-its-only-client.md). Per the
+> lifecycle convention in [`docs/specs/INDEX.md`](../specs/INDEX.md) this frozen appendix is not
+> edited to track new changes; it keeps its value as the record of what was measured and decided.
+
 This appendix is the detail behind decisions D-03, D-04 and D-05 and behind §5.10 and §7.9 of the
 plan: where each operation of the backend's `/api/v1` moves, what the move costs the Android app,
 the edge, the frontend and the backend's path-keyed controls, which security property it puts at

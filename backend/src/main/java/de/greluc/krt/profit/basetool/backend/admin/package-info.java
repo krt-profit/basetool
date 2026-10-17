@@ -17,10 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/**
- * The admin module: the runtime system settings, the Android version policy and the liveness probe
- * (plan §5.1 rank 6).
- */
+/** The admin module: the runtime system settings and the liveness probe (plan §5.1 rank 6). */
 @ApplicationModule(
     allowedDependencies = {
       "audit::api",

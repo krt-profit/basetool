@@ -3,6 +3,25 @@
 Each item says what it costs and what closing it involves. Nothing here is a vague "could be
 cleaner" — an entry earns its place by naming a failure that can actually happen.
 
+> [!note] Added 2026-10-17 (ADR-0274 amendment 1, #2673) — the backend keeps a live-sync vocabulary
+> it does not serve
+> The backend publishes into the frontend's live-sync rooms after a write that arrives over the
+> exchange API or from an admin bulk change — writes no browser makes, so the frontend cannot know
+> they happened (REQ-XCH-013, ADR-0260/0261). Keeping that publish side means `livesync.api`'s
+> `LiveSyncTopicClass` still mirrors six of the frontend's rooms, with their prefixes, arities and
+> section keys, in a module that now authorises no subscriber of its own.
+>
+> **The risk is drift, and it fails silently.** A prefix or section key renamed on the frontend
+> leaves the backend publishing frames the browser clips away on arrival: the page simply stays old,
+> with nothing broken and nothing logged. `LiveSyncTopicRegistryParityTest` is the only thing
+> standing between that and production — it parses the frontend's source and holds the backend's
+> registry to a subset of it. Deleting that test is how this debt turns into an incident.
+>
+> **The way out is named and not taken.** ADR-0143 and ADR-0274 both record it: move the relay into
+> the backend and have the frontend consume it, so one registry owns the rooms. It is strictly
+> better and strictly more expensive — every mutating service path would have to name its topic and
+> sections — and it is not foreclosed.
+
 ## 11.1 The cleanup rename — **closed 2026-09-22**
 
 The weekly cleanup job was `iri-docker-cleanup` and called `docker` directly; ADR-0194 renamed and

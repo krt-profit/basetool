@@ -24,9 +24,7 @@ import de.greluc.krt.profit.basetool.backend.platform.api.RedisJsonFanout;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -42,10 +40,9 @@ import tools.jackson.databind.node.ObjectNode;
  * Redis pub/sub {@link NotificationFanout} that delivers real-time notification pushes across
  * backend replicas (ADR-0094).
  *
- * <p>{@link #publish(Collection, NotificationSignal)} delivers to this instance's emitters first,
- * then publishes on the channel; {@link #onMessage(Message, byte[])} delivers peers' messages and
- * skips its own. A Redis outage leaves local delivery and the polling fallback intact
- * (REQ-NOTIF-006).
+ * <p>{@link #publish(Collection)} delivers to this instance's emitters first, then publishes on the
+ * channel; {@link #onMessage(Message, byte[])} delivers peers' messages and skips its own. A Redis
+ * outage leaves local delivery and the polling fallback intact (REQ-NOTIF-006).
  */
 @Slf4j
 public class RedisNotificationFanout implements NotificationFanout, MessageListener {
@@ -63,7 +60,7 @@ public class RedisNotificationFanout implements NotificationFanout, MessageListe
    * @param notificationStreamService the local SSE emitter registry (delivers to this instance)
    * @param redisTemplate the string Redis template used to publish
    * @param meterRegistry registry the publish/consume/error counters bind to
-   * @param channel the Redis channel notification signals cross
+   * @param channel the Redis channel the pushes cross
    * @param instanceId this JVM's stable instance id, used to skip own-origin messages
    */
   public RedisNotificationFanout(
@@ -96,78 +93,26 @@ public class RedisNotificationFanout implements NotificationFanout, MessageListe
 
   /** {@inheritDoc} */
   @Override
-  public void publish(
-      @NotNull Collection<UUID> recipientUserIds, @NotNull NotificationSignal signal) {
-    notificationStreamService.publish(recipientUserIds, signal);
+  public void publish(@NotNull Collection<UUID> recipientUserIds) {
+    notificationStreamService.publish(recipientUserIds);
     transport.publish(
-        root -> writePayload(root, recipientUserIds, signal),
+        root -> writePayload(root, recipientUserIds),
         () -> meterRegistry.counter(MetricNames.SSE_REDIS_PUBLISHED).increment());
   }
 
   /**
-   * Writes the wire payload {@code {v, origin, recipients[, signal]}}.
+   * Writes the wire payload {@code {v, origin, recipients}} (ADR-0273).
    *
    * @param root the empty message object
    * @param recipientUserIds the {@code sub} of every recipient
-   * @param signal what arrived; written only when it describes a notification
    */
-  private void writePayload(
-      @NotNull ObjectNode root,
-      @NotNull Collection<UUID> recipientUserIds,
-      @NotNull NotificationSignal signal) {
+  private void writePayload(@NotNull ObjectNode root, @NotNull Collection<UUID> recipientUserIds) {
     root.put("v", PAYLOAD_VERSION);
     root.put("origin", transport.instanceId());
     ArrayNode recipients = root.putArray("recipients");
     for (UUID sub : recipientUserIds) {
       recipients.add(sub.toString());
     }
-    if (signal.describesNotification()) {
-      ObjectNode signalNode = root.putObject("signal");
-      signalNode.put("type", String.valueOf(signal.type()));
-      signalNode.put("entityType", signal.entityType());
-      signalNode.put("entityId", signal.entityId() == null ? null : signal.entityId().toString());
-      ObjectNode params = signalNode.putObject("params");
-      signal.params().forEach(params::put);
-    }
-  }
-
-  /**
-   * Reads the signal a peer attached; a malformed or absent signal falls back to a bare refresh.
-   *
-   * @param root the parsed message
-   * @return the signal, or {@link NotificationSignal#refreshOnly()}
-   */
-  @NotNull
-  private NotificationSignal readSignal(@NotNull JsonNode root) {
-    JsonNode node = root.get("signal");
-    if (node == null || !node.isObject()) {
-      return NotificationSignal.refreshOnly();
-    }
-    NotificationType type;
-    try {
-      type = NotificationType.valueOf(node.path("type").asString(""));
-    } catch (IllegalArgumentException e) {
-      log.debug("Skipping unknown notification type in fan-out message", e);
-      return NotificationSignal.refreshOnly();
-    }
-    UUID entityId = null;
-    String rawId = node.path("entityId").asString("");
-    if (!rawId.isEmpty()) {
-      try {
-        entityId = UUID.fromString(rawId);
-      } catch (IllegalArgumentException e) {
-        log.debug("Skipping malformed entity id in fan-out message", e);
-      }
-    }
-    Map<String, String> params = new LinkedHashMap<>();
-    JsonNode paramsNode = node.get("params");
-    if (paramsNode != null && paramsNode.isObject()) {
-      paramsNode
-          .propertyStream()
-          .forEach(entry -> params.put(entry.getKey(), entry.getValue().asString("")));
-    }
-    String entityType = node.path("entityType").asString("");
-    return new NotificationSignal(type, entityType.isEmpty() ? null : entityType, entityId, params);
   }
 
   /**
@@ -204,7 +149,7 @@ public class RedisNotificationFanout implements NotificationFanout, MessageListe
     if (recipients.isEmpty()) {
       return;
     }
-    notificationStreamService.publish(recipients, readSignal(root));
+    notificationStreamService.publish(recipients);
     meterRegistry.counter(MetricNames.SSE_REDIS_CONSUMED).increment();
   }
 }

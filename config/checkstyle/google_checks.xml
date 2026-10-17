@@ -62,7 +62,7 @@
   <module name="FileLength">
     <property name="id" value="fileLengthMissionWriteController"/>
     <property name="fileExtensions" value="java"/>
-    <property name="max" value="1777"/>
+    <property name="max" value="1761"/>
   </module>
   <module name="SuppressionSingleFilter">
     <property name="id" value="fileLength"/>
@@ -140,7 +140,7 @@
   <module name="FileLength">
     <property name="id" value="fileLengthJobOrderWriteController"/>
     <property name="fileExtensions" value="java"/>
-    <property name="max" value="1385"/>
+    <property name="max" value="1376"/>
   </module>
   <module name="SuppressionSingleFilter">
     <property name="id" value="fileLength"/>
@@ -218,7 +218,7 @@
   <module name="FileLength">
     <property name="id" value="fileLengthRefineryOrderPageController"/>
     <property name="fileExtensions" value="java"/>
-    <property name="max" value="1204"/>
+    <property name="max" value="1182"/>
   </module>
   <module name="SuppressionSingleFilter">
     <property name="id" value="fileLength"/>
@@ -266,19 +266,6 @@
   <module name="SuppressionSingleFilter">
     <property name="id" value="fileLengthJobOrderService"/>
     <property name="files" value="^(?!.*basetool.backend.joborder.internal.JobOrderService\.java$)"/>
-  </module>
-  <module name="FileLength">
-    <property name="id" value="fileLengthMetricNames"/>
-    <property name="fileExtensions" value="java"/>
-    <property name="max" value="1152"/>
-  </module>
-  <module name="SuppressionSingleFilter">
-    <property name="id" value="fileLength"/>
-    <property name="files" value="basetool.backend.platform.api.MetricNames\.java$"/>
-  </module>
-  <module name="SuppressionSingleFilter">
-    <property name="id" value="fileLengthMetricNames"/>
-    <property name="files" value="^(?!.*basetool.backend.platform.api.MetricNames\.java$)"/>
   </module>
   <module name="FileLength">
     <property name="id" value="fileLengthOrgUnitMembershipService"/>
@@ -374,7 +361,7 @@
   <module name="FileLength">
     <property name="id" value="fileLengthAdminMissionDataPageController"/>
     <property name="fileExtensions" value="java"/>
-    <property name="max" value="1015"/>
+    <property name="max" value="1010"/>
   </module>
   <module name="SuppressionSingleFilter">
     <property name="id" value="fileLength"/>
@@ -394,27 +381,11 @@
   </module>
   <module name="SuppressionSingleFilter">
     <property name="id" value="methodLength"/>
-    <property name="files" value="basetool.frontend.refinery.web.RefineryOrderPageController\.java$"/>
-  </module>
-  <module name="SuppressionSingleFilter">
-    <property name="id" value="methodLengthRefineryOrderPageController"/>
-    <property name="files" value="^(?!.*basetool.frontend.refinery.web.RefineryOrderPageController\.java$)"/>
-  </module>
-  <module name="SuppressionSingleFilter">
-    <property name="id" value="methodLength"/>
     <property name="files" value="basetool.backend.refinery.internal.RefineryImportService\.java$"/>
   </module>
   <module name="SuppressionSingleFilter">
     <property name="id" value="methodLengthRefineryImportService"/>
     <property name="files" value="^(?!.*basetool.backend.refinery.internal.RefineryImportService\.java$)"/>
-  </module>
-  <module name="SuppressionSingleFilter">
-    <property name="id" value="methodLength"/>
-    <property name="files" value="basetool.frontend.joborder.web.JobOrderPageController\.java$"/>
-  </module>
-  <module name="SuppressionSingleFilter">
-    <property name="id" value="methodLengthJobOrderPageController"/>
-    <property name="files" value="^(?!.*basetool.frontend.joborder.web.JobOrderPageController\.java$)"/>
   </module>
   <module name="SuppressionSingleFilter">
     <property name="id" value="methodLength"/>
@@ -833,19 +804,11 @@
     </module>
     <module name="MethodLength">
       <property name="id" value="methodLengthSecurityConfig"/>
-      <property name="max" value="186"/>
-    </module>
-    <module name="MethodLength">
-      <property name="id" value="methodLengthRefineryOrderPageController"/>
-      <property name="max" value="178"/>
+      <property name="max" value="163"/>
     </module>
     <module name="MethodLength">
       <property name="id" value="methodLengthRefineryImportService"/>
       <property name="max" value="174"/>
-    </module>
-    <module name="MethodLength">
-      <property name="id" value="methodLengthJobOrderPageController"/>
-      <property name="max" value="171"/>
     </module>
     <module name="MethodLength">
       <property name="id" value="methodLengthJobOrderItemProductionService"/>

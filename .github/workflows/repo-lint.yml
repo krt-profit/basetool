@@ -419,6 +419,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 .github/scripts/image_reuse_plan.py --selftest
 
+      - name: ci-superseded / Self-test the superseded main-push decision
+        if: ${{ !cancelled() }}
+        run: bash scripts/ci-superseded.test.sh
+
   container-checks:
     name: Container checks
     runs-on: ubuntu-latest

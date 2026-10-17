@@ -70,9 +70,9 @@ public final class MetricNames {
       "basetool.catalogue.orphan.sweep.skipped";
 
   /**
-   * Gauge {@code basetool_redis_fanout_subscribed} — tag {@code fanout} ({@code livesync} / {@code
-   * notifications}); 1 while the cross-instance pub/sub container is listening, 0 while it is not.
-   * Bound to {@code isListening()}, not {@code isRunning()}.
+   * Gauge {@code basetool_redis_fanout_subscribed} — tag {@code fanout} ({@code notifications}); 1
+   * while the cross-instance pub/sub container is listening, 0 while it is not. Bound to {@code
+   * isListening()}, not {@code isRunning()}.
    */
   public static final String REDIS_FANOUT_SUBSCRIBED = "basetool.redis.fanout.subscribed";
 
@@ -501,8 +501,8 @@ public final class MetricNames {
 
   /**
    * Tag key: which cross-instance pub/sub container a {@link #REDIS_FANOUT_SUBSCRIBED} sample
-   * belongs to — {@link #FANOUT_LIVESYNC} or {@link #FANOUT_NOTIFICATIONS}. Two series, fixed at
-   * compile time.
+   * belongs to — on this backend only {@link #FANOUT_NOTIFICATIONS}, since the live-sync fan-out
+   * publishes without subscribing (ADR-0274). One series, fixed at compile time.
    */
   public static final String TAG_FANOUT = "fanout";
 
@@ -521,9 +521,6 @@ public final class MetricNames {
 
   /** Orphan-sweep stand-down: the run ended up with no rows at all, so a sweep would wipe. */
   public static final String SWEEP_SKIP_NO_ROWS = "no_rows";
-
-  /** Fan-out identity: the app live-sync bridge's Redis pub/sub container (ADR-0143). */
-  public static final String FANOUT_LIVESYNC = "livesync";
 
   /** Fan-out identity: the notification push's Redis pub/sub container (ADR-0094). */
   public static final String FANOUT_NOTIFICATIONS = "notifications";
@@ -876,157 +873,27 @@ public final class MetricNames {
   public static final String TAG_TERMS_VERSION = "terms_version";
 
   /**
-   * Gauge {@code basetool_livesync_streams} — app live-sync SSE streams currently open, summed
-   * across all members (ADR-0143).
-   */
-  public static final String LIVESYNC_STREAMS = "basetool.livesync.streams";
-
-  /**
-   * Counter {@code basetool_livesync_streams_evicted_total} — bumped when a member's oldest live-
-   * sync stream is dropped because they reached the per-member cap. Non-zero in normal use only if
-   * a client leaks streams on navigation.
-   */
-  public static final String LIVESYNC_STREAMS_EVICTED = "basetool.livesync.streams.evicted";
-
-  /**
-   * Counter {@code basetool_livesync_send_failures_total} — tags {@code event} ({@link #TAG_EVENT})
-   * and {@code cause} ({@link #TAG_CAUSE}); a frame that could not be written to a stream, which
-   * also retires it.
-   */
-  public static final String LIVESYNC_SEND_FAILURES = "basetool.livesync.send.failures";
-
-  /**
-   * Counter {@code basetool_livesync_frames_dropped_total} — tag {@code event} ({@link
-   * #TAG_EVENT}); a frame dropped because an app live-sync stream's bounded delivery queue was
-   * full. A rising rate means streams stopped draining.
-   */
-  public static final String LIVESYNC_FRAMES_DROPPED = "basetool.livesync.frames.dropped";
-
-  /**
-   * Gauge {@code basetool_livesync_frames_queued} — frames waiting in the app live-sync streams'
-   * delivery queues, summed across all streams (BE-PERF-13). Hovers near zero; a standing value is
-   * a subscriber that stopped reading.
-   */
-  public static final String LIVESYNC_FRAMES_QUEUED = "basetool.livesync.frames.queued";
-
-  /**
-   * Counter {@code basetool_livesync_delivered_total} — tag {@code topic_class}; {@code changed}
-   * frames written into a room, counted once per frame rather than once per receiver.
-   */
-  public static final String LIVESYNC_DELIVERED = "basetool.livesync.delivered";
-
-  /**
-   * Counter {@code basetool_livesync_subscribe_total} — tags {@code topic_class}, {@code outcome}
-   * ({@link #OUTCOME_ALLOWED} / {@link #OUTCOME_DENIED}) and {@code reason}; the verdict of an app
-   * live-sync subscribe (ADR-0143).
-   *
-   * <p>Uses the same name, tags and values as the frontend's {@code /ws/sync} counter. A denial's
-   * {@code reason} is {@link #SUBSCRIBE_DENY_AUTHZ} or {@link #SUBSCRIBE_DENY_CHECK_FAILED}; an
-   * allowed subscribe carries {@link #REASON_NONE}.
-   */
-  public static final String LIVESYNC_SUBSCRIBE = "basetool.livesync.subscribe";
-
-  /**
-   * Counter {@code basetool_livesync_invalid_topic_total} (unlabelled) — a subscribe or publish
-   * naming a topic that does not parse against this backend's registry (REQ-OBS-011).
-   */
-  public static final String LIVESYNC_INVALID_TOPIC = "basetool.livesync.invalid.topic";
-
-  /**
-   * Counter {@code basetool_livesync_publish_accepted_total} — tag {@code topic_class}; client
-   * {@code changed} frames taken and relayed.
+   * Counter {@code basetool_livesync_publish_accepted_total} — tag {@code topic_class}; frames the
+   * backend raised after a committed write of its own (ADR-0274).
    */
   public static final String LIVESYNC_PUBLISH_ACCEPTED = "basetool.livesync.publish.accepted";
 
   /**
-   * Counter {@code basetool_livesync_publish_rejected_total} — tags {@code reason} ({@link
-   * #REASON_NO_SECTIONS} / {@link #REASON_SUBJECT_BUCKET} / {@link #REASON_TOPIC_BUCKET}) and
-   * {@code topic_class}; client frames refused before they were relayed.
-   */
-  public static final String LIVESYNC_PUBLISH_REJECTED = "basetool.livesync.publish.rejected";
-
-  /**
    * Counter {@code basetool_livesync_redis_published_total} — tag {@code topic_class}; frames this
-   * instance put on the shared channel for the web frontend and peer replicas.
+   * instance put on the shared channel for the frontend's sessions.
    */
   public static final String LIVESYNC_REDIS_PUBLISHED = "basetool.livesync.redis.published";
 
   /**
-   * Counter {@code basetool_livesync_redis_consumed_total} — tag {@code topic_class}; frames taken
-   * off the shared channel and delivered to this instance's streams. Zero while browsers are active
-   * means the bridge is not actually bridging.
-   */
-  public static final String LIVESYNC_REDIS_CONSUMED = "basetool.livesync.redis.consumed";
-
-  /**
-   * Counter {@code basetool_livesync_redis_errors_total} — tag {@code op} ({@link #OP_PUBLISH} /
-   * {@link #OP_CONSUME}); a swallowed fan-out failure. A frame for a room this backend does not
-   * serve is not an error and is counted under {@link #LIVESYNC_REDIS_SKIPPED} instead.
+   * Counter {@code basetool_livesync_redis_errors_total} — tag {@code op} ({@link #OP_PUBLISH}); a
+   * swallowed publish failure, which costs an open page its refresh and never the write.
    */
   public static final String LIVESYNC_REDIS_ERRORS = "basetool.livesync.redis.errors";
 
   /**
-   * {@link #TAG_EVENT} value: the once-per-stream event naming the topics that were accepted. A
-   * failure to send it means the client never learns which rooms are live.
-   */
-  public static final String LIVESYNC_EVENT_SUBSCRIBED = "subscribed";
-
-  /** {@link #TAG_EVENT} value: a relayed change signal. */
-  public static final String LIVESYNC_EVENT_CHANGED = "changed";
-
-  /** {@link #TAG_EVENT} value: the keep-alive that holds an idle stream open through a proxy. */
-  public static final String LIVESYNC_EVENT_HEARTBEAT = "heartbeat";
-
-  /**
-   * Counter {@code basetool_livesync_redis_skipped_total} — tag {@code reason}; a frame taken off
-   * the shared channel and deliberately not delivered, such as one for a frontend-only room. Kept
-   * separate from {@link #LIVESYNC_REDIS_ERRORS}.
-   */
-  public static final String LIVESYNC_REDIS_SKIPPED = "basetool.livesync.redis.skipped";
-
-  /**
-   * {@link #TAG_REASON} value on {@link #LIVESYNC_REDIS_SKIPPED}: a room this backend does not
-   * serve.
-   */
-  public static final String REASON_UNKNOWN_TOPIC = "unknown_topic";
-
-  /** {@link #TAG_OUTCOME} value on {@link #LIVESYNC_SUBSCRIBE}: the room was opened. */
-  public static final String OUTCOME_ALLOWED = "allowed";
-
-  /** {@link #TAG_OUTCOME} value on {@link #LIVESYNC_SUBSCRIBE}: the room was refused. */
-  public static final String OUTCOME_DENIED = "denied";
-
-  /**
-   * {@link #TAG_REASON} placeholder on an {@link #OUTCOME_ALLOWED} subscribe. Micrometer rejects a
-   * meter whose series disagree on their tag keys, so the allowed series needs a value here.
-   */
-  public static final String REASON_NONE = "none";
-
-  /** Subscribe-deny reason: the room's own read refused this caller. */
-  public static final String SUBSCRIBE_DENY_AUTHZ = "authz";
-
-  /**
-   * Subscribe-deny reason: the check threw and the room was refused (fail closed); an
-   * infrastructure signal, unlike {@link #SUBSCRIBE_DENY_AUTHZ}.
-   */
-  public static final String SUBSCRIBE_DENY_CHECK_FAILED = "check_failed";
-
-  /**
-   * {@link #TAG_REASON} value on {@link #LIVESYNC_PUBLISH_REJECTED}: every section the client named
-   * was outside the topic class's whitelist, so the frame would have carried nothing.
-   */
-  public static final String REASON_NO_SECTIONS = "no_known_sections";
-
-  /** {@link #TAG_REASON} value: the emitting member's own token bucket was empty. */
-  public static final String REASON_SUBJECT_BUCKET = "subject_bucket";
-
-  /** {@link #TAG_REASON} value: the room's aggregate token bucket was empty. */
-  public static final String REASON_TOPIC_BUCKET = "topic_bucket";
-
-  /**
-   * Tag key: the live-sync room class a measurement belongs to (ADR-0143). Bounded by the {@code
+   * Tag key: the live-sync room class a measurement belongs to (ADR-0274). Bounded by the {@code
    * LiveSyncTopicClass} enum, one value per constant, distinct even where two classes share a wire
-   * prefix so the Auftrags-queue and one Auftrag never fold into one series (REQ-OBS-011).
+   * prefix so two surfaces never fold into one series (REQ-OBS-011).
    */
   public static final String TAG_TOPIC_CLASS = "topic_class";
 
@@ -1081,27 +948,6 @@ public final class MetricNames {
 
   /** {@link #TAG_OUTCOME} value on {@link #EXCHANGE_MIRROR_WRITES}: the mirror already agreed. */
   public static final String OUTCOME_UNCHANGED = "unchanged";
-
-  /**
-   * Gauge {@code basetool_android_version_policy_override{field}}: {@code 1} while the emergency
-   * override replaces that field's release default, else {@code 0} (REQ-API-020).
-   *
-   * <p>Per process — read it with {@code max()}, never {@code sum()}.
-   */
-  public static final String ANDROID_VERSION_POLICY_OVERRIDE =
-      "basetool.android.version.policy.override";
-
-  /** Tag key: the version-policy field on {@link #ANDROID_VERSION_POLICY_OVERRIDE}. */
-  public static final String TAG_FIELD = "field";
-
-  /** {@link #TAG_FIELD} value: the served floor. */
-  public static final String FIELD_MINIMUM_VERSION_CODE = "minimum_version_code";
-
-  /** {@link #TAG_FIELD} value: the newest published build. */
-  public static final String FIELD_LATEST_VERSION_CODE = "latest_version_code";
-
-  /** {@link #TAG_FIELD} value: the release page. */
-  public static final String FIELD_RELEASES_URL = "releases_url";
 
   /**
    * Counter {@code basetool_supply_needs_total} — needs by lifecycle event, tag {@code event}

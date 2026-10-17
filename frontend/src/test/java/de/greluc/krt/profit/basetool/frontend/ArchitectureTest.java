@@ -232,12 +232,10 @@ class ArchitectureTest {
 
   /**
    * The controllers that carry no {@code @PreAuthorize} because they must answer without a session,
-   * such as {@code AppLinkController}, the Android App Link's web-side fallback (REQ-SEC-038).
+   * such as {@code WebAppManifestController}, whose manifest a browser fetches without one.
    */
   private static final Set<String> PUBLIC_BY_DESIGN =
       Set.of(
-          "AppLinkController",
-          "AssetLinksController",
           "HomeController",
           "ImpressumController",
           "OssLicensesController",

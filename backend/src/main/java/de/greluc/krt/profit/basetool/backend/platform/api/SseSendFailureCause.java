@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.platform.api;
 
-import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncStreamService;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationStreamService;
 import java.io.IOException;
 import org.jetbrains.annotations.NotNull;

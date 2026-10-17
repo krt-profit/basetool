@@ -36,7 +36,7 @@ class FirstPartyClientIdsTest {
       new FirstPartyClientIds(
           new IngestGatewayProperties(List.of("gw-client")),
           new ConnectedAppsProperties(List.of("web-a")),
-          new ChangeSourceProperties(List.of("web-b"), List.of("app-a")),
+          new ChangeSourceProperties(List.of("web-b")),
           new PartialRoleScopeProperties(List.of("app-b", " ")),
           new KeycloakSyncProperties(
               false,
@@ -49,7 +49,7 @@ class FirstPartyClientIdsTest {
               100));
 
   @ParameterizedTest
-  @ValueSource(strings = {"gw-client", "web-a", "web-b", "app-a", "app-b", "admin-client"})
+  @ValueSource(strings = {"gw-client", "web-a", "web-b", "app-b", "admin-client"})
   void everyConfiguredFirstPartyIdIsRecognised(String clientId) {
     assertThat(ids.contains(clientId)).isTrue();
   }

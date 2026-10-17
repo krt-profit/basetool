@@ -3,9 +3,9 @@
 - **Status:** Accepted — amended by
   [ADR-0268](0268-the-backend-is-internal-only-and-ingest-is-the-single-public-api-entry-point.md)
   (2026-10-17): the production shape loses `basetool-android`, the `krt-mobile-dpop` profile, its
-  policy and the `dpop-refresh-only` marker role (ADR-0131). Because the provisioner never deletes,
-  removing them is a deliberate production write needing @greluc's explicit per-action approval
-  (#2674); converging the remaining shape is unchanged.
+  policy and the `dpop-refresh-only` marker role (ADR-0131). The provisioner deletes them wherever
+  they remain, the one exception to decision 4 (*Amendment 7*, #2674); converging the remaining
+  shape is unchanged.
 - **Date:** 2026-09-22
 - **Deciders:** @greluc (requested 2026-09-22: "the testing host must mirror production")
 - **Related:** [ADR-0131](0131-mobile-auth-refresh-only-dpop-binding.md) (the DPoP policy and its
@@ -253,3 +253,23 @@ required action Configure OTP, and the bindings; REQ-SEC-082 states the shape.
 - **A found trap, not a decision:** the runbook told the owner to bind the browser-flow copy as the
   Discord provider's post login flow. A post login flow runs after the provider; the browser copy
   would ask a brokered user for a username and password. The script builds a small flow for it.
+
+## Amendment 7 — 2026-10-17: the retired Android client is deleted by the provisioner
+
+- **Deciders:** @greluc (owner decision in #2674)
+
+With the Android app discontinued (ADR-0268), `basetool-android` leaves the production shape. It
+was deleted without a disabled grace period; on production the owner deleted the client by hand on
+2026-10-17. The provisioner no longer defines the client: decision 5 and the mobile provisioner it
+imported from are gone, and the kcadm wrapper lives on its own in `scripts/keycloak_kcadm.py`.
+
+**The provisioner deletes the retired objects as an explicit, named retirement** — the one
+exception to decision 4. A section of its own (`plan_retired`) detaches and removes the
+`krt-mobile-dpop-policy` policy, removes the `krt-mobile-dpop` profile, and deletes the client with
+its `dpop-refresh-only` marker role, mappers and scope mappings, in that order and wherever any of
+them still exists; every other client policy and profile is carried forward by name. Each line
+names what it deletes and why, the dry run lists it and exits `2`, and a realm without any of them
+receives no write. It is not a general permission to delete: the three objects are named constants,
+and everything else only the target realm has is still reported and left alone. Requirements:
+`REQ-OPS-033`, `REQ-SEC-030` and `REQ-SEC-035` (both superseded); pinned by case 4 of
+`scripts/provision-keycloak-realm.test.sh`.

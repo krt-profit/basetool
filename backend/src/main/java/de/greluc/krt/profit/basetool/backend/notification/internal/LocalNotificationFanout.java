@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.notification.internal;
 
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationFanout;
-import de.greluc.krt.profit.basetool.backend.notification.api.NotificationSignal;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationStreamService;
 import java.util.Collection;
 import java.util.UUID;
@@ -49,8 +48,7 @@ public class LocalNotificationFanout implements NotificationFanout {
 
   /** {@inheritDoc} */
   @Override
-  public void publish(
-      @NotNull Collection<UUID> recipientUserIds, @NotNull NotificationSignal signal) {
-    notificationStreamService.publish(recipientUserIds, signal);
+  public void publish(@NotNull Collection<UUID> recipientUserIds) {
+    notificationStreamService.publish(recipientUserIds);
   }
 }

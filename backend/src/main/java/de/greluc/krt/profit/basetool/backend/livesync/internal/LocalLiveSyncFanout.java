@@ -25,17 +25,18 @@ import java.util.List;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * The {@link LiveSyncFanout} used when the Redis bridge is off; carries a frame nowhere (ADR-0143).
+ * The {@link LiveSyncFanout} used when the Redis publisher is off; carries a frame nowhere
+ * (ADR-0274).
  *
- * <p>Streams on this instance are still served by the relay; only the crossing between app and
- * browser clients stops.
+ * <p>The frontend's own live sync between browser tabs is unaffected; only the backend's own
+ * announcements stop crossing.
  */
 public class LocalLiveSyncFanout implements LiveSyncFanout {
 
   /**
    * Does nothing.
    *
-   * @param topic ignored — local delivery already happened in the relay
+   * @param topic ignored — there is no transport to carry it
    * @param sections ignored, for the same reason
    */
   @Override

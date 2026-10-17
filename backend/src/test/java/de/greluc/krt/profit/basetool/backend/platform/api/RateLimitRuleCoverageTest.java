@@ -73,13 +73,11 @@ class RateLimitRuleCoverageTest {
   }
 
   @Test
-  @DisplayName("both stream connects the subject budget counts are real GET operations")
-  void theStreamConnectsAreRealOperations() {
+  @DisplayName("the stream connect the subject budget counts is a real GET operation")
+  void theStreamConnectIsARealOperation() {
     assertThat(
             PathControlInventory.deadPatterns(
-                List.of(
-                    SubjectRateLimitingFilter.SSE_CONNECT.getPatternString(),
-                    SubjectRateLimitingFilter.LIVE_SYNC_CONNECT.getPatternString()),
+                List.of(SubjectRateLimitingFilter.SSE_CONNECT.getPatternString()),
                 List.of(HttpMethod.GET),
                 PathControlInventory.dispatcher(context)))
         .isEmpty();

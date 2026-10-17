@@ -43,10 +43,7 @@ class FilterExemptionSetsTest {
 
   /** The pending-approval gate's exemptions. */
   private static final List<String> PENDING_EXEMPT =
-      List.of(
-          "/api/v1/users/me/registration-status",
-          "/api/v1/app/version-policy",
-          "/api/v1/terms/document");
+      List.of("/api/v1/users/me/registration-status", "/api/v1/terms/document");
 
   /** The terms gate's exemptions. */
   private static final List<String> TERMS_EXEMPT =
@@ -54,8 +51,7 @@ class FilterExemptionSetsTest {
           "/api/v1/terms/document",
           "/api/v1/terms/status",
           "/api/v1/terms/acceptance",
-          "/api/v1/users/me/registration-status",
-          "/api/v1/app/version-policy");
+          "/api/v1/users/me/registration-status");
 
   /** The mappings under {@code /api/v1/terms} reviewed as gated by consent: the administration. */
   private static final List<String> TERMS_GATED =
@@ -86,7 +82,7 @@ class FilterExemptionSetsTest {
   @Autowired private WebApplicationContext context;
 
   @Test
-  @DisplayName("the pending-approval gate exempts exactly its three paths")
+  @DisplayName("the pending-approval gate exempts exactly its two paths")
   void pendingExemptionsAreExact() {
     List<String> actual = new ArrayList<>(PendingApprovalAccessFilter.ANONYMOUS_READ_PATHS);
     actual.add(PendingApprovalAccessFilter.SELF_STATUS_PATH);
@@ -95,7 +91,7 @@ class FilterExemptionSetsTest {
   }
 
   @Test
-  @DisplayName("the terms gate exempts exactly its five paths")
+  @DisplayName("the terms gate exempts exactly its four paths")
   void termsExemptionsAreExact() {
     assertThat(TermsAcceptanceAccessFilter.EXEMPT_PATHS)
         .containsExactlyInAnyOrderElementsOf(TERMS_EXEMPT);

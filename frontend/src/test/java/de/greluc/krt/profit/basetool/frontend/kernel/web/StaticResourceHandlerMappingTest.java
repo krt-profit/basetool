@@ -157,7 +157,7 @@ class StaticResourceHandlerMappingTest {
    * @param lookupPath a route served by a controller, never by a file
    */
   @ParameterizedTest
-  @ValueSource(strings = {"/missions", "/bank", "/orders", "/.well-known/assetlinks.json"})
+  @ValueSource(strings = {"/missions", "/bank", "/orders", "/manifest.webmanifest"})
   void controllerRoutesAreNotProbedAgainstTheAssetTrees(String lookupPath) {
     assertNull(
         resourceUrlProvider.getForLookupPath(lookupPath),

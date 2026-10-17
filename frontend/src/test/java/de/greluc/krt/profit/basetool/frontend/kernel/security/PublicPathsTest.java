@@ -37,7 +37,7 @@ class PublicPathsTest {
 
   @ParameterizedTest
   @DisplayName("public documents are exempt from both gates")
-  @ValueSource(strings = {"/robots.txt", "/.well-known/assetlinks.json", "/manifest.webmanifest"})
+  @ValueSource(strings = {"/robots.txt", "/manifest.webmanifest"})
   void publicDocumentsAreGateExempt(String path) {
     assertThat(PublicPaths.isPublicDocument(path)).as(path).isTrue();
     assertThat(PublicPaths.isAssetOrPublicDocument(path)).as(path).isTrue();
@@ -106,12 +106,20 @@ class PublicPathsTest {
     assertThat(PublicPaths.isGateExempt(PublicPaths.relativePath(request))).isTrue();
   }
 
+  @ParameterizedTest
+  @DisplayName("a retired App Link path is not a public document and passes through every gate")
+  @ValueSource(strings = {"/.well-known/assetlinks.json", "/app/callback", "/app/link-help"})
+  void aRetiredAppLinkPathIsNotPublic(String path) {
+    assertThat(PublicPaths.isPublicDocument(path)).as(path).isFalse();
+    assertThat(PublicPaths.isGateExempt(path)).as(path).isFalse();
+  }
+
   @Test
   @DisplayName("a path that merely starts with a public document's name is not exempt")
   void doesNotMatchOnAPrefixOfAPublicDocument() {
     assertThat(PublicPaths.isGateExempt("/robots.txt.bak")).isFalse();
     assertThat(PublicPaths.isGateExempt("/manifest.webmanifest/../missions")).isFalse();
-    assertThat(PublicPaths.isGateExempt("/.well-known/assetlinks.json.old")).isFalse();
+    assertThat(PublicPaths.isGateExempt("/manifest.webmanifest.old")).isFalse();
   }
 
   @ParameterizedTest
@@ -131,8 +139,7 @@ class PublicPathsTest {
 
   @ParameterizedTest
   @DisplayName("an encoded spelling of a public document is exempt, as permitAll already treats it")
-  @ValueSource(
-      strings = {"/.well-known/assetlink%73.json", "/robots%2Etxt", "/manifest.webmanife%73t"})
+  @ValueSource(strings = {"/robot%73.txt", "/robots%2Etxt", "/manifest.webmanife%73t"})
   void anEncodedSpellingOfAPublicDocumentIsExempt(String path) {
     assertThat(PublicPaths.isPublicDocument(path)).as(path).isTrue();
     assertThat(PublicPaths.isGateExempt(path)).as(path).isTrue();
@@ -141,12 +148,11 @@ class PublicPathsTest {
   @Test
   @DisplayName("relativePath stays raw, and the predicate decodes it")
   void relativePathIsRawAndThePredicateDecodesIt() {
-    MockHttpServletRequest request =
-        new MockHttpServletRequest("GET", "/basetool/.well-known/assetlink%73.json");
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/basetool/robot%73.txt");
     request.setContextPath("/basetool");
-    request.setRequestURI("/basetool/.well-known/assetlink%73.json");
+    request.setRequestURI("/basetool/robot%73.txt");
 
-    assertThat(PublicPaths.relativePath(request)).isEqualTo("/.well-known/assetlink%73.json");
+    assertThat(PublicPaths.relativePath(request)).isEqualTo("/robot%73.txt");
     assertThat(PublicPaths.isGateExempt(PublicPaths.relativePath(request))).isTrue();
   }
 
@@ -183,8 +189,8 @@ class PublicPathsTest {
       strings = {
         "/robots.txt%252e",
         "/%252e%252e/robots.txt",
-        "/.well-known/assetlinks.json%252e",
-        "/.well-known/assetlink%2573.json"
+        "/manifest.webmanifest%252e",
+        "/manifest.webmanife%2573t"
       })
   void aDoubleEncodedSpellingIsNotExempt(String path) {
     assertThat(PublicPaths.isGateExempt(path)).as(path).isFalse();

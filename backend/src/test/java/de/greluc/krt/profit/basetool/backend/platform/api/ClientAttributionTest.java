@@ -57,7 +57,7 @@ class ClientAttributionTest {
   @BeforeEach
   void setUp() {
     clientProperties =
-        new ApiClientMetricsProperties(List.of("basetool-frontend", "basetool-android"));
+        new ApiClientMetricsProperties(List.of("basetool-frontend", "basetool-ingest-gateway"));
     gatewayClientIds = new ArrayList<>();
     gatewayProperties = new IngestGatewayProperties(gatewayClientIds);
     knownExchangeClients = Mockito.mock(KnownExchangeClients.class);
@@ -68,7 +68,7 @@ class ClientAttributionTest {
 
   @Test
   void label_keepsAConfiguredClientVerbatim() {
-    assertEquals("basetool-android", attribution.label("basetool-android"));
+    assertEquals("basetool-ingest-gateway", attribution.label("basetool-ingest-gateway"));
   }
 
   @Test

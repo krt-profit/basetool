@@ -479,17 +479,6 @@ groups:
           summary: "Public path no longer answers 200: {{ $labels.instance }}"
           description: "{{ $labels.instance }} stopped answering 200 on its first response. REQ-SEC-052 lists it as permitAll, so this is either a lost SecurityConfig entry (the path now 302s into /oauth2/authorization/keycloak) or an edge rule ahead of the app. For /manifest.webmanifest this is user-visible: new installs take their name and icon from whatever the redirect returns (REQ-UI-020, ADR-0164). Note http_2xx would NOT catch this — it follows redirects and would report the Keycloak 200 as success."
 
-      - alert: EdgeAppLinkFallbackBroken
-        expr: >-
-          probe_success{job="blackbox-app-link"} == 0
-          and on() (probe_success{job="blackbox-http", instance="https://profit-base.online"} == 1)
-        for: 15m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Android App Link fallback broken: {{ $labels.instance }}"
-          description: "https://profit-base.online/app/callback no longer answers 303 to /app/link-help on its first response (REQ-SEC-038). A 200 means the authorization code is being left in the member's address bar and history; a 302 into /oauth2/authorization/keycloak means the permitAll entry was lost and the member is sent back into a login they cannot finish; a 404 means AppLinkController is gone from the image. Check the frontend SecurityConfig anonymous matchers, AppLinkController, and the edge's frontend vhost (docker/edge/conf.d/10-frontend.conf.template) for a rule ahead of the app."
-
       - alert: EdgeHstsHeaderMissing
         expr: >-
           probe_success{job="blackbox-hsts"} == 0
