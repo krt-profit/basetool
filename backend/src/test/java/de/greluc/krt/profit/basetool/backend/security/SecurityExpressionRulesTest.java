@@ -69,7 +69,7 @@ class SecurityExpressionRulesTest {
           Map.entry("ownerScopeService", 3),
           Map.entry("operationAccessPolicy", 8),
           Map.entry("refineryAccessPolicy", 8),
-          Map.entry("missionSecurityService", 39),
+          Map.entry("missionSecurityService", 38),
           Map.entry("authHelperService", 15),
           Map.entry("exchangeGate", 14),
           Map.entry("orgRoleManagementSecurityService", 13),

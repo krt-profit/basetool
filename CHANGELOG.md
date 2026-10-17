@@ -52,6 +52,8 @@
 
 - **Das Audit-Log bleibt für App-Einträge lesbar.** Der Client-Filter im Audit-Log führt `basetool-android` weiter als „Android-App (eingestellt)“, damit alte Einträge zuordenbar bleiben; neue Einträge kann dieser Client nicht mehr erzeugen (REQ-OBS-018).
 
+- **Einsätze: `POST /api/v1/missions/{id}/participants/by-id` ist entfernt.** Der Endpunkt gab es nur für die eingestellte Android-App und hatte keinen Aufrufer mehr; Teilnehmer fügt die Einsatzleitung weiter über die Einsatzseite hinzu (ADR-0268, REQ-MISSION-020).
+
 - **Backend: keine Feldinjektion mehr.** `UserMapper`, `MissionMapper` und `InventoryItemMapper` erhalten ihre Abhängigkeiten über paketinterne `@Autowired`-Setter statt über Felder; die neue ArchUnit-Regel `noFieldIsAutowired` lässt kein `@Autowired`-Feld mehr zu (REQ-SEC-003). Kein Verhaltensunterschied.
 
 ### Fixed

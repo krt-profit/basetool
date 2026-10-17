@@ -113,7 +113,7 @@
 3 DELETE /api/v1/missions/{id}/objectives/{objectiveId}/slim /api/v1/missions/{id}/objectives/{objectiveId} T1 app
 3 PUT /api/v1/missions/{id}/objectives/{objectiveId}/slim /api/v1/missions/{id}/objectives/{objectiveId} T1 app
 3 POST /api/v1/missions/{id}/participants/add - T2 -
-3 POST /api/v1/missions/{id}/participants/by-id/slim /api/v1/missions/{id}/participants/by-id T1 app
+3 POST /api/v1/missions/{id}/participants/by-id/slim - T1 app
 3 POST /api/v1/missions/{id}/participants/slim /api/v1/missions/{id}/participants T2 -
 3 POST /api/v1/missions/{id}/participants/{participantId}/check-in/slim /api/v1/missions/{id}/participants/{participantId}/check-in T1 app
 3 POST /api/v1/missions/{id}/participants/{participantId}/check-out/slim /api/v1/missions/{id}/participants/{participantId}/check-out T1 app

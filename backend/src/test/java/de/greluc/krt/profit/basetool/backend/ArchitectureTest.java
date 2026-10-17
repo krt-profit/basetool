@@ -828,7 +828,7 @@ class ArchitectureTest {
 
   @Test
   void noFieldIsAutowired() {
-    assertFieldFloor("noFieldIsAutowired", INSTANCE_FIELDS, 8725);
+    assertFieldFloor("noFieldIsAutowired", INSTANCE_FIELDS, 8724);
     noFieldIsAutowiredRule().check(CLASSES);
   }
 
@@ -1501,7 +1501,7 @@ class ArchitectureTest {
   @Test
   void peerReadableMissionEndpointsMustRedactPii() {
     DescribedPredicate<JavaMethod> selection = peerReadableEndpoints(MISSION_PII_CARRYING_DTOS);
-    assertMethodFloor("peerReadableMissionEndpointsMustRedactPii", selection, 20);
+    assertMethodFloor("peerReadableMissionEndpointsMustRedactPii", selection, 19);
     peerReadableMissionEndpointsMustRedactPiiRule(selection, MISSION_PII_CARRYING_DTOS)
         .check(CLASSES);
   }
