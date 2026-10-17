@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-11.
-> **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0213](../adr/0213-a-release-that-moves-the-provider-jar-costs-one-outage.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md), [ADR-0083](../adr/0083-deploy-bot-health-drift-targeted-restart.md), [ADR-0145](../adr/0145-build-provenance-anchored-outside-the-registry.md), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md), [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md), [ADR-0187](../adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md), [ADR-0188](../adr/0188-the-host-bootstrap-is-an-ansible-role.md), [ADR-0189](../adr/0189-stateful-containers-run-as-their-own-uid.md), [ADR-0190](../adr/0190-every-container-but-keycloak-runs-read-only.md), [ADR-0196](../adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md), [ADR-0246](../adr/0246-pull-requests-merge-through-a-merge-queue-not-the-strict-up-to-date-policy.md), [ADR-0248](../adr/0248-the-shared-build-conventions-are-precompiled-plugins-of-an-included-build.md)
+> **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0213](../adr/0213-a-release-that-moves-the-provider-jar-costs-one-outage.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md), [ADR-0083](../adr/0083-deploy-bot-health-drift-targeted-restart.md), [ADR-0145](../adr/0145-build-provenance-anchored-outside-the-registry.md), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md), [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md), [ADR-0187](../adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md), [ADR-0188](../adr/0188-the-host-bootstrap-is-an-ansible-role.md), [ADR-0189](../adr/0189-stateful-containers-run-as-their-own-uid.md), [ADR-0190](../adr/0190-every-container-but-keycloak-runs-read-only.md), [ADR-0196](../adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md), [ADR-0246](../adr/0246-pull-requests-merge-through-a-merge-queue-not-the-strict-up-to-date-policy.md), [ADR-0248](../adr/0248-the-shared-build-conventions-are-precompiled-plugins-of-an-included-build.md), [ADR-0275](../adr/0275-the-plugin-classpath-resolves-from-the-portal-with-maven-central-behind-it.md)
 
 # Deployment delivery & promotion
 
@@ -2946,7 +2946,8 @@ isolated projects have nothing to reject and a module added later inherits no de
   took the whole build down for artifacts Central was serving all along: the Kotlin jars the
   `kotlin-dsl` plugin puts on `build-logic`'s classpath failed to resolve on main on 2026-10-17.
   Central is a fallback, not a second source of truth — the portal stays first and every artifact
-  still matches its committed checksum (REQ-OPS-034), the same bytes either way.
+  still matches its committed checksum (REQ-OPS-034), the same bytes either way
+  ([ADR-0275](../adr/0275-the-plugin-classpath-resolves-from-the-portal-with-maven-central-behind-it.md)).
 - **No behaviour change by the move.** The task graph (`build -m`, `tasks --all`), every task's
   type, dependencies and inputs, the compiler arguments including Error Prone's, the test JVM
   arguments, the resolved classpaths and the SBOM component lists are identical before and after.
@@ -2963,7 +2964,8 @@ isolated projects have nothing to reject and a module added later inherits no de
 
 **Enforced by:** `build-logic/` · `settings.gradle.kts` · `.github/scripts/check_sbom_coverage.py`
 (`sbom-coverage`) · `.github/scripts/image_reuse_plan.py` (`--selftest`) · **Decision:**
-[ADR-0248](../adr/0248-the-shared-build-conventions-are-precompiled-plugins-of-an-included-build.md) ·
+[ADR-0248](../adr/0248-the-shared-build-conventions-are-precompiled-plugins-of-an-included-build.md),
+[ADR-0275](../adr/0275-the-plugin-classpath-resolves-from-the-portal-with-maven-central-behind-it.md) ·
 **Related:** REQ-OPS-034, REQ-OPS-037, REQ-OPS-038
 
 ### REQ-OPS-047 — A library module of an application is named `<app>-<name>`, and the build reads the name
