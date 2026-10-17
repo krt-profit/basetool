@@ -140,7 +140,9 @@ public class ProfileController {
           model.addAttribute("profileSquadrons", user.squadrons());
         }
       }
-    } catch (Exception _) {
+    } catch (Exception e) {
+      log.warn(
+          "Could not load the caller's user row for the profile page; showing token claims", e);
     }
 
     PayoutPreference defaultPayoutPreference = PayoutPreference.PAYOUT;
@@ -658,7 +660,8 @@ public class ProfileController {
       if (me != null && me.version() != null) {
         return me.version();
       }
-    } catch (Exception _) {
+    } catch (Exception e) {
+      log.warn("Could not re-read the caller's user-row version; assuming the next one", e);
     }
     return (priorVersion == null ? 0L : priorVersion) + 1;
   }

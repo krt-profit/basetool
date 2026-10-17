@@ -22,6 +22,8 @@
 
 ### Fixed
 
+- **Einsatz-Detailseite: nicht geladene Auswahllisten werden gemeldet.** Schlägt das Laden einer Auswahlliste (Jobtypen, Crew-Funktionen, Organisationseinheiten, Frequenz- oder Schiffstypen, Schiffe für Einheiten) fehl, nennt ein Hinweis über den Tabs die betroffenen Listen, statt die Auswahl stillschweigend leer zu lassen; das Frontend protokolliert jeden Fehlschlag als WARN. Die Listen laden jetzt parallel (Frontend, REQ-MISSION-030).
+
 - **Frontend: Hostname-Prüfung zum Backend standardmäßig an.** Ohne gesetztes `INTERNAL_TLS_VERIFY_HOSTNAME` prüft das Webtool den Namen im Backend-Zertifikat jetzt wie der Ingest-Gateway, statt die Prüfung stillschweigend auszulassen; Compose und Quadlet setzten `true` bereits, `dev`/`test` bleiben unverändert (Frontend-Konfiguration, REQ-SEC-070).
 
 - **Mitglied bearbeiten: Rang passt nicht zur Officer-Rolle.** Ein Rang außerhalb des Bereichs der Keycloak-Rolle (Officer 1–12, Mitglieder 13–20) wird nicht mehr als „ungültiges Argument“ abgelehnt, sondern am Rang-Feld mit dem Hinweis, welche Rolle das Mitglied noch hat und dass sie zuerst in Keycloak geändert werden muss; unter dem Rang steht der erlaubte Bereich. Neuer API-Fehlercode `RANK_OUTSIDE_ROLE_RANGE` (REQ-ROLE-007, ADR-0264).

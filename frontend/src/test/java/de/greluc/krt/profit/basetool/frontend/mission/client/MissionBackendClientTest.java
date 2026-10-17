@@ -202,7 +202,6 @@ class MissionBackendClientTest {
             + "\"page\":0,\"size\":1000,\"totalElements\":1,\"totalPages\":1}";
     backend.answerJson(EMPTY_PAGE);
     backend.answerJson(jobTypes);
-    backend.answerJson(EMPTY_PAGE);
     backend.answerJson("[]");
     backend.answerJson(frequencyTypes);
     backend.answerJson(EMPTY_PAGE);
@@ -215,7 +214,6 @@ class MissionBackendClientTest {
               assertThat(jobType.id()).isEqualTo(OTHER);
               assertThat(jobType.name()).isEqualTo("Pilot");
             });
-    assertThat(client.squadrons().content()).isEmpty();
     assertThat(client.activeOrgUnits()).isEmpty();
     assertThat(client.frequencyTypes().content())
         .singleElement()
@@ -224,7 +222,6 @@ class MissionBackendClientTest {
 
     backend.expect("GET", "/api/v1/job-types?archetype=MISSION&size=1000&page=0");
     backend.expect("GET", "/api/v1/job-types?archetype=CREW&size=1000&page=0");
-    backend.expect("GET", "/api/v1/squadrons?size=1000&page=0");
     backend.expect("GET", "/api/v1/org-units/active");
     backend.expect(
         "GET", "/api/v1/frequency-types?size=1000&active=true&sort=sortIndex,asc&page=0");

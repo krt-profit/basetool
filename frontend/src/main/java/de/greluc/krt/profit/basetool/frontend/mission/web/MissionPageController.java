@@ -47,7 +47,6 @@ import de.greluc.krt.profit.basetool.frontend.mission.model.MissionParticipantDt
 import de.greluc.krt.profit.basetool.frontend.mission.model.ParticipantForm;
 import de.greluc.krt.profit.basetool.frontend.mission.model.UnitForm;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
-import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderListDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefinerySettingsDto;
 import java.math.BigDecimal;
@@ -56,6 +55,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -66,6 +66,7 @@ import java.util.concurrent.CompletionException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.propertyeditors.StringTrimmerEditor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
@@ -119,6 +120,15 @@ public class MissionPageController {
    */
   private static final int FINANCE_TABLE_PAGE_SIZE = 200;
 
+  /**
+   * Model attribute holding the i18n name keys of the detail page's option lists that could not be
+   * loaded; empty when every list loaded.
+   */
+  static final String OPTION_LIST_FAILURES = "optionListFailures";
+
+  /** Prefix of the i18n key naming an option list; the model attribute name completes it. */
+  private static final String OPTION_LIST_KEY_PREFIX = "mission.options.list.";
+
   /** The mission domain's typed backend client. */
   private final MissionBackendClient missionClient;
 
@@ -142,6 +152,82 @@ public class MissionPageController {
       log.warn("Could not load operations", e);
       model.addAttribute("operationsList", List.of());
     }
+  }
+
+  /**
+   * Loads the independent option lists of the mission-detail selects in parallel (REQ-MISSION-030).
+   *
+   * <p>A list whose backend read fails is logged once at WARN with its name, rendered empty, and
+   * its i18n name key is added to {@link #OPTION_LIST_FAILURES} for the page hint.
+   *
+   * @param model the view model receiving one attribute per list and the failure keys
+   * @param id the mission id, for the unit ship options
+   * @param withUnitShipOptions whether the unit ship options are loaded as well
+   */
+  private void addOptionListsToModel(
+      @NotNull Model model, @NotNull UUID id, boolean withUnitShipOptions) {
+    final CompletableFuture<List<JobTypeDto>> jobTypes =
+        parallelPageLoader.loadAsync(() -> contentOf(missionClient.missionJobTypes()));
+    final CompletableFuture<List<JobTypeDto>> crewJobTypes =
+        parallelPageLoader.loadAsync(() -> contentOf(missionClient.crewJobTypes()));
+    final CompletableFuture<List<OrgUnitMembershipOptionDto>> orgUnits =
+        parallelPageLoader.loadAsync(missionClient::activeOrgUnits);
+    final CompletableFuture<List<FrequencyTypeDto>> frequencyTypes =
+        parallelPageLoader.loadAsync(() -> contentOf(missionClient.frequencyTypes()));
+    final CompletableFuture<List<ShipTypeDto>> allShipTypes =
+        parallelPageLoader.loadAsync(() -> contentOf(missionClient.shipTypes()));
+    final CompletableFuture<List<ShipDto>> unitShipOptions =
+        withUnitShipOptions
+            ? parallelPageLoader.loadAsync(() -> missionClient.unitShipOptions(id))
+            : null;
+
+    List<String> failures = new ArrayList<>();
+    putOptionList(model, "jobTypes", jobTypes, failures);
+    putOptionList(model, "crewJobTypes", crewJobTypes, failures);
+    putOptionList(model, "orgUnits", orgUnits, failures);
+    putOptionList(model, "frequencyTypes", frequencyTypes, failures);
+    putOptionList(model, "allShipTypes", allShipTypes, failures);
+    if (unitShipOptions != null) {
+      putOptionList(model, "unitShipOptions", unitShipOptions, failures);
+    }
+    model.addAttribute(OPTION_LIST_FAILURES, List.copyOf(failures));
+  }
+
+  /**
+   * Joins one option-list load and stores its result under {@code attribute}, or an empty list when
+   * the load failed.
+   *
+   * @param model the view model
+   * @param attribute the model attribute, also the list name in the log line and the i18n key
+   * @param load the running load
+   * @param failures collects the i18n name key of every failed list
+   * @param <T> the option type
+   */
+  private static <T> void putOptionList(
+      @NotNull Model model,
+      @NotNull String attribute,
+      @NotNull CompletableFuture<List<T>> load,
+      @NotNull List<String> failures) {
+    try {
+      List<T> options = load.join();
+      model.addAttribute(attribute, options != null ? options : List.of());
+    } catch (CompletionException e) {
+      log.warn("Could not load the mission option list {}", attribute, e.getCause());
+      failures.add(OPTION_LIST_KEY_PREFIX + attribute);
+      model.addAttribute(attribute, List.of());
+    }
+  }
+
+  /**
+   * Returns the content of a catalogue page, empty when the backend sent no body.
+   *
+   * @param page the catalogue page, or {@code null}
+   * @param <T> the entry type
+   * @return the page content; never {@code null}
+   */
+  @NotNull
+  private static <T> List<T> contentOf(@Nullable PageResponse<T> page) {
+    return page != null && page.content() != null ? page.content() : List.of();
   }
 
   /**
@@ -355,51 +441,7 @@ public class MissionPageController {
 
       model.addAttribute("roundingMode", needFinance ? fetchRoundingMode() : "UP");
 
-      try {
-        PageResponse<JobTypeDto> jobTypesPage = missionClient.missionJobTypes();
-        model.addAttribute("jobTypes", jobTypesPage.content());
-      } catch (Exception _) {
-      }
-
-      try {
-        PageResponse<JobTypeDto> crewJobTypesPage = missionClient.crewJobTypes();
-        model.addAttribute("crewJobTypes", crewJobTypesPage.content());
-      } catch (Exception _) {
-      }
-
-      try {
-        PageResponse<SquadronDto> squadronsPage = missionClient.squadrons();
-        model.addAttribute("squadrons", squadronsPage.content());
-      } catch (Exception _) {
-      }
-
-      try {
-        List<OrgUnitMembershipOptionDto> orgUnits = missionClient.activeOrgUnits();
-        model.addAttribute("orgUnits", orgUnits != null ? orgUnits : List.of());
-      } catch (Exception _) {
-        model.addAttribute("orgUnits", List.of());
-      }
-
-      try {
-        PageResponse<FrequencyTypeDto> freqTypesPage = missionClient.frequencyTypes();
-        model.addAttribute("frequencyTypes", freqTypesPage.content());
-      } catch (Exception _) {
-      }
-
-      Boolean canEdit = mission.canEdit();
-      if (canEdit != null && canEdit && needCrewBoard) {
-        try {
-          List<ShipDto> unitShipOptions = missionClient.unitShipOptions(id);
-          model.addAttribute("unitShipOptions", unitShipOptions);
-        } catch (Exception _) {
-        }
-      }
-
-      try {
-        PageResponse<ShipTypeDto> allShipTypesPage = missionClient.shipTypes();
-        model.addAttribute("allShipTypes", allShipTypesPage.content());
-      } catch (Exception _) {
-      }
+      addOptionListsToModel(model, id, Boolean.TRUE.equals(mission.canEdit()) && needCrewBoard);
 
       if (authHelperService.isMemberOrAbove() && needFinance) {
         try {
