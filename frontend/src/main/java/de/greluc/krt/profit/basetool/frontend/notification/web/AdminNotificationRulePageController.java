@@ -23,6 +23,7 @@ import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResp
 
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.notification.client.NotificationBackendClient;
 import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationRuleDto;
 import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationRuleWriteRequest;
@@ -286,11 +287,13 @@ public class AdminNotificationRulePageController {
   @org.jetbrains.annotations.NotNull
   @GetMapping
   public String page(@RequestParam(required = false) String fragment, Model model) {
-    try {
-      List<NotificationRuleDto> rules = notificationClient.rules();
-      model.addAttribute("rules", rules == null ? List.of() : rules);
-    } catch (Exception e) {
-      log.debug("Failed to load notification rules", e);
+    if (!SectionFallback.run(
+        log,
+        "notification-rules",
+        () -> {
+          List<NotificationRuleDto> rules = notificationClient.rules();
+          model.addAttribute("rules", rules == null ? List.of() : rules);
+        })) {
       model.addAttribute("rules", List.of());
       model.addAttribute("error", "admin.notificationRules.error.load");
     }

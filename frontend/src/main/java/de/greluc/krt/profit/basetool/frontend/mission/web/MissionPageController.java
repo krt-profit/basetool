@@ -21,10 +21,6 @@ package de.greluc.krt.profit.basetool.frontend.mission.web;
 
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.propagateBackendError;
 
-import de.greluc.krt.profit.basetool.frontend.catalogue.model.FrequencyTypeDto;
-import de.greluc.krt.profit.basetool.frontend.catalogue.model.JobTypeDto;
-import de.greluc.krt.profit.basetool.frontend.catalogue.model.ShipTypeDto;
-import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
@@ -35,6 +31,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.RelayParams;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.mission.model.CrewForm;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionDto;
@@ -47,11 +44,11 @@ import de.greluc.krt.profit.basetool.frontend.mission.model.MissionParticipantDt
 import de.greluc.krt.profit.basetool.frontend.mission.model.ParticipantForm;
 import de.greluc.krt.profit.basetool.frontend.mission.model.UnitForm;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
-import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderListDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefinerySettingsDto;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -62,7 +59,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -135,13 +131,10 @@ public class MissionPageController {
   private final ParallelPageLoader parallelPageLoader;
 
   private void addOperationsToModel(Model model) {
-    try {
-      List<OperationReferenceDto> operations = missionClient.operationReferences();
-      model.addAttribute("operationsList", operations);
-    } catch (Exception e) {
-      log.warn("Could not load operations", e);
-      model.addAttribute("operationsList", List.of());
-    }
+    List<OperationReferenceDto> operations =
+        SectionFallback.load(
+            log, "operation-references", missionClient::operationReferences, List.of());
+    model.addAttribute("operationsList", operations);
   }
 
   /**
@@ -159,19 +152,15 @@ public class MissionPageController {
       ParticipantForm form =
           new ParticipantForm(null, "", null, null, "", List.of(), null, null, null, null);
       if (principal != null && prefillParticipantUser) {
-        try {
-          UserDto me = missionClient.currentUser();
-          if (me != null) {
-            String name =
-                (me.displayName() != null && !me.displayName().isBlank())
-                    ? me.displayName()
-                    : me.username();
-            form =
-                new ParticipantForm(
-                    me.id(), name, null, null, "", List.of(), null, null, null, null);
-          }
-        } catch (Exception e) {
-          log.warn("Could not prefill participant form", e);
+        UserDto me =
+            SectionFallback.load(log, "participant-prefill", missionClient::currentUser, null);
+        if (me != null) {
+          String name =
+              (me.displayName() != null && !me.displayName().isBlank())
+                  ? me.displayName()
+                  : me.username();
+          form =
+              new ParticipantForm(me.id(), name, null, null, "", List.of(), null, null, null, null);
         }
       }
       model.addAttribute("participantForm", form);
@@ -245,20 +234,22 @@ public class MissionPageController {
     String knownPeriod = RelayParams.oneOfOrNull(period, MISSION_PERIODS);
     String effectivePeriod = knownPeriod != null ? knownPeriod : showPast ? "ALL" : "UPCOMING";
 
-    try {
-      PageResponse<MissionListDto> missionsPage =
-          missionClient.searchMissions(
-              new MissionBackendClient.MissionSearch(
-                  search, start, end, page, size, knownStatuses, effectivePeriod));
-      model.addAttribute("missions", missionsPage.content());
-      model.addAttribute("missionsPage", missionsPage);
-      model.addAttribute("search", search);
-      model.addAttribute("start", start);
-      model.addAttribute("end", end);
-      model.addAttribute("showPast", !"UPCOMING".equals(effectivePeriod));
-      model.addAttribute("period", effectivePeriod);
-    } catch (Exception e) {
-      log.error("Error loading missions", e);
+    if (!SectionFallback.run(
+        log,
+        "missions-list",
+        () -> {
+          PageResponse<MissionListDto> missionsPage =
+              missionClient.searchMissions(
+                  new MissionBackendClient.MissionSearch(
+                      search, start, end, page, size, knownStatuses, effectivePeriod));
+          model.addAttribute("missions", missionsPage.content());
+          model.addAttribute("missionsPage", missionsPage);
+          model.addAttribute("search", search);
+          model.addAttribute("start", start);
+          model.addAttribute("end", end);
+          model.addAttribute("showPast", !"UPCOMING".equals(effectivePeriod));
+          model.addAttribute("period", effectivePeriod);
+        })) {
       model.addAttribute("error", "error.missions.load");
     }
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
@@ -288,158 +279,8 @@ public class MissionPageController {
       Model model,
       @AuthenticationPrincipal OidcUser principal,
       @RequestParam(required = false) String fragment) {
-    try {
-      MissionDto mission = missionClient.mission(id);
-
-      final boolean fullRender = fragment == null;
-      final String frag = fullRender ? null : fragment.toLowerCase(Locale.ROOT);
-      final boolean needMgmt = fullRender || "mgmt".equals(frag);
-      final boolean needCrewBoard = fullRender || "crew-board".equals(frag);
-      final boolean needFinance = fullRender || "finance".equals(frag);
-
-      MissionDetailModelBuilder.MissionDetailViewModel detail =
-          MissionDetailModelBuilder.build(mission);
-      model.addAttribute("mission", mission);
-      model.addAttribute("participants", detail.participants());
-      model.addAttribute("participantsByLeadType", detail.participantsByLeadType());
-      model.addAttribute("missionLeadTypes", detail.missionLeadTypes());
-      model.addAttribute("factLeaderName", detail.factLeaderName());
-      model.addAttribute("participantUserIds", detail.participantUserIds());
-      model.addAttribute("assignedUnitByParticipantId", detail.assignedUnitByParticipantId());
-      model.addAttribute("assignedUnitShipIds", detail.assignedUnitShipIds());
-      model.addAttribute("unassignedParticipants", detail.unassignedParticipants());
-      model.addAttribute("participantsById", detail.participantsById());
-      model.addAttribute("participationPercentages", detail.participationPercentages());
-      model.addAttribute("frequencyByTypeId", detail.frequencyByTypeId());
-      model.addAttribute("customFrequencies", detail.customFrequencies());
-
-      if (needMgmt) {
-        model.addAttribute("ownerOptions", fetchCallerMembershipOptions(principal));
-      } else {
-        model.addAttribute("ownerOptions", List.of());
-      }
-
-      if (!model.containsAttribute("missionForm")) {
-        model.addAttribute(
-            "missionForm",
-            new MissionForm(
-                mission.name() != null ? mission.name() : "",
-                mission.description() != null ? mission.description() : "",
-                mission.calendarLink() != null ? mission.calendarLink() : "",
-                mission.status() != null ? mission.status() : "",
-                formatInstant(mission.meetingTime()),
-                formatInstant(mission.plannedStartTime()),
-                formatInstant(mission.plannedEndTime()),
-                formatInstant(mission.actualStartTime()),
-                formatInstant(mission.actualEndTime()),
-                mission.isInternal() != null && mission.isInternal(),
-                mission.operation() != null ? String.valueOf(mission.operation().id()) : null,
-                mission.version(),
-                mission.coreVersion(),
-                mission.scheduleVersion(),
-                mission.flagsVersion(),
-                null,
-                mission.meetingPoint(),
-                null,
-                null,
-                true,
-                true,
-                true));
-      }
-      model.addAttribute("isNew", false);
-      model.addAttribute("authUserId", CurrentUser.userIdText(principal));
-      addFormsToModel(model, principal, fullRender);
-      if (fullRender) {
-        addOperationsToModel(model);
-      }
-
-      model.addAttribute("roundingMode", needFinance ? fetchRoundingMode() : "UP");
-
-      try {
-        PageResponse<JobTypeDto> jobTypesPage = missionClient.missionJobTypes();
-        model.addAttribute("jobTypes", jobTypesPage.content());
-      } catch (Exception _) {
-      }
-
-      try {
-        PageResponse<JobTypeDto> crewJobTypesPage = missionClient.crewJobTypes();
-        model.addAttribute("crewJobTypes", crewJobTypesPage.content());
-      } catch (Exception _) {
-      }
-
-      try {
-        PageResponse<SquadronDto> squadronsPage = missionClient.squadrons();
-        model.addAttribute("squadrons", squadronsPage.content());
-      } catch (Exception _) {
-      }
-
-      try {
-        List<OrgUnitMembershipOptionDto> orgUnits = missionClient.activeOrgUnits();
-        model.addAttribute("orgUnits", orgUnits != null ? orgUnits : List.of());
-      } catch (Exception _) {
-        model.addAttribute("orgUnits", List.of());
-      }
-
-      try {
-        PageResponse<FrequencyTypeDto> freqTypesPage = missionClient.frequencyTypes();
-        model.addAttribute("frequencyTypes", freqTypesPage.content());
-      } catch (Exception _) {
-      }
-
-      Boolean canEdit = mission.canEdit();
-      if (canEdit != null && canEdit && needCrewBoard) {
-        try {
-          List<ShipDto> unitShipOptions = missionClient.unitShipOptions(id);
-          model.addAttribute("unitShipOptions", unitShipOptions);
-        } catch (Exception _) {
-        }
-      }
-
-      try {
-        PageResponse<ShipTypeDto> allShipTypesPage = missionClient.shipTypes();
-        model.addAttribute("allShipTypes", allShipTypesPage.content());
-      } catch (Exception _) {
-      }
-
-      if (authHelperService.isMemberOrAbove() && needFinance) {
-        try {
-          CompletableFuture<MissionFinanceTotalsDto> totalsFuture =
-              parallelPageLoader.loadAsync(() -> missionClient.financeTotals(id));
-          CompletableFuture<PageResponse<MissionFinanceEntryDto>> entriesFuture =
-              parallelPageLoader.loadAsync(
-                  () -> missionClient.financeEntries(id, FINANCE_TABLE_PAGE_SIZE));
-          CompletableFuture<List<RefineryOrderListDto>> refineryFuture =
-              parallelPageLoader.loadAsync(() -> missionClient.refineryOrders(id));
-          CompletableFuture<List<InventoryItemDto>> inventoryFuture =
-              parallelPageLoader.loadAsync(() -> missionClient.inventory(id));
-          CompletableFuture.allOf(totalsFuture, entriesFuture, refineryFuture, inventoryFuture)
-              .join();
-
-          MissionFinanceTotalsDto totals = totalsFuture.join();
-          model.addAttribute("financeSum", totals.total());
-          model.addAttribute("financeIncomeSum", totals.incomeSum());
-          model.addAttribute("financeExpenseSum", totals.expenseSum());
-          model.addAttribute("financeIncomeCount", totals.incomeCount());
-          model.addAttribute("financeExpenseCount", totals.expenseCount());
-          Integer registered = mission.registeredParticipants();
-          model.addAttribute(
-              "financePerShare",
-              (totals.total() != null && registered != null && registered > 0)
-                  ? totals.total().divide(BigDecimal.valueOf(registered), 0, RoundingMode.HALF_UP)
-                  : null);
-
-          model.addAttribute("financeEntries", entriesFuture.join().content());
-          model.addAttribute("refineryOrders", refineryFuture.join());
-          model.addAttribute("inventoryEntries", inventoryFuture.join());
-        } catch (Exception e) {
-          Throwable cause =
-              (e instanceof CompletionException && e.getCause() != null) ? e.getCause() : e;
-          log.error("Error loading finance entries, refinery orders or mission inventory", cause);
-        }
-      }
-
-    } catch (Exception e) {
-      log.error("Error loading mission details", e);
+    if (!SectionFallback.run(
+        log, "mission-detail", () -> loadDetailModel(id, model, principal, fragment))) {
       if (fragment != null) {
         return "mission/mission-detail :: fragmentError";
       }
@@ -461,6 +302,173 @@ public class MissionPageController {
       };
     }
     return "mission/mission-detail";
+  }
+
+  /**
+   * Fills the mission-detail model for the full page or the requested section fragment.
+   *
+   * @param id the mission id
+   * @param model the Spring MVC model to populate
+   * @param principal the authenticated user, or {@code null}
+   * @param fragment the optional section key, {@code null} for the full page
+   */
+  private void loadDetailModel(
+      @NotNull UUID id, @NotNull Model model, OidcUser principal, String fragment) {
+    MissionDto mission = missionClient.mission(id);
+
+    final boolean fullRender = fragment == null;
+    final String frag = fullRender ? null : fragment.toLowerCase(Locale.ROOT);
+    final boolean needMgmt = fullRender || "mgmt".equals(frag);
+    final boolean needCrewBoard = fullRender || "crew-board".equals(frag);
+    final boolean needFinance = fullRender || "finance".equals(frag);
+
+    MissionDetailModelBuilder.MissionDetailViewModel detail =
+        MissionDetailModelBuilder.build(mission);
+    model.addAttribute("mission", mission);
+    model.addAttribute("participants", detail.participants());
+    model.addAttribute("participantsByLeadType", detail.participantsByLeadType());
+    model.addAttribute("missionLeadTypes", detail.missionLeadTypes());
+    model.addAttribute("factLeaderName", detail.factLeaderName());
+    model.addAttribute("participantUserIds", detail.participantUserIds());
+    model.addAttribute("assignedUnitByParticipantId", detail.assignedUnitByParticipantId());
+    model.addAttribute("assignedUnitShipIds", detail.assignedUnitShipIds());
+    model.addAttribute("unassignedParticipants", detail.unassignedParticipants());
+    model.addAttribute("participantsById", detail.participantsById());
+    model.addAttribute("participationPercentages", detail.participationPercentages());
+    model.addAttribute("frequencyByTypeId", detail.frequencyByTypeId());
+    model.addAttribute("customFrequencies", detail.customFrequencies());
+
+    if (needMgmt) {
+      model.addAttribute("ownerOptions", fetchCallerMembershipOptions(principal));
+    } else {
+      model.addAttribute("ownerOptions", List.of());
+    }
+
+    if (!model.containsAttribute("missionForm")) {
+      model.addAttribute(
+          "missionForm",
+          new MissionForm(
+              mission.name() != null ? mission.name() : "",
+              mission.description() != null ? mission.description() : "",
+              mission.calendarLink() != null ? mission.calendarLink() : "",
+              mission.status() != null ? mission.status() : "",
+              formatInstant(mission.meetingTime()),
+              formatInstant(mission.plannedStartTime()),
+              formatInstant(mission.plannedEndTime()),
+              formatInstant(mission.actualStartTime()),
+              formatInstant(mission.actualEndTime()),
+              mission.isInternal() != null && mission.isInternal(),
+              mission.operation() != null ? String.valueOf(mission.operation().id()) : null,
+              mission.version(),
+              mission.coreVersion(),
+              mission.scheduleVersion(),
+              mission.flagsVersion(),
+              null,
+              mission.meetingPoint(),
+              null,
+              null,
+              true,
+              true,
+              true));
+    }
+    model.addAttribute("isNew", false);
+    model.addAttribute("authUserId", CurrentUser.userIdText(principal));
+    addFormsToModel(model, principal, fullRender);
+    if (fullRender) {
+      addOperationsToModel(model);
+    }
+
+    model.addAttribute("roundingMode", needFinance ? fetchRoundingMode() : "UP");
+
+    addOptionListsToModel(id, mission, needCrewBoard, model);
+
+    if (authHelperService.isMemberOrAbove() && needFinance) {
+      SectionFallback.run(log, "mission-finance", () -> addFinanceToModel(id, mission, model));
+    }
+  }
+
+  /**
+   * Adds the catalogue option lists of the detail modals; a list whose read fails is left out of
+   * the model, except {@code orgUnits}, which falls back to an empty list.
+   *
+   * @param id the mission id
+   * @param mission the loaded mission, read for its {@code canEdit} flag
+   * @param needCrewBoard whether the crew board is rendered and needs the unit ship options
+   * @param model the Spring MVC model to populate
+   */
+  private void addOptionListsToModel(
+      @NotNull UUID id, @NotNull MissionDto mission, boolean needCrewBoard, @NotNull Model model) {
+    SectionFallback.run(
+        log,
+        "mission-job-types",
+        () -> model.addAttribute("jobTypes", missionClient.missionJobTypes().content()));
+    SectionFallback.run(
+        log,
+        "crew-job-types",
+        () -> model.addAttribute("crewJobTypes", missionClient.crewJobTypes().content()));
+    SectionFallback.run(
+        log,
+        "squadrons",
+        () -> model.addAttribute("squadrons", missionClient.squadrons().content()));
+    List<OrgUnitMembershipOptionDto> orgUnits =
+        SectionFallback.load(log, "active-org-units", missionClient::activeOrgUnits, List.of());
+    model.addAttribute("orgUnits", orgUnits != null ? orgUnits : List.of());
+    SectionFallback.run(
+        log,
+        "frequency-types",
+        () -> model.addAttribute("frequencyTypes", missionClient.frequencyTypes().content()));
+
+    Boolean canEdit = mission.canEdit();
+    if (canEdit != null && canEdit && needCrewBoard) {
+      SectionFallback.run(
+          log,
+          "unit-ship-options",
+          () -> model.addAttribute("unitShipOptions", missionClient.unitShipOptions(id)));
+    }
+
+    SectionFallback.run(
+        log,
+        "ship-types",
+        () -> model.addAttribute("allShipTypes", missionClient.shipTypes().content()));
+  }
+
+  /**
+   * Loads the member-only finance totals, entries, refinery orders and mission inventory
+   * concurrently and adds them to the model.
+   *
+   * @param id the mission id
+   * @param mission the loaded mission, read for its registered participant count
+   * @param model the Spring MVC model to populate
+   */
+  private void addFinanceToModel(
+      @NotNull UUID id, @NotNull MissionDto mission, @NotNull Model model) {
+    CompletableFuture<MissionFinanceTotalsDto> totalsFuture =
+        parallelPageLoader.loadAsync(() -> missionClient.financeTotals(id));
+    CompletableFuture<PageResponse<MissionFinanceEntryDto>> entriesFuture =
+        parallelPageLoader.loadAsync(
+            () -> missionClient.financeEntries(id, FINANCE_TABLE_PAGE_SIZE));
+    CompletableFuture<List<RefineryOrderListDto>> refineryFuture =
+        parallelPageLoader.loadAsync(() -> missionClient.refineryOrders(id));
+    CompletableFuture<List<InventoryItemDto>> inventoryFuture =
+        parallelPageLoader.loadAsync(() -> missionClient.inventory(id));
+    CompletableFuture.allOf(totalsFuture, entriesFuture, refineryFuture, inventoryFuture).join();
+
+    MissionFinanceTotalsDto totals = totalsFuture.join();
+    model.addAttribute("financeSum", totals.total());
+    model.addAttribute("financeIncomeSum", totals.incomeSum());
+    model.addAttribute("financeExpenseSum", totals.expenseSum());
+    model.addAttribute("financeIncomeCount", totals.incomeCount());
+    model.addAttribute("financeExpenseCount", totals.expenseCount());
+    Integer registered = mission.registeredParticipants();
+    model.addAttribute(
+        "financePerShare",
+        (totals.total() != null && registered != null && registered > 0)
+            ? totals.total().divide(BigDecimal.valueOf(registered), 0, RoundingMode.HALF_UP)
+            : null);
+
+    model.addAttribute("financeEntries", entriesFuture.join().content());
+    model.addAttribute("refineryOrders", refineryFuture.join());
+    model.addAttribute("inventoryEntries", inventoryFuture.join());
   }
 
   /**
@@ -529,13 +537,9 @@ public class MissionPageController {
     if (principal == null) {
       return List.of();
     }
-    try {
-      List<OrgUnitMembershipOptionDto> options = missionClient.pickableOrgUnits();
-      return options != null ? options : List.of();
-    } catch (Exception e) {
-      log.warn("Failed to fetch pickable org units for mission-create owner-picker", e);
-      return List.of();
-    }
+    List<OrgUnitMembershipOptionDto> options =
+        SectionFallback.load(log, "owner-options", missionClient::pickableOrgUnits, List.of());
+    return options != null ? options : List.of();
   }
 
   /**
@@ -561,13 +565,10 @@ public class MissionPageController {
 
   @NotNull
   private String fetchRoundingMode() {
-    try {
-      RefinerySettingsDto settings = missionClient.refinerySettings();
-      if (settings != null && settings.roundingMode() != null) {
-        return settings.roundingMode();
-      }
-    } catch (Exception _) {
-      log.warn("Failed to fetch refinery rounding mode, using default UP");
+    RefinerySettingsDto settings =
+        SectionFallback.load(log, "refinery-rounding-mode", missionClient::refinerySettings, null);
+    if (settings != null && settings.roundingMode() != null) {
+      return settings.roundingMode();
     }
     return "UP";
   }
@@ -598,7 +599,7 @@ public class MissionPageController {
       }
       ZonedDateTime zdt = instant.atZone(MISSION_TIME_ZONE);
       return zdt.toLocalDateTime().truncatedTo(ChronoUnit.SECONDS).toString();
-    } catch (Exception _) {
+    } catch (DateTimeException _) {
       log.warn("Failed to format instant: {}", instantObj);
       return String.valueOf(instantObj);
     }

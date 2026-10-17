@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.frontend.dashboard.model.AnnouncementReques
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -69,14 +70,10 @@ public class AdminAnnouncementPageController {
   @NotNull
   @GetMapping
   public String showAnnouncementPage(Model model) {
-    try {
-      AnnouncementDto adminAnnouncement = dashboardClient.adminAnnouncement();
-      model.addAttribute("adminAnnouncement", adminAnnouncement);
-    } catch (BackendServiceException e) {
-      log.debug("Could not fetch admin announcement", e);
-    } catch (Exception e) {
-      log.error("Could not fetch admin announcement", e);
-    }
+    SectionFallback.run(
+        log,
+        "admin-announcement",
+        () -> model.addAttribute("adminAnnouncement", dashboardClient.adminAnnouncement()));
     return "dashboard/admin/announcement";
   }
 

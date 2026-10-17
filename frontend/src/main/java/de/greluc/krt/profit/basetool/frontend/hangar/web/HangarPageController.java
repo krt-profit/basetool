@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.ActiveSquadronContext;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
@@ -49,6 +50,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Contract;
@@ -291,13 +293,9 @@ public class HangarPageController {
    * @return the options, or an empty list on backend failure; never {@code null}
    */
   private @NotNull List<OrgUnitMembershipOptionDto> fetchDirectOrgUnits() {
-    try {
-      List<OrgUnitMembershipOptionDto> options = hangarClient.directOrgUnits();
-      return options != null ? options : List.of();
-    } catch (Exception e) {
-      log.warn("Failed to fetch direct org units for the hangar unit dialog", e);
-      return List.of();
-    }
+    List<OrgUnitMembershipOptionDto> options =
+        SectionFallback.load(log, "hangar-unit-options", hangarClient::directOrgUnits, List.of());
+    return options != null ? options : List.of();
   }
 
   /**
@@ -382,13 +380,10 @@ public class HangarPageController {
    * @return picker options, or an empty list on backend failure; never {@code null}.
    */
   private List<OrgUnitMembershipOptionDto> fetchCallerMembershipOptions() {
-    try {
-      List<OrgUnitMembershipOptionDto> options = hangarClient.pickableOrgUnits();
-      return options != null ? options : List.of();
-    } catch (Exception e) {
-      log.warn("Failed to fetch pickable org units for hangar add-ship owner-picker", e);
-      return List.of();
-    }
+    List<OrgUnitMembershipOptionDto> options =
+        SectionFallback.load(
+            log, "hangar-owner-options", hangarClient::pickableOrgUnits, List.of());
+    return options != null ? options : List.of();
   }
 
   /**
@@ -472,20 +467,18 @@ public class HangarPageController {
                       return null;
                     });
 
-    List<SquadronShipOverviewDto> overview = new ArrayList<>();
-    PageResponse<SquadronShipOverviewDto> res = null;
-    try {
-      res = hangarClient.squadronOverview(effectivePage, effectiveSize, effectiveSearch);
-      if (res != null && res.content() != null) {
-        overview = new ArrayList<>(res.content());
-      }
-    } catch (BackendServiceException e) {
-      log.debug("Failed to fetch squadron overview", e);
-      model.addAttribute("error", "error.hangar.squadron.load");
-    } catch (Exception e) {
-      log.error("Failed to fetch squadron overview", e);
+    AtomicReference<PageResponse<SquadronShipOverviewDto>> loaded = new AtomicReference<>();
+    if (!SectionFallback.run(
+        log,
+        "hangar-unit-overview",
+        () ->
+            loaded.set(
+                hangarClient.squadronOverview(effectivePage, effectiveSize, effectiveSearch)))) {
       model.addAttribute("error", "error.hangar.squadron.load");
     }
+    PageResponse<SquadronShipOverviewDto> res = loaded.get();
+    List<SquadronShipOverviewDto> overview =
+        res != null && res.content() != null ? new ArrayList<>(res.content()) : new ArrayList<>();
 
     model.addAttribute("activeTab", TAB_UNIT);
     model.addAttribute("overview", overview);
@@ -798,7 +791,7 @@ public class HangarPageController {
         return number.longValue();
       }
       return Long.parseLong(o.toString());
-    } catch (Exception _) {
+    } catch (NumberFormatException _) {
       return null;
     }
   }

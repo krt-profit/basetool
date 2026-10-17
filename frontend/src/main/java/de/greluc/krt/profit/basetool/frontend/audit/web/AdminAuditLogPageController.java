@@ -25,11 +25,11 @@ import de.greluc.krt.profit.basetool.frontend.audit.model.AuditEventDto;
 import de.greluc.krt.profit.basetool.frontend.audit.model.AuditRowView;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankAuditEventDto;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.RelayParams;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -486,23 +486,16 @@ public class AdminAuditLogPageController {
             activeEventType,
             activeClientId);
 
-    PageResponse<AuditRowView> events = null;
-    try {
-      events =
-          isBank
-              ? adaptBank(auditClient.bankEvents(filter), eventKeyPrefix)
-              : adaptGeneric(auditClient.areaEvents(activeDomain, filter), eventKeyPrefix);
-    } catch (BackendServiceException e) {
-      log.debug("Failed to load audit log for domain {}", activeDomain, e);
-      model.addAttribute("error", "admin.audit.error.load");
-    } catch (Exception e) {
-      log.error("Failed to load audit log for domain {}", activeDomain, e);
+    if (!SectionFallback.run(
+        log,
+        "audit-events",
+        () -> model.addAttribute("events", loadEvents(isBank, activeDomain, filter)))) {
+      model.addAttribute("events", null);
       model.addAttribute("error", "admin.audit.error.load");
     }
 
     model.addAttribute("activeDomain", activeDomain);
     model.addAttribute("domains", DOMAINS);
-    model.addAttribute("events", events);
     model.addAttribute("eventTypes", EVENT_TYPES_BY_DOMAIN.getOrDefault(activeDomain, List.of()));
     model.addAttribute("eventKeyPrefix", eventKeyPrefix);
     model.addAttribute("filterFrom", from);
@@ -521,6 +514,22 @@ public class AdminAuditLogPageController {
       return "audit/admin/audit-log :: auditResults";
     }
     return "audit/admin/audit-log";
+  }
+
+  /**
+   * Reads one page of the active tab's trail and adapts it to the uniform view model.
+   *
+   * @param isBank whether the active tab is the bank trail
+   * @param activeDomain the active tab
+   * @param filter the page and filter values
+   * @return the adapted page, or {@code null} when the backend sent none
+   */
+  @Nullable
+  private PageResponse<AuditRowView> loadEvents(
+      boolean isBank, @NotNull String activeDomain, @NotNull AuditBackendClient.Filter filter) {
+    return isBank
+        ? adaptBank(auditClient.bankEvents(filter), BANK_EVENT_PREFIX)
+        : adaptGeneric(auditClient.areaEvents(activeDomain, filter), GENERIC_EVENT_PREFIX);
   }
 
   /**
@@ -633,14 +642,15 @@ public class AdminAuditLogPageController {
   @NotNull
   private Map<String, String> exchangeClientNames() {
     Map<String, String> names = new TreeMap<>();
-    try {
-      List<ExchangeClientDto> clients = auditClient.exchangeClients();
-      if (clients != null) {
-        clients.forEach(c -> names.put(c.clientId(), c.displayName()));
-      }
-    } catch (Exception e) {
-      log.debug("Could not load the exchange registry for the audit client filter", e);
-    }
+    SectionFallback.run(
+        log,
+        "exchange-clients",
+        () -> {
+          List<ExchangeClientDto> clients = auditClient.exchangeClients();
+          if (clients != null) {
+            clients.forEach(c -> names.put(c.clientId(), c.displayName()));
+          }
+        });
     return names;
   }
 }

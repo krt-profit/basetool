@@ -36,9 +36,11 @@ import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.RelayParams;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.StringNormalization;
 import java.io.IOException;
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -139,14 +141,15 @@ public class AdminPersonalBlueprintsPageController {
     if (keys.isEmpty()) {
       return new PersonalBlueprintBatchResultDto(0, 0, 0);
     }
-    try {
-      PersonalBlueprintBatchResultDto result =
-          blueprintClient.addMemberOwned(userSub, new PersonalBlueprintBatchCreateRequest(keys));
-      return result == null ? new PersonalBlueprintBatchResultDto(0, 0, 0) : result;
-    } catch (Exception e) {
-      log.error("Admin batch blueprint add failed for user {}", userSub, e);
-      return new PersonalBlueprintBatchResultDto(0, 0, 0);
-    }
+    PersonalBlueprintBatchResultDto result =
+        SectionFallback.load(
+            log,
+            "admin-personal-blueprint-batch-add",
+            () ->
+                blueprintClient.addMemberOwned(
+                    userSub, new PersonalBlueprintBatchCreateRequest(keys)),
+            null);
+    return result == null ? new PersonalBlueprintBatchResultDto(0, 0, 0) : result;
   }
 
   /**
@@ -312,13 +315,8 @@ public class AdminPersonalBlueprintsPageController {
    */
   @Nullable
   private UserDto fetchUser(UUID userSub) {
-    try {
-      return blueprintClient.user(userSub);
-    } catch (Exception e) {
-      log.warn(
-          "Failed to fetch selected member {} for admin personal blueprints picker", userSub, e);
-      return null;
-    }
+    return SectionFallback.load(
+        log, "admin-personal-blueprints-member", () -> blueprintClient.user(userSub), null);
   }
 
   /**
@@ -329,12 +327,11 @@ public class AdminPersonalBlueprintsPageController {
    * @return the owned-blueprint page, or an empty page on failure
    */
   private PageResponse<PersonalBlueprintDto> fetchOwned(UUID userSub, String q) {
-    try {
-      return blueprintClient.memberOwnedPage(userSub, PAGE_SIZE, q);
-    } catch (Exception e) {
-      log.error("Failed to fetch owned blueprints for user {}", userSub, e);
-      return new PageResponse<>(new ArrayList<>(), 0, PAGE_SIZE, 0, 0, List.of());
-    }
+    return SectionFallback.load(
+        log,
+        "admin-personal-blueprints-owned",
+        () -> blueprintClient.memberOwnedPage(userSub, PAGE_SIZE, q),
+        new PageResponse<>(new ArrayList<>(), 0, PAGE_SIZE, 0, 0, List.of()));
   }
 
   /**
@@ -361,7 +358,7 @@ public class AdminPersonalBlueprintsPageController {
     }
     try {
       return Instant.parse(iso.trim());
-    } catch (Exception _) {
+    } catch (DateTimeParseException _) {
       return null;
     }
   }

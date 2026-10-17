@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.MarkdownRenderer;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.RelayParams;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionFinanceSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionListDto;
 import de.greluc.krt.profit.basetool.frontend.operation.client.OperationBackendClient;
@@ -144,18 +145,20 @@ public class OperationPageController {
     model.addAttribute("showPast", !"UPCOMING".equals(effectivePeriod));
     model.addAttribute("period", effectivePeriod);
 
-    try {
-      PageResponse<OperationDto> operationsPage =
-          operationClient.searchOperations(
-              new OperationBackendClient.OperationSearch(
-                  search, start, end, page, size, effectivePeriod));
-      model.addAttribute("operations", operationsPage.content());
-      model.addAttribute("operationsPage", operationsPage);
-      model.addAttribute("search", search);
-      model.addAttribute("start", start);
-      model.addAttribute("end", end);
-    } catch (Exception e) {
-      log.error("Error loading operations", e);
+    if (!SectionFallback.run(
+        log,
+        "operations-list",
+        () -> {
+          PageResponse<OperationDto> operationsPage =
+              operationClient.searchOperations(
+                  new OperationBackendClient.OperationSearch(
+                      search, start, end, page, size, effectivePeriod));
+          model.addAttribute("operations", operationsPage.content());
+          model.addAttribute("operationsPage", operationsPage);
+          model.addAttribute("search", search);
+          model.addAttribute("start", start);
+          model.addAttribute("end", end);
+        })) {
       model.addAttribute("error", "error.operations.load");
     }
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
@@ -172,13 +175,9 @@ public class OperationPageController {
    *     {@code null}.
    */
   private List<OrgUnitMembershipOptionDto> fetchCallerMembershipOptions() {
-    try {
-      List<OrgUnitMembershipOptionDto> options = operationClient.pickableOrgUnits();
-      return options != null ? options : List.of();
-    } catch (Exception e) {
-      log.warn("Failed to fetch pickable org units for operation-create owner-picker", e);
-      return List.of();
-    }
+    List<OrgUnitMembershipOptionDto> options =
+        SectionFallback.load(log, "owner-options", operationClient::pickableOrgUnits, List.of());
+    return options != null ? options : List.of();
   }
 
   /**
@@ -208,10 +207,8 @@ public class OperationPageController {
     if (fragment != null) {
       return operationFragment(id, page, size, fragment, authentication, model);
     }
-    try {
-      loadFullModel(id, page, size, authentication, model);
-    } catch (Exception e) {
-      log.error("Error loading operation details", e);
+    if (!SectionFallback.run(
+        log, "operation-detail", () -> loadFullModel(id, page, size, authentication, model))) {
       model.addAttribute("error", "error.operation.load");
       return "redirect:/operations";
     }
@@ -245,26 +242,26 @@ public class OperationPageController {
     if ("missions".equals(fragment)) {
       return missionsFragment(id, page, size, model);
     }
-    try {
-      return switch (fragment.toLowerCase(Locale.ROOT)) {
-        case "overview" -> {
-          loadFullModel(id, page, size, authentication, model);
-          yield "operation/operation-detail :: overviewSection";
-        }
-        case "payout" -> {
-          loadPayoutModel(id, authentication, model);
-          yield "operation/operation-detail :: payoutSection";
-        }
-        case "finance" -> {
-          loadFinanceModel(id, model);
-          yield "operation/operation-detail :: financeSection";
-        }
-        default -> "operation/operation-detail :: fragmentError";
-      };
-    } catch (Exception e) {
-      log.error("Error loading operation fragment '{}' for {}", fragment, id, e);
-      return "operation/operation-detail :: fragmentError";
-    }
+    return SectionFallback.load(
+        log,
+        "operation-fragment",
+        () ->
+            switch (fragment.toLowerCase(Locale.ROOT)) {
+              case "overview" -> {
+                loadFullModel(id, page, size, authentication, model);
+                yield "operation/operation-detail :: overviewSection";
+              }
+              case "payout" -> {
+                loadPayoutModel(id, authentication, model);
+                yield "operation/operation-detail :: payoutSection";
+              }
+              case "finance" -> {
+                loadFinanceModel(id, model);
+                yield "operation/operation-detail :: financeSection";
+              }
+              default -> "operation/operation-detail :: fragmentError";
+            },
+        "operation/operation-detail :: fragmentError");
   }
 
   /**
@@ -366,13 +363,15 @@ public class OperationPageController {
    */
   @NotNull
   private String missionsFragment(UUID id, Integer page, Integer size, Model model) {
-    try {
-      model.addAttribute("operation", operationClient.operation(id));
-      PageResponse<MissionListDto> missionsPage = fetchMissionsPage(id, page, size);
-      model.addAttribute("missions", missionsPage.content());
-      model.addAttribute("missionsPage", missionsPage);
-    } catch (Exception e) {
-      log.error("Error loading missions fragment for operation {}", id, e);
+    if (!SectionFallback.run(
+        log,
+        "operation-missions",
+        () -> {
+          model.addAttribute("operation", operationClient.operation(id));
+          PageResponse<MissionListDto> missionsPage = fetchMissionsPage(id, page, size);
+          model.addAttribute("missions", missionsPage.content());
+          model.addAttribute("missionsPage", missionsPage);
+        })) {
       model.addAttribute("missions", List.of());
     }
     return "operation/operation-detail :: missions";
@@ -407,11 +406,13 @@ public class OperationPageController {
   @GetMapping("/{id}/finance/{missionId}")
   public String operationMissionFinance(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID missionId, Model model) {
-    try {
-      MissionFinanceSummaryDto detail = operationClient.missionFinance(id, missionId);
-      model.addAttribute("financeDetail", detail);
-    } catch (Exception e) {
-      log.error("Error loading finance detail for operation {} mission {}", id, missionId, e);
+    if (!SectionFallback.run(
+        log,
+        "operation-mission-finance",
+        () -> {
+          MissionFinanceSummaryDto detail = operationClient.missionFinance(id, missionId);
+          model.addAttribute("financeDetail", detail);
+        })) {
       model.addAttribute("financeDetailError", true);
     }
     return "operation/operation-detail :: financeDetail";

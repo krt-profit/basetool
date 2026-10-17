@@ -2744,6 +2744,14 @@ A backend failure is mapped once, by `BackendErrorMapper` (REQ-FE-029), and answ
   a section fallback (one part of a page fails, the page still renders with the part empty or marked
   unavailable), a form-post fallback (a non-AJAX write flashes its error toast and redirects back),
   or a translation into another exception.
+- **A section fallback goes through `SectionFallback`.** A page section whose backend call may
+  fail without failing the page calls `kernel.web.SectionFallback.load(log, section, call, fallback)`,
+  or `SectionFallback.run(log, section, work)` and marks the section unavailable when it answers
+  `false`, instead of its own `catch (Exception …)`. The helper lets a
+  `ReauthenticationRequiredException` through, also when it arrives wrapped, so a page GET with an
+  expired session redirects to the login instead of rendering its sections' error banners. It logs
+  every other failure once and answers the fallback. A pure parse fallback (`Instant.parse`,
+  `Long.parseLong`, `UUID.fromString`, `RoundingMode.valueOf`) catches its specific exception.
 - **The number only shrinks.** The broad catch clauses (`Exception`, `RuntimeException`,
   `Throwable`, alone or in a multi-catch) of every file in a `web` package are frozen per file in
   `frontend/src/test/resources/architecture/broad-catch-ratchet.properties`. A file above its count
@@ -2761,9 +2769,13 @@ A backend failure is mapped once, by `BackendErrorMapper` (REQ-FE-029), and answ
   backend refusal reaches the global handler.
 - [x] A file with one broad clause more than frozen, and one with one less, each fail the ratchet; a
   narrow clause and an `…Error` type are not counted.
+- [x] The section and silent fallbacks of the page controllers run through `SectionFallback`, and
+  each migrated controller answers a page GET with an expired session with the redirect to
+  `/oauth2/authorization/keycloak`.
 
-**Enforced by:** `BroadCatchRatchetTest`, the controller tests of the changed handlers · **Code:**
-`kernel/web/GlobalExceptionHandler`, `kernel/web/BackendErrorResponses` · **Related:** REQ-FE-029,
+**Enforced by:** `BroadCatchRatchetTest`, `SectionFallbackTest`, the `…ReauthMvcTest` of each
+migrated page controller, the controller tests of the changed handlers · **Code:**
+`kernel/web/GlobalExceptionHandler`, `kernel/web/BackendErrorResponses`, `kernel/web/SectionFallback` · **Related:** REQ-FE-029,
 REQ-SEC-012, ADR-0032
 
 ## Out of scope

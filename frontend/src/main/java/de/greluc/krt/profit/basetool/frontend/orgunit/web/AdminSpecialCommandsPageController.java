@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogPages.Comple
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.orgunit.client.OrgUnitBackendClient;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.MembershipLeadToggleRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SpecialCommandDto;
@@ -98,16 +99,14 @@ public class AdminSpecialCommandsPageController {
     }
     model.addAttribute("includeInactive", includeInactive);
 
-    try {
-      CompleteCatalog<SpecialCommandDto> catalog = fetchSpecialCommands(includeInactive);
-      model.addAttribute("specialCommands", catalog.items());
-      model.addAttribute("catalogTruncated", catalog.truncated());
-    } catch (BackendServiceException e) {
-      log.debug("Error loading SpecialCommands", e);
-      model.addAttribute("specialCommands", List.of());
-      model.addAttribute("error", "error.admin.specialcommands.load");
-    } catch (Exception e) {
-      log.error("Error loading SpecialCommands", e);
+    if (!SectionFallback.run(
+        log,
+        "special-commands",
+        () -> {
+          CompleteCatalog<SpecialCommandDto> catalog = fetchSpecialCommands(includeInactive);
+          model.addAttribute("specialCommands", catalog.items());
+          model.addAttribute("catalogTruncated", catalog.truncated());
+        })) {
       model.addAttribute("specialCommands", List.of());
       model.addAttribute("error", "error.admin.specialcommands.load");
     }

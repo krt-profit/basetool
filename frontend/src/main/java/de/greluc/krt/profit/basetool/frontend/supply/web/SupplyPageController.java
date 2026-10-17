@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.supply.client.SupplyBackendClient;
 import de.greluc.krt.profit.basetool.frontend.supply.model.DonationDto;
 import de.greluc.krt.profit.basetool.frontend.supply.model.MyDonationStatsDto;
@@ -38,6 +39,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.http.HttpStatus;
@@ -59,6 +61,7 @@ import org.springframework.web.server.ResponseStatusException;
 @UsesLayoutModel
 @RequestMapping
 @RequiredArgsConstructor
+@Slf4j
 @PreAuthorize("isAuthenticated()")
 public class SupplyPageController {
 
@@ -90,14 +93,16 @@ public class SupplyPageController {
    */
   @ModelAttribute("supplyTabs")
   public @NotNull SupplyTabs supplyTabs() {
-    try {
-      List<SupplyUnitDto> units = orEmpty(supplyClient.units());
-      boolean incoming = units.stream().anyMatch(u -> u.canManage() && u.acceptsDonations());
-      boolean managesAny = units.stream().anyMatch(SupplyUnitDto::canManage);
-      return new SupplyTabs(incoming, incoming || managesAny || authHelper.isAdmin());
-    } catch (RuntimeException _) {
-      return new SupplyTabs(false, false);
-    }
+    return SectionFallback.load(
+        log,
+        "supply-tabs",
+        () -> {
+          List<SupplyUnitDto> units = orEmpty(supplyClient.units());
+          boolean incoming = units.stream().anyMatch(u -> u.canManage() && u.acceptsDonations());
+          boolean managesAny = units.stream().anyMatch(SupplyUnitDto::canManage);
+          return new SupplyTabs(incoming, incoming || managesAny || authHelper.isAdmin());
+        },
+        new SupplyTabs(false, false));
   }
 
   /**

@@ -28,9 +28,9 @@ import de.greluc.krt.profit.basetool.frontend.identity.model.LinkRegistrationReq
 import de.greluc.krt.profit.basetool.frontend.identity.model.PendingRegistrationDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.RejectRegistrationRequest;
 import de.greluc.krt.profit.basetool.frontend.identity.model.ReopenRegistrationRequest;
-import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -75,15 +75,13 @@ public class AdminDiscordRegistrationsPageController {
   @NotNull
   @GetMapping
   public String list(Model model) {
-    try {
-      List<PendingRegistrationDto> registrations = identityClient.pendingRegistrations();
-      model.addAttribute("registrations", registrations == null ? List.of() : registrations);
-    } catch (BackendServiceException e) {
-      log.debug("Failed to load the Discord registration queue", e);
-      model.addAttribute("error", "error.admin.discordRegistrations.load");
-      model.addAttribute("registrations", List.of());
-    } catch (Exception e) {
-      log.error("Failed to load the Discord registration queue", e);
+    if (!SectionFallback.run(
+        log,
+        "pending-registrations",
+        () -> {
+          List<PendingRegistrationDto> registrations = identityClient.pendingRegistrations();
+          model.addAttribute("registrations", registrations == null ? List.of() : registrations);
+        })) {
       model.addAttribute("error", "error.admin.discordRegistrations.load");
       model.addAttribute("registrations", List.of());
     }
@@ -98,16 +96,10 @@ public class AdminDiscordRegistrationsPageController {
    * @return the rejected registrations, or an empty list when the read failed
    */
   private List<PendingRegistrationDto> loadRejected() {
-    try {
-      List<PendingRegistrationDto> rejected = identityClient.rejectedRegistrations();
-      return rejected == null ? List.of() : rejected;
-    } catch (BackendServiceException e) {
-      log.debug("Failed to load the rejected registrations", e);
-      return List.of();
-    } catch (Exception e) {
-      log.error("Failed to load the rejected registrations", e);
-      return List.of();
-    }
+    List<PendingRegistrationDto> rejected =
+        SectionFallback.load(
+            log, "rejected-registrations", identityClient::rejectedRegistrations, List.of());
+    return rejected == null ? List.of() : rejected;
   }
 
   /**

@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogPages.Comple
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.promotion.client.PromotionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.MemberEvaluationDto;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionCategoryDto;
@@ -494,53 +495,35 @@ public class PromotionPageController {
   }
 
   private List<PromotionTopicDto> fetchTopics() {
-    try {
-      List<PromotionTopicDto> result = promotionClient.topics();
-      return result != null ? result : new ArrayList<>();
-    } catch (Exception e) {
-      log.error("Failed to fetch promotion topics", e);
-      return new ArrayList<>();
-    }
+    List<PromotionTopicDto> result =
+        SectionFallback.load(log, "promotion-topics", promotionClient::topics, null);
+    return result != null ? result : new ArrayList<>();
   }
 
   private List<PromotionCategoryDto> fetchCategoriesByTopic(String topicId) {
-    try {
-      List<PromotionCategoryDto> result = promotionClient.categoriesByTopic(topicId);
-      return result != null ? result : new ArrayList<>();
-    } catch (Exception e) {
-      log.error("Failed to fetch categories for topic {}", topicId, e);
-      return new ArrayList<>();
-    }
+    List<PromotionCategoryDto> result =
+        SectionFallback.load(
+            log, "topic-categories", () -> promotionClient.categoriesByTopic(topicId), null);
+    return result != null ? result : new ArrayList<>();
   }
 
   private List<PromotionCategoryDto> fetchAllCategories() {
-    try {
-      PageResponse<PromotionCategoryDto> result = promotionClient.allCategories();
-      return result != null && result.content() != null ? result.content() : new ArrayList<>();
-    } catch (Exception e) {
-      log.error("Failed to fetch all categories", e);
-      return new ArrayList<>();
-    }
+    PageResponse<PromotionCategoryDto> result =
+        SectionFallback.load(log, "promotion-categories", promotionClient::allCategories, null);
+    return result != null && result.content() != null ? result.content() : new ArrayList<>();
   }
 
   private List<PromotionLevelContentDto> fetchLevelContents(String categoryId) {
-    try {
-      List<PromotionLevelContentDto> result = promotionClient.levelContents(categoryId);
-      return result != null ? result : new ArrayList<>();
-    } catch (Exception e) {
-      log.error("Failed to fetch level contents for category {}", categoryId, e);
-      return new ArrayList<>();
-    }
+    List<PromotionLevelContentDto> result =
+        SectionFallback.load(
+            log, "level-contents", () -> promotionClient.levelContents(categoryId), null);
+    return result != null ? result : new ArrayList<>();
   }
 
   private List<RankRequirementDto> fetchAllRankRequirements() {
-    try {
-      PageResponse<RankRequirementDto> result = promotionClient.rankRequirements();
-      return result != null && result.content() != null ? result.content() : new ArrayList<>();
-    } catch (Exception e) {
-      log.error("Failed to fetch rank requirements", e);
-      return new ArrayList<>();
-    }
+    PageResponse<RankRequirementDto> result =
+        SectionFallback.load(log, "rank-requirements", promotionClient::rankRequirements, null);
+    return result != null && result.content() != null ? result.content() : new ArrayList<>();
   }
 
   /**
@@ -550,23 +533,14 @@ public class PromotionPageController {
    */
   @Nullable
   private Integer fetchCurrentUserRank() {
-    try {
-      UserDto me = promotionClient.currentUser();
-      return me != null ? me.rank() : null;
-    } catch (Exception e) {
-      log.warn("Failed to fetch current user rank for promotion overview", e);
-      return null;
-    }
+    UserDto me = SectionFallback.load(log, "current-user-rank", promotionClient::currentUser, null);
+    return me != null ? me.rank() : null;
   }
 
   private List<MemberEvaluationDto> fetchMyEvaluations() {
-    try {
-      List<MemberEvaluationDto> result = promotionClient.myEvaluations();
-      return result != null ? result : new ArrayList<>();
-    } catch (Exception e) {
-      log.error("Failed to fetch my evaluations", e);
-      return new ArrayList<>();
-    }
+    List<MemberEvaluationDto> result =
+        SectionFallback.load(log, "my-evaluations", promotionClient::myEvaluations, null);
+    return result != null ? result : new ArrayList<>();
   }
 
   /**
@@ -576,13 +550,13 @@ public class PromotionPageController {
    * @return the complete evaluation catalogue with its truncation flag
    */
   private CompleteCatalog<MemberEvaluationDto> fetchAllEvaluations() {
-    try {
-      return CatalogPages.fetchAll(
-          page -> promotionClient.allEvaluations(MATRIX_FETCH_PAGE_SIZE, page));
-    } catch (Exception e) {
-      log.error("Failed to fetch all evaluations", e);
-      return CompleteCatalog.empty();
-    }
+    return SectionFallback.load(
+        log,
+        "all-evaluations",
+        () ->
+            CatalogPages.fetchAll(
+                page -> promotionClient.allEvaluations(MATRIX_FETCH_PAGE_SIZE, page)),
+        CompleteCatalog.empty());
   }
 
   /**
@@ -593,32 +567,25 @@ public class PromotionPageController {
    * @return the complete member catalogue with its truncation flag
    */
   private CompleteCatalog<UserDto> fetchMembers() {
-    try {
-      return CatalogPages.fetchAll(
-          page -> promotionClient.evaluatableMembers(MATRIX_FETCH_PAGE_SIZE, page));
-    } catch (Exception e) {
-      log.error("Failed to fetch evaluatable members", e);
-      return CompleteCatalog.empty();
-    }
+    return SectionFallback.load(
+        log,
+        "evaluatable-members",
+        () ->
+            CatalogPages.fetchAll(
+                page -> promotionClient.evaluatableMembers(MATRIX_FETCH_PAGE_SIZE, page)),
+        CompleteCatalog.empty());
   }
 
   private List<PromotionEligibilityDto> fetchMyEligibility() {
-    try {
-      List<PromotionEligibilityDto> result = promotionClient.myEligibility();
-      return result != null ? result : new ArrayList<>();
-    } catch (Exception e) {
-      log.error("Failed to fetch personal promotion eligibility", e);
-      return new ArrayList<>();
-    }
+    List<PromotionEligibilityDto> result =
+        SectionFallback.load(log, "my-eligibility", promotionClient::myEligibility, null);
+    return result != null ? result : new ArrayList<>();
   }
 
   private List<PromotionEligibilityDto> fetchEligibilityForUser(UUID userId) {
-    try {
-      List<PromotionEligibilityDto> result = promotionClient.eligibilityOf(userId);
-      return result != null ? result : new ArrayList<>();
-    } catch (Exception e) {
-      log.error("Failed to fetch promotion eligibility for member {}", userId, e);
-      return new ArrayList<>();
-    }
+    List<PromotionEligibilityDto> result =
+        SectionFallback.load(
+            log, "member-eligibility", () -> promotionClient.eligibilityOf(userId), null);
+    return result != null ? result : new ArrayList<>();
   }
 }
