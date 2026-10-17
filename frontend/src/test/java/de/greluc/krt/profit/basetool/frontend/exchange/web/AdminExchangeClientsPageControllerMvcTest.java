@@ -55,6 +55,9 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.regex.MatchResult;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -266,12 +269,65 @@ class AdminExchangeClientsPageControllerMvcTest {
         .doesNotContain("class=\"greeting")
         .doesNotContain("hud-box")
         .doesNotContain("colspan")
-        .contains("id=\"xc-table\" class=\"data-table data-table--stack\"")
+        .contains("id=\"xc-table\" class=\"data-table data-table--stack xc-table\"")
+        .contains("class=\"xc-capabilities-cell\"")
         .contains("data-list-total=\"1\"")
         .containsPattern(
             "class=\"cell-status\">\\s*<span class=\"chip chip--success\">Freigegeben<")
         .doesNotContain(">ACTIVE<")
         .contains("id=\"xc-undo-runs-empty\"");
+  }
+
+  /**
+   * Each confirmation on the page labels its button with the action it confirms, in both languages,
+   * and none borrows the notifications page's delete label.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void eachConfirmationNamesItsOwnAction() throws Exception {
+    stubRegistry();
+
+    String german = messageHolders(Locale.GERMAN);
+    assertThat(german)
+        .contains("data-confirm-widen-ok=\"Erweitern\"")
+        .contains("data-confirm-suspend-ok=\"Sperren\"")
+        .contains("data-confirm-off-ok=\"Ausschalten\"")
+        .contains("data-confirm-on-ok=\"Einschalten\"")
+        .contains("data-confirm-ok=\"Zurücknehmen\"")
+        .doesNotContain("=\"Löschen\"");
+
+    String english = messageHolders(Locale.ENGLISH);
+    assertThat(english)
+        .contains("data-confirm-widen-ok=\"Grant\"")
+        .contains("data-confirm-suspend-ok=\"Suspend\"")
+        .contains("data-confirm-off-ok=\"Turn off\"")
+        .contains("data-confirm-on-ok=\"Turn on\"")
+        .contains("data-confirm-ok=\"Undo\"")
+        .doesNotContain("=\"Delete\"");
+  }
+
+  /**
+   * Renders the page in one language and returns the opening tags of its two message holders,
+   * {@code #xc-i18n} and {@code #xc-undo-i18n}, which carry every confirmation text of the page.
+   *
+   * @param locale the request's language
+   * @return both holders' opening tags, one per line
+   * @throws Exception if the request fails
+   */
+  private String messageHolders(Locale locale) throws Exception {
+    String html =
+        mockMvc
+            .perform(get("/admin/exchange-clients").param("lang", locale.getLanguage()))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    Matcher holders = Pattern.compile("<span id=\"xc-(?:undo-)?i18n\"[^>]*>").matcher(html);
+    List<String> tags = holders.results().map(MatchResult::group).toList();
+    assertThat(tags).hasSize(2);
+    return String.join("\n", tags);
   }
 
   @Test

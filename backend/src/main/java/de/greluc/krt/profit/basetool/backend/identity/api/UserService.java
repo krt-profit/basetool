@@ -155,14 +155,15 @@ public class UserService {
 
   /**
    * Updates a user's rank, description, display name and join date. The version is checked when
-   * non-null; a {@code null} version (admin override) skips it. Rank must lie in the role's range
-   * (officers 1–12, members 13–20); {@code joinDate} may be cleared with {@code null}, the other
-   * fields change only when supplied. A rank that differs from the stored one records {@link
-   * AuditEventType#MEMBER_RANK_CHANGED} in the same transaction (REQ-AUDIT-001).
+   * non-null; a {@code null} version (admin override) skips it. Rank must lie in the stored role's
+   * range (officers 1–12, members 13–20, REQ-ROLE-007); {@code joinDate} may be cleared with {@code
+   * null}, the other fields change only when supplied. A rank that differs from the stored one
+   * records {@link AuditEventType#MEMBER_RANK_CHANGED} in the same transaction (REQ-AUDIT-001).
    *
    * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the user is unknown
    * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
-   * @throws IllegalArgumentException when the rank is outside the role-permitted range
+   * @throws IllegalArgumentException when a role holder's rank lies outside 1–20
+   * @throws RankOutsideRoleRangeException when the rank does not fit the stored role
    */
   @Transactional
   @NotNull
@@ -178,20 +179,7 @@ public class UserService {
     OptimisticLock.checkOptionalClient(user.getVersion(), version, User.class, id);
 
     if (rank != null) {
-      boolean isOfficer =
-          user.getRoles().stream().anyMatch(r -> r.getName().equalsIgnoreCase(Roles.OFFICER));
-      boolean isSquadronMember =
-          user.getRoles().stream().anyMatch(r -> r.getName().equalsIgnoreCase(Roles.KRT_MEMBER));
-
-      if (isOfficer) {
-        if (rank < 1 || rank > 12) {
-          throw new IllegalArgumentException("Officers can only have rank 1-12");
-        }
-      } else if (isSquadronMember) {
-        if (rank < 13 || rank > 20) {
-          throw new IllegalArgumentException("Squadron members can only have rank 13-20");
-        }
-      }
+      requireRankFitsStoredRole(user, rank);
       Integer previousRank = user.getRank();
       if (!rank.equals(previousRank)) {
         user.setRank(rank);
@@ -212,6 +200,34 @@ public class UserService {
     }
     user.setJoinDate(joinDate);
     return userRepository.save(user);
+  }
+
+  /**
+   * Checks the rank against the range of the user's stored Keycloak role (REQ-ROLE-007): {@code
+   * OFFICER} 1–12, else {@code KRT_MEMBER} 13–20; a user with neither role is not checked.
+   *
+   * @param user the user whose stored roles decide the range
+   * @param rank the requested rank
+   * @throws IllegalArgumentException when a role holder's rank lies outside 1–20
+   * @throws RankOutsideRoleRangeException when the rank lies in 1–20 but outside the role's range
+   */
+  private static void requireRankFitsStoredRole(@NotNull User user, int rank) {
+    boolean isOfficer =
+        user.getRoles().stream().anyMatch(r -> r.getName().equalsIgnoreCase(Roles.OFFICER));
+    boolean isSquadronMember =
+        user.getRoles().stream().anyMatch(r -> r.getName().equalsIgnoreCase(Roles.KRT_MEMBER));
+    if (!isOfficer && !isSquadronMember) {
+      return;
+    }
+    if (rank < 1 || rank > 20) {
+      throw new IllegalArgumentException("Rank must be 1-20");
+    }
+    if (isOfficer && rank > 12) {
+      throw RankOutsideRoleRangeException.officer();
+    }
+    if (!isOfficer && rank < 13) {
+      throw RankOutsideRoleRangeException.member();
+    }
   }
 
   /**

@@ -144,7 +144,7 @@ web, naming its client (REQ-AUDIT-005):
   role editor's permission grid, previously the one mutation in this area that left no trace);
   the admin's change of a member's numeric member rank 1–20 (`MEMBER_RANK_CHANGED`, recorded only
   when the rank differs from the stored one; subject and target are the member, details
-  `from=<old|null> to=<new>`; the rank set on `PUT /api/v1/users/{id}/attributes`); and
+  `from=<old|null> to=<new>`, REQ-ROLE-007); and
   Kommandogruppe create / rename+reorder / delete. For membership/rank events the
   subject is the org unit (its shorthand/name snapshot) and the affected user is the target
   reference; for Kommandogruppe events the subject is the group (its name snapshot). For a

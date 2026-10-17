@@ -2,7 +2,12 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <th:block th:fragment="footer">
-    <footer class="krt-footer">
+    <footer class="krt-footer" th:classappend="${testSystem} ? 'krt-footer--test-system'">
+        <div th:if="${testSystem}" class="krt-footer-instance" role="note"
+             th:title="#{footer.testSystem.title}">
+            <span aria-hidden="true">&#9888;</span>
+            <span th:text="#{footer.testSystem}">Testsystem</span>
+        </div>
         <div class="krt-footer-links">
             <a th:href="@{/impressum}" th:text="#{nav.impressum}">Impressum</a>
             <a th:href="@{/privacy}" th:text="#{nav.privacy}">Datenschutz</a>

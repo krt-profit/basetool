@@ -150,7 +150,8 @@ class MaterialsPageControllerTest {
             100,
             200,
             true,
-            true);
+            true,
+            null);
     PageResponse<MaterialPriceDto> pageResponse =
         new PageResponse<>(List.of(priceDto), 0, 10000, 1, 1, Collections.emptyList());
 

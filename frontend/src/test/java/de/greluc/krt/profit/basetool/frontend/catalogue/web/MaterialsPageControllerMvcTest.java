@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -295,6 +296,53 @@ class MaterialsPageControllerMvcTest {
         .isLessThan(html.indexOf("data-terminal=\"Lorville CBD\""));
   }
 
+  /**
+   * Every terminal row shows when UEX last updated its price, as a relative age with the absolute
+   * time below it; an update older than seven days is marked stale by icon and hidden text, and a
+   * row without an update time shows a dash.
+   */
+  @Test
+  @WithMockUser
+  void getMaterialDetail_showsTheUexUpdateAgePerRowAndMarksStaleOnes() throws Exception {
+    UUID id = UUID.randomUUID();
+    Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+    Instant fresh = now.minus(Duration.ofHours(3)).minus(Duration.ofMinutes(1));
+    Instant old = now.minus(Duration.ofDays(19)).minus(Duration.ofHours(1));
+    stubDetail(
+        material(id, null, false, false),
+        List.of(
+            price("Fresh TDD", null, new BigDecimal("90"), fresh),
+            price("Old CBD", null, new BigDecimal("80"), old),
+            price("Unknown Post", null, new BigDecimal("70"), null)));
+
+    String html =
+        mockMvc
+            .perform(get("/materials/" + id).locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .containsPattern("<th scope=\"col\" class=\"num\">UEX-Stand</th>")
+        .contains(">Letzter UEX-Sync<")
+        .contains("<time datetime=\"" + fresh + "\"")
+        .contains("<time datetime=\"" + old + "\"")
+        .contains(">vor 3 Std<")
+        .contains(">vor 19 Tagen<")
+        .containsPattern("class=\"cell-sub\">\\d{2}\\.\\d{2}\\. \\d{2}:\\d{2}<")
+        .containsPattern("data-label=\"UEX-Stand\"");
+    String freshCell = cellOf(html, "Fresh TDD");
+    String oldCell = cellOf(html, "Old CBD");
+    String unknownCell = cellOf(html, "Unknown Post");
+    assertThat(freshCell).doesNotContain("md-uex-age--stale").doesNotContain("krt-icon-warning");
+    assertThat(oldCell)
+        .contains("md-uex-age--stale")
+        .contains("#krt-icon-warning")
+        .contains("class=\"visually-hidden\">veraltet<");
+    assertThat(unknownCell).contains("md-price--none").doesNotContain("<time");
+  }
+
   /** A material without prices shows the empty state instead of a table. */
   @Test
   @WithMockUser
@@ -453,7 +501,37 @@ class MaterialsPageControllerMvcTest {
    * @return the price
    */
   private static MaterialPriceDto price(String terminal, BigDecimal buy, BigDecimal sell) {
-    return new MaterialPriceDto(UUID.randomUUID(), terminal, buy, sell, 100, 200, true, true);
+    return price(terminal, buy, sell, null);
+  }
+
+  /**
+   * One terminal price with the time UEX last updated it.
+   *
+   * @param terminal the terminal name
+   * @param buy the purchase price, or {@code null}
+   * @param sell the sale price, or {@code null}
+   * @param uexUpdatedAt the UEX update time, or {@code null}
+   * @return the price
+   */
+  private static MaterialPriceDto price(
+      String terminal, BigDecimal buy, BigDecimal sell, Instant uexUpdatedAt) {
+    return new MaterialPriceDto(
+        UUID.randomUUID(), terminal, buy, sell, 100, 200, true, true, uexUpdatedAt);
+  }
+
+  /**
+   * The UEX age cell of one terminal row of the rendered detail table.
+   *
+   * @param html the rendered page
+   * @param terminal the terminal whose row is wanted
+   * @return the markup from the row's age cell to the end of that row
+   */
+  private static String cellOf(String html, String terminal) {
+    int row = html.indexOf("data-terminal=\"" + terminal + "\"");
+    assertThat(row).as("row of %s", terminal).isNotNegative();
+    int cell = html.indexOf("data-testid=\"material-price-uex-age\"", row);
+    int start = html.lastIndexOf("<td", cell);
+    return html.substring(start, html.indexOf("</tr>", cell));
   }
 
   /**

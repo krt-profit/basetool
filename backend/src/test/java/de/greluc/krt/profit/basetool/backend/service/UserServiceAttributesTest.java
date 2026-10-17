@@ -36,6 +36,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.identity.api.MembershipOperations;
+import de.greluc.krt.profit.basetool.backend.identity.api.RankOutsideRoleRangeException;
 import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.api.SquadronVisibility;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -299,7 +300,7 @@ class UserServiceAttributesTest {
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
 
       assertThrows(
-          IllegalArgumentException.class,
+          RankOutsideRoleRangeException.class,
           () -> userService.updateUserAttributes(USER_ID, 5, null, null, 1L, null));
 
       verifyNoInteractions(auditRecorder);

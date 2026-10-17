@@ -57,7 +57,7 @@
                 <div class="kpi-value" th:if="${uexAge != null}" th:title="${uexAge.syncedAt}"
                      th:text="#{${'materials.detail.kpi.age.' + uexAge.unit}(${uexAge.amount})}">14 min</div>
                 <div class="kpi-value" th:if="${uexAge == null}">–</div>
-                <div class="kpi-sub" th:text="#{materials.detail.kpi.uexSync}">UEX-Sync</div>
+                <div class="kpi-sub" th:text="#{materials.detail.kpi.uexSync}">Letzter UEX-Sync</div>
             </div>
         </div>
 
@@ -82,6 +82,7 @@
                             <th scope="col" class="num" aria-sort="none" data-sort-col="buy">
                                 <span th:text="#{materials.detail.sort.buy}">Einkauf</span><span class="md-sort-mark" aria-hidden="true">↑</span>
                             </th>
+                            <th scope="col" class="num" th:text="#{materials.detail.th.uexUpdated}">UEX-Stand</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -96,6 +97,20 @@
                                 th:classappend="${row.priceSell() == null} ? 'md-price--none'" th:text="${row.sellText()}">89,6</td>
                             <td class="num md-price-buy" th:attr="data-label=#{materials.detail.sort.buy}"
                                 th:classappend="${row.priceBuy() == null} ? 'md-price--none'" th:text="${row.buyText()}">–</td>
+                            <td class="num md-uex-age" th:attr="data-label=#{materials.detail.th.uexUpdated}"
+                                th:classappend="${row.uexAge() == null} ? 'md-price--none' : (${row.uexStale()} ? 'md-uex-age--stale')"
+                                data-testid="material-price-uex-age">
+                                <time th:if="${row.uexAge() != null}" th:with="local=${@relativeDays.local(row.uexAge().syncedAt())}"
+                                      th:datetime="${row.uexAge().syncedAt()}" th:title="${#temporals.format(local, 'dd.MM.yyyy HH:mm')}"
+                                      ><span class="cell-title"
+                                        ><svg th:if="${row.uexStale()}" class="krt-icon" aria-hidden="true"><use href="#krt-icon-warning"/></svg
+                                        ><span th:text="#{${'materials.detail.uexAge.' + row.uexAge().unit()}(${row.uexAge().amount()})}">vor 3 Std</span
+                                        ><span th:if="${row.uexStale()}" class="visually-hidden" th:text="#{materials.detail.uexAge.stale}">veraltet</span
+                                    ></span
+                                    ><span class="cell-sub" th:text="${#temporals.format(local, 'dd.MM. HH:mm')}">17.10. 09:12</span
+                                ></time>
+                                <th:block th:if="${row.uexAge() == null}">–</th:block>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
