@@ -556,9 +556,6 @@ public class MissionPageController {
           e.getStatusCode(),
           e.getMessage());
       return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("UNEXPECTED ERROR in getUnassignedParticipantsAjax for mission {}", id, e);
-      return ResponseEntity.internalServerError().build();
     }
   }
 

@@ -82,9 +82,6 @@ public class InventoryPoolChangeProxyController {
           e.getStatusCode(),
           e.getMessage());
       return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Failed to move inventory item into another pool", e);
-      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -103,9 +100,6 @@ public class InventoryPoolChangeProxyController {
     } catch (BackendServiceException e) {
       log.debug("Failed to list pool targets: status={}, {}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Failed to list pool targets", e);
-      return ResponseEntity.internalServerError().build();
     }
   }
 

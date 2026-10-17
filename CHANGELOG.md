@@ -14,6 +14,8 @@
 
 ### Fixed
 
+- **Fehler beim Speichern: richtige Meldung und erneute Anmeldung.** 53 AJAX-Aktionen (Lager, Aufträge, Raffinerie, Missionen, Benachrichtigungen, Mitglieder, Profil, Organigramm, Admin-Stammdaten u. a.) fangen Fehler nicht mehr selbst als pauschalen 500/502 ab: Konflikte wie „gleichzeitig geändert" (409) behalten ihren Status und ihre Meldung, und eine abgelaufene Anmeldung führt wieder zur Keycloak-Anmeldung statt zu einem Fehler-Toast (Frontend, REQ-FE-036).
+
 - **Mitglied bearbeiten: Rang passt nicht zur Officer-Rolle.** Ein Rang außerhalb des Bereichs der Keycloak-Rolle (Officer 1–12, Mitglieder 13–20) wird nicht mehr als „ungültiges Argument“ abgelehnt, sondern am Rang-Feld mit dem Hinweis, welche Rolle das Mitglied noch hat und dass sie zuerst in Keycloak geändert werden muss; unter dem Rang steht der erlaubte Bereich. Neuer API-Fehlercode `RANK_OUTSIDE_ROLE_RANGE` (REQ-ROLE-007, ADR-0264).
 
 - **Lager-Übersicht: Umschalter „Globales Lager | Mein Lager“ ohne Leerraum.** Die Segmente sind wieder genau so breit wie ihre Beschriftung; die Kopfzeilen-Navigation vererbte ihren Abstand an jeden Segment-Umschalter, der als `<nav>` gesetzt ist (Design-System-CSS, REQ-UI-028).

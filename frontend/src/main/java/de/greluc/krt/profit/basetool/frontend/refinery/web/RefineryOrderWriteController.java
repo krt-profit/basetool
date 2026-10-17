@@ -56,7 +56,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -564,9 +563,6 @@ public class RefineryOrderWriteController {
     } catch (BackendServiceException bse) {
       log.debug("Failed to update refinery order {} (ajax): {}", id, bse.getMessage());
       return propagateBackendError(bse);
-    } catch (Exception e) {
-      log.error("Failed to update refinery order {} (ajax)", id, e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }
 
@@ -597,9 +593,6 @@ public class RefineryOrderWriteController {
     } catch (BackendServiceException bse) {
       log.debug("Failed to store refinery order {} (ajax): {}", id, bse.getMessage());
       return propagateBackendError(bse);
-    } catch (Exception e) {
-      log.error("Failed to store refinery order {} (ajax)", id, e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }
 
@@ -620,9 +613,6 @@ public class RefineryOrderWriteController {
     } catch (BackendServiceException bse) {
       log.debug("Failed to cancel refinery order {} (ajax): {}", id, bse.getMessage());
       return propagateBackendError(bse);
-    } catch (Exception e) {
-      log.error("Failed to cancel refinery order {} (ajax)", id, e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }
 
@@ -655,9 +645,6 @@ public class RefineryOrderWriteController {
     } catch (BackendServiceException bse) {
       log.debug("Failed to create refinery order (ajax): {}", bse.getMessage());
       return propagateBackendError(bse);
-    } catch (Exception e) {
-      log.error("Failed to create refinery order (ajax)", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }
 

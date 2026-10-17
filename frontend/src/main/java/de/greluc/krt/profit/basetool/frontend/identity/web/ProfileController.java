@@ -340,10 +340,6 @@ public class ProfileController {
       }
       return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
           .body(Map.of("detail", msg("error.profile.update.failed")));
-    } catch (Exception e) {
-      log.error("AJAX profile description update failed", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(Map.of("detail", msg("error.profile.update.failed")));
     }
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("version", refreshedUserVersion(form.version()));
@@ -441,10 +437,6 @@ public class ProfileController {
       }
       return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
           .body(Map.of("detail", msg("error.profile.update.failed")));
-    } catch (Exception e) {
-      log.error("AJAX payout-preference update failed", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(Map.of("detail", msg("error.profile.update.failed")));
     }
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("version", ownVersion(saved == null ? null : saved.version(), form.version()));
@@ -533,10 +525,6 @@ public class ProfileController {
             .body(Map.of("code", "OPTIMISTIC_LOCK", "detail", msg("error.concurrency.conflict")));
       }
       return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-          .body(Map.of("detail", msg("error.profile.update.failed")));
-    } catch (Exception e) {
-      log.error("AJAX blueprint-sharing update failed", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
           .body(Map.of("detail", msg("error.profile.update.failed")));
     }
     Map<String, Object> body = new LinkedHashMap<>();

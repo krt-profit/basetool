@@ -20,10 +20,12 @@
 package de.greluc.krt.profit.basetool.frontend.dashboard.web;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.frontend.dashboard.client.DashboardBackendClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import jakarta.servlet.http.HttpSession;
 import java.util.Collections;
 import org.junit.jupiter.api.Test;
@@ -68,15 +70,18 @@ class HomeControllerTest {
   }
 
   @Test
-  void markAnnouncementAsReadAjax_backendFailure_returns502AndDoesNotThrow() {
+  void markAnnouncementAsReadAjax_backendFailure_reachesTheGlobalHandlerWithItsStatus() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     HomeController controller = new HomeController(new DashboardBackendClient(backendApiClient));
-    doThrow(new RuntimeException("backend down"))
+    doThrow(new BackendServiceException("not found", null, 404))
         .when(backendApiClient)
         .put(anyString(), any(), any(), any(Object[].class));
 
-    var response = controller.markAnnouncementAsReadAjax(ANNOUNCEMENT_ID);
+    BackendServiceException thrown =
+        assertThrows(
+            BackendServiceException.class,
+            () -> controller.markAnnouncementAsReadAjax(ANNOUNCEMENT_ID));
 
-    assertEquals(502, response.getStatusCode().value());
+    assertEquals(404, thrown.getStatusCode());
   }
 }

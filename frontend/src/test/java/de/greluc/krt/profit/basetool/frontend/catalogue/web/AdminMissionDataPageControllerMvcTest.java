@@ -32,6 +32,8 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
@@ -39,6 +41,7 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.FrequencyTypeDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.JobTypeDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
@@ -49,6 +52,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -117,6 +121,42 @@ class AdminMissionDataPageControllerMvcTest {
     when(backendApiClient.get(
             contains("/api/v1/frequency-types"), anyTypeRef(), any(Object[].class)))
         .thenReturn(freqTypes);
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void reorderFrequencyTypes_keepsTheBackendLockConflict() throws Exception {
+    when(backendApiClient.post(eq("/api/v1/frequency-types/reorder"), any(), eq(Void.class)))
+        .thenThrow(
+            new BackendServiceException(
+                "locked", null, 409, "PESSIMISTIC_LOCK", null, List.of(), null));
+
+    mockMvc
+        .perform(
+            post("/admin/mission-data/frequency-types/reorder")
+                .with(csrf())
+                .accept(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("[\"" + UUID.randomUUID() + "\"]"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("PESSIMISTIC_LOCK"));
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void reorderFrequencyTypes_sendsALostSessionToTheLogin() throws Exception {
+    when(backendApiClient.post(eq("/api/v1/frequency-types/reorder"), any(), eq(Void.class)))
+        .thenThrow(new ReauthenticationRequiredException("token gone", null));
+
+    mockMvc
+        .perform(
+            post("/admin/mission-data/frequency-types/reorder")
+                .with(csrf())
+                .accept(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("[\"" + UUID.randomUUID() + "\"]"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(header().exists("X-Reauthenticate"));
   }
 
   @Test

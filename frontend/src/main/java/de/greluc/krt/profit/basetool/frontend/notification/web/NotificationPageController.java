@@ -344,11 +344,6 @@ public class NotificationPageController {
       return ResponseEntity.ok(new NotificationCountResponse(currentUnreadCount()));
     } catch (BackendServiceException e) {
       return propagateBackendError(e);
-    } catch (ReauthenticationRequiredException e) {
-      throw e;
-    } catch (Exception e) {
-      log.error("Mark-read {} (ajax) failed", id, e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }
 
@@ -365,11 +360,6 @@ public class NotificationPageController {
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
       return propagateBackendError(e);
-    } catch (ReauthenticationRequiredException e) {
-      throw e;
-    } catch (Exception e) {
-      log.error("Mark-all-read (ajax) failed", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }
 
@@ -387,11 +377,6 @@ public class NotificationPageController {
       return ResponseEntity.ok(new NotificationCountResponse(currentUnreadCount()));
     } catch (BackendServiceException e) {
       return propagateBackendError(e);
-    } catch (ReauthenticationRequiredException e) {
-      throw e;
-    } catch (Exception e) {
-      log.error("Delete notification {} (ajax) failed", id, e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }
 
@@ -408,11 +393,6 @@ public class NotificationPageController {
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
       return propagateBackendError(e);
-    } catch (ReauthenticationRequiredException e) {
-      throw e;
-    } catch (Exception e) {
-      log.error("Clear-read (ajax) failed", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }
 

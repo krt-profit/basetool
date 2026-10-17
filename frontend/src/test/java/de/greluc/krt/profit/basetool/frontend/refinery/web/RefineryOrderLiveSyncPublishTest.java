@@ -29,6 +29,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
 import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.frontend.refinery.client.RefineryBackendClient;
@@ -105,7 +106,7 @@ class RefineryOrderLiveSyncPublishTest {
 
   @Test
   void deleteOrderAjax_onBackendFailure_doesNotPublish() {
-    doThrow(new RuntimeException("backend down"))
+    doThrow(new BackendServiceException("backend down", null, 503))
         .when(backendApiClient)
         .delete(anyString(), any(), any(Object[].class));
 
@@ -137,7 +138,7 @@ class RefineryOrderLiveSyncPublishTest {
   @Test
   void storeOrderAjax_onBackendFailure_pokesNeitherRoom() {
     UUID id = UUID.randomUUID();
-    doThrow(new RuntimeException("backend down"))
+    doThrow(new BackendServiceException("backend down", null, 503))
         .when(backendApiClient)
         .post(anyString(), any(), eq(Void.class), any(Object[].class));
 

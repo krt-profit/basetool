@@ -102,8 +102,6 @@ public class OrgChartPageController {
       return ResponseEntity.ok(orgChartClient.createPosition(body));
     } catch (BackendServiceException e) {
       return relayError("Create org-chart position failed", e);
-    } catch (Exception e) {
-      return unexpectedError("Create org-chart position failed", e);
     }
   }
 
@@ -123,8 +121,6 @@ public class OrgChartPageController {
       return ResponseEntity.ok(orgChartClient.updatePosition(id, body));
     } catch (BackendServiceException e) {
       return relayError("Update org-chart position failed", e);
-    } catch (Exception e) {
-      return unexpectedError("Update org-chart position failed", e);
     }
   }
 
@@ -147,8 +143,6 @@ public class OrgChartPageController {
       return ResponseEntity.ok().build();
     } catch (BackendServiceException e) {
       return relayError("Vacate org-chart Kommandoleiter failed", e);
-    } catch (Exception e) {
-      return unexpectedError("Vacate org-chart Kommandoleiter failed", e);
     }
   }
 
@@ -167,8 +161,6 @@ public class OrgChartPageController {
       return ResponseEntity.ok().build();
     } catch (BackendServiceException e) {
       return relayError("Delete org-chart position failed", e);
-    } catch (Exception e) {
-      return unexpectedError("Delete org-chart position failed", e);
     }
   }
 
@@ -179,12 +171,5 @@ public class OrgChartPageController {
     payload.put("detail", e.getProblemDetail());
     int status = e.getStatusCode() > 0 ? e.getStatusCode() : 500;
     return ResponseEntity.status(status).body(payload);
-  }
-
-  private ResponseEntity<Object> unexpectedError(String logMessage, Exception e) {
-    log.error(logMessage, e);
-    Map<String, Object> payload = new HashMap<>();
-    payload.put("code", "INTERNAL_ERROR");
-    return ResponseEntity.status(500).body(payload);
   }
 }

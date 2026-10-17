@@ -286,9 +286,6 @@ public class AdminMaterialsPageController {
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "PUT /api/v1/materials", id, e);
       return ResponseEntity.status(500).build();
-    } catch (Exception e) {
-      log.error("Ajax update material failed", e);
-      return ResponseEntity.status(500).build();
     }
   }
 
@@ -314,9 +311,6 @@ public class AdminMaterialsPageController {
           e.getProblemCode(),
           e.getReadableErrorMessage());
       return ResponseEntity.status(e.getStatusCode()).build();
-    } catch (Exception e) {
-      log.error("Ajax create material failed", e);
-      return ResponseEntity.status(500).build();
     }
   }
 }

@@ -1480,14 +1480,16 @@ class InventoryPageControllerMvcTest {
   }
 
   /**
-   * A failed probe answers {@code 502}, so the form falls back to offering the opt-in rather than
-   * hiding it on a guess (REQ-INV-026).
+   * A failed probe keeps the backend's status, so the form falls back to offering the opt-in rather
+   * than hiding it on a guess (REQ-INV-026, REQ-FE-036).
    */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
-  void mergeCandidatesAjax_ShouldAnswerBadGatewayWhenTheBackendFails() throws Exception {
+  void mergeCandidatesAjax_ShouldKeepTheBackendStatusWhenTheBackendFails() throws Exception {
     when(backendApiClient.get(anyString(), eq(InventoryMergeCandidatesDto.class)))
-        .thenThrow(new IllegalStateException("backend down"));
+        .thenThrow(
+            new de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException(
+                "backend down", null, 503));
 
     mockMvc
         .perform(
@@ -1496,7 +1498,7 @@ class InventoryPageControllerMvcTest {
                 .param("materialId", UUID.randomUUID().toString())
                 .param("locationId", UUID.randomUUID().toString())
                 .param("quality", "500"))
-        .andExpect(status().isBadGateway());
+        .andExpect(status().isServiceUnavailable());
   }
 
   /**

@@ -590,11 +590,6 @@ public class LeitungPageController {
       payload.put("detail", e.getProblemDetail());
       int status = e.getStatusCode() > 0 ? e.getStatusCode() : 500;
       return ResponseEntity.status(status).body(payload);
-    } catch (Exception e) {
-      log.error(logMessage, e);
-      Map<String, Object> payload = new HashMap<>();
-      payload.put("code", "INTERNAL_ERROR");
-      return ResponseEntity.status(500).body(payload);
     }
   }
 

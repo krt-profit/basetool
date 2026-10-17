@@ -420,9 +420,6 @@ public class MissionWriteController {
         default -> status = HttpStatus.INTERNAL_SERVER_ERROR;
       }
       return ResponseEntity.status(status).build();
-    } catch (Exception e) {
-      log.error("Update actual time failed", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }
 
@@ -962,50 +959,40 @@ public class MissionWriteController {
   @ResponseBody
   public ResponseEntity<Object> addManager(@PathVariable String id, @PathVariable String userId) {
     log.debug("START addManager - id: '{}', userId: '{}'", id, userId);
+    if (id == null || id.isBlank() || userId == null || userId.isBlank()) {
+      log.debug("MISSING PARAMETERS - id: '{}', userId: '{}'", id, userId);
+      return ResponseEntity.badRequest().build();
+    }
+    UUID missionUuid;
+    UUID userUuid;
     try {
-      if (id == null || id.isBlank() || userId == null || userId.isBlank()) {
-        log.debug("MISSING PARAMETERS - id: '{}', userId: '{}'", id, userId);
-        return ResponseEntity.badRequest().build();
-      }
-      UUID missionUuid;
-      UUID userUuid;
-      try {
-        missionUuid = UUID.fromString(id.trim());
-      } catch (IllegalArgumentException e) {
-        log.debug("INVALID MISSION ID FORMAT - id: '{}', Error: {}", id, e.getMessage());
-        return ResponseEntity.badRequest().build();
-      }
-      try {
-        userUuid = UUID.fromString(userId.trim());
-      } catch (IllegalArgumentException e) {
-        log.debug("INVALID USER ID FORMAT - userId: '{}', Error: {}", userId, e.getMessage());
-        return ResponseEntity.badRequest().build();
-      }
+      missionUuid = UUID.fromString(id.trim());
+    } catch (IllegalArgumentException e) {
+      log.debug("INVALID MISSION ID FORMAT - id: '{}', Error: {}", id, e.getMessage());
+      return ResponseEntity.badRequest().build();
+    }
+    try {
+      userUuid = UUID.fromString(userId.trim());
+    } catch (IllegalArgumentException e) {
+      log.debug("INVALID USER ID FORMAT - userId: '{}', Error: {}", userId, e.getMessage());
+      return ResponseEntity.badRequest().build();
+    }
 
-      log.debug("CALLING BACKEND - Mission: {}, User: {}", missionUuid, userUuid);
-      try {
-        missionClient.addManager(missionUuid, userUuid);
-        log.debug("SUCCESS - Manager {} added to mission {}", userUuid, missionUuid);
-        return ResponseEntity.ok().build();
-      } catch (BackendServiceException e) {
-        log.debug(
-            "BACKEND ERROR adding manager for mission {} and user {}: Status={}, Message={},"
-                + " Readable={}",
-            missionUuid,
-            userUuid,
-            e.getStatusCode(),
-            e.getMessage(),
-            e.getReadableErrorMessage());
-        return propagateBackendError(e);
-      }
-    } catch (Exception e) {
+    log.debug("CALLING BACKEND - Mission: {}, User: {}", missionUuid, userUuid);
+    try {
+      missionClient.addManager(missionUuid, userUuid);
+      log.debug("SUCCESS - Manager {} added to mission {}", userUuid, missionUuid);
+      return ResponseEntity.ok().build();
+    } catch (BackendServiceException e) {
       log.debug(
-          "UNEXPECTED ERROR in addManager: id='{}', userId='{}', error={}",
-          id,
-          userId,
+          "BACKEND ERROR adding manager for mission {} and user {}: Status={}, Message={},"
+              + " Readable={}",
+          missionUuid,
+          userUuid,
+          e.getStatusCode(),
           e.getMessage(),
-          e);
-      return ResponseEntity.internalServerError().build();
+          e.getReadableErrorMessage());
+      return propagateBackendError(e);
     }
   }
 
@@ -1096,9 +1083,6 @@ public class MissionWriteController {
       }
       log.debug("Owner change (AJAX) failed: status={}", e.getStatusCode());
       return propagateBackendError(e);
-    } catch (Exception e) {
-      log.debug("UNEXPECTED ERROR in setMissionOwner for mission {}", id, e);
-      return ResponseEntity.internalServerError().build();
     }
   }
 

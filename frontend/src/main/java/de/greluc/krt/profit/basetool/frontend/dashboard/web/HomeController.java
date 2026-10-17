@@ -184,18 +184,14 @@ public class HomeController {
    * XMLHttpRequest}, so the page removes the control in place (REQ-FE-005).
    *
    * @param id announcement id to mark as read
-   * @return {@code 200} on success, {@code 502} on a backend failure
+   * @return {@code 200} on success; a failure is answered by the global handler with the backend's
+   *     status
    */
   @PostMapping(value = "/announcement/read", headers = "X-Requested-With=XMLHttpRequest")
   @ResponseBody
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<Void> markAnnouncementAsReadAjax(@RequestParam UUID id) {
-    try {
-      dashboardClient.markAnnouncementRead(id);
-      return ResponseEntity.ok().build();
-    } catch (Exception e) {
-      log.error("Failed to mark announcement as read", e);
-      return ResponseEntity.status(502).build();
-    }
+    dashboardClient.markAnnouncementRead(id);
+    return ResponseEntity.ok().build();
   }
 }

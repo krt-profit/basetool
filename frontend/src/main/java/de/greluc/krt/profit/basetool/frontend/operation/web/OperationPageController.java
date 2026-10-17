@@ -539,9 +539,6 @@ public class OperationPageController {
         return ResponseEntity.status(HttpStatus.CONFLICT).build();
       }
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    } catch (Exception e) {
-      log.error("Update payout paid-out flag failed", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }
 
