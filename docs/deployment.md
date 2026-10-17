@@ -631,7 +631,8 @@ protection for a host that has not got the check yet, and it is how the first in
 > they are collected per release from an audit of its PRs: **1.11.0** →
 > [`RELEASE_1.11.0_PRODUCTION_RUNBOOK.md`](archive/RELEASE_1.11.0_PRODUCTION_RUNBOOK.md); the **External
 > Client Exchange go-live** (#2092, the first release after 1.12.0) →
-> [`EXCHANGE_GO_LIVE_RUNBOOK.md`](archive/EXCHANGE_GO_LIVE_RUNBOOK.md).
+> [`EXCHANGE_GO_LIVE_RUNBOOK.md`](archive/EXCHANGE_GO_LIVE_RUNBOOK.md); **1.17.0** (the internal-only
+> backend, #2638) → [`RELEASE_1.17.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.17.0_PRODUCTION_RUNBOOK.md).
 
 ```bash
 gh workflow run promote.yml -f version=1.9.3
