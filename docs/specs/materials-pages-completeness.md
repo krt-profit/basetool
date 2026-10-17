@@ -123,8 +123,13 @@ terminal), „Ø Verkauf" (mean of the positive sale prices, with the number of 
 Ort · Verkauf · Einkauf · UEX-Stand; the location and the planet stripe come from the cached price
 matrix's rows of the same material (a matrix failure only empties the location). Zero or negative
 prices show as „–". The rows are sorted by sale price, highest first, terminals buying nothing last
-by name; the segment „Verkauf · Einkauf" re-sorts in the browser (purchase ascending) and the
-search narrows the rows by terminal.
+by name. Each of the Terminal, Ort, Verkauf and Einkauf headers is a sort button of the shared
+sortable header ([REQ-UI-030](ui-design-system.md)): a click on an inactive column sorts by it in
+its first direction (Terminal and Ort A–Z, Verkauf highest first, Einkauf lowest first), a second
+click reverses it; rows without a value stay last, ties go by terminal name, and the header carries
+the matching `aria-sort`. „UEX-Stand" is not sortable. Sorting happens in the browser and keeps the
+terminal search's narrowing. On a phone, where the stacked table hides its header row, the four
+sort buttons stay visible as a strip above the rows, so the table sorts on every device class.
 
 „UEX-Stand" is the time UEX last updated that terminal's price (`date_modified` of the UEX price
 row, stored by the commodity sync and returned as `uexUpdatedAt` by
@@ -137,7 +142,8 @@ icon and a visually hidden „veraltet", so colour is never the only signal. A r
 time shows „–".
 
 *Amended 2026-10-03 (website overhaul phase 3): chips, the four figures, the location column, the
-sale-price sort with the „Verkauf · Einkauf" segment.*
+sale-price sort. Amended 2026-10-17 (#2634): the column headers sort, the „Verkauf · Einkauf"
+segment is gone.*
 
 *Amended 2026-10-17 (#2649): the per-row „UEX-Stand" column with the seven-day stale mark; the
 sweep figure is labelled „Letzter UEX-Sync".*
@@ -152,6 +158,9 @@ sweep figure is labelled „Letzter UEX-Sync".*
   age, the absolute time and a `<time datetime>`; a row without one shows „–".
 - [ ] A row whose UEX update is more than seven days old is marked stale by icon, warning colour and
   hidden text; exactly seven days is not stale.
+- [ ] Every column header of the price table is a sort `<button>`; the sale column starts active and
+  descending, and no separate sort segment is rendered.
+- [ ] At phone width the sort buttons are visible and sort the table.
 
 **Enforced by:** `MaterialsPageControllerTest` /
 `MaterialsPageControllerMvcTest.getMaterialDetail_*` / `MaterialTerminalPricesTest` / `UexAgeTest` /

@@ -790,6 +790,22 @@ val testSafeUrl =
     outputs.upToDateWhen { false }
   }
 
+val testTableSort =
+  tasks.register<NodeTask>("testTableSort") {
+    group = "verification"
+    description =
+      "Regression tests for krtTableSort, the shared sortable table headers: value order, click cycle and aria-sort."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(layout.projectDirectory.file("scripts/krt-table-sort.test.mjs").asFile)
+    ignoreExitValue.set(false)
+    inputs.file(layout.projectDirectory.file("scripts/krt-table-sort.test.mjs"))
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-table-sort.js"),
+    )
+    outputs.upToDateWhen { false }
+  }
+
 val testEslintBans =
   tasks.register<NodeTask>("testEslintBans") {
     group = "verification"
@@ -912,6 +928,7 @@ tasks.named("check").configure {
     testTrustedTypesJs,
     testClientErrorCspJs,
     testSafeUrl,
+    testTableSort,
     testEslintBans,
     testTypecheckRatchet,
     testPromotionCsvEscape,
