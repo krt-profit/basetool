@@ -71,7 +71,6 @@ body:
         - label: Windows
         - label: Linux
         - label: macOS
-        - label: Android
         - label: Other (explain below)
 
   - type: checkboxes

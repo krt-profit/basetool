@@ -226,8 +226,7 @@ class TermsAcceptanceGateFilterTest {
   void skipsPublicDocuments() throws Exception {
     stubStatus(false);
 
-    for (String path :
-        new String[] {"/robots.txt", "/.well-known/assetlinks.json", "/manifest.webmanifest"}) {
+    for (String path : new String[] {"/robots.txt", "/manifest.webmanifest"}) {
       assertThat(invoke(path).getRedirectedUrl()).as(path).isNull();
     }
     verify(backendApiClient, never()).get(any(String.class), eq(TermsStatusDto.class));

@@ -19,19 +19,26 @@ from pathlib import Path
 from collections.abc import Callable
 
 
-def _load_mobile_provisioner():
-    """Import scripts/provision-keycloak-mobile-client.py (a hyphenated, unimportable name)."""
-    path = Path(__file__).resolve().with_name("provision-keycloak-mobile-client.py")
-    spec = importlib.util.spec_from_file_location("provision_keycloak_mobile_client", path)
+def _load_kcadm():
+    """Import scripts/keycloak_kcadm.py by path, so the script runs from any working directory."""
+    path = Path(__file__).resolve().with_name("keycloak_kcadm.py")
+    spec = importlib.util.spec_from_file_location("keycloak_kcadm", path)
     if spec is None or spec.loader is None:
-        raise SystemExit(f"FATAL: cannot load the mobile provisioner from {path}")
+        raise SystemExit(f"FATAL: cannot load the kcadm wrapper from {path}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
-mobile = _load_mobile_provisioner()
-KcadmError = mobile.KcadmError
+kcadm = _load_kcadm()
+KcadmError = kcadm.KcadmError
+
+APPLICATION_REALM_ROLES = ["KRT Member", "Officer", "Bank Employee", "Bank Management", "Admin"]
+
+RETIRED_CLIENT_ID = "basetool-android"
+RETIRED_DPOP_PROFILE = "krt-mobile-dpop"
+RETIRED_DPOP_POLICY = "krt-mobile-dpop-policy"
+RETIRED_REASON = "retired with the Android app, ADR-0268"
 
 BUILTIN_CLIENTS = frozenset({
     "account", "account-console", "admin-cli", "broker", "realm-management",
@@ -197,7 +204,6 @@ class ClientSpec:
     service_account_roles: dict[str, list[str]] | None = None
     env_vars_to_fill: list[str] = field(default_factory=list)
     env_doc_hint: str = ""
-    frozen_by_dpop_policy: bool = False
     unmanaged_fields: set[str] = field(default_factory=set)
     value_env: str | None = None
 
@@ -490,7 +496,6 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
             env_doc_hint=" (Grafana's generic_oauth login reads it)",
         ))
     specs.extend(external_client_spec(entry) for entry in (external_clients or []))
-    specs.append(android_spec(public_origin))
     return specs
 
 
@@ -503,7 +508,7 @@ def load_external_clients(path: Path) -> list[dict]:
     if not isinstance(entries, list):
         raise SystemExit(f"{path}: expected a JSON list of clients")
     reserved = BUILTIN_CLIENTS | {"basetool-frontend", "backend-service", "basetool-ingest-gateway",
-                                  "basetool-sc-extractor", "grafana", mobile.CLIENT_ID}
+                                  "basetool-sc-extractor", "grafana", RETIRED_CLIENT_ID}
     seen: set[str] = set()
     for entry in entries:
         client_id = entry.get("clientId") if isinstance(entry, dict) else None
@@ -561,48 +566,8 @@ def external_client_spec(entry: dict) -> ClientSpec:
     )
 
 
-def android_spec(public_origin: str) -> ClientSpec:
-    """`basetool-android`, built from the mobile provisioner's own definition.
-
-    Session bounds are capped at this script's realm SSO settings.
-    """
-    idle = min(mobile.SESSION_IDLE_SECONDS, int(REALM_SETTINGS["ssoSessionIdleTimeout"]))
-    maximum = min(mobile.SESSION_MAX_SECONDS, int(REALM_SETTINGS["ssoSessionMaxLifespan"]))
-    rep = mobile.client_representation([f"{public_origin}/app/callback"], idle, maximum)
-    scalar = {key: value for key, value in rep.items()
-              if key not in {"clientId", "name", "description", "redirectUris", "webOrigins",
-                             "attributes"}}
-    scalar["bearerOnly"] = False
-    return ClientSpec(
-        client_id=mobile.CLIENT_ID,
-        kind="public, authorization code + PKCE S256, DPoP-bound refresh token (ADR-0131)",
-        fields=scalar,
-        create_only={"name": rep["name"], "description": rep["description"]},
-        attributes={**rep["attributes"],
-                    "backchannel.logout.revoke.offline.tokens": "false",
-                    "backchannel.logout.session.required": "true"},
-        redirect_uris=rep["redirectUris"],
-        web_origins=rep["webOrigins"],
-        default_scopes=list(_STANDARD_DEFAULT),
-        optional_scopes=[s for s in _STANDARD_OPTIONAL if s != "offline_access"],
-        withheld_scopes=["offline_access", "extractor-ingest", "extractor-ingest-only"],
-        withheld_reason="ADR-0131 / ingest scopes retired 2026-09-22",
-        mappers=[{
-            "name": mobile.AUDIENCE_MAPPER,
-            "protocolMapper": "oidc-audience-mapper",
-            "config": {"included.client.audience": mobile.BACKEND_AUDIENCE,
-                       "access.token.claim": "true", "id.token.claim": "false",
-                       "introspection.token.claim": "true"},
-        }],
-        client_roles=[{"name": mobile.MARKER_ROLE,
-                       "description": "Marker role: scopes the refresh-only DPoP client policy."}],
-        realm_role_scope=list(mobile.MEMBER_REALM_ROLES),
-        frozen_by_dpop_policy=True,
-    )
-
-
-class RealmKcadm(mobile.Kcadm):
-    """The mobile provisioner's kcadm wrapper plus realm updates and link PUTs."""
+class RealmKcadm(kcadm.Kcadm):
+    """The shared kcadm wrapper plus realm updates and link PUTs."""
 
     def update_realm(self, payload: dict, what: str) -> None:
         """Partial update of the realm representation, which lives above the `-r` paths."""
@@ -625,7 +590,6 @@ class Change:
 
     text: str
     action: Callable[[], None]
-    frozen: bool = False
     service_account: bool = False
 
 
@@ -641,16 +605,6 @@ def _equal(desired, live) -> bool:
     if desired == "" and live in (None, ""):
         return True
     return _normalise(desired) == _normalise(live)
-
-
-def _matches(desired, live) -> bool:
-    """True when `live` carries every key of `desired` with an equal value, recursively; extra keys are ignored."""
-    if isinstance(desired, dict):
-        return isinstance(live, dict) and all(_matches(v, live.get(k)) for k, v in desired.items())
-    if isinstance(desired, list):
-        return (isinstance(live, list) and len(live) == len(desired)
-                and all(_matches(d, lv) for d, lv in zip(desired, live, strict=True)))
-    return _equal(desired, live)
 
 
 def _redact(payload: dict) -> dict:
@@ -713,13 +667,9 @@ class Planner:
         self.plan_realm_roles()
         self.plan_offline_access()
         self.plan_scopes()
-        for spec in (s for s in self.specs if not s.frozen_by_dpop_policy):
+        for spec in self.specs:
             self.plan_client(spec)
-        frozen_index = len(self.sections)
-        frozen_changes: list[Change] = []
-        for spec in (s for s in self.specs if s.frozen_by_dpop_policy):
-            frozen_changes += self.plan_client(spec, frozen=True)
-        self.plan_client_policies(frozen_changes, frozen_index)
+        self.plan_retired()
         self.plan_reports()
 
     def plan_realm_settings(self) -> None:
@@ -735,10 +685,10 @@ class Planner:
                                   lambda d=dict(diff): self.kc.update_realm(d, "token settings")))
 
     def plan_realm_roles(self) -> None:
-        """The application's realm roles, created when missing — the Android scope names them."""
+        """The application's realm roles, created when missing."""
         changes = self.section("application realm roles")
         present = {role.get("name") for role in (self.kc.get("roles") or [])}
-        for name in mobile.MEMBER_REALM_ROLES:
+        for name in APPLICATION_REALM_ROLES:
             if name not in present:
                 changes.append(Change(
                     f"+ create realm role '{name}'",
@@ -883,7 +833,7 @@ class Planner:
                       f"mapper '{mapper['name']}' created")
 
     def _mapper_changes(self, owner: str, base: str, desired: list[dict],
-                        live_mappers: list[dict], frozen: bool = False,
+                        live_mappers: list[dict],
                         exact: bool = False) -> list[Change]:
         """Create missing mappers and correct drifted ones.
 
@@ -897,7 +847,7 @@ class Planner:
             if live is None:
                 changes.append(Change(
                     f"+ {owner}: mapper '{mapper['name']}' -> {self._mapper_summary(mapper)}",
-                    lambda m=mapper: self._create_mapper(base, m), frozen))
+                    lambda m=mapper: self._create_mapper(base, m)))
                 continue
             config = live.get("config") or {}
             drift = {k: v for k, v in mapper["config"].items() if not _equal(v, config.get(k))}
@@ -913,7 +863,7 @@ class Planner:
                         "update", f"{base}/protocol-mappers/models/{lv['id']}",
                         {**lv, "protocolMapper": m["protocolMapper"],
                          "config": {**(lv.get("config") or {}), **m["config"]}},
-                        f"mapper '{m['name']}' corrected"), frozen))
+                        f"mapper '{m['name']}' corrected")))
         wanted = {m["name"] for m in desired}
         if exact:
             kept = {by_name[n].get("id") for n in wanted if n in by_name}
@@ -924,18 +874,18 @@ class Planner:
                     f"removed (not in this client's spec)",
                     lambda m=extra: self.kc.delete(
                         f"{base}/protocol-mappers/models/{m['id']}",
-                        f"mapper '{m.get('name')}' removed"), frozen))
+                        f"mapper '{m.get('name')}' removed")))
             return changes
         for name in sorted(n for n in by_name if n not in wanted):
             self.reports.append(f"{owner}: mapper '{name}' is not in the production shape")
         return changes
 
-    def plan_client(self, spec: ClientSpec, frozen: bool = False) -> list[Change]:
+    def plan_client(self, spec: ClientSpec) -> list[Change]:
         """Plan one client. Returns its changes, so the caller can see whether it needs a write."""
         changes = self.section(f"client '{spec.client_id}' — {spec.kind}")
         live = self.find_client(spec.client_id)
         if live is None:
-            changes += self._plan_new_client(spec, frozen)
+            changes += self._plan_new_client(spec)
             return changes
 
         uuid = live["id"]
@@ -966,28 +916,28 @@ class Planner:
                            if o in (live.get("webOrigins") or [])]
         for key, value in field_diff.items():
             changes.append(Change(f"~ {key}: {_normalise(live.get(key)) or '<absent>'} -> "
-                                  f"{_normalise(value)}", lambda: None, frozen))
+                                  f"{_normalise(value)}", lambda: None))
         if spec.value_env and "publicClient" in field_diff:
             changes.append(Change(f"~ secret: set from ${spec.value_env} (the value is not "
-                                  f"printed)", lambda: None, frozen))
+                                  f"printed)", lambda: None))
         for key, value in attribute_diff.items():
             changes.append(Change(f"~ attribute {key}: {attributes.get(key, '<absent>')} -> "
-                                  f"{value!r}", lambda: None, frozen))
+                                  f"{value!r}", lambda: None))
         for uri in missing_redirects:
-            changes.append(Change(f"+ redirect URI {uri}", lambda: None, frozen))
+            changes.append(Change(f"+ redirect URI {uri}", lambda: None))
         for origin in missing_origins:
-            changes.append(Change(f"+ web origin {origin}", lambda: None, frozen))
+            changes.append(Change(f"+ web origin {origin}", lambda: None))
         for uri in retired_redirects:
             changes.append(Change(f"- redirect URI {uri} withheld ({spec.withheld_reason})",
-                                  lambda: None, frozen))
+                                  lambda: None))
         for origin in retired_origins:
             changes.append(Change(f"- web origin {origin} withheld ({spec.withheld_reason})",
-                                  lambda: None, frozen))
+                                  lambda: None))
         if (field_diff or attribute_diff or missing_redirects or missing_origins
                 or retired_redirects or retired_origins):
             changes.append(Change(
                 "  (one update of the client representation)",
-                lambda lv=live: self._update_client(spec, lv), frozen))
+                lambda lv=live: self._update_client(spec, lv)))
         for uri in sorted(set(live.get("redirectUris") or []) - set(spec.redirect_uris)
                           - set(spec.withheld_redirect_uris)):
             self.reports.append(f"{spec.client_id}: redirect URI '{uri}' is not in the "
@@ -997,45 +947,44 @@ class Planner:
             self.reports.append(f"{spec.client_id}: web origin '{origin}' is not in the "
                                 f"production shape")
 
-        changes += self._plan_scope_assignments(spec, uuid, frozen)
+        changes += self._plan_scope_assignments(spec, uuid)
         changes += self._mapper_changes(
             spec.client_id, f"clients/{uuid}", spec.mappers,
-            self.kc.get(f"clients/{uuid}/protocol-mappers/models") or [], frozen=frozen,
+            self.kc.get(f"clients/{uuid}/protocol-mappers/models") or [],
             exact=spec.exact_mappers)
-        changes += self._plan_client_roles(spec, uuid, frozen)
-        changes += self._plan_role_scope(spec, uuid, frozen)
+        changes += self._plan_client_roles(spec, uuid)
+        changes += self._plan_role_scope(spec, uuid)
         changes += self._plan_service_account_roles(spec, uuid)
         return changes
 
-    def _plan_new_client(self, spec: ClientSpec, frozen: bool) -> list[Change]:
+    def _plan_new_client(self, spec: ClientSpec) -> list[Change]:
         changes = [Change(f"+ create client '{spec.client_id}'",
-                          lambda: self._create_client(spec), frozen)]
+                          lambda: self._create_client(spec))]
         for uri in spec.redirect_uris:
-            changes.append(Change(f"  redirect URI {uri}", lambda: None, frozen))
+            changes.append(Change(f"  redirect URI {uri}", lambda: None))
         for origin in spec.web_origins:
-            changes.append(Change(f"  web origin {origin}", lambda: None, frozen))
+            changes.append(Change(f"  web origin {origin}", lambda: None))
         changes.append(Change(
             f"= default scopes [{', '.join(spec.default_scopes)}], optional scopes "
             f"[{', '.join(spec.optional_scopes)}] — exactly; the realm defaults Keycloak attaches "
             f"on creation are this run's own side effect and are replaced",
-            lambda: self._converge_new_client_scopes(spec), frozen))
+            lambda: self._converge_new_client_scopes(spec)))
         for mapper in spec.mappers:
             changes.append(Change(
                 f"+ mapper '{mapper['name']}' -> {self._mapper_summary(mapper)}",
                 lambda m=mapper: self._create_mapper(
-                    f"clients/{self.client_uuid(spec.client_id)}", m), frozen))
+                    f"clients/{self.client_uuid(spec.client_id)}", m)))
         for role in spec.client_roles:
             changes.append(Change(
                 f"+ client role '{role['name']}'",
                 lambda r=role: self.kc.write(
                     "create", f"clients/{self.client_uuid(spec.client_id)}/roles", dict(r),
-                    f"client role '{r['name']}' created"), frozen))
+                    f"client role '{r['name']}' created")))
         if spec.realm_role_scope is not None:
             changes.append(Change(
                 f"= realm-role scope exactly [{', '.join(spec.realm_role_scope)}] "
                 f"(fullScopeAllowed off, REQ-SEC-035)",
-                lambda: self._converge_role_scope(spec, self.client_uuid(spec.client_id)),
-                frozen))
+                lambda: self._converge_role_scope(spec, self.client_uuid(spec.client_id))))
         if spec.service_account_roles:
             changes.append(Change(
                 f"+ service-account roles {self._role_summary(spec.service_account_roles)}",
@@ -1139,7 +1088,7 @@ class Planner:
             if name not in optional:
                 self._link_scope(uuid, "optional", name)
 
-    def _plan_scope_assignments(self, spec: ClientSpec, uuid: str, frozen: bool) -> list[Change]:
+    def _plan_scope_assignments(self, spec: ClientSpec, uuid: str) -> list[Change]:
         changes: list[Change] = []
         default, optional = self._assigned_scopes(uuid)
         existing = self.scopes_by_name()
@@ -1162,11 +1111,10 @@ class Planner:
                         lambda n=name, k=kind, sid=other[name]: (
                             self._unlink_scope(uuid, "optional" if k == "default" else "default",
                                                n, sid, "moved"),
-                            self._link_scope(uuid, k, n)), frozen))
+                            self._link_scope(uuid, k, n))))
                 else:
                     changes.append(Change(f"+ {kind} scope '{name}'",
-                                          lambda n=name, k=kind: self._link_scope(uuid, k, n),
-                                          frozen))
+                                          lambda n=name, k=kind: self._link_scope(uuid, k, n)))
         for name in spec.withheld_scopes:
             for kind, have in (("default", default), ("optional", optional)):
                 if name in have:
@@ -1174,7 +1122,7 @@ class Planner:
                         f"- {kind} scope '{name}' withheld "
                         f"({spec.withheld_scope_reason or spec.withheld_reason})",
                         lambda n=name, k=kind, sid=have[name]: self._unlink_scope(
-                            uuid, k, n, sid, "withheld"), frozen))
+                            uuid, k, n, sid, "withheld")))
         wanted_all = set(spec.default_scopes) | set(spec.optional_scopes) | set(
             spec.withheld_scopes)
         for kind, have in (("default", default), ("optional", optional)):
@@ -1183,16 +1131,16 @@ class Planner:
                                     f"production shape")
         return changes
 
-    def _plan_client_roles(self, spec: ClientSpec, uuid: str, frozen: bool) -> list[Change]:
+    def _plan_client_roles(self, spec: ClientSpec, uuid: str) -> list[Change]:
         if not spec.client_roles:
             return []
         present = {r.get("name") for r in (self.kc.get(f"clients/{uuid}/roles") or [])}
         return [Change(f"+ client role '{role['name']}'",
                        lambda r=role: self.kc.write("create", f"clients/{uuid}/roles", dict(r),
-                                                    f"client role '{r['name']}' created"), frozen)
+                                                    f"client role '{r['name']}' created"))
                 for role in spec.client_roles if role["name"] not in present]
 
-    def _plan_role_scope(self, spec: ClientSpec, uuid: str, frozen: bool) -> list[Change]:
+    def _plan_role_scope(self, spec: ClientSpec, uuid: str) -> list[Change]:
         if spec.realm_role_scope is None:
             return []
         assigned = {r.get("name") for r in
@@ -1207,7 +1155,7 @@ class Planner:
         if surplus:
             text += (f"{';' if missing else ''} take back {', '.join(surplus)} (REQ-SEC-035: a "
                      f"role added by hand does not survive a provisioning run)")
-        return [Change(text, lambda: self._converge_role_scope(spec, uuid), frozen)]
+        return [Change(text, lambda: self._converge_role_scope(spec, uuid))]
 
     def _converge_role_scope(self, spec: ClientSpec, uuid: str) -> None:
         assigned = self.kc.get(f"clients/{uuid}/scope-mappings/realm") or []
@@ -1302,64 +1250,58 @@ class Planner:
             print(f"  could not grant: {str(error).splitlines()[0]}")
             self._manual_grant(spec, roles, "granted")
 
-    def plan_client_policies(self, frozen_changes: list[Change], frozen_index: int) -> None:
-        """Profile and policy, with the detach the frozen client's writes need placed first.
+    def plan_retired(self) -> None:
+        """Delete the retired Android client and its DPoP policy and profile, ADR-0268.
 
-        :param frozen_changes: everything planned for the client the policy freezes
-        :param frozen_index: the section index where that client's writes begin — the detach
-            goes there, so it runs before the first of them
+        The policy goes first, so the profile is no longer referenced and the client no longer
+        matched; every other policy and profile is carried forward.
         """
-        profiles = mobile.read_list(self.kc, "client-policies/profiles", "profiles")
-        policies = mobile.read_list(self.kc, "client-policies/policies", "policies")
-        ours_profile = next((p for p in profiles if p.get("name") == mobile.PROFILE_NAME), None)
-        ours_policy = next((p for p in policies if p.get("name") == mobile.POLICY_NAME), None)
-        profile_differs = not _matches(mobile.dpop_profile(), ours_profile)
-        policy_differs = not _matches(mobile.dpop_policy(), ours_policy)
-        writes_frozen = any(c.frozen for c in frozen_changes)
-        detach = ours_policy is not None and (writes_frozen or profile_differs)
-
-        if detach:
-            title = "detach the DPoP policy — Keycloak refuses edits to the client while attached"
-            self.sections.insert(frozen_index, (title, [Change(
-                f"- detach '{mobile.POLICY_NAME}' ({len(policies) - 1} other policy(ies) "
-                f"carried forward)", self._detach_policy)]))
-
-        changes = self.section("DPoP client profile and policy (ADR-0131)")
-        if profile_differs:
+        changes = self.section(f"retired — '{RETIRED_CLIENT_ID}' and its DPoP policy and profile "
+                               f"(ADR-0268)")
+        policies = kcadm.read_list(self.kc, "client-policies/policies", "policies")
+        if any(p.get("name") == RETIRED_DPOP_POLICY for p in policies):
             changes.append(Change(
-                f"{'+' if ours_profile is None else '~'} profile '{mobile.PROFILE_NAME}' "
-                f"(merged by name into {len(profiles)} existing)",
-                lambda: self._merge("client-policies/profiles", "profiles", mobile.dpop_profile())))
-        if policy_differs or detach:
+                f"- policy '{RETIRED_DPOP_POLICY}' detached ({RETIRED_REASON}; "
+                f"{len(policies) - 1} other policy(ies) carried forward)",
+                lambda: self._remove_named("client-policies/policies", "policies",
+                                           RETIRED_DPOP_POLICY)))
+        profiles = kcadm.read_list(self.kc, "client-policies/profiles", "profiles")
+        if any(p.get("name") == RETIRED_DPOP_PROFILE for p in profiles):
             changes.append(Change(
-                f"{'+' if ours_policy is None or detach else '~'} attach policy "
-                f"'{mobile.POLICY_NAME}' (merged by name; every other policy carried forward)",
-                lambda: self._merge("client-policies/policies", "policies", mobile.dpop_policy())))
-        foreign = [p.get("name") for p in policies if p.get("name") != mobile.POLICY_NAME]
-        if foreign:
-            self.reports.append(f"client policies not in the production shape (kept): "
-                                f"{', '.join(sorted(str(n) for n in foreign))}")
+                f"- profile '{RETIRED_DPOP_PROFILE}' removed ({RETIRED_REASON}; "
+                f"{len(profiles) - 1} other profile(s) carried forward)",
+                lambda: self._remove_named("client-policies/profiles", "profiles",
+                                           RETIRED_DPOP_PROFILE)))
+        if self.find_client(RETIRED_CLIENT_ID) is not None:
+            changes.append(Change(
+                f"- client '{RETIRED_CLIENT_ID}' deleted with its roles, mappers and scope "
+                f"mappings ({RETIRED_REASON})", self._delete_retired_client))
 
-    def _merge(self, path: str, key: str, desired: dict) -> None:
-        current = mobile.read_list(self.kc, path, key)
-        self.kc.write("update", path, {key: mobile.merge_by_name(current, desired)},
-                      f"'{desired['name']}' merged into {len(current)} existing")
+    def _remove_named(self, path: str, key: str, name: str) -> None:
+        current = kcadm.read_list(self.kc, path, key)
+        remaining = [entry for entry in current if entry.get("name") != name]
+        if len(remaining) != len(current):
+            self.kc.write("update", path, {key: remaining}, f"'{name}' removed")
 
-    def _detach_policy(self) -> None:
-        policies = mobile.read_list(self.kc, "client-policies/policies", "policies")
-        remaining = [p for p in policies if p.get("name") != mobile.POLICY_NAME]
-        if len(remaining) != len(policies):
-            self.kc.write("update", "client-policies/policies", {"policies": remaining},
-                          "detached so the client can be edited")
+    def _delete_retired_client(self) -> None:
+        client = self.find_client(RETIRED_CLIENT_ID)
+        if client is not None:
+            self.kc.delete(f"clients/{client['id']}", f"client '{RETIRED_CLIENT_ID}' deleted")
 
     def plan_reports(self) -> None:
-        managed = {s.client_id for s in self.specs}
+        managed = {s.client_id for s in self.specs} | {RETIRED_CLIENT_ID}
         for client in self.kc.get("clients") or []:
             client_id = client.get("clientId")
             if client_id in BUILTIN_CLIENTS or client_id in managed:
                 continue
             hint = " (pass --grafana-origin to manage it)" if client_id == "grafana" else ""
             self.reports.append(f"client '{client_id}' is not in the production shape{hint}")
+        foreign = [p.get("name") for p in
+                   kcadm.read_list(self.kc, "client-policies/policies", "policies")
+                   if p.get("name") != RETIRED_DPOP_POLICY]
+        if foreign:
+            self.reports.append(f"client policies not in the production shape (kept): "
+                                f"{', '.join(sorted(str(n) for n in foreign))}")
         realm_defaults = {s.get("name") for s in
                           (self.kc.get("default-default-client-scopes") or [])}
         for name in AUDIENCE_SCOPES:
@@ -1501,9 +1443,7 @@ def main() -> int:
         return 0
     except KcadmError as error:
         print(f"\nFAILED: {error}", file=sys.stderr)
-        print("If this stopped inside the Android client's section, the DPoP policy may be "
-              "detached: the client is then unbound, not half-bound. Fix the cause and re-run; "
-              "the script is idempotent and re-attaches it.", file=sys.stderr)
+        print("Fix the cause and re-run; the script is idempotent.", file=sys.stderr)
         return 1
 
 

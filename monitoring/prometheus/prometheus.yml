@@ -218,25 +218,7 @@ scrape_configs:
           - https://profit-base.online/terms
           - https://profit-base.online/licenses
           - https://profit-base.online/robots.txt
-          - https://profit-base.online/.well-known/assetlinks.json
           - https://profit-base.online/manifest.webmanifest?locale=de
-          - https://profit-base.online/app/link-help
-    relabel_configs:
-      - source_labels: [__address__]
-        target_label: __param_target
-      - source_labels: [__param_target]
-        target_label: instance
-      - target_label: __address__
-        replacement: blackbox-exporter:9115
-
-  - job_name: blackbox-app-link
-    metrics_path: /probe
-    scrape_timeout: 15s
-    params:
-      module: [http_app_link_fallback_303]
-    static_configs:
-      - targets:
-          - https://profit-base.online/app/callback
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target

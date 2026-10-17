@@ -314,6 +314,11 @@ if verb == "update":
         save()
         sys.exit(0)
     if path in ("client-policies/profiles", "client-policies/policies"):
+        if path.endswith("profiles"):
+            kept = {p["name"] for p in body["profiles"]}
+            if any(name not in kept for p in data["policies"]["policies"]
+                   for name in p.get("profiles", [])):
+                fail("Invalid client profiles: a policy still references a removed profile")
         data[parts[1]] = body
         save()
         sys.exit(0)
@@ -360,6 +365,15 @@ if verb == "delete":
         if parts[1] not in data[key]:
             fail(f"stub: scope {parts[1]} is not a realm {key}")
         data[key] = [s for s in data[key] if s != parts[1]]
+        save()
+        sys.exit(0)
+    if parts[0] == "clients" and len(parts) == 2:
+        if policy_freezes(parts[1]):
+            fail("stub: the DPoP policy still matches this client; detach it before the delete")
+        data["clients"] = [c for c in data["clients"] if c["id"] != parts[1]]
+        for key in ("client_roles", "client_mappers", "client_default_scopes",
+                    "client_optional_scopes", "client_scope_mappings"):
+            data[key].pop(parts[1], None)
         save()
         sys.exit(0)
     if parts[0] in ("clients", "client-scopes") and parts[2:4] == ["protocol-mappers", "models"]:
@@ -463,9 +477,10 @@ state="$(mktemp -d)"
 make_stub "$state" empty
 output="$(run_provisioner "$state" --apply)"
 assert_eq "$(cat "${state}/rc")" "0" "the apply succeeds and verifies clean"
-for cid in basetool-frontend backend-service basetool-ingest-gateway basetool-sc-extractor basetool-android; do
+for cid in basetool-frontend backend-service basetool-ingest-gateway basetool-sc-extractor; do
   assert_eq "$(query "$state" "client('${cid}') is not None")" "True" "client ${cid} exists"
 done
+assert_eq "$(query "$state" "client('basetool-android') is None")" "True" "the retired app client is not created"
 assert_eq "$(query "$state" "client('grafana') is None")" "True" "grafana is left alone without --grafana-origin"
 assert_eq "$(query "$state" "sorted(set(m['config']['included.custom.audience'] for s in d['scopes'] for m in d['scope_mappers'].get(s['id'], [])))")" \
   "['basetool-backend', 'basetool-ingest']" "both audiences have their mappers"
@@ -480,27 +495,23 @@ assert_eq "$(query "$state" "scope_names('default', 'basetool-sc-extractor')")" 
   "['basic']" "the extractor carries only basic by default: no ingest scope, no backend audience (H1)"
 assert_eq "$(query "$state" "[client('basetool-sc-extractor')['consentRequired'], client('basetool-sc-extractor')['attributes']['dpop.bound.access.tokens']]")" \
   "[True, 'true']" "the extractor asks for consent and binds every token to DPoP (H1)"
-assert_eq "$(query "$state" "scope_names('optional', 'basetool-android')")" \
-  "['address', 'microprofile-jwt', 'organization', 'phone']" "offline_access is withheld from the app"
 assert_eq "$(query "$state" "sorted(client('basetool-frontend')['redirectUris'])")" \
   "['https://testing.example/*', 'https://testing.example/login/oauth2/code/keycloak']" \
   "the frontend's redirect URIs come from --public-origin"
-assert_eq "$(query "$state" "client('basetool-android')['redirectUris']")" \
-  "['https://testing.example/app/callback']" "the app's callback comes from --public-origin"
 assert_eq "$(query "$state" "client('basetool-frontend')['attributes']['post.logout.redirect.uris']")" \
   "https://testing.example/*##https://testing.example" "the post-logout list comes from --public-origin"
 assert_eq "$(query "$state" "client('basetool-frontend')['baseUrl']")" \
   "https://testing.example/" "the frontend's baseUrl comes from --public-origin (REQ-SEC-071)"
 assert_not_contains "$(cat "${state}/state.json")" "profit-base.online" "no production hostname is written into another realm"
-assert_eq "$(query "$state" "sorted(r['name'] for r in d['client_scope_mappings'][client('basetool-android')['id']])")" \
-  "['Admin', 'Bank Employee', 'Bank Management', 'KRT Member', 'Officer']" "the app's realm-role scope is exactly the member list"
 assert_eq "$(query "$state" "'Bank Management' in [r['name'] for r in d['roles']]")" "True" "a missing application role is created"
 assert_eq "$(query "$state" "mappers('basetool-frontend')")" \
   "['description', 'discord_guild_nickname', 'discord_user_id', 'rank', 'sub']" "the frontend's claim mappers exist"
 assert_eq "$(query "$state" "[p['name'] for p in d['policies']['policies']]")" \
-  "['someone-elses-policy', 'krt-mobile-dpop-policy']" "the DPoP policy is attached and a foreign policy survives"
+  "['someone-elses-policy']" "no client policy is written and a foreign policy survives"
 assert_eq "$(query "$state" "[p['name'] for p in d['profiles']['profiles']]")" \
-  "['someone-elses-profile', 'krt-mobile-dpop']" "the DPoP profile is merged and a foreign profile survives"
+  "['someone-elses-profile']" "no client profile is written and a foreign profile survives"
+assert_eq "$(grep -cE '^(create|update|delete) client-policies' "${state}/calls.log" || true)" "0" \
+  "the apply never writes the client-policy lists"
 assert_eq "$(query "$state" "sorted(r['name'] for u in d['users'].values() if u['client']==client('backend-service')['id'] for rid in u['client_roles'].get('c-rm', []) for r in d['client_roles']['c-rm'] if r['id']==rid)")" \
   "['manage-users', 'view-realm', 'view-users']" "backend-service's service account holds its realm-management roles"
 assert_eq "$(query "$state" "d['realm']['revokeRefreshToken'], d['realm']['offlineSessionMaxLifespan']")" \
@@ -523,7 +534,64 @@ output="$(run_provisioner "$state")"
 assert_eq "$(cat "${state}/rc")" "0" "a dry run against the shaped realm exits 0"
 rm -rf "$state"
 
-echo "4. an Android edit detaches the DPoP policy first and re-attaches it last"
+echo "4. the retired basetool-android client, its DPoP policy and its profile are deleted (ADR-0268)"
+RETIRED_REASON="retired with the Android app, ADR-0268"
+seed_android() {
+  STUB_STATE="$1" "$PYTHON" -c '
+import json, os, pathlib
+p = pathlib.Path(os.environ["STUB_STATE"]) / "state.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+d["clients"].append({"id": "c-android", "clientId": "basetool-android", "publicClient": True,
+                     "redirectUris": ["https://testing.example/app/callback"], "webOrigins": [],
+                     "attributes": {"pkce.code.challenge.method": "S256"}})
+d["client_roles"]["c-android"] = [{"id": "cr-marker", "name": "dpop-refresh-only"}]
+d["client_scope_mappings"]["c-android"] = [{"id": "r-krt", "name": "KRT Member"}]
+d["profiles"]["profiles"].append({"name": "krt-mobile-dpop", "executors": []})
+d["policies"]["policies"].append({"name": "krt-mobile-dpop-policy", "enabled": True,
+                                  "conditions": [], "profiles": ["krt-mobile-dpop"]})
+d["policies"]["policies"].append({"name": "a-later-policy", "enabled": True, "conditions": [],
+                                  "profiles": []})
+p.write_text(json.dumps(d), encoding="utf-8")
+'
+}
+state="$(mktemp -d)"
+make_stub "$state" empty
+run_provisioner "$state" --apply >/dev/null
+seed_android "$state"
+before="$(cat "${state}/state.json")"
+output="$(run_provisioner "$state")"
+assert_eq "$(cat "${state}/rc")" "2" "a realm still holding the app client plans changes"
+planned="$(printf '%s\n' "$output" | sed '/^\[only on this realm/,$d' | grep -E '^  [-+~=] ')"
+expected="$(printf '%s\n' \
+  "  - policy 'krt-mobile-dpop-policy' detached (${RETIRED_REASON}; 2 other policy(ies) carried forward)" \
+  "  - profile 'krt-mobile-dpop' removed (${RETIRED_REASON}; 1 other profile(s) carried forward)" \
+  "  - client 'basetool-android' deleted with its roles, mappers and scope mappings (${RETIRED_REASON})")"
+assert_eq "$planned" "$expected" "the plan deletes exactly the policy, the profile and the client, in that order"
+assert_not_contains "$output" "client 'basetool-android' is not in the production shape" "the retired client is deleted, not merely reported"
+assert_eq "$(cat "${state}/state.json")" "$before" "the dry run writes nothing"
+output="$(run_provisioner "$state" --apply)"
+assert_eq "$(cat "${state}/rc")" "0" "the apply succeeds and verifies clean"
+assert_eq "$(query "$state" "client('basetool-android') is None")" "True" "the app client is gone"
+assert_eq "$(query "$state" "'c-android' in d['client_roles'] or 'c-android' in d['client_scope_mappings']")" "False" \
+  "and its marker role and realm-role scope with it"
+assert_eq "$(query "$state" "[p['name'] for p in d['policies']['policies']]")" \
+  "['someone-elses-policy', 'a-later-policy']" "the DPoP policy is gone and every foreign policy survives in order"
+assert_eq "$(query "$state" "[p['name'] for p in d['profiles']['profiles']]")" \
+  "['someone-elses-profile']" "the DPoP profile is gone and the foreign profile survives"
+policy_line="$(grep -n '^update client-policies/policies$' "${state}/calls.log" | head -1 | cut -d: -f1)"
+profile_line="$(grep -n '^update client-policies/profiles$' "${state}/calls.log" | head -1 | cut -d: -f1)"
+delete_line="$(grep -n '^delete clients/c-android$' "${state}/calls.log" | head -1 | cut -d: -f1)"
+if [[ -n "$policy_line" && -n "$profile_line" && -n "$delete_line" \
+      && "$policy_line" -lt "$profile_line" && "$profile_line" -lt "$delete_line" ]]; then
+  pass "policy detach < profile removal < client delete"
+else
+  fail "policy detach < profile removal < client delete" \
+    "policy ${policy_line:-none}, profile ${profile_line:-none}, delete ${delete_line:-none}"
+fi
+output="$(run_provisioner "$state" --apply)"
+assert_contains "$output" "No changes" "a second apply is empty"
+assert_eq "$(writes_in "$state")" "0" "and sends no write"
+rm -rf "$state"
 state="$(mktemp -d)"
 make_stub "$state" empty
 run_provisioner "$state" --apply >/dev/null
@@ -531,50 +599,13 @@ STUB_STATE="$state" "$PYTHON" -c '
 import json, os, pathlib
 p = pathlib.Path(os.environ["STUB_STATE"]) / "state.json"
 d = json.loads(p.read_text(encoding="utf-8"))
-c = next(c for c in d["clients"] if c["clientId"] == "basetool-android")
-c["attributes"]["pkce.code.challenge.method"] = ""
-d["policies"]["policies"].append({"name": "a-later-policy", "enabled": True, "conditions": [], "profiles": []})
-p.write_text(json.dumps(d), encoding="utf-8")
-'
-android_id="$(query "$state" "client('basetool-android')['id']")"
-output="$(run_provisioner "$state" --apply)"
-assert_eq "$(cat "${state}/rc")" "0" "the apply succeeds against a policy-frozen client"
-detach_line="$(grep -n '^update client-policies/policies' "${state}/calls.log" | head -1 | cut -d: -f1)"
-client_line="$(grep -n "^update clients/${android_id}\$" "${state}/calls.log" | head -1 | cut -d: -f1)"
-attach_line="$(grep -n '^update client-policies/policies' "${state}/calls.log" | tail -1 | cut -d: -f1)"
-if [[ -n "$detach_line" && -n "$client_line" && -n "$attach_line" \
-      && "$detach_line" -lt "$client_line" && "$client_line" -lt "$attach_line" ]]; then
-  pass "detach < client update < re-attach"
-else
-  fail "detach < client update < re-attach" \
-    "detach ${detach_line:-none}, client ${client_line:-none}, attach ${attach_line:-none}"
-fi
-assert_eq "$(query "$state" "sorted(p['name'] for p in d['policies']['policies'])")" \
-  "['a-later-policy', 'krt-mobile-dpop-policy', 'someone-elses-policy']" "every foreign policy survives the detach/re-attach"
-assert_eq "$(query "$state" "client('basetool-android')['attributes']['pkce.code.challenge.method']")" "S256" "the drift is corrected"
-STUB_STATE="$state" "$PYTHON" -c '
-import json, os, pathlib
-p = pathlib.Path(os.environ["STUB_STATE"]) / "state.json"
-d = json.loads(p.read_text(encoding="utf-8"))
-next(c for c in d["clients"] if c["clientId"] == "basetool-frontend")["directAccessGrantsEnabled"] = True
-p.write_text(json.dumps(d), encoding="utf-8")
-'
-run_provisioner "$state" --apply >/dev/null
-assert_eq "$(grep -c '^update client-policies/policies' "${state}/calls.log" || true)" "0" "an unrelated client edit leaves the policy attached"
-STUB_STATE="$state" "$PYTHON" -c '
-import json, os, pathlib
-p = pathlib.Path(os.environ["STUB_STATE"]) / "state.json"
-d = json.loads(p.read_text(encoding="utf-8"))
-d["roles"].append({"id": "r-brl", "name": "Bereichsleitung"})
-uuid = next(c for c in d["clients"] if c["clientId"] == "basetool-android")["id"]
-d["client_scope_mappings"][uuid].append({"id": "r-brl", "name": "Bereichsleitung"})
+d["clients"].append({"id": "c-android", "clientId": "basetool-android", "attributes": {}})
 p.write_text(json.dumps(d), encoding="utf-8")
 '
 output="$(run_provisioner "$state" --apply)"
-assert_contains "$output" "take back Bereichsleitung" "the plan names the hand-added role"
-assert_eq "$(query "$state" "sorted(r['name'] for r in d['client_scope_mappings'][client('basetool-android')['id']])")" \
-  "['Admin', 'Bank Employee', 'Bank Management', 'KRT Member', 'Officer']" "a hand-added realm role is taken back off the app's scope"
-assert_eq "$(query "$state" "'krt-mobile-dpop-policy' in [p['name'] for p in d['policies']['policies']]")" "True" "and the policy is attached afterwards"
+assert_eq "$(cat "${state}/rc")" "0" "a client whose policy is already gone is deleted on its own"
+assert_eq "$(grep -cE '^update client-policies' "${state}/calls.log" || true)" "0" "and the policy lists are left alone"
+assert_eq "$(query "$state" "client('basetool-android') is None")" "True" "the client is gone"
 rm -rf "$state"
 
 echo "5. objects only the target realm has are reported, never deleted"
@@ -633,7 +664,7 @@ output="$(KCADM_STUB_STATE="$state" "$PYTHON" "$PROVISIONER" --public-origin "ht
 assert_contains "$output" "no path and no trailing slash" "a trailing slash is refused before anything is read"
 rm -rf "$state"
 
-echo "8. the three retirements of 2026-09-22 converge away from a realm in the old production shape"
+echo "8. the 2026-09-22 retirements of the extractor and frontend entries converge away from a realm in the old production shape"
 state="$(mktemp -d)"
 make_stub "$state" empty
 run_provisioner "$state" --apply >/dev/null
@@ -649,36 +680,27 @@ ex["redirectUris"] = ["http://127.0.0.1/*", "http://localhost/*"]
 fe = by_id["basetool-frontend"]
 fe["redirectUris"] = ["http://frontend:18081/*"] + fe["redirectUris"]
 fe["webOrigins"] = ["http://frontend:18081"] + fe["webOrigins"]
-app = by_id["basetool-android"]["id"]
-d["client_default_scopes"][app] += [ids["extractor-ingest"], ids["extractor-ingest-only"]]
 p.write_text(json.dumps(d), encoding="utf-8")
 '
 output="$(run_provisioner "$state")"
 planned="$(printf '%s\n' "$output" | sed '/^\[only on this realm/,$d' | grep -E '^  [-+~=] ' | sort)"
 expected="$(printf '%s\n' \
-  "  + attach policy 'krt-mobile-dpop-policy' (merged by name; every other policy carried forward)" \
-  "  - default scope 'extractor-ingest' withheld (ADR-0131 / ingest scopes retired 2026-09-22)" \
-  "  - default scope 'extractor-ingest-only' withheld (ADR-0131 / ingest scopes retired 2026-09-22)" \
-  "  - detach 'krt-mobile-dpop-policy' (1 other policy(ies) carried forward)" \
   "  - redirect URI http://127.0.0.1/* withheld (exchange-only since the extractor's 2.10.0 (H1, #2088); unused code flow retired 2026-09-22)" \
   "  - redirect URI http://frontend:18081/* withheld (compose-internal origin retired 2026-09-22)" \
   "  - redirect URI http://localhost/* withheld (exchange-only since the extractor's 2.10.0 (H1, #2088); unused code flow retired 2026-09-22)" \
   "  - web origin http://frontend:18081 withheld (compose-internal origin retired 2026-09-22)" \
   "  ~ standardFlowEnabled: true -> false" | sort)"
-assert_eq "$planned" "$expected" "the plan removes exactly the retired entries (and detaches for the app's scopes)"
+assert_eq "$planned" "$expected" "the plan removes exactly the retired entries"
 assert_not_contains "$output" "is not in the production shape" "a retired entry is removed, not merely reported"
 run_provisioner "$state" --apply >/dev/null
 assert_eq "$(cat "${state}/rc")" "0" "the apply succeeds and verifies clean"
 assert_eq "$(query "$state" "client('basetool-sc-extractor')['standardFlowEnabled'], client('basetool-sc-extractor')['redirectUris']")" \
   "(False, [])" "the extractor has no code flow and no redirect URI"
-assert_eq "$(query "$state" "[n for n in ('extractor-ingest', 'extractor-ingest-only') if n in scope_names('default', 'basetool-android')]")" \
-  "[]" "the app carries neither ingest scope"
 assert_eq "$(query "$state" "[u for u in client('basetool-frontend')['redirectUris'] + client('basetool-frontend')['webOrigins'] if 'frontend:18081' in u]")" \
   "[]" "the frontend's compose-internal origin is gone"
 assert_eq "$(query "$state" "scope_names('default', 'basetool-sc-extractor')")" \
   "['basic']" \
   "the extractor keeps only basic"
-assert_eq "$(query "$state" "'krt-mobile-dpop-policy' in [p['name'] for p in d['policies']['policies']]")" "True" "the DPoP policy is attached again"
 output="$(run_provisioner "$state" --apply)"
 assert_contains "$output" "No changes" "a second apply is empty"
 assert_eq "$(writes_in "$state")" "0" "and sends no write"

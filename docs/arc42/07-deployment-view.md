@@ -351,7 +351,9 @@ releases a rollback may still render.
 production and testing while the two realms were free to diverge — and did: on 2026-09-22 the
 testing realm lacked three of the Basetool's clients, both audience scopes and the DPoP policy.
 Its Basetool-owned part is therefore code too, applied by an operator rather than by the timer:
-`scripts/provision-keycloak-realm.py` converges a realm to production's shape, additively, and
+`scripts/provision-keycloak-realm.py` converges a realm to production's shape, additively except
+for one named retirement — it deletes the Android app's client and its DPoP policy and profile
+where they remain (ADR-0202, amended 2026-10-17) — and
 `scripts/keycloak-config-snapshot.sql` is the diff that shows whether two realms still agree
 (`REQ-OPS-033`, ADR-0202).
 

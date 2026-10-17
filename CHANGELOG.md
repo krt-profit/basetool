@@ -16,6 +16,8 @@
 
 - **Die Android-only-Fläche der API ist entfernt.** Es gibt kein `GET /api/v1/app/version-policy`, keine `app.android.version-policy.*`-Konfiguration und keine `410 APP_UPDATE_REQUIRED`-Antwort mehr; ein alter Pfad antwortet wie jeder unbekannte Pfad mit `404`. Die anonyme Fläche des Backends schrumpft damit auf `GET /api/v1/terms/document`, Health, `/internal/**` und `/error`. Entfallen sind außerdem die Variablen `APP_ANDROID_*_OVERRIDE`, der Alarm `AndroidVersionPolicyOverrideActive` und `docker-compose.android.yml` (ADR-0269, REQ-API-020/021, REQ-SEC-037).
 
+- **App Link und Keycloak-Client der Android-App sind entfernt.** `/.well-known/assetlinks.json`, `/app/callback` und `/app/link-help` gibt es nicht mehr, ebenso den Client `basetool-android`; der Realm-Provisioner löscht ihn samt DPoP-Policy und -Profil, wo sie noch existieren. Die Variablen `APP_ANDROID_PACKAGE_NAME` und `APP_ANDROID_CERT_FINGERPRINTS` entfallen (ADR-0268, ADR-0202, REQ-SEC-030/035/038).
+
 - **Management-Ports: Metriken nur noch mit Scrape-Zugang.** Auf den Management-Ports von Backend, Frontend und Ingest bleibt nur `/actuator/health` offen; `prometheus`, `info` und `loggers` verlangen den Basic-Auth-Zugang `MONITORING_SCRAPE_USER`/`MONITORING_SCRAPE_PASSWORD` und sind ohne ihn gesperrt. Vorher konnte jeder Nachbar-Container im selben Netz die Metriken lesen. Prometheus sendet `scrape_password`, das deshalb zu `MONITORING_SCRAPE_PASSWORD` passen muss (Benutzer `monitoring`) (REQ-OBS-005, ADR-0265).
 
 ### Added

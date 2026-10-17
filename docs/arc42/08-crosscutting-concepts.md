@@ -221,8 +221,8 @@ Two binding rules shape every UI change:
 - **The browser baseline is "Baseline 2025"**: Chrome 122, Firefox 131, Safari / iOS 18.4; the type
   check and ESLint run at ES2025 (ADR-0239, REQ-FE-018).
 - **An ETag only where it pays** (FE-PERF-03, 2026-09-22; assets out 2026-09-23). The frontend's
-  `ShallowEtagHeaderFilter` covers the web app manifest and `assetlinks.json` — publicly
-  cacheable and not content-hashed. The static assets are hashed, `immutable` and revalidate by
+  `ShallowEtagHeaderFilter` covers only the web app manifest — publicly cacheable and not
+  content-hashed. The static assets are hashed, `immutable` and revalidate by
   `Last-Modified`; everything else is `no-store`, where no ETag can be issued. So assets, pages,
   fragments and the SSE relay all leave unbuffered. A new publicly cacheable, non-hashed route
   joins `EtagConfig.ETAG_URL_PATTERNS` (ADR-0161).

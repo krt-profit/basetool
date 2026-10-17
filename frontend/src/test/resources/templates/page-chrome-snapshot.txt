@@ -458,11 +458,6 @@ settings/admin-settings.html head-fixed 9555df4e9114e159
 settings/admin-settings.html head-own <title>Systemeinstellungen - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/settings/admin-settings.css">
 settings/admin-settings.html body <body>
 settings/admin-settings.html parts chrome:434d458bee213826 x-content toast:a1359ecc4bd4b21d x-tail
-shell/app-link-help.html html <html lang="de">
-shell/app-link-help.html head-fixed 9555df4e9114e159
-shell/app-link-help.html head-own <title>Profit Basetool – Alle Staffeln - Diese Adresse gehört zur App</title><link rel="stylesheet" href="/css/pages/shell/app-link-help.css">
-shell/app-link-help.html body <body>
-shell/app-link-help.html parts chrome:434d458bee213826 x-content
 shell/impressum.html html <html lang="de">
 shell/impressum.html head-fixed 9555df4e9114e159
 shell/impressum.html head-own <title>Profit Basetool – Alle Staffeln - Impressum</title><link rel="stylesheet" href="/css/shell/legal.css">

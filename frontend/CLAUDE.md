@@ -348,8 +348,8 @@ sub-folders stay below the domain), a script `static/js/<domain>/<name>.js` (the
 under in `typecheck-ratchet.json`), an area stylesheet `static/css/<domain>/<name>.css` and a page
 stylesheet `static/css/pages/<domain>/<page>.css`. What no single domain owns lives in `kernel/`:
 the layout and chrome fragments, the dialog wrapper, the components, the transport and live-sync
-scripts, `kernel/styles.css`. The legal pages, the licences page, the app-link help, the SC links
-page and the error pages' stylesheets are the `shell` domain's.
+scripts, `kernel/styles.css`. The legal pages, the licences page, the SC links page and the error
+pages' stylesheets are the `shell` domain's.
 
 - **Nothing sits flat.** `AssetLayoutTest` fails on a template, script or stylesheet outside a
   domain folder; only the five error templates Spring Boot resolves by name stay at

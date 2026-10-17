@@ -32,19 +32,18 @@ import org.springframework.web.filter.ShallowEtagHeaderFilter;
  * Registers {@link ShallowEtagHeaderFilter} only on {@link #ETAG_URL_PATTERNS}, the routes whose
  * response can carry an ETag (ADR-0161).
  *
- * <p>These are {@code /manifest.webmanifest} and {@code /.well-known/assetlinks.json}; the
- * immutable, content-hashed static assets served by {@link WebMvcConfig} are excluded.
+ * <p>This is {@code /manifest.webmanifest}; the immutable, content-hashed static assets served by
+ * {@link WebMvcConfig} are excluded.
  */
 @Configuration
 public class EtagConfig {
 
   /**
-   * The servlet URL patterns the ETag filter is registered on: the two publicly cacheable,
-   * non-hashed responses whose revalidation an ETag turns into a body-less {@code 304}.
+   * The servlet URL patterns the ETag filter is registered on: the publicly cacheable, non-hashed
+   * response whose revalidation an ETag turns into a body-less {@code 304}.
    */
   @Unmodifiable
-  public static final List<String> ETAG_URL_PATTERNS =
-      List.of("/manifest.webmanifest", "/.well-known/assetlinks.json");
+  public static final List<String> ETAG_URL_PATTERNS = List.of("/manifest.webmanifest");
 
   /**
    * Registers the {@link ShallowEtagHeaderFilter} on {@link #ETAG_URL_PATTERNS} at near-highest

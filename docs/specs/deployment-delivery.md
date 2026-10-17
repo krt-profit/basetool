@@ -2266,8 +2266,7 @@ there.
 - **The desired state is production's**, read with the secret-free
   `scripts/keycloak-config-snapshot.sql` and written into the script: the Basetool's clients and
   their flags, attributes, redirect URIs, web origins, scope assignments and mappers; the
-  `extractor-ingest` / `extractor-ingest-only` scopes and their audience mappers; the Android
-  client's marker role and realm-role scope; the DPoP client profile and policy; the
+  `extractor-ingest` / `extractor-ingest-only` scopes and their audience mappers; the
   service-account roles; the realm's token and session settings. What production carries that looks
   unintended is reproduced and marked `PROD-AS-IS`, and changes in production first.
 - **Environment-specific values are arguments** (`--public-origin`, `--grafana-origin`). No
@@ -2275,9 +2274,8 @@ there.
 - **Dry run by default.** `--apply` writes, then re-plans; the apply fails unless the second plan is
   empty. A realm in shape produces no write at all.
 - **Additive.** An object only the target realm has is reported and left alone. The exceptions are
-  owner decisions, each named in the script — the Android client's realm-role scope
-  (`REQ-SEC-035`), its withheld `offline_access` (ADR-0131), the three retirements of
-  2026-09-22 (below), every client-level protocol mapper on `basetool-sc-extractor` and on a
+  owner decisions, each named in the script — the retired Android client (below), the
+  retirements of 2026-09-22 (below), every client-level protocol mapper on `basetool-sc-extractor` and on a
   third-party client (2026-09-28, ADR-0202 amendment 4), and `offline_access` on
   `basetool-frontend`, `backend-service`, `basetool-ingest-gateway` and `grafana` (2026-09-28,
   ADR-0202 amendment 5) — and the scope lists of a client the same run created.
@@ -2286,20 +2284,23 @@ there.
   dry run lists it and exits `2`, the apply deletes it, and the verify pass fails while one is left.
   A hand-added `basetool-backend` audience mapper therefore cannot outlive an apply that verifies
   clean (owner decision 2026-09-28, finding G5-L4 of #2092).
-- **Three production entries are retired and converge away wherever they are found** (owner
+- **Production entries retired on 2026-09-22 converge away wherever they are found** (owner
   decision 2026-09-22, ADR-0202 amendment): `basetool-sc-extractor`'s authorization-code flow and
-  its two loopback wildcard redirect URIs (`REQ-INGEST-002`); both ingest scopes on
-  `basetool-android` (`REQ-INGEST-011`); `basetool-frontend`'s `http://frontend:18081` redirect URI
-  and web origin. Gone from production since the owner-approved provisioner apply of 2026-09-23;
+  its two loopback wildcard redirect URIs (`REQ-INGEST-002`); `basetool-frontend`'s
+  `http://frontend:18081` redirect URI and web origin. Gone from production since the owner-approved provisioner apply of 2026-09-23;
   the testing realm keeps them until it is provisioned.
 - **`basetool-frontend` carries `baseUrl` = `<--public-origin>/`** (2026-09-25, ADR-0202
   amendment 3, `REQ-SEC-071`) — an added field, not in the 2026-09-22 production snapshot, so that
   Keycloak's error pages for the web login link back to the app. *(Updated 2026-09-25: production
   carries it — the owner set Home URL `https://profit-base.online/` by hand in the Admin Console,
   not through an `--apply`; it equals what the provisioner converges to.)*
-- **The DPoP write order holds** (`REQ-SEC-030`): when the Android client or the DPoP profile has to
-  change, the policy is detached first and re-attached last, and both client-policy lists are merged
-  by name so no other policy or profile is lost.
+- **The retired Android client is deleted wherever it is found** (owner decision 2026-10-17,
+  ADR-0268, ADR-0202 amendment 7, #2674): the client policy `krt-mobile-dpop-policy` is detached
+  first, the client profile `krt-mobile-dpop` removed next, and the client `basetool-android` —
+  with its marker role, mappers and scope mappings — deleted last. Each is a planned `-` line in
+  the dry run, both client-policy lists are rewritten without only that entry, so no other policy
+  or profile is lost, and the verify pass fails while one is left. The client is never reported as
+  “not in the production shape”, and the id stays reserved for third-party clients.
 - **No secret is printed, logged or sent back.** A confidential client the run creates is reported
   with the Admin Console path to its generated secret and the `.env` variables that need it.
 - **Built-in Keycloak objects are never touched**; realm-wide hardening stays in
@@ -2313,7 +2314,7 @@ there.
   `basetool-frontend`, `backend-service`, `basetool-ingest-gateway` and `grafana` (when managed)
   have it withheld — a planned `- optional scope 'offline_access' withheld (offline sessions are
   for the exchange clients only, ADR-0202 amendment 5)` line wherever found, never offered to one
-  the run creates — as `basetool-android` already had (ADR-0131); owner decision 2026-09-28.
+  the run creates; owner decision 2026-09-28.
   **`offline_access` is no realm default client scope either** (a second exception to „built-in
   objects are never touched", owner decision the same day): the provisioner removes it from the
   realm's default and optional client scopes wherever it is listed —
@@ -2335,14 +2336,17 @@ there.
 **Acceptance**
 
 - [ ] `provision-keycloak-realm.test.sh` passes: a dry run writes nothing; an apply from an empty
-  realm builds the shape and verifies clean; a second apply sends no write; an Android edit detaches,
-  writes and re-attaches in that order and keeps every foreign policy; target-only objects are
+  realm builds the shape and verifies clean; a second apply sends no write; target-only objects are
   reported and still present; no secret appears in the output or in any payload.
 - [ ] After provisioning, `keycloak-config-snapshot.sql` run on the environment and on production
   diffs only in the lines its header lists as environment-specific.
-- [ ] `provision-keycloak-realm.test.sh` section 8: against a realm still carrying the three retired
-  entries, the plan removes exactly those (plus the DPoP detach/re-attach the app's scope removal
-  needs) and a second apply is empty.
+- [ ] `provision-keycloak-realm.test.sh` section 8: against a realm still carrying the entries
+  retired on 2026-09-22, the plan removes exactly those and a second apply is empty.
+- [x] Section 4: a realm still holding `basetool-android`, its marker role, the DPoP policy and
+  profile plans exactly the three deletions in order (policy, profile, client), writes nothing in
+  the dry run, deletes them on apply while every foreign policy and profile survives, verifies
+  clean, and a second apply sends no write; a client whose policy is already gone is deleted on
+  its own.
 - [x] Section 17: a stray audience and claim mapper on the extractor and a role mapper on a
   third-party client are planned as removals and removed by the apply, which verifies clean; a stray
   mapper on `basetool-frontend` is still only reported and kept.

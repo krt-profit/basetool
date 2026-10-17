@@ -127,21 +127,19 @@ public final class FrontendPageRoutes {
           "/admin/p4k-import",
           "/impressum",
           "/licenses",
-          "/app/link-help",
           "/privacy",
           "/terms/accept",
           "/terms");
 
   /**
    * Routes that are accounted for but are not pages: HTML fragments, JSON read models, the
-   * notification SSE stream and one redirect.
+   * notification SSE stream.
    *
    * <p>Enumerated explicitly, so that together with {@link #PAGES} it must cover every routed
    * endpoint.
    */
   public static final @Unmodifiable List<String> NOT_PAGES =
       List.of(
-          "/app/callback",
           "/profile/deletion-request",
           "/profile/notification-preferences",
           "/inventory/all/stack/entries",
@@ -176,8 +174,8 @@ public final class FrontendPageRoutes {
 
   /**
    * Subtree roots the catalogue does not enumerate: the {@code /api/**} proxies, {@code
-   * assetlinks.json}, {@code manifest.webmanifest}, {@code /csrf}, the error page, the actuator
-   * tree and the OAuth2 entry and exit.
+   * manifest.webmanifest}, {@code /csrf}, the error page, the actuator tree and the OAuth2 entry
+   * and exit.
    *
    * <p>Matched segment by segment with {@link EndpointEnumeration#isUnder}, never by {@code
    * startsWith}.
@@ -187,7 +185,6 @@ public final class FrontendPageRoutes {
           "/api",
           "/csrf",
           "/manifest.webmanifest",
-          "/.well-known",
           "/error",
           "/actuator",
           "/oauth2",

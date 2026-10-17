@@ -2051,7 +2051,15 @@ filter runs, so such a test passes against the broken code.
 `RequestBodySizeLimitFilter`, `ApiCacheControlFilter`, `RateLimitingFilter` (backend + ingest),
 `PayloadSizeLimitFilter`, `RequestLoggingFilter` (ingest), `PublicPaths` (frontend)
 
-### REQ-SEC-030 — The native mobile client's refresh token MUST be sender-constrained, its access token MUST NOT be
+### REQ-SEC-030 — The native mobile client's refresh token MUST be sender-constrained, its access token MUST NOT be *(superseded)*
+
+> **Superseded 2026-10-17 (ADR-0268, #2674).** The Android app is discontinued and its Keycloak
+> client `basetool-android` is deleted, so no client in the realm holds a DPoP-bound refresh token.
+> `scripts/provision-keycloak-realm.py` now deletes the `krt-mobile-dpop-policy` policy, the
+> `krt-mobile-dpop` profile and the client wherever they remain (REQ-OPS-033, ADR-0202), and
+> `scripts/provision-keycloak-mobile-client.py` and `scripts/verify-dpop-binding.py` are gone. The
+> finding that the per-client switch re-binds the access token, and that the password grant
+> mis-reports the binding, stays true of Keycloak and is kept below for the next public client.
 
 The public Android client (`basetool-android`) MUST hold a **DPoP-bound refresh token** and MUST
 receive **plain Bearer access tokens** carrying no `cnf` claim. RFC 9700 §2.2.2 requires a public
@@ -2100,11 +2108,10 @@ nor the provisioning service account.
 - [x] Verification fails loudly when `dpop.bound.access.tokens` is flipped on, when the marker role
   is missing, or when the policy is present but unscoped.
 
-**Enforced by:** `provision-keycloak-mobile-client.test.sh` and, for the whole realm,
-`provision-keycloak-realm.test.sh` section 4 (configuration and write order) and
-`scripts/verify-dpop-binding.py` (behaviour) · **Code:**
-`scripts/provision-keycloak-mobile-client.py`, which `scripts/provision-keycloak-realm.py` imports
-for the client, profile and policy (`REQ-OPS-033`) · **Decision:**
+**Enforced by:** `provision-keycloak-realm.test.sh` section 4, which pins the retirement — policy
+detached before the profile is removed, profile removed before the client is deleted, foreign
+policies and profiles kept · **Code:** `scripts/provision-keycloak-realm.py` (`plan_retired`,
+`REQ-OPS-033`) · **Decision:**
 [ADR-0131](../adr/0131-mobile-auth-refresh-only-dpop-binding.md) · **Measurements:**
 [`ANDROID_API_EXPOSURE_PLAN.md`](../archive/ANDROID_API_EXPOSURE_PLAN.md) section 7
 
@@ -2528,7 +2535,13 @@ from the original registration.
 `ApprovalDecision#REOPENED`, `AdminDiscordRegistrationsPageController`, `discord-registrations.js`,
 `V233__allow_reopened_user_approval_decision.sql` · **Decision:** ADR-0140
 
-### REQ-SEC-035 — The mobile client's scope MUST carry the member realm roles, `Admin` included
+### REQ-SEC-035 — The mobile client's scope MUST carry the member realm roles, `Admin` included *(superseded)*
+
+> **Superseded 2026-10-17 (ADR-0268, #2674).** The client this requirement scoped, `basetool-android`,
+> is deleted with the app, and the realm provisioner removes it wherever it remains instead of
+> converging its scope. The durable finding is REQ-SEC-036's: a narrowed client's role claim must
+> never rewrite the stored role set, and the record below shows what withholding `Admin` from one
+> client did to the member it applied to.
 
 The Keycloak client `basetool-android` runs with `fullScopeAllowed: false`, so the realm roles its
 tokens carry are exactly the ones mapped onto its client scope. That list MUST be
@@ -2652,12 +2665,10 @@ not one that also silently changes what a post-incident review can reconstruct.
   unit; and the Lager under it reads **1403.4 SCU** (102.93 + 700 + 180 + 420.5), the org-wide
   total, against the 784.8 the same screen shows a member of one Staffel.
 
-**Enforced by:** `provision-keycloak-mobile-client.test.sh` section 7 and
-`provision-keycloak-realm.test.sh` sections 2 and 4 · **Code:**
-`scripts/provision-keycloak-mobile-client.py` (`MEMBER_REALM_ROLES`, `FORBIDDEN_REALM_ROLES`,
-`upsert_realm_role_scope`), `scripts/provision-keycloak-realm.py` (`_converge_role_scope`, which
-converges the same list in both directions), `UserReconciliationService#syncUser`,
-`CustomJwtGrantedAuthoritiesConverter`, `OrgUnitViewModel` (app) · **Decision:**
+**Enforced by:** `provision-keycloak-realm.test.sh` section 4, which pins that the client is deleted
+rather than scoped · **Code:** `scripts/provision-keycloak-realm.py`
+(`plan_retired`), `UserReconciliationService#syncUser`, `CustomJwtGrantedAuthoritiesConverter` ·
+**Decision:**
 [ADR-0131](../adr/0131-mobile-auth-refresh-only-dpop-binding.md), and the 2026-09-02 reversal above
 
 ### REQ-SEC-036 — A client's role claim is authoritative only if its scope is complete *(superseded)*
@@ -2759,7 +2770,16 @@ membership authority is minted; the demand feed reads the member's memberships i
 `CustomJwtGrantedAuthoritiesConverter#assembleFor(User, Collection)` · **Configuration:**
 `app.security.partial-role-scope.client-ids`
 
-### REQ-SEC-038 — The Android App Link is verifiable, or the login is broken
+### REQ-SEC-038 — The Android App Link is verifiable, or the login is broken *(superseded)*
+
+> **Superseded 2026-10-17 (ADR-0268, #2674).** The Android app is discontinued and its Keycloak
+> client deleted, so no login ends at an App Link any more. `/.well-known/assetlinks.json`,
+> `/app/callback` and `/app/link-help` have no handler and no anonymous matcher: a member past the
+> session gates gets `404`, and an anonymous request is sent to the login like any member page
+> (`RetiredAppLinkRoutesTest`). The `blackbox-app-link` probe and `EdgeAppLinkFallbackBroken` are
+> removed with them (REQ-OBS-012). What stays true is the trap: a machine-fetched document behind the
+> authenticated catch-all answers `302` into the login, which is why `/manifest.webmanifest` keeps
+> its own `permitAll` entry (REQ-UI-020).
 
 The Android app's production redirect URI is an **App Link** —
 `https://profit-base.online/app/callback` — rather than a custom scheme, so that no other installed
@@ -2859,13 +2879,8 @@ replaces rather than appends breaks every installed copy for the length of the r
 > is the half of this requirement that can regress in production without any test noticing. The
 > fallback is not vestigial: it was used from the wild on 2026-09-16, the day after it shipped.
 
-**Code:** `frontend/…/shell/web/AssetLinksController.java`,
-`frontend/…/shell/web/AppLinkController.java`,
-`frontend/…/shell/web/AndroidAppLinkProperties.java`, `SecurityConfig` (anonymous matchers),
-`frontend/…/templates/shell/app-link-help.html`.
-**Test:** `AssetLinksControllerTest` — asserts the three response conditions through the real
-security chain, and that the digests are an array. `AppLinkControllerTest` — the fallback's redirect,
-its dropped query and the page behind it. `AnonymousSurfaceSweepMvcTest` — that both stay anonymous.
+**Code:** none since #2674 — the controllers, their properties and the help page are removed.
+**Test:** `RetiredAppLinkRoutesTest` — the three paths carry no anonymous access and no handler.
 
 ---
 
@@ -4140,9 +4155,7 @@ a method gate.
 | `/licenses`                                                                     | The third-party licence notice (REQ-UI-021, ADR-0197): owed to whoever receives the software, and the landing page already serves the bundled font to a visitor with no session. No backend call, no data. |
 | `/error`, `/error/**`                                                           | Error pages carry no data, and an error view that needs a session cannot render the outage that broke it.                                                                                                                                                                                                                       |
 | the asset trees, `/favicon.ico`, `/robots.txt`, `/sm/**`, `/**/*.map`           | Assets. The three mechanical entries keep the OAuth2 saved-request replay off a 404 (REQ-SEC-025, ADR-0088).                                                                                                                                                                                                                    |
-| `/.well-known/assetlinks.json`                                                  | Android App Links verification is fetched by the platform with no session (REQ-SEC-038).                                                                                                                                                                                                                                        |
-| `/manifest.webmanifest`                                                         | The web app manifest, read by a browser on the landing page before any login (REQ-UI-020, ADR-0164). Three localised strings, two colours and the path of an already-public icon; behind the catch-all it would answer `302` into OAuth and installs would name the app after the login page. Same class as the entry above it. |
-| `/app/callback`, `/app/link-help`                                               | The Android App Link fallback (REQ-SEC-038): a member mid-login may hold no session, and behind the catch-all the callback would loop into OAuth and park its authorization code in the saved-request cache. `/app/callback` only answers `303` to the help page, dropping the query.                                          |
+| `/manifest.webmanifest`                                                         | The web app manifest, read by a browser on the landing page before any login (REQ-UI-020, ADR-0164). Three localised strings, two colours and the path of an already-public icon; behind the catch-all it would answer `302` into OAuth and installs would name the app after the login page.                                   |
 | `/actuator/health`, `/actuator/health/**`                                       | The container health check (the image's `HEALTHCHECK`, rendered into the Quadlet `HealthCmd` in prod); in prod Actuator lives on the internal management port (ADR-0090).                                                                                                                                                     |
 | `/oauth2/authorization/keycloak`, `/login/oauth2/code/keycloak`, `POST /logout` | Spring Security's own login and logout endpoints — filters, not matrix entries.                                                                                                                                                                                                                                                 |
 
@@ -4177,22 +4190,21 @@ a method gate.
 > one to the waiting page and reconciles roles against the backend on the way.
 >
 > For a **page** that is correct. For a **document** — one an external verifier or a browser fetches
-> on its own schedule — it turns the document into a login page. `/.well-known/assetlinks.json`
-> shipped exactly that way: `permitAll` here, exempt in neither gate, so a signed-in member was
-> answered with the consent page and each hit paid a `/api/v1/users/me` round trip.
+> on its own schedule — it turns the document into a login page. The Android App Links descriptor
+> (REQ-SEC-038, superseded) shipped exactly that way: `permitAll` here, exempt in neither gate, so a
+> signed-in member was answered with the consent page and each hit paid a `/api/v1/users/me` round
+> trip.
 >
 > The exemption therefore lives in **one** place, `frontend/kernel/security/PublicPaths`, which both gates
 > read: `isStaticAsset` (the asset trees, the favicon, `/sm/`, `*.map`), `isPublicDocument`
-> (`/robots.txt`, `/.well-known/assetlinks.json`, `/manifest.webmanifest`), `isAuthInfrastructure`
+> (`/robots.txt`, `/manifest.webmanifest`), `isAuthInfrastructure`
 > (login, logout, OAuth, error, actuator) and `isLegalPage` (`/impressum`, `/privacy`, `/terms` — the
 > pages a gate may never hold a member away from, REQ-SEC-028). **A new public document goes in both
 > this table and `isPublicDocument`.** Pinned by `PublicPathsTest` plus a case in each gate's own test.
-> The App Link fallback pages are `permitAll` but deliberately in none of these sets: they are pages
-> for a member, not documents a verifier fetches, so a signed-in member still meets the gates there.
 >
 > **Both halves match the same way, so both accept the same spellings.** Spring Security matches
 > `permitAll` with a `PathPatternRequestMatcher`, which decides on the percent-**decoded**
-> segment. `PublicPaths` compared the raw `getRequestURI()`, so `/.well-known/assetlink%73.json`
+> segment. `PublicPaths` compared the raw `getRequestURI()`, so `/robot%73.txt`
 > was `permitAll` here and exempt in neither gate — admitted by the URL layer, then redirected by
 > the one below it. Fail-closed, so a consistency defect rather than a hole, but the same defect
 > as the drifted copies above, one layer down. Every predicate in `PublicPaths` matches a parsed

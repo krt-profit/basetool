@@ -204,10 +204,7 @@ public class SecurityConfig {
                         "/terms",
                         "/licenses",
                         "/robots.txt",
-                        "/.well-known/assetlinks.json",
                         "/manifest.webmanifest",
-                        "/app/callback",
-                        "/app/link-help",
                         "/favicon.ico",
                         "/sm/**",
                         "/**/*.map")

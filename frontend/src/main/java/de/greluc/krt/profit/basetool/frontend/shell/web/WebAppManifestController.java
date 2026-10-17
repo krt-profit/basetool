@@ -44,7 +44,7 @@ import org.springframework.web.servlet.resource.ResourceUrlProvider;
  * <p>Always answers {@code 200} anonymously, as {@code application/manifest+json}, with localized
  * strings from {@link MessageSource} and a content-hashed icon URL from {@link
  * ResourceUrlProvider}. The locale comes from the {@code ?locale=} parameter, so the response is a
- * pure function of its URL. Compare {@link AssetLinksController}.
+ * pure function of its URL.
  */
 @RestController
 @RequiredArgsConstructor
