@@ -94,6 +94,19 @@ public interface StockReads {
       @NotNull UUID member, @NotNull Collection<String> keys);
 
   /**
+   * Returns how the member's lots with the given keys split into personal stock and the member's
+   * own shared stock per org-unit pool (REQ-XCH-016).
+   *
+   * @param member the member
+   * @param keys the lot keys; an empty collection yields an empty list
+   * @return one part per lot and pool, the personal part with no unit; shared rows without a unit
+   *     count as personal
+   */
+  @NotNull
+  List<ExchangeStockSplitRow> exchangeLotSplits(
+      @NotNull UUID member, @NotNull Collection<String> keys);
+
+  /**
    * Counts a member's lots, personal and shared, as the exchange keys them.
    *
    * @param member the member

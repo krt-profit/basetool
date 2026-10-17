@@ -277,10 +277,10 @@ def validate_origin(value: str, flag: str) -> str:
 
 
 def seed_client_spec(realm: str) -> ClientSpec:
-    """The testing-only seed client: password grant plus a user-managing service account (ADR-0278)."""
+    """The testing-only seed client: password grant plus a user-managing service account (ADR-0279)."""
     return ClientSpec(
         client_id=SEED_CLIENT_ID,
-        kind="confidential, password grant + service account (testing only: the briefing seed, ADR-0278)",
+        kind="confidential, password grant + service account (testing only: the briefing seed, ADR-0279)",
         fields={
             **_flags(public=False, standard=False, service_accounts=True, full_scope=True,
                      frontchannel_logout=True),
@@ -311,7 +311,7 @@ def reject_production_origin(public_origin: str) -> None:
     host = public_origin.split("://", 1)[1].split(":", 1)[0]
     if any(host == marker or host.endswith("." + marker) for marker in PRODUCTION_HOST_MARKERS):
         raise SystemExit(f"--seed-client is for the testing system only; {public_origin} is a "
-                         f"production origin (ADR-0278)")
+                         f"production origin (ADR-0279)")
 
 
 def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
@@ -1429,7 +1429,7 @@ def main() -> int:
     parser.add_argument("--seed-client", action="store_true",
                         help="also manage the testing-only `basetool-seed` client that "
                              "scripts/seed-briefing.py signs in with; refused for a production "
-                             "origin (ADR-0278)")
+                             "origin (ADR-0279)")
     parser.add_argument("--apply", action="store_true",
                         help="write the planned changes (default: dry run, writes nothing)")
     parser.add_argument("--container", default="keycloak",

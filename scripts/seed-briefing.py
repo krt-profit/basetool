@@ -15,7 +15,7 @@ and the presenter list as CSV into `--out`. A second run reuses the accounts and
 and skips the data once the test org structure exists.
 
 `purge` deletes every Keycloak account the seed created (marked by its e-mail domain). The
-Basetool data itself goes with the wipe of `scripts/testing-reset.sh` (ADR-0278, REQ-OPS-050).
+Basetool data itself goes with the wipe of `scripts/testing-reset.sh` (ADR-0279, REQ-OPS-050).
 
 The client secret comes from `$SEED_CLIENT_SECRET`, never from the command line. Every URL that
 names a production host is refused.
@@ -98,7 +98,7 @@ def refuse_production(url: str, flag: str) -> None:
     host = urllib.parse.urlsplit(url).hostname or ""
     if any(host == marker or host.endswith("." + marker) for marker in PRODUCTION_HOST_MARKERS):
         raise SystemExit(f"{flag} {url} names a production host; the seed runs against the "
-                         f"testing system only (ADR-0278)")
+                         f"testing system only (ADR-0279)")
 
 
 def require_loopback(url: str) -> None:

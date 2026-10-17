@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.StarSystemDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.TerminalDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitChoice;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeShipChangeSet;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStockChangeSet;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.ShipBulkOrgUnitRequestDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.ShipOrgUnitRequestDto;
@@ -333,6 +334,13 @@ class MassAssignmentGuardTest {
                   "orgUnitVersion",
                   "the unit counter the client last saw, checked by the conditional update"
                       + " (ADR-0258)")),
+          Map.entry(
+              ExchangeStockChangeSet.Op.class,
+              Map.of(
+                  "orgUnit",
+                  "the unit whose pool a share fills, which ExchangeStockWriteService and"
+                      + " RebookCommands require to be a direct membership of the member"
+                      + " (REQ-XCH-016)")),
           Map.entry(
               ExchangeOrgUnitChoice.class,
               Map.of(

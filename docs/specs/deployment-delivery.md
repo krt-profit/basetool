@@ -3131,7 +3131,7 @@ says so instead of disappearing (ADR-0276).
 ### REQ-OPS-050 — The testing system is seeded through its API and emptied by a database wipe
 
 The testing system can be filled with the briefing's test data and emptied again, repeatably, and
-neither tool can reach production (ADR-0278).
+neither tool can reach production (ADR-0279).
 
 - **The seed goes through the API.** `scripts/seed-briefing.py seed` creates its Keycloak accounts
   through the Admin API and every Basetool row through `/api/v1`, signed in as the account the row
@@ -3194,7 +3194,7 @@ neither tool can reach production (ADR-0278).
 `scripts/provision-keycloak-realm.py` (`--seed-client`) · `scripts/testing-reset.test.sh`,
 `seed-briefing.py --selftest` (`repo-lint.yml`) · `scripts/provision-keycloak-realm.test.sh`
 (`keycloak-provisioner.yml`) · **Decision:**
-[ADR-0278](../adr/0278-the-testing-system-is-seeded-through-its-api-and-emptied-by-a-database-wipe.md) ·
+[ADR-0279](../adr/0279-the-testing-system-is-seeded-through-its-api-and-emptied-by-a-database-wipe.md) ·
 **Runbook:** [`deployment.md` → Seeding and emptying the testing system](../deployment.md#seeding-and-emptying-the-testing-system) ·
 **Related:** REQ-OPS-033, REQ-SEC-024, REQ-ORG-017
 

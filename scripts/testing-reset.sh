@@ -19,7 +19,7 @@ WRITER_SERVICES=(frontend ingest backend)
 
 usage() {
   printf 'usage: %s %s\n' "$(basename "$0")" "${CONFIRM_FLAG}" >&2
-  printf 'Empties the Basetool database of the testing host (ADR-0278, REQ-OPS-050).\n' >&2
+  printf 'Empties the Basetool database of the testing host (ADR-0279, REQ-OPS-050).\n' >&2
   printf 'Keycloak, Redis and every other volume stay as they are.\n' >&2
 }
 

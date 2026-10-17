@@ -784,7 +784,7 @@ prints `1`.
 ### Seeding and emptying the testing system
 
 `scripts/seed-briefing.py` fills the testing system with the briefing's test data through the API;
-`scripts/testing-reset.sh` empties its Basetool database again (REQ-OPS-050, ADR-0278). Neither
+`scripts/testing-reset.sh` empties its Basetool database again (REQ-OPS-050, ADR-0279). Neither
 runs against production: the seed refuses a production URL, the provisioner refuses `--seed-client`
 for a production origin, and the reset refuses a host whose `.env` lacks
 `APP_INSTANCE_TEST_SYSTEM=true`. Everything below is a write on the **testing** host only.
@@ -836,7 +836,7 @@ connect the test application `briefing-test-app` once from a device-grant client
 
 **Emptying**
 
-Copy the script and its libraries to the testing host — they are not installed there (ADR-0278) —
+Copy the script and its libraries to the testing host — they are not installed there (ADR-0279) —
 and run it as root:
 
 ```bash

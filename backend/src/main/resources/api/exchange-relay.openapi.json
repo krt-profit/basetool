@@ -3575,6 +3575,9 @@
           "quantity" : {
             "$ref" : "#/components/schemas/ExchangeQuantityDto"
           },
+          "split" : {
+            "$ref" : "#/components/schemas/ExchangeStockSplitDto"
+          },
           "stolen" : {
             "type" : "boolean"
           }
@@ -3600,6 +3603,40 @@
             "items" : {
               "$ref" : "#/components/schemas/ExchangeTombstoneDto"
             }
+          }
+        }
+      },
+      "ExchangeStockSplitDto" : {
+        "type" : "object",
+        "properties" : {
+          "personal" : {
+            "$ref" : "#/components/schemas/ExchangeQuantityDto"
+          },
+          "pools" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeStockSplitPool"
+            }
+          }
+        }
+      },
+      "ExchangeStockSplitPool" : {
+        "type" : "object",
+        "properties" : {
+          "orgUnit" : {
+            "$ref" : "#/components/schemas/ExchangeStockSplitUnit"
+          },
+          "quantity" : {
+            "$ref" : "#/components/schemas/ExchangeQuantityDto"
+          }
+        }
+      },
+      "ExchangeStockSplitUnit" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
           }
         }
       },
@@ -3864,12 +3901,15 @@
           },
           "op" : {
             "type" : "string",
-            "pattern" : "^set-quantity$"
+            "pattern" : "^(set-quantity|share)$"
           },
           "opId" : {
             "type" : "string",
             "maxLength" : 64,
             "minLength" : 1
+          },
+          "orgUnit" : {
+            "$ref" : "#/components/schemas/StockOpUnit"
           },
           "override" : {
             "type" : "boolean"
@@ -4376,6 +4416,16 @@
             "type" : "string"
           }
         }
+      },
+      "StockOpUnit" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        },
+        "required" : [ "id" ]
       },
       "Uex" : {
         "type" : "object",

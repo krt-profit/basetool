@@ -1,4 +1,4 @@
-# ADR-0278 — The testing system is seeded through its API and emptied by a database wipe
+# ADR-0279 — The testing system is seeded through its API and emptied by a database wipe
 
 - **Status:** Accepted
 - **Date:** 2026-10-17

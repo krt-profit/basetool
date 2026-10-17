@@ -195,6 +195,7 @@ class ExchangeStockWritePathCharacterisationTest {
         stolen,
         new ExchangeStockChangeSet.Quantity(new BigDecimal(target), "SCU"),
         new ExchangeStockChangeSet.Quantity(new BigDecimal(expected), "SCU"),
+        null,
         null);
   }
 

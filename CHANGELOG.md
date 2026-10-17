@@ -22,6 +22,10 @@
 
 ### Added
 
+- **Exchange: Bestand an eine Einheit geben.** Eine verbundene Anwendung kann mit der neuen Operation `share` auf `POST /exchange/v1/me/stock/changes` einen Teil des persönlichen Bestands eines Postens in den Pool einer Einheit geben, in der das Mitglied direkt Mitglied ist; es bleibt Halter. Die Einheit wird immer ausdrücklich genannt, die Umbuchung ist wie im Web auditiert und über „Verbundene Anwendungen“ rückgängig zu machen (Migration `V305`, ADR-0278, REQ-XCH-016).
+
+- **Exchange: Aufteilung eines Lagerpostens.** Jeder Posten von `GET /exchange/v1/me/stock` trägt jetzt `split`: wie viel davon persönlich ist und wie viel das Mitglied selbst in welchem Einheiten-Pool hält, auch in einer verlassenen Einheit. Eine Umbuchung zwischen persönlich und geteilt erscheint damit im Änderungs-Feed, Schlüssel und Gesamtmenge bleiben gleich (Migration `V304`, REQ-XCH-016).
+
 - **Audit: Änderung des Mitgliedsrangs wird protokolliert.** Ändert ein Admin den Rang 1–20 eines Mitglieds, schreibt das Audit-Log unter „Rollen & Mitglieder“ das Ereignis „Mitgliedsrang geändert“ mit altem und neuem Rang; ein unveränderter Rang erzeugt keinen Eintrag (REQ-AUDIT-001, REQ-ROLE-007).
 
 - **Profitberechnung: Sortieren per Spaltenkopf.** Material, je SCU, Marge, Kapital und Max Profit sortieren per Klick auf den Spaltenkopf, ein zweiter Klick dreht die Reihenfolge um – auch auf dem Handy über eine Leiste über der Liste. Die Platzziffer bleibt der Rang nach Max Profit; die Sortierung bleibt bei einer neuen Berechnung erhalten und wird pro Browser gemerkt (REQ-UI-030).
@@ -32,7 +36,7 @@
 
 - **Testsystem im Footer erkennbar.** Auf dem Testsystem zeigt der Footer jeder Seite ein gelbes „Testsystem"-Schild, damit niemand dort versehentlich echte Arbeit erledigt; Produktion bleibt unverändert. Geschaltet über die neue Umgebungsvariable `APP_INSTANCE_TEST_SYSTEM` (Frontend, REQ-UI-029).
 
-- **Testsystem: Testdaten für die Einweisung per Skript.** `scripts/seed-briefing.py` legt über die API Testkonten (Präsentation und Teilnehmer mit Ausgabeliste), Org-Struktur und Daten in allen Bereichen an; `scripts/testing-reset.sh` leert danach die Basetool-Datenbank des Testsystems. Beides verweigert Produktion; der Seed meldet sich über den neuen, nur im Testsystem angelegten Keycloak-Client `basetool-seed` an (`provision-keycloak-realm.py --seed-client`, REQ-OPS-050, ADR-0278).
+- **Testsystem: Testdaten für die Einweisung per Skript.** `scripts/seed-briefing.py` legt über die API Testkonten (Präsentation und Teilnehmer mit Ausgabeliste), Org-Struktur und Daten in allen Bereichen an; `scripts/testing-reset.sh` leert danach die Basetool-Datenbank des Testsystems. Beides verweigert Produktion; der Seed meldet sich über den neuen, nur im Testsystem angelegten Keycloak-Client `basetool-seed` an (`provision-keycloak-realm.py --seed-client`, REQ-OPS-050, ADR-0279).
 
 ### Changed
 
