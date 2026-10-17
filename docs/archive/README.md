@@ -68,6 +68,7 @@ section number, not because it describes the system today.
 | [`EXCHANGE_GO_LIVE_RUNBOOK.md`](EXCHANGE_GO_LIVE_RUNBOOK.md) | The External Client Exchange go-live, with the coupled Android and SC Extractor release | 2026-09-28 |
 | [`RELEASE_1.11.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.11.0_PRODUCTION_RUNBOOK.md) | The production rollout of v1.11.0 | 2026-09-25 |
 | [`RELEASE_1.14.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.14.0_PRODUCTION_RUNBOOK.md) | The production rollout of v1.14.0 | 2026-10 |
+| [`RELEASE_1.17.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.17.0_PRODUCTION_RUNBOOK.md) | The production rollout of v1.17.0, the internal-only backend (#2638) | 2026-10-17 |
 | [`INGEST_KEYCLOAK_SETUP.md`](INGEST_KEYCLOAK_SETUP.md) | The Keycloak side of the ingest gateway, including onboarding an approved ingest client | Applied 2026-06 → 2026-09; archived 2026-10-13 |
 | [`KEYCLOAK_HARDENING_RUNBOOK.md`](KEYCLOAK_HARDENING_RUNBOOK.md) | The twelve realm hardening steps (WP-K2) | Archived 2026-10-13; per-step state as of that date |
 | [`OWNER_STEPS_2026-10.md`](OWNER_STEPS_2026-10.md) | The owner-only host and realm steps of October 2026 | Archived 2026-10-13 |
