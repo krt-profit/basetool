@@ -18,9 +18,13 @@
 
 - **Monitoring: CSP-Verstöße nennen ihre Ursache.** Der Fehler-Beacon meldet bei einem `trusted-types`-Verstoß den versuchten Policy-Namen und bei jedem CSP-Verstoß, ob der Code von der eigenen Seite, einer Browser-Erweiterung oder anderswoher stammt; `basetool_client_csp_violation_total` trägt dafür das Label `code_origin` (Dashboard 07, Panel 85). Grundlage für die Trusted-Types-Umstellung auf `enforce` (REQ-SEC-064, REQ-FE-022).
 
+- **Backend: keine Feldinjektion mehr.** `UserMapper`, `MissionMapper` und `InventoryItemMapper` erhalten ihre Abhängigkeiten über paketinterne `@Autowired`-Setter statt über Felder; die neue ArchUnit-Regel `noFieldIsAutowired` lässt kein `@Autowired`-Feld mehr zu (REQ-SEC-003). Kein Verhaltensunterschied.
+
 ### Fixed
 
 - **Einsatz-Detailseite: nicht geladene Auswahllisten werden gemeldet.** Schlägt das Laden einer Auswahlliste (Jobtypen, Crew-Funktionen, Organisationseinheiten, Frequenz- oder Schiffstypen, Schiffe für Einheiten) fehl, nennt ein Hinweis über den Tabs die betroffenen Listen, statt die Auswahl stillschweigend leer zu lassen; das Frontend protokolliert jeden Fehlschlag als WARN. Die Listen laden jetzt parallel (Frontend, REQ-MISSION-030).
+
+- **Frontend: Hostname-Prüfung zum Backend standardmäßig an.** Ohne gesetztes `INTERNAL_TLS_VERIFY_HOSTNAME` prüft das Webtool den Namen im Backend-Zertifikat jetzt wie der Ingest-Gateway, statt die Prüfung stillschweigend auszulassen; Compose und Quadlet setzten `true` bereits, `dev`/`test` bleiben unverändert (Frontend-Konfiguration, REQ-SEC-070).
 
 - **Mitglied bearbeiten: Rang passt nicht zur Officer-Rolle.** Ein Rang außerhalb des Bereichs der Keycloak-Rolle (Officer 1–12, Mitglieder 13–20) wird nicht mehr als „ungültiges Argument“ abgelehnt, sondern am Rang-Feld mit dem Hinweis, welche Rolle das Mitglied noch hat und dass sie zuerst in Keycloak geändert werden muss; unter dem Rang steht der erlaubte Bereich. Neuer API-Fehlercode `RANK_OUTSIDE_ROLE_RANGE` (REQ-ROLE-007, ADR-0264).
 

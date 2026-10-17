@@ -209,6 +209,9 @@ equivalents — a new violation fails `./gradlew test`:
   (the controller and frontend proxy require merely `isAuthenticated()`), so this rule fails a future
   mutation that drops the check — which would otherwise ship reachable by any authenticated member —
   at build time rather than in production (security review, INFO regression guard).
+- No backend field is `@Autowired` (`noFieldIsAutowired`): dependencies arrive through the
+  constructor, and a MapStruct abstract mapper takes them through package-private `@Autowired`
+  setters.
 - The frontend does not depend on Spring Data JPA or JDBC (`frontendShouldNotDependOnSpringDataJpa`,
   `frontendShouldNotUseJdbcDirectly`); ingest depends on no persistence at all.
 
@@ -5513,10 +5516,11 @@ production rollout reaches step by step:
   (`WebClientConfig`), its backend readiness probe (`BackendHealthIndicator`) and the ingest relay
   (`RestClientConfig`) verify the backend's hostname, which ADR-0204 §6 had switched off for the
   relay. The backend's Keycloak client, the edge, Prometheus and the blackbox exporter verified
-  already. `dev` and `test` are unaffected. The ingest jar defaults the check to on
-  (`app.ingest.verify-backend-hostname: ${INTERNAL_TLS_VERIFY_HOSTNAME:true}`, and its `dev` profile
-  sets `false` explicitly), so a jar started outside compose or Quadlet under `prod` checks the name
-  too (ING-SEC-04); the frontend jar's default is still `false`.
+  already. `dev` and `test` are unaffected. Both jars default the check to on
+  (`app.ingest.verify-backend-hostname` and `app.http.verify-backend-hostname`, each
+  `${INTERNAL_TLS_VERIFY_HOSTNAME:true}`), so a jar started outside compose or Quadlet under `prod`
+  checks the name too (ING-SEC-04). The ingest `dev` profile sets `false` explicitly; the frontend's
+  `dev` and `test` profiles trust any certificate and skip the check regardless of the switch.
 - **Shipped in two releases.** The first was inert: every per-service mount fell back to the shared
   keystore and `INTERNAL_TLS_VERIFY_HOSTNAME` defaulted to `false`. The second — rollout step 3 —
   bakes the Quadlet units to `/var/iri/secrets/tls/<service>.p12` and the CA-only truststore and
@@ -5530,8 +5534,10 @@ production rollout reaches step by step:
   leaves no CA key anywhere; each leaf verifies for each of its own names and for no other service's.
 - [ ] With verification on, the relay and the frontend refuse a backend certificate that chains to
   the pinned anchor but does not name the host they dialled, and accept one that does; with it off
-  (the default) both behave exactly as before; `dev` is unaffected either way.
+  both behave exactly as before; `dev` is unaffected either way.
 - [ ] The frontend's backend readiness probe follows the same switch.
+- [ ] With `INTERNAL_TLS_VERIFY_HOSTNAME` unset, the frontend and the ingest jar both verify the
+  hostname; no `prod` profile file turns it off.
 - [ ] With nothing configured, every Quadlet unit mounts the shared keystore at every new mount
   point; the deploy pre-flight refuses a release whose units mount any PKCS#12 the host lacks.
 - [ ] The E2E stack serves each app on its own leaf, and the seeder reaches the backend through the
@@ -5550,7 +5556,8 @@ a working copy; the runbook now carries that form. A release rollback to 1.11.0 
 4 undone first. *(Updated 2026-09-25 evening; this paragraph said steps 3 and 4 were open.)*
 
 **Enforced by:** `scripts/mint-internal-tls.test.sh` (`repo-lint.yml`) · `RestClientConfigTest`
-(ingest) · `BackendHostnameVerificationTest` · `BackendHealthIndicatorHostnameTest` ·
+(ingest) · `IngestPropertiesTest` · `BackendHostnameVerificationTest` ·
+`BackendHealthIndicatorHostnameTest` · `BackendHostnameDefaultTest` ·
 `scripts/deploy.test.sh` (`scenario_podman_missing_per_service_keystore_refuses`) ·
 `generate-quadlet.py --check` · the E2E suite (`docker-compose.e2e.yml`, `BackendSeeder`) ·
 **Code:** `scripts/mint-internal-tls.sh`, `WebClientConfig`, `BackendHealthIndicator`,

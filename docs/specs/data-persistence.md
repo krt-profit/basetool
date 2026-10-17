@@ -35,7 +35,8 @@ is one global line across every domain, so a migration is never named for the mo
 tables (that is REQ-DATA-020's map). A Gradle module extracted later (exchange, bank; plan §5.8)
 puts its migrations into that same location on the backend's class path, not into a location of its
 own, and the backend stays the application that runs Flyway. The CI job *Check migration version
-numbering* refuses a duplicate or out-of-order version.
+numbering* refuses a duplicate or out-of-order version, and a gap in the sequence that the
+migration README does not list under *Skipped version numbers* with its reason.
 
 ### REQ-DATA-002 — Startup seeding
 

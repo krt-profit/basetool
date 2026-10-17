@@ -12,7 +12,7 @@ There is no source set where "Lombok isn't available here" is a reason not to us
 resolves Lombok from the version catalog rather than a Boot BOM and must keep that pin **equal** to
 the Boot-managed version, because `lombok.config` is a single shared file at the repository root.
 
-- **Constructor injection only** (favor Lombok `@RequiredArgsConstructor`). No field `@Autowired`.
+- **Constructor injection only** (favor Lombok `@RequiredArgsConstructor`). No field `@Autowired` — `ArchitectureTest.noFieldIsAutowired` fails the backend build on one. The one exception is a MapStruct abstract mapper, which MapStruct instantiates itself: it takes each collaborator it calls in its own methods through a package-private `@Autowired` setter beside a `protected` field (`JobOrderMapper`, `UserMapper`).
 - **Records** for DTOs and immutable config wrappers.
 - **`_` for a variable whose value is deliberately unused** — a lambda parameter, a catch parameter (an empty `catch` included), a pattern component ([ADR-0214](../../docs/adr/0214-code-carries-no-comments-besides-javadoc.md) amendment, D-14). Keep a descriptive name where the name states intent. Not in `keycloak-spi`, whose Java-21 bytecode has no unnamed variables.
 - **No `default` on a switch over a project enum** unless the switch handles a deliberate subset ([ADR-0238](../../docs/adr/0238-a-switch-over-a-project-enum-has-no-default.md), D-15). Write an exhaustive switch as a switch expression, or as a statement with a `case null ->` arm, so javac checks it and a new constant fails the build at every decision site; a switch over an enum the project does not own keeps its `default`.
