@@ -31,7 +31,7 @@
                                   role="button" tabindex="0"
                                   data-trigger="inv-my-assoc-edit"
                                   data-assoc-chip="jobOrder"
-                                  th:data-target-id="${a.jobOrderId}"
+                                  th:data-target-id="${a.jobOrderId}" th:data-target-label="'#' + ${a.jobOrderDisplayId}"
                                   th:data-amount="${a.amount}"
                                   th:title="#{inventory.assoc.amount}">
                                 <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·
@@ -91,9 +91,10 @@
                                   data-trigger="inv-my-assoc-edit"
                                   data-assoc-chip="mission"
                                   th:data-target-id="${a.missionId}"
+                                  th:data-target-label="${#strings.isEmpty(a.missionName)} ? #{inventory.assoc.mission.unknown} : (${a.missionPlannedStartTime != null} ? |${a.missionName} - ${#temporals.format(a.missionPlannedStartTime, #messages.msg('format.date'), #locale)}| : ${a.missionName})"
                                   th:data-amount="${a.amount}"
                                   th:title="#{inventory.assoc.amount}">
-                                <span th:text="${a.missionName}">Nachtfalke</span> ·
+                                <span th:text="${#strings.isEmpty(a.missionName)} ? #{inventory.assoc.mission.unknown} : ${a.missionName}">Nachtfalke</span> ·
                                 <span class="assoc-chip__amt"
                                       th:text="${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(a.amount, 1, 'NONE') : #numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
                             </span>
@@ -270,7 +271,7 @@
                                   role="button" tabindex="0"
                                   data-trigger="inv-my-assoc-edit"
                                   data-assoc-chip="jobOrder"
-                                  th:data-target-id="${a.jobOrderId}"
+                                  th:data-target-id="${a.jobOrderId}" th:data-target-label="'#' + ${a.jobOrderDisplayId}"
                                   th:data-amount="${a.amount}"
                                   th:title="#{inventory.assoc.amount}">
                                 <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·
@@ -465,7 +466,7 @@
                                       role="button" tabindex="0"
                                       data-trigger="inv-admin-assoc-edit"
                                       data-assoc-chip="jobOrder"
-                                      th:data-target-id="${a.jobOrderId}"
+                                      th:data-target-id="${a.jobOrderId}" th:data-target-label="'#' + ${a.jobOrderDisplayId}"
                                       th:data-amount="${a.amount}"
                                       th:title="#{inventory.assoc.amount}">
                                     <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·
@@ -535,9 +536,10 @@
                                       data-trigger="inv-admin-assoc-edit"
                                       data-assoc-chip="mission"
                                       th:data-target-id="${a.missionId}"
+                                  th:data-target-label="${#strings.isEmpty(a.missionName)} ? #{inventory.assoc.mission.unknown} : (${a.missionPlannedStartTime != null} ? |${a.missionName} - ${#temporals.format(a.missionPlannedStartTime, #messages.msg('format.date'), #locale)}| : ${a.missionName})"
                                       th:data-amount="${a.amount}"
                                       th:title="#{inventory.assoc.amount}">
-                                    <span th:text="${a.missionName}">Nachtfalke</span> ·
+                                    <span th:text="${#strings.isEmpty(a.missionName)} ? #{inventory.assoc.mission.unknown} : ${a.missionName}">Nachtfalke</span> ·
                                     <span class="assoc-chip__amt"
                                           th:text="${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(a.amount, 1, 'NONE') : #numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
                                 </span>
@@ -578,7 +580,7 @@
                             <th:block sec:authorize="!hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                                 <span th:each="a : ${entry.missionAllocations}"
                                       class="assoc-chip assoc-chip--mission">
-                                    <span th:text="${a.missionName}">Nachtfalke</span> ·
+                                    <span th:text="${#strings.isEmpty(a.missionName)} ? #{inventory.assoc.mission.unknown} : ${a.missionName}">Nachtfalke</span> ·
                                     <span class="assoc-chip__amt"
                                           th:text="${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(a.amount, 1, 'NONE') : #numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
                                 </span>
@@ -687,7 +689,7 @@
                                       role="button" tabindex="0"
                                       data-trigger="inv-admin-assoc-edit"
                                       data-assoc-chip="jobOrder"
-                                      th:data-target-id="${a.jobOrderId}"
+                                      th:data-target-id="${a.jobOrderId}" th:data-target-label="'#' + ${a.jobOrderDisplayId}"
                                       th:data-amount="${a.amount}"
                                       th:title="#{inventory.assoc.amount}">
                                     <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·
