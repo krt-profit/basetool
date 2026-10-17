@@ -90,7 +90,7 @@ public class BackendHealthIndicator implements HealthIndicator {
       @Value("${app.backend-health-url:${app.backend-url}}") String backendHealthUrl,
       SslBundles sslBundles,
       Environment environment,
-      @Value("${app.http.verify-backend-hostname:false}") boolean verifyHostname) {
+      @Value("${app.http.verify-backend-hostname:true}") boolean verifyHostname) {
     this(
         backendHealthUrl,
         CONNECT_TIMEOUT,
