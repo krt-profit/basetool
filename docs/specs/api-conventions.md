@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-11.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-17.
 > **Owner area:** API · **Related:** [`security-and-access.md`](security-and-access.md), [`observability.md`](observability.md)
 
 # API conventions
@@ -15,11 +15,11 @@ stable, predictable surface.
 
 Paths are `/api/v1/...`. A breaking change is made by **hard cut** (ADR-0234): the operation
 moves or changes in place in one release, with no parallel old path, no deprecation alias and no
-sunset window. Every operation belongs to one contract tier — **T0** never breaks (the version gate
-`GET /api/v1/app/version-policy`, `POST /internal/discord/account-existence`, the 18 exchange relay
-operations under `/api/v1/exchange/**`, the two SSE streams and `POST /api/v1/live-sync/changed`);
-**T1**, what a released Android build calls, breaks only in a declared hard-cut wave under
-REQ-API-009 and REQ-API-010; **T2**, web-only, changes freely under the carve-out below.
+sunset window. Two compatibility constraints stand outside that rule: the exchange relay operations
+stay frozen on the gateway where their external clients consume them (REQ-XCH-039), and
+`POST /internal/discord/account-existence` is a contract with the separately promoted Keycloak SPI
+(ADR-0055). Everything else on `/api/v1` changes under the carve-out below. The contract tiers
+(`T0` / `T1` / `T2`) that once split the surface by client are gone with the Android app (ADR-0269).
 There is no deprecation machinery: `@ApiDeprecation`, `DeprecationInterceptor` and
 `OpenApiDeprecationConfig` went with the last deprecated operation, `POST /api/v1/hangar/import/fleetview`,
 which wave 6 of the API cut deleted (it answers `410 APP_UPDATE_REQUIRED` to a build that still calls it).
@@ -28,7 +28,8 @@ No operation of the document is marked `deprecated`.
 > [!note] Amended 2026-10-02 — the hard cut (owner decisions D-03, D-04, D-11; ADR-0234)
 > Breaking changes used to go to `/api/v2/...` beside `/api/v1`. **Decided, implementation
 > pending:** the tier marker (`x-contract-tier`) and the T0 record do not exist yet; until they do,
-> the tiers are the lists named here and in REQ-API-009.
+> the tiers are the lists named here and in REQ-API-009. The tiers were built and are removed again
+> with the app (ADR-0269).
 
 **The seventeen deprecated mission endpoints are deleted — early** (owner decision 2026-09-22,
 #1996): the MissionDto-returning unit, crew, participant, check-in/-out, payout-preference,
@@ -37,18 +38,20 @@ frequency and manager writes and the unversioned `PUT …/owner/{userId}`. Their
 release rather than on the announced date, and app builds older than 2026-09-07 (the move to the
 slim paths) must be updated. Their `/slim` twins and the versioned `PUT …/owner` replace them.
 `POST …/participants` left REQ-API-009's frozen set and the API-vhost allow-list with them, and the
-nightly probe asserts 404 for it. Its manager-only successor for the app is
-`POST …/participants/by-id` (REQ-MISSION-020, ADR-0170 amendment; the `/slim` suffix dropped in wave 3 of the API cut), admitted and frozen.
+nightly probe asserted 404 for it. Its manager-only successor for the app,
+`POST …/participants/by-id` (REQ-MISSION-020, ADR-0170 amendment; the `/slim` suffix dropped in
+wave 3 of the API cut), stays in the backend but has no caller since the app was discontinued
+(ADR-0268).
 
 **Carve-out — internal-only endpoints (T2):** a `/api/v1` endpoint consumed solely by the in-repo
 frontend may change its response *shape* or its path in place when frontend and backend deploy
 atomically and `DtoOpenApiContractTest` guards the frontend mirror against
 `openapi.json` — e.g. the inventory `/grouped` move from `items` to `stacks` (ADR-0003).
 
-**The carve-out stops at the external contract set.** Its whole justification is the atomic
-deploy, which a released native client does not have. Operations listed in REQ-API-009 are
-therefore frozen against in-place shape change even though they live under `/api/v1`, and change
-only in a declared hard-cut wave (REQ-API-009).
+**The carve-out stops where the atomic deploy does.** Its whole justification is that frontend and
+backend ship together. The exchange relay operations and the Keycloak SPI's
+`POST /internal/discord/account-existence` have callers that do not, so they stay out of it
+(REQ-API-009's amendment names both).
 
 ### REQ-API-002 — DTOs only at boundaries
 
@@ -257,8 +260,8 @@ hierarchy (a sealed kernel of kinds plus one `ProblemCode` enum per module) land
   code string is the contract; the Java name is not.
 - **`exception.CoreProblemCode`** — the error kernel's enum: the handler's codes, the eight
   `AppExceptionKind` codes, the request pipeline's (`TERMS_NOT_ACCEPTED`, `PENDING_APPROVAL`,
-  `NO_ROLE`, `SERVICE_UNAVAILABLE`, `RATE_LIMIT_EXCEEDED`, `REQUEST_BODY_TOO_LARGE`,
-  `APP_UPDATE_REQUIRED`) and `NOT_ACCEPTABLE` (`406`) — 27 codes.
+  `NO_ROLE`, `SERVICE_UNAVAILABLE`, `RATE_LIMIT_EXCEEDED`, `REQUEST_BODY_TOO_LARGE`) and
+  `NOT_ACCEPTABLE` (`406`) — 26 codes.
 - **One enum per module, in the module's `api` package** — `bank.api.BankProblemCode` (the 18
   `BANK_*` codes), `exchange.api.ExchangeProblemCode` (`ACTING_MEMBER_REFUSED`, which the exchange
   module's `ActingMemberFilter` answers), `inventory.api.InventoryProblemCode` (`OVER_ALLOCATION`),
@@ -267,12 +270,12 @@ hierarchy (a sealed kernel of kinds plus one `ProblemCode` enum per module) land
   `scope.api.ScopeProblemCode` (`OWNER_ORG_UNIT_REQUIRED`), `supply.api.SupplyProblemCode` (the
   `SUPPLY_*` codes), `purchasing.api.PurchasingProblemCode` (the `PURCHASING_*` codes) and
   `identity.api.IdentityProblemCode` (`RANK_OUTSIDE_ROLE_RANGE`, REQ-ROLE-007). Names and wire
-  values did not change when they left `CoreProblemCode`; the registry holds 82 codes across the
-  ten enums. Three are
-  **reserved**, registered but not emitted: `BANK_HOLDER_OVERDRAFT` (ADR-0039),
-  `BANK_CARTEL_APPROVAL_REQUIRED` (ADR-0109) and `APP_UPDATE_REQUIRED`, which retired paths will
-  answer (ADR-0234, D-11; registered with `410`). Every producer references the enum; no code is a
-  literal any more.
+  values did not change when they left `CoreProblemCode`; the registry holds 81 codes across the
+  ten enums. Two are
+  **reserved**, registered but not emitted: `BANK_HOLDER_OVERDRAFT` (ADR-0039) and
+  `BANK_CARTEL_APPROVAL_REQUIRED` (ADR-0109). `APP_UPDATE_REQUIRED` left the registry with the app
+  floor (REQ-API-020, superseded). Every producer references the enum; no code is a literal any
+  more.
 - **The committed list** `backend/src/test/resources/api/problem-codes.txt`, one `<CODE> <status>`
   line per code, sorted. A new, renamed or removed code changes it in the same PR, so the change is
   reviewed.
@@ -311,7 +314,8 @@ hierarchy (a sealed kernel of kinds plus one `ProblemCode` enum per module) land
   the generic kinds and `DomainProblem`, and every module exception and module enum lives in a
   module's `api` package — a planted kernel-package exception and enum are caught
   (`ErrorModelShapeTest`, 2026-10-04).
-- [ ] The app generating its constants from the document — **open**, the app.
+- [x] ~~The app generating its constants from the document~~ — moot: the Android app is discontinued
+  (ADR-0268).
 
 **Enforced by:** `ProblemCodeRegistryTest`, `ProblemCodeRuntimeProbeTest`,
 `GlobalExceptionHandlerClientErrorTest` (backend) ·
@@ -330,8 +334,9 @@ a database connection.
 **The kernel page policy** (plan D-18, amended 2026-10-03). The default ceiling is
 `MAX_PAGE_SIZE` = **1 000**. A list opts out only explicitly, by passing `PageCeiling.LOAD_ALL`
 (`LOAD_ALL_MAX_PAGE_SIZE` = 100 000), and only for a caller that requests a larger page. The value
-was set from the callers in the code, not guessed: every frontend, Android-app and ingest call
-requests at most 1 000 except eight, which are the reviewed opt-outs —
+was set from the callers in the code, not guessed: every frontend and ingest call (and, when it was
+measured, every Android-app call) requests at most 1 000 except eight, which are the reviewed
+opt-outs —
 
 | Opt-out | Caller | Requested `size` |
 | --- | --- | ---: |
@@ -442,11 +447,18 @@ contract tests then compared against a stale contract. Two parts close it:
   CI it rewrites a stale file, in CI (`CI=true`) it fails naming it (`CommittedOpenApi.refresh`).
   It writes LF on every platform.
 
-### REQ-API-018 — Every operation names its domain and its contract tier; every schema name one type
+### REQ-API-018 — Every operation names its domain; every schema name one type
+
+> [!note] Amended 2026-10-17 (ADR-0269, #2673) — the contract tier is gone
+> The requirement also gave every operation a contract tier (`x-contract-tier`, from
+> `contract-tiers.txt`, held by `ExternalContractTest`). The tiers sorted the surface by what a
+> released Android build called; with the app discontinued they are removed, together with the
+> extension, the file and `ContractTiers`, and their bullet and acceptance lines leave this
+> requirement; git keeps the text.
 
 The committed `openapi.json` is the review surface of the domain cut (ADR-0234, plan §5.10), so it
-says, per operation, which domain owns it and how frozen it is, and it describes every exposed type
-under a name of its own.
+says, per operation, which domain owns it, and it describes every exposed type under a name of its
+own.
 
 - **One tag per domain.** `OpenApiDomainConfig.domainTagCustomizer` (an `OperationCustomizer`)
   replaces every operation's tags with exactly one, its controller's domain, and mirrors it as
@@ -463,21 +475,10 @@ under a name of its own.
   module, or the API domain one of five reviewed entries names — the `privacy` module's endpoints
   are tagged `identity`, the `admin` module's `admin-system`, and `LeitungController`,
   `BlueprintController` and `UexLocationController` keep the domain the REST cut gives them —, and
-  an entry no controller needs fails. One published document stays — the app vendors it and the
-  frontend generates its test types from it; per-domain views are filtered from it. The exchange
+  an entry no controller needs fails. One published document stays — the frontend generates its
+  test types from it; per-domain views are filtered from it. The exchange
   relay surface alone is fenced into its own internal document (REQ-XCH-039), so the `exchange`
   domain's 19 relay operations are counted there and its 21 member and admin operations here.
-- **One contract tier per operation**, as `x-contract-tier` (REQ-API-001 names the tiers):
-  `T0` never breaks, `T1` is the Android contract, `T2` is web-only. The single source is
-  `backend/src/main/resources/api/contract-tiers.txt`, one `<T0|T1> <VERB> <path>` line per frozen
-  operation; every operation it does not name is `T2`. `ExternalContractTest` holds it to the record
-  that never changes (`T0`: the version gate, the 18 exchange relay operations, the two streams and
-  `POST /api/v1/live-sync/changed` — the SPI endpoint is T0 too but not in the document) and to the
-  frozen set (`T1` = frozen set minus `T0`, both directions), checks the committed documents — the
-  published one and the relay document — carry each tier, and refuses a declared-break ledger line
-  on a `T0` operation (REQ-API-017). The previous-release comparison also compares every operation
-  the previous documents mark `T0` or `T1`, reading a release's relay document together with its
-  `openapi.json`. The tier is data, not an exposure switch: the edge allow-list stays a reviewed file.
 - **Unique schema names.** Every name under `components.schemas` belongs to exactly one exposed Java
   type or an explicit `@Schema(name = …)`. `ExposedTypes` walks every main-source controller's
   handlers — return types, `@RequestBody` / `@RequestPart` parameters, generic arguments, record
@@ -486,31 +487,29 @@ under a name of its own.
   change sets, and `Provenance` of the blueprint change set and the blueprint DTO. `Skipped` was
   named as a third collision by the audit, but its namesake is a service record no controller
   exposes; the exposed one gets its name explicitly all the same. The name the document already
-  showed — and that the app's vendored copy and its generated models carry — stays on the type that
-  had it (`Op` the stock op, `Provenance` the change-set provenance, `Skipped` the undo result); the
-  others became
+  showed — which the Android app's vendored copy and its generated models carried at the time —
+  stayed on the type that had it (`Op` the stock op, `Provenance` the change-set provenance,
+  `Skipped` the undo result); the others became
   `ExchangeBlueprintOp`, `ExchangeShipOp` and `ExchangeBlueprintProvenance`, so the blueprint and
   ship change sets are documented correctly for the first time (and the ship op's `Insurance`
-  appears). `use-fqn` stays off: it would rename every schema and every generated app model.
+  appears). `use-fqn` stays off: it would rename every schema the frontend's generated test types
+  are keyed by.
 
 **Acceptance**
 
 - [x] Every operation carries exactly one tag, equal to `x-domain`, from the 22 domains; the tag list
-  is the domains; every operation carries the tier its list entry or `T2` gives it — asserted by the
-  generator before it writes and on the committed document (`OpenApiDocumentAssertionsTest`).
+  is the domains — asserted by the generator before it writes and on the committed document
+  (`OpenApiDocumentAssertionsTest`).
 - [x] Each domain's operation count has a floor at today's count (575 operations: 559 in
   `openapi.json`, the 19 relay operations in the relay document, REQ-XCH-039).
-- [x] `T0` equals its record, `T1` equals the frozen set minus `T0`, no ledger line breaks `T0`
-  (`ExternalContractTest.theContractTiersMatchTheFrozenSet`).
 - [x] No two exposed types share a schema name; the scan reaches at least 441 names, and the domain
   table names exactly the 99 controllers (`OpenApiSchemaNamesTest`).
-- [x] Each guard proven able to fail: a planted document with every fault, planted tier lines, planted
-  fixture controllers with two `Op` records, the real ship op without its explicit name, and a dropped
-  `T1` line.
+- [x] Each guard proven able to fail: a planted document with every fault, planted fixture
+  controllers with two `Op` records, and the real ship op without its explicit name.
 
-**Enforced by:** `OpenApiGeneratorTest`, `OpenApiDocumentAssertionsTest`, `OpenApiSchemaNamesTest`,
-`ExternalContractTest` (backend) ·
-**Related:** REQ-API-001, REQ-API-007, REQ-API-009, REQ-API-017, ADR-0234
+**Enforced by:** `OpenApiGeneratorTest`, `OpenApiDocumentAssertionsTest`, `OpenApiSchemaNamesTest`
+(backend) ·
+**Related:** REQ-API-001, REQ-API-007, REQ-API-009, ADR-0234, ADR-0269
 
 ### REQ-API-008 — Shared controller boilerplate (argument resolvers & response helpers)
 
@@ -534,7 +533,16 @@ The two resolvers are wired in `WebMvcConfig#addArgumentResolvers`; the JWT-subj
 hidden from the generated OpenAPI document via `SpringDocUtils.addAnnotationsToIgnore` in
 `OpenApiConfig` (they are as invisible as the `JwtAuthenticationToken` parameters they replaced).
 
-### REQ-API-009 — The external contract set is frozen against in-place change
+### REQ-API-009 — The external contract set is frozen against in-place change *(superseded)*
+
+> **Superseded 2026-10-17 (ADR-0269, #2673).** The set was frozen for one client, the Android app,
+> which is discontinued (ADR-0268); `ExternalContractTest`, the contract tiers and the app call lists
+> are removed with it, and `/api/v1` is back under REQ-API-001's atomic-deploy carve-out. Two
+> constraints remain, both named in the amendment at the end of this section: the exchange relay
+> operations stay frozen on the gateway (REQ-XCH-039), and `POST /internal/discord/account-existence`
+> is a contract with the Keycloak SPI (ADR-0055). The notification stream's event names leave the
+> freeze too: their readers are the frontend's relay and its browser script, which deploy with the
+> backend. The table and the text below record the set as it stood.
 
 Endpoints a **shipped client** consumes are a contract, because the client cannot be redeployed
 with the server. A released Android build sits on a member's phone for weeks — distribution is
@@ -1087,7 +1095,11 @@ REQ-API-007, REQ-SEC-027
 
 ---
 
-### REQ-API-010 — The server states which app builds it still serves
+### REQ-API-010 — The server states which app builds it still serves *(superseded)*
+
+> **Superseded 2026-10-17 (ADR-0269, #2673).** There is no app build left to serve: the version
+> policy endpoint is removed with the app floor (REQ-API-020, superseded), see the amendment at the
+> end of this section. The text below records the requirement as it stood.
 
 A frozen contract (REQ-API-009) keeps a shipped build working. It cannot make one **stop**: when an
 operation is genuinely retired, or a defect makes a build unsafe to keep using, something has to
@@ -1191,8 +1203,8 @@ same RFC 7807 handling — only the bytes differ.
 > a caller that sends `Accept: application/json`, or no `Accept` at all, is served exactly what it was
 > served before CBOR existed.
 
-**JSON remains the contract.** `openapi.json` documents one representation, the frozen contract set
-of REQ-API-009 is expressed in it, and the shipped clients — the Android app and the SC extractor —
+**JSON remains the contract.** `openapi.json` documents one representation, and the clients outside
+the atomic deploy — the SC extractor and the connected applications behind the ingest gateway —
 ask for it. CBOR is an encoding of the same document, not a second API, and nothing may be reachable
 in one and not the other.
 
@@ -1264,8 +1276,8 @@ body would skip `NormalizedStringDeserializer` entirely: no trim, no NFC normali
 - [x] The rollback lever reaches a deployed container: `APP_HTTP_CODEC` is named in the frontend's
   compose environment, a closed allow-list with no `env_file`, and therefore in the generated
   `quadlet/env.d/frontend.env.tmpl` the production unit reads.
-- [x] `openapi.json` is unchanged by the second representation, so the generated Android models are
-  too — springdoc already emits `*/*` for these responses.
+- [x] `openapi.json` is unchanged by the second representation, so every model generated from it
+  is too — springdoc already emits `*/*` for these responses.
 - [ ] The serialization cost is actually measured. **Open** — ADR-0161 §8.5 makes this its own
   precondition, and `app.http.codec=JSON` is the way back while it is pending.
 
@@ -1300,9 +1312,8 @@ consumer instead of reusing the heaviest projection that happens to contain the 
   the same answers. It answers all four parts or fails as a whole; ADR-0151's fail-closed handling of
   the capabilities stays the client's.
 
-Neither endpoint is on the API vhost: both serve the web frontend over the internal hop. Offering them
-to the Android app is an admission change (REQ-API-021) in the same change as the app starts using
-them, per REQ-API-009.
+Both serve the web frontend over the internal hop; since the API vhost is gone (ADR-0268) no other
+client reaches them.
 
 > [!note] Corrected 2026-10-03 — `/me/layout` *was* on the API vhost until now
 > The sentence above was not true when it was written: the edge's `^/api/v1/me/` prefix rule admitted
@@ -1751,7 +1762,7 @@ The application's Jackson 3 mapper keeps `FAIL_ON_UNKNOWN_PROPERTIES` off, which
 default and the behaviour of every body the frozen contract has ever accepted. A client that sends a
 property the server does not declare gets the request handled without it; a property the server
 adds later is invisible to an older client. The frontend and the backend deploy together and the
-contract tests (REQ-API-016, REQ-API-017) check both sides, and the exchange's tolerant reading is
+frontend's DTO mirror tests check both sides (REQ-API-007), and the exchange's tolerant reading is
 part of its frozen behaviour (REQ-XCH-009), so the policy is not tightened. Mass assignment is not
 this requirement's concern: REQ-SEC-077 refuses a body that carries a server-managed field.
 
@@ -1776,7 +1787,7 @@ throughout is one root of its own (`/api/v1/roles/**`). No `/api/v1/admin/**` tr
 rule, `/api/v1/*/admin/**` and `/api/v1/roles/**`, requires `ADMIN` ahead of every domain rule, so a
 domain's own rule (for example the hangar's or the personal inventory's) can never decide an admin
 path; every handler keeps its own `hasRole('ADMIN')`. Every admin sub-tree is `no-store`
-(REQ-SEC-031) and is web-only (tier T2), so the API vhost never admits it (REQ-API-021).
+(REQ-SEC-031) and is web-only.
 
 **Acceptance**
 
