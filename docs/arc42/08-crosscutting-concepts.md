@@ -283,7 +283,9 @@ kernel holds one — `BackendApiClient`, and `BackendSideChannels` for the SSE r
 (`WebClientConfinementTest`); a controller calls its domain's typed client in
 `frontend.<domain>.client`, a thin service over `BackendApiClient` (plan F3,
 `TypedBackendClientTest`). `BackendErrorMapper` maps every failed `BackendApiClient` call in one
-exhaustive switch, and a runtime value enters a backend URI only as a template variable, for every
+exhaustive switch and `GlobalExceptionHandler` answers it; a `web` handler adds no catch-all of its
+own, and the broad catch clauses that remain are frozen per file and only shrink (REQ-FE-036,
+`BroadCatchRatchetTest`). A runtime value enters a backend URI only as a template variable, for every
 verb (REQ-SEC-051, `WriteUriTemplateTest` and `ReadUriTemplateTest`). The first filter of all four refuses any request whose scheme, host
 and port differ from `app.backend-url`, before the OAuth2 filter can attach the member's bearer —
 an absolute URL handed to a client would otherwise carry the token to that host. Future

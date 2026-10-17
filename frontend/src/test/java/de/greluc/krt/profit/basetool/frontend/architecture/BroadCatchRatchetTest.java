@@ -71,6 +71,40 @@ class BroadCatchRatchetTest {
     Map<String, Integer> actual = countWebSources(resolveModuleRelative(PACKAGE_ROOT));
     Map<String, Integer> frozen = loadFrozen();
 
+    assertThat(grown(actual, frozen))
+        .as(
+            "web files with more broad catch clauses than frozen; let the failure reach"
+                + " BackendErrorMapper and the GlobalExceptionHandler, or catch the specific"
+                + " exception, instead of raising the count")
+        .isEmpty();
+    assertThat(shrunk(actual, frozen))
+        .as("web files below their frozen count; lower the entry (delete it at 0)")
+        .isEmpty();
+  }
+
+  @Test
+  void aGrownAndAShrunkFileAreEachReported() {
+    Map<String, Integer> frozen = Map.of("a/web/A.java", 2, "b/web/B.java", 3);
+    Map<String, Integer> actual = Map.of("a/web/A.java", 3, "b/web/B.java", 2, "c/web/C.java", 1);
+
+    assertThat(grown(actual, frozen))
+        .containsOnlyKeys("a/web/A.java", "c/web/C.java")
+        .containsEntry("a/web/A.java", "3 > 2")
+        .containsEntry("c/web/C.java", "1 > 0");
+    assertThat(shrunk(actual, frozen)).containsOnlyKeys("b/web/B.java");
+    assertThat(shrunk(Map.of(), frozen)).containsEntry("b/web/B.java", "0 < 3");
+  }
+
+  /**
+   * Lists the files whose count exceeds the frozen one; a file missing from the frozen map may hold
+   * none.
+   *
+   * @param actual the counted clauses by file
+   * @param frozen the frozen counts by file
+   * @return {@code count > allowed} by file
+   */
+  private static Map<String, String> grown(
+      Map<String, Integer> actual, Map<String, Integer> frozen) {
     Map<String, String> grown = new TreeMap<>();
     actual.forEach(
         (file, count) -> {
@@ -79,13 +113,18 @@ class BroadCatchRatchetTest {
             grown.put(file, count + " > " + allowed);
           }
         });
-    assertThat(grown)
-        .as(
-            "web files with more broad catch clauses than frozen; let the failure reach"
-                + " BackendErrorMapper and the GlobalExceptionHandler, or catch the specific"
-                + " exception, instead of raising the count")
-        .isEmpty();
+    return grown;
+  }
 
+  /**
+   * Lists the files whose count fell below the frozen one, a vanished file counting as zero.
+   *
+   * @param actual the counted clauses by file
+   * @param frozen the frozen counts by file
+   * @return {@code count < allowed} by file
+   */
+  private static Map<String, String> shrunk(
+      Map<String, Integer> actual, Map<String, Integer> frozen) {
     Map<String, String> shrunk = new TreeMap<>();
     frozen.forEach(
         (file, allowed) -> {
@@ -94,9 +133,7 @@ class BroadCatchRatchetTest {
             shrunk.put(file, count + " < " + allowed);
           }
         });
-    assertThat(shrunk)
-        .as("web files below their frozen count; lower the entry (delete it at 0)")
-        .isEmpty();
+    return shrunk;
   }
 
   @Test
