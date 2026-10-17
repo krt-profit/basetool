@@ -20,6 +20,7 @@
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
+import { krtTableSort } from '/js/kernel/krt-table-sort.js';
 
 /** @typedef {ApiDto<'ProfitCalculationDto'>} ProfitRow */
 
@@ -140,8 +141,52 @@ function routeLine(cls, side, terminal, place, price) {
     }${num(PRICE, price)}</span>`;
 }
 
+/** @type {{ key: string, dir: 'asc' | 'desc' }} */
+const DEFAULT_SORT = { key: 'profit', dir: 'desc' };
+
 /**
- * Renders the result rows, highest full-load profit first and numbered.
+ * The raw value of a value attribute, or `null` when the row has none.
+ *
+ * @param {HTMLTableRowElement} row the result row
+ * @param {string} name the attribute suffix after `data-`
+ * @returns {number | null} the value
+ */
+function numberOf(row, name) {
+    const raw = row.getAttribute(`data-${name}`);
+    if (raw === null || raw === '') return null;
+    const n = Number(raw);
+    return isFinite(n) ? n : null;
+}
+
+/**
+ * The value attribute of a number, empty when it is absent.
+ *
+ * @param {number | null | undefined} value the number
+ * @returns {string} the attribute text
+ */
+function attr(value) {
+    return value == null || !isFinite(Number(value)) ? '' : String(Number(value));
+}
+
+const resultsTable = /** @type {HTMLTableElement | null} */ (
+    document.getElementById('resultsTable')
+);
+
+const sorter = resultsTable
+    ? krtTableSort.attach(resultsTable, {
+          initial: DEFAULT_SORT,
+          valueOf: (row, key) =>
+              key === 'material' ? row.getAttribute('data-material') || '' : numberOf(row, key),
+          tiebreak: (a, b) => (numberOf(a, 'rank') || 0) - (numberOf(b, 'rank') || 0),
+          onChange: () => {
+              persistProfitFilters();
+          },
+      })
+    : null;
+
+/**
+ * Renders the result rows, ranked by full-load profit, then puts them in the chosen order; the
+ * rank stays the profit rank whatever the order.
  *
  * @param {ProfitRow[]} data the rows
  */
@@ -162,7 +207,13 @@ function renderRows(data) {
         const rank = index + 1;
         return krtHtml`<tr class="profit-row${
             rank === 1 ? ' profit-row--top' : ''
-        }" data-testid="profit-row"><td><a class="row-link" data-testid="row-link" href="/materials/${encodeURIComponent(
+        }" data-testid="profit-row" data-rank="${rank}" data-material="${
+            item.materialName || ''
+        }" data-per-scu="${attr(item.profitPerScu)}" data-margin="${attr(
+            item.marginPercent,
+        )}" data-capital="${attr(item.fullLoadCost)}" data-profit="${attr(
+            item.maxProfitFullLoad,
+        )}"><td><a class="row-link" data-testid="row-link" href="/materials/${encodeURIComponent(
             item.materialId || '',
         )}"><span class="profit-rank">${rank}</span><span class="cell-title">${
             item.materialName
@@ -187,6 +238,7 @@ function renderRows(data) {
         )}</td><td class="num profit-max">${num(WHOLE, item.maxProfitFullLoad)}</td></tr>`;
     });
     krtHtml.set(body, html);
+    if (sorter) sorter.apply();
 }
 
 let requestToken = 0;
@@ -242,7 +294,7 @@ function readProfitFilterPref() {
     }
 }
 
-/** Saves the ship and the systems, all systems as `null`. */
+/** Saves the ship, the systems (all systems as `null`) and the table order. */
 function persistProfitFilters() {
     const select = shipSelect();
     const checks = systemChecks();
@@ -259,15 +311,17 @@ function persistProfitFilters() {
             JSON.stringify({
                 shipId: select && select.value !== '' ? select.value : null,
                 systems: picked.length === 0 || picked.length === checks.length ? null : picked,
+                sort: sorter ? sorter.state() : null,
             }),
         );
     } catch (_e) {}
 }
 
-/** Restores the last chosen ship and systems; stale values fall back to the defaults. */
+/** Restores the last chosen ship, systems and order; stale values fall back to the defaults. */
 function restoreProfitFilters() {
     const saved = readProfitFilterPref();
     if (!saved) return;
+    if (sorter) sorter.set(saved.sort);
     const select = shipSelect();
     if (select && typeof saved.shipId === 'string' && saved.shipId !== '') {
         for (let i = 0; i < select.options.length; i++) {
