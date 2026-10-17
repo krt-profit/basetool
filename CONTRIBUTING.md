@@ -766,6 +766,11 @@ that — promotion to `:stable` and the host rollout — is in
   `@SuppressFBWarnings(justification = "...")` where the annotation has
   that attribute, otherwise into the commit message and the PR — never
   into a code comment.
+- **Size ratchet** (REQ-OPS-048, ADR-0267): a production Java file has at
+  most 1,000 lines and a method at most 150. Files that were larger are
+  allow-listed in `google_checks.xml` at their size (`fileLength<Class>`,
+  `methodLength<Class>`). Never raise or add an entry; when you shrink a
+  listed file, lower its entry or remove it.
 - **Test and e2e sources** get one Checkstyle rule only,
   `InvalidJavadocPosition` (`config/checkstyle/javadoc_position.xml`,
   ADR-0222): a Javadoc directly above another Javadoc fails `check`.
