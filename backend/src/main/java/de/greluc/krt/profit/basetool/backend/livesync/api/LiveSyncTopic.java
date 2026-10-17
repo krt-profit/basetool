@@ -19,15 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.livesync.api;
 
-import java.util.Locale;
 import java.util.UUID;
-import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A parsed live-sync topic: its class, the resource it names, and the canonical string used as the
- * room key everywhere (ADR-0143).
+ * A live-sync room the backend publishes into: its class, the resource it names, and the canonical
+ * wire string the frontend matches its own rooms against (ADR-0274).
  *
  * @param topicClass the room class
  * @param resourceId the resource named, or {@code null} for a global room
@@ -40,77 +38,33 @@ public record LiveSyncTopic(
   private static final char SEPARATOR = ':';
 
   /**
-   * Longest topic string accepted, comfortably above {@code refinery-order:<uuid>} (50 characters).
+   * The room of one resource, e.g. one member's own hangar or one org unit's overview.
    *
-   * <p>A bound on the parse itself, so a crafted multi-megabyte query parameter is rejected before
-   * anything splits or allocates on it.
-   */
-  public static final int MAX_LENGTH = 80;
-
-  /**
-   * Parses a wire topic string: one known prefix, optionally followed by a colon and a well-formed
-   * UUID, in the arity the prefix's class declares.
-   *
-   * @param raw the topic as it arrived, untrimmed and untrusted
-   * @return the parsed topic, or {@code null} if it names no room this backend serves
-   */
-  @Contract("null -> null")
-  @Nullable
-  public static LiveSyncTopic parse(@Nullable String raw) {
-    if (raw == null) {
-      return null;
-    }
-    String trimmed = raw.trim();
-    if (trimmed.isEmpty() || trimmed.length() > MAX_LENGTH) {
-      return null;
-    }
-    int separator = trimmed.indexOf(SEPARATOR);
-    String prefix = (separator < 0) ? trimmed : trimmed.substring(0, separator);
-    String idPart = (separator < 0) ? null : trimmed.substring(separator + 1);
-
-    LiveSyncTopicClass topicClass = LiveSyncTopicClass.resolve(prefix, idPart != null);
-    if (topicClass == null) {
-      return null;
-    }
-    if (idPart == null) {
-      return new LiveSyncTopic(topicClass, null, prefix);
-    }
-    UUID resourceId = parseUuid(idPart);
-    if (resourceId == null) {
-      return null;
-    }
-    return new LiveSyncTopic(topicClass, resourceId, prefix + SEPARATOR + resourceId);
-  }
-
-  /**
-   * The resource id of a per-resource topic.
-   *
-   * @return the id
-   * @throws IllegalStateException if the topic carries no id (registry and parser disagree)
+   * @param topicClass the room class; must be per-resource
+   * @param resourceId the resource the room belongs to
+   * @return the room
+   * @throws IllegalArgumentException if the class names no resource
    */
   @NotNull
-  public UUID requiredResourceId() {
-    if (resourceId == null) {
-      throw new IllegalStateException(
-          "Per-resource topic class " + topicClass + " parsed without a resource id");
+  public static LiveSyncTopic of(@NotNull LiveSyncTopicClass topicClass, @NotNull UUID resourceId) {
+    if (!topicClass.perResource()) {
+      throw new IllegalArgumentException("Topic class " + topicClass + " names no resource");
     }
-    return resourceId;
+    return new LiveSyncTopic(topicClass, resourceId, topicClass.prefix() + SEPARATOR + resourceId);
   }
 
   /**
-   * Parses a UUID strictly, rejecting any input whose canonical form differs from it apart from
-   * case.
+   * The one global room of a class, which every viewer of that surface listens on.
    *
-   * @param candidate the id segment
-   * @return the parsed id, or {@code null} if it is not a full, well-formed UUID
+   * @param topicClass the room class; must not be per-resource
+   * @return the room
+   * @throws IllegalArgumentException if the class names a resource
    */
-  @Nullable
-  private static UUID parseUuid(@NotNull String candidate) {
-    try {
-      UUID parsed = UUID.fromString(candidate);
-      return parsed.toString().equals(candidate.toLowerCase(Locale.ROOT)) ? parsed : null;
-    } catch (IllegalArgumentException _) {
-      return null;
+  @NotNull
+  public static LiveSyncTopic global(@NotNull LiveSyncTopicClass topicClass) {
+    if (topicClass.perResource()) {
+      throw new IllegalArgumentException("Topic class " + topicClass + " names a resource");
     }
+    return new LiveSyncTopic(topicClass, null, topicClass.prefix());
   }
 }

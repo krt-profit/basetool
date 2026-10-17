@@ -2108,7 +2108,31 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   degrades cross-replica push). These emit only where the fan-out is enabled (prod); a sustained
   `publish` error stream drives the `LiveSyncRedisFanoutBroken` alert (below).
 
-The app live-sync bridge (ADR-0143, REQ-FE-019) adds a second family on the **backend**, and the
+> [!important] Amended 2026-10-17 (ADR-0274, #2673) — the backend's live-sync family is three
+> series, all on the publish side
+> With the app's bridge gone the backend serves no live-sync client, so every meter about a
+> *subscriber* goes with it: `basetool_livesync_streams`, `…_streams_evicted_total`,
+> `…_send_failures_total`, `…_delivered_total`, `…_subscribe_total`, `…_invalid_topic_total`,
+> `…_publish_rejected_total`, `…_frames_queued`, `…_frames_dropped_total`,
+> `…_redis_consumed_total` and `…_redis_skipped_total`, together with the
+> `basetool_redis_fanout_subscribed{fanout="livesync"}` series — the backend publishes without
+> subscribing, so that gauge has no subscription to report and its **absence** is correct.
+> `RedisFanoutUnsubscribed` therefore watches one fan-out on this service, `notifications`.
+>
+> **What stays, and what it now means.** `basetool_livesync_publish_accepted_total{topic_class}`
+> counts frames the backend raised after a committed write of its own — an exchange or ingest write
+> no browser made — and `basetool_livesync_redis_published_total{topic_class}` counts the same
+> traffic one hop on, with `basetool_livesync_redis_errors_total{op="publish"}` for a swallowed
+> publish. A flatline in the first while the exchange API is taking writes means open pages are
+> going stale with nothing broken and nothing logged, which is the REQ-FE-010 defect class. The
+> `consume` value of `op` no longer occurs on this service.
+>
+> Removed with them: the `AppLiveSyncBridgeSilent` and `AppLiveSyncFramesDropped` alerts and their
+> rule tests, and the *App live-sync streams (open)* dashboard panel. The frontend's identically
+> named series are untouched — they were only ever told apart by `job`, which is the arrangement
+> described below and the reason nothing else had to move.
+
+The app live-sync bridge (ADR-0143, REQ-FE-019) added a second family on the **backend**, and the
 naming is a deliberate choice rather than an accident. Where the concept is the same as the
 frontend's, the metric is the same: `basetool_livesync_subscribe_total{topic_class,outcome,reason}`,
 `basetool_livesync_invalid_topic_total`, and the three
@@ -2129,8 +2153,9 @@ separating a client bug from either bucket doing its job),
 thread through a bounded per-stream queue (BE-PERF-13, 2026-09-23) —
 `basetool_livesync_frames_queued` (frames waiting, summed; hovers near zero) and
 `basetool_livesync_frames_dropped_total{event}` (frames refused by a full queue, `event` the
-bounded `subscribed`/`changed`/`heartbeat` triple). `AppLiveSyncFramesDropped` warns on >3 drops/h
-per `event` sustained 15m, the threshold shape of its web-side twin `LiveSyncRelayDropsSustained`.
+bounded `subscribed`/`changed`/`heartbeat` triple). `AppLiveSyncFramesDropped` warned on >3
+drops/h per `event` sustained 15m, the threshold shape of its web-side twin
+`LiveSyncRelayDropsSustained`.
 
 That last one is a distinction worth stating, because merging it would have been the easy mistake:
 the frontend's staff-only rooms ride the same Redis channel, so this backend sees a **steady**
@@ -3588,7 +3613,34 @@ the group buys nothing until rsyslog is given `$FileGroup adm` and auditd `log_g
 therefore ends by asking whether the `alloy` user can actually **open** both files — the membership
 check that preceded it was green on a host where neither was readable.
 
-### REQ-OBS-018 — The public API surface must be attributable, and probed before it exists
+### REQ-OBS-018 — The API surface must be attributable, and probed before it exists
+
+> [!important] Amended 2026-10-17 (ADR-0268/ADR-0270, #2672 and #2673) — the surface is internal, so
+> the caller set is enumerable
+> **The attribution requirement stands; the surface it attributes changed.** The vhost and its
+> blackbox probes went in #2672 (REQ-OPS-042, superseded), replaced by a probe that asserts the
+> opposite — that the API host does not resolve (REQ-OBS-012). `basetool_api_client_requests_total{client_id}`
+> stays and is still the denominator of any per-client reasoning.
+>
+> **`basetool-android` leaves `app.monitoring.api-clients.known-client-ids`**, which now holds
+> `basetool-frontend` alone beside the configured ingest gateways and the exchange registry. A token
+> from the retired client would therefore be labelled `other` — but it no longer reaches the
+> counter at all: since ADR-0270 the decoder refuses a token whose `azp` is not in
+> `app.security.jwt.accepted-client-ids` (`basetool-frontend`, `basetool-ingest-gateway`), so a
+> request that is counted is one of the named clients, or the gateway acting for a member. That
+> makes `ApiUnknownClient` a narrower signal than it was: a sustained `other` is now an exchange
+> client the registry does not hold, not unregistered client software.
+>
+> **The bounded-label discipline is unchanged**, and the two literals still mean opposite things:
+> `other` is a client nobody registered here, `none` is a Keycloak mapper regression that blinds
+> attribution for every client at once. The audit viewer keeps its `basetool-android` label,
+> rendered "Android-App (eingestellt)" / "Android app (discontinued)", because audit rows written by
+> the app are historical data that must stay readable.
+>
+> Removed with the app floor: the `basetool_android_version_policy_override{field}` gauge, its
+> `AndroidVersionPolicyOverrideActive` alert and the rule test
+> `android_version_policy_override_test.yml` (REQ-API-020, superseded).
+
 
 Exposing `/api/v1` on its own internet-reachable vhost (ADR-0135) adds two questions the monitoring
 plane could not answer, and both have to be answerable *before* the surface is live rather than

@@ -38,8 +38,6 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-import tools.jackson.databind.json.JsonMapper;
-import tools.jackson.databind.node.ObjectNode;
 
 /**
  * In-memory registry of this instance's Server-Sent-Event subscribers, keyed by recipient {@code
@@ -55,11 +53,11 @@ public class NotificationStreamService {
   /** How long a single SSE connection is held open before the client must reconnect. */
   private static final long EMITTER_TIMEOUT_MS = Duration.ofMinutes(30).toMillis();
 
-  /** What the event carried before it carried anything, and what a refresh-only push still is. */
-  private static final String REFRESH_ONLY_PAYLOAD = "new";
-
-  /** Renders the signal; stateless and thread-safe, so one instance serves every push. */
-  private static final JsonMapper JSON_MAPPER = JsonMapper.builder().build();
+  /**
+   * The event's only data: a bare "something changed" marker, carrying nothing about what arrived
+   * (ADR-0273). The web client's handler takes no argument and ignores it.
+   */
+  private static final String PUSH_PAYLOAD = "new";
 
   /**
    * Maximum concurrent SSE streams per recipient {@code sub}; beyond it the oldest is retired with
@@ -141,15 +139,12 @@ public class NotificationStreamService {
   }
 
   /**
-   * Pushes a {@code notification} event carrying the serialized signal to every live subscriber of
-   * the given recipients; dead emitters are dropped.
+   * Pushes the bare {@code notification} event to every live subscriber of the given recipients;
+   * dead emitters are dropped.
    *
    * @param recipientUserIds the recipients whose connections to notify
-   * @param signal what those recipients are being told
    */
-  public void publish(
-      @NotNull Collection<UUID> recipientUserIds, @NotNull NotificationSignal signal) {
-    String payload = serialize(signal);
+  public void publish(@NotNull Collection<UUID> recipientUserIds) {
     for (UUID recipientUserId : recipientUserIds) {
       Queue<SseEmitter> emitters = emittersBySub.get(recipientUserId);
       if (emitters == null) {
@@ -157,38 +152,12 @@ public class NotificationStreamService {
       }
       for (SseEmitter emitter : emitters) {
         try {
-          emitter.send(SseEmitter.event().name("notification").data(payload));
+          emitter.send(SseEmitter.event().name("notification").data(PUSH_PAYLOAD));
         } catch (IOException | RuntimeException e) {
           recordSendFailure(MetricNames.SSE_EVENT_NOTIFICATION, recipientUserId, e);
           remove(recipientUserId, emitter);
         }
       }
-    }
-  }
-
-  /**
-   * Renders a signal as the event's data; a refresh-only signal and a serialization failure both
-   * render as {@code "new"}.
-   *
-   * @param signal what to render
-   * @return the event data
-   */
-  @NotNull
-  private String serialize(@NotNull NotificationSignal signal) {
-    if (!signal.describesNotification()) {
-      return REFRESH_ONLY_PAYLOAD;
-    }
-    try {
-      ObjectNode root = JSON_MAPPER.createObjectNode();
-      root.put("type", String.valueOf(signal.type()));
-      root.put("entityType", signal.entityType());
-      root.put("entityId", signal.entityId() == null ? null : signal.entityId().toString());
-      ObjectNode params = root.putObject("params");
-      signal.params().forEach(params::put);
-      return JSON_MAPPER.writeValueAsString(root);
-    } catch (RuntimeException e) {
-      log.debug("Notification signal could not be serialised; falling back to the bare push", e);
-      return REFRESH_ONLY_PAYLOAD;
     }
   }
 

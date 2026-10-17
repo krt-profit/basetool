@@ -1858,6 +1858,13 @@ gateway, WP 2.3 (#2099)
 
 ### REQ-XCH-030 — Exchange writes appear live
 
+> [!note] Amended 2026-10-17 (ADR-0274, #2673) — the publisher moved, the frames did not
+> `ExchangeLiveSync` now announces through `livesync.api.LiveSyncPublisher` instead of the removed
+> `LiveSyncRelayService`, and the rooms it publishes into are the only ones the backend's
+> `LiveSyncTopicClass` still declares. The frames, their topics and their section keys are
+> unchanged, and `LiveSyncTopicRegistryParityTest` still holds the backend's registry to a subset of
+> the frontend's — which is what keeps an exchange write reaching the member's open pages.
+
 After each committed exchange write the backend publishes live-sync frames on the topics and
 sections the web pages and the app listen on (Lager, Blueprints, Hangar, and the Materialbörse when
 offers changed) — `ExchangeLiveSync`, see REQ-XCH-013.

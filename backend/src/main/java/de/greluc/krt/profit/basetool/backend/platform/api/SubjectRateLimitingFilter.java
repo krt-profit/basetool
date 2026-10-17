@@ -81,12 +81,6 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
       PathPatternParser.defaultInstance.parse("/api/v1/notifications/stream");
 
   /**
-   * The app's live-sync stream (ADR-0143), counted like {@link #SSE_CONNECT} although it is a GET.
-   */
-  static final PathPattern LIVE_SYNC_CONNECT =
-      PathPatternParser.defaultInstance.parse("/api/v1/live-sync/stream");
-
-  /**
    * Path segments that mark an expensive document-rendering endpoint: any {@code /api/**} path
    * carrying one of them, compared decoded, spends from the export budget.
    */
@@ -169,10 +163,10 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
    *
    * @param method the request method; may be {@code null} for a malformed request.
    * @param path the decoded-matchable request path, already known to be under {@code /api/**}.
-   * @return {@code true} for an API write or one of the two stream connects.
+   * @return {@code true} for an API write or the stream connect.
    */
   private static boolean spendsFromWriteBudget(String method, @NotNull PathContainer path) {
-    return isWrite(method) || SSE_CONNECT.matches(path) || LIVE_SYNC_CONNECT.matches(path);
+    return isWrite(method) || SSE_CONNECT.matches(path);
   }
 
   /**

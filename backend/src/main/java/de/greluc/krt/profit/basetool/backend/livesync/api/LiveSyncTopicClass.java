@@ -27,152 +27,52 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The topic rooms the app's live-sync bridge admits and the sections each may carry (ADR-0143).
+ * The rooms the backend itself publishes into after a committed write, and the sections each may
+ * carry (ADR-0274).
  *
- * <p>Must stay in step with the frontend's {@code LiveSyncTopicClass}; {@code
- * LiveSyncTopicRegistryParityTest} enforces it.
+ * <p>Every constant must name a room the frontend's {@code LiveSyncTopicClass} also knows, with the
+ * same prefix, arity and section keys; {@code LiveSyncTopicRegistryParityTest} enforces that. A
+ * room only this side knows is a room whose frames the browser clips away on arrival.
  */
 @RequiredArgsConstructor
 public enum LiveSyncTopicClass {
 
   /**
-   * Per-Einsatz room, the Einsatz detail. Presence-bearing on the web (editor dots); the bridge
-   * relays only {@code changed} for it and never a presence frame, which is why it may be
-   * subscribed here at all — ADR-0094 fails this class closed precisely because a web subscribe
-   * emits a presence snapshot, and this one cannot.
-   */
-  MISSION("mission", true, "mission", LiveSyncAuthorization.MISSION),
-
-  /** Global Einsatz-list room: a peer's create, core edit or delete invalidates the list. */
-  MISSIONS_LIST("missions", false, "missions_list", LiveSyncAuthorization.MEMBER),
-
-  /**
-   * Per-Operation room. {@code missions} and {@code finance} are cross-published from an Einsatz.
-   */
-  OPERATION("operation", true, "operation", LiveSyncAuthorization.OPERATION),
-
-  /** Per-Auftrag room, the job-order detail. */
-  ORDER("order", true, "order_detail", LiveSyncAuthorization.JOB_ORDER),
-
-  /**
-   * Global Auftrags-queue room. Distinct from {@link #ORDER} despite the shared wire stem: the two
-   * are told apart by whether the topic carries an id, and they keep separate metric labels so the
-   * ops dashboard never folds them into one series.
-   */
-  ORDERS_QUEUE("orders", false, "orders_queue", LiveSyncAuthorization.JOB_ORDER_QUEUE),
-
-  /** Per-Raffinerie-Order room, the refinery-order detail and its Einlagern dialog. */
-  REFINERY_ORDER("refinery-order", true, "refinery_order", LiveSyncAuthorization.REFINERY_ORDER),
-
-  /** Global Raffinerie-queue room: the member's own order list. */
-  REFINERY("refinery", false, "refinery_queue", LiveSyncAuthorization.MEMBER),
-
-  /**
    * Global shared-Lager room: one opaque key, because every viewer re-reads its own scoped view.
    */
-  INVENTORY_ALL("inventory", false, "inventory_all", LiveSyncAuthorization.MEMBER),
+  INVENTORY_ALL("inventory", false, "inventory_all"),
 
-  /** A member's own hangar, keyed by the member's id; only that member may subscribe. */
-  HANGAR_OWN("hangar", true, "hangar_own", LiveSyncAuthorization.SELF),
+  /** A member's own hangar, keyed by the member's id. */
+  HANGAR_OWN("hangar", true, "hangar_own"),
 
   /** One org unit's hangar overview, keyed by the unit's id (ADR-0260). */
-  HANGAR_UNIT("hangar-unit", true, "hangar_unit", LiveSyncAuthorization.HANGAR_UNIT),
+  HANGAR_UNIT("hangar-unit", true, "hangar_unit"),
 
   /**
    * The hangar overview across every unit the viewer can see: one opaque key that every ship change
    * pokes, because each viewer re-reads its own scoped view (ADR-0260).
    */
-  HANGAR_UNITS("hangar-units", false, "hangar_units", LiveSyncAuthorization.MEMBER),
+  HANGAR_UNITS("hangar-units", false, "hangar_units"),
 
-  /** A member's own blueprints, keyed by the member's id; only that member may subscribe. */
-  BLUEPRINTS_OWN("blueprints", true, "blueprints_own", LiveSyncAuthorization.SELF),
+  /** A member's own blueprints, keyed by the member's id. */
+  BLUEPRINTS_OWN("blueprints", true, "blueprints_own"),
 
-  /**
-   * Global Materialbörse room: {@code board} for the Angebote, {@code requests} for the Gesuche.
-   */
-  MATERIALBOARD("materialboard", false, "materialboard", LiveSyncAuthorization.MEMBER),
+  /** Global Materialbörse room; the backend pokes {@code board} when a book-out changed offers. */
+  MATERIALBOARD("materialboard", false, "materialboard");
 
-  /**
-   * Per-account Kartellbank room. The bare {@code bank} prefix — the frontend's staff room — is
-   * absent here, so a topic of {@code bank} with no id resolves to nothing and is refused.
-   */
-  BANK_ACCOUNT("bank", true, "bank_account", LiveSyncAuthorization.BANK_ACCOUNT),
-
-  /** Global org-unit bank room: the member-facing account overview and its settings region. */
-  ORGUNIT_BANK("orgunit-bank", false, "orgunit_bank", LiveSyncAuthorization.MEMBER);
-
-  /**
-   * Upper bound on the sections a single frame may name, before the class whitelist is applied.
-   *
-   * <p>Sits above every class's whitelist, so it never clips a legitimate frame; it exists to bound
-   * the parse of a crafted oversized array. Same value and same reasoning as ADR-0094's {@code
-   * MAX_CHANGED_SECTIONS}.
-   */
-  public static final int MAX_SECTIONS_PER_FRAME = 16;
-
-  private static final Set<String> MISSION_SECTIONS =
-      Set.of(
-          "crew",
-          "finance",
-          "mgmt",
-          "overview",
-          "steps",
-          "objectives",
-          "frequencies",
-          "organisation");
-  private static final Set<String> MISSIONS_LIST_SECTIONS = Set.of("list");
-  private static final Set<String> OPERATION_SECTIONS =
-      Set.of("overview", "missions", "payout", "finance");
-  private static final Set<String> ORDER_SECTIONS =
-      Set.of(
-          "header",
-          "kpi",
-          "materials",
-          "aggregated",
-          "items",
-          "item-stock",
-          "handovers",
-          "item-handovers",
-          "item-handover-lines",
-          "blueprint-owners",
-          "assignees");
-  private static final Set<String> ORDERS_QUEUE_SECTIONS = Set.of("queue", "demand");
-  private static final Set<String> REFINERY_ORDER_SECTIONS = Set.of("order", "store");
-  private static final Set<String> REFINERY_SECTIONS = Set.of("queue");
   private static final Set<String> INVENTORY_ALL_SECTIONS = Set.of("stock");
   private static final Set<String> SHIPS_SECTIONS = Set.of("ships");
   private static final Set<String> BLUEPRINTS_OWN_SECTIONS = Set.of("list");
-  private static final Set<String> MATERIALBOARD_SECTIONS = Set.of("board", "requests");
-  private static final Set<String> BANK_ACCOUNT_SECTIONS = Set.of("account", "bookings", "chart");
-  private static final Set<String> ORGUNIT_BANK_SECTIONS =
-      Set.of("orgUnitBank", "orgUnitBankSettings");
+  private static final Set<String> MATERIALBOARD_SECTIONS = Set.of("board");
 
   private final @NotNull String prefix;
   private final boolean perResource;
   private final @NotNull String metricLabel;
-  private final @NotNull LiveSyncAuthorization authorization;
-
-  /**
-   * Resolves a wire prefix and the presence of an id onto a class.
-   *
-   * @param prefix the wire prefix before the first colon
-   * @param withId whether the topic carried a resource id
-   * @return the matching class, or {@code null} if no class admits that combination
-   */
-  @Nullable
-  public static LiveSyncTopicClass resolve(@NotNull String prefix, boolean withId) {
-    for (LiveSyncTopicClass candidate : values()) {
-      if (candidate.perResource == withId && candidate.prefix.equals(prefix)) {
-        return candidate;
-      }
-    }
-    return null;
-  }
 
   /**
    * Returns the wire prefix, the part of a topic string before the first colon.
    *
-   * @return the prefix, e.g. {@code refinery-order}
+   * @return the prefix, e.g. {@code hangar-unit}
    */
   @NotNull
   public String prefix() {
@@ -182,7 +82,7 @@ public enum LiveSyncTopicClass {
   /**
    * Tells whether a topic of this class names one resource by id.
    *
-   * @return {@code true} for a per-resource room such as {@code mission:{id}}, {@code false} for a
+   * @return {@code true} for a per-resource room such as {@code hangar:{id}}, {@code false} for a
    *     global one such as {@code materialboard}
    */
   public boolean perResource() {
@@ -197,27 +97,19 @@ public enum LiveSyncTopicClass {
   @NotNull
   public Set<String> allowedSections() {
     return switch (this) {
-      case MISSION -> MISSION_SECTIONS;
-      case MISSIONS_LIST -> MISSIONS_LIST_SECTIONS;
-      case OPERATION -> OPERATION_SECTIONS;
-      case ORDER -> ORDER_SECTIONS;
-      case ORDERS_QUEUE -> ORDERS_QUEUE_SECTIONS;
-      case REFINERY_ORDER -> REFINERY_ORDER_SECTIONS;
-      case REFINERY -> REFINERY_SECTIONS;
       case INVENTORY_ALL -> INVENTORY_ALL_SECTIONS;
       case HANGAR_OWN, HANGAR_UNIT, HANGAR_UNITS -> SHIPS_SECTIONS;
       case BLUEPRINTS_OWN -> BLUEPRINTS_OWN_SECTIONS;
       case MATERIALBOARD -> MATERIALBOARD_SECTIONS;
-      case BANK_ACCOUNT -> BANK_ACCOUNT_SECTIONS;
-      case ORGUNIT_BANK -> ORGUNIT_BANK_SECTIONS;
     };
   }
 
   /**
-   * Reduces a frame's raw section list to the admitted keys: bounded by {@link
-   * #MAX_SECTIONS_PER_FRAME}, filtered and de-duplicated in order. Unknown keys are dropped.
+   * Reduces a frame's raw section list to the admitted keys, filtered and de-duplicated in order.
+   * An unknown key is dropped, so a section renamed on one side cannot travel as a key the other
+   * side ignores.
    *
-   * @param raw the sections as they arrived, untrusted and possibly containing nulls
+   * @param raw the sections as the caller named them, possibly containing nulls
    * @return the admitted keys, possibly empty
    */
   @NotNull
@@ -226,11 +118,7 @@ public enum LiveSyncTopicClass {
       return List.of();
     }
     LinkedHashSet<String> kept = new LinkedHashSet<>();
-    int examined = 0;
     for (String section : raw) {
-      if (examined++ >= MAX_SECTIONS_PER_FRAME) {
-        break;
-      }
       if (section != null && allowedSections().contains(section)) {
         kept.add(section);
       }
@@ -242,23 +130,12 @@ public enum LiveSyncTopicClass {
    * Returns the bounded value used for the {@code topic_class} metric tag.
    *
    * <p>Distinct per class even where two classes share a wire prefix, so a dashboard never reads
-   * the Auftrags-queue and one Auftrag as the same series (REQ-OBS-011).
+   * two surfaces as the same series (REQ-OBS-011).
    *
-   * @return the tag value, e.g. {@code order_detail}
+   * @return the tag value, e.g. {@code hangar_unit}
    */
   @NotNull
   public String metricLabel() {
     return metricLabel;
-  }
-
-  /**
-   * Returns the check a caller must pass to subscribe to a room of this class.
-   *
-   * @return the authorization kind, resolved against the caller by {@code
-   *     LiveSyncSubscriptionAuthorizer}
-   */
-  @NotNull
-  public LiveSyncAuthorization authorization() {
-    return authorization;
   }
 }

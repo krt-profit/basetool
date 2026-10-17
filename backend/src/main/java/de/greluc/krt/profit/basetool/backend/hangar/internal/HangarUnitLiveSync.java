@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
-import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncRelayService;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
@@ -50,7 +50,7 @@ public class HangarUnitLiveSync {
   /** The section every hangar overview room carries. */
   static final String SHIPS = "ships";
 
-  private final LiveSyncRelayService relayService;
+  private final LiveSyncPublisher publisher;
 
   /**
    * Announces a change of ships in the given org units; a {@code null} entry is a ship without a
@@ -88,15 +88,9 @@ public class HangarUnitLiveSync {
    */
   private void publish(@NotNull Set<UUID> units) {
     for (UUID unit : units) {
-      send(
-          new LiveSyncTopic(
-              LiveSyncTopicClass.HANGAR_UNIT,
-              unit,
-              LiveSyncTopicClass.HANGAR_UNIT.prefix() + ':' + unit));
+      send(LiveSyncTopic.of(LiveSyncTopicClass.HANGAR_UNIT, unit));
     }
-    send(
-        new LiveSyncTopic(
-            LiveSyncTopicClass.HANGAR_UNITS, null, LiveSyncTopicClass.HANGAR_UNITS.prefix()));
+    send(LiveSyncTopic.global(LiveSyncTopicClass.HANGAR_UNITS));
   }
 
   /**
@@ -106,7 +100,7 @@ public class HangarUnitLiveSync {
    */
   private void send(@NotNull LiveSyncTopic topic) {
     try {
-      relayService.publishFromServer(topic, List.of(SHIPS));
+      publisher.publish(topic, List.of(SHIPS));
     } catch (RuntimeException e) {
       log.warn(
           "Live-sync frame for {} after a hangar write was not published",

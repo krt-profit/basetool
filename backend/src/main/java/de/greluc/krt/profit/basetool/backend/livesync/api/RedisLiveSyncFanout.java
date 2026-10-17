@@ -22,48 +22,40 @@ package de.greluc.krt.profit.basetool.backend.livesync.api;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.RedisJsonFanout;
 import io.micrometer.core.instrument.MeterRegistry;
-import java.util.ArrayList;
 import java.util.List;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-import org.springframework.data.redis.connection.Message;
-import org.springframework.data.redis.connection.MessageListener;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
 
 /**
- * Bridges live-sync {@code changed} frames between the app's SSE streams and the frontend's Redis
- * channel {@code basetool:livesync:changed} (ADR-0143).
+ * Publishes the backend's {@code changed} frames onto the frontend's Redis channel {@code
+ * basetool:livesync:changed}, where every frontend replica's {@code /ws/sync} sessions pick them up
+ * (ADR-0274).
  *
- * <p>Local delivery happens in {@link LiveSyncRelayService} before {@link #publish}, so a Redis
- * outage only costs peer delivery.
+ * <p>Publish-only: the backend serves no live-sync client of its own, so it never subscribes to the
+ * channel. A Redis outage therefore costs a page its refresh, never the write.
  */
-public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
+public class RedisLiveSyncFanout implements LiveSyncFanout {
 
   /** Payload schema version, so a later format change is detectable on consume. */
   private static final int PAYLOAD_VERSION = 1;
 
-  private final LiveSyncStreamService streamService;
   private final MeterRegistry meterRegistry;
   private final RedisJsonFanout transport;
 
   /**
-   * Creates the Redis live-sync bridge.
+   * Creates the Redis live-sync publisher.
    *
-   * @param streamService the local emitter registry a consumed frame is delivered to
    * @param redisTemplate the string template used to publish
-   * @param meterRegistry registry the publish/consume/error counters bind to
-   * @param channel the shared channel used by the frontend as well
-   * @param instanceId this JVM's stable id, used to skip frames this instance published
+   * @param meterRegistry registry the publish and error counters bind to
+   * @param channel the shared channel the frontend listens on
+   * @param instanceId this JVM's stable id, carried so a consumer can skip its own frames
    */
   public RedisLiveSyncFanout(
-      @NotNull LiveSyncStreamService streamService,
       @NotNull StringRedisTemplate redisTemplate,
       @NotNull MeterRegistry meterRegistry,
       @NotNull String channel,
       @NotNull String instanceId) {
-    this.streamService = streamService;
     this.meterRegistry = meterRegistry;
     this.transport =
         new RedisJsonFanout(
@@ -76,7 +68,7 @@ public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
   }
 
   /**
-   * Returns the channel this bridge publishes to and listens on.
+   * Returns the channel this publisher writes to.
    *
    * @return the channel name
    */
@@ -105,80 +97,5 @@ public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
                     MetricNames.TAG_TOPIC_CLASS,
                     topic.topicClass().metricLabel())
                 .increment());
-  }
-
-  /**
-   * Delivers a frame from a frontend instance or a peer backend replica to the local streams,
-   * skipping own-origin and unusable frames without raising.
-   *
-   * @param message the raw Redis message
-   * @param pattern the subscription pattern; unused
-   */
-  @Override
-  public void onMessage(@NotNull Message message, @Nullable byte[] pattern) {
-    transport.consume(message, this::deliver);
-  }
-
-  /**
-   * Delivers a peer's parsed frame to this instance's streams.
-   *
-   * @param root the parsed payload, already known not to be this instance's own
-   */
-  private void deliver(@NotNull JsonNode root) {
-    LiveSyncTopic topic = LiveSyncTopic.parse(text(root, "topic"));
-    if (topic == null) {
-      meterRegistry
-          .counter(
-              MetricNames.LIVESYNC_REDIS_SKIPPED,
-              MetricNames.TAG_REASON,
-              MetricNames.REASON_UNKNOWN_TOPIC)
-          .increment();
-      return;
-    }
-    List<String> sections = topic.topicClass().clipSections(sections(root));
-    if (sections.isEmpty()) {
-      return;
-    }
-    streamService.deliver(topic, sections);
-    meterRegistry
-        .counter(
-            MetricNames.LIVESYNC_REDIS_CONSUMED,
-            MetricNames.TAG_TOPIC_CLASS,
-            topic.topicClass().metricLabel())
-        .increment();
-  }
-
-  /**
-   * Reads the {@code sections} array, skipping non-string and null elements.
-   *
-   * @param root the parsed payload
-   * @return the raw section strings, in wire order
-   */
-  @NotNull
-  private static List<String> sections(@NotNull JsonNode root) {
-    List<String> raw = new ArrayList<>();
-    JsonNode node = root.get("sections");
-    if (node == null || !node.isArray()) {
-      return raw;
-    }
-    for (JsonNode element : node) {
-      if (element != null && element.isString()) {
-        raw.add(element.asString());
-      }
-    }
-    return raw;
-  }
-
-  /**
-   * Reads a string field, tolerating absence and a wrong type.
-   *
-   * @param root the parsed payload
-   * @param field the field name
-   * @return the text, or {@code null} if the field is missing or not a string
-   */
-  @Nullable
-  private static String text(@NotNull JsonNode root, @NotNull String field) {
-    JsonNode node = root.get(field);
-    return (node != null && node.isString()) ? node.asString() : null;
   }
 }

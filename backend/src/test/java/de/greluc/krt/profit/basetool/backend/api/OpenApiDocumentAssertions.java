@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.api;
 
 import de.greluc.krt.profit.basetool.backend.platform.internal.ApiDomains;
-import de.greluc.krt.profit.basetool.backend.platform.internal.ContractTiers;
 import de.greluc.krt.profit.basetool.backend.platform.internal.OpenApiDomainConfig;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,9 +34,9 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * What a generated OpenAPI document must satisfy before it is written (REQ-API-007, REQ-API-018):
- * the bearer security scheme, exactly the two anonymous operations, one domain tag and one contract
- * tier on every operation, a per-domain operation-count floor, no exchange relay path, and no
- * dangling reference; and what the exchange's internal relay document must satisfy (REQ-XCH-039).
+ * the bearer security scheme, exactly the one anonymous operation, one domain tag on every
+ * operation, a per-domain operation-count floor, no exchange relay path, and no dangling reference;
+ * and what the exchange's internal relay document must satisfy (REQ-XCH-039).
  */
 public final class OpenApiDocumentAssertions {
 
@@ -45,8 +44,7 @@ public final class OpenApiDocumentAssertions {
   private static final Set<String> VERBS = Set.of("get", "post", "put", "patch", "delete");
 
   /** The operations that answer without a token (REQ-SEC-037). */
-  public static final Set<String> ANONYMOUS =
-      Set.of("GET /api/v1/app/version-policy", "GET /api/v1/terms/document");
+  public static final Set<String> ANONYMOUS = Set.of("GET /api/v1/terms/document");
 
   /**
    * How many operations each domain held when the floor was last raised; a domain that loses
@@ -54,7 +52,7 @@ public final class OpenApiDocumentAssertions {
    */
   public static final Map<String, Integer> DOMAIN_FLOOR =
       Map.ofEntries(
-          Map.entry("admin-system", 4),
+          Map.entry("admin-system", 3),
           Map.entry("audit", 4),
           Map.entry("bank", 65),
           Map.entry("blueprint", 25),
@@ -66,7 +64,6 @@ public final class OpenApiDocumentAssertions {
           Map.entry("inventory", 27),
           Map.entry("joborder", 40),
           Map.entry("leadership", 1),
-          Map.entry("livesync", 2),
           Map.entry("materialexchange", 21),
           Map.entry("mission", 50),
           Map.entry("notification", 13),
@@ -87,18 +84,15 @@ public final class OpenApiDocumentAssertions {
    * Lists everything a document gets wrong.
    *
    * @param document the generated document
-   * @param tiers the contract tier list
    * @param floor the per-domain operation-count floor
    * @return one line per problem; empty when the document is sound
    */
   public static @NotNull @Unmodifiable List<String> problems(
-      @NotNull JsonNode document,
-      @NotNull ContractTiers tiers,
-      @NotNull Map<String, Integer> floor) {
+      @NotNull JsonNode document, @NotNull Map<String, Integer> floor) {
     List<String> problems = new ArrayList<>();
     Set<String> anonymous = new TreeSet<>();
     Map<String, Integer> perDomain = new TreeMap<>();
-    checkDocument(document, tiers, problems, anonymous, perDomain);
+    checkDocument(document, problems, anonymous, perDomain);
     if (!anonymous.equals(ANONYMOUS)) {
       problems.add("the anonymous operations are " + anonymous + ", expected " + ANONYMOUS);
     }
@@ -117,36 +111,23 @@ public final class OpenApiDocumentAssertions {
   /**
    * Lists everything the exchange's internal relay document gets wrong (REQ-XCH-039): beyond the
    * checks of {@link #problems}, it holds only relay paths, exactly {@link
-   * ExchangeFence#RELAY_OPERATIONS} operations, all of the {@code exchange} domain and tier {@code
-   * T0}, and none of them anonymous.
+   * ExchangeFence#RELAY_OPERATIONS} operations, all of the {@code exchange} domain, and none of
+   * them anonymous.
    *
    * @param relay the relay document
-   * @param tiers the contract tier list
    * @return one line per problem; empty when the document is sound
    */
-  public static @NotNull @Unmodifiable List<String> relayProblems(
-      @NotNull JsonNode relay, @NotNull ContractTiers tiers) {
+  public static @NotNull @Unmodifiable List<String> relayProblems(@NotNull JsonNode relay) {
     List<String> problems = new ArrayList<>();
     Set<String> anonymous = new TreeSet<>();
     Map<String, Integer> perDomain = new TreeMap<>();
-    checkDocument(relay, tiers, problems, anonymous, perDomain);
+    checkDocument(relay, problems, anonymous, perDomain);
     if (!anonymous.isEmpty()) {
       problems.add("the relay document has anonymous operations " + anonymous);
     }
     for (Map.Entry<String, JsonNode> path : relay.path("paths").properties()) {
       if (!ExchangeFence.isRelayPath(path.getKey())) {
         problems.add(path.getKey() + " is not an exchange relay path");
-      }
-      for (Map.Entry<String, JsonNode> verb : path.getValue().properties()) {
-        if (VERBS.contains(verb.getKey())
-            && !ContractTiers.T0.equals(
-                verb.getValue().path(OpenApiDomainConfig.TIER_EXTENSION).asString(""))) {
-          problems.add(
-              verb.getKey().toUpperCase(Locale.ROOT)
-                  + " "
-                  + path.getKey()
-                  + " is a relay operation outside tier T0");
-        }
       }
     }
     if (!perDomain.keySet().equals(Set.of(RELAY_DOMAIN))) {
@@ -166,18 +147,16 @@ public final class OpenApiDocumentAssertions {
   }
 
   /**
-   * Checks what both documents share: the security scheme and requirement, every operation's tag,
-   * domain and tier, the tag list, and that every reference resolves.
+   * Checks what both documents share: the security scheme and requirement, every operation's tag
+   * and domain, the tag list, and that every reference resolves.
    *
    * @param document the document
-   * @param tiers the contract tier list
    * @param problems the accumulator
    * @param anonymous collects the operations that declare {@code security: []}
    * @param perDomain collects the operation count per domain
    */
   private static void checkDocument(
       JsonNode document,
-      ContractTiers tiers,
       List<String> problems,
       Set<String> anonymous,
       Map<String, Integer> perDomain) {
@@ -204,7 +183,7 @@ public final class OpenApiDocumentAssertions {
         if (operationSecurity != null && operationSecurity.isEmpty()) {
           anonymous.add(key);
         }
-        checkTags(key, operation, tiers, problems, usedDomains, perDomain);
+        checkTags(key, operation, problems, usedDomains, perDomain);
       }
     }
 
@@ -243,11 +222,10 @@ public final class OpenApiDocumentAssertions {
   }
 
   /**
-   * Checks one operation's tag, domain extension and tier.
+   * Checks one operation's tag and domain extension.
    *
    * @param key the operation as {@code VERB path}
    * @param operation the operation node
-   * @param tiers the contract tier list
    * @param problems the accumulator
    * @param usedDomains the domains seen so far
    * @param perDomain the operation count per domain so far
@@ -255,7 +233,6 @@ public final class OpenApiDocumentAssertions {
   private static void checkTags(
       String key,
       JsonNode operation,
-      ContractTiers tiers,
       List<String> problems,
       Set<String> usedDomains,
       Map<String, Integer> perDomain) {
@@ -271,12 +248,6 @@ public final class OpenApiDocumentAssertions {
     } else {
       usedDomains.add(domain);
       perDomain.merge(domain, 1, Integer::sum);
-    }
-    String[] parts = key.split(" ", 2);
-    String expected = tiers.tierOf(parts[0], parts[1]);
-    String tier = operation.path(OpenApiDomainConfig.TIER_EXTENSION).asString("");
-    if (!expected.equals(tier)) {
-      problems.add(key + " has contract tier '" + tier + "', expected " + expected);
     }
   }
 }

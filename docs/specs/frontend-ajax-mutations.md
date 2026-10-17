@@ -839,6 +839,25 @@ reload.
 > Everything else in this requirement — the opaque-keys rule, the three mirror points, the
 > pill/coalesce contract, the abuse bounds — is unchanged and is what REQ-FE-015 generalizes.
 
+> **Amendment (#2673 / ADR-0274):** the requirement is **not weakened**, and it becomes a
+> single-implementation promise again. The backend's own live-sync surface — `GET
+> /api/v1/live-sync/stream` and `POST /api/v1/live-sync/changed`, built so the Android app could
+> emit and receive `changed` frames (ADR-0143) — is removed with its only client, together with the
+> SSE stream service, the subscription authorizer, the `LiveSyncTopicAuthorizer` SPI and its seven
+> per-domain implementations. Live sync between browsers is the frontend's `/ws/sync` alone, as it
+> was before the app and as ADR-0094 built it; a PWA tab (ADR-0164) opens that socket like any other
+> tab.
+>
+> **What the backend keeps, and why.** It still *publishes* into the frontend's rooms after a
+> committed write of its own, through `LiveSyncPublisher` onto the shared Redis channel
+> `basetool:livesync:changed`: an exchange or ingest write (REQ-XCH-013) and an org-unit ship change
+> (ADR-0260, ADR-0261) arrive at the backend and no browser made them, so without that publish the
+> member's open pages would stay stale — exactly the defect class this requirement exists to
+> prevent. The backend's `LiveSyncTopicClass` therefore keeps only the six rooms it publishes into,
+> and `LiveSyncTopicRegistryParityTest` keeps holding it to a subset of the frontend's registry: a
+> prefix or section key only the backend knows is a frame the browser clips away on arrival, with
+> nothing broken and nothing logged.
+
 The transport is the **`mission:{id}` topic room of the shared live-sync WebSocket** (REQ-FE-015;
 `/ws/sync`, `krt-live-sync.js` + the `mission-presence.js` adapter) — no new backend module, no
 Flyway migration. The acting client's `krtRefreshMissionSection(keys)` chokepoint, which already

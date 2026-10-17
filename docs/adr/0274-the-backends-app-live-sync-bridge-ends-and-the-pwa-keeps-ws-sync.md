@@ -14,6 +14,51 @@
   [ADR-0268](0268-the-backend-is-internal-only-and-ingest-is-the-single-public-api-entry-point.md) ·
   specs `REQ-FE-010`, `REQ-OBS-011`, `REQ-SEC-037`
 
+## Amendment 1 — the backend keeps publishing (2026-10-17, #2673)
+
+**Two bullets of the decision below were wrong about the backend's own writes, and the
+implementation corrects them rather than following them.** They are kept as written, with this
+amendment above them, because the mistake is instructive: the ADR reasoned from *who subscribes* and
+concluded that nothing on this side needed the channel.
+
+*What was overlooked.* `ExchangeLiveSync` (REQ-XCH-013) and `HangarUnitLiveSync` (ADR-0260,
+ADR-0261) publish into the frontend's rooms after a committed backend write. Those writes arrive
+over the exchange API through the ingest gateway, or from an admin bulk change — **no browser makes
+them**, so the frontend cannot know they happened. Removing the backend's publish side would have
+left a member's open Lager, hangar and Materialbörse pages stale after every exchange write, with
+nothing broken and nothing logged: exactly the failure shape REQ-FE-010 exists to prevent, and
+exactly the shape the *Alternatives considered* section below warns about in a different guise.
+
+*What the implementation does instead.*
+
+1. **The client-facing bridge is removed as decided**: `GET /api/v1/live-sync/stream`, `POST
+   /api/v1/live-sync/changed`, `LiveSyncController`, `LiveSyncStreamService`,
+   `LiveSyncSubscriptionAuthorizer`, `LiveSyncAuthorization`, `LiveSyncChangedRequest`, the
+   `LiveSyncTopicAuthorizer` SPI with its seven per-domain implementations, the per-client rate
+   limiting of `LiveSyncRelayService` with both token buckets, and the subscriber-side metrics and
+   alerts.
+2. **The publish side stays**, as a seam that does one thing: `LiveSyncPublisher.publish(topic,
+   sections)` clips the sections, hands the frame to the fan-out and counts it. There is no bucket,
+   because the write that raised the frame is bounded already.
+3. **`RedisLiveSyncFanout` becomes publish-only.** It no longer implements `MessageListener`, and
+   `LiveSyncRedisConfig` registers no listener container and no executor. The sentence *"the backend
+   stops doing either"* is therefore half right: it stops **consuming** `basetool:livesync:changed`
+   and keeps **publishing** on it.
+4. **`LiveSyncTopicClass` shrinks to the six rooms the backend actually publishes into** —
+   `inventory`, `hangar:{id}`, `hangar-unit:{id}`, `hangar-units`, `blueprints:{id}`,
+   `materialboard` — and loses its `authorization` column and its wire parser with the subscribe
+   path. The other nine classes existed only so an app could subscribe to them.
+5. **`LiveSyncTopicRegistryParityTest` stays, against the decision below.** With a publish-only
+   registry the drift risk it guards is *larger*, not smaller: a prefix or section key the frontend
+   renames is a frame the browser clips away on arrival. The test was already one-directional — every
+   backend class must exist in the frontend with the same arity and sections — so a smaller backend
+   registry only makes it stricter.
+
+*What this costs.* The backend still holds a live-sync vocabulary that must stay in step with the
+frontend's, which is most of what the decision below wanted to be rid of. The honest version of
+that wish is the alternative the ADR already names — move the relay into the backend and have the
+frontend consume it — and it is still not foreclosed.
+
 ## Context
 
 ADR-0143 built a live-sync surface in the **backend** — `GET /api/v1/live-sync/stream?topics=…` and

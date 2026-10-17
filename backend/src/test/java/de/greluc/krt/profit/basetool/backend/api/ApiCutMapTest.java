@@ -154,34 +154,21 @@ class ApiCutMapTest {
   }
 
   /**
-   * An operation still at its old path has the tier and the app call the map says; one that moved
-   * stands at its new path with the tier it had, a fold with the strictest tier of the operations
-   * folded into it.
+   * An operation the map says moved stands at its new path in the committed document, unless the
+   * map deletes it. The tier and app columns are a historical record since ADR-0269 and are no
+   * longer compared with anything.
    */
   @Test
-  @DisplayName("the map agrees with the document on tier and the app's calls")
+  @DisplayName("every moved operation stands at its new path in the document")
   void theMapAgreesWithTheDocument() throws IOException {
     JsonNode paths = CommittedOpenApi.published().path("paths");
-    Set<String> appCalls = appCalls();
     List<String> disagreements = new ArrayList<>();
-    List<Entry> entries = map();
-    for (Entry entry : entries) {
-      JsonNode operation = paths.path(entry.oldPath()).path(entry.verb().toLowerCase());
-      if (!operation.isMissingNode()) {
-        if (!entry.tier().equals(operation.path("x-contract-tier").asString(""))) {
-          disagreements.add(entry.oldKey() + " tier " + operation.path("x-contract-tier"));
-        }
-        if (entry.app() != appCalls.contains(entry.oldKey())) {
-          disagreements.add(entry.oldKey() + " app flag");
-        }
+    for (Entry entry : map()) {
+      if (entry.deleted()
+          || !paths.path(entry.oldPath()).path(entry.verb().toLowerCase()).isMissingNode()) {
         continue;
       }
-      if (entry.deleted()) {
-        continue;
-      }
-      JsonNode moved = paths.path(entry.newPath()).path(entry.verb().toLowerCase());
-      if (moved.isMissingNode()
-          || !tierAfterMove(entries, entry).equals(moved.path("x-contract-tier").asString(""))) {
+      if (paths.path(entry.newPath()).path(entry.verb().toLowerCase()).isMissingNode()) {
         disagreements.add(entry.verb() + " " + entry.newPath() + " is not the moved operation");
       }
     }

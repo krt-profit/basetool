@@ -25,7 +25,6 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.backend.refinery.web.RefineryLocationYieldController;
@@ -53,7 +52,7 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
  * Holds wave 5 of the REST API cut (job orders and game items) to the running application: the new
  * paths of the map are served, no handler answers an old path any more, the new paths demand
  * authentication and keep the gates of the operations they replace, and the old ones answer {@code
- * 410 APP_UPDATE_REQUIRED} (frozen) or {@code 404} (never frozen).
+ * 404}; with the app gone there is no retired-path answer any more (ADR-0269).
  */
 @SpringBootTest
 class GameItemPathCutTest {
@@ -130,27 +129,27 @@ class GameItemPathCutTest {
   }
 
   @Test
-  @DisplayName("a frozen old path meets the update wall and an unfrozen one is gone")
+  @DisplayName("every old path is gone, and none of them answers the retired 410 any more")
   void theOldPathsAreGone() throws Exception {
-    List<String> frozenAnswers = new ArrayList<>();
     for (Moved m : wave5()) {
       HttpMethod method = HttpMethod.valueOf(m.verb());
-      if (m.frozen()) {
-        mockMvc
-            .perform(request(method, concrete(m.oldPath())).with(csrf()))
-            .andExpect(status().isGone())
-            .andExpect(jsonPath("$.code").value("APP_UPDATE_REQUIRED"));
-        frozenAnswers.add(m.verb() + " " + m.oldPath());
-      } else {
-        mockMvc
-            .perform(
-                request(method, concrete(m.oldPath()))
-                    .with(user("member").roles("ADMIN"))
-                    .with(csrf()))
-            .andExpect(status().isNotFound());
-      }
+      int status =
+          mockMvc
+              .perform(
+                  request(method, concrete(m.oldPath()))
+                      .with(user("member").roles("ADMIN"))
+                      .with(csrf()))
+              .andReturn()
+              .getResponse()
+              .getStatus();
+
+      assertThat(status)
+          .as(
+              "%s %s must be gone: 404, or 400 where a sibling pattern now reads the old segment"
+                  + " as its path variable. The retired-path 410 ended with the app (ADR-0269)",
+              m.verb(), m.oldPath())
+          .isIn(400, 404);
     }
-    assertThat(frozenAnswers).as("the frozen operations of wave 5").hasSize(3);
   }
 
   @Test

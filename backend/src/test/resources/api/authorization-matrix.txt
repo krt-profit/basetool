@@ -4,7 +4,6 @@ GET /api/v1/announcements/current | AnnouncementController#getPublicAnnouncement
 PUT /api/v1/announcements/current | AnnouncementController#updateAnnouncement | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/announcements/current/admin | AnnouncementController#getAdminAnnouncement | pre=hasRole('ADMIN') | url=/api/v1/announcements/current/admin -> hasAnyAuthority(ROLE_ADMIN)
 PUT /api/v1/announcements/{id}/read | AnnouncementReadController#updateReadAnnouncement | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/app/version-policy | AppVersionPolicyController#versionPolicy | pre=permitAll() | url=GET /api/v1/app/version-policy -> permitAll
 DELETE /api/v1/audit/{domain} | AuditAdminController#purgeAuditLog | pre=hasRole('ADMIN') | url=/api/v1/audit/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/audit/{domain} | AuditAdminController#getAuditLog | pre=hasRole('ADMIN') | url=/api/v1/audit/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/audit/{domain}/export | AuditAdminController#exportAuditLog | pre=hasRole('ADMIN') | url=/api/v1/audit/** -> hasAnyAuthority(ROLE_ADMIN)
@@ -202,8 +201,6 @@ POST /api/v1/job-types | JobTypeController#createJobType | pre=hasRole('ADMIN') 
 DELETE /api/v1/job-types/{id} | JobTypeController#deleteJobType | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 PUT /api/v1/job-types/{id} | JobTypeController#updateJobType | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 POST /api/v1/job-types/{id}/activate | JobTypeController#activateJobType | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
-POST /api/v1/live-sync/changed | LiveSyncController#changed | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/live-sync/stream | LiveSyncController#stream | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/locations | LocationController#getAllLocations | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/locations | LocationController#createLocation | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/locations/home-locations | LocationController#getHomeLocations | pre=isAuthenticated() | url=anyRequest -> authenticated

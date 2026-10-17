@@ -14,7 +14,6 @@ docker compose --profile prod up -d                                             
 docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml \
     --profile dev up -d                                                                     # isolated test stack with throwaway credentials
 docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml \
-    -f docker-compose.android.yml --profile dev up -d                                       # ... and this one WHENEVER the client is the Android emulator
 ```
 
 Further overrides, layered on top in this order when needed: `docker-compose.build.yml` (build the
@@ -33,13 +32,6 @@ Host ports (dev profile only, bound to `127.0.0.1`): backend `11261`, frontend `
 The backend always serves HTTPS (`server.ssl.enabled: true`, key alias `basetool`); the frontend reaches it at `https://backend:11261` by default (`BACKEND_URL`), so a frontend run from Gradle against a backend run from Gradle needs `BACKEND_URL=https://localhost:11261`. There is no Swagger UI — the backend's OpenAPI document is served at `https://localhost:11261/v3/api-docs` in the `dev`/`test` profiles only (disabled in `prod`), and the committed `backend/src/main/resources/api/openapi.json` is its API-documentation artifact. The ingest gateway has no generated document; its exchange contract `ingest/src/main/resources/api/exchange-v1.openapi.json` is served at `https://localhost:11262/exchange/v1/openapi.json` in every profile.
 
 ## Driving the Android emulator against this stack
-
-**Always layer `docker-compose.android.yml` on top when the client is the app.** Without it the
-stack pins `KC_HOSTNAME=host.docker.internal` — a name that containers and the host browser both
-resolve and that **the emulator resolves not at all**: it reaches the host only as `10.0.2.2`, and
-Play-store system images cannot be rooted to add a hosts entry. The login then dies *after* the
-Keycloak form with `DNS_PROBE_FINISHED_NXDOMAIN`, which looks like a broken realm rather than the
-topology mismatch it is.
 
 The override pins the issuer to `127.0.0.1:18080` — which is what the app's `dev` flavour already
 expects — republishes Keycloak and the backend on all interfaces, and gives the backend a

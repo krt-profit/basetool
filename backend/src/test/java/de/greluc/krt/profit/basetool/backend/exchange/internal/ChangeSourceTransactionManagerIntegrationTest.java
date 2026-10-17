@@ -88,15 +88,6 @@ class ChangeSourceTransactionManagerIntegrationTest {
   }
 
   @Test
-  void theAppWritesAsApp() {
-    authenticate(jwt("basetool-android"));
-
-    write("from-app");
-
-    assertThat(last().getSourceChannel()).isEqualTo("app");
-  }
-
-  @Test
   void aRelayedClientWritesAsThatClientAndInstallation() {
     authenticate(new Relayed("versekit", "k".repeat(43)));
 

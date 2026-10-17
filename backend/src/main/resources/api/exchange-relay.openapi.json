@@ -135,7 +135,6 @@
         },
         "summary" : "Exchange: the Lager's locations",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -251,7 +250,6 @@
         },
         "summary" : "Exchange: resolve item references",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -367,7 +365,6 @@
         },
         "summary" : "Exchange: does this RSI handle belong to the member",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -508,7 +505,6 @@
         },
         "summary" : "Exchange: my blueprints and their changes",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -624,7 +620,6 @@
         },
         "summary" : "Exchange: add or remove my blueprints",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -740,7 +735,6 @@
         },
         "summary" : "Exchange: preview blueprints for review",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -856,7 +850,6 @@
         },
         "summary" : "Exchange: build a refinery draft for review",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -970,7 +963,6 @@
         },
         "summary" : "Exchange: the calling installation",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       },
       "post" : {
@@ -1084,7 +1076,6 @@
         },
         "summary" : "Exchange: label the calling installation",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -1198,7 +1189,6 @@
         },
         "summary" : "Exchange: the open demand of my units",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -1312,7 +1302,6 @@
         },
         "summary" : "Exchange: my org units",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -1453,7 +1442,6 @@
         },
         "summary" : "Exchange: my ships and their changes",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -1569,7 +1557,6 @@
         },
         "summary" : "Exchange: change my ships",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -1710,7 +1697,6 @@
         },
         "summary" : "Exchange: my stock lots and their changes",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -1826,7 +1812,6 @@
         },
         "summary" : "Exchange: set my stock lots",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -1967,7 +1952,6 @@
         },
         "summary" : "Exchange: the shared stock of my units",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -2083,7 +2067,6 @@
         },
         "summary" : "Exchange: book stock into and out of my units' pools",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -2206,7 +2189,6 @@
         },
         "summary" : "Exchange: the roster of one of my Logistician units",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     },
@@ -2337,7 +2319,6 @@
         },
         "summary" : "Exchange: the earmark targets of one of my Logistician units",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "exchange"
       }
     }

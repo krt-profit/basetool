@@ -53,24 +53,23 @@ class SecurityTest {
   }
 
   @Test
-  void testCorsHeaders() throws Exception {
+  void aPreflightIsNeverAnswered() throws Exception {
     mockMvc
         .perform(
             options("/api/v1/missions")
                 .header("Origin", "http://localhost:8080")
                 .header("Access-Control-Request-Method", "GET"))
-        .andExpect(status().isOk())
-        .andExpect(header().exists("Access-Control-Allow-Origin"));
+        .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
   }
 
   @Test
-  void testCorsHeaders_ForbiddenOrigin() throws Exception {
+  void noOriginIsEverAllowed() throws Exception {
     mockMvc
         .perform(
             options("/api/v1/missions")
                 .header("Origin", "http://localhost:3000")
                 .header("Access-Control-Request-Method", "GET"))
-        .andExpect(status().isForbidden());
+        .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
   }
 
   @Test

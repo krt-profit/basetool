@@ -19,6 +19,6 @@
 
 /**
  * The admin module's internals: the system-setting entity, repository, service and mapper, and the
- * Android version-policy settings and metric (plan §5.2).
+ * The admin module's internal settings (plan §5.2).
  */
 package de.greluc.krt.profit.basetool.backend.admin.internal;

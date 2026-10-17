@@ -97,9 +97,11 @@ app:
     ingest-gateway:
       client-ids: ${APP_SECURITY_INGEST_GATEWAY_CLIENT_IDS:}
     partial-role-scope:
-      client-ids: ${APP_SECURITY_PARTIAL_ROLE_SCOPE_CLIENT_IDS:basetool-android}
+      client-ids: ${APP_SECURITY_PARTIAL_ROLE_SCOPE_CLIENT_IDS:}
     authorities-cache:
       ttl: ${APP_SECURITY_AUTHORITIES_CACHE_TTL:PT5M}
+    jwt:
+      accepted-client-ids: ${APP_SECURITY_JWT_ACCEPTED_CLIENT_IDS:basetool-frontend,basetool-ingest-gateway}
   logging:
     correlation-id-header: X-Correlation-Id
     correlation-id-mdc-key: correlationId
@@ -111,7 +113,7 @@ app:
       username: ${MONITORING_SCRAPE_USER:}
       password: ${MONITORING_SCRAPE_PASSWORD:}
     api-clients:
-      known-client-ids: ${APP_MONITORING_API_CLIENTS_KNOWN_CLIENT_IDS:basetool-frontend,basetool-android}
+      known-client-ids: ${APP_MONITORING_API_CLIENTS_KNOWN_CLIENT_IDS:basetool-frontend}
     business-metrics:
       enabled: true
       interval-ms: 60000
@@ -177,16 +179,6 @@ app:
       reconcile-interval: ${APP_EXCHANGE_MIRROR_RECONCILE_INTERVAL:PT60S}
     connected-apps:
       web-client-ids: ${APP_EXCHANGE_CONNECTED_APPS_WEB_CLIENT_IDS:basetool-frontend}
-  android:
-    version-policy:
-      release:
-        minimum-version-code: 20
-        latest-version-code: 20
-        releases-url: https://github.com/krt-profit/basetool-android/releases/latest
-      emergency-override:
-        minimum-version-code: ${APP_ANDROID_MINIMUM_VERSION_CODE_OVERRIDE:}
-        latest-version-code: ${APP_ANDROID_LATEST_VERSION_CODE_OVERRIDE:}
-        releases-url: ${APP_ANDROID_RELEASES_URL_OVERRIDE:}
   default-blueprints:
     provisioning:
       enabled: ${APP_DEFAULT_BLUEPRINTS_PROVISIONING_ENABLED:true}

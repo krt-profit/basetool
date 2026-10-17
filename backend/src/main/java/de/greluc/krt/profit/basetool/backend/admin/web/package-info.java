@@ -18,7 +18,7 @@
  */
 
 /**
- * The admin module's REST surface: the settings, app version-policy and system ping controllers and
- * their DTOs (plan §5.2).
+ * The admin module's REST surface: the settings and system ping controllers and their DTOs (plan
+ * §5.2).
  */
 package de.greluc.krt.profit.basetool.backend.admin.web;

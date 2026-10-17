@@ -51,7 +51,6 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import com.tngtech.archunit.library.dependencies.SliceAssignment;
 import com.tngtech.archunit.library.dependencies.SliceIdentifier;
-import de.greluc.krt.profit.basetool.backend.admin.web.AppVersionPolicyController;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.audit.internal.AuditRetentionProperties;
@@ -64,7 +63,6 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankAccountDet
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankAccountSettingsDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankApprovalLimitService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankBalanceDto;
-import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankLiveSyncTopicAuthorizer;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankRecipientDirectory;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankRequestService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankResponsibilityService;
@@ -143,7 +141,6 @@ import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
-import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncAuthorization;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.backend.livesync.internal.LiveSyncFanoutProperties;
@@ -385,7 +382,6 @@ class ArchitectureTest {
           JobOrderInventoryOwnerRedactor.class,
           KnownExchangeClients.class,
           LikePatterns.class,
-          LiveSyncAuthorization.class,
           LocationReferenceDto.class,
           MaterialCategoryDto.class,
           MaterialCollectionEntryDto.class,
@@ -532,7 +528,6 @@ class ArchitectureTest {
           OrgUnitBankViewUserDto.class,
           OrgUnitBankAccessService.class,
           OrgUnitBankApprovalLimitService.class,
-          OrgUnitBankLiveSyncTopicAuthorizer.class,
           OrgUnitBankRecipientDirectory.class,
           OrgUnitBankRequestService.class,
           OrgUnitBankResponsibilityService.class,
@@ -621,7 +616,6 @@ class ArchitectureTest {
   /** The handler methods that may declare {@code @PreAuthorize("permitAll()")} (REQ-SEC-052). */
   static final Set<Method> PERMIT_ALL_ALLOWED_METHODS =
       Set.of(
-          method(AppVersionPolicyController.class, "versionPolicy"),
           method(TermsDocumentController.class, "document", Locale.class),
           method(BasetoolErrorController.class, "handleError", HttpServletRequest.class));
 
@@ -834,7 +828,7 @@ class ArchitectureTest {
 
   @Test
   void noFieldIsAutowired() {
-    assertFieldFloor("noFieldIsAutowired", INSTANCE_FIELDS, 8780);
+    assertFieldFloor("noFieldIsAutowired", INSTANCE_FIELDS, 8727);
     noFieldIsAutowiredRule().check(CLASSES);
   }
 
@@ -955,17 +949,17 @@ class ArchitectureTest {
   }
 
   @Test
-  void permitAllIsDeclaredOnlyOnTheFourPublicEndpoints() {
-    assertClassFloor("permitAllIsDeclaredOnlyOnTheFourPublicEndpoints", CONTROLLER_CODE, 99);
+  void permitAllIsDeclaredOnlyOnThePublicEndpoints() {
+    assertClassFloor("permitAllIsDeclaredOnlyOnThePublicEndpoints", CONTROLLER_CODE, 99);
     List<String> declarations =
         CLASSES.stream()
             .filter(CONTROLLER_CODE)
             .flatMap(c -> permitAllDeclarations(c).stream())
             .toList();
     assertFloor(
-        "permitAllIsDeclaredOnlyOnTheFourPublicEndpoints (permitAll declarations)",
+        "permitAllIsDeclaredOnlyOnThePublicEndpoints (permitAll declarations)",
         declarations.size(),
-        4);
+        3);
     for (Method allowed : PERMIT_ALL_ALLOWED_METHODS) {
       assertThat(declarations)
           .as("the allow-listed handler %s must still declare permitAll()", allowed)

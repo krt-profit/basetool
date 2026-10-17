@@ -26,14 +26,15 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Which Keycloak clients count as the web and as the app when the change feed records who changed
- * an entry (REQ-XCH-013, ADR-0224).
+ * Which Keycloak clients count as the web when the change feed records who changed an entry
+ * (REQ-XCH-013, ADR-0224).
+ *
+ * <p>The app source is gone with the app (ADR-0268); a caller that is neither a web client nor a
+ * gateway is recorded as the exchange client it is.
  *
  * @param webClientIds the clients of the member's browser session
- * @param appClientIds the clients of the Android app
  */
 @Validated
 @ConfigurationProperties(prefix = "app.exchange.change-source")
 public record ChangeSourceProperties(
-    @DefaultValue("basetool-frontend") @NotNull List<String> webClientIds,
-    @DefaultValue("basetool-android") @NotNull List<String> appClientIds) {}
+    @DefaultValue("basetool-frontend") @NotNull List<String> webClientIds) {}

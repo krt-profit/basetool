@@ -22,20 +22,20 @@ package de.greluc.krt.profit.basetool.backend.platform.internal;
 import de.greluc.krt.profit.basetool.backend.platform.api.RateLimitProperties;
 import jakarta.servlet.DispatcherType;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.web.server.autoconfigure.servlet.ForwardedHeaderFilterCustomizer;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
-import org.springframework.web.filter.ForwardedHeaderFilter;
 
 /**
- * Orders {@link ClientIpContextFilter} before Spring's {@link ForwardedHeaderFilter}, so client-IP
- * attribution sees the raw proxy headers (REQ-SEC-011).
+ * Puts {@link ClientIpContextFilter} at the front of the chain, so client-IP attribution reads the
+ * raw proxy headers of the actual TCP peer (REQ-SEC-011).
  *
- * <p>Requires {@code server.forward-headers-strategy: none}; the forwarded-header filter is
- * re-registered here at {@link Ordered#HIGHEST_PRECEDENCE} {@code + 1}.
+ * <p>Requires {@code server.forward-headers-strategy: none}. Spring's {@code ForwardedHeaderFilter}
+ * is deliberately not registered (ADR-0272): its only effect here would be a host/scheme/port
+ * rewrite nothing reads, against a documented side effect — a client-chosen {@code getRemoteAddr()}
+ * for everything downstream. A backend that ever has to build an absolute URL from a request must
+ * build it from configuration instead, or re-open that question.
  */
 @Configuration
 public class ForwardedHeaderConfig {
@@ -57,28 +57,6 @@ public class ForwardedHeaderConfig {
         DispatcherType.REQUEST, DispatcherType.ASYNC, DispatcherType.ERROR);
     registration.addUrlPatterns("/*");
     registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
-    return registration;
-  }
-
-  /**
-   * Registers Spring's forwarded-header filter one slot behind the client-IP resolution, with the
-   * same dispatcher types and {@link ForwardedHeaderFilterCustomizer} hook as Boot's own
-   * registration.
-   *
-   * @param customizerProvider the optional customizer applied to the filter.
-   * @return the registration, ordered at {@link Ordered#HIGHEST_PRECEDENCE} {@code + 1}.
-   */
-  @NotNull
-  @Bean
-  public FilterRegistrationBean<ForwardedHeaderFilter> forwardedHeaderFilter(
-      ObjectProvider<ForwardedHeaderFilterCustomizer> customizerProvider) {
-    ForwardedHeaderFilter filter = new ForwardedHeaderFilter();
-    customizerProvider.ifAvailable(customizer -> customizer.customize(filter));
-    FilterRegistrationBean<ForwardedHeaderFilter> registration =
-        new FilterRegistrationBean<>(filter);
-    registration.setDispatcherTypes(
-        DispatcherType.REQUEST, DispatcherType.ASYNC, DispatcherType.ERROR);
-    registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 1);
     return registration;
   }
 }

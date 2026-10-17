@@ -122,7 +122,6 @@ class SecurityProblemHandlers platform RFC 7807 handler family of GlobalExceptio
 class RequestProblemHandlers platform RFC 7807 handler family of GlobalExceptionHandler
 class ApplicationProblemHandlers platform RFC 7807 handler family of GlobalExceptionHandler
 class ErrorDisclosurePolicy kernel the disclosure policy every AppException carries (ADR-0235)
-class LiveSyncChangedRequest livesync app live-sync relay payload
 class Department orgunit Bereich brand colour
 class MembershipRole orgunit rank on an OrgUnitMembership
 class FinanceType mission mission finance entry type

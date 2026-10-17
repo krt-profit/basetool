@@ -63,7 +63,6 @@ public final class NoStoreApiScopes {
           "/api/v1/exchange/**",
           "/api/v1/hangar/**",
           "/api/v1/inventory/**",
-          "/api/v1/live-sync/**",
           "/api/v1/material-exchange/**",
           "/api/v1/me/**",
           "/api/v1/missions/*/finance-entries/**",
@@ -91,7 +90,6 @@ public final class NoStoreApiScopes {
   private static final List<String> REVALIDATE_FAMILIES =
       List.of(
           "/api/v1/announcements/current/**",
-          "/api/v1/app/**",
           "/api/v1/blueprints/**",
           "/api/v1/cities/**",
           "/api/v1/exchange/catalog/**",

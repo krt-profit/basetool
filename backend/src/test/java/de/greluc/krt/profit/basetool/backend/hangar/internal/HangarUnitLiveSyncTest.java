@@ -27,7 +27,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
-import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncRelayService;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
@@ -52,7 +52,7 @@ class HangarUnitLiveSyncTest {
   private static final UUID UNIT_A = UUID.fromString("1a2b3c4d-0000-4000-8000-00000000000a");
   private static final UUID UNIT_B = UUID.fromString("1a2b3c4d-0000-4000-8000-00000000000b");
 
-  @Mock private LiveSyncRelayService relayService;
+  @Mock private LiveSyncPublisher relayService;
 
   @InjectMocks private HangarUnitLiveSync liveSync;
 
@@ -103,9 +103,7 @@ class HangarUnitLiveSyncTest {
   @Test
   @DisplayName("a failed publish never fails the write")
   void failedPublishIsSwallowed() {
-    doThrow(new IllegalStateException("redis down"))
-        .when(relayService)
-        .publishFromServer(any(), any());
+    doThrow(new IllegalStateException("redis down")).when(relayService).publish(any(), any());
 
     liveSync.unitsChanged(List.of(UNIT_A));
 
@@ -134,7 +132,7 @@ class HangarUnitLiveSyncTest {
    */
   private List<String> publishedTopics() {
     ArgumentCaptor<LiveSyncTopic> topics = ArgumentCaptor.forClass(LiveSyncTopic.class);
-    verify(relayService, atLeastOnce()).publishFromServer(topics.capture(), eq(List.of("ships")));
+    verify(relayService, atLeastOnce()).publish(topics.capture(), eq(List.of("ships")));
     return topics.getAllValues().stream().map(LiveSyncTopic::canonical).toList();
   }
 

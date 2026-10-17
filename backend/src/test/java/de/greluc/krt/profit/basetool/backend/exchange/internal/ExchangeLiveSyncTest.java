@@ -26,8 +26,9 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncRelayService;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -45,7 +46,7 @@ class ExchangeLiveSyncTest {
 
   private static final UUID MEMBER = UUID.fromString("0b7a3c6e-2f1d-4e8a-9c3b-5d6e7f809a1b");
 
-  @Mock private LiveSyncRelayService relayService;
+  @Mock private LiveSyncPublisher publisher;
   @InjectMocks private ExchangeLiveSync liveSync;
 
   @AfterEach
@@ -60,11 +61,11 @@ class ExchangeLiveSyncTest {
     TransactionSynchronizationManager.initSynchronization();
 
     liveSync.hangarChanged(MEMBER);
-    verify(relayService, never()).publishFromServer(any(), anyList());
+    verify(publisher, never()).publish(any(), anyList());
 
     TransactionSynchronizationUtils.triggerAfterCommit();
-    verify(relayService)
-        .publishFromServer(eq(LiveSyncTopic.parse("hangar:" + MEMBER)), eq(List.of("ships")));
+    verify(publisher)
+        .publish(eq(LiveSyncTopic.of(LiveSyncTopicClass.HANGAR_OWN, MEMBER)), eq(List.of("ships")));
   }
 
   @Test
@@ -74,31 +75,30 @@ class ExchangeLiveSyncTest {
     liveSync.blueprintsChanged(MEMBER);
     TransactionSynchronizationManager.clearSynchronization();
 
-    verify(relayService, never()).publishFromServer(any(), anyList());
+    verify(publisher, never()).publish(any(), anyList());
   }
 
   @Test
   void aStockWriteRefreshesTheLagerAndTheBoardOnlyWhenOffersChanged() {
     liveSync.stockChanged(false);
-    verify(relayService)
-        .publishFromServer(eq(LiveSyncTopic.parse("inventory")), eq(List.of("stock")));
-    verify(relayService, never())
-        .publishFromServer(eq(LiveSyncTopic.parse("materialboard")), anyList());
+    verify(publisher)
+        .publish(eq(LiveSyncTopic.global(LiveSyncTopicClass.INVENTORY_ALL)), eq(List.of("stock")));
+    verify(publisher, never())
+        .publish(eq(LiveSyncTopic.global(LiveSyncTopicClass.MATERIALBOARD)), anyList());
 
     liveSync.stockChanged(true);
-    verify(relayService)
-        .publishFromServer(eq(LiveSyncTopic.parse("materialboard")), eq(List.of("board")));
+    verify(publisher)
+        .publish(eq(LiveSyncTopic.global(LiveSyncTopicClass.MATERIALBOARD)), eq(List.of("board")));
   }
 
   @Test
   void aFailedPublishDoesNotFailTheWrite() {
-    doThrow(new IllegalStateException("redis down"))
-        .when(relayService)
-        .publishFromServer(any(), anyList());
+    doThrow(new IllegalStateException("redis down")).when(publisher).publish(any(), anyList());
 
     liveSync.blueprintsChanged(MEMBER);
 
-    verify(relayService)
-        .publishFromServer(eq(LiveSyncTopic.parse("blueprints:" + MEMBER)), eq(List.of("list")));
+    verify(publisher)
+        .publish(
+            eq(LiveSyncTopic.of(LiveSyncTopicClass.BLUEPRINTS_OWN, MEMBER)), eq(List.of("list")));
   }
 }

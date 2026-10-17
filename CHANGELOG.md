@@ -8,6 +8,14 @@
 
 - **Neuer Alarm `PublicApiHostResolvesAgain`.** Er schlägt an, wenn `api.profit-base.online` wieder auflöst; der tägliche `edge-deny-probe`-Workflow prüft zusätzlich von außen, dass die Backend-Ports 11261/11271 zu sind und kein Vhost `/api/v1/**` beantwortet (REQ-OBS-012).
 
+- **Das Backend nimmt Token nur noch von bekannten Clients an.** Ein Zugriff auf `/api/v1` wird abgewiesen, wenn der Token nicht von `basetool-frontend` oder `basetool-ingest-gateway` ausgestellt wurde (Claim `azp`); ein neuer Realm-Client erhält damit nicht mehr automatisch API-Zugriff. Fehlt die Liste unter `prod`, startet das Backend nicht. Neue Variable `IRI_BACKEND_ACCEPTED_CLIENT_IDS` (ADR-0270, REQ-SEC-024).
+
+- **CSRF und CORS sind auf der Backend-Kette abgeschaltet.** Die Kette nimmt ausschließlich einen Bearer-JWT an und legt keine Session an, deshalb schützt CSRF dort nichts; ein neuer Test hält genau das fest, statt wie bisher eine Pfadliste zu pinnen. `app.cors.allowed-origin-patterns` entfällt. Der Prometheus-Scrape-Pfad bleibt unverändert (ADR-0271, REQ-SEC-044).
+
+- **Weitergeleitete Client-Adressen werden nur noch den eigenen Netzen geglaubt.** `app.rate-limit.trusted-proxies` nennt das Frontend- und das Ingest-Netz statt des ganzen Container-Adressraums, und Springs `ForwardedHeaderFilter` ist nicht mehr registriert. Ein Nachbar-Container kann damit nicht mehr behaupten, für ein beliebiges Mitglied zu sprechen (ADR-0272, REQ-SEC-011).
+
+- **Die Android-only-Fläche der API ist entfernt.** Es gibt kein `GET /api/v1/app/version-policy`, keine `app.android.version-policy.*`-Konfiguration und keine `410 APP_UPDATE_REQUIRED`-Antwort mehr; ein alter Pfad antwortet wie jeder unbekannte Pfad mit `404`. Die anonyme Fläche des Backends schrumpft damit auf `GET /api/v1/terms/document`, Health, `/internal/**` und `/error`. Entfallen sind außerdem die Variablen `APP_ANDROID_*_OVERRIDE`, der Alarm `AndroidVersionPolicyOverrideActive` und `docker-compose.android.yml` (ADR-0269, REQ-API-020/021, REQ-SEC-037).
+
 - **Management-Ports: Metriken nur noch mit Scrape-Zugang.** Auf den Management-Ports von Backend, Frontend und Ingest bleibt nur `/actuator/health` offen; `prometheus`, `info` und `loggers` verlangen den Basic-Auth-Zugang `MONITORING_SCRAPE_USER`/`MONITORING_SCRAPE_PASSWORD` und sind ohne ihn gesperrt. Vorher konnte jeder Nachbar-Container im selben Netz die Metriken lesen. Prometheus sendet `scrape_password`, das deshalb zu `MONITORING_SCRAPE_PASSWORD` passen muss (Benutzer `monitoring`) (REQ-OBS-005, ADR-0265).
 
 ### Added
@@ -25,6 +33,12 @@
 - **Materialdetail: Sortieren über die Spaltenköpfe.** Die Tabelle „Preise und Terminals" sortiert per Klick auf Terminal, Ort, Verkauf oder Einkauf; ein zweiter Klick dreht die Richtung um – auch auf dem Handy über eine Leiste über der Liste. Der Umschalter „Verkauf · Einkauf" entfällt, Standard bleibt „Verkauf, höchster zuerst" (REQ-UI-015, REQ-UI-030).
 
 - **Monitoring: CSP-Verstöße nennen ihre Ursache.** Der Fehler-Beacon meldet bei einem `trusted-types`-Verstoß den versuchten Policy-Namen und bei jedem CSP-Verstoß, ob der Code von der eigenen Seite, einer Browser-Erweiterung oder anderswoher stammt; `basetool_client_csp_violation_total` trägt dafür das Label `code_origin` (Dashboard 07, Panel 85). Grundlage für die Trusted-Types-Umstellung auf `enforce` (REQ-SEC-064, REQ-FE-022).
+
+- **Benachrichtigungs-Push ohne Inhalt.** Das SSE-Ereignis `notification` trägt wieder nur „etwas hat sich geändert“ statt Typ, Entität und Textparametern – die App, für die der Inhalt gebaut wurde, ist eingestellt, und der Browser hat ihn nie gelesen. Ein Ereignis löst pro Empfänger genau einen Push aus. Für Mitglieder ändert sich nichts: Glocke und Zähler aktualisieren wie bisher (ADR-0273, REQ-NOTIF-010/021).
+
+- **Live-Sync: die App-Brücke im Backend ist weg.** `GET /api/v1/live-sync/stream` und `POST /api/v1/live-sync/changed` sind entfernt; Live-Sync zwischen Browsern läuft wie vor der App allein über `/ws/sync` im Frontend. Schreibzugriffe über die Exchange-API und aus dem Hangar melden offenen Seiten weiterhin, dass sich etwas geändert hat – an dieser Stelle ändert sich für Mitglieder nichts (ADR-0274, REQ-FE-010, REQ-XCH-013).
+
+- **Das Audit-Log bleibt für App-Einträge lesbar.** Der Client-Filter im Audit-Log führt `basetool-android` weiter als „Android-App (eingestellt)“, damit alte Einträge zuordenbar bleiben; neue Einträge kann dieser Client nicht mehr erzeugen (REQ-OBS-018).
 
 - **Backend: keine Feldinjektion mehr.** `UserMapper`, `MissionMapper` und `InventoryItemMapper` erhalten ihre Abhängigkeiten über paketinterne `@Autowired`-Setter statt über Felder; die neue ArchUnit-Regel `noFieldIsAutowired` lässt kein `@Autowired`-Feld mehr zu (REQ-SEC-003). Kein Verhaltensunterschied.
 

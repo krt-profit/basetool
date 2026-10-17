@@ -109,8 +109,8 @@ class ProblemCodeRuntimeProbeTest {
   }
 
   /**
-   * A request missing a required parameter is a 400, and a response no accepted media type can
-   * carry is a 406, through the real chain.
+   * A request whose path variable does not convert is a 400, and a response no accepted media type
+   * can carry is a 406, through the real chain.
    *
    * @throws Exception if a request cannot be performed
    */
@@ -121,15 +121,15 @@ class ProblemCodeRuntimeProbeTest {
             .jwt(token -> token.subject(UUID.randomUUID().toString()))
             .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
 
-    MockHttpServletResponse missing =
-        mockMvc.perform(get("/api/v1/live-sync/stream").with(member)).andReturn().getResponse();
-    assertThat(missing.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
-    assertThat(new ObjectMapper().readTree(missing.getContentAsString()).path("code").asString())
-        .isEqualTo(CoreProblemCode.BAD_REQUEST.code());
+    MockHttpServletResponse malformed =
+        mockMvc.perform(get("/api/v1/missions/not-a-uuid").with(member)).andReturn().getResponse();
+    assertThat(malformed.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+    assertThat(new ObjectMapper().readTree(malformed.getContentAsString()).path("code").asString())
+        .isEqualTo(CoreProblemCode.TYPE_MISMATCH.code());
 
     MockHttpServletResponse unacceptable =
         mockMvc
-            .perform(get("/api/v1/app/version-policy").with(member).accept("text/csv"))
+            .perform(get("/api/v1/terms/document").with(member).accept("text/csv"))
             .andReturn()
             .getResponse();
     assertThat(unacceptable.getStatus()).isEqualTo(HttpStatus.NOT_ACCEPTABLE.value());
@@ -152,7 +152,7 @@ class ProblemCodeRuntimeProbeTest {
     assertThat(codeOf(get("/api/v1/users/me"))).isEqualTo(CoreProblemCode.UNAUTHENTICATED.code());
     assertThat(
             codeOf(
-                post("/api/v1/app/version-policy")
+                post("/api/v1/terms/document")
                     .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))))
         .isEqualTo(CoreProblemCode.METHOD_NOT_ALLOWED.code());
 

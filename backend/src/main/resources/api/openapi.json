@@ -37,8 +37,6 @@
   }, {
     "name" : "leadership"
   }, {
-    "name" : "livesync"
-  }, {
     "name" : "materialexchange"
   }, {
     "name" : "mission"
@@ -155,7 +153,6 @@
           }
         },
         "tags" : [ "dashboard" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "dashboard"
       },
       "get" : {
@@ -274,7 +271,6 @@
           }
         },
         "tags" : [ "dashboard" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "dashboard"
       },
       "put" : {
@@ -386,7 +382,6 @@
           }
         },
         "tags" : [ "dashboard" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "dashboard"
       }
     },
@@ -498,7 +493,6 @@
           }
         },
         "tags" : [ "dashboard" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "dashboard"
       }
     },
@@ -611,132 +605,7 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "identity"
-      }
-    },
-    "/api/v1/app/version-policy" : {
-      "get" : {
-        "description" : "Returns the minimum supported versionCode, the newest published one, and the release page. Anonymous by design: an app too old to authenticate must still be able to learn that it is too old.",
-        "operationId" : "versionPolicy",
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/AppVersionPolicyDto"
-                }
-              }
-            },
-            "description" : "The policy in force",
-            "headers" : {
-              "Cache-Control" : {
-                "description" : "Caching policy: no-cache, must-revalidate",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
-                "schema" : {
-                  "type" : "string"
-                }
-              }
-            }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Bad Request"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Unauthorized"
-          },
-          "403" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Forbidden"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Not Found"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Conflict"
-          },
-          "429" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
-            "headers" : {
-              "Retry-After" : {
-                "$ref" : "#/components/headers/Retry-After"
-              },
-              "X-Rate-Limit-Limit" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
-              },
-              "X-Rate-Limit-Remaining" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
-              },
-              "X-Rate-Limit-Retry-After-Seconds" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
-              }
-            }
-          },
-          "500" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Internal Server Error"
-          }
-        },
-        "security" : [ ],
-        "summary" : "Which Android builds the server still serves",
-        "tags" : [ "admin-system" ],
-        "x-contract-tier" : "T0",
-        "x-domain" : "admin-system"
       }
     },
     "/api/v1/audit/{domain}" : {
@@ -857,7 +726,6 @@
         },
         "summary" : "Purge an activity audit log's entries older than a cutoff (admin)",
         "tags" : [ "audit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "audit"
       },
       "get" : {
@@ -1039,7 +907,6 @@
         },
         "summary" : "Read an activity audit log (admin; paged, filterable)",
         "tags" : [ "audit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "audit"
       }
     },
@@ -1184,7 +1051,6 @@
         },
         "summary" : "Export an activity audit log as a PDF for a period (admin)",
         "tags" : [ "audit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "audit"
       }
     },
@@ -1325,7 +1191,6 @@
         },
         "summary" : "Export an activity audit log as JSON for a period (admin)",
         "tags" : [ "audit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "audit"
       }
     },
@@ -1491,7 +1356,6 @@
         },
         "summary" : "List/search the bank accounts visible to the caller (paged)",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       },
       "post" : {
@@ -1604,7 +1468,6 @@
         },
         "summary" : "Create a bank account (management: any type; employee: SPECIAL only)",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -1726,7 +1589,6 @@
         },
         "summary" : "Read one bank account incl. holder distribution",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       },
       "patch" : {
@@ -1848,7 +1710,6 @@
         },
         "summary" : "Rename a bank account (management)",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -1972,7 +1833,6 @@
         },
         "summary" : "Set or clear the KRT-account 3-stage approval thresholds (management)",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "bank"
       }
     },
@@ -2110,7 +1970,6 @@
         },
         "summary" : "Balance-over-time series of a bank account for a period",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "bank"
       }
     },
@@ -2234,7 +2093,6 @@
         },
         "summary" : "Set or clear a bank account's balance target (bank staff with access)",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "bank"
       }
     },
@@ -2358,7 +2216,6 @@
         },
         "summary" : "Close a bank account (management; zero balance required)",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -2482,7 +2339,6 @@
         },
         "summary" : "Reopen a closed bank account (management)",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -2627,7 +2483,6 @@
         },
         "summary" : "Download the account statement PDF for a period",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -2788,7 +2643,6 @@
         },
         "summary" : "List the booking history of a bank account (paged, optional period)",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -2902,7 +2756,6 @@
         },
         "summary" : "Purge the bank audit log's entries older than a cutoff (admin)",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "bank"
       },
       "get" : {
@@ -3084,7 +2937,6 @@
         },
         "summary" : "Read the bank audit log (admin; paged, filterable)",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "bank"
       }
     },
@@ -3221,7 +3073,6 @@
         },
         "summary" : "Export the bank audit log as a PDF for a period (admin)",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "bank"
       }
     },
@@ -3354,7 +3205,6 @@
         },
         "summary" : "Export the bank audit log as JSON for a period (admin)",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "bank"
       }
     },
@@ -3459,7 +3309,6 @@
         },
         "summary" : "Reset all bank balances to zero after an SC wipe (admin)",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "bank"
       }
     },
@@ -3572,7 +3421,6 @@
         },
         "summary" : "Read the bank dashboard for the caller",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -3687,7 +3535,6 @@
         },
         "summary" : "Book a deposit",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -3808,7 +3655,6 @@
         },
         "summary" : "Download the management three-month report PDF",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -3941,7 +3787,6 @@
         },
         "summary" : "List bank grants (management; filterable per account or employee)",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       },
       "post" : {
@@ -4054,7 +3899,6 @@
         },
         "summary" : "Create a bank grant (management)",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -4169,7 +4013,6 @@
         },
         "summary" : "Revoke a bank grant (management)",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       },
       "patch" : {
@@ -4299,7 +4142,6 @@
         },
         "summary" : "Update a bank grant's capability flags (management)",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -4415,7 +4257,6 @@
         },
         "summary" : "List the bank holder registry",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       },
       "post" : {
@@ -4528,7 +4369,6 @@
         },
         "summary" : "Register a user as bank holder (management)",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -4643,7 +4483,6 @@
         },
         "summary" : "Book a holder-to-holder Umbuchung",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -4765,7 +4604,6 @@
         },
         "summary" : "Read one bank holder incl. global custody total",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       },
       "patch" : {
@@ -4887,7 +4725,6 @@
         },
         "summary" : "Activate or deactivate a bank holder (management)",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -5032,7 +4869,6 @@
         },
         "summary" : "List the custody history of a bank holder (paged)",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -5175,7 +5011,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "identity"
       }
     },
@@ -5318,7 +5153,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -5440,7 +5274,6 @@
         },
         "summary" : "Read-only detail of an org-unit account the caller may view",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -5554,7 +5387,6 @@
         },
         "summary" : "Clear the all-members approval limit on an org-unit account",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       },
       "put" : {
@@ -5676,7 +5508,6 @@
         },
         "summary" : "Set the all-members approval limit on an org-unit account",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -5790,7 +5621,6 @@
         },
         "summary" : "Clear the area-members (Mitglieder des Bereichs) approval limit",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       },
       "put" : {
@@ -5912,7 +5742,6 @@
         },
         "summary" : "Set the area-members (Mitglieder des Bereichs) approval limit",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -6033,7 +5862,6 @@
         },
         "summary" : "Clear a role-bucket approval limit on an org-unit account",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       },
       "put" : {
@@ -6162,7 +5990,6 @@
         },
         "summary" : "Set a role-bucket approval limit on an org-unit account",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -6284,7 +6111,6 @@
         },
         "summary" : "Clear an individual user's approval limit on an org-unit account",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       },
       "put" : {
@@ -6414,7 +6240,6 @@
         },
         "summary" : "Set an individual user's approval limit on an org-unit account",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -6552,7 +6377,6 @@
         },
         "summary" : "Balance-over-time series of an org-unit account for a period",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "bank"
       }
     },
@@ -6676,7 +6500,6 @@
         },
         "summary" : "Set or clear an org-unit account's balance target (responsible holder)",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -6798,7 +6621,6 @@
         },
         "summary" : "Read an org-unit account's responsibility settings (holder/OL)",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -6943,7 +6765,6 @@
         },
         "summary" : "Download the Halter-redacted account statement PDF (org-unit viewer)",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "bank"
       }
     },
@@ -7104,7 +6925,6 @@
         },
         "summary" : "Booking history of an org-unit account (Halter redacted, optional period)",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -7225,7 +7045,6 @@
         },
         "summary" : "Toggle the all-members view grant of an org-unit account",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -7346,7 +7165,6 @@
         },
         "summary" : "Toggle the area-members (Mitglieder des Bereichs) view grant",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "bank"
       }
     },
@@ -7467,7 +7285,6 @@
         },
         "summary" : "Revoke a role bucket's view access to an org-unit account",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       },
       "post" : {
@@ -7586,7 +7403,6 @@
         },
         "summary" : "Grant a role bucket view access to an org-unit account",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -7708,7 +7524,6 @@
         },
         "summary" : "Revoke an individual user's view access to an org-unit account",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "bank"
       },
       "post" : {
@@ -7828,7 +7643,6 @@
         },
         "summary" : "Grant an individual user view access to an org-unit account",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "bank"
       }
     },
@@ -7945,7 +7759,6 @@
         },
         "summary" : "List the balances of the org-unit accounts the caller oversees",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -8061,7 +7874,6 @@
         },
         "summary" : "List the caller's own booking requests and their status",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       },
       "post" : {
@@ -8175,7 +7987,6 @@
         },
         "summary" : "Raise a confirm-before-post booking request",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -8291,7 +8102,6 @@
         },
         "summary" : "List booking requests on the accounts the caller is responsible for",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -8415,7 +8225,6 @@
         },
         "summary" : "Edit one of the caller's own pending, unapproved booking requests",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -8539,7 +8348,6 @@
         },
         "summary" : "Cancel one of the caller's own pending booking requests",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -8653,7 +8461,6 @@
         },
         "summary" : "Revoke the responsible holder's in-app approval for a booking request",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       },
       "post" : {
@@ -8765,7 +8572,6 @@
         },
         "summary" : "Grant the responsible holder's in-app approval for a booking request",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -8881,7 +8687,6 @@
         },
         "summary" : "List all active accounts as transfer-request destinations",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -9030,7 +8835,6 @@
         },
         "summary" : "List booking requests for the bank-staff confirmation queue (paged)",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -9154,7 +8958,6 @@
         },
         "summary" : "Confirm a pending booking request and book it onto the ledger",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -9278,7 +9081,6 @@
         },
         "summary" : "Reject a pending booking request with a reason",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -9401,7 +9203,6 @@
         },
         "summary" : "Reverse a transaction (management)",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -9514,7 +9315,6 @@
         },
         "summary" : "Read the current in-game transfer-fee rate",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -9639,7 +9439,6 @@
         },
         "summary" : "Book an account-to-account transfer (over-ceiling KRT amounts become a request)",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -9764,7 +9563,6 @@
         },
         "summary" : "Book a withdrawal (over-ceiling KRT amounts become an approval request)",
         "tags" : [ "bank" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "bank"
       }
     },
@@ -9918,7 +9716,6 @@
         },
         "summary" : "List synced crafting blueprints",
         "tags" : [ "blueprint" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "blueprint"
       }
     },
@@ -10037,7 +9834,6 @@
         } ],
         "summary" : "List the auto-granted default blueprints.",
         "tags" : [ "blueprint" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "blueprint"
       },
       "post" : {
@@ -10153,7 +9949,6 @@
         } ],
         "summary" : "Add a product to the default set and grant it to all users.",
         "tags" : [ "blueprint" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "blueprint"
       }
     },
@@ -10263,7 +10058,6 @@
         } ],
         "summary" : "Remove a product from the default set (existing grants are kept).",
         "tags" : [ "blueprint" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "blueprint"
       }
     },
@@ -10375,7 +10169,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "identity"
       },
       "put" : {
@@ -10487,7 +10280,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "identity"
       }
     },
@@ -10632,7 +10424,6 @@
         } ],
         "summary" : "Search blueprint products (type-ahead) with an owned-by-caller flag.",
         "tags" : [ "blueprint" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "blueprint"
       }
     },
@@ -10773,7 +10564,6 @@
         },
         "summary" : "Preview blueprint material derivation",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "joborder"
       }
     },
@@ -10892,7 +10682,6 @@
         } ],
         "summary" : "List recent P4K import jobs.",
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       },
       "post" : {
@@ -11014,7 +10803,6 @@
         } ],
         "summary" : "Upload a P4K catalog and enqueue an async preview (dry-run) job.",
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -11139,7 +10927,6 @@
         } ],
         "summary" : "Fetch one P4K import job (poll its status / result).",
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -11264,7 +11051,6 @@
         } ],
         "summary" : "Enqueue an async apply job from a finished preview (optionally seeding).",
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -11383,7 +11169,6 @@
         } ],
         "summary" : "List every quality tier.",
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       },
       "post" : {
@@ -11499,7 +11284,6 @@
         } ],
         "summary" : "Add a quality tier.",
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -11609,7 +11393,6 @@
         } ],
         "summary" : "Delete an unused quality tier.",
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       },
       "put" : {
@@ -11734,7 +11517,6 @@
         } ],
         "summary" : "Change a quality tier.",
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -11856,7 +11638,6 @@
         },
         "summary" : "Delete old sync-report events",
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       },
       "get" : {
@@ -11992,7 +11773,6 @@
         },
         "summary" : "List sync-report events",
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -12137,7 +11917,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -12267,7 +12046,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -12387,7 +12165,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -12500,7 +12277,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -12616,7 +12392,6 @@
         },
         "summary" : "List my connected apps",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "exchange"
       }
     },
@@ -12732,7 +12507,6 @@
         },
         "summary" : "List exchange clients",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "exchange"
       },
       "post" : {
@@ -12846,7 +12620,6 @@
         },
         "summary" : "Register an exchange client",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "exchange"
       }
     },
@@ -12963,7 +12736,6 @@
         },
         "summary" : "Exchange client usage",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "exchange"
       }
     },
@@ -13085,7 +12857,6 @@
         },
         "summary" : "Get an exchange client",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "exchange"
       },
       "put" : {
@@ -13218,7 +12989,6 @@
         },
         "summary" : "Update an exchange client",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "exchange"
       }
     },
@@ -13342,7 +13112,6 @@
         },
         "summary" : "Activate an exchange client",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "exchange"
       }
     },
@@ -13477,7 +13246,6 @@
         },
         "summary" : "Suspend an exchange client",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "exchange"
       }
     },
@@ -13612,7 +13380,6 @@
         },
         "summary" : "Start a bulk undo",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "exchange"
       }
     },
@@ -13745,7 +13512,6 @@
         },
         "summary" : "Installations a bulk undo could reach",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "exchange"
       }
     },
@@ -13870,7 +13636,6 @@
         },
         "summary" : "Preview a bulk undo",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "exchange"
       }
     },
@@ -13983,7 +13748,6 @@
         },
         "summary" : "Get the global exchange switch",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "exchange"
       },
       "put" : {
@@ -14107,7 +13871,6 @@
         },
         "summary" : "Set the global exchange switch",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "exchange"
       }
     },
@@ -14223,7 +13986,6 @@
         },
         "summary" : "Recent bulk undo runs",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "exchange"
       }
     },
@@ -14345,7 +14107,6 @@
         },
         "summary" : "A bulk undo run and what it left alone",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "exchange"
       }
     },
@@ -14456,7 +14217,6 @@
         },
         "summary" : "Disconnect an installation",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "exchange"
       }
     },
@@ -14564,7 +14324,6 @@
         },
         "summary" : "Mark a new installation seen",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "exchange"
       }
     },
@@ -14680,7 +14439,6 @@
         },
         "summary" : "Confirm a held-back change set",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "exchange"
       }
     },
@@ -14796,7 +14554,6 @@
         },
         "summary" : "Preview a held-back change set",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "exchange"
       }
     },
@@ -14909,7 +14666,6 @@
         },
         "summary" : "Read whether my name is withheld from connected apps",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "exchange"
       },
       "put" : {
@@ -15023,7 +14779,6 @@
         },
         "summary" : "Withhold my name from connected apps, or share it again",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "exchange"
       }
     },
@@ -15133,7 +14888,6 @@
         },
         "summary" : "Disconnect a client",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "exchange"
       }
     },
@@ -15257,7 +15011,6 @@
         },
         "summary" : "Undo a client's changes",
         "tags" : [ "exchange" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "exchange"
       }
     },
@@ -15409,7 +15162,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       },
       "post" : {
@@ -15521,7 +15273,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -15632,7 +15383,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -15738,7 +15488,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       },
       "get" : {
@@ -15866,7 +15615,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       },
       "put" : {
@@ -15987,7 +15735,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -16093,7 +15840,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -16258,7 +16004,6 @@
         },
         "summary" : "List game items",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       }
     },
@@ -16393,7 +16138,6 @@
         },
         "summary" : "List blueprints for a game item",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       }
     },
@@ -16537,7 +16281,6 @@
           }
         },
         "tags" : [ "hangar" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "hangar"
       },
       "post" : {
@@ -16658,7 +16401,6 @@
           }
         },
         "tags" : [ "hangar" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "hangar"
       }
     },
@@ -16783,7 +16525,6 @@
         },
         "summary" : "Change the org unit of several ships of a member",
         "tags" : [ "hangar" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "hangar"
       }
     },
@@ -16897,7 +16638,6 @@
           }
         },
         "tags" : [ "hangar" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "hangar"
       },
       "put" : {
@@ -17026,7 +16766,6 @@
           }
         },
         "tags" : [ "hangar" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "hangar"
       }
     },
@@ -17159,7 +16898,6 @@
         },
         "summary" : "Change the org unit of a member's ship",
         "tags" : [ "hangar" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "hangar"
       }
     },
@@ -17279,7 +17017,6 @@
           }
         },
         "tags" : [ "hangar" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "hangar"
       }
     },
@@ -17422,7 +17159,6 @@
           }
         },
         "tags" : [ "hangar" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "hangar"
       }
     },
@@ -17521,7 +17257,6 @@
         },
         "summary" : "Delete all own ships",
         "tags" : [ "hangar" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "hangar"
       },
       "get" : {
@@ -17655,7 +17390,6 @@
           }
         },
         "tags" : [ "hangar" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "hangar"
       },
       "post" : {
@@ -17767,7 +17501,6 @@
           }
         },
         "tags" : [ "hangar" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "hangar"
       }
     },
@@ -17883,7 +17616,6 @@
         },
         "summary" : "Change the org unit of several ships",
         "tags" : [ "hangar" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "hangar"
       }
     },
@@ -17999,7 +17731,6 @@
         },
         "summary" : "Set home location for all own ships",
         "tags" : [ "hangar" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "hangar"
       }
     },
@@ -18096,7 +17827,6 @@
           }
         },
         "tags" : [ "hangar" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "hangar"
       }
     },
@@ -18202,7 +17932,6 @@
           }
         },
         "tags" : [ "hangar" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "hangar"
       },
       "put" : {
@@ -18323,7 +18052,6 @@
           }
         },
         "tags" : [ "hangar" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "hangar"
       }
     },
@@ -18448,7 +18176,6 @@
         },
         "summary" : "Change a ship's org unit",
         "tags" : [ "hangar" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "hangar"
       }
     },
@@ -18591,7 +18318,6 @@
           }
         },
         "tags" : [ "hangar" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "hangar"
       }
     },
@@ -18709,7 +18435,6 @@
         },
         "summary" : "Check access to an org unit's hangar overview",
         "tags" : [ "hangar" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "hangar"
       }
     },
@@ -18823,7 +18548,6 @@
           }
         },
         "tags" : [ "inventory" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "inventory"
       }
     },
@@ -18968,7 +18692,6 @@
           }
         },
         "tags" : [ "inventory" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "inventory"
       }
     },
@@ -19067,7 +18790,6 @@
         },
         "summary" : "Delete all global inventory",
         "tags" : [ "inventory" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "inventory"
       },
       "get" : {
@@ -19273,7 +18995,6 @@
           }
         },
         "tags" : [ "inventory" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "inventory"
       }
     },
@@ -19477,7 +19198,6 @@
           }
         },
         "tags" : [ "inventory" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "inventory"
       }
     },
@@ -19671,7 +19391,6 @@
           }
         },
         "tags" : [ "inventory" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "inventory"
       }
     },
@@ -19795,7 +19514,6 @@
           }
         },
         "tags" : [ "inventory" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "inventory"
       }
     },
@@ -19904,7 +19622,6 @@
         },
         "summary" : "Bulk checkout",
         "tags" : [ "inventory" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "inventory"
       }
     },
@@ -20020,7 +19737,6 @@
         },
         "summary" : "Bulk change personal rows' org unit",
         "tags" : [ "inventory" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "inventory"
       }
     },
@@ -20136,7 +19852,6 @@
         },
         "summary" : "Bulk rebook",
         "tags" : [ "inventory" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "inventory"
       }
     },
@@ -20252,7 +19967,6 @@
         },
         "summary" : "Bulk mark or unmark stock as stolen",
         "tags" : [ "inventory" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "inventory"
       }
     },
@@ -20397,7 +20111,6 @@
           }
         },
         "tags" : [ "inventory" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "inventory"
       }
     },
@@ -20542,7 +20255,6 @@
           }
         },
         "tags" : [ "inventory" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "inventory"
       }
     },
@@ -20713,7 +20425,6 @@
         },
         "summary" : "Probe for mergeable stock",
         "tags" : [ "inventory" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "inventory"
       }
     },
@@ -20858,7 +20569,6 @@
           }
         },
         "tags" : [ "inventory" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "inventory"
       }
     },
@@ -21079,7 +20789,6 @@
           }
         },
         "tags" : [ "inventory" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "inventory"
       }
     },
@@ -21299,7 +21008,6 @@
           }
         },
         "tags" : [ "inventory" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "inventory"
       }
     },
@@ -21493,7 +21201,6 @@
           }
         },
         "tags" : [ "inventory" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "inventory"
       }
     },
@@ -21618,7 +21325,6 @@
         },
         "summary" : "Remove an inventory allocation",
         "tags" : [ "inventory" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "inventory"
       },
       "patch" : {
@@ -21751,7 +21457,6 @@
         },
         "summary" : "Change an inventory allocation amount",
         "tags" : [ "inventory" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "inventory"
       },
       "post" : {
@@ -21884,7 +21589,6 @@
         },
         "summary" : "Add an inventory allocation",
         "tags" : [ "inventory" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "inventory"
       }
     },
@@ -22007,7 +21711,6 @@
           }
         },
         "tags" : [ "inventory" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "inventory"
       }
     },
@@ -22132,7 +21835,6 @@
         },
         "summary" : "Update delivered status",
         "tags" : [ "inventory" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "inventory"
       }
     },
@@ -22255,7 +21957,6 @@
           }
         },
         "tags" : [ "inventory" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "inventory"
       }
     },
@@ -22380,7 +22081,6 @@
         },
         "summary" : "Change a personal row's org unit",
         "tags" : [ "inventory" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "inventory"
       }
     },
@@ -22505,7 +22205,6 @@
         },
         "summary" : "Rebook personal marker",
         "tags" : [ "inventory" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "inventory"
       }
     },
@@ -22640,7 +22339,6 @@
         },
         "summary" : "Move a shared row into another pool",
         "tags" : [ "inventory" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "inventory"
       }
     },
@@ -22766,7 +22464,6 @@
         },
         "summary" : "List the pools a shared row may move into",
         "tags" : [ "inventory" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "inventory"
       }
     },
@@ -22901,7 +22598,6 @@
         },
         "summary" : "Mark or unmark stock as stolen",
         "tags" : [ "inventory" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "inventory"
       }
     },
@@ -23062,7 +22758,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "catalogue"
       },
       "post" : {
@@ -23174,7 +22869,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -23280,7 +22974,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       },
       "put" : {
@@ -23401,7 +23094,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -23507,244 +23199,7 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
-      }
-    },
-    "/api/v1/live-sync/changed" : {
-      "post" : {
-        "operationId" : "changed",
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/LiveSyncChangedRequest"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "202" : {
-            "description" : "Signal relayed."
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Bad Request"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Unauthorized"
-          },
-          "403" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Forbidden"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Not Found"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Conflict"
-          },
-          "429" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
-            "headers" : {
-              "Retry-After" : {
-                "$ref" : "#/components/headers/Retry-After"
-              },
-              "X-Rate-Limit-Limit" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
-              },
-              "X-Rate-Limit-Remaining" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
-              },
-              "X-Rate-Limit-Retry-After-Seconds" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
-              }
-            }
-          },
-          "500" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Internal Server Error"
-          }
-        },
-        "security" : [ {
-          "bearer-jwt" : [ ]
-        } ],
-        "summary" : "Announce a change so other viewers of the same room re-fetch.",
-        "tags" : [ "livesync" ],
-        "x-contract-tier" : "T0",
-        "x-domain" : "livesync"
-      }
-    },
-    "/api/v1/live-sync/stream" : {
-      "get" : {
-        "operationId" : "stream_1",
-        "parameters" : [ {
-          "description" : "Comma-separated topics, e.g. `missions,mission:<uuid>`.",
-          "in" : "query",
-          "name" : "topics",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/SseEmitter"
-                }
-              }
-            },
-            "description" : "SSE stream opened.",
-            "headers" : {
-              "Cache-Control" : {
-                "description" : "Caching policy: private, no-store",
-                "schema" : {
-                  "type" : "string"
-                }
-              }
-            }
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Bad Request"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Unauthorized"
-          },
-          "403" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Forbidden"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Not Found"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Conflict"
-          },
-          "429" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
-            "headers" : {
-              "Retry-After" : {
-                "$ref" : "#/components/headers/Retry-After"
-              },
-              "X-Rate-Limit-Limit" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
-              },
-              "X-Rate-Limit-Remaining" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
-              },
-              "X-Rate-Limit-Retry-After-Seconds" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
-              }
-            }
-          },
-          "500" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Internal Server Error"
-          }
-        },
-        "security" : [ {
-          "bearer-jwt" : [ ]
-        } ],
-        "summary" : "Subscribe to live change signals for a set of topics (Server-Sent Events).",
-        "tags" : [ "livesync" ],
-        "x-contract-tier" : "T0",
-        "x-domain" : "livesync"
       }
     },
     "/api/v1/locations" : {
@@ -23896,7 +23351,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       },
       "post" : {
@@ -24008,7 +23462,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -24134,7 +23587,6 @@
         },
         "summary" : "Curated home locations",
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "catalogue"
       }
     },
@@ -24258,7 +23710,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -24382,7 +23833,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "catalogue"
       }
     },
@@ -24534,7 +23984,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "catalogue"
       }
     },
@@ -24640,7 +24089,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       },
       "get" : {
@@ -24768,7 +24216,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       },
       "put" : {
@@ -24889,7 +24336,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -25025,7 +24471,6 @@
         },
         "summary" : "Get refinery yields of a location",
         "tags" : [ "refinery" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "refinery"
       }
     },
@@ -25178,7 +24623,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -25308,7 +24752,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -25428,7 +24871,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -25552,7 +24994,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       },
       "post" : {
@@ -25664,7 +25105,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -25770,7 +25210,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       },
       "get" : {
@@ -25898,7 +25337,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       },
       "put" : {
@@ -26019,7 +25457,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -26135,7 +25572,6 @@
         } ],
         "summary" : "Materialbörse board tab counts.",
         "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "materialexchange"
       }
     },
@@ -26253,7 +25689,6 @@
         } ],
         "summary" : "List a craftable item on the Materialbörse.",
         "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "materialexchange"
       }
     },
@@ -26431,7 +25866,6 @@
         } ],
         "summary" : "List Materialbörse offers (board), filtered and sorted.",
         "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "materialexchange"
       },
       "post" : {
@@ -26547,7 +25981,6 @@
         } ],
         "summary" : "Release a Lager row to the Materialbörse.",
         "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "materialexchange"
       }
     },
@@ -26664,7 +26097,6 @@
         } ],
         "summary" : "Deactivate the active offer for a Lager row.",
         "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "materialexchange"
       }
     },
@@ -26789,7 +26221,6 @@
         } ],
         "summary" : "Get one Materialbörse offer detail.",
         "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "materialexchange"
       }
     },
@@ -26906,7 +26337,6 @@
         } ],
         "summary" : "Deactivate a Materialbörse offer.",
         "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "materialexchange"
       }
     },
@@ -27023,7 +26453,6 @@
         } ],
         "summary" : "Withdraw interest from a Materialbörse offer.",
         "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "materialexchange"
       },
       "post" : {
@@ -27138,7 +26567,6 @@
         } ],
         "summary" : "Register interest in a Materialbörse offer.",
         "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "materialexchange"
       }
     },
@@ -27265,7 +26693,6 @@
         } ],
         "summary" : "Edit a Materialbörse offer (offered amount and remark).",
         "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "materialexchange"
       }
     },
@@ -27400,7 +26827,6 @@
         } ],
         "summary" : "List the caller's own Lager rows eligible for release.",
         "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "materialexchange"
       }
     },
@@ -27532,7 +26958,6 @@
         } ],
         "summary" : "Which of the given Lager rows currently carry an active offer.",
         "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "materialexchange"
       }
     },
@@ -27702,7 +27127,6 @@
         } ],
         "summary" : "List Materialbörse requests (board), filtered and sorted.",
         "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "materialexchange"
       },
       "post" : {
@@ -27818,7 +27242,6 @@
         } ],
         "summary" : "Post a material request (Gesuch) to the Materialbörse.",
         "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "materialexchange"
       }
     },
@@ -27934,7 +27357,6 @@
         } ],
         "summary" : "Materialbörse Gesuche board tab counts.",
         "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "materialexchange"
       }
     },
@@ -28052,7 +27474,6 @@
         } ],
         "summary" : "Post a craftable-item request (Gesuch) to the Materialbörse.",
         "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "materialexchange"
       }
     },
@@ -28177,7 +27598,6 @@
         } ],
         "summary" : "Get one Materialbörse request detail.",
         "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "materialexchange"
       },
       "put" : {
@@ -28302,7 +27722,6 @@
         } ],
         "summary" : "Edit a Materialbörse request (desired quantity, minimum quality, remark).",
         "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "materialexchange"
       }
     },
@@ -28419,7 +27838,6 @@
         } ],
         "summary" : "Deactivate a Materialbörse request.",
         "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "materialexchange"
       }
     },
@@ -28536,7 +27954,6 @@
         } ],
         "summary" : "Withdraw a fulfilment signal from a Materialbörse request.",
         "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "materialexchange"
       },
       "post" : {
@@ -28651,7 +28068,6 @@
         } ],
         "summary" : "Signal that you can supply a Materialbörse request.",
         "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "materialexchange"
       }
     },
@@ -28777,7 +28193,6 @@
         },
         "summary" : "List all material external aliases",
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       },
       "post" : {
@@ -28890,7 +28305,6 @@
         },
         "summary" : "Create a new material external alias",
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -28997,7 +28411,6 @@
         },
         "summary" : "Delete a material external alias",
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       },
       "get" : {
@@ -29126,7 +28539,6 @@
         },
         "summary" : "Get a single material external alias by id",
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       },
       "put" : {
@@ -29248,7 +28660,6 @@
         },
         "summary" : "Update an existing material external alias",
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -29409,7 +28820,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       },
       "post" : {
@@ -29521,7 +28931,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -29647,7 +29056,6 @@
         },
         "summary" : "Get all job-order materials",
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -29771,7 +29179,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -29950,7 +29357,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "catalogue"
       }
     },
@@ -30102,7 +29508,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "catalogue"
       }
     },
@@ -30245,7 +29650,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "catalogue"
       }
     },
@@ -30413,7 +29817,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "catalogue"
       }
     },
@@ -30519,7 +29922,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       },
       "get" : {
@@ -30647,7 +30049,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "catalogue"
       },
       "put" : {
@@ -30768,7 +30169,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -30921,7 +30321,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "catalogue"
       }
     },
@@ -31054,7 +30453,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "catalogue"
       }
     },
@@ -31167,7 +30565,6 @@
         },
         "summary" : "Per-principal UI capability flags (blueprint overview, job orders, bank staff).",
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "identity"
       }
     },
@@ -31281,7 +30678,6 @@
         },
         "summary" : "The caller's layout context in one read",
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -31468,7 +30864,6 @@
         },
         "summary" : "List missions (paginated, filterable)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       },
       "post" : {
@@ -31581,7 +30976,6 @@
         },
         "summary" : "Create a new mission",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "mission"
       }
     },
@@ -31707,7 +31101,6 @@
         },
         "summary" : "Lookup missions for the warehouse picker",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -31819,7 +31212,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "identity"
       },
       "put" : {
@@ -31931,7 +31323,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "identity"
       }
     },
@@ -32053,7 +31444,6 @@
         },
         "summary" : "Get next upcoming mission",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "mission"
       }
     },
@@ -32160,7 +31550,6 @@
         },
         "summary" : "Delete a mission",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "mission"
       },
       "get" : {
@@ -32289,7 +31678,6 @@
         },
         "summary" : "Get mission by ID",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -32414,7 +31802,6 @@
         },
         "summary" : "Patch mission core section",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -32539,7 +31926,6 @@
         },
         "summary" : "Patch mission flags section",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -32667,7 +32053,6 @@
         },
         "summary" : "Add or update a frequency for a mission (slim response)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "mission"
       }
     },
@@ -32795,7 +32180,6 @@
         },
         "summary" : "Add a custom (mission-specific) frequency (slim response)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -32931,7 +32315,6 @@
         },
         "summary" : "Update a custom (mission-specific) frequency (slim response)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "mission"
       }
     },
@@ -33047,7 +32430,6 @@
         },
         "summary" : "Remove a frequency from a mission (slim response)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -33171,7 +32553,6 @@
         },
         "summary" : "Join a mission",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -33287,7 +32668,6 @@
         },
         "summary" : "Remove a manager from a mission (slim response)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       },
       "post" : {
@@ -33411,7 +32791,6 @@
         },
         "summary" : "Add a manager to a mission (slim response)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -33539,7 +32918,6 @@
         },
         "summary" : "Add a goal (Ziel) to a mission (slim response)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -33667,7 +33045,6 @@
         },
         "summary" : "Reorder a mission's goals (slim response)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -33801,7 +33178,6 @@
         },
         "summary" : "Delete a mission goal (slim response)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       },
       "put" : {
@@ -33935,7 +33311,6 @@
         },
         "summary" : "Update a mission goal (slim response)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -34060,7 +33435,6 @@
         },
         "summary" : "Change the owner of a mission (version-checked)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "mission"
       }
     },
@@ -34185,7 +33559,6 @@
         },
         "summary" : "Reassign the owning org unit of a mission (version-checked)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "mission"
       }
     },
@@ -34313,7 +33686,6 @@
         },
         "summary" : "Add a participant (slim response)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "mission"
       }
     },
@@ -34441,7 +33813,6 @@
         },
         "summary" : "Add a registered member by id (manager-only, slim response)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -34576,7 +33947,6 @@
         },
         "summary" : "Get unassigned participants",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "mission"
       }
     },
@@ -34692,7 +34062,6 @@
         },
         "summary" : "Remove a participant (slim response)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       },
       "put" : {
@@ -34823,7 +34192,6 @@
         },
         "summary" : "Update a participant (slim response)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -34946,7 +34314,6 @@
         },
         "summary" : "Check in a participant (slim response)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -35069,7 +34436,6 @@
         },
         "summary" : "Check out a participant (slim response)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -35202,7 +34568,6 @@
         },
         "summary" : "Update payout preference for a participant (slim response)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -35327,7 +34692,6 @@
         },
         "summary" : "Set or clear the party lead of a mission",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -35452,7 +34816,6 @@
         },
         "summary" : "Patch mission schedule section",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -35580,7 +34943,6 @@
         },
         "summary" : "Add an Ablauf step to a mission (slim response)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -35708,7 +35070,6 @@
         },
         "summary" : "Reorder a mission's Ablauf steps (slim response)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -35842,7 +35203,6 @@
         },
         "summary" : "Delete an Ablauf step (slim response)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       },
       "put" : {
@@ -35976,7 +35336,6 @@
         },
         "summary" : "Update an Ablauf step (slim response)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -36112,7 +35471,6 @@
         },
         "summary" : "Toggle an Ablauf step's done flag (slim response)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -36236,7 +35594,6 @@
         },
         "summary" : "Create a sub-mission",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "mission"
       }
     },
@@ -36371,7 +35728,6 @@
         },
         "summary" : "List selectable ships for a mission's units",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -36499,7 +35855,6 @@
         },
         "summary" : "Add a unit to a mission (slim response)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -36635,7 +35990,6 @@
         },
         "summary" : "Add crew to a mission unit (slim response)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -36759,7 +36113,6 @@
         },
         "summary" : "Remove crew from a mission unit (slim response)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       },
       "put" : {
@@ -36898,7 +36251,6 @@
         },
         "summary" : "Update crew in a mission unit (slim response)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -37014,7 +36366,6 @@
         },
         "summary" : "Delete a mission unit (slim response)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       },
       "put" : {
@@ -37145,7 +36496,6 @@
         },
         "summary" : "Update a mission unit (slim response)",
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -37292,7 +36642,6 @@
           }
         },
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       },
       "post" : {
@@ -37413,7 +36762,6 @@
           }
         },
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -37534,7 +36882,6 @@
           }
         },
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "mission"
       }
     },
@@ -37655,7 +37002,6 @@
           }
         },
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -37769,7 +37115,6 @@
           }
         },
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       },
       "put" : {
@@ -37898,7 +37243,6 @@
           }
         },
         "tags" : [ "mission" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "mission"
       }
     },
@@ -38038,7 +37382,6 @@
         } ],
         "summary" : "List the caller's notifications (paginated, sortable).",
         "tags" : [ "notification" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "notification"
       }
     },
@@ -38157,7 +37500,6 @@
         } ],
         "summary" : "List all notification rules.",
         "tags" : [ "notification" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "notification"
       },
       "post" : {
@@ -38273,7 +37615,6 @@
         } ],
         "summary" : "Create a notification rule.",
         "tags" : [ "notification" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "notification"
       }
     },
@@ -38383,7 +37724,6 @@
         } ],
         "summary" : "Delete a notification rule.",
         "tags" : [ "notification" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "notification"
       },
       "get" : {
@@ -38506,7 +37846,6 @@
         } ],
         "summary" : "Fetch a single notification rule.",
         "tags" : [ "notification" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "notification"
       },
       "put" : {
@@ -38631,7 +37970,6 @@
         } ],
         "summary" : "Update a notification rule.",
         "tags" : [ "notification" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "notification"
       }
     },
@@ -38750,7 +38088,6 @@
         } ],
         "summary" : "List the caller's notification preferences, one entry per type.",
         "tags" : [ "notification" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "notification"
       }
     },
@@ -38877,7 +38214,6 @@
         } ],
         "summary" : "Mute or unmute one notification type for the caller.",
         "tags" : [ "notification" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "notification"
       }
     },
@@ -38985,7 +38321,6 @@
         } ],
         "summary" : "Delete all of the caller's already-read notifications.",
         "tags" : [ "notification" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "notification"
       }
     },
@@ -39093,7 +38428,6 @@
         } ],
         "summary" : "Mark all of the caller's notifications read.",
         "tags" : [ "notification" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "notification"
       }
     },
@@ -39222,7 +38556,6 @@
         } ],
         "summary" : "List the caller's most recent notifications (for the bell dropdown).",
         "tags" : [ "notification" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "notification"
       }
     },
@@ -39338,7 +38671,6 @@
         } ],
         "summary" : "Subscribe to the caller's notification stream (Server-Sent Events).",
         "tags" : [ "notification" ],
-        "x-contract-tier" : "T0",
         "x-domain" : "notification"
       }
     },
@@ -39454,7 +38786,6 @@
         } ],
         "summary" : "Count the caller's unread notifications (always-on bell badge).",
         "tags" : [ "notification" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "notification"
       }
     },
@@ -39564,7 +38895,6 @@
         } ],
         "summary" : "Delete one of the caller's notifications (read or unread).",
         "tags" : [ "notification" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "notification"
       }
     },
@@ -39681,7 +39011,6 @@
         } ],
         "summary" : "Mark one of the caller's notifications read.",
         "tags" : [ "notification" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "notification"
       }
     },
@@ -39822,7 +39151,6 @@
         },
         "summary" : "List all operations (paginated)",
         "tags" : [ "operation" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "operation"
       },
       "post" : {
@@ -39935,7 +39263,6 @@
         },
         "summary" : "Create a new operation",
         "tags" : [ "operation" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "operation"
       }
     },
@@ -40052,7 +39379,6 @@
         },
         "summary" : "Lookup operations",
         "tags" : [ "operation" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "operation"
       }
     },
@@ -40226,7 +39552,6 @@
         },
         "summary" : "Search operations (paginated)",
         "tags" : [ "operation" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "operation"
       }
     },
@@ -40334,7 +39659,6 @@
         },
         "summary" : "Delete an operation",
         "tags" : [ "operation" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "operation"
       },
       "get" : {
@@ -40455,7 +39779,6 @@
         },
         "summary" : "Get operation by ID",
         "tags" : [ "operation" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "operation"
       },
       "put" : {
@@ -40578,7 +39901,6 @@
         },
         "summary" : "Update an existing operation",
         "tags" : [ "operation" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "operation"
       }
     },
@@ -40701,7 +40023,6 @@
         },
         "summary" : "Get the finance roll-up for an operation (totals only)",
         "tags" : [ "operation" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "operation"
       }
     },
@@ -40824,7 +40145,6 @@
         },
         "summary" : "Get aggregated finances for an operation (full breakdown)",
         "tags" : [ "operation" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "operation"
       }
     },
@@ -40955,7 +40275,6 @@
         },
         "summary" : "Get one mission's finance detail within an operation",
         "tags" : [ "operation" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "operation"
       }
     },
@@ -41078,7 +40397,6 @@
         },
         "summary" : "Get participation payout breakdown with amounts and paid-out status",
         "tags" : [ "operation" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "operation"
       }
     },
@@ -41203,7 +40521,6 @@
         },
         "summary" : "Toggle the per-participant paid-out flag for an operation",
         "tags" : [ "operation" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "operation"
       }
     },
@@ -41374,7 +40691,6 @@
         },
         "summary" : "Get all job orders",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       },
       "post" : {
@@ -41488,7 +40804,6 @@
         },
         "summary" : "Create a new job order",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       }
     },
@@ -41604,7 +40919,6 @@
         },
         "summary" : "Create a new item job order",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       }
     },
@@ -41730,7 +41044,6 @@
         },
         "summary" : "Lookup active job orders",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       }
     },
@@ -41844,7 +41157,6 @@
         },
         "summary" : "Get the cross-order material demand",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       }
     },
@@ -41996,7 +41308,6 @@
         },
         "summary" : "Get my requested job orders",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "joborder"
       }
     },
@@ -42118,7 +41429,6 @@
         },
         "summary" : "Get the job-order ageing thresholds.",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       }
     },
@@ -42226,7 +41536,6 @@
         },
         "summary" : "Delete a job order",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "joborder"
       },
       "get" : {
@@ -42347,7 +41656,6 @@
         },
         "summary" : "Get job order by ID",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       },
       "put" : {
@@ -42470,7 +41778,6 @@
         },
         "summary" : "Update job order",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       }
     },
@@ -42596,7 +41903,6 @@
         },
         "summary" : "Get orphaned linked inventory for a job order",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "joborder"
       }
     },
@@ -42712,7 +42018,6 @@
         },
         "summary" : "Unlink a single inventory item from a job order",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       }
     },
@@ -42835,7 +42140,6 @@
         },
         "summary" : "Remove an assignee",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       },
       "post" : {
@@ -42956,7 +42260,6 @@
         },
         "summary" : "Add an assignee",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       }
     },
@@ -43087,7 +42390,6 @@
         },
         "summary" : "Delete an assignee note",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       },
       "put" : {
@@ -43218,7 +42520,6 @@
         },
         "summary" : "Set an assignee note",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       }
     },
@@ -43343,7 +42644,6 @@
         },
         "summary" : "Toggle item-order blueprint variant counting",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "joborder"
       }
     },
@@ -43468,7 +42768,6 @@
         },
         "summary" : "Create a job order handover",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       }
     },
@@ -43591,7 +42890,6 @@
         },
         "summary" : "Get item-order blueprint coverage",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "joborder"
       }
     },
@@ -43716,7 +43014,6 @@
         },
         "summary" : "Create an item handover",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       }
     },
@@ -43841,7 +43138,6 @@
         },
         "summary" : "Update an item job order",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       }
     },
@@ -43966,7 +43262,6 @@
         },
         "summary" : "Requester edit of an item order",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "joborder"
       }
     },
@@ -44109,7 +43404,6 @@
         },
         "summary" : "Book production for an item line",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       }
     },
@@ -44243,7 +43537,6 @@
         },
         "summary" : "Get the quality-bucket attribution of a job order material's linked stock",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "joborder"
       }
     },
@@ -44377,7 +43670,6 @@
         },
         "summary" : "Get inventory items for a job order material",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       }
     },
@@ -44500,7 +43792,6 @@
         },
         "summary" : "Update job order priority",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       }
     },
@@ -44625,7 +43916,6 @@
         },
         "summary" : "Requester edit of a material order",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       }
     },
@@ -44750,7 +44040,6 @@
         },
         "summary" : "Reassign responsible org unit",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "joborder"
       }
     },
@@ -44875,7 +44164,6 @@
         },
         "summary" : "Update job order status",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       }
     },
@@ -45001,7 +44289,6 @@
         },
         "summary" : "List claim buckets for an order",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       },
       "post" : {
@@ -45124,7 +44411,6 @@
         },
         "summary" : "Create or update a material claim",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       }
     },
@@ -45240,7 +44526,6 @@
         },
         "summary" : "Withdraw a material claim",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       }
     },
@@ -45366,7 +44651,6 @@
         },
         "summary" : "Preview handover report PDF",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "joborder"
       }
     },
@@ -45504,7 +44788,6 @@
         },
         "summary" : "Download handover report PDF",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "joborder"
       }
     },
@@ -45642,7 +44925,6 @@
         },
         "summary" : "Download item-handover report PDF",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "joborder"
       }
     },
@@ -45768,7 +45050,6 @@
         },
         "summary" : "Get the earmarked item stock for a job order",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       }
     },
@@ -45894,7 +45175,6 @@
         },
         "summary" : "Get material collection for a job order",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       }
     },
@@ -46010,7 +45290,6 @@
         },
         "summary" : "Unlink a material from a job order",
         "tags" : [ "joborder" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       }
     },
@@ -46124,7 +45403,6 @@
         },
         "summary" : "Get the Profit-Bereich org chart",
         "tags" : [ "orgchart" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgchart"
       }
     },
@@ -46237,7 +45515,6 @@
         },
         "summary" : "The org units the caller may appoint leadership ranks into, by tier",
         "tags" : [ "leadership" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "leadership"
       }
     },
@@ -46353,7 +45630,6 @@
         },
         "summary" : "Assign a user to an org-chart position",
         "tags" : [ "orgchart" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgchart"
       }
     },
@@ -46461,7 +45737,6 @@
         },
         "summary" : "Remove an org-chart position",
         "tags" : [ "orgchart" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgchart"
       },
       "put" : {
@@ -46584,7 +45859,6 @@
         },
         "summary" : "Reassign or reorder an org-chart position",
         "tags" : [ "orgchart" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgchart"
       }
     },
@@ -46707,7 +45981,6 @@
         },
         "summary" : "Vacate a Kommando's Kommandoleiter",
         "tags" : [ "orgchart" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgchart"
       }
     },
@@ -46833,7 +46106,6 @@
         },
         "summary" : "List all org units",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       }
     },
@@ -46959,7 +46231,6 @@
         },
         "summary" : "List every active org unit",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       }
     },
@@ -47085,7 +46356,6 @@
         },
         "summary" : "List every active org unit of all kinds (incl. Bereich + OL)",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "orgunit"
       }
     },
@@ -47220,7 +46490,6 @@
         },
         "summary" : "List Bereiche",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       },
       "post" : {
@@ -47334,7 +46603,6 @@
         },
         "summary" : "Create a Bereich",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       }
     },
@@ -47459,7 +46727,6 @@
         },
         "summary" : "Add a Bereichsleitung member",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       }
     },
@@ -47575,7 +46842,6 @@
         },
         "summary" : "Remove a Bereichsleitung member",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       }
     },
@@ -47687,7 +46953,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "identity"
       }
     },
@@ -47804,7 +47069,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -47928,7 +47192,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "identity"
       }
     },
@@ -48043,7 +47306,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -48160,7 +47422,6 @@
         },
         "summary" : "List the org units the caller may pin as their active context",
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "identity"
       }
     },
@@ -48292,7 +47553,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "identity"
       },
       "patch" : {
@@ -48413,7 +47673,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -48534,7 +47793,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -48669,7 +47927,6 @@
         },
         "summary" : "List the Organisationsleitung",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       },
       "post" : {
@@ -48783,7 +48040,6 @@
         },
         "summary" : "Create the Organisationsleitung",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       }
     },
@@ -48891,7 +48147,6 @@
         },
         "summary" : "Vacate the Grand Admiral post",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       },
       "put" : {
@@ -49007,7 +48262,6 @@
         },
         "summary" : "Designate the Grand Admiral",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       }
     },
@@ -49132,7 +48386,6 @@
         },
         "summary" : "Add an Organisationsleitung member",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       }
     },
@@ -49248,7 +48501,6 @@
         },
         "summary" : "Remove an Organisationsleitung member",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       }
     },
@@ -49373,7 +48625,6 @@
         },
         "summary" : "Set an org unit's parent",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       }
     },
@@ -49518,7 +48769,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -49648,7 +48898,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -49768,7 +49017,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -49881,7 +49129,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -49989,7 +49236,6 @@
         } ],
         "summary" : "Clear the caller's removable owned blueprints (keeps auto-granted defaults).",
         "tags" : [ "blueprint" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "blueprint"
       },
       "get" : {
@@ -50134,7 +49380,6 @@
         } ],
         "summary" : "List the caller's owned blueprints (paginated, sortable, name filter).",
         "tags" : [ "blueprint" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "blueprint"
       },
       "post" : {
@@ -50250,7 +49495,6 @@
         } ],
         "summary" : "Add a blueprint to the caller's owned set.",
         "tags" : [ "blueprint" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "blueprint"
       }
     },
@@ -50358,7 +49602,6 @@
         } ],
         "summary" : "Clear every user's removable owned blueprints (keeps auto-granted defaults).",
         "tags" : [ "blueprint" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "blueprint"
       }
     },
@@ -50468,7 +49711,6 @@
         } ],
         "summary" : "Delete any owned blueprint by id.",
         "tags" : [ "blueprint" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "blueprint"
       },
       "put" : {
@@ -50593,7 +49835,6 @@
         } ],
         "summary" : "Update any owned blueprint by id.",
         "tags" : [ "blueprint" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "blueprint"
       }
     },
@@ -50748,7 +49989,6 @@
         } ],
         "summary" : "List a specific user's owned blueprints.",
         "tags" : [ "blueprint" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "blueprint"
       },
       "post" : {
@@ -50873,7 +50113,6 @@
         } ],
         "summary" : "Add a blueprint on behalf of the given user.",
         "tags" : [ "blueprint" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "blueprint"
       }
     },
@@ -51000,7 +50239,6 @@
         } ],
         "summary" : "Add several blueprints on behalf of the given user (multi-select).",
         "tags" : [ "blueprint" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "blueprint"
       }
     },
@@ -51127,7 +50365,6 @@
         } ],
         "summary" : "Apply reviewed import resolutions for the given user.",
         "tags" : [ "blueprint" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "blueprint"
       }
     },
@@ -51260,7 +50497,6 @@
         } ],
         "summary" : "Preview a blueprint import for the given user (no writes).",
         "tags" : [ "blueprint" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "blueprint"
       }
     },
@@ -51378,7 +50614,6 @@
         } ],
         "summary" : "Add several blueprints at once (multi-select); skips owned/unknown keys.",
         "tags" : [ "blueprint" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "blueprint"
       }
     },
@@ -51506,7 +50741,6 @@
         } ],
         "summary" : "Craftability of the caller's owned blueprints from their own stock (RESOURCE + bridged PIECE items).",
         "tags" : [ "blueprint" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "blueprint"
       }
     },
@@ -51624,7 +50858,6 @@
         } ],
         "summary" : "Apply reviewed import resolutions; learns aliases for manual picks.",
         "tags" : [ "blueprint" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "blueprint"
       }
     },
@@ -51748,7 +50981,6 @@
         } ],
         "summary" : "Preview a blueprint import (SCMDB or BP Extractor JSON; no writes).",
         "tags" : [ "blueprint" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "blueprint"
       }
     },
@@ -51896,7 +51128,6 @@
         } ],
         "summary" : "List blueprints available among the caller's oversight org-unit members.",
         "tags" : [ "blueprint" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "blueprint"
       }
     },
@@ -52023,7 +51254,6 @@
         } ],
         "summary" : "List the in-scope members who own a given blueprint (display names only).",
         "tags" : [ "blueprint" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "blueprint"
       }
     },
@@ -52133,7 +51363,6 @@
         } ],
         "summary" : "Remove a blueprint from the caller's owned set.",
         "tags" : [ "blueprint" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "blueprint"
       },
       "put" : {
@@ -52258,7 +51487,6 @@
         } ],
         "summary" : "Update an owned blueprint's acquisition date / note.",
         "tags" : [ "blueprint" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "blueprint"
       }
     },
@@ -52383,7 +51611,6 @@
         } ],
         "summary" : "Get the recipe (ingredients + per-quality stat contributions) of an owned blueprint.",
         "tags" : [ "blueprint" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "blueprint"
       }
     },
@@ -52530,7 +51757,6 @@
         } ],
         "summary" : "List own personal inventory entries (paginated, sortable, optional name filter).",
         "tags" : [ "personalinventory" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "personalinventory"
       },
       "post" : {
@@ -52646,7 +51872,6 @@
         } ],
         "summary" : "Create a new personal inventory entry for the caller.",
         "tags" : [ "personalinventory" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "personalinventory"
       }
     },
@@ -52756,7 +51981,6 @@
         } ],
         "summary" : "Delete any personal inventory entry by id.",
         "tags" : [ "personalinventory" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "personalinventory"
       },
       "put" : {
@@ -52881,7 +52105,6 @@
         } ],
         "summary" : "Update any personal inventory entry by id.",
         "tags" : [ "personalinventory" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "personalinventory"
       }
     },
@@ -53036,7 +52259,6 @@
         } ],
         "summary" : "List a specific user's personal inventory entries.",
         "tags" : [ "personalinventory" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "personalinventory"
       },
       "post" : {
@@ -53161,7 +52383,6 @@
         } ],
         "summary" : "Create a personal inventory entry on behalf of the given user.",
         "tags" : [ "personalinventory" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "personalinventory"
       }
     },
@@ -53271,7 +52492,6 @@
         } ],
         "summary" : "Delete one of the caller's personal inventory entries.",
         "tags" : [ "personalinventory" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "personalinventory"
       },
       "get" : {
@@ -53394,7 +52614,6 @@
         } ],
         "summary" : "Fetch a single personal inventory entry owned by the caller.",
         "tags" : [ "personalinventory" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "personalinventory"
       },
       "put" : {
@@ -53519,7 +52738,6 @@
         } ],
         "summary" : "Update an existing personal inventory entry owned by the caller.",
         "tags" : [ "personalinventory" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "personalinventory"
       }
     },
@@ -53664,7 +52882,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -53794,7 +53011,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -53914,7 +53130,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -54027,7 +53242,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -54167,7 +53381,6 @@
         } ],
         "summary" : "List all promotion categories (paginated).",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       },
       "post" : {
@@ -54283,7 +53496,6 @@
         } ],
         "summary" : "Create a new promotion category. Requires ADMIN or OFFICER role.",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       }
     },
@@ -54431,7 +53643,6 @@
         } ],
         "summary" : "List categories for a specific topic (paginated).",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       }
     },
@@ -54559,7 +53770,6 @@
         } ],
         "summary" : "List all categories for a specific topic ordered by sortOrder (no pagination).",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       }
     },
@@ -54669,7 +53879,6 @@
         } ],
         "summary" : "Delete a promotion category. Requires ADMIN or OFFICER role.",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       },
       "get" : {
@@ -54792,7 +54001,6 @@
         } ],
         "summary" : "Get a single promotion category by ID.",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       },
       "put" : {
@@ -54917,7 +54125,6 @@
         } ],
         "summary" : "Update a promotion category. Requires ADMIN or OFFICER role.",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       }
     },
@@ -55036,7 +54243,6 @@
         } ],
         "summary" : "Evaluate eligibility for the caller for every configured rank transition.",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "promotion"
       }
     },
@@ -55171,7 +54377,6 @@
         } ],
         "summary" : "Evaluate eligibility for the caller for a single rank transition.",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       }
     },
@@ -55299,7 +54504,6 @@
         } ],
         "summary" : "Evaluate eligibility for another member (ADMIN/OFFICER only).",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       }
     },
@@ -55439,7 +54643,6 @@
         } ],
         "summary" : "List all member evaluations (ADMIN/OFFICER, squadron-scoped for OFFICER).",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       }
     },
@@ -55579,7 +54782,6 @@
         } ],
         "summary" : "List squadron members eligible for evaluation (ADMIN/OFFICER, squadron-scoped, admins and officers excluded).",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       }
     },
@@ -55698,7 +54900,6 @@
         } ],
         "summary" : "List own evaluations (JWT-sub filtered).",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "promotion"
       }
     },
@@ -55838,7 +55039,6 @@
         } ],
         "summary" : "List own evaluations paginated (JWT-sub filtered).",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       }
     },
@@ -55973,7 +55173,6 @@
         } ],
         "summary" : "Upsert evaluation for a user/category. ADMIN or OFFICER of the category's owning squadron.",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       }
     },
@@ -56083,7 +55282,6 @@
         } ],
         "summary" : "Delete a member evaluation. ADMIN or OFFICER of the category's owning squadron.",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       }
     },
@@ -56223,7 +55421,6 @@
         } ],
         "summary" : "List all level contents (paginated).",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       },
       "post" : {
@@ -56339,7 +55536,6 @@
         } ],
         "summary" : "Create a new level content. Requires ADMIN or OFFICER role.",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       }
     },
@@ -56467,7 +55663,6 @@
         } ],
         "summary" : "List all level contents for a specific category.",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       }
     },
@@ -56577,7 +55772,6 @@
         } ],
         "summary" : "Delete a level content. Requires ADMIN or OFFICER role.",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       },
       "get" : {
@@ -56700,7 +55894,6 @@
         } ],
         "summary" : "Get a single level content by ID.",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       },
       "put" : {
@@ -56825,7 +56018,6 @@
         } ],
         "summary" : "Update a level content. Requires ADMIN or OFFICER role.",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       }
     },
@@ -56965,7 +56157,6 @@
         } ],
         "summary" : "List all rank requirements (paginated).",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       },
       "post" : {
@@ -57081,7 +56272,6 @@
         } ],
         "summary" : "Create a new rank requirement. Requires ADMIN or OFFICER role.",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       }
     },
@@ -57217,7 +56407,6 @@
         } ],
         "summary" : "List rank requirements for a specific rank transition.",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       }
     },
@@ -57327,7 +56516,6 @@
         } ],
         "summary" : "Delete a rank requirement. Requires ADMIN or OFFICER role.",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       },
       "get" : {
@@ -57450,7 +56638,6 @@
         } ],
         "summary" : "Get a single rank requirement by ID.",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       },
       "put" : {
@@ -57575,7 +56762,6 @@
         } ],
         "summary" : "Update a rank requirement. Requires ADMIN or OFFICER role.",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       }
     },
@@ -57715,7 +56901,6 @@
         } ],
         "summary" : "List all promotion topics (paginated).",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       },
       "post" : {
@@ -57831,7 +57016,6 @@
         } ],
         "summary" : "Create a new promotion topic. Requires ADMIN or OFFICER role.",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       }
     },
@@ -57950,7 +57134,6 @@
         } ],
         "summary" : "List all promotion topics ordered by sortOrder (no pagination).",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       }
     },
@@ -58060,7 +57243,6 @@
         } ],
         "summary" : "Delete a promotion topic. Requires ADMIN or OFFICER role.",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       },
       "get" : {
@@ -58183,7 +57365,6 @@
         } ],
         "summary" : "Get a single promotion topic by ID.",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       },
       "put" : {
@@ -58308,7 +57489,6 @@
         } ],
         "summary" : "Update a promotion topic. Requires ADMIN or OFFICER role.",
         "tags" : [ "promotion" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "promotion"
       }
     },
@@ -58424,7 +57604,6 @@
         },
         "summary" : "List the bank accounts that can fund purchasing",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       }
     },
@@ -58540,7 +57719,6 @@
         },
         "summary" : "Read the risk-class table",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       },
       "put" : {
@@ -58656,7 +57834,6 @@
         },
         "summary" : "Set the risk-class table",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       }
     },
@@ -58769,7 +57946,6 @@
         },
         "summary" : "Read the purchasing settings",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       },
       "put" : {
@@ -58882,7 +58058,6 @@
         },
         "summary" : "Set the purchasing switch and settings",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       }
     },
@@ -59051,7 +58226,6 @@
         },
         "summary" : "List the deals the caller may read (paged)",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       },
       "post" : {
@@ -59164,7 +58338,6 @@
         },
         "summary" : "Create a draft deal",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       }
     },
@@ -59286,7 +58459,6 @@
         },
         "summary" : "Read one deal",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       },
       "put" : {
@@ -59408,7 +58580,6 @@
         },
         "summary" : "Edit a draft deal",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       }
     },
@@ -59532,7 +58703,6 @@
         },
         "summary" : "Cancel a deal before any money was confirmed",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       }
     },
@@ -59646,7 +58816,6 @@
         },
         "summary" : "Close the delivery of a deal",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       }
     },
@@ -59770,7 +58939,6 @@
         },
         "summary" : "Record a delivery of a deal",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       }
     },
@@ -59902,7 +59070,6 @@
         },
         "summary" : "Accept or reject a delivery of a deal",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       }
     },
@@ -60026,7 +59193,6 @@
         },
         "summary" : "Record the settlement of a deal",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       }
     },
@@ -60150,7 +59316,6 @@
         },
         "summary" : "Request a money tranche of a deal from the bank",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       }
     },
@@ -60266,7 +59431,6 @@
         },
         "summary" : "List the trade delegates",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       },
       "post" : {
@@ -60379,7 +59543,6 @@
         },
         "summary" : "Appoint a trade delegate",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       }
     },
@@ -60503,7 +59666,6 @@
         },
         "summary" : "Set the personal monthly limit of a trade delegate",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       }
     },
@@ -60627,7 +59789,6 @@
         },
         "summary" : "Revoke a trade delegate",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       }
     },
@@ -60787,7 +59948,6 @@
         },
         "summary" : "List the trade partners (paged)",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       },
       "post" : {
@@ -60900,7 +60060,6 @@
         },
         "summary" : "Create a trade partner",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       }
     },
@@ -61022,7 +60181,6 @@
         },
         "summary" : "Read one trade partner",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       },
       "put" : {
@@ -61144,7 +60302,6 @@
         },
         "summary" : "Edit a trade partner",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       }
     },
@@ -61268,7 +60425,6 @@
         },
         "summary" : "Block a trade partner",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       }
     },
@@ -61392,7 +60548,6 @@
         },
         "summary" : "Erase an individual trade partner's handle and notes",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       }
     },
@@ -61516,7 +60671,6 @@
         },
         "summary" : "Unblock a trade partner",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       }
     },
@@ -61629,7 +60783,6 @@
         },
         "summary" : "Read where purchasing is paused",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       },
       "post" : {
@@ -61742,7 +60895,6 @@
         },
         "summary" : "Pause purchasing globally or for one raising unit",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       }
     },
@@ -61857,7 +61009,6 @@
         },
         "summary" : "Resume purchasing globally or for one raising unit",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       }
     },
@@ -61985,7 +61136,6 @@
         },
         "summary" : "Read the purchasing report",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       }
     },
@@ -62114,7 +61264,6 @@
         },
         "summary" : "Export the purchasing report as CSV",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       }
     },
@@ -62242,7 +61391,6 @@
         },
         "summary" : "Read the purchasing report as a forum text block",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       }
     },
@@ -62355,7 +61503,6 @@
         },
         "summary" : "Read whether purchasing is on and what the caller may do",
         "tags" : [ "purchasing" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "purchasing"
       }
     },
@@ -62492,7 +61639,6 @@
         } ],
         "summary" : "List the quality tiers, active ones only unless includeInactive is set.",
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -62616,7 +61762,6 @@
           }
         },
         "tags" : [ "refinery" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "refinery"
       },
       "post" : {
@@ -62728,7 +61873,6 @@
           }
         },
         "tags" : [ "refinery" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "refinery"
       }
     },
@@ -62889,7 +62033,6 @@
           }
         },
         "tags" : [ "refinery" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "refinery"
       }
     },
@@ -63004,7 +62147,6 @@
         },
         "summary" : "Match a RefineryExtract JSON (desktop screenshot extraction) against master data and return a non-persisted draft for the create form.",
         "tags" : [ "refinery" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "refinery"
       }
     },
@@ -63165,7 +62307,6 @@
           }
         },
         "tags" : [ "refinery" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "refinery"
       }
     },
@@ -63287,7 +62428,6 @@
         },
         "summary" : "Get the refinery settings.",
         "tags" : [ "refinery" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "refinery"
       }
     },
@@ -63431,7 +62571,6 @@
           }
         },
         "tags" : [ "refinery" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "refinery"
       },
       "post" : {
@@ -63552,7 +62691,6 @@
           }
         },
         "tags" : [ "refinery" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "refinery"
       }
     },
@@ -63666,7 +62804,6 @@
           }
         },
         "tags" : [ "refinery" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "refinery"
       },
       "put" : {
@@ -63795,7 +62932,6 @@
           }
         },
         "tags" : [ "refinery" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "refinery"
       }
     },
@@ -63901,7 +63037,6 @@
           }
         },
         "tags" : [ "refinery" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "refinery"
       },
       "get" : {
@@ -64020,7 +63155,6 @@
           }
         },
         "tags" : [ "refinery" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "refinery"
       },
       "put" : {
@@ -64141,7 +63275,6 @@
           }
         },
         "tags" : [ "refinery" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "refinery"
       }
     },
@@ -64257,7 +63390,6 @@
           }
         },
         "tags" : [ "refinery" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "refinery"
       }
     },
@@ -64402,7 +63534,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "catalogue"
       },
       "post" : {
@@ -64514,7 +63645,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -64620,7 +63750,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       },
       "get" : {
@@ -64748,7 +63877,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       },
       "put" : {
@@ -64869,7 +63997,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -65005,7 +64132,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -65127,7 +64253,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -65253,7 +64378,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -65368,7 +64492,6 @@
           }
         },
         "tags" : [ "admin-system" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "admin-system"
       }
     },
@@ -65488,7 +64611,6 @@
           }
         },
         "tags" : [ "admin-system" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "admin-system"
       },
       "put" : {
@@ -65608,7 +64730,6 @@
           }
         },
         "tags" : [ "admin-system" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "admin-system"
       }
     },
@@ -65761,7 +64882,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "catalogue"
       }
     },
@@ -65891,7 +65011,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -66011,7 +65130,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -66156,7 +65274,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -66286,7 +65403,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -66406,7 +65522,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -66519,7 +65634,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -66674,7 +65788,6 @@
         },
         "summary" : "List Spezialkommandos",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       },
       "post" : {
@@ -66788,7 +65901,6 @@
         },
         "summary" : "Create a Spezialkommando",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       }
     },
@@ -66896,7 +66008,6 @@
         },
         "summary" : "Soft-delete a Spezialkommando",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       },
       "get" : {
@@ -67026,7 +66137,6 @@
         },
         "summary" : "Get a Spezialkommando by id",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       },
       "put" : {
@@ -67149,7 +66259,6 @@
         },
         "summary" : "Update a Spezialkommando",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       }
     },
@@ -67257,7 +66366,6 @@
         },
         "summary" : "Activate a soft-deleted Spezialkommando",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       }
     },
@@ -67383,7 +66491,6 @@
         },
         "summary" : "List Spezialkommando members",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       }
     },
@@ -67499,7 +66606,6 @@
         },
         "summary" : "Remove a member from a Spezialkommando",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       },
       "patch" : {
@@ -67630,7 +66736,6 @@
         },
         "summary" : "Patch per-membership role flags",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       },
       "post" : {
@@ -67751,7 +66856,6 @@
         },
         "summary" : "Add a member to a Spezialkommando",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       }
     },
@@ -67884,7 +66988,6 @@
         },
         "summary" : "Toggle the SK-Lead flag on a membership",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       }
     },
@@ -68009,7 +67112,6 @@
         },
         "summary" : "Toggle Spezialkommando profit-eligibility",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       }
     },
@@ -68162,7 +67264,6 @@
           }
         },
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       },
       "post" : {
@@ -68274,7 +67375,6 @@
           }
         },
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       }
     },
@@ -68380,7 +67480,6 @@
           }
         },
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       },
       "put" : {
@@ -68501,7 +67600,6 @@
           }
         },
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       }
     },
@@ -68607,7 +67705,6 @@
           }
         },
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       }
     },
@@ -68740,7 +67837,6 @@
         },
         "summary" : "Patch per-Squadron-membership role flags",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       }
     },
@@ -68863,7 +67959,6 @@
           }
         },
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       }
     },
@@ -68986,7 +68081,6 @@
           }
         },
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       }
     },
@@ -69120,7 +68214,6 @@
         },
         "summary" : "List a squadron's Kommandogruppen",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       },
       "post" : {
@@ -69242,7 +68335,6 @@
         },
         "summary" : "Create a Kommandogruppe (admin or the squadron's Staffelleiter)",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       }
     },
@@ -69357,7 +68449,6 @@
         },
         "summary" : "Delete a Kommandogruppe (admin or the squadron's Staffelleiter)",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       },
       "put" : {
@@ -69487,7 +68578,6 @@
         },
         "summary" : "Rename / reorder a Kommandogruppe (admin or the squadron's Staffelleiter)",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       }
     },
@@ -69617,7 +68707,6 @@
         },
         "summary" : "Clear a Staffel member's squadron leadership rank",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       },
       "put" : {
@@ -69747,7 +68836,6 @@
         },
         "summary" : "Assign a squadron leadership rank to a Staffel member",
         "tags" : [ "orgunit" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "orgunit"
       }
     },
@@ -69892,7 +68980,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       },
       "post" : {
@@ -70004,7 +69091,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -70110,7 +69196,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       },
       "get" : {
@@ -70238,7 +69323,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       },
       "put" : {
@@ -70359,7 +69443,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -70472,7 +69555,6 @@
         },
         "summary" : "Read the supply runtime settings",
         "tags" : [ "supply" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "supply"
       },
       "put" : {
@@ -70585,7 +69667,6 @@
         },
         "summary" : "Store the supply runtime settings",
         "tags" : [ "supply" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "supply"
       }
     },
@@ -70701,7 +69782,6 @@
         },
         "summary" : "List every org unit with its supply setting",
         "tags" : [ "supply" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "supply"
       }
     },
@@ -70825,7 +69905,6 @@
         },
         "summary" : "Set what an org unit does in the supply module",
         "tags" : [ "supply" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "supply"
       }
     },
@@ -70982,7 +70061,6 @@
         },
         "summary" : "List the donations of a receiving unit (paged)",
         "tags" : [ "supply" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "supply"
       },
       "post" : {
@@ -71095,7 +70173,6 @@
         },
         "summary" : "Pledge a material donation",
         "tags" : [ "supply" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "supply"
       }
     },
@@ -71210,7 +70287,6 @@
         },
         "summary" : "Record a donation the unit already received",
         "tags" : [ "supply" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "supply"
       }
     },
@@ -71334,7 +70410,6 @@
         },
         "summary" : "Decline a pledged donation",
         "tags" : [ "supply" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "supply"
       }
     },
@@ -71458,7 +70533,6 @@
         },
         "summary" : "Confirm the receipt of a pledged donation",
         "tags" : [ "supply" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "supply"
       }
     },
@@ -71582,7 +70656,6 @@
         },
         "summary" : "Withdraw a pledged donation",
         "tags" : [ "supply" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "supply"
       }
     },
@@ -71731,7 +70804,6 @@
         },
         "summary" : "List the caller's own donations (paged)",
         "tags" : [ "supply" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "supply"
       }
     },
@@ -71844,7 +70916,6 @@
         },
         "summary" : "Read the caller's own donation totals",
         "tags" : [ "supply" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "supply"
       }
     },
@@ -72016,7 +71087,6 @@
         },
         "summary" : "List the needs the caller may see (paged)",
         "tags" : [ "supply" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "supply"
       },
       "post" : {
@@ -72129,7 +71199,6 @@
         },
         "summary" : "Raise a need",
         "tags" : [ "supply" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "supply"
       }
     },
@@ -72254,7 +71323,6 @@
         },
         "summary" : "List the open needs of one raising unit",
         "tags" : [ "supply" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "supply"
       }
     },
@@ -72376,7 +71444,6 @@
         },
         "summary" : "Read one need",
         "tags" : [ "supply" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "supply"
       },
       "put" : {
@@ -72498,7 +71565,6 @@
         },
         "summary" : "Edit an open or paused need",
         "tags" : [ "supply" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "supply"
       }
     },
@@ -72622,7 +71688,6 @@
         },
         "summary" : "Pause an open need",
         "tags" : [ "supply" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "supply"
       }
     },
@@ -72746,7 +71811,6 @@
         },
         "summary" : "Resume a paused need",
         "tags" : [ "supply" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "supply"
       }
     },
@@ -72870,7 +71934,6 @@
         },
         "summary" : "Withdraw a need",
         "tags" : [ "supply" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "supply"
       }
     },
@@ -72983,7 +72046,6 @@
         },
         "summary" : "Read whether the supply surface is switched on",
         "tags" : [ "supply" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "supply"
       }
     },
@@ -73106,7 +72168,6 @@
         },
         "summary" : "Read the donation statistics per receiving unit and month",
         "tags" : [ "supply" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "supply"
       }
     },
@@ -73222,7 +72283,6 @@
         },
         "summary" : "List the units that raise needs or accept donations",
         "tags" : [ "supply" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "supply"
       }
     },
@@ -73367,7 +72427,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "catalogue"
       }
     },
@@ -73497,7 +72556,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       },
       "put" : {
@@ -73618,7 +72676,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -73738,7 +72795,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -73851,7 +72907,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -73971,7 +73026,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -74084,7 +73138,6 @@
           }
         },
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
       }
     },
@@ -74190,7 +73243,6 @@
         },
         "summary" : "Accept the Terms of Use",
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "identity"
       }
     },
@@ -74320,7 +73372,6 @@
         },
         "summary" : "Consent overview",
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -74434,7 +73485,6 @@
         },
         "summary" : "Number of users who have not accepted",
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -74558,7 +73608,6 @@
         "security" : [ ],
         "summary" : "The Terms-of-Use wording in force",
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "identity"
       }
     },
@@ -74672,7 +73721,6 @@
         },
         "summary" : "Consent status of the calling user",
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "identity"
       }
     },
@@ -74816,7 +73864,6 @@
         } ],
         "summary" : "Search UEX cities and space stations by name (case insensitive).",
         "tags" : [ "catalogue" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "catalogue"
       }
     },
@@ -74952,7 +73999,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -75069,7 +74115,6 @@
         },
         "summary" : "List the pending account-deletion requests",
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -75194,7 +74239,6 @@
         },
         "summary" : "Refuse an account-deletion request",
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -75312,7 +74356,6 @@
         },
         "summary" : "Carry out an account-deletion request",
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -75434,7 +74477,6 @@
         },
         "summary" : "Find every mention of a name across the free-text surfaces",
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -75559,7 +74601,6 @@
         },
         "summary" : "List registrations awaiting a decision, or the rejected ones.",
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -75681,7 +74722,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -75804,7 +74844,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -75928,7 +74967,6 @@
         },
         "summary" : "Move an older account's own data onto this registration.",
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -76050,7 +75088,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -76173,7 +75210,6 @@
         },
         "summary" : "Reopen a rejected registration back into the approval queue.",
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -76296,7 +75332,6 @@
         },
         "summary" : "Export another member's data (Art. 15 / Art. 20)",
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -76419,7 +75454,6 @@
         },
         "summary" : "Export another member's data as a PDF",
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -76534,7 +75568,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -76646,7 +75679,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "identity"
       }
     },
@@ -76745,7 +75777,6 @@
         },
         "summary" : "Withdraw my own account-deletion request",
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       },
       "get" : {
@@ -76867,7 +75898,6 @@
         },
         "summary" : "Read my own account-deletion request",
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       },
       "post" : {
@@ -76981,7 +76011,6 @@
         },
         "summary" : "Request erasure of my own account (Art. 17)",
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -77095,7 +76124,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -77209,7 +76237,6 @@
         },
         "summary" : "Export my own data (Art. 15 / Art. 20)",
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -77324,7 +76351,6 @@
         },
         "summary" : "Export my own data as a PDF",
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -77436,7 +76462,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "identity"
       }
     },
@@ -77548,7 +76573,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "identity"
       },
       "put" : {
@@ -77660,7 +76684,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "identity"
       }
     },
@@ -77803,7 +76826,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T1",
         "x-domain" : "identity"
       }
     },
@@ -77946,7 +76968,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -78050,7 +77071,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -78156,7 +77176,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       },
       "get" : {
@@ -78275,7 +77294,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -78398,7 +77416,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -78521,7 +77538,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     },
@@ -78642,7 +77658,6 @@
           }
         },
         "tags" : [ "identity" ],
-        "x-contract-tier" : "T2",
         "x-domain" : "identity"
       }
     }
@@ -79014,22 +78029,6 @@
           }
         },
         "required" : [ "content", "version" ]
-      },
-      "AppVersionPolicyDto" : {
-        "type" : "object",
-        "properties" : {
-          "latestVersionCode" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "minimumVersionCode" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "releasesUrl" : {
-            "type" : "string"
-          }
-        }
       },
       "AppointDelegateRequest" : {
         "type" : "object",
@@ -84223,32 +83222,6 @@
             "format" : "uuid"
           }
         }
-      },
-      "LiveSyncChangedRequest" : {
-        "type" : "object",
-        "description" : "Announces that a live-sync room's regions changed, so peers re-fetch them.",
-        "properties" : {
-          "sections" : {
-            "type" : "array",
-            "description" : "The regions of the room that changed.",
-            "example" : [ "crew" ],
-            "items" : {
-              "type" : "string",
-              "maxLength" : 64,
-              "minLength" : 0
-            },
-            "maxItems" : 16,
-            "minItems" : 0
-          },
-          "topic" : {
-            "type" : "string",
-            "description" : "The live-sync room that changed.",
-            "example" : "mission:8f14e45f-ceea-467a-9c5b-5f1f52a3a1c2",
-            "maxLength" : 80,
-            "minLength" : 0
-          }
-        },
-        "required" : [ "sections", "topic" ]
       },
       "LocationDto" : {
         "type" : "object",

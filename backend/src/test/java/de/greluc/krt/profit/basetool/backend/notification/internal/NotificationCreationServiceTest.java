@@ -38,14 +38,12 @@ import de.greluc.krt.profit.basetool.backend.notification.api.Notification;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationMuteService;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationParamsCodec;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRepository;
-import de.greluc.krt.profit.basetool.backend.notification.api.NotificationSignal;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.math.BigDecimal;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -98,7 +96,7 @@ class NotificationCreationServiceTest {
         .thenReturn(Map.of(NotificationType.JOB_ORDER_CREATED, Set.of(A, B)));
     when(notificationParamsCodec.serialize(any())).thenReturn("{\"displayId\":\"9\"}");
 
-    Set<UUID> recipients = flatten(service.createFromEvent(event));
+    Set<UUID> recipients = service.createFromEvent(event);
 
     assertThat(recipients).containsExactlyInAnyOrder(A, B);
     ArgumentCaptor<List<Notification>> captor = ArgumentCaptor.captor();
@@ -130,7 +128,7 @@ class NotificationCreationServiceTest {
     JobOrderCreatedEvent event = event();
     when(ruleEvaluationService.resolveRecipients(event)).thenReturn(Map.of());
 
-    Set<UUID> recipients = flatten(service.createFromEvent(event));
+    Set<UUID> recipients = service.createFromEvent(event);
 
     assertThat(recipients).isEmpty();
     verify(notificationRepository, never()).saveAll(any());
@@ -168,7 +166,7 @@ class NotificationCreationServiceTest {
         .thenReturn(Map.of(NotificationType.BANK_BOOKING_REQUEST_CONFIRMED, Set.of(requester)));
     when(notificationParamsCodec.serialize(any())).thenReturn("{}");
 
-    Set<UUID> affected = flatten(service.createFromEvent(event));
+    Set<UUID> affected = service.createFromEvent(event);
 
     assertThat(affected).containsExactlyInAnyOrder(staffA, staffB, requester);
     verify(notificationRepository)
@@ -199,7 +197,7 @@ class NotificationCreationServiceTest {
         .thenReturn(1);
     when(ruleEvaluationService.resolveRecipients(event)).thenReturn(Map.of());
 
-    Set<UUID> affected = flatten(service.createFromEvent(event));
+    Set<UUID> affected = service.createFromEvent(event);
 
     assertThat(affected).containsExactly(staff);
     verify(notificationRepository, never()).saveAll(any());
@@ -217,7 +215,7 @@ class NotificationCreationServiceTest {
         .thenReturn(List.of());
     when(ruleEvaluationService.resolveRecipients(event)).thenReturn(Map.of());
 
-    Set<UUID> affected = flatten(service.createFromEvent(event));
+    Set<UUID> affected = service.createFromEvent(event);
 
     assertThat(affected).isEmpty();
     verify(notificationRepository, never()).deleteByTypeInAndEntity(any(), any(), any());
@@ -262,7 +260,7 @@ class NotificationCreationServiceTest {
         .thenReturn(1);
     when(notificationParamsCodec.serialize(any())).thenReturn("{}");
 
-    Set<UUID> affected = flatten(service.createFromEvent(event));
+    Set<UUID> affected = service.createFromEvent(event);
 
     assertThat(affected).containsExactlyInAnyOrder(formerHolder, newHolder);
     verify(notificationRepository, never()).deleteByTypeInAndEntity(any(), any(), any());
@@ -289,7 +287,7 @@ class NotificationCreationServiceTest {
     when(ruleEvaluationService.resolveRecipients(event))
         .thenReturn(Map.of(NotificationType.BANK_BOOKING_REQUEST_CREATED, Set.of(formerHolder)));
 
-    Set<UUID> affected = flatten(service.createFromEvent(event));
+    Set<UUID> affected = service.createFromEvent(event);
 
     assertThat(affected).isEmpty();
     verify(notificationRepository, never())
@@ -312,7 +310,7 @@ class NotificationCreationServiceTest {
                 Set.of(newHolder, staffWhoDeletedTheirNotice)));
     when(notificationParamsCodec.serialize(any())).thenReturn("{}");
 
-    Set<UUID> affected = flatten(service.createFromEvent(event));
+    Set<UUID> affected = service.createFromEvent(event);
 
     assertThat(affected).containsExactly(newHolder);
     ArgumentCaptor<List<Notification>> captor = ArgumentCaptor.captor();
@@ -335,14 +333,13 @@ class NotificationCreationServiceTest {
         .thenReturn(List.of(A, B));
     when(ruleEvaluationService.resolveRecipients(event)).thenReturn(Map.of());
 
-    Map<NotificationSignal, Set<UUID>> result = service.createFromEvent(event);
+    Set<UUID> result = service.createFromEvent(event);
 
     verify(notificationRepository)
         .deleteByTypeInAndEntityForRecipients(
             Set.of(NotificationType.JOB_ORDER_CREATED), "STUB", entity, Set.of(A));
     verify(notificationRepository, never()).deleteByTypeInAndEntity(any(), any(), any());
-    assertThat(result).containsOnlyKeys(NotificationSignal.refreshOnly());
-    assertThat(flatten(result)).containsExactly(A);
+    assertThat(result).containsExactly(A);
   }
 
   @Test
@@ -358,7 +355,7 @@ class NotificationCreationServiceTest {
         .thenReturn(List.of(B));
     when(ruleEvaluationService.resolveRecipients(event)).thenReturn(Map.of());
 
-    Set<UUID> affected = flatten(service.createFromEvent(event));
+    Set<UUID> affected = service.createFromEvent(event);
 
     assertThat(affected).isEmpty();
     verify(notificationRepository, never())
@@ -396,7 +393,7 @@ class NotificationCreationServiceTest {
         .thenReturn(List.of(A, B));
     when(ruleEvaluationService.resolveRecipients(event)).thenReturn(Map.of());
 
-    Set<UUID> affected = flatten(service.createFromEvent(event));
+    Set<UUID> affected = service.createFromEvent(event);
 
     assertThat(affected).containsExactlyInAnyOrder(A, B);
     verify(notificationRepository)
@@ -405,17 +402,5 @@ class NotificationCreationServiceTest {
     verify(notificationRepository)
         .deleteByTypeInAndEntityForRecipients(
             Set.of(NotificationType.JOB_ORDER_CREATED), "STUB", entity, Set.of(A));
-  }
-
-  /**
-   * Unions every recipient reached by the call, regardless of signal.
-   *
-   * @param bySignal the call's result
-   * @return the union of its recipient sets
-   */
-  private static Set<UUID> flatten(Map<NotificationSignal, Set<UUID>> bySignal) {
-    Set<UUID> all = new HashSet<>();
-    bySignal.values().forEach(all::addAll);
-    return all;
   }
 }

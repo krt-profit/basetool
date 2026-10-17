@@ -21,78 +21,94 @@ package de.greluc.krt.profit.basetool.backend.filter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.greluc.krt.profit.basetool.backend.platform.internal.ClientIpContextFilter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
-import org.springframework.web.filter.ForwardedHeaderFilter;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Pins the {@code ForwardedHeaderFilter} behaviour that {@link ClientIpContextFilter} and {@code
- * ForwardedHeaderConfig} work around: downstream of it, the peer address is client-chosen and the
- * original chain is gone (REQ-SEC-011).
+ * Pins what holds now that Spring's {@code ForwardedHeaderFilter} is not registered (ADR-0272,
+ * REQ-SEC-011): the real TCP peer reaches the application unrewritten, the {@code X-Forwarded-For}
+ * chain is still readable, and {@link ClientIpContextFilter} honours a forwarded entry only when
+ * the peer is a trusted relay.
+ *
+ * <p>This exists so the framework behaviour behind that decision is not re-discovered: with the
+ * filter registered, {@code getRemoteAddr()} downstream is the leftmost entry of the chain, which
+ * any client can set, and the original chain is gone. The test therefore asserts the attribution a
+ * spoofed header must <em>not</em> move.
  */
 class ForwardedHeaderRewriteTest {
 
   /** The chain an appending proxy produces: attacker-supplied entry first, real peer appended. */
   private static final String SPOOFED_THEN_REAL = "9.9.9.9, 203.0.113.7";
 
+  /** The frontend network, the only trusted relay in this fixture. */
+  private static final List<String> TRUSTED_FRONTEND = List.of("172.28.2.0/24");
+
   @Test
-  @DisplayName("after ForwardedHeaderFilter, getRemoteAddr() is the leftmost - client-chosen - hop")
-  void rewritesRemoteAddrToTheLeftmostHop() throws Exception {
-    Observation observed = observeThroughForwardedHeaderFilter();
+  @DisplayName("without the filter, the application still sees the real peer and the raw chain")
+  void theRealPeerAndTheRawChainReachTheApplication() throws Exception {
+    Observation observed = observe(new ClientIpContextFilter(List.of()), "172.28.2.5");
 
     assertEquals(
-        "9.9.9.9",
+        "172.28.2.5",
         observed.remoteAddr(),
-        "the real peer 172.28.0.5 is replaced by the first entry of the chain, which any client "
-            + "can set — this is why attribution cannot happen downstream of this filter");
-  }
-
-  @Test
-  @DisplayName("after ForwardedHeaderFilter, the X-Forwarded-For chain is no longer readable")
-  void hidesTheForwardedForHeader() throws Exception {
-    Observation observed = observeThroughForwardedHeaderFilter();
-
-    assertNull(
+        "nothing rewrites the peer address any more, so a downstream component that reads it is"
+            + " reading the actual TCP peer");
+    assertEquals(
+        SPOOFED_THEN_REAL,
         observed.forwardedFor(),
-        "the header is stripped from the wrapped request, so a downstream filter cannot walk the "
-            + "chain itself to recover the proxy-appended client address");
+        "the header survives, which is what lets the resolution walk the chain itself");
   }
 
   @Test
-  @DisplayName("the scheme and host rewriting we still want is unaffected by the reordering")
-  void stillRebuildsSchemeAndHost() throws Exception {
-    Observation observed = observeThroughForwardedHeaderFilter();
+  @DisplayName("a forwarded entry from a trusted relay is honoured")
+  void aTrustedRelayMovesAttribution() throws Exception {
+    Observation observed = observe(new ClientIpContextFilter(TRUSTED_FRONTEND), "172.28.2.5");
 
-    assertEquals("api.profit-base.online", observed.serverName(), "host must come from the header");
-    assertTrue(observed.secure(), "X-Forwarded-Proto: https must mark the request secure");
+    assertEquals(
+        "203.0.113.7",
+        observed.resolvedClientIp(),
+        "the frontend relays the member's browser address so the per-IP budget keys on the member"
+            + " rather than on one container (REQ-SEC-032)");
+  }
+
+  @Test
+  @DisplayName("a forwarded header from an untrusted peer does not move attribution")
+  void anUntrustedPeerCannotSpeakForAnyone() throws Exception {
+    Observation observed = observe(new ClientIpContextFilter(TRUSTED_FRONTEND), "172.28.9.9");
+
+    assertEquals(
+        "172.28.9.9",
+        observed.resolvedClientIp(),
+        "a peer that is on an internal network but is not a relay — a monitoring scrape, a future"
+            + " sidecar — must not be able to claim to speak for an arbitrary member (ADR-0272)");
   }
 
   /**
-   * Sends one representative proxied request through a bare {@link ForwardedHeaderFilter} and
-   * captures what the next filter in the chain observes.
+   * Sends one representative proxied request through the client-IP resolution and captures what the
+   * next filter in the chain observes.
    *
-   * @return the four values the design decision turns on.
-   * @throws Exception if the filter chain fails.
+   * @param filter the resolution under test, with its trusted-proxy list
+   * @param peer the TCP peer address to present
+   * @return what the application sees
+   * @throws Exception if the filter chain fails
    */
-  private Observation observeThroughForwardedHeaderFilter() throws Exception {
+  private Observation observe(ClientIpContextFilter filter, String peer) throws Exception {
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/missions");
-    request.setRemoteAddr("172.28.0.5");
+    request.setRemoteAddr(peer);
     request.addHeader("X-Forwarded-For", SPOOFED_THEN_REAL);
     request.addHeader("X-Forwarded-Proto", "https");
-    request.addHeader("X-Forwarded-Host", "api.profit-base.online");
 
     AtomicReference<Observation> captured = new AtomicReference<>();
     OncePerRequestFilter probe =
@@ -104,16 +120,12 @@ class ForwardedHeaderRewriteTest {
                 new Observation(
                     req.getRemoteAddr(),
                     req.getHeader("X-Forwarded-For"),
-                    req.getServerName(),
-                    req.isSecure()));
+                    String.valueOf(req.getAttribute(ClientIpContextFilter.CLIENT_IP_ATTRIBUTE))));
           }
         };
 
-    new ForwardedHeaderFilter()
-        .doFilter(
-            request,
-            new MockHttpServletResponse(),
-            new MockFilterChain(new HttpServlet() {}, probe));
+    filter.doFilter(
+        request, new MockHttpServletResponse(), new MockFilterChain(new HttpServlet() {}, probe));
 
     Observation observation = captured.get();
     assertNotNull(observation, "the probe filter must have run");
@@ -121,13 +133,11 @@ class ForwardedHeaderRewriteTest {
   }
 
   /**
-   * What a filter placed after {@link ForwardedHeaderFilter} can see.
+   * What a filter placed after the client-IP resolution can see.
    *
-   * @param remoteAddr the peer address as reported to the downstream filter.
-   * @param forwardedFor the {@code X-Forwarded-For} header as visible downstream, or {@code null}.
-   * @param serverName the host name after rewriting.
-   * @param secure whether the request is reported as TLS-terminated.
+   * @param remoteAddr the peer address as reported to the downstream filter
+   * @param forwardedFor the {@code X-Forwarded-For} header as visible downstream
+   * @param resolvedClientIp the address the resolution attributed the request to
    */
-  private record Observation(
-      String remoteAddr, String forwardedFor, String serverName, boolean secure) {}
+  private record Observation(String remoteAddr, String forwardedFor, String resolvedClientIp) {}
 }

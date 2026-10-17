@@ -55,8 +55,8 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
  * Holds wave 6 of the REST API cut (the small rest: announcement, Materialbörse requests, the
  * deleted Fleetview import and the Lager deactivation) to the running application: the new paths of
  * the map are served, no handler answers an old path any more, the new paths demand authentication
- * and keep the gates of the operations they replace, and the old ones answer {@code 410
- * APP_UPDATE_REQUIRED} (frozen) or {@code 404} (never frozen).
+ * and keep the gates of the operations they replace, and the old ones answer {@code 410 404}; with
+ * the app gone there is no retired-path answer any more (ADR-0269).
  */
 @SpringBootTest
 class SmallRestPathCutTest {
@@ -140,30 +140,17 @@ class SmallRestPathCutTest {
   }
 
   @Test
-  @DisplayName("a frozen old path meets the update wall and an unfrozen one is gone")
+  @DisplayName("every old path is gone, frozen or not")
   void theOldPathsAreGone() throws Exception {
-    List<String> frozenAnswers = new ArrayList<>();
     for (Moved m : wave6()) {
       HttpMethod method = HttpMethod.valueOf(m.verb());
-      if (m.frozen()) {
-        mockMvc
-            .perform(request(method, concrete(m.oldPath())).with(csrf()))
-            .andExpect(status().isGone())
-            .andExpect(jsonPath("$.code").value("APP_UPDATE_REQUIRED"));
-        frozenAnswers.add(m.verb() + " " + m.oldPath());
-      } else {
-        mockMvc
-            .perform(
-                request(method, concrete(m.oldPath()))
-                    .with(user("member").roles("ADMIN"))
-                    .with(csrf()))
-            .andExpect(status().isNotFound());
-      }
+      mockMvc
+          .perform(
+              request(method, concrete(m.oldPath()))
+                  .with(user("member").roles("ADMIN"))
+                  .with(csrf()))
+          .andExpect(status().isNotFound());
     }
-    assertThat(frozenAnswers)
-        .as("the frozen operations of wave 6, the Fleetview import among them")
-        .hasSize(9)
-        .contains("POST /api/v1/hangar/import/fleetview");
   }
 
   @Test

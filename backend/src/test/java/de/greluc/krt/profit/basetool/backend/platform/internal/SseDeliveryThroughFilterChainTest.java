@@ -113,15 +113,6 @@ class SseDeliveryThroughFilterChainTest {
         .contains("connected");
   }
 
-  @Test
-  @Timeout(value = 60, unit = TimeUnit.SECONDS)
-  @DisplayName("the live-sync stream delivers its first event to a real socket")
-  void liveSyncStreamDeliversToASocket() throws Exception {
-    assertThat(firstLineOf("/api/v1/live-sync/stream?topics=inventory"))
-        .as("first frame of the live-sync stream")
-        .contains("subscribed");
-  }
-
   /**
    * Opens a stream and returns the first non-blank line, giving up after {@link
    * #FIRST_BYTE_BUDGET}. Reads a line stream because the body never ends.

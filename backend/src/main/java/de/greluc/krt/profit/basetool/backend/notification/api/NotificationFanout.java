@@ -32,12 +32,10 @@ import org.jetbrains.annotations.NotNull;
 public interface NotificationFanout {
 
   /**
-   * Pushes a notification signal to the given recipients across all backend replicas; must not
-   * throw.
+   * Pushes a bare "your inbox changed" event to the given recipients across all backend replicas;
+   * must not throw.
    *
    * @param recipientUserIds the Keycloak subjects of the users to notify
-   * @param signal what those recipients are being told, or {@link NotificationSignal#refreshOnly()}
-   *     when their inbox changed without a new message
    */
-  void publish(@NotNull Collection<UUID> recipientUserIds, @NotNull NotificationSignal signal);
+  void publish(@NotNull Collection<UUID> recipientUserIds);
 }

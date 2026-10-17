@@ -87,6 +87,11 @@ probe table, `RetiredOperations` / `RetiredOperationFilter` / `retired-operation
   not as a tier in a machine-readable file whose only other consumer is gone. A constraint on one
   operation does not earn a framework, and the framework is what mistook it for one.
 
+- **The live-sync topic-registry parity test.** It reads the frontend's source rather than a
+  committed contract, and it guards a mirror between two of our own modules that is still
+  load-bearing: the backend publishes into the frontend's rooms after an exchange or ingest write
+  (ADR-0274, amendment 1). It sat beside the contract tests and is not one of them.
+
 **`/api/v1` is evolvable in place again**, under REQ-API-001 unchanged. The per-domain re-cut of
 ADR-0231 continues — it is why the tiers existed in that shape — but a wave is now an ordinary
 atomic deploy of frontend and backend: no app release, no floor raise, no ledger line, no retired
