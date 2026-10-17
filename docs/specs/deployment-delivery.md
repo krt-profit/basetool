@@ -1520,7 +1520,7 @@ points the name at the host's own reverse proxy; its default, `localhost:127.0.0
 > production included: measured on the production host at the cutover, ports 22, 80 and 443 on its
 > public IPv4 and IPv6 all refused from inside a container while `host-gateway` answered. Quadlet
 > units cannot interpolate `IRI_KEYCLOAK_HOST_ALIAS` either — the generator bakes in the no-op
-> default. So every rootless host, production first, aliases **all four** of its public names to
+> default. So every rootless host, production first, aliases **all three** of its public names to
 > `host-gateway` through a drop-in the Ansible role writes from `basetool_host_public_name_aliases`
 > (`<svc>.container.d/10-host-alias.conf` for backend, frontend, ingest, grafana and
 > blackbox-exporter), and the first entry must equal `IRI_KEYCLOAK_HOST_ALIAS` in `.env` —
@@ -2760,7 +2760,25 @@ of 32.
 `test-support/…/context/TestContextKeys` · `backend/…/testcontext/LeafServiceMockTest` ·
 `backend/…/testcontext/LeafServiceMockSecurityTest` · **Related:** REQ-OPS-039
 
-### REQ-OPS-042 — The edge's API admission ships as generated config, and the nightly probe checks the same table
+### REQ-OPS-042 — The edge's API admission ships as generated config, and the nightly probe checks the same table *(superseded)*
+
+> **Superseded 2026-10-17 (ADR-0268, #2672).** The vhost this requirement delivered no longer
+> exists, so neither does its admission. Removed with it: `docker/edge/conf.d/50-api.conf.template`,
+> `include/api-admission.conf`, `include/api-allowlist.conf`, the generator `EdgeAdmission` and the
+> `:backend:generateEdgeAdmission` task, `EdgeAdmissionTest`, `EdgeAdmissionNginxTest`,
+> `EdgeProbeBackendStatusTest`, and the generated probe table in `edge-deny-probe.yml` (639 of its
+> 707 lines). The workflow keeps its Keycloak `/admin`, `/actuator` and members-only steps and gains
+> three that assert the backend is *not* reachable (REQ-OBS-012). `check-edge-nginx.sh` still
+> renders and starts the whole edge in its four shapes; it derives the host variables from the
+> templates, so dropping the vhost dropped `EDGE_HOST_API` from it without an edit.
+>
+> **What the requirement got right outlives it.** "One writer, and the nightly probe asserts the
+> generated table from outside" is why the admission map and its probe never drifted apart in the
+> two months the vhost existed. The shape to copy, should a generated edge artifact ever return,
+> is the pairing — a generator that owns the file and an external probe that reads the deployed
+> result — not the map itself.
+>
+> The text below is the record.
 
 The API vhost's admission (REQ-API-021) is configuration in `docker/edge/`, and it is delivered the
 way every edge change is: it rides the config bundle of the release that carries the matching

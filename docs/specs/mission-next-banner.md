@@ -21,9 +21,9 @@ gone with its audience.
 
 The single-mission `GET /api/v1/missions/next` endpoint (REQ-MISSION-003, REQ-MISSION-008) is
 **retained**, but it is no longer what the home page renders, and it too requires a login. Nothing
-in the frontend calls it today, and it is not admitted on the public API vhost
-(`docker/edge/include/api-admission.conf`, REQ-API-021), so the Android app cannot reach it yet — its plan lists
-it for a future dashboard.
+in the frontend calls it today. It was never admitted on the public API vhost, which has since been
+removed altogether (ADR-0268): the backend is internal-only, so the endpoint is reachable only to
+the frontend and the ingest gateway.
 
 The `/next` lookup must surface only missions that are still **operationally relevant**. A mission
 that has already been `COMPLETED` or `CANCELLED` but happens to carry a future planned-start time

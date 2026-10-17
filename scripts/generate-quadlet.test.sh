@@ -197,8 +197,8 @@ expect "a pin on a network the edge does not join is refused" \
   'g.FRONT_END["edge"]["pins"]["net-proxy-loki"] = "172.28.9.250"; g.generate()' \
   'REFUSAL: edge: pins an address on net-proxy-loki, which it does not join'
 expect "a pin outside its network's subnet is refused" \
-  'g.FRONT_END["edge"]["pins"]["net-proxy-api"] = "10.0.0.9"; g.generate()' \
-  'REFUSAL: edge: 10.0.0.9 is outside 172.28.13.0/24'
+  'g.FRONT_END["edge"]["pins"]["net-proxy-grafana"] = "10.0.0.9"; g.generate()' \
+  'REFUSAL: edge: 10.0.0.9 is outside 172.28.11.0/24'
 expect "a pinned address the role does not trust is refused" \
   'g.FRONT_END["edge"]["pins"]["net-proxy-ingest"] = "172.28.7.249"; g.generate()' \
   'pinned for edge but missing from basetool_host_edge_trusted_proxies'

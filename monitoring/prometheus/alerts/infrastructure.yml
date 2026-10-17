@@ -2,7 +2,7 @@ groups:
   - name: infrastructure-critical
     rules:
       - alert: TargetDown
-        expr: up{job!~"blackbox-(http|edge|force|members|public|hsts|internal|dns|app).*"} == 0
+        expr: up{job!~"blackbox-(http|edge|force|members|public|hsts|internal|dns|app|api).*"} == 0
         for: 3m
         labels:
           severity: critical
@@ -492,7 +492,7 @@ groups:
 
       - alert: EdgeHstsHeaderMissing
         expr: >-
-          probe_success{job=~"blackbox-hsts.*"} == 0
+          probe_success{job="blackbox-hsts"} == 0
           and on() (probe_success{job="blackbox-http", instance="https://profit-base.online"} == 1)
         for: 30m
         labels:
@@ -513,6 +513,17 @@ groups:
         annotations:
           summary: "Endpoint unreachable over IPv6: {{ $labels.instance }}"
           description: "{{ $labels.instance }} answers over IPv4 but not IPv6 — an IPv6-only regression (broken AAAA path or lost edge v6 binding). IPv6 clients cannot reach it. Check the AAAA record and the edge IPv6 listener."
+
+      - alert: PublicApiHostResolvesAgain
+        expr: >-
+          probe_success{job=~"blackbox-api-absent(-aaaa)?"} == 0
+          and on() (probe_success{job="blackbox-dns-a"} == 1)
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "The retired API host resolves again (api.profit-base.online)"
+          description: "api.profit-base.online answers with an address record again (A, AAAA or CNAME), while the apex still resolves — so this is the name coming back, not a DNS outage. The backend is internal-only and the ingest gateway is the only public API (ADR-0268): a resolving API host means the DNS record is back, and a vhost may be answering on it. Each record type is probed by its own job (blackbox-api-absent for A, -aaaa for AAAA), so an AAAA-only record is caught too. Check the zone at the DNS provider, then docker/edge/conf.d for a re-added vhost and the backend's networks in docker-compose.yml / quadlet for a re-joined edge network. The probe accepts NOERROR and NXDOMAIN and keys on the answer section, because a removed name in this zone answers NODATA rather than NXDOMAIN. The daily edge-deny-probe workflow asserts the same thing from a GitHub runner, plus that 11261 and 11271 are closed on the public address."
 
       - alert: DnsResolutionFailed
         expr: probe_success{job=~"blackbox-dns-.*"} == 0

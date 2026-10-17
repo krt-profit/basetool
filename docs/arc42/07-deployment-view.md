@@ -37,7 +37,7 @@ the user namespace ([`docs/backup.md`](../backup.md)) — and why both the desti
 
 ## 7.2 Containers are systemd units
 
-Quadlet `.container`, `.network` and `.volume` files — eighteen containers, eighteen networks and
+Quadlet `.container`, `.network` and `.volume` files — eighteen containers, seventeen networks and
 three volumes, plus one `env.d` template per container — are generated from the compose files by
 [`scripts/generate-quadlet.py`](../../scripts/generate-quadlet.py), committed under
 [`quadlet/`](../../quadlet/), kept honest by the `quadlet-drift` CI job — a Dependabot compose bump
@@ -105,11 +105,13 @@ Consequences worth stating:
   podman 5.8, remain `PodmanArgs=`.
 - **The edge publishes on loopback only** and is pinned with `ip=` on every network it joins, so
   the set of addresses haproxy's PROXY header can arrive from is finite (§11.5c).
-- **The API vhost admits operations, not paths.** Its admission is one generated nginx `map` on
-  verb and path (`docker/edge/include/api-admission.conf`), rendered from the frozen contract set
-  with the nightly probe's table, and it ships in the config bundle like the rest of `docker/edge`;
-  `reconcile_edge` applies it in the promotion that carries the matching backend (REQ-API-021,
-  REQ-OPS-042).
+- **No vhost reaches the backend.** The edge joins `net-proxy-frontend`, `-keycloak`, `-ingest` and
+  `-grafana`, and since #2672 nothing else: `net-proxy-api` and the vhost that used it are deleted,
+  so there is no route from the edge to the backend's `11261` connector or its `11271` management
+  port (ADR-0268). The edge's generated admission map went with it (REQ-OPS-042, superseded), and
+  the daily `edge-deny-probe.yml` run asserts the absence from a GitHub runner — the name does not
+  resolve, both ports refuse a connection on the public address, and no live hostname answers
+  `/api/v1/**` (REQ-OBS-012).
 
 ## 7.3 What moved out of containers, and what was deleted
 

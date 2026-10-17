@@ -409,11 +409,11 @@ STUB
 chmod +x "${WORK}/hoststub.sh"
 
 ALL_LOCAL=(--host frontend=localhost --host ingest=localhost
-           --host grafana=localhost --host api=localhost)
+           --host grafana=localhost)
 ALL_IP=(--host frontend=127.0.0.1 --host ingest=127.0.0.1
-        --host grafana=127.0.0.1 --host api=127.0.0.1)
+        --host grafana=127.0.0.1)
 MIXED=(--host frontend=localhost --host ingest=localhost
-       --host grafana=localhost --host api=127.0.0.1)
+       --host grafana=127.0.0.1)
 STUB_ARGS=(--host-stub "bash ${WORK}/hoststub.sh")
 
 assert_status() {

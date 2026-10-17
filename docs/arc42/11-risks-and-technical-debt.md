@@ -93,12 +93,14 @@ Under rootless Podman the PROXY header the edge receives comes from the edge's *
 `rootlessport` dials the container's published port from inside its netns, so the peer nginx sees is
 whichever of the container's addresses podman chose. **Which one is not ours to choose**, and it is
 not stable — measured on the production host 2026-09-22, three recreations with nothing else
-changed, the peer appeared on `net-proxy-frontend`, then `net-proxy-grafana`, then `net-proxy-api`.
+changed, the peer appeared on `net-proxy-frontend`, then `net-proxy-grafana`, then `net-proxy-api`
+(a network #2672 has since deleted along with the API vhost).
 
 The mitigation does not remove the choice, it **bounds** it: every network the edge joins is pinned
-with `ip=`, so the candidate set is finite and fixed, and `EDGE_TRUSTED_PROXY` names all six of
-those addresses. That keeps ADR-0187's rule intact — name the address, never a prefix — because six
-named addresses are no more a range than one is.
+with `ip=`, so the candidate set is finite and fixed, and `EDGE_TRUSTED_PROXY` names all five of
+those addresses. That keeps ADR-0187's rule intact — name the address, never a prefix — because five
+named addresses are no more a range than one is. The set shrank from six when `net-proxy-api` went,
+which is one candidate fewer rather than a change of kind.
 
 **Why this is an entry here and not a closed item.** A future podman could present an address that
 is not in the set — an IPv6 one, say, or a new interface — and the failure mode is silent: nginx
@@ -311,10 +313,12 @@ since the go-live of 2026-09-28, so these risks hold now.
   are the limits and the budget cap, the four-eyes rule on every tranche, the risk classes, the overdue
   settlement notice and the pause switch ([`purchasing.md`](../specs/purchasing.md), ADR-0255); a delegate
   who reports a false payment is found by the settlement and the bank's own trail, not prevented.
-- **A fifth certificate directory** (`keycloak.<domain>`) is carried and served by nothing, left
-  from before identity moved onto the app origin (ADR-0166). It is documented so the count does not
-  read as a missing certificate; pruning it is a deliberate edge change, not a clean-up to do in
-  passing.
+- **Two certificate directories are carried and served by nothing**: `keycloak.<domain>`, left from
+  before identity moved onto the app origin (ADR-0166), and since #2672 `api.<domain>`, left from
+  the retired API vhost (ADR-0268). `acme` writes only the directories `ACME_HOSTS` names, so
+  neither is renewed and the material in them expires in place. They are documented so the count of
+  five directories against three live vhosts does not read as a missing certificate; pruning them is
+  a deliberate change on the host's `edge-certs` volume, not a clean-up to do in passing.
 - ~~**`versions.properties` is vestigial**~~ — **resolved 2026-09-23.** The entry said "nothing
   reads it", which was wrong: the three application Dockerfiles copied it, and the refreshVersions
   settings plugin — applied on every build — recreated it when missing, which is why deleting it

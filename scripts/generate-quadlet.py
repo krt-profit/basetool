@@ -51,7 +51,6 @@ FRONT_END = {
             "net-proxy-keycloak": "172.28.4.250",
             "net-proxy-ingest": "172.28.7.250",
             "net-proxy-grafana": "172.28.11.250",
-            "net-proxy-api": "172.28.13.250",
         },
     }
 }

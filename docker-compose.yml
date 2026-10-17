@@ -528,7 +528,6 @@ services:
       - net-backend-frontend
       - net-backend-keycloak
       - net-backend-ingest
-      - net-proxy-api
       - net-redis-backend
       - net-monitoring-scrape
 
@@ -733,7 +732,6 @@ services:
       EDGE_HOST_FRONTEND: ${EDGE_HOST_FRONTEND:-}
       EDGE_HOST_INGEST: ${EDGE_HOST_INGEST:-}
       EDGE_HOST_GRAFANA: ${EDGE_HOST_GRAFANA:-}
-      EDGE_HOST_API: ${EDGE_HOST_API:-}
       EDGE_TRUSTED_PROXY: ${EDGE_TRUSTED_PROXY:-}
       EDGE_ADMIN_ALLOW: ${EDGE_ADMIN_ALLOW:-}
       EDGE_GRAFANA_UPSTREAM_VERIFY: ${EDGE_GRAFANA_UPSTREAM_VERIFY:-off}
@@ -756,7 +754,6 @@ services:
       - net-proxy-keycloak
       - net-proxy-ingest
       - net-proxy-grafana
-      - net-proxy-api
 
   acme:
     profiles: ["prod"]
@@ -906,13 +903,3 @@ networks:
       config:
         - subnet: 172.28.11.0/24
           gateway: 172.28.11.1
-  net-proxy-api:
-    internal: true
-    driver: bridge
-    enable_ipv6: true
-    ipam:
-      config:
-        - subnet: 172.28.13.0/24
-          gateway: 172.28.13.1
-        - subnet: fd00:28:13::/64
-          gateway: fd00:28:13::1

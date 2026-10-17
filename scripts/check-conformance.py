@@ -48,7 +48,6 @@ DEFAULT_HOSTS = {
     "frontend": "profit-base.online",
     "ingest": "ingest.profit-base.online",
     "grafana": "grafana.profit-base.online",
-    "api": "api.profit-base.online",
 }
 
 CERT_MIN_DAYS = 21

@@ -24,6 +24,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.greluc.krt.profit.basetool.backend.platform.api.RetiredOperations;
 import de.greluc.krt.profit.basetool.backend.platform.internal.RetiredOperationsConfig;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import org.jetbrains.annotations.NotNull;
@@ -90,12 +92,25 @@ class CommittedAppCallListTest {
    * @throws IOException if the lists cannot be read
    */
   private static AppCallList.Release current() throws IOException {
-    return AppCallList.load(
-            EdgeAdmissionTest.repositoryRoot().resolve("backend/src/test/resources/api/app-calls"))
+    return AppCallList.load(repositoryRoot().resolve("backend/src/test/resources/api/app-calls"))
         .stream()
         .filter(release -> release.versionCode() == CURRENT_BUILD)
         .findFirst()
         .orElseThrow(() -> new AssertionError("no app call list " + CURRENT_BUILD + ".txt"));
+  }
+
+  /**
+   * Walks up from the working directory to the directory that holds {@code settings.gradle.kts}.
+   *
+   * @return the repository root
+   */
+  private static @NotNull Path repositoryRoot() {
+    Path dir = Path.of("").toAbsolutePath();
+    while (dir != null && !Files.exists(dir.resolve("settings.gradle.kts"))) {
+      dir = dir.getParent();
+    }
+    assertThat(dir).as("no settings.gradle.kts above the working directory").isNotNull();
+    return dir;
   }
 
   @Test

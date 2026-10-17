@@ -260,7 +260,7 @@ class ExternalContractTest {
 
   /**
    * The contract set: every operation the Android app consumes, recorded from the generated
-   * document; the API vhost admits it through the map {@link EdgeAdmission} renders from it.
+   * document.
    */
   private static final List<ContractOperation> CONTRACT =
       List.of(
