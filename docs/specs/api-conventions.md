@@ -263,9 +263,12 @@ hierarchy (a sealed kernel of kinds plus one `ProblemCode` enum per module) land
   `BANK_*` codes), `exchange.api.ExchangeProblemCode` (`ACTING_MEMBER_REFUSED`, which the exchange
   module's `ActingMemberFilter` answers), `inventory.api.InventoryProblemCode` (`OVER_ALLOCATION`),
   `joborder.api.JobOrderProblemCode` (`PRODUCTION_ALLOCATION`),
-  `refinery.api.RefineryProblemCode` (`MISSION_PARTICIPANT_REQUIRED`) and
-  `scope.api.ScopeProblemCode` (`OWNER_ORG_UNIT_REQUIRED`). Names and wire values did not change
-  when they left `CoreProblemCode`; the registry holds 50 codes across the seven enums. Three are
+  `refinery.api.RefineryProblemCode` (`MISSION_PARTICIPANT_REQUIRED`),
+  `scope.api.ScopeProblemCode` (`OWNER_ORG_UNIT_REQUIRED`), `supply.api.SupplyProblemCode` (the
+  `SUPPLY_*` codes), `purchasing.api.PurchasingProblemCode` (the `PURCHASING_*` codes) and
+  `identity.api.IdentityProblemCode` (`RANK_OUTSIDE_ROLE_RANGE`, REQ-ROLE-007). Names and wire
+  values did not change when they left `CoreProblemCode`; the registry holds 82 codes across the
+  ten enums. Three are
   **reserved**, registered but not emitted: `BANK_HOLDER_OVERDRAFT` (ADR-0039),
   `BANK_CARTEL_APPROVAL_REQUIRED` (ADR-0109) and `APP_UPDATE_REQUIRED`, which retired paths will
   answer (ADR-0234, D-11; registered with `410`). Every producer references the enum; no code is a
