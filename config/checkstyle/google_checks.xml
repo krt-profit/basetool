@@ -88,7 +88,7 @@
   <module name="FileLength">
     <property name="id" value="fileLengthInventoryPageController"/>
     <property name="fileExtensions" value="java"/>
-    <property name="max" value="1521"/>
+    <property name="max" value="1519"/>
   </module>
   <module name="SuppressionSingleFilter">
     <property name="id" value="fileLength"/>
@@ -244,7 +244,7 @@
   <module name="FileLength">
     <property name="id" value="fileLengthJobOrderPageController"/>
     <property name="fileExtensions" value="java"/>
-    <property name="max" value="1167"/>
+    <property name="max" value="1154"/>
   </module>
   <module name="SuppressionSingleFilter">
     <property name="id" value="fileLength"/>

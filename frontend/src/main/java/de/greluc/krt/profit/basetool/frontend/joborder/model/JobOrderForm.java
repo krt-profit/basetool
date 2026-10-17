@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.Data;
+import org.jetbrains.annotations.NotNull;
 
 /** Form-binding object for Job Order input. */
 @Data
@@ -53,6 +54,31 @@ public class JobOrderForm {
   /** Seeds the form with one empty material row so the "add material" UI starts non-empty. */
   public JobOrderForm() {
     materials.add(new JobOrderMaterialForm());
+  }
+
+  /**
+   * Prefills an edit form with the order's comment, version and material lines, keeping one empty
+   * line when the order has none.
+   *
+   * @param order the order being edited
+   * @return the prefilled form
+   */
+  @NotNull
+  public static JobOrderForm forEdit(@NotNull JobOrderDto order) {
+    JobOrderForm form = new JobOrderForm();
+    form.setComment(order.comment());
+    form.setVersion(order.version());
+    if (order.materials() != null && !order.materials().isEmpty()) {
+      form.getMaterials().clear();
+      for (JobOrderMaterialDto mat : order.materials()) {
+        JobOrderMaterialForm mf = new JobOrderMaterialForm();
+        mf.setMaterialId(mat.material().id());
+        mf.setMinQuality(mat.minQuality());
+        mf.setAmount(mat.amount());
+        form.getMaterials().add(mf);
+      }
+    }
+    return form;
   }
 
   /** Form-binding object for Job Order Material input. */

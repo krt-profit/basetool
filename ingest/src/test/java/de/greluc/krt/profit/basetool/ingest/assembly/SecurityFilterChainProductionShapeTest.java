@@ -32,8 +32,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * Pins the gateway's security filter chains through {@link FilterChainProxy} in the shape
- * production runs them (REQ-XCH-036): the open management-port chain first, the basic-auth scrape
- * chain second, the main chain with the exchange gates last.
+ * production runs them (REQ-XCH-036): the basic-auth management-port chain first, the basic-auth
+ * scrape chain second, the main chain with the exchange gates last.
  */
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -49,7 +49,7 @@ class SecurityFilterChainProductionShapeTest {
       List.of(
           "Or [PathPattern [/actuator/**]] -> DisableEncodeUrlFilter,"
               + " WebAsyncManagerIntegrationFilter, SecurityContextHolderFilter,"
-              + " HeaderWriterFilter, CsrfFilter, LogoutFilter,"
+              + " HeaderWriterFilter, CsrfFilter, LogoutFilter, BasicAuthenticationFilter,"
               + " SecurityContextHolderAwareRequestFilter, AnonymousAuthenticationFilter,"
               + " SessionManagementFilter, ExceptionTranslationFilter, AuthorizationFilter",
           "Or [PathPattern [/actuator/prometheus]] -> DisableEncodeUrlFilter,"
