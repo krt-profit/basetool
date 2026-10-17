@@ -305,6 +305,23 @@ class ExchangeGoldenAnswerTest {
   }
 
   @Test
+  void aRefusedShareIsRelayedAsRecorded() throws Exception {
+    OVERRIDES.put(
+        "POST /api/v1/exchange/me/stock/changes",
+        json(200, fixture("change-result/valid/share-refused.json")));
+
+    assertThat(
+            matches(
+                "refused-stock-changes-share-not-a-member",
+                record(
+                    post(
+                        "/me/stock/changes",
+                        fixture("change-set--stockChangeSet/valid/share.json")))))
+        .as("golden differs; see " + OBSERVED)
+        .isTrue();
+  }
+
+  @Test
   void aHeldBackMassChangeIsStagedWithTheSeamsMembersAndAnswersAsRecorded() throws Exception {
     OVERRIDES.put(
         "POST /api/v1/exchange/me/stock/changes",
@@ -364,6 +381,9 @@ class ExchangeGoldenAnswerTest {
             fixture("change-set--blueprintChangeSet/valid/add-and-remove.json")));
     routes.put("route-get-stock", get("/me/stock"));
     routes.put("route-post-stock-changes", post("/me/stock/changes", stockSet()));
+    routes.put(
+        "route-post-stock-changes-share",
+        post("/me/stock/changes", fixture("change-set--stockChangeSet/valid/share.json")));
     routes.put("route-get-ships", get("/me/ships?limit=10"));
     routes.put(
         "route-post-ship-changes",

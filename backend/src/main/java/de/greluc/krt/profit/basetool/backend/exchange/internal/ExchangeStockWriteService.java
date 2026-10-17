@@ -40,6 +40,8 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.math.BigDecimal;
@@ -47,6 +49,7 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -77,7 +80,8 @@ import tools.jackson.databind.ObjectMapper;
  * takes the lot's personal rows first, then rows without an org unit, then the oldest, and never
  * more of a row than its job-order and mission reservations leave free, through the Lager's own
  * book-out, which lowers linked Materialbörse offers and audits each offer it lowers or removes;
- * they are counted in the result.
+ * they are counted in the result. A share moves part of a lot's personal stock into the pool of one
+ * of the member's direct units through the Lager's rebooking ({@link ExchangeStockShares}).
  */
 @Service
 @RequiredArgsConstructor
@@ -116,6 +120,8 @@ public class ExchangeStockWriteService {
   private final StockReads stockReads;
   private final StockCommands stockCommands;
   private final StockOfferLookup stockOfferLookup;
+  private final ExchangeStockShares shares;
+  private final OrgUnitMembershipQueryService membershipQueryService;
   private final InventoryProperties inventoryProperties;
   private final ExchangeChangeRepository changeRepository;
   private final ExchangeJournalService journalService;
@@ -187,12 +193,24 @@ public class ExchangeStockWriteService {
             ? Map.of()
             : flipStolen(caller.member(), plan);
     List<ExchangeChangeResultDto.OpResult> results = new ArrayList<>();
+    Set<String> touched = new HashSet<>();
     for (int i = 0; i < plan.size(); i++) {
       String opId = changeSet.ops().get(i).opId();
-      switch (plan.get(i)) {
+      Planned planned = plan.get(i);
+      if (planned instanceof Share share) {
+        planned = runShare(caller, batch, share, changeSet.dryRun(), touched);
+      }
+      switch (planned) {
         case Change change -> {
           if (!changeSet.dryRun()) {
-            execute(caller, batch, change, moves, flipped, offers);
+            execute(caller, batch, change, moves, flipped, offers, touched);
+            counter(caller, APPLIED).increment();
+          }
+          touched.add(change.lot().key());
+          applied++;
+        }
+        case Share _ -> {
+          if (!changeSet.dryRun()) {
             counter(caller, APPLIED).increment();
           }
           applied++;
@@ -310,6 +328,9 @@ public class ExchangeStockWriteService {
     List<Lot> lots = new ArrayList<>(ops.size());
     for (int i = 0; i < ops.size(); i++) {
       ExchangeStockChangeSet.Op op = ops.get(i);
+      if (isShare(op) && op.orgUnit() == null) {
+        throw new BadRequestException("A share names its org unit");
+      }
       ExchangeLotCatalogue.Entry entry = Objects.requireNonNull(catalogue.get(i));
       Skip skip = null;
       Lot lot = null;
@@ -321,7 +342,8 @@ public class ExchangeStockWriteService {
         if (location.isEmpty()) {
           skip = new Skip(REJECTED, LOCATION_UNKNOWN);
         } else if (!unit.equals(op.quantity().unit())
-            || !unit.equals(op.expectedQuantity().unit())) {
+            || !unit.equals(op.expectedQuantity().unit())
+            || (isShare(op) && !ExchangeStockShares.isWhole(op.quantity(), unit))) {
           skip = new Skip(REJECTED, UNIT_MISMATCH);
         } else if (Boolean.TRUE.equals(op.stolen())
             && !inventoryProperties.stolenMarkingEnabled()) {
@@ -338,6 +360,11 @@ public class ExchangeStockWriteService {
     }
     Map<String, List<StockRow>> locked = lockInKeyOrder(caller.member(), lots);
     Map<String, BigDecimal> quantities = new HashMap<>();
+    Map<String, BigDecimal> personals = new HashMap<>();
+    Set<UUID> memberships =
+        ops.stream().anyMatch(ExchangeStockWriteService::isShare)
+            ? membershipQueryService.findDirectMembershipOrgUnitIds(caller.member())
+            : Set.of();
     List<Planned> plan = new ArrayList<>();
     for (int i = 0; i < ops.size(); i++) {
       if (early.get(i) != null) {
@@ -349,8 +376,26 @@ public class ExchangeStockWriteService {
       String unit = lot.unit();
       List<StockRow> rows = Objects.requireNonNull(locked.get(lot.key()));
       BigDecimal current = quantities.computeIfAbsent(lot.key(), _ -> round(sum(rows), unit));
+      BigDecimal personal =
+          personals.computeIfAbsent(
+              lot.key(), _ -> round(sum(ExchangeStockShares.personalRows(rows)), unit));
       BigDecimal expected = round(op.expectedQuantity().amount(), unit);
       BigDecimal target = round(op.quantity().amount(), unit);
+      if (isShare(op)) {
+        UUID orgUnitId = Objects.requireNonNull(op.orgUnit()).id();
+        String refusal =
+            ExchangeStockShares.refusal(orgUnitId, memberships, personal, expected, target);
+        if (refusal != null || target.signum() == 0) {
+          plan.add(new Skip(refusal == null ? UNCHANGED : REJECTED, refusal));
+        } else {
+          personals.put(lot.key(), personal.subtract(target));
+          plan.add(
+              new Share(
+                  new ExchangeStockShares.Move(
+                      lot.stock(), lot.key(), unit, orgUnitId, target, current)));
+        }
+        continue;
+      }
       if (current.compareTo(expected) != 0) {
         plan.add(new Skip(REJECTED, VERSION_CONFLICT));
         continue;
@@ -371,9 +416,77 @@ public class ExchangeStockWriteService {
         continue;
       }
       quantities.put(lot.key(), target);
+      BigDecimal delta = target.subtract(current);
+      personals.put(
+          lot.key(),
+          delta.signum() > 0
+              ? personal.add(delta)
+              : personal.subtract(personal.min(delta.negate())));
       plan.add(new Change(lot, current, target, rows));
     }
     return plan;
+  }
+
+  /**
+   * Runs a planned share; a dry run leaves a lot an earlier op of the batch would have written to
+   * the plan.
+   *
+   * @param caller the caller
+   * @param batch the change set's id
+   * @param share the share
+   * @param dryRun whether to write nothing
+   * @param touched the lots earlier ops of the batch wrote or would have written; the share's lot
+   *     is added
+   * @return the share when it ran or would run, else the skip of the Lager's refusal
+   */
+  private @NotNull Planned runShare(
+      @NotNull ExchangeCaller caller,
+      @NotNull UUID batch,
+      @NotNull Share share,
+      boolean dryRun,
+      @NotNull Set<String> touched) {
+    String key = share.move().key();
+    if (!(dryRun && touched.contains(key))) {
+      String refusal = shares.run(caller, batch, share.move(), dryRun);
+      if (refusal != null) {
+        return new Skip(REJECTED, refusal);
+      }
+    }
+    touched.add(key);
+    return share;
+  }
+
+  /**
+   * Moves a lot's shared stock in the named pools back to personal for an undo; all or nothing.
+   *
+   * @param member the member
+   * @param lotKey the lot's key as the journal records it
+   * @param unit the lot's unit
+   * @param pools the amount to take back from each pool
+   * @return whether every pool gave its amount back; {@code false} writes nothing
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public boolean takeBackShares(
+      @NotNull UUID member,
+      @NotNull String lotKey,
+      @NotNull String unit,
+      @NotNull Map<UUID, BigDecimal> pools) {
+    Optional<Lot> parsed = parseLot(lotKey, unit);
+    if (parsed.isEmpty()) {
+      return false;
+    }
+    stockCommands.lockLots(member, List.of(lotKey));
+    return shares.takeBack(member, parsed.get().stock(), pools);
+  }
+
+  /**
+   * Whether an op is a share.
+   *
+   * @param op the op
+   * @return {@code true} for a {@code share}
+   */
+  private static boolean isShare(@NotNull ExchangeStockChangeSet.Op op) {
+    return ExchangeStockChangeSet.SHARE.equals(op.op());
   }
 
   /**
@@ -631,6 +744,7 @@ public class ExchangeStockWriteService {
    * @param moves the falling lots that are moves
    * @param flipped the amount of each change that marking already moved
    * @param offers the running offer effects
+   * @param touched the lots earlier ops of the batch wrote, whose rows are read again
    */
   private void execute(
       @NotNull ExchangeCaller caller,
@@ -638,14 +752,19 @@ public class ExchangeStockWriteService {
       @NotNull Change change,
       @NotNull Set<Change> moves,
       @NotNull Map<Change, BigDecimal> flipped,
-      @NotNull OfferEffects offers) {
+      @NotNull OfferEffects offers,
+      @NotNull Set<String> touched) {
     BigDecimal delta = change.target().subtract(change.current());
     BigDecimal booked = delta.abs().subtract(flipped.getOrDefault(change, BigDecimal.ZERO));
     if (booked.signum() > 0 && delta.signum() > 0) {
       stockCommands.bookIn(caller.member(), change.lot().stock(), booked.doubleValue());
     } else if (booked.signum() > 0) {
+      List<StockRow> rows =
+          touched.contains(change.lot().key())
+              ? stockCommands.lockLotRows(caller.member(), change.lot().stock())
+              : change.rows();
       List<StockRow> stillInLot =
-          change.rows().stream()
+          rows.stream()
               .filter(row -> Boolean.TRUE.equals(row.getStolen()) == change.lot().stolen())
               .toList();
       bookOut(caller.member(), stillInLot, booked, change.lot().unit(), offers);
@@ -741,8 +860,7 @@ public class ExchangeStockWriteService {
    * @param unit the unit
    * @return the state
    */
-  private static @NotNull Map<String, Object> state(
-      @NotNull BigDecimal quantity, @NotNull String unit) {
+  static @NotNull Map<String, Object> state(@NotNull BigDecimal quantity, @NotNull String unit) {
     Map<String, Object> state = new LinkedHashMap<>();
     state.put("quantity", quantity);
     state.put("unit", unit);
@@ -839,7 +957,14 @@ public class ExchangeStockWriteService {
   }
 
   /** What one op of a change set will do. */
-  private sealed interface Planned permits Change, Skip {}
+  private sealed interface Planned permits Change, Share, Skip {}
+
+  /**
+   * An op that moves part of a lot's personal stock into a pool.
+   *
+   * @param move the share
+   */
+  private record Share(@NotNull ExchangeStockShares.Move move) implements Planned {}
 
   /**
    * An op that changes a lot.

@@ -3901,12 +3901,15 @@
           },
           "op" : {
             "type" : "string",
-            "pattern" : "^set-quantity$"
+            "pattern" : "^(set-quantity|share)$"
           },
           "opId" : {
             "type" : "string",
             "maxLength" : 64,
             "minLength" : 1
+          },
+          "orgUnit" : {
+            "$ref" : "#/components/schemas/StockOpUnit"
           },
           "override" : {
             "type" : "boolean"
@@ -4413,6 +4416,16 @@
             "type" : "string"
           }
         }
+      },
+      "StockOpUnit" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        },
+        "required" : [ "id" ]
       },
       "Uex" : {
         "type" : "object",

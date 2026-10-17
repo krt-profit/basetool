@@ -84,10 +84,12 @@ personal and shared, in the web or anywhere else, or moving shared stock to anot
 lot's `key` and `quantity` and brings the lot into the feed with its new `split`. A lot whose stock
 changes while a snapshot is read may move to a later page; its change follows in the feed either way.
 
-## Setting quantities — `POST /exchange/v1/me/stock/changes`
+## Changing the stock — `POST /exchange/v1/me/stock/changes`
 
-Send an `Idempotency-Key` and a change set of 1 to 500 `set-quantity` ops, `dryRun` optional. An op
-names the lot and says what it should hold, and what the client last saw it hold:
+Send an `Idempotency-Key` and a change set of 1 to 500 ops, `dryRun` optional. A `set-quantity`
+op names the lot and says what it should hold, and what the client last saw it hold; a
+[`share`](#sharing-into-a-units-pool) op moves part of the lot's personal stock into a unit's
+pool. Both kinds may be mixed in one change set:
 
 ```json
 {
@@ -131,6 +133,50 @@ elsewhere; ask the member, then resend with `override: true`. On `STOCK_EARMARKE
 to release the reservation in the web. On `VERSION_CONFLICT`, pull the feed, merge, and send the op
 again under a new `Idempotency-Key`.
 
+### Sharing into a unit's pool
+
+A `share` op moves part of a lot's personal stock into the pool of a unit the member directly
+belongs to. The member stays the holder, and the lot keeps its `key` and `quantity`; only its
+`split` changes.
+
+```json
+{
+  "op": "share",
+  "opId": "s1",
+  "material": {"bt": "c3b1e0c2-8a4e-4f64-9a51-2b9f5c7e0a11", "name": "Laranite"},
+  "location": {"name": "Area18", "uex": {"kind": "CITY", "id": 4}},
+  "quality": 712,
+  "stolen": false,
+  "orgUnit": {"id": "0c2f8a51-7d3e-4b9a-9f10-5a6b7c8d9e01"},
+  "quantity": {"amount": 4, "unit": "SCU"},
+  "expectedQuantity": {"amount": 4.5, "unit": "SCU"}
+}
+```
+
+- `orgUnit` is always required. Name one of the units
+  [`GET /me/org-units`](org-units.md) returns, even when the member has only one; the server never
+  picks a unit.
+- `quantity` is the amount to move.
+- `expectedQuantity` is the lot's `split.personal` in the client's last synced state, as the
+  earlier ops of the change set leave it.
+
+After the material, location, unit and stolen steps above, a share is decided in these steps:
+
+| Step | Refused as |
+| --- | --- |
+| An item's `quantity` is whole pieces | `rejected` `UNIT_MISMATCH` |
+| `orgUnit` is one of the member's own units; an admin role or a leadership seat adds none | `rejected` `NOT_A_MEMBER` |
+| The lot's personal amount must equal `expectedQuantity` | `rejected` `VERSION_CONFLICT` |
+| `quantity` is at most `expectedQuantity` | `rejected` `QUANTITY_ABOVE_EXPECTED` |
+| A `quantity` of 0 | `unchanged` |
+| The member's personal stock holds `quantity`; shared stock outside any unit is not taken | `rejected` `INSUFFICIENT_STOCK` |
+| None of it is reserved for a job order, mission or donation | `rejected` `STOCK_EARMARKED` |
+| The move leaves every row at least what it offers on the Material Exchange | `rejected` `STOCK_OFFERED` |
+
+A share takes the member's personal stock already marked for the target unit first, then
+personal stock without a unit, then the rest, the oldest first. The stolen marking, the quality
+and the location stay as they are.
+
 ## What a change books
 
 A change is booked like the warehouse books it, audited in the warehouse under your client's name:
@@ -139,6 +185,9 @@ A change is booked like the warehouse books it, audited in the warehouse under y
   the existing stock of that item as a book-in in the web does.
 - **A fall** books the difference out, taking personal stock first, then stock without an org unit,
   then the oldest. It never takes stock reserved for a job order or mission.
+- **A share** rebooks the stock from personal into the unit's pool, as the member's rebooking in
+  the web does. It never counts as a removal for the mass-change guard, and an undo moves it
+  back to personal.
 
 **Material Exchange offers.** The Material Exchange is the Basetool's board of stock offers and
 requests between members, unrelated to this API. A book-out that leaves less stock than an offer

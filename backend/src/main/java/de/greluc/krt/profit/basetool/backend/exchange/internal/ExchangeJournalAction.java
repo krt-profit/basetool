@@ -30,6 +30,7 @@ public enum ExchangeJournalAction {
   BLUEPRINT_ADD(ExchangeResource.BLUEPRINT),
   BLUEPRINT_REMOVE(ExchangeResource.BLUEPRINT),
   STOCK_SET_QUANTITY(ExchangeResource.STOCK),
+  STOCK_SHARE(ExchangeResource.STOCK),
   SHIP_LINK(ExchangeResource.SHIP),
   SHIP_UPSERT(ExchangeResource.SHIP),
   SHIP_REMOVE(ExchangeResource.SHIP),

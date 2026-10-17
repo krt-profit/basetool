@@ -22,6 +22,8 @@
 
 ### Added
 
+- **Exchange: Bestand an eine Einheit geben.** Eine verbundene Anwendung kann mit der neuen Operation `share` auf `POST /exchange/v1/me/stock/changes` einen Teil des persönlichen Bestands eines Postens in den Pool einer Einheit geben, in der das Mitglied direkt Mitglied ist; es bleibt Halter. Die Einheit wird immer ausdrücklich genannt, die Umbuchung ist wie im Web auditiert und über „Verbundene Anwendungen“ rückgängig zu machen (Migration `V305`, ADR-0278, REQ-XCH-016).
+
 - **Exchange: Aufteilung eines Lagerpostens.** Jeder Posten von `GET /exchange/v1/me/stock` trägt jetzt `split`: wie viel davon persönlich ist und wie viel das Mitglied selbst in welchem Einheiten-Pool hält, auch in einer verlassenen Einheit. Eine Umbuchung zwischen persönlich und geteilt erscheint damit im Änderungs-Feed, Schlüssel und Gesamtmenge bleiben gleich (Migration `V304`, REQ-XCH-016).
 
 - **Audit: Änderung des Mitgliedsrangs wird protokolliert.** Ändert ein Admin den Rang 1–20 eines Mitglieds, schreibt das Audit-Log unter „Rollen & Mitglieder“ das Ereignis „Mitgliedsrang geändert“ mit altem und neuem Rang; ein unveränderter Rang erzeugt keinen Eintrag (REQ-AUDIT-001, REQ-ROLE-007).

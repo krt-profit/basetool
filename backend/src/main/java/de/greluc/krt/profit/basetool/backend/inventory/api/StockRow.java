@@ -115,6 +115,13 @@ public interface StockRow {
   Boolean getStolen();
 
   /**
+   * Returns whether the row is the holder's personal stock rather than shared in a pool.
+   *
+   * @return {@code true} for personal stock
+   */
+  Boolean getPersonal();
+
+  /**
    * Sums the amounts of the row's job-order slices (its job-order allocations must be loaded).
    *
    * @return the total earmarked to job orders

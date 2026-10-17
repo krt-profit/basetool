@@ -952,6 +952,21 @@ of a shared row to another pool, changes the lot's split but never its key or to
 lot into the change feed whichever channel wrote it.
 Older clients that ignore `split` keep working (REQ-XCH-026).
 
+A `share` op on the same change set moves part of a lot's personal stock into the pool of a unit
+the member directly belongs to, the member staying the holder (ADR-0278, `exchange.stock.write`,
+no new scope). It is addressed by lot like `set-quantity` and always names `orgUnit` `{id}`: there
+is no automatic choice of a sole membership and no shared row without a unit. The unit must be one
+of the member's own direct memberships, the set `GET /me/org-units` returns; an admin role or a
+leadership seat adds nothing (`NOT_A_MEMBER`). `expectedQuantity` is the lot's `split.personal` as
+the earlier ops of the batch leave it, compared under the lot lock (`VERSION_CONFLICT`); a
+`quantity` above it is refused (`QUANTITY_ABOVE_EXPECTED`), and a fraction of a piece is
+`UNIT_MISMATCH`. The rows are those the Lager's `RebookCommands` takes (REQ-INV-060), with its
+refusals answered per op as `INSUFFICIENT_STOCK`, `STOCK_EARMARKED` and `STOCK_OFFERED`. A share is
+audited by the Lager's `INVENTORY_ITEM_DEPERSONALIZED` under the client, journaled as
+`STOCK_SHARE` under the lot's key, never counted as a removal by the mass-change guard, and
+decided without a write by `dryRun`. An undo moves the shared amount back to personal, then sets
+the lot's quantity back; a pool that no longer holds it leaves the lot skipped as `GONE`.
+
 *Amended 2026-10-02 (ADR-0230, owner decision of the same day):* a lot covered the member's personal
 rows only, and a material carrying a UEX commodity id — nearly the whole catalogue, every ore and
 refined metal included — was stored at quality 0 whatever the client sent. Three lots of one
@@ -1000,6 +1015,18 @@ production had landed at quality 0 (203 journal entries, 36 lots).
   answers `STOCK_EARMARKED` when the free stock is short. *`ExchangeStockWriteControllerTest`.*
 - [x] `materialKind` carries the UEX flags the material has and leaves the unknown ones out.
   *`ExchangeStockControllerTest`.*
+- [x] A share with a matching `expectedQuantity` into a direct membership moves exactly
+  `quantity`, the target unit's personal rows first, then those without a unit; the lot keeps its
+  `key` and total, its `split` and feed show the move, and the rows' holder is the member.
+  *`ExchangeStockShareControllerTest`.*
+- [x] A share is refused with nothing written for a unit the member is not a direct member of, also
+  for an admin and for an area leader naming a squadron below their area, for a stale
+  `expectedQuantity`, a `quantity` above it, earmarked stock, a move below a Materialbörse offer
+  and a fraction of a piece. *`ExchangeStockShareControllerTest`.*
+- [x] Shares and `set-quantity` in one change set are decided in order; `dryRun` writes nothing; a
+  share of every lot is never held back as a mass change. *`ExchangeStockShareControllerTest`.*
+- [x] An undo takes a share back to personal and sets the lot back; a share whose pool stock is
+  gone is skipped as `GONE`. *`ExchangeUndoControllerTest`.*
 - [x] Moving stock to the lot's stolen twin marks the rows — a part split off, a whole lot flipped —
   and a piece book-in joins the existing row. *`ExchangeStockWriteControllerTest`.*
 

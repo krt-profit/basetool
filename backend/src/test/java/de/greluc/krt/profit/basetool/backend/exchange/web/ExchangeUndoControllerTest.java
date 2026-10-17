@@ -438,6 +438,131 @@ class ExchangeUndoControllerTest {
   }
 
   @Test
+  void aShareMixedWithASetIsTakenBackToPersonalAndTheLotSetBack() throws Exception {
+    UUID laranite = material("Laranite");
+    UUID place = location();
+    UUID squadron = orgUnit("SQUADRON");
+    joins(squadron);
+    personalRow(laranite, place, 10);
+    write(
+            "stock",
+            "{\"ops\":["
+                + share(laranite, locationName(place), squadron, "4", "10")
+                + ","
+                + lot(laranite, locationName(place), "12", "10")
+                + "]}")
+        .andExpect(jsonPath("$.applied").value(2));
+
+    undo(Instant.now().minus(1, ChronoUnit.HOURS))
+        .andExpect(jsonPath("$.restored").value(1))
+        .andExpect(jsonPath("$.skipped.length()").value(0));
+
+    assertThat(total(laranite)).isEqualTo(10.0);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM inventory_item WHERE user_id = ? AND NOT personal",
+                Integer.class,
+                member))
+        .isZero();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM audit_event WHERE event_type = 'INVENTORY_ITEM_PERSONALIZED'"
+                    + " AND actor_user_id = ?",
+                Integer.class,
+                member))
+        .isPositive();
+  }
+
+  @Test
+  void aShareWhosePoolStockTheClientBookedOutIsSkippedAsGone() throws Exception {
+    UUID laranite = material("Laranite");
+    UUID place = location();
+    UUID squadron = orgUnit("SQUADRON");
+    joins(squadron);
+    personalRow(laranite, place, 10);
+    write("stock", "{\"ops\":[" + share(laranite, locationName(place), squadron, "10", "10") + "]}")
+        .andExpect(jsonPath("$.applied").value(1));
+    write("stock", "{\"ops\":[" + lot(laranite, locationName(place), "0", "10") + "]}")
+        .andExpect(jsonPath("$.applied").value(1));
+
+    undo(Instant.now().minus(1, ChronoUnit.HOURS))
+        .andExpect(jsonPath("$.restored").value(0))
+        .andExpect(jsonPath("$.skipped[0].resource").value("STOCK"))
+        .andExpect(jsonPath("$.skipped[0].reason").value("GONE"));
+
+    assertThat(total(laranite)).isZero();
+  }
+
+  /**
+   * Seeds a personal row of the member without an org unit at quality 500.
+   *
+   * @param material the material
+   * @param location the location
+   * @param amount the amount
+   * @return the row
+   */
+  private @NotNull UUID personalRow(@NotNull UUID material, @NotNull UUID location, double amount) {
+    UUID id = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO inventory_item (id, user_id, material_id, location_id, quality, amount,"
+            + " personal, stolen, created_at, version) VALUES (?, ?, ?, ?, 500, ?, true, false,"
+            + " now(), 0)",
+        id,
+        member,
+        material,
+        location,
+        amount);
+    return id;
+  }
+
+  /**
+   * Builds a share op of a not-stolen SCU lot at quality 500.
+   *
+   * @param material the material
+   * @param place the location name
+   * @param unit the receiving org unit
+   * @param quantity the amount to move
+   * @param expected the personal amount the client last saw
+   * @return the op as JSON
+   */
+  private static @NotNull String share(
+      @NotNull UUID material,
+      @NotNull String place,
+      @NotNull UUID unit,
+      @NotNull String quantity,
+      @NotNull String expected) {
+    return """
+    {"op":"share","material":{"bt":"%s"},"location":{"name":"%s"},"quality":500,"stolen":false,
+     "orgUnit":{"id":"%s"},"quantity":{"amount":%s,"unit":"SCU"},
+     "expectedQuantity":{"amount":%s,"unit":"SCU"}}\
+    """
+        .formatted(material, place, unit, quantity, expected);
+  }
+
+  /**
+   * Builds a set-quantity op of a not-stolen SCU lot at quality 500 the client last saw at an
+   * amount.
+   *
+   * @param material the material
+   * @param place the location name
+   * @param quantity the new quantity
+   * @param expected the quantity the client last saw
+   * @return the op as JSON
+   */
+  private static @NotNull String lot(
+      @NotNull UUID material,
+      @NotNull String place,
+      @NotNull String quantity,
+      @NotNull String expected) {
+    return """
+    {"op":"set-quantity","material":{"bt":"%s"},"location":{"name":"%s"},"quality":500,
+     "stolen":false,"quantity":{"amount":%s,"unit":"SCU"},
+     "expectedQuantity":{"amount":%s,"unit":"SCU"}}\
+    """
+        .formatted(material, place, quantity, expected);
+  }
+
+  @Test
   void anEntryJournaledWithoutAUnitLeavesTheUnitAlone() throws Exception {
     UUID cutlass = shipType("Cutlass Black");
     UUID squadron = orgUnit("SQUADRON");
