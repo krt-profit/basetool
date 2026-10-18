@@ -1,3 +1,7 @@
+> **Archived 2026-10-17.** Doc type: Historical record — frozen, kept as a record and no longer updated. Commands and states below describe the host and the code as they were.
+>
+> **Current truth:** [`deployment.md`](../deployment.md). Index of the archive: [`README.md`](README.md).
+
 # Release 1.17.0 — production rollout runbook
 
 > **Doc type:** Operator runbook for **one** release — the move of production (and, through
@@ -6,14 +10,14 @@
 > own stock into a unit pool). Written 2026-10-17 from an audit of the 46 pull requests between
 > `v1.16.5` and `7d816a1fc` and from read-only reads of production the same day. **Historical once
 > 1.17.0 is live and §5 is done**: move it to `docs/archive/` then and let
-> [`deployment.md`](deployment.md) stay the living truth.
+> [`deployment.md`](../deployment.md) stay the living truth.
 >
 > **Every step that writes to a host is a production write**: it waits for @greluc's explicit yes,
 > in chat, to that exact command (CLAUDE.md → *Production host access*). Nothing here is approval, and
 > no write in this document has been executed.
 
 Shell conventions (`cd /`, `${UCTL}`, `${UPOD}`) are the ones in
-[`deployment.md` → Shell conventions](deployment.md#shell-conventions-used-below).
+[`deployment.md` → Shell conventions](../deployment.md#shell-conventions-used-below).
 
 ---
 
@@ -94,7 +98,7 @@ take the app down, it only blinds the three app scrape targets.
 
 ### 2.3 The host scripts (mandatory, every promotion)
 
-[`deployment.md` → Before a promotion: the host scripts](deployment.md#before-a-promotion-the-host-scripts)
+[`deployment.md` → Before a promotion: the host scripts](../deployment.md#before-a-promotion-the-host-scripts)
 with `--rev v1.17.0`. Expected: no difference, since no listed script changed.
 
 ### 2.4 Announce (no host change)
@@ -145,10 +149,10 @@ Each line is a production write with its own approval. None of it is urgent.
 | Step | What | Why |
 |---|---|---|
 | C1 | Delete `EDGE_HOST_API` from `/var/iri/code/.env` | #2686; inert on 1.17.0, required by v1.16.5 |
-| C2 | Drop `172.28.13.250` from `EDGE_TRUSTED_PROXY` | #2686; then the *trusted == pinned* check in [`deployment.md` → The edge](deployment.md#the-edge) passes again |
+| C2 | Drop `172.28.13.250` from `EDGE_TRUSTED_PROXY` | #2686; then the *trusted == pinned* check in [`deployment.md` → The edge](../deployment.md#the-edge) passes again |
 | C3 | Delete `APP_ANDROID_MINIMUM_VERSION_CODE`, `APP_ANDROID_LATEST_VERSION_CODE`, `APP_ANDROID_RELEASES_URL` | #2692/#2701; read by nothing since 1.17.0 |
 | C4 | `cd / && ${UPOD} network rm net-proxy-api`, or leave it to `container-cleanup` | #2686; unused, no subnet clash |
-| C5 | Keycloak: provisioner dry run, then `--apply`, to delete `krt-mobile-dpop-policy` and the `krt-mobile-dpop` profile if they still exist | #2700, ADR-0202 amendment; the client itself was deleted by hand on 2026-10-17. Runbook: [`docs/keycloak/README.md`](keycloak/README.md) → *a kcadm session on the production container* |
+| C5 | Keycloak: provisioner dry run, then `--apply`, to delete `krt-mobile-dpop-policy` and the `krt-mobile-dpop` profile if they still exist | #2700, ADR-0202 amendment; the client itself was deleted by hand on 2026-10-17. Runbook: [`docs/keycloak/README.md`](../keycloak/README.md) → *a kcadm session on the production container* |
 | C6 | Private Ansible inventory: drop `api.profit-base.online` from `basetool_host_public_name_aliases`, then `--tags podman` | cosmetic; the alias resolves nothing that matters |
 
 After C1–C3, render `env.d/` (`render-env-d.py`); no restart is needed, since no running container
@@ -169,5 +173,19 @@ reads those keys.
 - **#2675 (part 5):** 7 days after the promotion, measure the `401` floor without the API-host probes,
   set `BackendUnauthenticatedFlood`'s threshold, amend ADR-0173 and REQ-OBS-018. Then #2638 can close.
 - **Testing host (optional):** `APP_INSTANCE_TEST_SYSTEM=true` in its `.env` turns on the footer marker
-  (#2650, [`deployment.md` → Promoting to testing](deployment.md#promoting-to-testing)).
+  (#2650, [`deployment.md` → Promoting to testing](../deployment.md#promoting-to-testing)).
 - Move this file to `docs/archive/` with the archive header.
+
+---
+
+## 7. Outcome (2026-10-17)
+
+- `promote.yml` for `1.17.0` green; `deploy.sh` applied it in one restart window, 21:07–21:09 UTC,
+  `deploy successful`. Flyway `V304`–`V306` in 15 ms; `JWT azp check enforced; accepted client ids:
+  [basetool-frontend, basetool-ingest-gateway]`.
+- `edge-deny-probe` green from outside. The stale `DnsResolutionFailed` (`blackbox-dns-api-a`,
+  `-aaaa`) and `BlackboxProbeFailed` (`blackbox-http-auth`, API host) alerts of the v1.16.5 config
+  resolved at 21:13–21:18 UTC, after the new `prometheus.yml` dropped their jobs. No `TargetDown`.
+- §5 C1–C4 done by @greluc at 21:17 UTC (`trusted == pinned`, `net-proxy-api` removed); the old
+  `.env` is kept as `.env.backup-20261017-211716`. From then on a rollback to v1.16.5 needs
+  `EDGE_HOST_API` back first. C5 and C6 are open and optional.
