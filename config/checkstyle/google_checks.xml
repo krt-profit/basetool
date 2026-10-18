@@ -205,7 +205,7 @@
   <module name="FileLength">
     <property name="id" value="fileLengthInventoryItemController"/>
     <property name="fileExtensions" value="java"/>
-    <property name="max" value="1226"/>
+    <property name="max" value="1204"/>
   </module>
   <module name="SuppressionSingleFilter">
     <property name="id" value="fileLength"/>

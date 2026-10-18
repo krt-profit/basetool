@@ -368,6 +368,8 @@ class InventoryItemStackQueryDataTest {
             false,
             null,
             false,
+            null,
+            false,
             null);
     assertThat(userItemStacks).hasSize(1);
     assertThat(userItemStacks.get(0).gameItem().getId()).isEqualTo(gameItem.getId());
@@ -386,6 +388,8 @@ class InventoryItemStackQueryDataTest {
             Set.of(),
             false,
             false,
+            false,
+            null,
             false,
             null,
             false,
@@ -751,6 +755,8 @@ class InventoryItemStackQueryDataTest {
             false,
             null,
             false,
+            null,
+            false,
             null);
 
     assertThat(ids)
@@ -916,6 +922,8 @@ class InventoryItemStackQueryDataTest {
             false,
             false,
             false,
+            false,
+            null,
             false,
             null,
             false,

@@ -135,7 +135,7 @@ public class InventoryBackendClient {
    * @param nonPersonalOnly whether only the caller's shared entries are listed
    * @param stolenOnly whether only stock marked „gestohlen" is listed
    * @param nonStolenOnly whether stock marked „gestohlen" is hidden
-   * @param attributes the category, component-type, size and grade filters
+   * @param attributes the category, component-type, size, grade and class filters
    */
   public record ItemFilter(
       @Nullable List<UUID> gameItemIds,
@@ -917,7 +917,7 @@ public class InventoryBackendClient {
   }
 
   /**
-   * Appends one repeated query parameter per category, component type, size and grade
+   * Appends one repeated query parameter per category, component type, size, grade and class
    * (REQ-INV-063).
    *
    * @param uriBuilder the builder
@@ -929,6 +929,7 @@ public class InventoryBackendClient {
     attributes.componentTypes().forEach(type -> uriBuilder.queryParam("componentTypes", type));
     attributes.sizes().forEach(size -> uriBuilder.queryParam("sizes", size));
     attributes.grades().forEach(grade -> uriBuilder.queryParam("grades", grade));
+    attributes.itemClasses().forEach(itemClass -> uriBuilder.queryParam("itemClasses", itemClass));
   }
 
   /**

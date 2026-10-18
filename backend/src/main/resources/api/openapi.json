@@ -19125,6 +19125,17 @@
           }
         }, {
           "in" : "query",
+          "name" : "itemClasses",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "MILITARY", "CIVILIAN", "INDUSTRIAL", "STEALTH", "COMPETITION" ]
+            }
+          }
+        }, {
+          "in" : "query",
           "name" : "catalog",
           "required" : false,
           "schema" : {
@@ -20758,6 +20769,17 @@
           }
         }, {
           "in" : "query",
+          "name" : "itemClasses",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "MILITARY", "CIVILIAN", "INDUSTRIAL", "STEALTH", "COMPETITION" ]
+            }
+          }
+        }, {
+          "in" : "query",
           "name" : "catalog",
           "required" : false,
           "schema" : {
@@ -21017,6 +21039,17 @@
             "type" : "array",
             "items" : {
               "type" : "string"
+            }
+          }
+        }, {
+          "in" : "query",
+          "name" : "itemClasses",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "MILITARY", "CIVILIAN", "INDUSTRIAL", "STEALTH", "COMPETITION" ]
             }
           }
         }, {

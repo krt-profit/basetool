@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
@@ -122,6 +123,8 @@ class InventoryAggregationServiceTest {
               eq(false),
               isNull(),
               eq(false),
+              isNull(),
+              eq(false),
               isNull());
     }
 
@@ -147,6 +150,8 @@ class InventoryAggregationServiceTest {
               eq(false),
               eq(false),
               eq(false),
+              eq(false),
+              isNull(),
               eq(false),
               isNull(),
               eq(false),
@@ -196,6 +201,8 @@ class InventoryAggregationServiceTest {
               eq(false),
               isNull(),
               eq(false),
+              isNull(),
+              eq(false),
               isNull());
     }
 
@@ -218,7 +225,8 @@ class InventoryAggregationServiceTest {
               List.of(GameItemKind.VEHICLE_ITEM),
               List.of(ShipComponentType.QUANTUM_DRIVE),
               List.of(2),
-              List.of("A")));
+              List.of("A"),
+              List.of(ShipComponentClass.MILITARY)));
 
       verify(inventoryItemViewRepository)
           .findUserItemStacks(
@@ -240,7 +248,9 @@ class InventoryAggregationServiceTest {
               eq(true),
               eq(List.of(2)),
               eq(true),
-              eq(List.of("A")));
+              eq(List.of("A")),
+              eq(true),
+              eq(List.of(ShipComponentClass.MILITARY)));
     }
 
     @Test
@@ -266,11 +276,18 @@ class InventoryAggregationServiceTest {
               anyBoolean(),
               any(),
               anyBoolean(),
+              any(),
+              anyBoolean(),
               any()))
           .thenReturn(List.of());
 
       service.getAllAggregatedItemInventory(
-          null, null, null, false, false, new ItemAttributeFilter(null, null, null, List.of("C")));
+          null,
+          null,
+          null,
+          false,
+          false,
+          new ItemAttributeFilter(null, null, null, List.of("C"), null));
 
       verify(inventoryItemViewRepository)
           .findGlobalItemStacks(
@@ -295,7 +312,9 @@ class InventoryAggregationServiceTest {
               eq(false),
               isNull(),
               eq(true),
-              eq(List.of("C")));
+              eq(List.of("C")),
+              eq(false),
+              isNull());
     }
 
     @Test
@@ -337,6 +356,8 @@ class InventoryAggregationServiceTest {
               anyBoolean(),
               any(),
               anyBoolean(),
+              any(),
+              anyBoolean(),
               any()))
           .thenReturn(List.of());
 
@@ -356,6 +377,8 @@ class InventoryAggregationServiceTest {
               eq(Set.of(memberOrgUnitId)),
               eq(false),
               eq(false),
+              eq(false),
+              isNull(),
               eq(false),
               isNull(),
               eq(false),
@@ -505,6 +528,8 @@ class InventoryAggregationServiceTest {
               anyBoolean(),
               any(),
               anyBoolean(),
+              any(),
+              anyBoolean(),
               any()))
           .thenReturn(List.of(entry));
 
@@ -534,6 +559,8 @@ class InventoryAggregationServiceTest {
               eq(false),
               eq(false),
               eq(false),
+              eq(false),
+              isNull(),
               eq(false),
               isNull(),
               eq(false),
@@ -659,6 +686,8 @@ class InventoryAggregationServiceTest {
               anyBoolean(),
               eq(false),
               eq(false),
+              anyBoolean(),
+              any(),
               anyBoolean(),
               any(),
               anyBoolean(),
@@ -835,6 +864,8 @@ class InventoryAggregationServiceTest {
             anyBoolean(),
             any(),
             anyBoolean(),
+            any(),
+            anyBoolean(),
             any()))
         .thenReturn(List.of());
   }
@@ -861,6 +892,8 @@ class InventoryAggregationServiceTest {
             any(),
             eq(false),
             eq(false),
+            anyBoolean(),
+            any(),
             anyBoolean(),
             any(),
             anyBoolean(),

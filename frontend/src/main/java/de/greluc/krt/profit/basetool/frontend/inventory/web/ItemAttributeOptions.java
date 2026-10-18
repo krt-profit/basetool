@@ -29,19 +29,21 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * The options of the item view's category, component-type, size and grade filters: only values
- * present in the viewer's stock (REQ-INV-063).
+ * The options of the item view's category, component-type, size, grade and class filters: only
+ * values present in the viewer's stock (REQ-INV-063).
  *
  * @param kinds the distinct item category names, sorted
  * @param componentTypes the distinct ship component type names, sorted
  * @param sizes the distinct component sizes, ascending
  * @param grades the distinct component grades, sorted
+ * @param itemClasses the distinct component class names, sorted
  */
 public record ItemAttributeOptions(
     @NotNull @Unmodifiable List<String> kinds,
     @NotNull @Unmodifiable List<String> componentTypes,
     @NotNull @Unmodifiable List<Integer> sizes,
-    @NotNull @Unmodifiable List<String> grades) {
+    @NotNull @Unmodifiable List<String> grades,
+    @NotNull @Unmodifiable List<String> itemClasses) {
 
   /**
    * Collects the options from the game items of the given groups.
@@ -56,7 +58,8 @@ public record ItemAttributeOptions(
         distinctSorted(gameItems, InventoryGameItemReferenceDto::kind),
         distinctSorted(gameItems, InventoryGameItemReferenceDto::componentType),
         distinctSorted(gameItems, InventoryGameItemReferenceDto::size),
-        distinctSorted(gameItems, InventoryGameItemReferenceDto::grade));
+        distinctSorted(gameItems, InventoryGameItemReferenceDto::grade),
+        distinctSorted(gameItems, InventoryGameItemReferenceDto::itemClass));
   }
 
   private static <T extends Comparable<T>> @NotNull @Unmodifiable List<T> distinctSorted(

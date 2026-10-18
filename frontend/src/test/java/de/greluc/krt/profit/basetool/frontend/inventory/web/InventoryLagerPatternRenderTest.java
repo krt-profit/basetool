@@ -291,7 +291,7 @@ class InventoryLagerPatternRenderTest {
   }
 
   /**
-   * Both Lager items views render the category, component-type, size and grade filters with
+   * Both Lager items views render the category, component-type, size, grade and class filters with
    * translated options drawn from the stock, and tick the values the address carries (REQ-INV-063).
    */
   @Test
@@ -300,7 +300,7 @@ class InventoryLagerPatternRenderTest {
     String my =
         main(
             render(
-                "/inventory/my?view=items&sizes=1",
+                "/inventory/my?view=items&sizes=1&itemClasses=MILITARY",
                 "/inventory/my-inventory/grouped",
                 itemGroups()));
     String global =
@@ -312,10 +312,12 @@ class InventoryLagerPatternRenderTest {
           .contains("data-testid=\"item-componentType-filter\"")
           .contains("data-testid=\"item-size-filter\"")
           .contains("data-testid=\"item-grade-filter\"")
+          .contains("data-testid=\"item-itemClass-filter\"")
           .contains("data-chip-label=\"Kategorie\"")
           .contains("data-chip-label=\"Komponententyp\"")
           .contains("data-chip-label=\"Größe\"")
           .contains("data-chip-label=\"Grad\"")
+          .contains("data-chip-label=\"Klasse\"")
           .contains("data-trigger=\"" + page[1] + "-update-state\"")
           .containsPattern(
               "<span>Schiffskomponente</span>\\s*<input type=\"checkbox\" class=\"kindCheck\""
@@ -331,10 +333,15 @@ class InventoryLagerPatternRenderTest {
                   + " value=\"1\"")
           .containsPattern(
               "<span>A</span>\\s*<input type=\"checkbox\" class=\"gradeCheck\" name=\"grades\""
-                  + " value=\"A\"");
+                  + " value=\"A\"")
+          .containsPattern(
+              "<span>Militär</span>\\s*<input type=\"checkbox\" class=\"itemClassCheck\""
+                  + " name=\"itemClasses\" value=\"MILITARY\"");
     }
     assertThat(my).containsPattern("name=\"sizes\" value=\"1\"[^>]*checked");
     assertThat(global).doesNotContainPattern("name=\"sizes\" value=\"1\"[^>]*checked");
+    assertThat(my).containsPattern("name=\"itemClasses\" value=\"MILITARY\"[^>]*checked");
+    assertThat(global).doesNotContainPattern("name=\"itemClasses\" value=\"MILITARY\"[^>]*checked");
   }
 
   /**
