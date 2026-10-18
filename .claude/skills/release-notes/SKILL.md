@@ -163,6 +163,25 @@ Behalte nur, was ein Nutzer **sehen, anklicken oder anders erleben** kann.
   „ships dark" / Feature-Flag Standard aus.** Solche Einträge fliegen raus, egal
   wie groß der Diff war.
 
+**Weglassen — nur für Admins** (für normale Nutzer unsichtbar): Die Notes richten
+sich an alle Rollen **unterhalb** von Admin — Mitglieder, Logistiker,
+Einsatz-Manager, Offiziere, Einheits- und Bereichsleitungen, Bank-Personal,
+Handelsbeauftragte. Was ausschließlich Admins sehen oder tun können, gehört nicht
+hinein — dieselbe Grenze, die auch das Wiki zieht:
+
+- Der Administrationsbereich und jede Admin-only-Seite oder -Aktion
+  (`admin.*`-Schlüssel, Pfade unter `/admin`, `ROLE_ADMIN`-only-Endpunkte,
+  „Administration öffnen", Admin-Übersichten, Audit-Log-Admin-Ansicht,
+  Einstellungen, Stammdaten-Pflege, Wiki-Sync-Steuerung, Benutzerverwaltung).
+- Was ein Admin sehen, übersteuern oder konfigurieren kann — auch dann, wenn der
+  Eintrag sonst nutzerbezogen klingt.
+- Mischeinträge werden **gekürzt, nicht gestrichen**: Nur der Admin-Teil fällt weg
+  (z. B. aus „Schnellzugriff … und ‚Administration öffnen' (Admins)" bleibt der
+  Schnellzugriff ohne die Admin-Aktion). Ein Nutzer-Effekt, der aus einer
+  Admin-Einstellung folgt, bleibt — ohne die Einstellung zu nennen.
+- Ein Admin darf höchstens als Ansprechpartner vorkommen („bei Fragen an die
+  Administration wenden"), nie mit dem, was er dafür tut.
+
 Im Zweifel gilt: **Würde ein Mitglied den Unterschied bemerken, ohne dass man es
 ihm erklärt? Wenn nein → weglassen.** Lieber zehn ehrliche, relevante Zeilen als
 fünfzig, die niemand versteht.
@@ -534,6 +553,8 @@ triffst du auch in Grenzfällen die richtige Entscheidung:
 
 - [ ] Startpunkt korrekt aufgelöst (Datum vs. Tag vs. Commit), Zeitfenster stimmt.
 - [ ] Nur nutzersichtbare Punkte; alle „Rendering unverändert"/intern-Einträge raus.
+- [ ] Nichts, was nur Admins betrifft: keine Admin-Seiten, -Aktionen oder -Einstellungen;
+      Mischeinträge um den Admin-Teil gekürzt.
 - [ ] Kein Jargon mehr: keine Pfade, `V###`, Framework-Namen, HTTP-Codes, PR-Nummern.
 - [ ] Erster Block = `<h2>Release Notes (TT.MM. → TT.MM.)</h2>` mit korrektem Fenster.
 - [ ] Zweiter Block = Pflicht-Unterzeile `<p><em>Version <aktuelle released Version> · Stand <TT.MM.JJJJ></em></p>` (Wortlaut aus SUGGESTED SUBTITLE).
