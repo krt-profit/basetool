@@ -309,6 +309,14 @@ interface KrtPageSectionsConfig {
         busyTest?: (sectionKey: string, container: Element | '' | null) => boolean;
         /** Builds the receiver although the topic is not known yet, for a later `retarget`. */
         retargetable?: boolean;
+        /**
+         * Wraps the re-render of a peer change, for a page that restores state around the swap;
+         * `run` re-renders the given sections without a broadcast.
+         */
+        refresh?: (
+            sectionKeys: string[],
+            run: (sectionKeys: string[]) => Promise<boolean[]>,
+        ) => void;
         /** Maps the sections a peer changed to the sections to re-render. */
         expand?: (sectionKeys: string[]) => string[];
     };

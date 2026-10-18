@@ -198,7 +198,14 @@ function create(config) {
             busyTest: receiverCfg.busyTest,
             /** @param {string[]} keys the sections a peer changed */
             refresh(keys) {
-                refresh(typeof expand === 'function' ? expand(keys) : keys, { broadcast: false });
+                const list = typeof expand === 'function' ? expand(keys) : keys;
+                /** @param {string[]} sectionKeys the sections to re-render without a broadcast */
+                const run = (sectionKeys) => refresh(sectionKeys, { broadcast: false });
+                if (typeof receiverCfg.refresh === 'function') {
+                    receiverCfg.refresh(list, run);
+                } else {
+                    run(list);
+                }
             },
         });
     }

@@ -380,6 +380,26 @@ await test('a retargetable receiver is built before the topic is known', async (
     assert.equal(typeof sections.receiver.retarget, 'function');
 });
 
+await test('a receiver refresh hook wraps the re-render of a peer change', async () => {
+    const h = harness();
+    const seen = [];
+    const sections = h.krtPageSections.create(
+        declaration({
+            receiver: {
+                refresh(keys, run) {
+                    seen.push(keys);
+                    return run(keys);
+                },
+            },
+        }),
+    );
+    sections.receiver.apply(['b']);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.deepEqual(plain(seen), [['b']]);
+    assert.equal(h.elements['#b'].innerHTML, 'fresh frag-b');
+    assert.equal(h.live.sent.length, 0);
+});
+
 await test('publish is a no-op without a topic', async () => {
     const h = harness();
     h.krtPageSections.publish(null, ['a']);

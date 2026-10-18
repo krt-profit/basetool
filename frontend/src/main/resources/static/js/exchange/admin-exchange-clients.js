@@ -20,33 +20,41 @@
 import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
-
-const EXCHANGE_CLIENTS_SECTIONS = {
-    registry: { container: '#xc-registry-host', fragmentValue: 'registry' },
-    undoRuns: { container: '#xc-undo-runs-host', fragmentValue: 'undoRuns' },
-};
 
 function initAdminExchangeClients() {
     const BASE = '/admin/exchange-clients';
     const RUN_POLL_MS = 3000;
 
+    /** @type {() => void} */
+    let afterRunsRefresh = () => {};
+
+    const clients = krtPageSections.create({
+        dict() {
+            const holder = document.getElementById('xc-i18n');
+            return { 'xc.refresh.error': (holder && holder.dataset.error) || '' };
+        },
+        keys: { refreshErrorKey: 'xc.refresh.error' },
+        sections: {
+            registry: { container: '#xc-registry-host', fragmentValue: 'registry' },
+            undoRuns: { container: '#xc-undo-runs-host', fragmentValue: 'undoRuns' },
+        },
+        pageUrl() {
+            return BASE;
+        },
+        topic: 'exchange-clients',
+        receiver: {
+            coalesceMs: 1500,
+            refresh(keys, run) {
+                run(keys).then(() => {
+                    if (keys.includes('undoRuns')) afterRunsRefresh();
+                });
+            },
+        },
+    });
+
     wireUndo();
-
-    /** Tells the other admins' open pages that the switch or the client table changed. */
-    function broadcastRegistry() {
-        if (typeof krtLiveSync.sendChanged === 'function') {
-            krtLiveSync.sendChanged('exchange-clients', ['registry']);
-        }
-    }
-
-    /** Tells the other admins' open pages that a bulk undo started and suspended its client. */
-    function broadcastUndoStart() {
-        if (typeof krtLiveSync.sendChanged === 'function') {
-            krtLiveSync.sendChanged('exchange-clients', ['registry', 'undoRuns']);
-        }
-    }
 
     const form = document.getElementById('xc-form');
     const title = document.getElementById('xc-form-title');
@@ -244,16 +252,6 @@ function initAdminExchangeClients() {
                 });
         }
 
-        /** Re-renders the switch and the client table in place from the `registry` fragment. */
-        function refreshRegistry() {
-            return krtFetch.swap({
-                url: BASE,
-                container: '#xc-registry-host',
-                fragmentValue: 'registry',
-                errorMessage: i18n.error,
-            });
-        }
-
         /**
          * Runs `action` after the member confirmed, or at once where no confirm dialog exists.
          * @param {string} titleText
@@ -278,17 +276,16 @@ function initAdminExchangeClients() {
             const id = editedId();
             const submitter = el.form.querySelector('button[type="submit"]');
             const save = function () {
-                krtFetch.write({
+                clients.write({
                     method: id ? 'PUT' : 'POST',
                     url: BASE + (id ? `/${encodeURIComponent(id)}` : ''),
                     payload: buildPayload(),
                     successMessage: i18n.saved,
                     errorMessage: i18n.error,
                     submitter,
+                    refresh: ['registry'],
                     onSuccess() {
                         resetForm();
-                        broadcastRegistry();
-                        return refreshRegistry();
                     },
                 });
             };
@@ -317,17 +314,14 @@ function initAdminExchangeClients() {
                 return;
             }
             const send = function () {
-                krtFetch.write({
+                clients.write({
                     method: 'POST',
                     url: `${BASE}/${encodeURIComponent(id)}/${action}`,
                     payload: { version: rowVersion == null ? null : Number(rowVersion) },
                     successMessage: action === 'suspend' ? i18n.suspended : i18n.activated,
                     errorMessage: i18n.error,
                     submitter,
-                    onSuccess() {
-                        broadcastRegistry();
-                        return refreshRegistry();
-                    },
+                    refresh: ['registry'],
                 });
             };
             if (action === 'suspend') {
@@ -355,7 +349,7 @@ function initAdminExchangeClients() {
                 enabled ? i18n.confirmOffBody : i18n.confirmOnBody,
                 enabled ? i18n.confirmOffOk : i18n.confirmOnOk,
                 () => {
-                    krtFetch.write({
+                    clients.write({
                         method: 'PUT',
                         url: `${BASE}/settings`,
                         payload: {
@@ -365,10 +359,7 @@ function initAdminExchangeClients() {
                         successMessage: i18n.switched,
                         errorMessage: i18n.error,
                         submitter,
-                        onSuccess() {
-                            broadcastRegistry();
-                            return refreshRegistry();
-                        },
+                        refresh: ['registry'],
                     });
                 },
             );
@@ -673,13 +664,10 @@ function initAdminExchangeClients() {
                     submitter: submit,
                     onSuccess() {
                         krtModal.close('xc-undo-modal');
-                        broadcastUndoStart();
-                        return Promise.all([refreshRegistry(), refreshRuns()]);
+                        return clients.refresh(['registry', 'undoRuns']).then(afterRunsRefresh);
                     },
                     onError() {
-                        broadcastUndoStart();
-                        refreshRegistry();
-                        refreshRuns();
+                        clients.refresh(['registry', 'undoRuns']).then(afterRunsRefresh);
                         return false;
                     },
                 });
@@ -697,27 +685,7 @@ function initAdminExchangeClients() {
             });
         }
 
-        /** Re-renders the switch and the client table, which show the client suspended. */
-        function refreshRegistry() {
-            return krtFetch.swap({
-                url: BASE,
-                container: '#xc-registry-host',
-                fragmentValue: 'registry',
-                errorMessage: i18n.error,
-            });
-        }
-
-        /** Re-renders the run list in place and keeps polling while a run is going. */
-        function refreshRuns() {
-            return krtFetch
-                .swap({
-                    url: BASE,
-                    container: '#xc-undo-runs-host',
-                    fragmentValue: 'undoRuns',
-                    errorMessage: i18n.error,
-                })
-                .then(schedulePoll);
-        }
+        afterRunsRefresh = schedulePoll;
 
         /** Polls the run list again while it shows a running run. */
         function schedulePoll() {
@@ -729,7 +697,7 @@ function initAdminExchangeClients() {
             if (list && list.getAttribute('data-xc-running') === 'true') {
                 pollTimer = window.setTimeout(() => {
                     pollTimer = null;
-                    refreshRuns();
+                    clients.refresh('undoRuns', { broadcast: false }).then(schedulePoll);
                 }, RUN_POLL_MS);
             }
         }
@@ -830,21 +798,6 @@ function initAdminExchangeClients() {
         });
 
         schedulePoll();
-
-        krtLiveSync.createReceiver({
-            topic: 'exchange-clients',
-            sections: EXCHANGE_CLIENTS_SECTIONS,
-            coalesceMs: 1500,
-            /** @param {string[]} keys the sections another admin changed */
-            refresh(keys) {
-                if (keys.includes('registry')) {
-                    refreshRegistry();
-                }
-                if (keys.includes('undoRuns')) {
-                    refreshRuns();
-                }
-            },
-        });
     }
 }
 

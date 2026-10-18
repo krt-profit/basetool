@@ -60,11 +60,10 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void exchangeClientsSeamMap_matchesTheAdminExchangeClientsTopicWhitelist() throws IOException {
-    Set<String> jsKeys =
-        seamMapKeys("/static/js/exchange/admin-exchange-clients.js", "EXCHANGE_CLIENTS_SECTIONS");
+    Set<String> jsKeys = seamMapKeys("/static/js/exchange/admin-exchange-clients.js", "sections");
     assertThat(jsKeys)
         .as(
-            "EXCHANGE_CLIENTS_SECTIONS keys in admin-exchange-clients.js vs"
+            "sections keys in admin-exchange-clients.js vs"
                 + " LiveSyncTopicClass.EXCHANGE_CLIENTS whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.EXCHANGE_CLIENTS.allowedSections());
   }
@@ -72,13 +71,11 @@ class LiveSyncSectionMapParityTest {
   @Test
   void exchangeClientsPage_broadcastsEveryWriteWithWhitelistedKeys() throws IOException {
     String js = readResource("/static/js/exchange/admin-exchange-clients.js");
-    assertSendChangedKeysWhitelisted(
-        js, "'exchange-clients'", LiveSyncTopicClass.EXCHANGE_CLIENTS.allowedSections());
     assertThat(js)
         .as("a bulk undo start must refresh the peers' client table and run list")
-        .contains("sendChanged('exchange-clients', ['registry', 'undoRuns'])")
+        .contains("clients.refresh(['registry', 'undoRuns'])")
         .as("a registry write must refresh the peers' client table")
-        .contains("sendChanged('exchange-clients', ['registry'])")
+        .contains("refresh: ['registry']")
         .as("the page must receive the peers' changes")
         .contains("topic: 'exchange-clients'");
   }
@@ -134,11 +131,10 @@ class LiveSyncSectionMapParityTest {
   @Test
   void blueprintSeamMap_matchesTheOwnBlueprintsTopicWhitelist() throws IOException {
     Set<String> jsKeys =
-        seamMapKeys(
-            "/static/js/personalinventory/personal-inventory-blueprints.js", "BLUEPRINT_SECTIONS");
+        seamMapKeys("/static/js/personalinventory/personal-inventory-blueprints.js", "sections");
     assertThat(jsKeys)
         .as(
-            "BLUEPRINT_SECTIONS keys in personal-inventory-blueprints.js vs"
+            "sections keys in personal-inventory-blueprints.js vs"
                 + " LiveSyncTopicClass.BLUEPRINTS_OWN whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.BLUEPRINTS_OWN.allowedSections());
   }
@@ -370,23 +366,23 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void membersSeamMap_matchesTheMembersTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/identity/members.js", "MEMBERS_SECTIONS");
+    Set<String> jsKeys = seamMapKeys("/static/js/identity/members.js", "sections");
     assertThat(jsKeys)
-        .as("MEMBERS_SECTIONS keys in members.js vs LiveSyncTopicClass.MEMBERS whitelist")
+        .as("sections keys in members.js vs LiveSyncTopicClass.MEMBERS whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.MEMBERS.allowedSections());
   }
 
   @Test
   void orgStructureSeamMaps_partitionTheOrgStructureTopicWhitelist() throws IOException {
     Set<String> editorKeys = seamMapKeys("/static/js/orgunit/admin-org-structure.js", "sections");
-    Set<String> chartKeys = seamMapKeys("/static/js/orgchart/org-chart.js", "ORG_CHART_SECTIONS");
+    Set<String> chartKeys = seamMapKeys("/static/js/orgchart/org-chart.js", "sections");
     Set<String> whitelist = LiveSyncTopicClass.ORG_STRUCTURE.allowedSections();
 
     assertThat(editorKeys)
         .as("sections keys in admin-org-structure.js vs the ORG_STRUCTURE whitelist")
         .isSubsetOf(whitelist);
     assertThat(chartKeys)
-        .as("ORG_CHART_SECTIONS keys in org-chart.js vs the ORG_STRUCTURE whitelist")
+        .as("sections keys in org-chart.js vs the ORG_STRUCTURE whitelist")
         .isSubsetOf(whitelist);
 
     Set<String> union = new LinkedHashSet<>(editorKeys);

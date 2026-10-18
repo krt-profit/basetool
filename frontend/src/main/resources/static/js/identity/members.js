@@ -28,24 +28,18 @@ import {
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 
-const MEMBERS_SECTIONS = {
-    roster: { container: '#members-results', fragmentValue: 'results' },
-};
-
-/** Re-renders the roster fragment in place, or reloads when the transport is missing. */
-function refreshMembersResults() {
-    const container = document.getElementById('members-results');
-    if (!container) {
-        location.reload();
-        return;
-    }
-    krtFetch.swap({
-        url: window.location.pathname + window.location.search,
-        container,
-    });
-}
+const members = krtPageSections.create({
+    sections: {
+        roster: { container: '#members-results', fragmentValue: 'results' },
+    },
+    pageUrl() {
+        return window.location.pathname + window.location.search;
+    },
+    topic: 'members',
+    receiver: document.getElementById('members-results') ? { coalesceMs: 1500 } : undefined,
+});
 
 /** Wires the live roster filter and the name autocomplete of the search field. */
 function bindFilter() {
@@ -141,7 +135,7 @@ async function deleteUser(userId) {
         successMessage: MSG_DELETE_SUCCESS,
         errorMessage: MSG_DELETE_ERROR,
         onSuccess() {
-            refreshMembersResults();
+            members.refresh('roster', { broadcast: false });
         },
     });
 }
@@ -154,7 +148,7 @@ function syncMembersNow() {
         successMessage: MSG_SYNC_SUCCESS,
         errorMessage: MSG_SYNC_ERROR,
         onSuccess() {
-            refreshMembersResults();
+            members.refresh('roster', { broadcast: false });
         },
     });
 }
@@ -215,7 +209,7 @@ function confirmConsolidate() {
         onSuccess() {
             showFrontendSuccessToast(MSG_CONSOLIDATE_SUCCESS);
             closeConsolidate();
-            refreshMembersResults();
+            members.refresh('roster', { broadcast: false });
         },
     });
 }
@@ -241,20 +235,3 @@ krtEvents.on('click', 'members-sync', () => {
 krtEvents.on('click', 'members-consolidate', (el) => {
     openConsolidate(el);
 });
-
-function initMembers() {
-    if (!document.getElementById('members-results')) {
-        return;
-    }
-
-    krtLiveSync.createReceiver({
-        topic: 'members',
-        sections: MEMBERS_SECTIONS,
-        coalesceMs: 1500,
-        refresh() {
-            refreshMembersResults();
-        },
-    });
-}
-
-initMembers();

@@ -27,11 +27,7 @@ import {
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
-
-const ORG_CHART_SECTIONS = {
-    chart: { container: '#oc-chart', fragmentValue: 'chartBody' },
-};
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 
 const ORG_CHART_UNITS_SECTION = 'units';
 
@@ -42,57 +38,61 @@ const modalContent = modal ? modal.querySelector('.krt-modal') : null;
 /** @type {HTMLElement | null} */
 let lastTrigger = null;
 
-/** @param {number} [keepScroll] the scroll position to restore instead of the current one */
-function refreshChart(keepScroll) {
+const orgChart = krtPageSections.create({
+    dict() {
+        return { 'orgchart.refresh.failed': OC_I18N.refreshFailed };
+    },
+    keys: { refreshErrorKey: 'orgchart.refresh.failed' },
+    sections: {
+        chart: { container: '#oc-chart', fragmentValue: 'chartBody' },
+    },
+    pageUrl() {
+        return '/org-chart';
+    },
+    topic: 'org-structure',
+    alsoBroadcast: [ORG_CHART_UNITS_SECTION],
+    receiver: chart
+        ? {
+              coalesceMs: 1500,
+              busyTest() {
+                  return !!modal && window.getComputedStyle(modal).display !== 'none';
+              },
+              refresh(keys, run) {
+                  keepChartScroll(() => run(keys));
+              },
+          }
+        : undefined,
+});
+
+/**
+ * Runs a chart re-render and puts the horizontal scroll position back once the new chart landed.
+ *
+ * @param {() => Promise<boolean[]>} render the re-render
+ * @param {number} [keepScroll] the scroll position to restore instead of the current one
+ */
+function keepChartScroll(render, keepScroll) {
     if (!chart) {
         window.location.reload();
         return;
     }
     const savedX = typeof keepScroll === 'number' ? keepScroll : chart.scrollLeft;
-    krtFetch
-        .swap({
-            url: '/org-chart',
-            container: chart,
-            fragmentValue: 'chartBody',
-            errorMessage: OC_I18N.refreshFailed,
-        })
-        .then((ok) => {
-            if (!ok) {
+    render().then((flags) => {
+        if (!flags.every(Boolean)) {
+            return;
+        }
+        const deadline = performance.now() + 5000;
+        let prevMax = -1;
+        (function reapply() {
+            const maxScroll = chart.scrollWidth - chart.clientWidth;
+            chart.scrollLeft = savedX;
+            const landed = chart.scrollLeft >= Math.min(savedX, maxScroll) - 1;
+            const settled = maxScroll === prevMax;
+            prevMax = maxScroll;
+            if (savedX <= 0 || (landed && settled) || performance.now() >= deadline) {
                 return;
             }
-            const deadline = performance.now() + 5000;
-            let prevMax = -1;
-            (function reapply() {
-                const maxScroll = chart.scrollWidth - chart.clientWidth;
-                chart.scrollLeft = savedX;
-                const landed = chart.scrollLeft >= Math.min(savedX, maxScroll) - 1;
-                const settled = maxScroll === prevMax;
-                prevMax = maxScroll;
-                if (savedX <= 0 || (landed && settled) || performance.now() >= deadline) {
-                    return;
-                }
-                window.requestAnimationFrame(reapply);
-            })();
-        });
-}
-
-function broadcastOrgStructureChanged() {
-    if (typeof krtLiveSync.sendChanged === 'function') {
-        krtLiveSync.sendChanged('org-structure', ['chart', ORG_CHART_UNITS_SECTION]);
-    }
-}
-
-if (chart) {
-    krtLiveSync.createReceiver({
-        topic: 'org-structure',
-        sections: ORG_CHART_SECTIONS,
-        coalesceMs: 1500,
-        refresh() {
-            refreshChart();
-        },
-        busyTest() {
-            return !!modal && window.getComputedStyle(modal).display !== 'none';
-        },
+            window.requestAnimationFrame(reapply);
+        })();
     });
 }
 
@@ -267,15 +267,14 @@ function send(method, url, body) {
             showFrontendSuccessToast(OC_I18N.saved);
             const keepScroll = chart ? chart.scrollLeft : 0;
             closeModal();
-            refreshChart(keepScroll);
-            broadcastOrgStructureChanged();
+            keepChartScroll(() => orgChart.refresh('chart'), keepScroll);
         },
         onError(_status, data) {
             if (data && data.code === 'OPTIMISTIC_LOCK') {
                 showFrontendErrorToast(OC_I18N.conflict);
                 const keepScroll = chart ? chart.scrollLeft : 0;
                 closeModal();
-                refreshChart(keepScroll);
+                keepChartScroll(() => orgChart.refresh('chart', { broadcast: false }), keepScroll);
                 return true;
             }
             const message = data && data.detail ? data.detail : OC_I18N.genericError;
