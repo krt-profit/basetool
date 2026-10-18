@@ -36,7 +36,6 @@ import de.greluc.krt.profit.basetool.ingest.relay.ExchangeRelay;
 import de.greluc.krt.profit.basetool.ingest.store.ExchangeBudget;
 import de.greluc.krt.profit.basetool.ingest.store.ExchangeQuotas;
 import io.micrometer.core.instrument.MeterRegistry;
-import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -113,12 +112,6 @@ public class ExchangeController {
   /** The code of a draft too large to hand off. */
   static final String PAYLOAD_TOO_LARGE = "PAYLOAD_TOO_LARGE";
 
-  /** The code of a change set the mass-change guard held back for the member's confirmation. */
-  static final String MASS_CHANGE_CONFIRMATION_REQUIRED = "MASS_CHANGE_CONFIRMATION_REQUIRED";
-
-  /** The frontend page where the member confirms a staged mass change. */
-  static final String CONFIRMATION_PATH = "/connected-apps/confirm";
-
   /** The only offline-file major version the gateway reads. */
   static final String FORMAT_MAJOR = "1";
 
@@ -164,15 +157,7 @@ public class ExchangeController {
   private final ExchangeStoreProperties storeProperties;
   private final IngestProperties ingestProperties;
   private final MeterRegistry meterRegistry;
-
-  /** Registers the staged mass-change counter at zero. */
-  @PostConstruct
-  void registerCounters() {
-    meterRegistry.counter(
-        MetricNames.EXCHANGE_MASS_CHANGES_STAGED,
-        MetricNames.TAG_CLIENT_ID,
-        MetricNames.EXCHANGE_CLIENT_NONE);
-  }
+  private final HeldMassChanges heldMassChanges;
 
   /**
    * Returns the service document: what this token may do and what the server expects.
@@ -799,6 +784,11 @@ public class ExchangeController {
         return overQuota;
       }
     }
+    String digest = heldMassChanges.digest(context, resource, body);
+    ResponseEntity<?> resent = heldMassChanges.resent(context, digest);
+    if (resent != null) {
+      return resent;
+    }
     String target = BACKEND + (ORG_STOCK.equals(resource) ? "/" : "/me/") + resource + "/changes";
     ExchangeRelay.Result result =
         body.get("ops") instanceof ArrayNode ops && ops.size() > LARGE_CHANGE_SET_OPS
@@ -807,8 +797,8 @@ public class ExchangeController {
     if (ExchangeRefusals.RELAY_BUSY.equals(result.code())) {
       quotas.refundCounted(request);
     }
-    if (!result.isOk() && MASS_CHANGE_CONFIRMATION_REQUIRED.equals(result.code())) {
-      return staged(context, request, resource, body, result);
+    if (!result.isOk() && HeldMassChanges.MASS_CHANGE_CONFIRMATION_REQUIRED.equals(result.code())) {
+      return staged(context, request, resource, body, result, digest);
     }
     return relayed(result, "change-result.schema.json", unknown);
   }
@@ -856,14 +846,16 @@ public class ExchangeController {
   }
 
   /**
-   * Stages a change set the mass-change guard held back, stamped with the time it was staged, and
-   * answers where the member confirms it.
+   * Stages a change set the mass-change guard held back, stamped with the time it was staged,
+   * records its digest so a byte-identical resend finds it, and answers where the member confirms
+   * it.
    *
    * @param context the admitted request
    * @param request the write, whose quota count a budget refusal gives back
    * @param resource the resource's path segment
    * @param body the change set
    * @param result the backend's refusal
+   * @param digest the change set's digest, or {@code null} when none was computed
    * @return {@code 409 MASS_CHANGE_CONFIRMATION_REQUIRED} with the {@code confirmationUrl}, or a
    *     problem when the change set cannot be staged
    */
@@ -872,7 +864,8 @@ public class ExchangeController {
       @NotNull HttpServletRequest request,
       @NotNull String resource,
       @NotNull JsonNode body,
-      @NotNull ExchangeRelay.Result result) {
+      @NotNull ExchangeRelay.Result result,
+      @Nullable String digest) {
     ObjectNode document = objectMapper.createObjectNode();
     document.put("clientId", context.clientId());
     document.put("installationKey", context.keyThumbprint());
@@ -911,23 +904,7 @@ public class ExchangeController {
           "The confirmation cannot be prepared; try again later.",
           RETRY_AFTER_SECONDS);
     }
-    meterRegistry
-        .counter(
-            MetricNames.EXCHANGE_MASS_CHANGES_STAGED, MetricNames.TAG_CLIENT_ID, context.clientId())
-        .increment();
-    ProblemDetail problem =
-        Problems.of(
-            loggingProperties,
-            HttpStatus.CONFLICT,
-            HttpStatus.CONFLICT.getReasonPhrase(),
-            MASS_CHANGE_CONFIRMATION_REQUIRED,
-            result.detail());
-    problem.setProperty(
-        "confirmationUrl",
-        ingestProperties.frontendBaseUrl() + CONFIRMATION_PATH + "?handoff=" + staged.handoffId());
-    return ResponseEntity.status(HttpStatus.CONFLICT)
-        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
-        .body(problem);
+    return heldMassChanges.staged(context, digest, staged.handoffId(), result.detail());
   }
 
   /**

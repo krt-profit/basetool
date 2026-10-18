@@ -389,6 +389,66 @@ class ExchangeChangeRouteTest {
   }
 
   @Test
+  void aHeldBackMassChangeRecordsItsDigestForAResend() throws Exception {
+    when(relay.forward(any(), anyString(), any(), any(), any()))
+        .thenReturn(
+            new ExchangeRelay.Result(
+                409, null, "MASS_CHANGE_CONFIRMATION_REQUIRED", "40 removals in 24 hours."));
+    when(stagingService.massChangeDigest(anyString(), eq("blueprints"), any()))
+        .thenReturn("digest-1");
+    when(stagingService.stageMassChange(eq("versekit"), eq(member), anyString(), anyLong()))
+        .thenReturn(new HandoffStagingService.Staged("hid-1", "ingest:handoff:x:hid-1", 321L));
+    when(stagingService.stagedBytes(eq(HandoffKind.MASS_CHANGE), anyString())).thenReturn(321L);
+
+    post("/exchange/v1/me/blueprints/changes", ADD).andExpect(status().isConflict());
+
+    verify(stagingService)
+        .rememberMassChange(
+            "versekit",
+            member,
+            new HandoffStagingService.HeldMassChange(
+                "digest-1", "hid-1", "40 removals in 24 hours."));
+  }
+
+  @Test
+  void aResentHeldMassChangeGetsTheStagedLinkWithoutBeingRelayedOrStagedAgain() throws Exception {
+    when(stagingService.massChangeDigest(anyString(), eq("stock"), any())).thenReturn("digest-1");
+    when(stagingService.liveMassChange("versekit", member, "digest-1"))
+        .thenReturn(
+            new HandoffStagingService.HeldMassChange(
+                "digest-1", "hid-1", "12 removals in 24 hours."));
+    double stagedBefore = staged();
+    double repeatedBefore = repeated();
+
+    post("/exchange/v1/me/stock/changes", example("change-set--stockChangeSet/valid/set.json"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("MASS_CHANGE_CONFIRMATION_REQUIRED"))
+        .andExpect(jsonPath("$.detail").value("12 removals in 24 hours."))
+        .andExpect(
+            jsonPath("$.confirmationUrl")
+                .value("http://localhost:18081/connected-apps/confirm?handoff=hid-1"));
+
+    verify(relay, never()).forward(any(), anyString(), any(), any(), any());
+    verify(relay, never()).forwardLarge(any(), anyString(), any(), any(), any());
+    verify(stagingService, never())
+        .stageMassChange(anyString(), anyString(), anyString(), anyLong());
+    verify(idempotency, never()).store(anyString(), any());
+    assertThat(repeated() - repeatedBefore).isEqualTo(1.0);
+    assertThat(staged() - stagedBefore).isZero();
+  }
+
+  @Test
+  void aDryRunNeverLooksForAStagedMassChange() throws Exception {
+    when(relay.forward(any(), anyString(), any(), any(), any())).thenReturn(ok(RESULT));
+    String dryRun = ADD.replace("{\"ops\"", "{\"dryRun\":true,\"ops\"");
+
+    post("/exchange/v1/me/blueprints/changes", dryRun).andExpect(status().isOk());
+
+    verify(stagingService, never()).massChangeDigest(anyString(), anyString(), any());
+    verify(stagingService, never()).liveMassChange(anyString(), anyString(), anyString());
+  }
+
+  @Test
   void aMassChangeWhoseStagedFormIsTooLargeIsRefusedWith413AndNotCached() throws Exception {
     when(relay.forward(any(), anyString(), any(), any(), any()))
         .thenReturn(new ExchangeRelay.Result(409, null, "MASS_CHANGE_CONFIRMATION_REQUIRED", ""));
@@ -440,6 +500,17 @@ class ExchangeChangeRouteTest {
   private double staged() {
     return meterRegistry
         .counter(MetricNames.EXCHANGE_MASS_CHANGES_STAGED, MetricNames.TAG_CLIENT_ID, "versekit")
+        .count();
+  }
+
+  /**
+   * Reads the repeated mass-change counter of the test client.
+   *
+   * @return its count
+   */
+  private double repeated() {
+    return meterRegistry
+        .counter(MetricNames.EXCHANGE_MASS_CHANGES_REPEATED, MetricNames.TAG_CLIENT_ID, "versekit")
         .count();
   }
 

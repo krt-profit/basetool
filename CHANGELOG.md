@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Exchange: Bestätigungslink bleibt bei erneut gesendeter Massenänderung gültig.** Sendet eine verbundene Anwendung einen zur Bestätigung zurückgehaltenen Änderungssatz unverändert erneut, solange er noch wartet, antwortet das Gateway mit demselben `confirmationUrl`, statt ihn neu abzulegen und den Link ungültig zu machen, den das Mitglied gerade bekommen hat. Solche Wiederholungen zählen in der neuen Metrik `basetool_ingest_exchange_mass_changes_repeated_total` mit Alarm `ExchangeHeldBatchResent`, `ExchangeGuardStorm` zählt nur noch verschiedene zurückgehaltene Änderungssätze (Ingest, ADR-0281, REQ-XCH-021).
+
 ## [v1.17.0](https://github.com/krt-profit/basetool/releases/tag/v1.17.0) - 2026-10-17
 
 ### Added
