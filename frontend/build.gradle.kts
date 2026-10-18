@@ -820,6 +820,20 @@ val testTableSort =
     outputs.upToDateWhen { false }
   }
 
+val testSearchJs =
+  tasks.register<NodeTask>("testSearchJs") {
+    group = "verification"
+    description =
+      "Regression tests for the tolerant menu search: case, umlauts, spelled-out umlauts and hit ranges."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(layout.projectDirectory.file("scripts/krt-search.test.mjs").asFile)
+    ignoreExitValue.set(false)
+    inputs.file(layout.projectDirectory.file("scripts/krt-search.test.mjs"))
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-search.js"))
+    outputs.upToDateWhen { false }
+  }
+
 val testEslintBans =
   tasks.register<NodeTask>("testEslintBans") {
     group = "verification"
@@ -943,6 +957,7 @@ tasks.named("check").configure {
     testClientErrorCspJs,
     testSafeUrl,
     testTableSort,
+    testSearchJs,
     testEslintBans,
     testTypecheckRatchet,
     testPromotionCsvEscape,

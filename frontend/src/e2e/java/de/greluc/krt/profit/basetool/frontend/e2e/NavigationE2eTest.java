@@ -23,6 +23,7 @@ import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertTha
 
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
+import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import java.nio.file.Path;
@@ -129,6 +130,66 @@ class NavigationE2eTest {
           assertThat(page.locator("#nav-palette .palette-row[data-href='/org-chart']")).isVisible();
           page.keyboard().press("Escape");
           assertThat(page.locator("#nav-palette")).isHidden();
+        });
+  }
+
+  /**
+   * The quick access finds a page by its label spelled without umlauts and by a search term, and
+   * runs the create-mission action.
+   */
+  @Test
+  void quickAccessMatchesTolerantlyAndRunsActions() {
+    run(
+        1440,
+        900,
+        "nav-palette-actions",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
+          String overview =
+              page.locator("#sidebar a[href='/materials/overview']").textContent().trim();
+          String spelled =
+              overview
+                  .replace("Ü", "Ue")
+                  .replace("ü", "ue")
+                  .replace("Ä", "Ae")
+                  .replace("ä", "ae")
+                  .replace("Ö", "Oe")
+                  .replace("ö", "oe");
+          page.keyboard().press("Control+k");
+          page.getByTestId("palette-input").fill(spelled.toLowerCase());
+          assertThat(page.locator("#nav-palette .palette-row[data-href='/materials/overview']"))
+              .isVisible();
+
+          String keywords =
+              page.locator("#sidebar a[href='/hangar']").getAttribute("data-nav-keywords");
+          page.getByTestId("palette-input").fill(keywords.split(" ")[0]);
+          assertThat(page.locator("#nav-palette .palette-row[data-href='/hangar']")).isVisible();
+
+          String create = page.getByTestId("palette-action-create-mission").textContent().trim();
+          page.getByTestId("palette-input").fill(create);
+          page.getByTestId("palette-input").press("Enter");
+          page.waitForURL(Pattern.compile(".*/missions/new$"));
+        });
+  }
+
+  /** The administration action opens the drawer on the administration groups. */
+  @Test
+  void quickAccessOpensTheAdministration() {
+    run(
+        1440,
+        900,
+        "nav-palette-admin",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
+          page.keyboard().press("Control+k");
+          page.locator("#nav-palette .palette-row .palette-row-label")
+              .filter(
+                  new Locator.FilterOptions()
+                      .setHasText(page.locator(".palette").getAttribute("data-action-admin")))
+              .first()
+              .click();
+          assertThat(page.locator("#sidebar")).hasClass(Pattern.compile("\\bopen\\b"));
+          assertThat(page.locator("#sidebar")).hasClass(Pattern.compile("\\bis-admin-mode\\b"));
         });
   }
 

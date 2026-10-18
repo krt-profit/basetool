@@ -155,6 +155,58 @@ class NavigationRenderMvcTest {
   }
 
   /**
+   * The quick access's own pages and actions follow the roles: every member may create orders,
+   * missions and refinery orders and book into the own stock, only a logistician into the global
+   * stock, and only an administrator gets the sync-report pages.
+   *
+   * @throws Exception if the page cannot be rendered
+   */
+  @Test
+  void quickAccessSourcesFollowTheRoles() throws Exception {
+    String member = render(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
+    String logistician =
+        render(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_LOGISTICIAN")));
+    String admin = render(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_ADMIN")));
+
+    assertThat(member)
+        .contains("data-entries-url=\"/quick-access/entries\"")
+        .contains("data-testid=\"palette-action-create-order\"")
+        .contains("data-testid=\"palette-action-create-mission\"")
+        .contains("data-testid=\"palette-action-create-refinery\"")
+        .contains("data-testid=\"palette-action-book-my\"")
+        .contains("data-testid=\"palette-action-handbook\"")
+        .contains("href=\"/hangar/squadron\"")
+        .contains("href=\"/inventory/my\"")
+        .contains("href=\"/inventory/all\"")
+        .doesNotContain("data-testid=\"palette-action-book-global\"")
+        .doesNotContain("/admin/sync-reports/uex");
+    assertThat(member.contains("data-testid=\"palette-action-lang-de\""))
+        .as("exactly one language switch")
+        .isNotEqualTo(member.contains("data-testid=\"palette-action-lang-en\""));
+    assertThat(logistician).contains("data-testid=\"palette-action-book-global\"");
+    assertThat(admin)
+        .contains("href=\"/admin/sync-reports/uex\"")
+        .contains("href=\"/admin/sync-reports/scwiki\"");
+  }
+
+  /**
+   * Menu links carry the search terms the menu filter and the quick access match beside the label.
+   *
+   * @throws Exception if the page cannot be rendered
+   */
+  @Test
+  void menuLinksCarrySearchTerms() throws Exception {
+    String sidebar =
+        section(
+            SIDEBAR,
+            render(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))));
+
+    assertThat(sidebar)
+        .containsPattern("href=\"/hangar\" data-nav-keywords=\"[^\"]+\"")
+        .containsPattern("href=\"/profile\" data-nav-keywords=\"[^\"]+\"");
+  }
+
+  /**
    * An anonymous visitor of a public legal page gets the login links, but no quick access, no tab
    * bar, no bell and no menu filter.
    *

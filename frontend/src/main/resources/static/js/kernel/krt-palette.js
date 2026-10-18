@@ -20,6 +20,8 @@
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtChrome } from '/js/kernel/krt-chrome.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtSearchFind, krtSearchFold } from '/js/kernel/krt-search.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const RECENT_KEY = 'krt.recent';
@@ -33,15 +35,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const results = document.getElementById('palette-results');
     const emptyEl = dialog ? dialog.querySelector('.palette-empty') : null;
     if (!dialog || !(root instanceof HTMLElement) || !input || !results) return;
+    const paletteRoot = root;
     const paletteInput = input;
     const resultsEl = results;
-    const data = root.dataset;
+    const data = paletteRoot.dataset;
 
     /**
      * @typedef {object} PaletteItem
      * @property {string} label the visible name
      * @property {string} crumb the group it belongs to, shown as a breadcrumb
      * @property {string} icon the sprite symbol without its `krt-icon-` prefix
+     * @property {string} foldLabel the folded label the search matches first
+     * @property {string} foldRest the folded breadcrumb and search terms the search matches second
      * @property {string} [href] the page it opens; absent for an action
      * @property {() => void} [run] what an action does
      */
@@ -57,42 +62,99 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     /**
-     * Collects every page the member may open from the rendered menu, so the palette offers
-     * exactly the links the server rendered for this member.
+     * A palette row with its folded search text.
      *
-     * @returns {PaletteItem[]} the pages, deduplicated by target
+     * @param {{ label: string, crumb: string, icon: string, keywords: string, href?: string, run?: () => void }} spec
+     *     what the row shows and does
+     * @returns {PaletteItem} the row
      */
-    const buildIndex = function () {
-        /** @type {PaletteItem[]} */
-        const out = [];
-        const seen = new Set();
-        const sidebar = document.getElementById('sidebar');
-        if (!sidebar) return out;
-        const links = ['.nav-mode-main', '.nav-personal', '.nav-mode-admin', '.nav-legal'].flatMap(
-            (zone) => {
-                return Array.from(sidebar.querySelectorAll(`${zone} a[href]`));
-            },
-        );
-        links.forEach((a) => {
-            if (a.hasAttribute('data-nav-skip') || a.closest('.nav-lang-menu')) return;
-            const href = a.getAttribute('href') || '';
-            if (href.charAt(0) !== '/' || href.indexOf('/oauth2/') === 0 || seen.has(href)) return;
-            const label = textOf(a.querySelector('.nav-top-label') || a);
-            if (!label) return;
-            const groupHolder = a.closest('[data-nav-group]');
-            const iconHolder = a.closest('[data-nav-icon]');
-            seen.add(href);
-            out.push({
-                href,
-                label,
-                crumb: groupHolder ? groupHolder.getAttribute('data-nav-group') || '' : '',
-                icon: iconHolder ? iconHolder.getAttribute('data-nav-icon') || 'list' : 'list',
-            });
-        });
-        return out;
+    const makeItem = function (spec) {
+        /** @type {PaletteItem} */
+        const item = {
+            label: spec.label,
+            crumb: spec.crumb,
+            icon: spec.icon,
+            foldLabel: krtSearchFold(spec.label),
+            foldRest: krtSearchFold(`${spec.crumb} ${spec.keywords}`),
+        };
+        if (spec.href) item.href = spec.href;
+        if (spec.run) item.run = spec.run;
+        return item;
     };
 
-    const index = buildIndex();
+    /** @type {PaletteItem[]} */
+    const index = [];
+    const seen = new Set();
+
+    /**
+     * Adds a page unless its target is already offered.
+     *
+     * @param {string} href the page's path
+     * @param {string} label its name
+     * @param {string} crumb its group
+     * @param {string} icon its sprite symbol
+     * @param {string} keywords its additional search terms
+     * @returns {boolean} whether the page was added
+     */
+    const addPage = function (href, label, crumb, icon, keywords) {
+        if (!label || href.charAt(0) !== '/' || href.indexOf('/oauth2/') === 0 || seen.has(href)) {
+            return false;
+        }
+        seen.add(href);
+        index.push(makeItem({ href, label, crumb, icon, keywords }));
+        return true;
+    };
+
+    /**
+     * Collects every page the member may open from the rendered menu and the palette's own page
+     * list, so the palette offers exactly the links the server rendered for this member.
+     */
+    const buildIndex = function () {
+        const sidebar = document.getElementById('sidebar');
+        const menuLinks = sidebar
+            ? ['.nav-mode-main', '.nav-personal', '.nav-mode-admin', '.nav-legal'].flatMap(
+                  (zone) => {
+                      return Array.from(sidebar.querySelectorAll(`${zone} a[href]`));
+                  },
+              )
+            : [];
+        const ownLinks = Array.from(paletteRoot.querySelectorAll('.palette-source-pages a[href]'));
+        menuLinks.concat(ownLinks).forEach((a) => {
+            if (a.hasAttribute('data-nav-skip') || a.closest('.nav-lang-menu')) return;
+            const groupHolder = a.closest('[data-nav-group]');
+            const iconHolder = a.closest('[data-nav-icon]');
+            addPage(
+                a.getAttribute('href') || '',
+                textOf(a.querySelector('.nav-top-label') || a),
+                groupHolder ? groupHolder.getAttribute('data-nav-group') || '' : '',
+                iconHolder ? iconHolder.getAttribute('data-nav-icon') || 'list' : 'list',
+                a.getAttribute('data-nav-keywords') || '',
+            );
+        });
+    };
+
+    buildIndex();
+
+    /**
+     * The actions behind the server-rendered links of one source list.
+     *
+     * @param {string} selector the source list
+     * @returns {PaletteItem[]} one action per link, in document order
+     */
+    const linkActions = function (selector) {
+        const crumb = data.actionCrumb || '';
+        return Array.from(paletteRoot.querySelectorAll(`${selector} a[href]`)).map((a) => {
+            return makeItem({
+                label: textOf(a),
+                crumb,
+                icon: a.getAttribute('data-nav-icon') || 'list',
+                keywords: a.getAttribute('data-nav-keywords') || '',
+                run() {
+                    if (a instanceof HTMLElement) a.click();
+                },
+            });
+        });
+    };
 
     /**
      * The actions the palette offers besides pages.
@@ -100,41 +162,52 @@ document.addEventListener('DOMContentLoaded', () => {
      * @returns {PaletteItem[]} the actions this member can take on this page
      */
     const buildActions = function () {
-        /** @type {PaletteItem[]} */
-        const out = [];
         const crumb = data.actionCrumb || '';
-        const createHref = data.createOrderHref;
-        if (createHref) {
-            out.push({
-                label: krtI18nText(data.actionCreateOrder, 'data-action-create-order'),
-                crumb,
-                icon: 'plus',
-                run() {
-                    window.location.assign(createHref);
-                },
-            });
-        }
+        /** @type {PaletteItem[]} */
+        const out = linkActions('.palette-source-actions');
         const select = document.getElementById('squadron-switcher-select');
         if (select) {
-            out.push({
-                label: krtI18nText(data.actionOuSwitch, 'data-action-ou-switch'),
-                crumb,
-                icon: 'swap',
-                run() {
-                    if (krtChrome.nav) krtChrome.nav.open(select);
-                },
-            });
+            out.push(
+                makeItem({
+                    label: krtI18nText(data.actionOuSwitch, 'data-action-ou-switch'),
+                    crumb,
+                    icon: 'swap',
+                    keywords: '',
+                    run() {
+                        if (krtChrome.nav) krtChrome.nav.open(select);
+                    },
+                }),
+            );
         }
+        if (document.querySelector('#sidebar .nav-admin-entry')) {
+            out.push(
+                makeItem({
+                    label: krtI18nText(data.actionAdmin, 'data-action-admin'),
+                    crumb,
+                    icon: 'gear',
+                    keywords: '',
+                    run() {
+                        if (krtChrome.nav) krtChrome.nav.openAdmin();
+                    },
+                }),
+            );
+        }
+        linkActions('.palette-source-tail').forEach((item) => {
+            out.push(item);
+        });
         const logoutForm = document.getElementById('nav-logout-form');
         if (logoutForm instanceof HTMLFormElement) {
-            out.push({
-                label: krtI18nText(data.actionLogout, 'data-action-logout'),
-                crumb,
-                icon: 'logout',
-                run() {
-                    logoutForm.requestSubmit();
-                },
-            });
+            out.push(
+                makeItem({
+                    label: krtI18nText(data.actionLogout, 'data-action-logout'),
+                    crumb,
+                    icon: 'logout',
+                    keywords: '',
+                    run() {
+                        logoutForm.requestSubmit();
+                    },
+                }),
+            );
         }
         return out;
     };
@@ -159,15 +232,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const recordVisit = function () {
-        const sidebar = document.getElementById('sidebar');
-        const active = sidebar ? sidebar.querySelector('a.is-active[href]') : null;
-        const href = active ? active.getAttribute('href') : null;
+    /**
+     * Puts a page at the top of the recently visited pages.
+     *
+     * @param {PaletteItem} entry the page
+     */
+    const remember = function (entry) {
+        const href = entry.href;
         if (!href) return;
-        const entry = index.find((e) => {
-            return e.href === href;
-        });
-        if (!entry) return;
         const list = readRecent().filter((e) => {
             return e.href !== href;
         });
@@ -176,13 +248,47 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, RECENT_MAX)));
         } catch (_e) {}
     };
+
+    /**
+     * Records the current page: the offered page with exactly this path, otherwise the menu link
+     * the drawer marks as current.
+     */
+    const recordVisit = function () {
+        const here = window.location.pathname;
+        let entry = index.find((e) => {
+            return e.href === here;
+        });
+        if (!entry) {
+            const sidebar = document.getElementById('sidebar');
+            const active = sidebar ? sidebar.querySelector('a.is-active[href]') : null;
+            const href = active ? active.getAttribute('href') : null;
+            entry = href
+                ? index.find((e) => {
+                      return e.href === href;
+                  })
+                : undefined;
+        }
+        if (entry) remember(entry);
+    };
     recordVisit();
+
+    /**
+     * Whether an item matches the folded query, and how well.
+     *
+     * @param {PaletteItem} item the row
+     * @param {string} q the folded query
+     * @returns {number} 0 for a label hit, 1 for a breadcrumb or search-term hit, -1 for none
+     */
+    const rankOf = function (item, q) {
+        if (item.foldLabel.includes(q)) return 0;
+        return item.foldRest.includes(q) ? 1 : -1;
+    };
 
     /**
      * The groups shown for a query: recent pages and actions when it is empty, matching pages and
      * actions otherwise.
      *
-     * @param {string} q the lower-cased, trimmed query
+     * @param {string} q the folded, trimmed query
      * @returns {{ label: string, items: PaletteItem[] }[]} the non-empty groups in display order
      */
     const groupsFor = function (q) {
@@ -212,11 +318,11 @@ document.addEventListener('DOMContentLoaded', () => {
             return groups;
         }
         const pages = index
-            .filter((e) => {
-                return e.label.toLowerCase().includes(q) || e.crumb.toLowerCase().includes(q);
-            })
             .map((e, i) => {
-                return { e, rank: e.label.toLowerCase().includes(q) ? 0 : 1, i };
+                return { e, rank: rankOf(e, q), i };
+            })
+            .filter((x) => {
+                return x.rank >= 0;
             })
             .sort((a, b) => {
                 return a.rank - b.rank || a.i - b.i;
@@ -226,7 +332,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return x.e;
             });
         const acts = actions.filter((a) => {
-            return a.label.toLowerCase().includes(q);
+            return rankOf(a, q) >= 0;
         });
         if (pages.length) {
             groups.push({ label: krtI18nText(data.pages, 'data-pages'), items: pages });
@@ -258,22 +364,22 @@ document.addEventListener('DOMContentLoaded', () => {
      * The label with the first occurrence of the query marked.
      *
      * @param {string} label the visible name
-     * @param {string} q the lower-cased query
+     * @param {string} q the folded query
      * @returns {HTMLSpanElement} the label element
      */
     const labelWithHit = function (label, q) {
         const span = document.createElement('span');
         span.className = 'palette-row-label';
-        const at = q ? label.toLowerCase().indexOf(q) : -1;
-        if (at < 0) {
+        const hit = krtSearchFind(label, q);
+        if (!hit) {
             span.textContent = label;
             return span;
         }
-        span.appendChild(document.createTextNode(label.slice(0, at)));
+        span.appendChild(document.createTextNode(label.slice(0, hit.start)));
         const mark = document.createElement('mark');
-        mark.textContent = label.slice(at, at + q.length);
+        mark.textContent = label.slice(hit.start, hit.end);
         span.appendChild(mark);
-        span.appendChild(document.createTextNode(label.slice(at + q.length)));
+        span.appendChild(document.createTextNode(label.slice(hit.end)));
         return span;
     };
 
@@ -313,12 +419,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (item.run) {
             item.run();
         } else if (item.href) {
+            remember(item);
             window.location.assign(item.href);
         }
     };
 
-    const render = function () {
-        const q = paletteInput.value.trim().toLowerCase();
+    /**
+     * Shows the rows for the current query.
+     *
+     * @param {number} [keep] the row index to select instead of the first
+     */
+    const render = function (keep) {
+        const q = krtSearchFold(paletteInput.value.trim());
         resultsEl.textContent = '';
         rows = [];
         groupsFor(q).forEach((group) => {
@@ -365,7 +477,34 @@ document.addEventListener('DOMContentLoaded', () => {
             resultsEl.appendChild(wrap);
         });
         if (emptyEl instanceof HTMLElement) emptyEl.hidden = rows.length > 0;
-        select(0);
+        select(keep || 0);
+    };
+
+    let extraRequested = false;
+
+    /**
+     * Loads, once per page, the pages whose access the server decides with a backend read, and
+     * shows them when the palette is still open.
+     */
+    const loadExtraPages = function () {
+        const url = data.entriesUrl;
+        if (extraRequested || !url) return;
+        extraRequested = true;
+        krtFetch
+            .getJson(url)
+            .then((list) => {
+                if (!Array.isArray(list)) return;
+                let added = false;
+                list.forEach((/** @type {any} */ e) => {
+                    if (!e || typeof e.href !== 'string' || typeof e.label !== 'string') return;
+                    const iconName = typeof e.icon === 'string' && e.icon ? e.icon : 'list';
+                    const crumb = typeof e.crumb === 'string' ? e.crumb : '';
+                    const keywords = typeof e.keywords === 'string' ? e.keywords : '';
+                    if (addPage(e.href, e.label, crumb, iconName, keywords)) added = true;
+                });
+                if (added && krtModal.isOpen(dialog)) render(selected);
+            })
+            .catch(() => {});
     };
 
     /**
@@ -379,11 +518,14 @@ document.addEventListener('DOMContentLoaded', () => {
         krtModal.open(dialog, { focus: paletteInput });
         const end = paletteInput.value.length;
         paletteInput.setSelectionRange(end, end);
+        loadExtraPages();
     };
 
     krtChrome.palette = { open };
 
-    paletteInput.addEventListener('input', render);
+    paletteInput.addEventListener('input', () => {
+        render();
+    });
     paletteInput.addEventListener('keydown', (e) => {
         if (e.key === 'ArrowDown') {
             e.preventDefault();

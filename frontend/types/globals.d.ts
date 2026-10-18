@@ -770,6 +770,9 @@ interface KrtNavApi {
 
     /** Closes the drawer without moving focus. */
     close(): void;
+
+    /** Opens the drawer on the administration groups; only effective for an administrator. */
+    openAdmin(): void;
 }
 
 /** The quick-access command palette (`krt-palette.js`, REQ-UI-026). */

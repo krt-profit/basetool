@@ -268,9 +268,11 @@ Two binding rules shape every UI change:
   layer went with `inline-migration.css` on 2026-10-04 (REQ-UI-027 phase 4, `NoMigrationClassTest`).
 - **One navigation chrome, rendered once** (2026-10-03). Every app page includes
   `kernel/fragments/header.html` and `kernel/fragments/sidebar.html`; the drawer is also the phone menu sheet, and
-  the `Ctrl`/`⌘` + `K` quick access indexes the links the server rendered into it, so `sec:authorize`
-  in that one template stays the only place that decides which pages a member is offered
-  (REQ-UI-026, ADR-0240, `NavigationRenderMvcTest`, `NavigationE2eTest`).
+  the `Ctrl`/`⌘` + `K` quick access indexes the links the server rendered into it and into the
+  palette's own source lists, so the server alone decides which pages a member is offered; tabs
+  whose visibility needs a backend read come from domain `QuickAccessContributor`s through
+  `GET /quick-access/entries` on the first opening (REQ-UI-026, ADR-0240, ADR-0282,
+  `NavigationRenderMvcTest`, `NavigationE2eTest`).
 - **Work pages follow three patterns, built from fragments** (2026-10-03). A list (A), the
   overview of the home page (B) or a form (C): one page head with at most one primary action and an
   overflow menu, a toolbar with live filters and removable filter chips, a list table that stacks on

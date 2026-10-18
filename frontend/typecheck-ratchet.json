@@ -128,6 +128,7 @@
       "kernel/krt-modal.js",
       "kernel/krt-overflow-menu.js",
       "kernel/krt-palette.js",
+      "kernel/krt-search.js",
       "kernel/krt-searchable-select.js",
       "kernel/krt-table-sort.js",
       "kernel/krt-user-search.js",
