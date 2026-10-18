@@ -3,6 +3,14 @@
 Changes to the Exchange API contract, newest first. Every change within `v1` is additive
 ([versioning](versioning.md)).
 
+## 2026-10-18
+
+- **Clarified: an identical resend of a held batch keeps its link.** While a batch held for the
+  member's confirmation still waits, resending it byte for byte from the same installation answers
+  the same `409 MASS_CHANGE_CONFIRMATION_REQUIRED` with the same `confirmationUrl`, instead of
+  holding it again under a new link that replaced the one the member was shown
+  ([sync guide](sync-guide.md#the-mass-change-guard)). Do not resend held batches all the same.
+
 ## 2026-10-17
 
 - **New: taking stock back from a unit's pool.** `POST /exchange/v1/me/stock/changes` gains the op

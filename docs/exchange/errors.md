@@ -55,7 +55,7 @@ codes, whichever side refuses it.
 | `IDEMPOTENCY_IN_PROGRESS` | 409 | gateway | The same key is still being processed. | Retry the same request after a short wait. |
 | `CURSOR_EXPIRED` | 410 | backend, gateway | The cursor is older than the tombstones, or not one the server issued. | Reconcile a full snapshot against the last baseline — not add-only. |
 | `VERSION_CONFLICT` | 409 | backend | A ship's or org-stock entry's `version`, or a lot's `expectedQuantity`, no longer matches. | Pull, merge, retry. |
-| `MASS_CHANGE_CONFIRMATION_REQUIRED` | 409 | backend | The batch exceeds the mass-change guard; it is staged. | Show the member `confirmationUrl`; do not retry the batch. |
+| `MASS_CHANGE_CONFIRMATION_REQUIRED` | 409 | backend | The batch exceeds the mass-change guard; it is staged. An identical resend while it waits gets the same `confirmationUrl`. | Show the member `confirmationUrl`; do not retry the batch. |
 | `RATE_LIMITED` | 429 | gateway | A limit per minute or per hour is exhausted: per client and member, per client, per source IP address, or the hourly account check ([limits](sync-guide.md#rate-limits-quota-and-back-off)). | Honour `Retry-After`. |
 | `QUOTA_EXCEEDED` | 429 | gateway | The daily write quota is exhausted; an org-stock change set counts each of its ops and is refused as a whole when they do not all fit. | Retry after `Retry-After`, the next day at the latest. |
 | `BACKEND_RELAY_FAILED` | 502 | gateway | The backend did not answer usably: an error, a refusal the contract does not name, or an answer that breaks the v1 schema. | Back off; retry with the same key. |

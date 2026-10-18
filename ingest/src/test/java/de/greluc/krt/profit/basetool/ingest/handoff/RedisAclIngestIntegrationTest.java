@@ -104,6 +104,26 @@ class RedisAclIngestIntegrationTest {
   }
 
   @Test
+  void theMassChangeDigestRunsUnderTheIngestUser() {
+    HandoffStagingService service =
+        new HandoffStagingService(
+            template(ingest), JsonMapper.builder().build(), TestProperties.ingest());
+    HandoffStagingService.Staged staged =
+        service.stageMassChange("versekit", "sub-acl", "{\"resource\":\"stock\"}", 4096);
+
+    service.rememberMassChange(
+        "versekit",
+        "sub-acl",
+        new HandoffStagingService.HeldMassChange("d1", staged.handoffId(), "held"));
+
+    assertThat(service.liveMassChange("versekit", "sub-acl", "d1"))
+        .as("SET and GET of the digest ran under the ingest user")
+        .isNotNull();
+    assertThat(template(admin).getExpire("ingest:handoff-digest:mass:versekit:sub-acl"))
+        .isPositive();
+  }
+
+  @Test
   void theExchangeRegistryIsReadOnlyForTheIngestUser() {
     template(admin).opsForValue().set("exchange:registry", "{}");
     StringRedisTemplate template = template(ingest);
