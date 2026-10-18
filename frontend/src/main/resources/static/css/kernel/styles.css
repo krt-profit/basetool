@@ -7404,18 +7404,23 @@
         .data-table--stack td:not(:first-child, .cell-status, .cell-actions) {
             order: 3;
             flex: 0 1 auto;
+            position: relative;
             min-width: 0;
-            margin-right: -0.75rem;
             font-size: 0.85rem;
             text-align: left;
             color: var(--color-gray-2-text);
         }
         .data-table--stack
             td:not(:first-child, .cell-status, .cell-actions, .cell-block):has(
-                ~ td:not(.cell-status, .cell-actions, .cell-block)
+                ~ td:not(.cell-status, .cell-actions, .cell-block, :empty)
             )::after {
-            content: '\00a0\00b7';
-            margin: 0 0.4em 0 0;
+            content: '\00b7';
+            position: absolute;
+            right: -0.5rem;
+            bottom: 0;
+        }
+        .data-table--stack td:has(> :is(div, p, ul, ol, table, form))::after {
+            content: none;
         }
         .data-table--stack td[data-label]:not(:first-child, .cell-status)::before {
             content: attr(data-label) ': ';
@@ -8119,7 +8124,10 @@
             color: inherit;
         }
 
-        .data-table--stack td:not(:first-child, .cell-status, .cell-actions) .cell-sub::before {
+        .data-table--stack
+            td:not(:first-child, .cell-status, .cell-actions)
+            :not(div, .meter)
+            + .cell-sub::before {
             content: '\00a0\00b7\00a0';
         }
 

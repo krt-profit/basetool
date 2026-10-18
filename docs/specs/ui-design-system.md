@@ -720,9 +720,10 @@ a geometric check had no rule for:
   into two 190px columns. Field labels of a `.kv-list` hyphenate instead of breaking a word without a
   hyphen („Handelsbeauftrag / ter").
 - **A separator stays with what it separates.** The `·` between the cells of a stacked table row
-  carries a no-break space before it, and a cell holding a block (a progress bar, a list) draws none,
-  so no line starts with a lone dot. A list rendered inline puts its comma after an item, never
-  before the next one. A count beside a name (`(1)`) never wraps on its own.
+  sits in the gap after a cell, positioned against the cell rather than flowing as text, so it can
+  never begin a line or wrap away on its own; a cell that holds a block (a progress bar, a list), an
+  empty cell and a `.cell-block` cell take no separator. A list rendered inline puts its comma after
+  an item, never before the next one. A count beside a name (`(1)`) never wraps on its own.
 - **A chip never shrinks below its text.** In a flex row whose children may shrink, the chip
   declares `flex-shrink: 0` and the name beside it gives way.
 - **A required star is drawn once.** The automatic star of a required field steps back when the label
