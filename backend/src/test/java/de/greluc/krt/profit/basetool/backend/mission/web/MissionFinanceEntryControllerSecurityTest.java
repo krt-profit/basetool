@@ -36,7 +36,6 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryService;
-import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.math.BigDecimal;
 import java.util.List;
@@ -76,7 +75,6 @@ class MissionFinanceEntryControllerSecurityTest {
   @MockitoBean private OwnerScopeService ownerScopeService;
 
   @MockitoBean private MissionAccessPolicy missionAccessPolicy;
-  @MockitoBean private MissionSecurityService missionSecurityService;
 
   @BeforeEach
   void setUp() {
@@ -180,7 +178,7 @@ class MissionFinanceEntryControllerSecurityTest {
   @Test
   void createFinanceEntry_member_returnsEntryWithParticipantEmailStripped() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(missionSecurityService.canCreateFinanceEntry(any(), any(), any())).thenReturn(true);
+    when(missionAccessPolicy.canCreateFinanceEntry(any(), any(), any())).thenReturn(true);
     when(financeEntryService.createEntry(any())).thenReturn(persistedEntryWithUserPii(missionId));
 
     String body =
@@ -209,7 +207,7 @@ class MissionFinanceEntryControllerSecurityTest {
   @Test
   void createFinanceEntry_authenticatedOfficer_stripsParticipantEmail() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(missionSecurityService.canCreateFinanceEntry(any(), any(), any())).thenReturn(true);
+    when(missionAccessPolicy.canCreateFinanceEntry(any(), any(), any())).thenReturn(true);
     when(financeEntryService.createEntry(any())).thenReturn(persistedEntryWithUserPii(missionId));
 
     String body =
@@ -242,7 +240,7 @@ class MissionFinanceEntryControllerSecurityTest {
   void createFinanceEntry_memberWhoMayOnlySeeTheMission_isForbidden() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(missionAccessPolicy.canSeeMission(missionId)).thenReturn(true);
-    when(missionSecurityService.canCreateFinanceEntry(any(), any(), any())).thenReturn(false);
+    when(missionAccessPolicy.canCreateFinanceEntry(any(), any(), any())).thenReturn(false);
 
     mockMvc
         .perform(

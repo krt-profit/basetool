@@ -90,7 +90,13 @@ class MissionScopeParityTest {
                 .collect(Collectors.toSet()),
         (wired, id) ->
             new MissionAccessPolicy(
-                    wired.ownerScopeService(), wired.authHelper(), missionRepository)
+                    wired.ownerScopeService(),
+                    wired.authHelper(),
+                    missionRepository,
+                    null,
+                    null,
+                    null,
+                    null)
                 .canSeeMission(id));
   }
 

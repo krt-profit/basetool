@@ -268,45 +268,45 @@ PUT /api/v1/missions/me/payout-preference | MyPayoutPreferenceController#updateM
 GET /api/v1/missions/next | MissionController#getNextMission | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() | url=anyRequest -> authenticated
 DELETE /api/v1/missions/{id} | MissionController#deleteMission | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/missions/{id} | MissionController#getMissionById | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionAccessPolicy.canSeeMission(#id) | url=anyRequest -> authenticated
-PATCH /api/v1/missions/{id}/core | MissionController#patchMissionCore | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
-PATCH /api/v1/missions/{id}/flags | MissionController#patchMissionFlags | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
-POST /api/v1/missions/{id}/frequencies | MissionController#addOrUpdateFrequencySlim | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
-POST /api/v1/missions/{id}/frequencies/custom | MissionController#addCustomFrequencySlim | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
-PUT /api/v1/missions/{id}/frequencies/custom/{frequencyId} | MissionController#updateCustomFrequencySlim | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
-DELETE /api/v1/missions/{id}/frequencies/{frequencyId} | MissionController#removeFrequencySlim | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
-POST /api/v1/missions/{id}/join | MissionController#joinMission | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionAccessPolicy.canSeeMission(#id) | url=anyRequest -> authenticated
-DELETE /api/v1/missions/{id}/managers/{userId} | MissionController#removeManagerSlim | pre=@missionSecurityService.canManageManagers(#id, authentication) | url=anyRequest -> authenticated
-POST /api/v1/missions/{id}/managers/{userId} | MissionController#addManagerSlim | pre=@missionSecurityService.canManageManagers(#id, authentication) | url=anyRequest -> authenticated
-POST /api/v1/missions/{id}/objectives | MissionController#addObjectiveSlim | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
-PUT /api/v1/missions/{id}/objectives/reorder | MissionController#reorderObjectivesSlim | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
-DELETE /api/v1/missions/{id}/objectives/{objectiveId} | MissionController#deleteObjectiveSlim | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
-PUT /api/v1/missions/{id}/objectives/{objectiveId} | MissionController#updateObjectiveSlim | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
-PUT /api/v1/missions/{id}/owner | MissionController#updateMissionOwner | pre=@missionSecurityService.canChangeOwner(#id, authentication) | url=anyRequest -> authenticated
-PUT /api/v1/missions/{id}/owning-org-unit | MissionController#updateMissionOwningOrgUnit | pre=@missionSecurityService.canChangeOwner(#id, authentication) | url=anyRequest -> authenticated
-POST /api/v1/missions/{id}/participants | MissionController#addParticipantSlim | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionAccessPolicy.canSeeMission(#id) | url=anyRequest -> authenticated
-GET /api/v1/missions/{id}/participants/unassigned | MissionController#getUnassignedParticipants | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
-DELETE /api/v1/missions/{id}/participants/{participantId} | MissionController#removeParticipantSlim | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionSecurityService.canAccessParticipant(#id, #participantId, authentication) | url=anyRequest -> authenticated
-PUT /api/v1/missions/{id}/participants/{participantId} | MissionController#updateParticipantSlim | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionSecurityService.canAccessParticipant(#id, #participantId, authentication) | url=anyRequest -> authenticated
-POST /api/v1/missions/{id}/participants/{participantId}/check-in | MissionController#checkInParticipantSlim | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionSecurityService.canAccessParticipant(#id, #participantId, authentication) | url=anyRequest -> authenticated
-POST /api/v1/missions/{id}/participants/{participantId}/check-out | MissionController#checkOutParticipantSlim | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionSecurityService.canAccessParticipant(#id, #participantId, authentication) | url=anyRequest -> authenticated
-PUT /api/v1/missions/{id}/participants/{participantId}/payout-preference | MissionController#updatePayoutPreferenceSlim | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionSecurityService.canAccessParticipant(#id, #participantId, authentication) | url=anyRequest -> authenticated
-PUT /api/v1/missions/{id}/party-lead | MissionController#setPartyLead | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
-PATCH /api/v1/missions/{id}/schedule | MissionController#patchMissionSchedule | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
-POST /api/v1/missions/{id}/steps | MissionController#addStepSlim | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
-PUT /api/v1/missions/{id}/steps/reorder | MissionController#reorderStepsSlim | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
-DELETE /api/v1/missions/{id}/steps/{stepId} | MissionController#deleteStepSlim | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
-PUT /api/v1/missions/{id}/steps/{stepId} | MissionController#updateStepSlim | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
-PATCH /api/v1/missions/{id}/steps/{stepId}/done | MissionController#toggleStepDoneSlim | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
-POST /api/v1/missions/{id}/sub-missions | MissionController#createSubMission | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
-GET /api/v1/missions/{id}/unit-ship-options | MissionController#getUnitShipOptions | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
-POST /api/v1/missions/{id}/units | MissionController#addUnitSlim | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
-POST /api/v1/missions/{id}/units/{missionUnitId}/crew | MissionController#addCrewSlim | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
-DELETE /api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId} | MissionController#removeCrewSlim | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
-PUT /api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId} | MissionController#updateCrewSlim | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
-DELETE /api/v1/missions/{id}/units/{unitId} | MissionController#deleteUnitSlim | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
-PUT /api/v1/missions/{id}/units/{unitId} | MissionController#updateUnitSlim | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
+PATCH /api/v1/missions/{id}/core | MissionController#patchMissionCore | pre=@missionAccessPolicy.canManageMission(#id, authentication) | url=anyRequest -> authenticated
+PATCH /api/v1/missions/{id}/flags | MissionController#patchMissionFlags | pre=@missionAccessPolicy.canManageMission(#id, authentication) | url=anyRequest -> authenticated
+POST /api/v1/missions/{id}/frequencies | MissionController#addOrUpdateFrequencySlim | pre=@missionAccessPolicy.canManageMission(#id, authentication) | url=anyRequest -> authenticated
+POST /api/v1/missions/{id}/frequencies/custom | MissionController#addCustomFrequencySlim | pre=@missionAccessPolicy.canManageMission(#id, authentication) | url=anyRequest -> authenticated
+PUT /api/v1/missions/{id}/frequencies/custom/{frequencyId} | MissionController#updateCustomFrequencySlim | pre=@missionAccessPolicy.canManageMission(#id, authentication) | url=anyRequest -> authenticated
+DELETE /api/v1/missions/{id}/frequencies/{frequencyId} | MissionController#removeFrequencySlim | pre=@missionAccessPolicy.canManageMission(#id, authentication) | url=anyRequest -> authenticated
+POST /api/v1/missions/{id}/join | MissionController#joinMission | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() | url=anyRequest -> authenticated
+DELETE /api/v1/missions/{id}/managers/{userId} | MissionController#removeManagerSlim | pre=isAuthenticated() | url=anyRequest -> authenticated
+POST /api/v1/missions/{id}/managers/{userId} | MissionController#addManagerSlim | pre=isAuthenticated() | url=anyRequest -> authenticated
+POST /api/v1/missions/{id}/objectives | MissionController#addObjectiveSlim | pre=isAuthenticated() | url=anyRequest -> authenticated
+PUT /api/v1/missions/{id}/objectives/reorder | MissionController#reorderObjectivesSlim | pre=isAuthenticated() | url=anyRequest -> authenticated
+DELETE /api/v1/missions/{id}/objectives/{objectiveId} | MissionController#deleteObjectiveSlim | pre=isAuthenticated() | url=anyRequest -> authenticated
+PUT /api/v1/missions/{id}/objectives/{objectiveId} | MissionController#updateObjectiveSlim | pre=isAuthenticated() | url=anyRequest -> authenticated
+PUT /api/v1/missions/{id}/owner | MissionController#updateMissionOwner | pre=@missionAccessPolicy.canChangeOwner(#id, authentication) | url=anyRequest -> authenticated
+PUT /api/v1/missions/{id}/owning-org-unit | MissionController#updateMissionOwningOrgUnit | pre=@missionAccessPolicy.canChangeOwner(#id, authentication) | url=anyRequest -> authenticated
+POST /api/v1/missions/{id}/participants | MissionController#addParticipantSlim | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() | url=anyRequest -> authenticated
+GET /api/v1/missions/{id}/participants/unassigned | MissionController#getUnassignedParticipants | pre=@missionAccessPolicy.canManageMission(#id, authentication) | url=anyRequest -> authenticated
+DELETE /api/v1/missions/{id}/participants/{participantId} | MissionController#removeParticipantSlim | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() | url=anyRequest -> authenticated
+PUT /api/v1/missions/{id}/participants/{participantId} | MissionController#updateParticipantSlim | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() | url=anyRequest -> authenticated
+POST /api/v1/missions/{id}/participants/{participantId}/check-in | MissionController#checkInParticipantSlim | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() | url=anyRequest -> authenticated
+POST /api/v1/missions/{id}/participants/{participantId}/check-out | MissionController#checkOutParticipantSlim | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() | url=anyRequest -> authenticated
+PUT /api/v1/missions/{id}/participants/{participantId}/payout-preference | MissionController#updatePayoutPreferenceSlim | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() | url=anyRequest -> authenticated
+PUT /api/v1/missions/{id}/party-lead | MissionController#setPartyLead | pre=isAuthenticated() | url=anyRequest -> authenticated
+PATCH /api/v1/missions/{id}/schedule | MissionController#patchMissionSchedule | pre=@missionAccessPolicy.canManageMission(#id, authentication) | url=anyRequest -> authenticated
+POST /api/v1/missions/{id}/steps | MissionController#addStepSlim | pre=isAuthenticated() | url=anyRequest -> authenticated
+PUT /api/v1/missions/{id}/steps/reorder | MissionController#reorderStepsSlim | pre=isAuthenticated() | url=anyRequest -> authenticated
+DELETE /api/v1/missions/{id}/steps/{stepId} | MissionController#deleteStepSlim | pre=isAuthenticated() | url=anyRequest -> authenticated
+PUT /api/v1/missions/{id}/steps/{stepId} | MissionController#updateStepSlim | pre=isAuthenticated() | url=anyRequest -> authenticated
+PATCH /api/v1/missions/{id}/steps/{stepId}/done | MissionController#toggleStepDoneSlim | pre=isAuthenticated() | url=anyRequest -> authenticated
+POST /api/v1/missions/{id}/sub-missions | MissionController#createSubMission | pre=@missionAccessPolicy.canManageMission(#id, authentication) | url=anyRequest -> authenticated
+GET /api/v1/missions/{id}/unit-ship-options | MissionController#getUnitShipOptions | pre=@missionAccessPolicy.canManageMission(#id, authentication) | url=anyRequest -> authenticated
+POST /api/v1/missions/{id}/units | MissionController#addUnitSlim | pre=isAuthenticated() | url=anyRequest -> authenticated
+POST /api/v1/missions/{id}/units/{missionUnitId}/crew | MissionController#addCrewSlim | pre=isAuthenticated() | url=anyRequest -> authenticated
+DELETE /api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId} | MissionController#removeCrewSlim | pre=isAuthenticated() | url=anyRequest -> authenticated
+PUT /api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId} | MissionController#updateCrewSlim | pre=isAuthenticated() | url=anyRequest -> authenticated
+DELETE /api/v1/missions/{id}/units/{unitId} | MissionController#deleteUnitSlim | pre=isAuthenticated() | url=anyRequest -> authenticated
+PUT /api/v1/missions/{id}/units/{unitId} | MissionController#updateUnitSlim | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/missions/{missionId}/finance-entries | MissionFinanceEntryController#getFinanceEntries | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionAccessPolicy.canSeeMission(#missionId) | url=anyRequest -> authenticated
-POST /api/v1/missions/{missionId}/finance-entries | MissionFinanceEntryController#createFinanceEntry | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionSecurityService.canCreateFinanceEntry(#missionId, #dto.participantId(), authentication) | url=anyRequest -> authenticated
+POST /api/v1/missions/{missionId}/finance-entries | MissionFinanceEntryController#createFinanceEntry | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionAccessPolicy.canCreateFinanceEntry(#missionId, #dto.participantId(), authentication) | url=anyRequest -> authenticated
 GET /api/v1/missions/{missionId}/finance-entries/sum | MissionFinanceEntryController#getFinanceEntriesSum | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionAccessPolicy.canSeeMission(#missionId) | url=anyRequest -> authenticated
 GET /api/v1/missions/{missionId}/finance-entries/summary | MissionFinanceEntryController#getFinanceSummary | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionAccessPolicy.canSeeMission(#missionId) | url=anyRequest -> authenticated
 DELETE /api/v1/missions/{missionId}/finance-entries/{entryId} | MissionFinanceEntryController#deleteFinanceEntry | pre=isAuthenticated() | url=anyRequest -> authenticated
@@ -347,26 +347,26 @@ GET /api/v1/orders/requested | JobOrderController#getRequestedJobOrders | pre=is
 GET /api/v1/orders/settings | JobOrderSettingsController#settings | pre=isAuthenticated() | url=anyRequest -> authenticated
 DELETE /api/v1/orders/{id} | JobOrderController#deleteJobOrder | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/orders/{id} | JobOrderController#getJobOrderById | pre=isAuthenticated() and (@jobOrderAccessPolicy.canSeeJobOrder(#id) or @jobOrderAccessPolicy.canSeeJobOrderAsRequester(#id)) | url=anyRequest -> authenticated
-PUT /api/v1/orders/{id} | JobOrderController#updateJobOrder | pre=hasRole('LOGISTICIAN') and @jobOrderAccessPolicy.canEditJobOrder(#id) | url=anyRequest -> authenticated
+PUT /api/v1/orders/{id} | JobOrderController#updateJobOrder | pre=hasRole('LOGISTICIAN') | url=anyRequest -> authenticated
 GET /api/v1/orders/{id}/allocations/orphaned | JobOrderController#getOrphanedLinkedInventory | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
-DELETE /api/v1/orders/{id}/allocations/{inventoryItemId} | JobOrderController#unlinkInventoryItem | pre=hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN') and @jobOrderAccessPolicy.canEditJobOrder(#id) | url=anyRequest -> authenticated
+DELETE /api/v1/orders/{id}/allocations/{inventoryItemId} | JobOrderController#unlinkInventoryItem | pre=hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN') | url=anyRequest -> authenticated
 DELETE /api/v1/orders/{id}/assignees/{userId} | JobOrderController#removeAssignee | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
 POST /api/v1/orders/{id}/assignees/{userId} | JobOrderController#addAssignee | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
 DELETE /api/v1/orders/{id}/assignees/{userId}/note | JobOrderController#deleteAssigneeNote | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
 PUT /api/v1/orders/{id}/assignees/{userId}/note | JobOrderController#setAssigneeNote | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
-PATCH /api/v1/orders/{id}/blueprint-variant-counting | JobOrderController#updateBlueprintVariantCounting | pre=hasRole('LOGISTICIAN') and @jobOrderAccessPolicy.canEditJobOrder(#id) | url=anyRequest -> authenticated
+PATCH /api/v1/orders/{id}/blueprint-variant-counting | JobOrderController#updateBlueprintVariantCounting | pre=hasRole('LOGISTICIAN') | url=anyRequest -> authenticated
 POST /api/v1/orders/{id}/handovers | JobOrderController#createHandover | pre=(hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')) and @jobOrderAccessPolicy.canEditJobOrder(#id) | url=anyRequest -> authenticated
 GET /api/v1/orders/{id}/item-blueprint-owners | JobOrderController#getItemBlueprintOwners | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrderBlueprintOwners(#id) | url=anyRequest -> authenticated
 POST /api/v1/orders/{id}/item-handovers | JobOrderController#createItemHandover | pre=(hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')) and @jobOrderAccessPolicy.canEditJobOrder(#id) | url=anyRequest -> authenticated
-PUT /api/v1/orders/{id}/items | JobOrderController#updateItemJobOrder | pre=hasRole('LOGISTICIAN') and @jobOrderAccessPolicy.canEditJobOrder(#id) | url=anyRequest -> authenticated
-PUT /api/v1/orders/{id}/items/requested | JobOrderController#updateItemJobOrderAsRequester | pre=isAuthenticated() and @jobOrderAccessPolicy.canEditJobOrderAsRequester(#id) | url=anyRequest -> authenticated
+PUT /api/v1/orders/{id}/items | JobOrderController#updateItemJobOrder | pre=hasRole('LOGISTICIAN') | url=anyRequest -> authenticated
+PUT /api/v1/orders/{id}/items/requested | JobOrderController#updateItemJobOrderAsRequester | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/orders/{id}/items/{itemId}/production | JobOrderController#bookProduction | pre=(hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')) and @jobOrderAccessPolicy.canEditJobOrder(#id) | url=anyRequest -> authenticated
 GET /api/v1/orders/{id}/materials/{matId}/attribution | JobOrderController#getStockAttributionForJobOrderMaterial | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
 GET /api/v1/orders/{id}/materials/{matId}/inventory | JobOrderController#getInventoryItemsForJobOrderMaterial | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
 PUT /api/v1/orders/{id}/priority | JobOrderController#updateJobOrderPriority | pre=hasRole('LOGISTICIAN') and @jobOrderAccessPolicy.canEditJobOrder(#id) | url=anyRequest -> authenticated
-PUT /api/v1/orders/{id}/requested | JobOrderController#updateJobOrderAsRequester | pre=isAuthenticated() and @jobOrderAccessPolicy.canEditJobOrderAsRequester(#id) | url=anyRequest -> authenticated
-PATCH /api/v1/orders/{id}/responsible-org-unit | JobOrderController#reassignResponsibleOrgUnit | pre=hasRole('LOGISTICIAN') and @jobOrderAccessPolicy.canEditJobOrder(#id) | url=anyRequest -> authenticated
-PUT /api/v1/orders/{id}/status | JobOrderController#updateJobOrderStatus | pre=hasRole('LOGISTICIAN') and @jobOrderAccessPolicy.canEditJobOrder(#id) | url=anyRequest -> authenticated
+PUT /api/v1/orders/{id}/requested | JobOrderController#updateJobOrderAsRequester | pre=isAuthenticated() | url=anyRequest -> authenticated
+PATCH /api/v1/orders/{id}/responsible-org-unit | JobOrderController#reassignResponsibleOrgUnit | pre=hasRole('LOGISTICIAN') | url=anyRequest -> authenticated
+PUT /api/v1/orders/{id}/status | JobOrderController#updateJobOrderStatus | pre=hasRole('LOGISTICIAN') | url=anyRequest -> authenticated
 GET /api/v1/orders/{jobOrderId}/claims | MaterialClaimController#getClaimBuckets | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId) | url=anyRequest -> authenticated
 POST /api/v1/orders/{jobOrderId}/claims | MaterialClaimController#upsertClaim | pre=hasRole('LOGISTICIAN') and @ownerScopeService.canViewJobOrders() | url=anyRequest -> authenticated
 DELETE /api/v1/orders/{jobOrderId}/claims/{claimId} | MaterialClaimController#withdrawClaim | pre=hasRole('LOGISTICIAN') and @ownerScopeService.canViewJobOrders() | url=anyRequest -> authenticated
@@ -375,7 +375,7 @@ GET /api/v1/orders/{jobOrderId}/handovers/{handoverId}/report | JobOrderControll
 GET /api/v1/orders/{jobOrderId}/item-handovers/{handoverId}/report | JobOrderController#downloadItemHandoverReport | pre=hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN') and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId) | url=anyRequest -> authenticated
 GET /api/v1/orders/{jobOrderId}/item-stock | JobOrderItemStockController#getItemStock | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId) | url=anyRequest -> authenticated
 GET /api/v1/orders/{jobOrderId}/material-collection | MaterialCollectionController#getMaterialCollection | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId) | url=anyRequest -> authenticated
-DELETE /api/v1/orders/{jobOrderId}/materials/{materialId} | JobOrderController#unlinkMaterial | pre=hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN') and @jobOrderAccessPolicy.canEditJobOrder(#jobOrderId) | url=anyRequest -> authenticated
+DELETE /api/v1/orders/{jobOrderId}/materials/{materialId} | JobOrderController#unlinkMaterial | pre=hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/org-chart | OrgChartController#getOrgChart | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/org-chart/leadership | LeitungController#view | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/org-chart/positions | OrgChartController#createPosition | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
@@ -653,8 +653,8 @@ GET /v3/api-docs.yaml | OpenApiWebMvcResource#openapiYaml | pre=none | url=/v3/a
 MemberEvaluationService#delete(1) | pre=hasAnyRole('ADMIN','OFFICER')
 MemberEvaluationService#listAll(1) | pre=hasAnyRole('ADMIN','OFFICER')
 MemberEvaluationService#upsert(3) | pre=hasAnyRole('ADMIN','OFFICER')
-MissionFinanceEntryService#deleteEntry(2) | pre=@missionSecurityService.canEditFinanceEntry(#entryId, authentication)
-MissionFinanceEntryService#updateEntry(3) | pre=@missionSecurityService.canEditFinanceEntry(#entryId, authentication)
+MissionFinanceEntryService#deleteEntry(2) | pre=@missionAccessPolicy.canEditFinanceEntry(#entryId, authentication)
+MissionFinanceEntryService#updateEntry(3) | pre=@missionAccessPolicy.canEditFinanceEntry(#entryId, authentication)
 PromotionCategoryService#create(1) | pre=hasAnyRole('ADMIN','OFFICER')
 PromotionCategoryService#delete(1) | pre=hasAnyRole('ADMIN','OFFICER')
 PromotionCategoryService#update(2) | pre=hasAnyRole('ADMIN','OFFICER')

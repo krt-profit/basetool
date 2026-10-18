@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionUnit;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -42,9 +43,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class MissionStructureServiceTest {
 
   @Mock private MissionRepository missionRepository;
+
+  @Mock private MissionEditor missionEditor;
   @Mock private AuditRecorder auditRecorder;
   @Mock private MissionNotificationPublisher notificationPublisher;
   @InjectMocks private MissionStructureService missionStructureService;
+
+  @BeforeEach
+  void wireMissionEditor() {
+    MissionEditorFixture.delegate(missionEditor, missionRepository, auditRecorder);
+  }
 
   @Test
   void removeMissionUnit_shouldNotCallMissionRepositorySave() {

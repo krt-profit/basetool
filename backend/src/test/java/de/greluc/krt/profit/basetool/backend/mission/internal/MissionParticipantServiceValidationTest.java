@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -56,7 +57,9 @@ class MissionParticipantServiceValidationTest {
 
   @Mock private MissionRepository missionRepository;
 
-  @Mock private MissionSecurityService missionSecurityService;
+  @Mock private MissionEditor missionEditor;
+
+  @Mock private MissionAccessPolicy missionAccessPolicy;
 
   @Mock private org.springframework.security.core.Authentication authentication;
 
@@ -69,6 +72,11 @@ class MissionParticipantServiceValidationTest {
   @Mock private AuditService auditService;
 
   @InjectMocks private MissionParticipantService missionParticipantService;
+
+  @BeforeEach
+  void wireMissionEditor() {
+    MissionEditorFixture.delegate(missionEditor, missionRepository, auditService);
+  }
 
   @Test
   void updateParticipantAttributes_rejectsStartBeforeMissionActualStart() {
@@ -106,7 +114,7 @@ class MissionParticipantServiceValidationTest {
 
   @Test
   void updateParticipantAttributes_rejectsStartAfterEnd() {
-    when(missionSecurityService.canManageLoadedMission(any(), any())).thenReturn(true);
+    when(missionAccessPolicy.canManageLoadedMission(any(), any())).thenReturn(true);
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     Mission mission = new Mission();
@@ -145,7 +153,7 @@ class MissionParticipantServiceValidationTest {
 
   @Test
   void updateParticipantAttributes_rejectsNonMissionArchetypeDesiredJobType() {
-    when(missionSecurityService.canManageLoadedMission(any(), any())).thenReturn(true);
+    when(missionAccessPolicy.canManageLoadedMission(any(), any())).thenReturn(true);
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     UUID desiredJobTypeId = UUID.randomUUID();
@@ -187,7 +195,7 @@ class MissionParticipantServiceValidationTest {
 
   @Test
   void updateParticipantAttributes_rejectsNonMissionArchetypePlannedJobType() {
-    when(missionSecurityService.canManageLoadedMission(any(), any())).thenReturn(true);
+    when(missionAccessPolicy.canManageLoadedMission(any(), any())).thenReturn(true);
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     UUID plannedJobTypeId = UUID.randomUUID();

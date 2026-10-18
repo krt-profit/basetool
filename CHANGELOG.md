@@ -16,6 +16,11 @@
 
 - **Schnellzugriff: mehr Seiten, mehr Aktionen, tolerantere Suche.** `Strg`/`⌘` + `K` findet jetzt auch Reiter-Seiten wie „Mein Lager“, „Globales Lager“, „Hangar der Org-Einheit“ sowie – wenn du sie sehen darfst – die Reiter von „Bedarf & Spenden“ und „Ankauf“, und bietet die Aktionen „Neue Mission anlegen“, „Neuen Raffinerieauftrag anlegen“, „In mein Lager einbuchen“, „Ins globale Lager einbuchen“ (Logistiker), „Handbuch öffnen“, Sprachwechsel und „Administration öffnen“ (Admins). Menüfilter und Schnellzugriff finden „ü“ auch als „ue“ und hören auf Suchbegriffe („Schiffe“ → Hangar); besuchte Rechtsseiten erscheinen unter „Zuletzt besucht“ (neuer Endpunkt `GET /quick-access/entries`, ADR-0282, REQ-UI-026).
 
+### Changed
+
+- **Aufträge: Bearbeiten verlangt die Version.** Eine Auftragsänderung mit Versionsfeld (Status, Blueprint-Zählweise, Bearbeiten, Bearbeiten als Auftraggeber) ohne `version` antwortet jetzt mit 409 statt eine gleichzeitige Änderung still zu überschreiben (REQ-ORDERS-046).
+- **Missionen und Aufträge: Zugriff wird am geladenen Datensatz geprüft.** Ablauf, Teilnehmer, Einheiten, Crews und Co-Manager einer Mission sowie Auftragsänderungen prüft jetzt ein Edit-Modul pro Aggregat, auch für Aufrufe ohne HTTP-Anfrage; der Endpunkt prüft nur noch die Rolle. Eine unbekannte Mission oder ein unbekannter Auftrag antwortet dort mit 404 statt 403 (REQ-SEC-085, ADR-0287).
+
 ### Fixed
 
 - **Exchange: `share` nimmt den ganzen persönlichen Anteil.** Eine verbundene Anwendung kann jetzt alles teilen, was `split.personal` zeigt: Nach dem persönlichen Bestand nimmt `share` auch geteilten Bestand ohne Einheit, statt mit `INSUFFICIENT_STOCK` abzulehnen. Dieser Teil wird als Pool-Wechsel auditiert (REQ-INV-060, REQ-XCH-016).

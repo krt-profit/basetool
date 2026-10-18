@@ -48,7 +48,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderUpdated
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
@@ -109,6 +108,9 @@ public class JobOrderService {
 
   private final UserService userService;
 
+  /** Runs the load, gate, version check, audit, notices and projection of every order edit. */
+  private final JobOrderEditor jobOrderEditor;
+
   /**
    * Persists a new job order in the next free priority slot (1 is highest), taking each material's
    * minimum quality verbatim from the DTO (650 or {@code null} for none).
@@ -148,7 +150,7 @@ public class JobOrderService {
     auditRecorder.record(
         AuditEventType.JOB_ORDER_CREATED,
         jobOrder.getId(),
-        orderLabel(jobOrder),
+        JobOrderAuditLabel.of(jobOrder),
         null,
         AuditDetails.of("type", "MATERIAL")
             .with("materials", jobOrder.getMaterials().size())
@@ -199,7 +201,7 @@ public class JobOrderService {
     auditRecorder.record(
         AuditEventType.JOB_ORDER_ITEM_CREATED,
         jobOrder.getId(),
-        orderLabel(jobOrder),
+        JobOrderAuditLabel.of(jobOrder),
         null,
         AuditDetails.of("type", "ITEM")
             .with("lines", jobOrder.getItems().size())
@@ -231,25 +233,24 @@ public class JobOrderService {
   }
 
   /**
-   * Publishes a {@link JobOrderUpdatedByRequesterEvent} so the responsible org unit's officers and
-   * leads are notified after commit (REQ-ORDERS-023). Reads only scalars and never re-saves the
-   * order.
+   * Builds the {@link JobOrderUpdatedByRequesterEvent} that notifies the responsible org unit's
+   * officers and leads after commit (REQ-ORDERS-023). Reads only scalars.
    *
    * @param jobOrder the persisted, flushed job order after the requester edit
+   * @return the event to publish
    */
-  private void publishJobOrderUpdatedByRequester(@NotNull JobOrder jobOrder) {
+  private JobOrderUpdatedByRequesterEvent updatedByRequesterEvent(@NotNull JobOrder jobOrder) {
     OrgUnit responsible = jobOrder.getResponsibleOrgUnit();
     OrgUnit requesting = jobOrder.getRequestingOrgUnit();
-    eventPublisher.publishEvent(
-        new JobOrderUpdatedByRequesterEvent(
-            jobOrder.getId(),
-            jobOrder.getDisplayId(),
-            jobOrder.getHandle(),
-            new OrgUnitRef(responsible.getId(), responsible.getKind()),
-            responsible.getShorthand(),
-            requesting == null ? null : new OrgUnitRef(requesting.getId(), requesting.getKind()),
-            requesting == null ? null : requesting.getShorthand(),
-            authHelperService.currentUserId().orElse(null)));
+    return new JobOrderUpdatedByRequesterEvent(
+        jobOrder.getId(),
+        jobOrder.getDisplayId(),
+        jobOrder.getHandle(),
+        new OrgUnitRef(responsible.getId(), responsible.getKind()),
+        responsible.getShorthand(),
+        requesting == null ? null : new OrgUnitRef(requesting.getId(), requesting.getKind()),
+        requesting == null ? null : requesting.getShorthand(),
+        authHelperService.currentUserId().orElse(null));
   }
 
   /**
@@ -276,8 +277,11 @@ public class JobOrderService {
   }
 
   private void publishJobOrderClosed(@NotNull UUID jobOrderId) {
-    eventPublisher.publishEvent(
-        new JobOrderClosedEvent(jobOrderId, authHelperService.currentUserId().orElse(null)));
+    eventPublisher.publishEvent(closedEvent(jobOrderId));
+  }
+
+  private JobOrderClosedEvent closedEvent(@NotNull UUID jobOrderId) {
+    return new JobOrderClosedEvent(jobOrderId, authHelperService.currentUserId().orElse(null));
   }
 
   /**
@@ -296,12 +300,11 @@ public class JobOrderService {
    */
   @Transactional
   public JobOrderDto updateJobOrderStatus(UUID id, UpdateJobOrderStatusDto dto) {
-    JobOrder jobOrder =
-        Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
+    return jobOrderEditor.edit(
+        id, JobOrderGate.EDIT, dto.version(), jobOrder -> applyStatus(jobOrder, dto.status()));
+  }
 
-    OptimisticLock.checkOptionalClient(jobOrder.getVersion(), dto.version(), JobOrder.class, id);
-
-    JobOrderStatus status = dto.status();
+  private JobOrderEdit applyStatus(@NotNull JobOrder jobOrder, @NotNull JobOrderStatus status) {
     final JobOrderStatus previousStatus = jobOrder.getStatus();
     boolean isTerminal = (status == JobOrderStatus.COMPLETED || status == JobOrderStatus.REJECTED);
     boolean wasTerminal =
@@ -324,29 +327,24 @@ public class JobOrderService {
       jobOrderPriorityService.normalizePriorities();
     }
 
+    List<Object> notices = new ArrayList<>();
     if (isTerminal && !wasTerminal) {
       stockCommands.releaseJobOrderEarmarks(jobOrder.getId());
-      publishJobOrderClosed(jobOrder.getId());
-      publishJobOrderFinished(jobOrder, status.name());
+      notices.add(closedEvent(jobOrder.getId()));
+      notices.add(finishedNotice(jobOrder, status.name()));
     }
 
-    if (status == JobOrderStatus.COMPLETED && previousStatus != JobOrderStatus.COMPLETED) {
-      auditRecorder.record(
-          AuditEventType.JOB_ORDER_COMPLETED,
-          jobOrder.getId(),
-          orderLabel(jobOrder),
-          null,
-          AuditDetails.of("from", previousStatus).with("autoCompleted", "false"));
-    } else {
-      auditRecorder.record(
-          AuditEventType.JOB_ORDER_STATUS_CHANGED,
-          jobOrder.getId(),
-          orderLabel(jobOrder),
-          null,
-          AuditDetails.of("from", previousStatus).with("to", status));
-    }
-
-    return jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
+    JobOrderEdit edit =
+        status == JobOrderStatus.COMPLETED && previousStatus != JobOrderStatus.COMPLETED
+            ? JobOrderEdit.audited(
+                jobOrder,
+                AuditEventType.JOB_ORDER_COMPLETED,
+                AuditDetails.of("from", previousStatus).with("autoCompleted", "false"))
+            : JobOrderEdit.audited(
+                jobOrder,
+                AuditEventType.JOB_ORDER_STATUS_CHANGED,
+                AuditDetails.of("from", previousStatus).with("to", status));
+    return edit.notifying(notices);
   }
 
   /**
@@ -381,29 +379,23 @@ public class JobOrderService {
   @Transactional
   public JobOrderDto updateBlueprintVariantCounting(
       UUID id, boolean countWithVariants, Long version) {
-    JobOrder jobOrder =
-        Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
-
-    if (jobOrder.getType() != JobOrderType.ITEM) {
-      throw new BadRequestException("Blueprint variant counting applies only to item orders");
-    }
-
-    OptimisticLock.checkOptionalClient(jobOrder.getVersion(), version, JobOrder.class, id);
-
-    if (jobOrder.isCountBlueprintsWithVariants() == countWithVariants) {
-      return jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
-    }
-
-    jobOrder.setCountBlueprintsWithVariants(countWithVariants);
-    jobOrder = jobOrderRepository.saveAndFlush(jobOrder);
-
-    auditRecorder.record(
-        AuditEventType.JOB_ORDER_BLUEPRINT_COUNTING_CHANGED,
-        jobOrder.getId(),
-        orderLabel(jobOrder),
-        null,
-        AuditDetails.of("countWithVariants", countWithVariants));
-    return jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
+    return jobOrderEditor.edit(
+        id,
+        JobOrderGate.EDIT,
+        version,
+        jobOrder -> {
+          if (jobOrder.getType() != JobOrderType.ITEM) {
+            throw new BadRequestException("Blueprint variant counting applies only to item orders");
+          }
+          if (jobOrder.isCountBlueprintsWithVariants() == countWithVariants) {
+            return JobOrderEdit.unchanged(jobOrder);
+          }
+          jobOrder.setCountBlueprintsWithVariants(countWithVariants);
+          return JobOrderEdit.audited(
+              jobOrderRepository.saveAndFlush(jobOrder),
+              AuditEventType.JOB_ORDER_BLUEPRINT_COUNTING_CHANGED,
+              AuditDetails.of("countWithVariants", countWithVariants));
+        });
   }
 
   /**
@@ -419,30 +411,26 @@ public class JobOrderService {
    */
   @Transactional
   public JobOrderDto updateJobOrder(UUID id, CreateJobOrderDto updateDto) {
-    JobOrder jobOrder =
-        Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
-
-    OptimisticLock.checkOptionalClient(
-        jobOrder.getVersion(), updateDto.version(), JobOrder.class, id);
-
-    if (updateDto.requestingOrgUnitId() != null) {
-      jobOrder.setRequestingOrgUnit(
-          jobOrderOrgUnitResolver.resolveRequestingOrgUnit(updateDto.requestingOrgUnitId()));
-    }
-    jobOrder.setHandle(updateDto.handle());
-    jobOrder.setComment(StringNormalization.trimToNull(updateDto.comment()));
-
-    MaterialReplaceOutcome outcome =
-        replaceMaterialsWithinTransaction(id, jobOrder, updateDto.materials());
-    auditRecorder.record(
-        AuditEventType.JOB_ORDER_UPDATED,
-        outcome.order().getId(),
-        orderLabel(outcome.order()),
-        null,
-        AuditDetails.of("materialsRemoved", outcome.removedCount())
-            .with("materials", outcome.order().getMaterials().size())
-            .with("orphanedClaimsWithdrawn", outcome.orphanedClaimsWithdrawn()));
-    return jobOrderStockProjectionService.mapToDtoWithStock(outcome.order());
+    return jobOrderEditor.edit(
+        id,
+        JobOrderGate.EDIT,
+        updateDto.version(),
+        jobOrder -> {
+          if (updateDto.requestingOrgUnitId() != null) {
+            jobOrder.setRequestingOrgUnit(
+                jobOrderOrgUnitResolver.resolveRequestingOrgUnit(updateDto.requestingOrgUnitId()));
+          }
+          jobOrder.setHandle(updateDto.handle());
+          jobOrder.setComment(StringNormalization.trimToNull(updateDto.comment()));
+          MaterialReplaceOutcome outcome =
+              replaceMaterialsWithinTransaction(id, jobOrder, updateDto.materials());
+          return JobOrderEdit.audited(
+              outcome.order(),
+              AuditEventType.JOB_ORDER_UPDATED,
+              AuditDetails.of("materialsRemoved", outcome.removedCount())
+                  .with("materials", outcome.order().getMaterials().size())
+                  .with("orphanedClaimsWithdrawn", outcome.orphanedClaimsWithdrawn()));
+        });
   }
 
   /**
@@ -564,15 +552,20 @@ public class JobOrderService {
    */
   @Transactional
   public JobOrderDto updateItemJobOrder(UUID id, CreateJobOrderItemRequestDto updateDto) {
-    JobOrder jobOrder =
-        Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
+    return jobOrderEditor.edit(
+        id,
+        JobOrderGate.EDIT,
+        updateDto.version(),
+        jobOrder -> rewriteItemOrder(jobOrder, updateDto));
+  }
 
+  private JobOrderEdit rewriteItemOrder(
+      @NotNull JobOrder jobOrder, @NotNull CreateJobOrderItemRequestDto updateDto) {
+    UUID id = jobOrder.getId();
     if (jobOrder.getType() != JobOrderType.ITEM) {
       throw new BadRequestException(
           "Order " + id + " is not an item order; use the material-order update endpoint.");
     }
-    OptimisticLock.checkOptionalClient(
-        jobOrder.getVersion(), updateDto.version(), JobOrder.class, id);
     if (jobOrder.getItemHandovers() != null && !jobOrder.getItemHandovers().isEmpty()) {
       throw new BadRequestException(
           "Item order " + id + " already has handovers and can no longer be edited.");
@@ -592,14 +585,11 @@ public class JobOrderService {
 
     int orphanedClaimsWithdrawn =
         materialClaimService.withdrawOrphanedClaimsWithinTransaction(jobOrder);
-    auditRecorder.record(
+    return JobOrderEdit.audited(
+        jobOrder,
         AuditEventType.JOB_ORDER_ITEM_UPDATED,
-        jobOrder.getId(),
-        orderLabel(jobOrder),
-        null,
         AuditDetails.of("lines", jobOrder.getItems().size())
             .with("orphanedClaimsWithdrawn", orphanedClaimsWithdrawn));
-    return jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
   }
 
   /**
@@ -742,31 +732,30 @@ public class JobOrderService {
    */
   @Transactional
   public JobOrderDto updateJobOrderAsRequester(UUID id, CreateJobOrderDto updateDto) {
-    JobOrder jobOrder =
-        Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
-    if (jobOrder.getType() != JobOrderType.MATERIAL) {
-      throw new BadRequestException(
-          "Order " + id + " is not a material order; use the requester item-update endpoint.");
-    }
-    OptimisticLock.checkOptionalClient(
-        jobOrder.getVersion(), updateDto.version(), JobOrder.class, id);
-    assertRequesterEditable(jobOrder);
-
-    jobOrder.setComment(StringNormalization.trimToNull(updateDto.comment()));
-
-    MaterialReplaceOutcome outcome =
-        replaceMaterialsWithinTransaction(id, jobOrder, updateDto.materials());
-    auditRecorder.record(
-        AuditEventType.JOB_ORDER_UPDATED,
-        outcome.order().getId(),
-        orderLabel(outcome.order()),
-        null,
-        AuditDetails.of("materialsRemoved", outcome.removedCount())
-            .with("materials", outcome.order().getMaterials().size())
-            .with("orphanedClaimsWithdrawn", outcome.orphanedClaimsWithdrawn())
-            .with("byRequester", true));
-    publishJobOrderUpdatedByRequester(outcome.order());
-    return jobOrderStockProjectionService.mapToDtoWithStock(outcome.order());
+    return jobOrderEditor.edit(
+        id,
+        JobOrderGate.REQUESTER,
+        updateDto.version(),
+        jobOrder -> {
+          if (jobOrder.getType() != JobOrderType.MATERIAL) {
+            throw new BadRequestException(
+                "Order "
+                    + id
+                    + " is not a material order; use the requester item-update endpoint.");
+          }
+          assertRequesterEditable(jobOrder);
+          jobOrder.setComment(StringNormalization.trimToNull(updateDto.comment()));
+          MaterialReplaceOutcome outcome =
+              replaceMaterialsWithinTransaction(id, jobOrder, updateDto.materials());
+          return JobOrderEdit.audited(
+                  outcome.order(),
+                  AuditEventType.JOB_ORDER_UPDATED,
+                  AuditDetails.of("materialsRemoved", outcome.removedCount())
+                      .with("materials", outcome.order().getMaterials().size())
+                      .with("orphanedClaimsWithdrawn", outcome.orphanedClaimsWithdrawn())
+                      .with("byRequester", true))
+              .notifying(List.of(updatedByRequesterEvent(outcome.order())));
+        });
   }
 
   /**
@@ -789,14 +778,20 @@ public class JobOrderService {
   @Transactional
   public JobOrderDto updateItemJobOrderAsRequester(
       UUID id, CreateJobOrderItemRequestDto updateDto) {
-    JobOrder jobOrder =
-        Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
+    return jobOrderEditor.edit(
+        id,
+        JobOrderGate.REQUESTER,
+        updateDto.version(),
+        jobOrder -> rewriteItemOrderAsRequester(jobOrder, updateDto));
+  }
+
+  private JobOrderEdit rewriteItemOrderAsRequester(
+      @NotNull JobOrder jobOrder, @NotNull CreateJobOrderItemRequestDto updateDto) {
+    UUID id = jobOrder.getId();
     if (jobOrder.getType() != JobOrderType.ITEM) {
       throw new BadRequestException(
           "Order " + id + " is not an item order; use the requester material-update endpoint.");
     }
-    OptimisticLock.checkOptionalClient(
-        jobOrder.getVersion(), updateDto.version(), JobOrder.class, id);
     assertRequesterEditable(jobOrder);
 
     jobOrder.setComment(StringNormalization.trimToNull(updateDto.comment()));
@@ -825,16 +820,13 @@ public class JobOrderService {
         Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
     int orphanedClaimsWithdrawn =
         materialClaimService.withdrawOrphanedClaimsWithinTransaction(refreshed);
-    auditRecorder.record(
-        AuditEventType.JOB_ORDER_ITEM_UPDATED,
-        refreshed.getId(),
-        orderLabel(refreshed),
-        null,
-        AuditDetails.of("lines", refreshed.getItems().size())
-            .with("orphanedClaimsWithdrawn", orphanedClaimsWithdrawn)
-            .with("byRequester", true));
-    publishJobOrderUpdatedByRequester(refreshed);
-    return jobOrderStockProjectionService.mapToDtoWithStock(refreshed);
+    return JobOrderEdit.audited(
+            refreshed,
+            AuditEventType.JOB_ORDER_ITEM_UPDATED,
+            AuditDetails.of("lines", refreshed.getItems().size())
+                .with("orphanedClaimsWithdrawn", orphanedClaimsWithdrawn)
+                .with("byRequester", true))
+        .notifying(List.of(updatedByRequesterEvent(refreshed)));
   }
 
   /**
@@ -871,7 +863,7 @@ public class JobOrderService {
 
     final Integer priority = jobOrder.getPriority();
     final UUID deletedId = jobOrder.getId();
-    final String deletedLabel = orderLabel(jobOrder);
+    final String deletedLabel = JobOrderAuditLabel.of(jobOrder);
     final NoticeEvent deletedNotice = finishedNotice(jobOrder, "DELETED");
     jobOrderRepository.delete(jobOrder);
     jobOrderRepository.flush();
@@ -911,27 +903,24 @@ public class JobOrderService {
    */
   @Transactional
   public void unlinkMaterial(UUID jobOrderId, UUID materialId) {
-    JobOrder jobOrder =
-        Entities.require(
-            jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);
-
-    boolean exists =
-        jobOrder.getMaterials().stream().anyMatch(m -> m.getMaterial().getId().equals(materialId));
-    if (!exists) {
-      throw new NotFoundException("Material not linked to job order: " + materialId);
-    }
-
-    final String label = orderLabel(jobOrder);
-    stockCommands.releaseJobOrderMaterialEarmarks(jobOrderId, materialId);
-
-    jobOrder.getMaterials().removeIf(m -> m.getMaterial().getId().equals(materialId));
-    jobOrderRepository.save(jobOrder);
-    auditRecorder.record(
-        AuditEventType.JOB_ORDER_MATERIAL_UNLINKED,
+    jobOrderEditor.editWithoutProjection(
         jobOrderId,
-        label,
-        null,
-        AuditDetails.of("material", materialId));
+        JobOrderGate.EDIT,
+        jobOrder -> {
+          boolean exists =
+              jobOrder.getMaterials().stream()
+                  .anyMatch(m -> m.getMaterial().getId().equals(materialId));
+          if (!exists) {
+            throw new NotFoundException("Material not linked to job order: " + materialId);
+          }
+          stockCommands.releaseJobOrderMaterialEarmarks(jobOrderId, materialId);
+          jobOrder.getMaterials().removeIf(m -> m.getMaterial().getId().equals(materialId));
+          jobOrderRepository.save(jobOrder);
+          return JobOrderEdit.audited(
+              jobOrder,
+              AuditEventType.JOB_ORDER_MATERIAL_UNLINKED,
+              AuditDetails.of("material", materialId));
+        });
   }
 
   /**
@@ -943,26 +932,24 @@ public class JobOrderService {
    */
   @Transactional
   public void unlinkInventoryItem(UUID jobOrderId, UUID inventoryItemId) {
-    final JobOrder jobOrder =
-        Entities.require(
-            jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);
-
-    StockRow item =
-        Entities.require(
-            stockReads.findRow(inventoryItemId),
-            () -> "InventoryItem not found: " + inventoryItemId);
-
-    if (!item.isEarmarkedForJobOrder(jobOrderId)) {
-      throw new NotFoundException("InventoryItem not linked to job order: " + inventoryItemId);
-    }
-
-    stockCommands.releaseJobOrderEarmark(item.getId(), jobOrderId);
-    auditRecorder.record(
-        AuditEventType.JOB_ORDER_INVENTORY_UNLINKED,
+    jobOrderEditor.editWithoutProjection(
         jobOrderId,
-        orderLabel(jobOrder),
-        null,
-        AuditDetails.of("inventoryItem", inventoryItemId));
+        JobOrderGate.EDIT,
+        jobOrder -> {
+          StockRow item =
+              Entities.require(
+                  stockReads.findRow(inventoryItemId),
+                  () -> "InventoryItem not found: " + inventoryItemId);
+          if (!item.isEarmarkedForJobOrder(jobOrderId)) {
+            throw new NotFoundException(
+                "InventoryItem not linked to job order: " + inventoryItemId);
+          }
+          stockCommands.releaseJobOrderEarmark(item.getId(), jobOrderId);
+          return JobOrderEdit.audited(
+              jobOrder,
+              AuditEventType.JOB_ORDER_INVENTORY_UNLINKED,
+              AuditDetails.of("inventoryItem", inventoryItemId));
+        });
   }
 
   /**
@@ -1037,7 +1024,7 @@ public class JobOrderService {
       auditRecorder.record(
           AuditEventType.JOB_ORDER_COMPLETED,
           jobOrder.getId(),
-          orderLabel(jobOrder),
+          JobOrderAuditLabel.of(jobOrder),
           null,
           "autoCompleted=true");
       publishJobOrderClosed(jobOrder.getId());
@@ -1065,9 +1052,11 @@ public class JobOrderService {
    */
   @Transactional
   public JobOrderDto reassignResponsibleOrgUnit(UUID id, UUID newResponsibleOrgUnitId) {
-    JobOrder jobOrder =
-        Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
+    return jobOrderEditor.editUnversioned(
+        id, JobOrderGate.EDIT, jobOrder -> reassign(jobOrder, newResponsibleOrgUnitId));
+  }
 
+  private JobOrderEdit reassign(@NotNull JobOrder jobOrder, @NotNull UUID newResponsibleOrgUnitId) {
     OrgUnit target =
         orgUnitRepository
             .findById(newResponsibleOrgUnitId)
@@ -1106,7 +1095,7 @@ public class JobOrderService {
         target.getId(),
         target.getKind());
 
-    eventPublisher.publishEvent(
+    NoticeEvent reassignedNotice =
         JobOrderNotices.reassigned(
             jobOrder.getId(),
             jobOrder.getDisplayId(),
@@ -1114,33 +1103,19 @@ public class JobOrderService {
             previous == null ? null : previous.getShorthand(),
             new OrgUnitRef(target.getId(), target.getKind()),
             target.getShorthand(),
-            userService.currentActor()));
+            userService.currentActor());
 
     int claimsWithdrawn = 0;
     if (target.getKind() == OrgUnitKind.SQUADRON) {
       claimsWithdrawn = materialClaimService.withdrawAllForOrderWithinTransaction(jobOrder);
     }
-    auditRecorder.record(
-        AuditEventType.JOB_ORDER_REASSIGNED,
-        jobOrder.getId(),
-        orderLabel(jobOrder),
-        null,
-        AuditDetails.of("fromOrgUnit", orgUnitRef(previous))
-            .with("toOrgUnit", orgUnitRef(target))
-            .with("claimsWithdrawn", claimsWithdrawn));
-    return jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
-  }
-
-  /**
-   * Composes the audit subject label {@code #<displayId> '<handle>'} for a job order
-   * (REQ-AUDIT-001). The handle names the order's contact person, so the label is personal data and
-   * is excluded from the data-subject export (REQ-SEC-058).
-   *
-   * @param jobOrder the order
-   * @return the {@code #<displayId> '<handle>'} label
-   */
-  private static String orderLabel(@NotNull JobOrder jobOrder) {
-    return JobOrderAuditLabel.of(jobOrder.getDisplayId());
+    return JobOrderEdit.audited(
+            jobOrder,
+            AuditEventType.JOB_ORDER_REASSIGNED,
+            AuditDetails.of("fromOrgUnit", orgUnitRef(previous))
+                .with("toOrgUnit", orgUnitRef(target))
+                .with("claimsWithdrawn", claimsWithdrawn))
+        .notifying(List.of(reassignedNotice));
   }
 
   /**

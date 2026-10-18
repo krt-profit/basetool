@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.repository.*;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -43,11 +44,18 @@ class MissionServicePayoutTest {
 
   @Mock private MissionRepository missionRepository;
 
+  @Mock private MissionEditor missionEditor;
+
   @Mock private MissionParticipantRepository missionParticipantRepository;
 
   @Mock private AuditService auditService;
   @Mock private MissionNotificationPublisher notificationPublisher;
   @InjectMocks private MissionParticipantService missionParticipantService;
+
+  @BeforeEach
+  void wireMissionEditor() {
+    MissionEditorFixture.delegate(missionEditor, missionRepository, auditService);
+  }
 
   @Test
   void shouldCheckInParticipant() {
@@ -62,7 +70,7 @@ class MissionServicePayoutTest {
     p.setMission(mission);
     mission.getParticipants().add(p);
 
-    when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(p));
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
 
     Mission updatedMission = missionParticipantService.checkIn(missionId, participantId);
 
@@ -87,7 +95,7 @@ class MissionServicePayoutTest {
     p.setStartTime(originalArrival);
     mission.getParticipants().add(p);
 
-    when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(p));
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
 
     Mission updatedMission = missionParticipantService.checkIn(missionId, participantId);
 
@@ -113,7 +121,7 @@ class MissionServicePayoutTest {
     p.setStartTime(Instant.now().minusSeconds(3600));
     mission.getParticipants().add(p);
 
-    when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(p));
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
 
     Mission updatedMission = missionParticipantService.checkOut(missionId, participantId);
 
@@ -136,7 +144,7 @@ class MissionServicePayoutTest {
     p.setPayoutPreference(PayoutPreference.PAYOUT);
     mission.getParticipants().add(p);
 
-    when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(p));
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
 
     Mission updatedMission =
         missionParticipantService.updatePayoutPreference(
@@ -163,7 +171,7 @@ class MissionServicePayoutTest {
     p.setStartTime(Instant.now().minusSeconds(3 * 3600));
     mission.getParticipants().add(p);
 
-    when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(p));
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
 
     Mission updatedMission = missionParticipantService.checkOut(missionId, participantId);
 
@@ -191,7 +199,7 @@ class MissionServicePayoutTest {
     p.setStartTime(startAfterEnd);
     mission.getParticipants().add(p);
 
-    when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(p));
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
 
     Mission updatedMission = missionParticipantService.checkOut(missionId, participantId);
 

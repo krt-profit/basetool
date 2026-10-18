@@ -23,12 +23,12 @@ import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantDto;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryCreateDto;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryUpdateDto;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceTotalsDto;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionPeerRedactor;
-import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
@@ -57,7 +57,7 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>The ledger is restricted to members and above ({@code @authHelperService.isMemberOrAbove()});
  * every response strips nested participant PII via {@link #redactParticipantPii}. Update/delete are
- * gated on {@link MissionSecurityService#canEditFinanceEntry}.
+ * gated on {@link MissionAccessPolicy#canEditFinanceEntry}.
  */
 @Slf4j
 @RestController
@@ -139,7 +139,7 @@ public class MissionFinanceEntryController {
   }
 
   /**
-   * Creates a finance entry, gated by {@code @missionSecurityService.canCreateFinanceEntry}
+   * Creates a finance entry, gated by {@code @missionAccessPolicy.canCreateFinanceEntry}
    * (REQ-SEC-042): a mission manager in scope books for anyone on the mission, a plain member only
    * for their own participant row.
    *
@@ -152,7 +152,7 @@ public class MissionFinanceEntryController {
   @ResponseStatus(HttpStatus.CREATED)
   @PreAuthorize(
       "isAuthenticated() and @authHelperService.isMemberOrAbove()"
-          + " and @missionSecurityService.canCreateFinanceEntry(#missionId,"
+          + " and @missionAccessPolicy.canCreateFinanceEntry(#missionId,"
           + " #dto.participantId(), authentication)")
   public MissionFinanceEntryDto createFinanceEntry(
       @PathVariable UUID missionId, @RequestBody @Valid MissionFinanceEntryCreateDto dto) {

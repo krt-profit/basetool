@@ -41,12 +41,12 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemHandover;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.joborder.web.JobOrderController;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOffer;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeRequest;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
-import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService;
 import de.greluc.krt.profit.basetool.backend.mission.web.MissionController;
 import de.greluc.krt.profit.basetool.backend.mission.web.MissionFinanceEntryController;
 import de.greluc.krt.profit.basetool.backend.operation.internal.Operation;
@@ -118,7 +118,6 @@ class TenancyGuardTest {
           MissionAccessPolicy.class,
           InventoryAccessPolicy.class,
           HangarAccessPolicy.class,
-          MissionSecurityService.class,
           SpecialCommandSecurityService.class,
           OrgRoleManagementSecurityService.class,
           SupplyAccessPolicy.class,
@@ -259,11 +258,113 @@ class TenancyGuardTest {
               new HandlerKey(PromotionCategoryController.class, "delete"),
               "PromotionCategoryService checks canEditSquadron on the topic's owning Staffel"),
           Map.entry(
+              new HandlerKey(MissionController.class, "joinMission"),
+              "MissionEditor checks the mission gate on the loaded mission"),
+          Map.entry(
+              new HandlerKey(MissionController.class, "setPartyLead"),
+              "MissionEditor checks the mission gate on the loaded mission"),
+          Map.entry(
+              new HandlerKey(MissionController.class, "addUnitSlim"),
+              "MissionEditor checks the mission gate on the loaded mission"),
+          Map.entry(
+              new HandlerKey(MissionController.class, "updateUnitSlim"),
+              "MissionEditor checks the mission gate on the loaded mission"),
+          Map.entry(
+              new HandlerKey(MissionController.class, "deleteUnitSlim"),
+              "MissionEditor checks the mission gate on the loaded mission"),
+          Map.entry(
+              new HandlerKey(MissionController.class, "addStepSlim"),
+              "MissionEditor checks the mission gate on the loaded mission"),
+          Map.entry(
+              new HandlerKey(MissionController.class, "updateStepSlim"),
+              "MissionEditor checks the mission gate on the loaded mission"),
+          Map.entry(
+              new HandlerKey(MissionController.class, "deleteStepSlim"),
+              "MissionEditor checks the mission gate on the loaded mission"),
+          Map.entry(
+              new HandlerKey(MissionController.class, "reorderStepsSlim"),
+              "MissionEditor checks the mission gate on the loaded mission"),
+          Map.entry(
+              new HandlerKey(MissionController.class, "toggleStepDoneSlim"),
+              "MissionEditor checks the mission gate on the loaded mission"),
+          Map.entry(
+              new HandlerKey(MissionController.class, "addObjectiveSlim"),
+              "MissionEditor checks the mission gate on the loaded mission"),
+          Map.entry(
+              new HandlerKey(MissionController.class, "updateObjectiveSlim"),
+              "MissionEditor checks the mission gate on the loaded mission"),
+          Map.entry(
+              new HandlerKey(MissionController.class, "deleteObjectiveSlim"),
+              "MissionEditor checks the mission gate on the loaded mission"),
+          Map.entry(
+              new HandlerKey(MissionController.class, "reorderObjectivesSlim"),
+              "MissionEditor checks the mission gate on the loaded mission"),
+          Map.entry(
+              new HandlerKey(MissionController.class, "addCrewSlim"),
+              "MissionEditor checks the mission gate on the loaded mission"),
+          Map.entry(
+              new HandlerKey(MissionController.class, "updateCrewSlim"),
+              "MissionEditor checks the mission gate on the loaded mission"),
+          Map.entry(
+              new HandlerKey(MissionController.class, "removeCrewSlim"),
+              "MissionEditor checks the mission gate on the loaded mission"),
+          Map.entry(
+              new HandlerKey(MissionController.class, "updateParticipantSlim"),
+              "MissionEditor checks the mission gate on the loaded mission"),
+          Map.entry(
+              new HandlerKey(MissionController.class, "checkInParticipantSlim"),
+              "MissionEditor checks the mission gate on the loaded mission"),
+          Map.entry(
+              new HandlerKey(MissionController.class, "checkOutParticipantSlim"),
+              "MissionEditor checks the mission gate on the loaded mission"),
+          Map.entry(
+              new HandlerKey(MissionController.class, "updatePayoutPreferenceSlim"),
+              "MissionEditor checks the mission gate on the loaded mission"),
+          Map.entry(
+              new HandlerKey(MissionController.class, "addParticipantSlim"),
+              "MissionEditor checks the mission gate on the loaded mission"),
+          Map.entry(
+              new HandlerKey(MissionController.class, "removeParticipantSlim"),
+              "MissionEditor checks the mission gate on the loaded mission"),
+          Map.entry(
+              new HandlerKey(MissionController.class, "addManagerSlim"),
+              "MissionEditor checks the mission gate on the loaded mission"),
+          Map.entry(
+              new HandlerKey(MissionController.class, "removeManagerSlim"),
+              "MissionEditor checks the mission gate on the loaded mission"),
+          Map.entry(
+              new HandlerKey(JobOrderController.class, "updateJobOrderStatus"),
+              "JobOrderEditor checks the order gate on the loaded order"),
+          Map.entry(
+              new HandlerKey(JobOrderController.class, "updateJobOrder"),
+              "JobOrderEditor checks the order gate on the loaded order"),
+          Map.entry(
+              new HandlerKey(JobOrderController.class, "updateItemJobOrder"),
+              "JobOrderEditor checks the order gate on the loaded order"),
+          Map.entry(
+              new HandlerKey(JobOrderController.class, "updateBlueprintVariantCounting"),
+              "JobOrderEditor checks the order gate on the loaded order"),
+          Map.entry(
+              new HandlerKey(JobOrderController.class, "reassignResponsibleOrgUnit"),
+              "JobOrderEditor checks the order gate on the loaded order"),
+          Map.entry(
+              new HandlerKey(JobOrderController.class, "updateJobOrderAsRequester"),
+              "JobOrderEditor checks the order gate on the loaded order"),
+          Map.entry(
+              new HandlerKey(JobOrderController.class, "updateItemJobOrderAsRequester"),
+              "JobOrderEditor checks the order gate on the loaded order"),
+          Map.entry(
+              new HandlerKey(JobOrderController.class, "unlinkMaterial"),
+              "JobOrderEditor checks the order gate on the loaded order"),
+          Map.entry(
+              new HandlerKey(JobOrderController.class, "unlinkInventoryItem"),
+              "JobOrderEditor checks the order gate on the loaded order"),
+          Map.entry(
               new HandlerKey(MissionFinanceEntryController.class, "updateFinanceEntry"),
-              "the service method carries @missionSecurityService.canEditFinanceEntry"),
+              "the service method carries @missionAccessPolicy.canEditFinanceEntry"),
           Map.entry(
               new HandlerKey(MissionFinanceEntryController.class, "deleteFinanceEntry"),
-              "the service method carries @missionSecurityService.canEditFinanceEntry"));
+              "the service method carries @missionAccessPolicy.canEditFinanceEntry"));
 
   /** Selected write handlers that write no tenant data, each with the reason. */
   private static final Map<HandlerKey, String> NOT_TENANT_WRITES = Map.of();

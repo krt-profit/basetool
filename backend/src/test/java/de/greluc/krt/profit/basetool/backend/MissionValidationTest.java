@@ -141,10 +141,22 @@ class MissionValidationTest {
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
 
-    missionParticipantService.addParticipant(
-        mission.getId(), officerUser.getId(), null, null, null, null, null);
-    missionStructureService.addUnitToMission(
-        mission.getId(), "Test Unit", st.getId(), ship.getId(), false, null, null, null);
+    org.springframework.security.core.Authentication member =
+        org.springframework.security.core.context.SecurityContextHolder.getContext()
+            .getAuthentication();
+    org.springframework.security.core.context.SecurityContextHolder.getContext()
+        .setAuthentication(
+            new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                "seed-admin", "n/a", java.util.List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
+    try {
+      missionParticipantService.addParticipant(
+          mission.getId(), officerUser.getId(), null, null, null, null, null);
+      missionStructureService.addUnitToMission(
+          mission.getId(), "Test Unit", st.getId(), ship.getId(), false, null, null, null);
+    } finally {
+      org.springframework.security.core.context.SecurityContextHolder.getContext()
+          .setAuthentication(member);
+    }
     mission = missionRepository.findById(mission.getId()).orElseThrow();
     missionShip = mission.getAssignedUnits().iterator().next();
 

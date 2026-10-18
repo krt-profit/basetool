@@ -19,11 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
-import static de.greluc.krt.profit.basetool.backend.mission.internal.MissionSectionVersions.enforceSectionVersion;
-
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
-import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeRepository;
@@ -69,6 +66,8 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Participant writes never bump the mission's {@code @Version}; the attribute edit guards on the
  * participant's own version and the party-lead change on {@code partyLeadVersion} (REQ-ORG-018).
+ * Every write runs through {@link MissionEditor}: sign-up behind the read gate, a row edit behind
+ * the participant gate, the party lead and the co-managers behind the manage gate.
  */
 @Slf4j
 @Service
@@ -95,10 +94,11 @@ public class MissionParticipantService {
   /** Polymorphic repository used to materialise org-unit affiliations by id. */
   private final OrgUnitRepository orgUnitRepository;
 
-  /** Records the state-mutating participant activities into the audit log (REQ-AUDIT-001). */
-  private final AuditRecorder auditRecorder;
+  /** Runs the load, gate, section check and audit of every roster edit. */
+  private final MissionEditor missionEditor;
 
-  private final MissionSecurityService missionSecurityService;
+  /** Decides whether the caller may set the planned job type or rename an external row. */
+  private final MissionAccessPolicy missionAccessPolicy;
 
   /** Resolves a free-text participant name to a registered member or an external name. */
   private final ParticipantTargetResolver participantTargetResolver;
@@ -140,8 +140,28 @@ public class MissionParticipantService {
       @Nullable String comment,
       @Nullable List<UUID> orgUnitIds,
       @Nullable PayoutPreference payoutPreference) {
-    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
+    return missionEditor.edit(
+        missionId,
+        MissionGate.SEE,
+        mission ->
+            appendParticipant(
+                mission,
+                userId,
+                guestName,
+                desiredJobTypeId,
+                comment,
+                orgUnitIds,
+                payoutPreference));
+  }
 
+  private MissionEdit appendParticipant(
+      @NotNull Mission mission,
+      @Nullable UUID userId,
+      @Nullable String guestName,
+      @Nullable UUID desiredJobTypeId,
+      @Nullable String comment,
+      @Nullable List<UUID> orgUnitIds,
+      @Nullable PayoutPreference payoutPreference) {
     if (mission.getParticipants() != null
         && mission.getParticipants().size() >= MissionService.MAX_PARTICIPANTS_PER_MISSION) {
       throw new BusinessConflictException(
@@ -205,14 +225,11 @@ public class MissionParticipantService {
     mission.getParticipants().add(participant);
     missionParticipantRepository.save(participant);
     notificationPublisher.participantAdded(mission, participant);
-    auditRecorder.record(
+    return MissionEdit.audited(
         AuditEventType.MISSION_PARTICIPANT_ADDED,
-        mission.getId(),
-        mission.getName(),
         finalUserId,
         AuditDetails.of("participant", participant.getId())
             .with("type", finalUserId != null ? "user" : "external"));
-    return mission;
   }
 
   /**
@@ -255,33 +272,30 @@ public class MissionParticipantService {
    */
   @Transactional
   public Mission removeParticipant(@NotNull UUID missionId, @NotNull UUID participantId) {
-    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
-
-    mission.getParticipants().stream()
-        .filter(p -> p.getId().equals(participantId))
-        .findFirst()
-        .ifPresent(leaving -> notificationPublisher.participantRemoved(mission, leaving));
-    boolean removed = mission.getParticipants().removeIf(p -> p.getId().equals(participantId));
-
-    if (!removed) {
-      throw new NotFoundException("Participant not found in this mission");
-    }
-
-    for (MissionUnit ship : mission.getAssignedUnits()) {
-      ship.getCrew()
-          .removeIf(
-              crew ->
-                  crew.getParticipant() != null
-                      && crew.getParticipant().getId().equals(participantId));
-    }
-
-    auditRecorder.record(
-        AuditEventType.MISSION_PARTICIPANT_REMOVED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("participant", participantId));
-    return mission;
+    return missionEditor.edit(
+        missionId,
+        MissionGate.participant(participantId),
+        mission -> {
+          mission.getParticipants().stream()
+              .filter(p -> p.getId().equals(participantId))
+              .findFirst()
+              .ifPresent(leaving -> notificationPublisher.participantRemoved(mission, leaving));
+          boolean removed =
+              mission.getParticipants().removeIf(p -> p.getId().equals(participantId));
+          if (!removed) {
+            throw new NotFoundException("Participant not found in this mission");
+          }
+          for (MissionUnit ship : mission.getAssignedUnits()) {
+            ship.getCrew()
+                .removeIf(
+                    crew ->
+                        crew.getParticipant() != null
+                            && crew.getParticipant().getId().equals(participantId));
+          }
+          return MissionEdit.audited(
+              AuditEventType.MISSION_PARTICIPANT_REMOVED,
+              AuditDetails.of("participant", participantId));
+        });
   }
 
   /**
@@ -308,7 +322,62 @@ public class MissionParticipantService {
       String guestName,
       Long version,
       Authentication authentication) {
-    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
+    return missionEditor.edit(
+        missionId,
+        MissionGate.participant(participantId),
+        mission ->
+            applyAttributes(
+                mission,
+                participantId,
+                new ParticipantAttributes(
+                    desiredMissionJobTypeId,
+                    plannedMissionJobTypeId,
+                    comment,
+                    startTime,
+                    endTime,
+                    orgUnitIds,
+                    payoutPreference,
+                    guestName),
+                version,
+                authentication));
+  }
+
+  /**
+   * The editable per-mission attributes of one participant row.
+   *
+   * @param desiredMissionJobTypeId the desired mission job type, or {@code null} to clear it
+   * @param plannedMissionJobTypeId the planned mission job type, or {@code null} to clear it
+   * @param comment the free-text comment
+   * @param startTime the credited start, or {@code null}
+   * @param endTime the credited end, or {@code null}
+   * @param orgUnitIds the declared affiliation of an external participant
+   * @param payoutPreference the payout choice, or {@code null} to keep it
+   * @param guestName the new external name, or {@code null} to keep it
+   */
+  private record ParticipantAttributes(
+      UUID desiredMissionJobTypeId,
+      UUID plannedMissionJobTypeId,
+      String comment,
+      Instant startTime,
+      Instant endTime,
+      List<UUID> orgUnitIds,
+      PayoutPreference payoutPreference,
+      String guestName) {}
+
+  private MissionEdit applyAttributes(
+      @NotNull Mission mission,
+      @NotNull UUID participantId,
+      @NotNull ParticipantAttributes attributes,
+      Long version,
+      Authentication authentication) {
+    final UUID desiredMissionJobTypeId = attributes.desiredMissionJobTypeId();
+    final UUID plannedMissionJobTypeId = attributes.plannedMissionJobTypeId();
+    final Instant startTime = attributes.startTime();
+    final Instant endTime = attributes.endTime();
+    final PayoutPreference payoutPreference = attributes.payoutPreference();
+    final String guestName = attributes.guestName();
+    final String comment = attributes.comment();
+    final List<UUID> orgUnitIds = attributes.orgUnitIds();
 
     MissionParticipant participant =
         Entities.require(
@@ -323,7 +392,7 @@ public class MissionParticipantService {
     }
 
     final boolean callerMayManageMission =
-        missionSecurityService.canManageLoadedMission(mission, authentication);
+        missionAccessPolicy.canManageLoadedMission(mission, authentication);
 
     if (payoutPreference != null) {
       participant.setPayoutPreference(payoutPreference);
@@ -420,92 +489,106 @@ public class MissionParticipantService {
     participant.setEndTime(endTime);
 
     missionParticipantRepository.saveAndFlush(participant);
-    auditRecorder.record(
+    return MissionEdit.audited(
         AuditEventType.MISSION_PARTICIPANT_UPDATED,
-        mission.getId(),
-        mission.getName(),
         participant.getUser() != null ? participant.getUser().getId() : null,
         AuditDetails.of("participant", participantId));
-    return mission;
   }
 
   /**
    * Marks a participant as checked in, setting {@code startTime} only on the first check-in so the
-   * credited time cannot be shortened by a repeat.
+   * credited time cannot be shortened by a repeat; a repeat records nothing.
+   *
+   * @param missionId the mission id
+   * @param participantId the participant to check in
+   * @return the managed mission
    */
   @Transactional
   public Mission checkIn(UUID missionId, UUID participantId) {
-    MissionParticipant participant = getParticipant(missionId, participantId);
-    Mission mission = participant.getMission();
-    if (mission.getActualStartTime() == null) {
-      throw new IllegalArgumentException("Cannot check in before mission actual start time is set");
-    }
-    if (participant.getStartTime() != null) {
-      return mission;
-    }
-    participant.setStartTime(Instant.now());
-    missionParticipantRepository.saveAndFlush(participant);
-    notificationPublisher.checkedIn(mission, participant);
-    auditRecorder.record(
-        AuditEventType.MISSION_PARTICIPANT_CHECKED_IN,
-        mission.getId(),
-        mission.getName(),
-        participant.getUser() != null ? participant.getUser().getId() : null,
-        AuditDetails.of("participant", participantId));
-    return mission;
+    return missionEditor.edit(
+        missionId,
+        MissionGate.participant(participantId),
+        mission -> {
+          MissionParticipant participant = findParticipant(mission, participantId);
+          if (mission.getActualStartTime() == null) {
+            throw new IllegalArgumentException(
+                "Cannot check in before mission actual start time is set");
+          }
+          if (participant.getStartTime() != null) {
+            return MissionEdit.unchanged();
+          }
+          participant.setStartTime(Instant.now());
+          missionParticipantRepository.saveAndFlush(participant);
+          notificationPublisher.checkedIn(mission, participant);
+          return MissionEdit.audited(
+              AuditEventType.MISSION_PARTICIPANT_CHECKED_IN,
+              participant.getUser() != null ? participant.getUser().getId() : null,
+              AuditDetails.of("participant", participantId));
+        });
   }
 
   /**
    * Marks a participant as checked out. Sets {@code endTime} to {@code now()}. Unlike check-in, a
    * repeated check-out overrides the previous timestamp — late check-out corrections.
+   *
+   * @param missionId the mission id
+   * @param participantId the participant to check out
+   * @return the managed mission
    */
   @Transactional
   public Mission checkOut(UUID missionId, UUID participantId) {
-    MissionParticipant participant = getParticipant(missionId, participantId);
-    Mission mission = participant.getMission();
-    if (mission.getActualEndTime() != null && Instant.now().isAfter(mission.getActualEndTime())) {
-      if (participant.getStartTime() != null
-          && mission.getActualEndTime().isBefore(participant.getStartTime())) {
-        participant.setEndTime(participant.getStartTime());
-      } else {
-        participant.setEndTime(mission.getActualEndTime());
-      }
-    } else {
-      participant.setEndTime(Instant.now());
-    }
-    missionParticipantRepository.saveAndFlush(participant);
-    auditRecorder.record(
-        AuditEventType.MISSION_PARTICIPANT_CHECKED_OUT,
-        mission.getId(),
-        mission.getName(),
-        participant.getUser() != null ? participant.getUser().getId() : null,
-        AuditDetails.of("participant", participantId));
-    return mission;
+    return missionEditor.edit(
+        missionId,
+        MissionGate.participant(participantId),
+        mission -> {
+          MissionParticipant participant = findParticipant(mission, participantId);
+          if (mission.getActualEndTime() != null
+              && Instant.now().isAfter(mission.getActualEndTime())) {
+            if (participant.getStartTime() != null
+                && mission.getActualEndTime().isBefore(participant.getStartTime())) {
+              participant.setEndTime(participant.getStartTime());
+            } else {
+              participant.setEndTime(mission.getActualEndTime());
+            }
+          } else {
+            participant.setEndTime(Instant.now());
+          }
+          missionParticipantRepository.saveAndFlush(participant);
+          return MissionEdit.audited(
+              AuditEventType.MISSION_PARTICIPANT_CHECKED_OUT,
+              participant.getUser() != null ? participant.getUser().getId() : null,
+              AuditDetails.of("participant", participantId));
+        });
   }
 
   /**
-   * Updates a participant's payout preference (PAYOUT or DONATE). Guests can change their own
-   * preference even without authentication — the security gate on the participant row keeps other
-   * users' preferences locked.
+   * Updates a participant's payout preference (PAYOUT or DONATE); a {@code null} preference changes
+   * and records nothing.
+   *
+   * @param missionId the mission id
+   * @param participantId the participant whose preference changes
+   * @param preference the new preference, or {@code null}
+   * @return the managed mission
    */
   @Transactional
   public Mission updatePayoutPreference(
       UUID missionId, UUID participantId, PayoutPreference preference) {
-    MissionParticipant participant = getParticipant(missionId, participantId);
-    Mission mission = participant.getMission();
-
-    if (preference != null) {
-      participant.setPayoutPreference(preference);
-      missionParticipantRepository.save(participant);
-      missionParticipantRepository.flush();
-      auditRecorder.record(
-          AuditEventType.MISSION_PARTICIPANT_UPDATED,
-          mission.getId(),
-          mission.getName(),
-          participant.getUser() != null ? participant.getUser().getId() : null,
-          AuditDetails.of("participant", participantId).with("field", "payoutPreference"));
-    }
-    return mission;
+    return missionEditor.edit(
+        missionId,
+        MissionGate.participant(participantId),
+        mission -> {
+          MissionParticipant participant = findParticipant(mission, participantId);
+          if (preference == null) {
+            return MissionEdit.unchanged();
+          }
+          participant.setPayoutPreference(preference);
+          missionParticipantRepository.save(participant);
+          missionParticipantRepository.flush();
+          return MissionEdit.audited(
+              AuditEventType.MISSION_PARTICIPANT_UPDATED,
+              participant.getUser() != null ? participant.getUser().getId() : null,
+              AuditDetails.of("participant", participantId).with("field", "payoutPreference"));
+        });
   }
 
   /**
@@ -529,68 +612,86 @@ public class MissionParticipantService {
       @Nullable UUID userId,
       @Nullable String guestName,
       @NotNull Long expectedPartyLeadVersion) {
-    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
-    enforceSectionVersion(
-        missionRepository, mission, MissionSection.PARTY_LEAD, expectedPartyLeadVersion, missionId);
-
-    if (userId != null) {
-      User user = Entities.require(userRepository.findPlainById(userId), "User not found");
-      boolean newLead =
-          mission.getPartyLeadUser() == null || !userId.equals(mission.getPartyLeadUser().getId());
-      mission.setPartyLeadUser(user);
-      mission.setPartyLeadGuestName(null);
-      if (newLead) {
-        notificationPublisher.responsibilityAssigned(mission, userId, "PARTY_LEAD");
-      }
-    } else if (guestName != null && !guestName.isBlank()) {
-      mission.setPartyLeadUser(null);
-      mission.setPartyLeadGuestName(guestName.trim());
-    } else {
-      mission.setPartyLeadUser(null);
-      mission.setPartyLeadGuestName(null);
-    }
-
-    Mission saved = missionRepository.save(mission);
-    auditRecorder.record(
-        AuditEventType.MISSION_PARTY_LEAD_CHANGED,
-        mission.getId(),
-        mission.getName(),
-        userId,
-        AuditDetails.of(
-            "kind",
-            userId != null
-                ? "user"
-                : (guestName != null && !guestName.isBlank() ? "external" : "cleared")));
-    return saved;
+    return missionEditor.editSection(
+        missionId,
+        MissionGate.MANAGE,
+        MissionSection.PARTY_LEAD,
+        expectedPartyLeadVersion,
+        mission -> {
+          if (userId != null) {
+            User user = Entities.require(userRepository.findPlainById(userId), "User not found");
+            boolean newLead =
+                mission.getPartyLeadUser() == null
+                    || !userId.equals(mission.getPartyLeadUser().getId());
+            mission.setPartyLeadUser(user);
+            mission.setPartyLeadGuestName(null);
+            if (newLead) {
+              notificationPublisher.responsibilityAssigned(mission, userId, "PARTY_LEAD");
+            }
+          } else if (guestName != null && !guestName.isBlank()) {
+            mission.setPartyLeadUser(null);
+            mission.setPartyLeadGuestName(guestName.trim());
+          } else {
+            mission.setPartyLeadUser(null);
+            mission.setPartyLeadGuestName(null);
+          }
+          return MissionEdit.audited(
+              AuditEventType.MISSION_PARTY_LEAD_CHANGED,
+              userId,
+              AuditDetails.of(
+                  "kind",
+                  userId != null
+                      ? "user"
+                      : (guestName != null && !guestName.isBlank() ? "external" : "cleared")));
+        });
   }
 
   /**
    * Adds a co-manager. Co-managers can edit the mission with the same privileges as the owner
-   * (except they cannot transfer ownership — see {@link MissionSecurityService#canChangeOwner}).
+   * (except they cannot transfer ownership — see {@link MissionAccessPolicy#canChangeOwner}).
+   *
+   * @param missionId the mission id
+   * @param userId the user to add as co-manager
+   * @return the managed mission
    */
   @Transactional
   public Mission addManager(@NotNull UUID missionId, @NotNull UUID userId) {
-    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
-    User user = Entities.require(userRepository.findPlainById(userId), "User not found");
-    if (mission.getManagers().add(user)) {
-      notificationPublisher.responsibilityAssigned(mission, userId, "MANAGER");
-    }
-    auditRecorder.record(
-        AuditEventType.MISSION_MANAGER_ADDED, mission.getId(), mission.getName(), userId, null);
-    return mission;
+    return missionEditor.edit(
+        missionId,
+        MissionGate.MANAGE,
+        mission -> {
+          User user = Entities.require(userRepository.findPlainById(userId), "User not found");
+          if (mission.getManagers().add(user)) {
+            notificationPublisher.responsibilityAssigned(mission, userId, "MANAGER");
+          }
+          return MissionEdit.audited(AuditEventType.MISSION_MANAGER_ADDED, userId, null);
+        });
   }
 
   /**
    * Removes a co-manager. The owner cannot be removed via this method — use {@link
    * MissionService#updateMissionOwner} to transfer ownership first.
+   *
+   * @param missionId the mission id
+   * @param userId the co-manager to remove
+   * @return the managed mission
    */
   @Transactional
   public Mission removeManager(@NotNull UUID missionId, @NotNull UUID userId) {
-    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
-    mission.getManagers().removeIf(u -> u.getId().equals(userId));
-    auditRecorder.record(
-        AuditEventType.MISSION_MANAGER_REMOVED, mission.getId(), mission.getName(), userId, null);
-    return mission;
+    return missionEditor.edit(
+        missionId,
+        MissionGate.MANAGE,
+        mission -> {
+          mission.getManagers().removeIf(u -> u.getId().equals(userId));
+          return MissionEdit.audited(AuditEventType.MISSION_MANAGER_REMOVED, userId, null);
+        });
+  }
+
+  private static MissionParticipant findParticipant(
+      @NotNull Mission mission, @NotNull UUID participantId) {
+    return Entities.require(
+        mission.getParticipants().stream().filter(p -> p.getId().equals(participantId)).findFirst(),
+        "Participant not found in mission");
   }
 
   /**

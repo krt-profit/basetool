@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
-import static de.greluc.krt.profit.basetool.backend.mission.internal.MissionSectionVersions.enforceSectionVersion;
-
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
@@ -30,7 +28,6 @@ import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionObjective;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionObjectiveKind;
-import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionStep;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSectionVersions.MissionSection;
 import java.util.ArrayList;
@@ -54,14 +51,15 @@ import org.springframework.transaction.annotation.Transactional;
  * MissionObjective}s.
  *
  * <p>Steps and objectives each have their own section counter ({@code stepsVersion} / {@code
- * objectivesVersion}), so edits here never collide with other mission sections (REQ-ORG-018).
+ * objectivesVersion}), so edits here never collide with other mission sections (REQ-ORG-018). Every
+ * edit runs through {@link MissionEditor} behind the manage gate.
  */
 @Service
 @RequiredArgsConstructor
 public class MissionTimelineService {
 
-  /** Repository for the mission aggregate root (fetch-or-throw + section-counter writeback). */
-  private final MissionRepository missionRepository;
+  /** Runs the load, gate, section check, save and audit of every timeline edit. */
+  private final MissionEditor missionEditor;
 
   /** Repository used to persist a newly appended {@link MissionStep} child. */
   private final MissionStepRepository missionStepRepository;
@@ -69,7 +67,7 @@ public class MissionTimelineService {
   /** Repository used to persist a newly appended {@link MissionObjective} child. */
   private final MissionObjectiveRepository missionObjectiveRepository;
 
-  /** Records the state-mutating timeline activities into the audit log (REQ-AUDIT-001). */
+  /** Records the steps and goals a mission create seeds (REQ-AUDIT-001). */
   private final AuditRecorder auditRecorder;
 
   /**
@@ -81,10 +79,6 @@ public class MissionTimelineService {
    * @param meta the optional free-text time/place hint
    * @param expectedStepsVersion the steps-section version the caller last saw
    * @return the managed mission
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the mission is
-   *     unknown
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
-   *     expectedStepsVersion} is stale
    */
   @Transactional
   public Mission addStep(
@@ -92,26 +86,16 @@ public class MissionTimelineService {
       String title,
       @Nullable String meta,
       @NotNull Long expectedStepsVersion) {
-    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
-    enforceSectionVersion(
-        missionRepository, mission, MissionSection.STEPS, expectedStepsVersion, missionId);
-
-    MissionStep step = new MissionStep();
-    step.setTitle(title == null ? null : title.trim());
-    step.setMeta(StringNormalization.trimToNull(meta));
-    step.setDone(false);
-    step.setOrderIndex(nextStepOrderIndex(mission));
-    mission.addStep(step);
-    missionStepRepository.save(step);
-
-    missionRepository.save(mission);
-    auditRecorder.record(
-        AuditEventType.MISSION_STEP_ADDED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("step", step.getId()));
-    return mission;
+    return missionEditor.editSection(
+        missionId,
+        MissionGate.MANAGE,
+        MissionSection.STEPS,
+        expectedStepsVersion,
+        mission -> {
+          MissionStep step = newStep(mission, title, meta, nextStepOrderIndex(mission));
+          return MissionEdit.audited(
+              AuditEventType.MISSION_STEP_ADDED, AuditDetails.of("step", step.getId()));
+        });
   }
 
   /**
@@ -126,13 +110,7 @@ public class MissionTimelineService {
   @Transactional(propagation = Propagation.MANDATORY)
   public void addStepAtCreate(
       @NotNull Mission mission, String title, @Nullable String meta, int orderIndex) {
-    MissionStep step = new MissionStep();
-    step.setTitle(title == null ? null : title.trim());
-    step.setMeta(StringNormalization.trimToNull(meta));
-    step.setDone(false);
-    step.setOrderIndex(orderIndex);
-    mission.addStep(step);
-    missionStepRepository.save(step);
+    MissionStep step = newStep(mission, title, meta, orderIndex);
     auditRecorder.record(
         AuditEventType.MISSION_STEP_ADDED,
         mission.getId(),
@@ -145,8 +123,13 @@ public class MissionTimelineService {
    * Edits an existing Ablauf step's title and time/place hint. Mutates the managed child via
    * dirty-checking (no explicit child save) and bumps {@code stepsVersion}.
    *
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
-   *     expectedStepsVersion} is stale
+   * @param missionId the mission id
+   * @param stepId the step to edit
+   * @param title the new step title
+   * @param meta the new time/place hint, or {@code null}
+   * @param expectedStepsVersion the steps-section version the caller last saw
+   * @return the managed mission
+   * @throws NotFoundException when the step is not a child of the mission
    */
   @Transactional
   public Mission updateStep(
@@ -155,99 +138,95 @@ public class MissionTimelineService {
       String title,
       @Nullable String meta,
       @NotNull Long expectedStepsVersion) {
-    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
-    enforceSectionVersion(
-        missionRepository, mission, MissionSection.STEPS, expectedStepsVersion, missionId);
-
-    MissionStep step = findStep(mission, stepId);
-    step.setTitle(title == null ? null : title.trim());
-    step.setMeta(StringNormalization.trimToNull(meta));
-
-    missionRepository.save(mission);
-    auditRecorder.record(
-        AuditEventType.MISSION_STEP_UPDATED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("step", stepId));
-    return mission;
+    return missionEditor.editSection(
+        missionId,
+        MissionGate.MANAGE,
+        MissionSection.STEPS,
+        expectedStepsVersion,
+        mission -> {
+          MissionStep step = findStep(mission, stepId);
+          step.setTitle(title == null ? null : title.trim());
+          step.setMeta(StringNormalization.trimToNull(meta));
+          return MissionEdit.audited(
+              AuditEventType.MISSION_STEP_UPDATED, AuditDetails.of("step", stepId));
+        });
   }
 
   /**
    * Removes an Ablauf step and re-packs the remaining steps' {@code orderIndex} to 0..n-1 so the
    * timeline stays contiguous. Bumps {@code stepsVersion}.
    *
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the step is not a
-   *     child of the mission
+   * @param missionId the mission id
+   * @param stepId the step to remove
+   * @param expectedStepsVersion the steps-section version the caller last saw
+   * @return the managed mission
+   * @throws NotFoundException when the step is not a child of the mission
    */
   @Transactional
   public Mission deleteStep(
       @NotNull UUID missionId, @NotNull UUID stepId, @NotNull Long expectedStepsVersion) {
-    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
-    enforceSectionVersion(
-        missionRepository, mission, MissionSection.STEPS, expectedStepsVersion, missionId);
-
-    boolean removed = mission.removeStep(stepId);
-    if (!removed) {
-      throw new NotFoundException("MissionStep not found in this mission");
-    }
-    repackStepOrder(mission);
-
-    missionRepository.save(mission);
-    auditRecorder.record(
-        AuditEventType.MISSION_STEP_REMOVED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("step", stepId));
-    return mission;
+    return missionEditor.editSection(
+        missionId,
+        MissionGate.MANAGE,
+        MissionSection.STEPS,
+        expectedStepsVersion,
+        mission -> {
+          if (!mission.removeStep(stepId)) {
+            throw new NotFoundException("MissionStep not found in this mission");
+          }
+          repackStepOrder(mission);
+          return MissionEdit.audited(
+              AuditEventType.MISSION_STEP_REMOVED, AuditDetails.of("step", stepId));
+        });
   }
 
   /**
    * Reorders the mission's Ablauf steps, reassigning {@code orderIndex} 0..n-1 under the atomically
    * enforced {@code stepsVersion} guard, and records one reorder event.
    *
+   * @param missionId the mission id
+   * @param orderedStepIds every step id of the mission in the new order
+   * @param expectedStepsVersion the steps-section version the caller last saw
+   * @return the managed mission
    * @throws IllegalArgumentException when the id set does not match the mission's steps exactly
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
-   *     expectedStepsVersion} is stale
    */
   @Transactional
   public Mission reorderSteps(
       @NotNull UUID missionId,
       @NotNull List<UUID> orderedStepIds,
       @NotNull Long expectedStepsVersion) {
-    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
-    enforceSectionVersion(
-        missionRepository, mission, MissionSection.STEPS, expectedStepsVersion, missionId);
-
-    Set<UUID> existingIds =
-        mission.getSteps().stream().map(MissionStep::getId).collect(Collectors.toSet());
-    if (orderedStepIds.size() != existingIds.size()
-        || !existingIds.equals(new HashSet<>(orderedStepIds))) {
-      throw new IllegalArgumentException("Reorder id set must match the mission's steps exactly");
-    }
-
-    Map<UUID, MissionStep> byId =
-        mission.getSteps().stream().collect(Collectors.toMap(MissionStep::getId, s -> s));
-    for (int i = 0; i < orderedStepIds.size(); i++) {
-      Objects.requireNonNull(byId.get(orderedStepIds.get(i))).setOrderIndex(i);
-    }
-
-    missionRepository.save(mission);
-    auditRecorder.record(
-        AuditEventType.MISSION_STEP_REORDERED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("count", existingIds.size()));
-    return mission;
+    return missionEditor.editSection(
+        missionId,
+        MissionGate.MANAGE,
+        MissionSection.STEPS,
+        expectedStepsVersion,
+        mission -> {
+          Set<UUID> existingIds =
+              mission.getSteps().stream().map(MissionStep::getId).collect(Collectors.toSet());
+          if (orderedStepIds.size() != existingIds.size()
+              || !existingIds.equals(new HashSet<>(orderedStepIds))) {
+            throw new IllegalArgumentException(
+                "Reorder id set must match the mission's steps exactly");
+          }
+          Map<UUID, MissionStep> byId =
+              mission.getSteps().stream().collect(Collectors.toMap(MissionStep::getId, s -> s));
+          for (int i = 0; i < orderedStepIds.size(); i++) {
+            Objects.requireNonNull(byId.get(orderedStepIds.get(i))).setOrderIndex(i);
+          }
+          return MissionEdit.audited(
+              AuditEventType.MISSION_STEP_REORDERED, AuditDetails.of("count", existingIds.size()));
+        });
   }
 
   /**
    * Sets a step's {@code done} flag and bumps {@code stepsVersion}.
    *
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the step is not a
-   *     child of the mission
+   * @param missionId the mission id
+   * @param stepId the step to toggle
+   * @param done the new done flag
+   * @param expectedStepsVersion the steps-section version the caller last saw
+   * @return the managed mission
+   * @throws NotFoundException when the step is not a child of the mission
    */
   @Transactional
   public Mission toggleStepDone(
@@ -255,28 +234,201 @@ public class MissionTimelineService {
       @NotNull UUID stepId,
       boolean done,
       @NotNull Long expectedStepsVersion) {
-    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
-    enforceSectionVersion(
-        missionRepository, mission, MissionSection.STEPS, expectedStepsVersion, missionId);
+    return missionEditor.editSection(
+        missionId,
+        MissionGate.MANAGE,
+        MissionSection.STEPS,
+        expectedStepsVersion,
+        mission -> {
+          findStep(mission, stepId).setDone(done);
+          return MissionEdit.audited(
+              AuditEventType.MISSION_STEP_DONE_CHANGED,
+              AuditDetails.of("step", stepId).with("done", done));
+        });
+  }
 
-    MissionStep step = findStep(mission, stepId);
-    step.setDone(done);
+  /**
+   * Appends a goal (Ziel) to the end of the mission's goal list, bumps {@code objectivesVersion}
+   * and records an audit event without the title.
+   *
+   * @param missionId the mission id
+   * @param title the required goal text
+   * @param kind the classification (primary / secondary / non-goal)
+   * @param expectedObjectivesVersion the goals-section version the caller last saw
+   * @return the managed mission
+   */
+  @Transactional
+  public Mission addObjective(
+      @NotNull UUID missionId,
+      String title,
+      @NotNull MissionObjectiveKind kind,
+      @NotNull Long expectedObjectivesVersion) {
+    return missionEditor.editSection(
+        missionId,
+        MissionGate.MANAGE,
+        MissionSection.OBJECTIVES,
+        expectedObjectivesVersion,
+        mission -> {
+          MissionObjective objective =
+              newObjective(mission, title, kind, nextObjectiveOrderIndex(mission));
+          return MissionEdit.audited(
+              AuditEventType.MISSION_OBJECTIVE_ADDED,
+              AuditDetails.of("objective", objective.getId()).with("kind", kind));
+        });
+  }
 
-    missionRepository.save(mission);
+  /**
+   * Creates a goal within the mission's create transaction, without a version check or bump, and
+   * records a {@code MISSION_OBJECTIVE_ADDED} audit event.
+   *
+   * @param mission the managed, already-persisted mission to append the goal to
+   * @param title the required goal text
+   * @param kind the classification (primary / secondary / non-goal)
+   * @param orderIndex the 0-based position to assign this goal
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void addObjectiveAtCreate(
+      @NotNull Mission mission, String title, @NotNull MissionObjectiveKind kind, int orderIndex) {
+    MissionObjective objective = newObjective(mission, title, kind, orderIndex);
     auditRecorder.record(
-        AuditEventType.MISSION_STEP_DONE_CHANGED,
+        AuditEventType.MISSION_OBJECTIVE_ADDED,
         mission.getId(),
         mission.getName(),
         null,
-        AuditDetails.of("step", stepId).with("done", done));
-    return mission;
+        AuditDetails.of("objective", objective.getId()).with("kind", kind));
+  }
+
+  /**
+   * Edits an existing goal's text and classification. Mutates the managed child via dirty-checking
+   * (no explicit child save) and bumps {@code objectivesVersion}.
+   *
+   * @param missionId the mission id
+   * @param objectiveId the goal to edit
+   * @param title the new goal text
+   * @param kind the new classification
+   * @param expectedObjectivesVersion the goals-section version the caller last saw
+   * @return the managed mission
+   * @throws NotFoundException when the goal is not a child of the mission
+   */
+  @Transactional
+  public Mission updateObjective(
+      @NotNull UUID missionId,
+      @NotNull UUID objectiveId,
+      String title,
+      @NotNull MissionObjectiveKind kind,
+      @NotNull Long expectedObjectivesVersion) {
+    return missionEditor.editSection(
+        missionId,
+        MissionGate.MANAGE,
+        MissionSection.OBJECTIVES,
+        expectedObjectivesVersion,
+        mission -> {
+          MissionObjective objective = findObjective(mission, objectiveId);
+          objective.setTitle(title == null ? null : title.trim());
+          objective.setKind(kind);
+          return MissionEdit.audited(
+              AuditEventType.MISSION_OBJECTIVE_UPDATED,
+              AuditDetails.of("objective", objectiveId).with("kind", kind));
+        });
+  }
+
+  /**
+   * Removes a goal and re-packs the remaining goals' {@code orderIndex} to 0..n-1 so the list stays
+   * contiguous. Bumps {@code objectivesVersion}.
+   *
+   * @param missionId the mission id
+   * @param objectiveId the goal to remove
+   * @param expectedObjectivesVersion the goals-section version the caller last saw
+   * @return the managed mission
+   * @throws NotFoundException when the goal is not a child of the mission
+   */
+  @Transactional
+  public Mission deleteObjective(
+      @NotNull UUID missionId, @NotNull UUID objectiveId, @NotNull Long expectedObjectivesVersion) {
+    return missionEditor.editSection(
+        missionId,
+        MissionGate.MANAGE,
+        MissionSection.OBJECTIVES,
+        expectedObjectivesVersion,
+        mission -> {
+          if (!mission.removeObjective(objectiveId)) {
+            throw new NotFoundException("MissionObjective not found in this mission");
+          }
+          repackObjectiveOrder(mission);
+          return MissionEdit.audited(
+              AuditEventType.MISSION_OBJECTIVE_REMOVED, AuditDetails.of("objective", objectiveId));
+        });
+  }
+
+  /**
+   * Reorders the mission's goals, reassigning {@code orderIndex} 0..n-1 under the atomically
+   * enforced {@code objectivesVersion} guard, and records one reorder event.
+   *
+   * @param missionId the mission id
+   * @param orderedObjectiveIds every goal id of the mission in the new order
+   * @param expectedObjectivesVersion the goals-section version the caller last saw
+   * @return the managed mission
+   * @throws IllegalArgumentException when the id set does not match the mission's goals exactly
+   */
+  @Transactional
+  public Mission reorderObjectives(
+      @NotNull UUID missionId,
+      @NotNull List<UUID> orderedObjectiveIds,
+      @NotNull Long expectedObjectivesVersion) {
+    return missionEditor.editSection(
+        missionId,
+        MissionGate.MANAGE,
+        MissionSection.OBJECTIVES,
+        expectedObjectivesVersion,
+        mission -> {
+          Set<UUID> existingIds =
+              mission.getObjectives().stream()
+                  .map(MissionObjective::getId)
+                  .collect(Collectors.toSet());
+          if (orderedObjectiveIds.size() != existingIds.size()
+              || !existingIds.equals(new HashSet<>(orderedObjectiveIds))) {
+            throw new IllegalArgumentException(
+                "Reorder id set must match the mission's goals exactly");
+          }
+          Map<UUID, MissionObjective> byId =
+              mission.getObjectives().stream()
+                  .collect(Collectors.toMap(MissionObjective::getId, o -> o));
+          for (int i = 0; i < orderedObjectiveIds.size(); i++) {
+            Objects.requireNonNull(byId.get(orderedObjectiveIds.get(i))).setOrderIndex(i);
+          }
+          return MissionEdit.audited(
+              AuditEventType.MISSION_OBJECTIVE_REORDERED,
+              AuditDetails.of("count", existingIds.size()));
+        });
+  }
+
+  private MissionStep newStep(
+      @NotNull Mission mission, String title, @Nullable String meta, int orderIndex) {
+    MissionStep step = new MissionStep();
+    step.setTitle(title == null ? null : title.trim());
+    step.setMeta(StringNormalization.trimToNull(meta));
+    step.setDone(false);
+    step.setOrderIndex(orderIndex);
+    mission.addStep(step);
+    missionStepRepository.save(step);
+    return step;
+  }
+
+  private MissionObjective newObjective(
+      @NotNull Mission mission, String title, @NotNull MissionObjectiveKind kind, int orderIndex) {
+    MissionObjective objective = new MissionObjective();
+    objective.setTitle(title == null ? null : title.trim());
+    objective.setKind(kind);
+    objective.setOrderIndex(orderIndex);
+    mission.addObjective(objective);
+    missionObjectiveRepository.save(objective);
+    return objective;
   }
 
   /**
    * Finds a managed step by id within the mission, or throws.
    *
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the step is not a
-   *     child of the mission
+   * @throws NotFoundException when the step is not a child of the mission
    */
   private static MissionStep findStep(@NotNull Mission mission, @NotNull UUID stepId) {
     return Entities.require(
@@ -305,195 +457,9 @@ public class MissionTimelineService {
   }
 
   /**
-   * Appends a goal (Ziel) to the end of the mission's goal list, bumps {@code objectivesVersion}
-   * and records an audit event without the title.
-   *
-   * @param missionId the mission id
-   * @param title the required goal text
-   * @param kind the classification (primary / secondary / non-goal)
-   * @param expectedObjectivesVersion the goals-section version the caller last saw
-   * @return the managed mission
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the mission is
-   *     unknown
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
-   *     expectedObjectivesVersion} is stale
-   */
-  @Transactional
-  public Mission addObjective(
-      @NotNull UUID missionId,
-      String title,
-      @NotNull MissionObjectiveKind kind,
-      @NotNull Long expectedObjectivesVersion) {
-    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
-    enforceSectionVersion(
-        missionRepository,
-        mission,
-        MissionSection.OBJECTIVES,
-        expectedObjectivesVersion,
-        missionId);
-
-    MissionObjective objective = new MissionObjective();
-    objective.setTitle(title == null ? null : title.trim());
-    objective.setKind(kind);
-    objective.setOrderIndex(nextObjectiveOrderIndex(mission));
-    mission.addObjective(objective);
-    missionObjectiveRepository.save(objective);
-
-    missionRepository.save(mission);
-    auditRecorder.record(
-        AuditEventType.MISSION_OBJECTIVE_ADDED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("objective", objective.getId()).with("kind", kind));
-    return mission;
-  }
-
-  /**
-   * Creates a goal within the mission's create transaction, without a version check or bump, and
-   * records a {@code MISSION_OBJECTIVE_ADDED} audit event.
-   *
-   * @param mission the managed, already-persisted mission to append the goal to
-   * @param title the required goal text
-   * @param kind the classification (primary / secondary / non-goal)
-   * @param orderIndex the 0-based position to assign this goal
-   */
-  @Transactional(propagation = Propagation.MANDATORY)
-  public void addObjectiveAtCreate(
-      @NotNull Mission mission, String title, @NotNull MissionObjectiveKind kind, int orderIndex) {
-    MissionObjective objective = new MissionObjective();
-    objective.setTitle(title == null ? null : title.trim());
-    objective.setKind(kind);
-    objective.setOrderIndex(orderIndex);
-    mission.addObjective(objective);
-    missionObjectiveRepository.save(objective);
-    auditRecorder.record(
-        AuditEventType.MISSION_OBJECTIVE_ADDED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("objective", objective.getId()).with("kind", kind));
-  }
-
-  /**
-   * Edits an existing goal's text and classification. Mutates the managed child via dirty-checking
-   * (no explicit child save) and bumps {@code objectivesVersion}.
-   *
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
-   *     expectedObjectivesVersion} is stale
-   */
-  @Transactional
-  public Mission updateObjective(
-      @NotNull UUID missionId,
-      @NotNull UUID objectiveId,
-      String title,
-      @NotNull MissionObjectiveKind kind,
-      @NotNull Long expectedObjectivesVersion) {
-    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
-    enforceSectionVersion(
-        missionRepository,
-        mission,
-        MissionSection.OBJECTIVES,
-        expectedObjectivesVersion,
-        missionId);
-
-    MissionObjective objective = findObjective(mission, objectiveId);
-    objective.setTitle(title == null ? null : title.trim());
-    objective.setKind(kind);
-
-    missionRepository.save(mission);
-    auditRecorder.record(
-        AuditEventType.MISSION_OBJECTIVE_UPDATED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("objective", objectiveId).with("kind", kind));
-    return mission;
-  }
-
-  /**
-   * Removes a goal and re-packs the remaining goals' {@code orderIndex} to 0..n-1 so the list stays
-   * contiguous. Bumps {@code objectivesVersion}.
-   *
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the goal is not a
-   *     child of the mission
-   */
-  @Transactional
-  public Mission deleteObjective(
-      @NotNull UUID missionId, @NotNull UUID objectiveId, @NotNull Long expectedObjectivesVersion) {
-    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
-    enforceSectionVersion(
-        missionRepository,
-        mission,
-        MissionSection.OBJECTIVES,
-        expectedObjectivesVersion,
-        missionId);
-
-    boolean removed = mission.removeObjective(objectiveId);
-    if (!removed) {
-      throw new NotFoundException("MissionObjective not found in this mission");
-    }
-    repackObjectiveOrder(mission);
-
-    missionRepository.save(mission);
-    auditRecorder.record(
-        AuditEventType.MISSION_OBJECTIVE_REMOVED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("objective", objectiveId));
-    return mission;
-  }
-
-  /**
-   * Reorders the mission's goals, reassigning {@code orderIndex} 0..n-1 under the atomically
-   * enforced {@code objectivesVersion} guard, and records one reorder event.
-   *
-   * @throws IllegalArgumentException when the id set does not match the mission's goals exactly
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
-   *     expectedObjectivesVersion} is stale
-   */
-  @Transactional
-  public Mission reorderObjectives(
-      @NotNull UUID missionId,
-      @NotNull List<UUID> orderedObjectiveIds,
-      @NotNull Long expectedObjectivesVersion) {
-    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
-    enforceSectionVersion(
-        missionRepository,
-        mission,
-        MissionSection.OBJECTIVES,
-        expectedObjectivesVersion,
-        missionId);
-
-    Set<UUID> existingIds =
-        mission.getObjectives().stream().map(MissionObjective::getId).collect(Collectors.toSet());
-    if (orderedObjectiveIds.size() != existingIds.size()
-        || !existingIds.equals(new HashSet<>(orderedObjectiveIds))) {
-      throw new IllegalArgumentException("Reorder id set must match the mission's goals exactly");
-    }
-
-    Map<UUID, MissionObjective> byId =
-        mission.getObjectives().stream().collect(Collectors.toMap(MissionObjective::getId, o -> o));
-    for (int i = 0; i < orderedObjectiveIds.size(); i++) {
-      Objects.requireNonNull(byId.get(orderedObjectiveIds.get(i))).setOrderIndex(i);
-    }
-
-    missionRepository.save(mission);
-    auditRecorder.record(
-        AuditEventType.MISSION_OBJECTIVE_REORDERED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("count", existingIds.size()));
-    return mission;
-  }
-
-  /**
    * Finds a managed goal by id within the mission, or throws.
    *
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the goal is not a
-   *     child of the mission
+   * @throws NotFoundException when the goal is not a child of the mission
    */
   private static MissionObjective findObjective(
       @NotNull Mission mission, @NotNull UUID objectiveId) {

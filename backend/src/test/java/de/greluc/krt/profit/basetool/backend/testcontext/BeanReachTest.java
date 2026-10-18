@@ -35,14 +35,14 @@ class BeanReachTest {
           "jwtConverter", Set.of("userService"),
           "userService", Set.of("userRepository"),
           "reportController", Set.of("reportService"),
-          "missionSecurityService", Set.of());
+          "missionAccessPolicy", Set.of());
 
   @Test
   void reportsAMockTheSecurityChainReachesTransitively() {
     assertThat(
             BeanReach.reachedTargets(
                 bean -> GRAPH.getOrDefault(bean, Set.of()),
-                List.of("securityFilterChain", "missionSecurityService"),
+                List.of("securityFilterChain", "missionAccessPolicy"),
                 List.of("userRepository", "reportService")))
         .containsExactly("userRepository <- userService <- jwtConverter <- securityFilterChain");
   }
@@ -52,9 +52,9 @@ class BeanReachTest {
     assertThat(
             BeanReach.reachedTargets(
                 bean -> GRAPH.getOrDefault(bean, Set.of()),
-                List.of("missionSecurityService"),
-                List.of("missionSecurityService")))
-        .containsExactly("missionSecurityService");
+                List.of("missionAccessPolicy"),
+                List.of("missionAccessPolicy")))
+        .containsExactly("missionAccessPolicy");
   }
 
   @Test
@@ -62,7 +62,7 @@ class BeanReachTest {
     assertThat(
             BeanReach.reachedTargets(
                 bean -> GRAPH.getOrDefault(bean, Set.of()),
-                List.of("securityFilterChain", "missionSecurityService"),
+                List.of("securityFilterChain", "missionAccessPolicy"),
                 List.of("reportService")))
         .isEmpty();
   }

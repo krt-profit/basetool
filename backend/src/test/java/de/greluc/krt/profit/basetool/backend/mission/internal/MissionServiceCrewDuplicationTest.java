@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.model.*;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.*;
 import java.util.*;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -46,6 +47,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class MissionServiceCrewDuplicationTest {
 
   @Mock private MissionRepository missionRepository;
+
+  @Mock private MissionEditor missionEditor;
   @Mock private UserRepository userRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private ShipRepository shipRepository;
@@ -55,6 +58,11 @@ class MissionServiceCrewDuplicationTest {
   @Mock private AuditService auditService;
   @Mock private MissionNotificationPublisher notificationPublisher;
   @InjectMocks private MissionStructureService missionStructureService;
+
+  @BeforeEach
+  void wireMissionEditor() {
+    MissionEditorFixture.delegate(missionEditor, missionRepository, auditService);
+  }
 
   @Test
   void addCrewToShip_shouldThrowIfParticipantAlreadyAssignedToSameUnit() {

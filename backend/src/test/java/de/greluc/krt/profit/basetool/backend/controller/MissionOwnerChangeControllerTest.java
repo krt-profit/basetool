@@ -32,9 +32,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionOwnership;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
-import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionStructureService;
 import de.greluc.krt.profit.basetool.backend.platform.api.GlobalExceptionHandler;
@@ -68,7 +68,7 @@ class MissionOwnerChangeControllerTest {
   @MockitoBean private MissionParticipantService missionParticipantService;
 
   @MockitoBean private MissionStructureService missionStructureService;
-  @MockitoBean private MissionSecurityService missionSecurityService;
+  @MockitoBean private MissionAccessPolicy missionAccessPolicy;
 
   private final UUID missionId = UUID.randomUUID();
   private final UUID newOwnerId = UUID.randomUUID();
@@ -76,7 +76,7 @@ class MissionOwnerChangeControllerTest {
   @BeforeEach
   void setUp() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-    when(missionSecurityService.canChangeOwner(eq(missionId), any())).thenReturn(true);
+    when(missionAccessPolicy.canChangeOwner(eq(missionId), any())).thenReturn(true);
   }
 
   private static SimpleGrantedAuthority officer() {

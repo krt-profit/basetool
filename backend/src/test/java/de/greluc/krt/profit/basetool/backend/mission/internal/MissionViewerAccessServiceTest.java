@@ -37,15 +37,15 @@ import org.springframework.security.core.Authentication;
 
 /**
  * Unit tests for {@link MissionViewerAccessService}, verifying its delegation to {@link
- * AuthHelperService} and {@link MissionSecurityService}, in particular that {@code
- * canManageManagers} calls {@link MissionSecurityService#canManageManagers}.
+ * AuthHelperService} and {@link MissionAccessPolicy}, in particular that {@code canManageManagers}
+ * applies the manage rule.
  */
 @ExtendWith(MockitoExtension.class)
 class MissionViewerAccessServiceTest {
 
   @Mock private AuthHelperService authHelperService;
 
-  @Mock private MissionSecurityService missionSecurityService;
+  @Mock private MissionAccessPolicy missionAccessPolicy;
 
   @InjectMocks private MissionViewerAccessService missionViewerAccessService;
 
@@ -80,27 +80,25 @@ class MissionViewerAccessServiceTest {
     UUID missionId = UUID.randomUUID();
     Authentication authentication = mock(Authentication.class);
     when(authHelperService.rawAuthentication()).thenReturn(authentication);
-    when(missionSecurityService.canManageMission(missionId, authentication)).thenReturn(true);
+    when(missionAccessPolicy.canManageMission(missionId, authentication)).thenReturn(true);
 
     boolean result = missionViewerAccessService.canManageMission(missionId);
 
-    assertTrue(result, "canManageMission must return the MissionSecurityService result verbatim");
-    verify(missionSecurityService).canManageMission(missionId, authentication);
-    verify(missionSecurityService, never()).canManageManagers(missionId, authentication);
+    assertTrue(result, "canManageMission must return the MissionAccessPolicy result verbatim");
+    verify(missionAccessPolicy).canManageMission(missionId, authentication);
   }
 
   @Test
-  void canManageManagers_delegatesToSecurityServiceCanManageManagers() {
+  void canManageManagers_appliesTheManageRule() {
     UUID missionId = UUID.randomUUID();
     Authentication authentication = mock(Authentication.class);
     when(authHelperService.rawAuthentication()).thenReturn(authentication);
-    when(missionSecurityService.canManageManagers(missionId, authentication)).thenReturn(true);
+    when(missionAccessPolicy.canManageMission(missionId, authentication)).thenReturn(true);
 
     boolean result = missionViewerAccessService.canManageManagers(missionId);
 
-    assertTrue(result, "canManageManagers must return the MissionSecurityService result verbatim");
-    verify(missionSecurityService).canManageManagers(missionId, authentication);
-    verify(missionSecurityService, never()).canManageMission(missionId, authentication);
+    assertTrue(result, "canManageManagers must return the MissionAccessPolicy result verbatim");
+    verify(missionAccessPolicy).canManageMission(missionId, authentication);
   }
 
   @Test
@@ -108,7 +106,7 @@ class MissionViewerAccessServiceTest {
     UUID missionId = UUID.randomUUID();
     Authentication authentication = mock(Authentication.class);
     when(authHelperService.rawAuthentication()).thenReturn(authentication);
-    when(missionSecurityService.canManageMission(missionId, authentication)).thenReturn(false);
+    when(missionAccessPolicy.canManageMission(missionId, authentication)).thenReturn(false);
 
     boolean result = missionViewerAccessService.canManageMission(missionId);
 

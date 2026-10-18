@@ -29,8 +29,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
-import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionStructureService;
 import java.util.UUID;
@@ -63,7 +63,7 @@ class MissionControllerCreatePathTest {
   @MockitoBean private MissionParticipantService missionParticipantService;
 
   @MockitoBean private MissionStructureService missionStructureService;
-  @MockitoBean private MissionSecurityService missionSecurityService;
+  @MockitoBean private MissionAccessPolicy missionAccessPolicy;
 
   @BeforeEach
   void setUp() {
@@ -124,7 +124,7 @@ class MissionControllerCreatePathTest {
   @Test
   void createSubMission_dangerousFieldsInJson_areSilentlyDroppedByDtoBinding() throws Exception {
     UUID parentId = UUID.randomUUID();
-    when(missionSecurityService.canManageMission(eq(parentId), any())).thenReturn(true);
+    when(missionAccessPolicy.canManageMission(eq(parentId), any())).thenReturn(true);
     when(missionService.addSubMission(eq(parentId), any(CreateMissionRequest.class)))
         .thenReturn(new Mission());
 

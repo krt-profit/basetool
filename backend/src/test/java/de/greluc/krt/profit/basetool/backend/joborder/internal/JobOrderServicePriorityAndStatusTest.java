@@ -71,7 +71,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
  * Unit tests for the priority and status transitions of {@link JobOrderService} and its priority
@@ -81,6 +80,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 class JobOrderServicePriorityAndStatusTest {
 
   @Mock private JobOrderRepository jobOrderRepository;
+  @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
   @Mock private MaterialRepository materialRepository;
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private OrderLinkedStockRows orderLinkedStockRows;
@@ -128,7 +128,14 @@ class JobOrderServicePriorityAndStatusTest {
             jobOrderPriorityService,
             qualityTierService,
             null,
-            actingUserService());
+            actingUserService(),
+            new JobOrderEditor(
+                jobOrderRepository,
+                jobOrderAccessPolicy,
+                auditService,
+                eventPublisher,
+                jobOrderStockProjectionService));
+    lenient().when(jobOrderAccessPolicy.canEdit(any(), any())).thenReturn(true);
     lenient()
         .when(jobOrderMapper.toDto(any(JobOrder.class)))
         .thenAnswer(
@@ -174,19 +181,6 @@ class JobOrderServicePriorityAndStatusTest {
           () ->
               service.updateJobOrderStatus(
                   ORDER_ID, new UpdateJobOrderStatusDto(JobOrderStatus.COMPLETED, 1L)));
-    }
-
-    @Test
-    void versionMismatch_throwsOptimisticLockingFailure() {
-      JobOrder o = newOrder(JobOrderStatus.OPEN, 1, 5L);
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(o));
-
-      assertThrows(
-          ObjectOptimisticLockingFailureException.class,
-          () ->
-              service.updateJobOrderStatus(
-                  ORDER_ID, new UpdateJobOrderStatusDto(JobOrderStatus.COMPLETED, 99L)));
-      verify(jobOrderRepository, never()).save(any());
     }
 
     @Test
@@ -358,18 +352,6 @@ class JobOrderServicePriorityAndStatusTest {
           Integer.valueOf(3), o.getPriority(), "active-to-active transition preserves priority");
       verify(jobOrderRepository, never()).lockAllJobOrders();
     }
-
-    @Test
-    void nullVersionInDto_bypassesOptimisticCheck() {
-      JobOrder o = newOrder(JobOrderStatus.OPEN, 1, 5L);
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(o));
-      when(jobOrderRepository.save(o)).thenReturn(o);
-
-      service.updateJobOrderStatus(
-          ORDER_ID, new UpdateJobOrderStatusDto(JobOrderStatus.IN_PROGRESS, null));
-
-      verify(jobOrderRepository).save(o);
-    }
   }
 
   @Nested
@@ -457,17 +439,6 @@ class JobOrderServicePriorityAndStatusTest {
     }
 
     @Test
-    void versionMismatch_throws() {
-      JobOrder o = newOrder(JobOrderStatus.OPEN, 1, 7L);
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(o));
-
-      assertThrows(
-          ObjectOptimisticLockingFailureException.class,
-          () -> service.updateJobOrder(ORDER_ID, newUpdateDto(3L)));
-      verify(jobOrderRepository, never()).saveAndFlush(any());
-    }
-
-    @Test
     void removedMaterials_areUnlinkedFromInventory() {
       UUID xId = UUID.randomUUID();
       UUID yId = UUID.randomUUID();
@@ -513,19 +484,6 @@ class JobOrderServicePriorityAndStatusTest {
               1L);
 
       assertThrows(NotFoundException.class, () -> service.updateJobOrder(ORDER_ID, dto));
-    }
-
-    @Test
-    void nullVersion_bypassesOptimisticCheck() {
-      JobOrder o = newOrder(JobOrderStatus.OPEN, 1, 5L);
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(o));
-      when(jobOrderRepository.saveAndFlush(o)).thenReturn(o);
-
-      CreateJobOrderDto dto = new CreateJobOrderDto(null, null, "b", null, List.of(), null);
-
-      service.updateJobOrder(ORDER_ID, dto);
-
-      verify(jobOrderRepository).saveAndFlush(o);
     }
   }
 

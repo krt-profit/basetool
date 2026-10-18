@@ -40,4 +40,14 @@ public final class JobOrderAuditLabel {
   public static @NotNull String of(@Nullable Integer displayId) {
     return "#" + (displayId == null ? "?" : displayId);
   }
+
+  /**
+   * Returns the label for one loaded order.
+   *
+   * @param jobOrder the order
+   * @return {@code #<displayId>}, or {@code #?} when the number is missing
+   */
+  public static @NotNull String of(@NotNull JobOrder jobOrder) {
+    return of(jobOrder.getDisplayId());
+  }
 }

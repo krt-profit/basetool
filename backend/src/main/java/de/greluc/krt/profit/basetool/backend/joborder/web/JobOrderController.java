@@ -697,8 +697,7 @@ public class JobOrderController {
         responseCode = "409",
         description = "Conflict – optimistic locking failure (version mismatch)")
   })
-  @PreAuthorize(
-      "hasRole('" + Roles.LOGISTICIAN + "') and @jobOrderAccessPolicy.canEditJobOrder(#id)")
+  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
   public JobOrderDto updateJobOrderStatus(
       @PathVariable UUID id, @RequestBody @Valid UpdateJobOrderStatusDto dto) {
     return jobOrderService.updateJobOrderStatus(id, dto);
@@ -732,8 +731,7 @@ public class JobOrderController {
    */
   @PutMapping("/{id}")
   @Operation(summary = "Update job order", description = "Updates job order details and materials.")
-  @PreAuthorize(
-      "hasRole('" + Roles.LOGISTICIAN + "') and @jobOrderAccessPolicy.canEditJobOrder(#id)")
+  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
   public JobOrderDto updateJobOrder(
       @PathVariable UUID id, @RequestBody @Valid CreateJobOrderDto dto) {
     return jobOrderService.updateJobOrder(id, dto);
@@ -765,8 +763,7 @@ public class JobOrderController {
         responseCode = "409",
         description = "Conflict – optimistic locking failure (version mismatch)")
   })
-  @PreAuthorize(
-      "hasRole('" + Roles.LOGISTICIAN + "') and @jobOrderAccessPolicy.canEditJobOrder(#id)")
+  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
   public JobOrderDto updateItemJobOrder(
       @PathVariable UUID id, @RequestBody @Valid CreateJobOrderItemRequestDto dto) {
     return jobOrderService.updateItemJobOrder(id, dto);
@@ -802,7 +799,7 @@ public class JobOrderController {
         responseCode = "409",
         description = "Conflict - optimistic locking failure (version mismatch)")
   })
-  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canEditJobOrderAsRequester(#id)")
+  @PreAuthorize("isAuthenticated()")
   public JobOrderDto updateJobOrderAsRequester(
       @PathVariable UUID id, @RequestBody @Valid CreateJobOrderDto dto) {
     return cleanupJobOrderForRequester(jobOrderService.updateJobOrderAsRequester(id, dto));
@@ -836,7 +833,7 @@ public class JobOrderController {
         responseCode = "409",
         description = "Conflict - optimistic locking failure (version mismatch)")
   })
-  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canEditJobOrderAsRequester(#id)")
+  @PreAuthorize("isAuthenticated()")
   public JobOrderDto updateItemJobOrderAsRequester(
       @PathVariable UUID id, @RequestBody @Valid CreateJobOrderItemRequestDto dto) {
     return cleanupJobOrderForRequester(jobOrderService.updateItemJobOrderAsRequester(id, dto));
@@ -866,8 +863,7 @@ public class JobOrderController {
         responseCode = "409",
         description = "Conflict – optimistic locking failure (version mismatch)")
   })
-  @PreAuthorize(
-      "hasRole('" + Roles.LOGISTICIAN + "') and @jobOrderAccessPolicy.canEditJobOrder(#id)")
+  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
   public JobOrderDto updateBlueprintVariantCounting(
       @PathVariable UUID id, @NotNull @RequestBody @Valid UpdateJobOrderBlueprintCountingDto dto) {
     return jobOrderService.updateBlueprintVariantCounting(
@@ -889,8 +885,7 @@ public class JobOrderController {
       description =
           "Changes which org unit processes the order. Admin: free to any profit-eligible org unit;"
               + " squadron logistician/officer: escalate own squadron's order to an SK only.")
-  @PreAuthorize(
-      "hasRole('" + Roles.LOGISTICIAN + "') and @jobOrderAccessPolicy.canEditJobOrder(#id)")
+  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
   public JobOrderDto reassignResponsibleOrgUnit(
       @PathVariable UUID id, @NotNull @RequestBody @Valid ReassignResponsibleOrgUnitRequest body) {
     return jobOrderService.reassignResponsibleOrgUnit(id, body.responsibleOrgUnitId());
@@ -939,13 +934,7 @@ public class JobOrderController {
     @ApiResponse(responseCode = "404", description = "Job order or material not found")
   })
   @PreAuthorize(
-      "hasAnyRole('"
-          + Roles.LOGISTICIAN
-          + "', '"
-          + Roles.OFFICER
-          + "', '"
-          + Roles.ADMIN
-          + "') and @jobOrderAccessPolicy.canEditJobOrder(#jobOrderId)")
+      "hasAnyRole('" + Roles.LOGISTICIAN + "', '" + Roles.OFFICER + "', '" + Roles.ADMIN + "')")
   public void unlinkMaterial(@PathVariable UUID jobOrderId, @PathVariable UUID materialId) {
     jobOrderService.unlinkMaterial(jobOrderId, materialId);
   }
@@ -970,13 +959,7 @@ public class JobOrderController {
     @ApiResponse(responseCode = "404", description = "Job order or inventory item not found")
   })
   @PreAuthorize(
-      "hasAnyRole('"
-          + Roles.LOGISTICIAN
-          + "', '"
-          + Roles.OFFICER
-          + "', '"
-          + Roles.ADMIN
-          + "') and @jobOrderAccessPolicy.canEditJobOrder(#id)")
+      "hasAnyRole('" + Roles.LOGISTICIAN + "', '" + Roles.OFFICER + "', '" + Roles.ADMIN + "')")
   public void unlinkInventoryItem(@PathVariable UUID id, @PathVariable UUID inventoryItemId) {
     jobOrderService.unlinkInventoryItem(id, inventoryItemId);
   }
