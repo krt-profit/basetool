@@ -22,6 +22,10 @@ confirm and the per-section serialization of ADR-0071), version propagation, the
 the broadcast and the receiver. The sender map and the receiver map become one declaration; the
 parity test reads the `sections:` property of the declaration instead of a named constant.
 
+The write's `propagateVersion` option replaces a hand-written `dataset.version =` or `syncVersion`
+write on a page that patches the DOM without a re-render; a section re-rendered after the write gets
+its version from the fragment, so no page needs both.
+
 Its seam is covered by a node test over a fake DOM running the real `krt-fetch.js` transport
 (`:frontend:testPageSectionsJs`). The six pages that used `sectionWrite` migrate in this change.
 

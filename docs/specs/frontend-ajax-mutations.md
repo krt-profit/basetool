@@ -33,7 +33,9 @@ owns the whole choreography and returns `{write, refresh, notify, receiver, sect
 - `write` decorates `krtFetch.write` with the section's localized success/error/conflict
   strings and the per-section `serialize` default (ADR-0071). A 409 shows the conflict confirm
   and neither re-renders nor broadcasts. `propagateVersion: true` writes the response version to
-  the section container and every `[data-version]` in it; `refresh: [keys]` re-renders and
+  the section container and every `[data-version]` in it. It replaces a hand-written
+  `dataset.version =` or `syncVersion` write on a page that patches the DOM without a re-render; a
+  section re-rendered after the write gets its version from the fragment. `refresh: [keys]` re-renders and
   broadcasts those sections once after a 2xx, before the caller's `onSuccess`.
 - `refresh` re-renders sections in place via `krtFetch.swap` and broadcasts to the topic first
   (`alsoBroadcast` keys are appended) unless it applies a peer signal, `{broadcast: false}`.
