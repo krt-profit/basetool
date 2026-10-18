@@ -27,7 +27,7 @@ import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryBookOutFo
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryForm;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryStackDto;
-import de.greluc.krt.profit.basetool.frontend.inventory.model.ItemAttributeFilter;
+import de.greluc.krt.profit.basetool.frontend.inventory.model.LagerQuery;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderGameItemNeedDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialNeedDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderReferenceDto;
@@ -435,24 +435,7 @@ public class InventoryPageController {
    * view=items} shows the game-item tree (REQ-INV-030); filter options list only items and
    * locations in stock in the caller's scope (REQ-INV-040).
    *
-   * @param view {@code "items"} for the game-item view, anything else (or absent) for material
-   * @param materialIds optional material id filter (multi; material view only)
-   * @param minQuality optional minimum-quality filter (material view only)
-   * @param jobOrderIds optional job-order id filter (multi; both views)
-   * @param missionIds optional mission id filter (multi; material view only)
-   * @param gameItemIds optional game-item id filter (multi; items view only)
-   * @param locationIds optional storage-location id filter (multi; both views, REQ-INV-040)
-   * @param personalOnly when true, show only the caller's personal entries
-   * @param nonPersonalOnly when true, show only the caller's shared entries; mutually exclusive
-   *     with {@code personalOnly}
-   * @param stolenOnly when true, show only stock marked „gestohlen" (REQ-INV-053)
-   * @param nonStolenOnly when true, hide stock marked „gestohlen"; mutually exclusive with {@code
-   *     stolenOnly}
-   * @param kinds optional item-category filter (multi; items view only, REQ-INV-063)
-   * @param componentTypes optional ship-component-type filter (multi; items view only)
-   * @param sizes optional component-size filter (multi; items view only)
-   * @param grades optional component-grade filter (multi; items view only)
-   * @param itemClasses optional component-class filter (multi; items view only)
+   * @param query the Lager filters bound from the query string
    * @param fragment when true, return the {@code inventoryTableFragment} fragment
    * @param model model populated with grouped items, filter catalogs and auth-derived UX flags
    * @return either the full {@code inventory-my} view or its table fragment
@@ -460,22 +443,7 @@ public class InventoryPageController {
   @NotNull
   @GetMapping("/my")
   public String viewMyInventory(
-      @RequestParam(required = false) String view,
-      @RequestParam(required = false) List<UUID> materialIds,
-      @RequestParam(required = false) Integer minQuality,
-      @RequestParam(required = false) List<UUID> jobOrderIds,
-      @RequestParam(required = false) List<UUID> missionIds,
-      @RequestParam(required = false) List<UUID> gameItemIds,
-      @RequestParam(required = false) List<UUID> locationIds,
-      @RequestParam(required = false, defaultValue = "false") boolean personalOnly,
-      @RequestParam(required = false, defaultValue = "false") boolean nonPersonalOnly,
-      @RequestParam(required = false, defaultValue = "false") boolean stolenOnly,
-      @RequestParam(required = false, defaultValue = "false") boolean nonStolenOnly,
-      @RequestParam(required = false) List<String> kinds,
-      @RequestParam(required = false) List<String> componentTypes,
-      @RequestParam(required = false) List<Integer> sizes,
-      @RequestParam(required = false) List<String> grades,
-      @RequestParam(required = false) List<String> itemClasses,
+      @ModelAttribute LagerQuery query,
       @RequestParam(required = false, defaultValue = "false") boolean fragment,
       Model model) {
     if (!model.containsAttribute("inventoryForm")) {
@@ -484,9 +452,9 @@ public class InventoryPageController {
     if (!model.containsAttribute("inventoryBookOutForm")) {
       model.addAttribute("inventoryBookOutForm", new InventoryBookOutForm());
     }
-    boolean itemsView = isItemsView(view);
+    boolean itemsView = query.itemsView();
     model.addAttribute("view", itemsView ? "items" : "material");
-    StolenFilter stolen = new StolenFilter(stolenOnly, nonStolenOnly);
+    addLagerParameterNames(model);
 
     if (itemsView) {
       addItemViewModel(
@@ -494,19 +462,11 @@ public class InventoryPageController {
           InventoryBackendClient.Listing.MY,
           "my-item-inventory",
           "error.inventory.personal.load",
-          new InventoryBackendClient.ItemFilter(
-              gameItemIds,
-              locationIds,
-              jobOrderIds,
-              personalOnly,
-              nonPersonalOnly,
-              stolen.stolenOnly(),
-              stolen.nonStolenOnly(),
-              new ItemAttributeFilter(kinds, componentTypes, sizes, grades, itemClasses)),
+          query,
           fragment);
       model.addAttribute("users", fetchUsers());
-      model.addAttribute("selectedPersonalOnly", personalOnly);
-      model.addAttribute("selectedNonPersonalOnly", nonPersonalOnly);
+      model.addAttribute("selectedPersonalOnly", query.personalOnly());
+      model.addAttribute("selectedNonPersonalOnly", query.nonPersonalOnly());
       model.addAttribute("authUserId", currentAuthName());
       model.addAttribute("canEditForeignNotes", hasLogisticianOrAbove());
       if (fragment) {
@@ -520,17 +480,7 @@ public class InventoryPageController {
             model,
             "my-material-inventory",
             "error.inventory.personal.load",
-            () ->
-                fetchGroupedMaterialInventory(
-                    InventoryBackendClient.Listing.MY,
-                    materialIds,
-                    locationIds,
-                    minQuality,
-                    jobOrderIds,
-                    missionIds,
-                    personalOnly,
-                    nonPersonalOnly,
-                    stolen));
+            () -> inventoryClient.grouped(InventoryBackendClient.Listing.MY, query));
 
     model.addAttribute("groupedItems", groupedItems);
     model.addAttribute("items", new ArrayList<>());
@@ -540,36 +490,14 @@ public class InventoryPageController {
         resolveLocationFilterOptions(
             groupedItems,
             fragment,
-            anyMaterialFilterActive(
-                materialIds,
-                locationIds,
-                minQuality,
-                jobOrderIds,
-                missionIds,
-                personalOnly || nonPersonalOnly || stolen.active()),
-            () ->
-                fetchGroupedMaterialInventory(
-                    InventoryBackendClient.Listing.MY,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    false,
-                    false,
-                    StolenFilter.NONE)));
+            query.anyActive(),
+            () -> inventoryClient.grouped(InventoryBackendClient.Listing.MY, LagerQuery.empty())));
     model.addAttribute("jobOrders", fetchActiveJobOrders());
     model.addAttribute("missions", fetchMissions());
     model.addAttribute("users", fetchUsers());
-    model.addAttribute("selectedMaterialIds", materialIds);
-    model.addAttribute("selectedLocationIds", locationIds);
-    model.addAttribute("selectedMinQuality", minQuality);
-    model.addAttribute("selectedJobOrderIds", jobOrderIds);
-    model.addAttribute("selectedMissionIds", missionIds);
-    model.addAttribute("selectedPersonalOnly", personalOnly);
-    model.addAttribute("selectedNonPersonalOnly", nonPersonalOnly);
-    model.addAttribute("selectedStolenOnly", stolenOnly);
-    model.addAttribute("selectedNonStolenOnly", nonStolenOnly);
+    addSelectedMaterialFilters(model, query);
+    model.addAttribute("selectedPersonalOnly", query.personalOnly());
+    model.addAttribute("selectedNonPersonalOnly", query.nonPersonalOnly());
     model.addAttribute("authUserId", currentAuthName());
     model.addAttribute("canEditForeignNotes", hasLogisticianOrAbove());
 
@@ -583,69 +511,41 @@ public class InventoryPageController {
    * Returns the ids of every own inventory entry matching the current {@code /inventory/my} filter
    * and view, backing "Alle markieren" (REQ-INV-034).
    *
-   * @param view {@code "items"} for the game-item view, anything else (or absent) for material
-   * @param materialIds optional material id filter (multi; material view only)
-   * @param minQuality optional minimum-quality filter (material view only)
-   * @param jobOrderIds optional job-order id filter (multi; both views)
-   * @param missionIds optional mission id filter (multi; material view only)
-   * @param gameItemIds optional game-item id filter (multi; items view only)
-   * @param locationIds optional storage-location id filter (multi; both views, REQ-INV-040)
-   * @param personalOnly when true, restrict to the caller's personal entries
-   * @param nonPersonalOnly when true, restrict to the caller's shared entries (mutually exclusive
-   *     with {@code personalOnly})
-   * @param stolenOnly when true, show only stock marked „gestohlen" (REQ-INV-053)
-   * @param nonStolenOnly when true, hide stock marked „gestohlen"; mutually exclusive with {@code
-   *     stolenOnly}
-   * @param kinds optional item-category filter (multi; items view only, REQ-INV-063)
-   * @param componentTypes optional ship-component-type filter (multi; items view only)
-   * @param sizes optional component-size filter (multi; items view only)
-   * @param grades optional component-grade filter (multi; items view only)
-   * @param itemClasses optional component-class filter (multi; items view only)
+   * @param query the Lager filters bound from the query string
    * @return the ids of every matching entry, in creation order; never {@code null}
    */
   @GetMapping("/my/entry-ids")
   @ResponseBody
-  public List<UUID> myEntryIds(
-      @RequestParam(required = false) String view,
-      @RequestParam(required = false) List<UUID> materialIds,
-      @RequestParam(required = false) Integer minQuality,
-      @RequestParam(required = false) List<UUID> jobOrderIds,
-      @RequestParam(required = false) List<UUID> missionIds,
-      @RequestParam(required = false) List<UUID> gameItemIds,
-      @RequestParam(required = false) List<UUID> locationIds,
-      @RequestParam(required = false, defaultValue = "false") boolean personalOnly,
-      @RequestParam(required = false, defaultValue = "false") boolean nonPersonalOnly,
-      @RequestParam(required = false, defaultValue = "false") boolean stolenOnly,
-      @RequestParam(required = false, defaultValue = "false") boolean nonStolenOnly,
-      @RequestParam(required = false) List<String> kinds,
-      @RequestParam(required = false) List<String> componentTypes,
-      @RequestParam(required = false) List<Integer> sizes,
-      @RequestParam(required = false) List<String> grades,
-      @RequestParam(required = false) List<String> itemClasses) {
-    List<UUID> ids =
-        isItemsView(view)
-            ? inventoryClient.myItemEntryIds(
-                new InventoryBackendClient.ItemFilter(
-                    gameItemIds,
-                    locationIds,
-                    jobOrderIds,
-                    personalOnly,
-                    nonPersonalOnly,
-                    stolenOnly,
-                    nonStolenOnly,
-                    new ItemAttributeFilter(kinds, componentTypes, sizes, grades, itemClasses)))
-            : inventoryClient.myMaterialEntryIds(
-                new InventoryBackendClient.MaterialFilter(
-                    materialIds,
-                    locationIds,
-                    minQuality,
-                    jobOrderIds,
-                    missionIds,
-                    personalOnly,
-                    nonPersonalOnly,
-                    stolenOnly,
-                    nonStolenOnly));
+  public List<UUID> myEntryIds(@ModelAttribute LagerQuery query) {
+    List<UUID> ids = inventoryClient.myEntryIds(query);
     return ids != null ? ids : List.of();
+  }
+
+  /**
+   * Publishes the filter parameter names and the attribute-filter families, so the page script
+   * reads the names from the page instead of repeating them (REQ-INV-030).
+   *
+   * @param model the model to fill
+   */
+  private static void addLagerParameterNames(@NotNull Model model) {
+    model.addAttribute("lagerFilterParams", String.join(",", LagerQuery.filterParameterNames()));
+    model.addAttribute("lagerAttributeFilters", String.join(",", LagerQuery.attributeFilters()));
+  }
+
+  /**
+   * Publishes the active material-view selection for the filter widgets.
+   *
+   * @param model the model to fill
+   * @param query the Lager filters of the request
+   */
+  private static void addSelectedMaterialFilters(@NotNull Model model, @NotNull LagerQuery query) {
+    model.addAttribute("selectedMaterialIds", query.materialIds());
+    model.addAttribute("selectedLocationIds", query.locationIds());
+    model.addAttribute("selectedMinQuality", query.minQuality());
+    model.addAttribute("selectedJobOrderIds", query.jobOrderIds());
+    model.addAttribute("selectedMissionIds", query.missionIds());
+    model.addAttribute("selectedStolenOnly", query.stolenOnly());
+    model.addAttribute("selectedNonStolenOnly", query.nonStolenOnly());
   }
 
   /**
@@ -667,18 +567,18 @@ public class InventoryPageController {
       @NotNull InventoryBackendClient.Listing listing,
       @NotNull String section,
       @NotNull String errorKey,
-      @NotNull InventoryBackendClient.ItemFilter filter,
+      @NotNull LagerQuery filter,
       boolean fragment) {
     List<GroupedInventoryDto> groupedItems =
         loadGroupedSection(
-            model, section, errorKey, () -> inventoryClient.groupedItems(listing, filter));
+            model, section, errorKey, () -> inventoryClient.grouped(listing, filter));
     List<GroupedInventoryDto> optionSource = groupedItems;
     if (!fragment && filter.anyActive()) {
       List<GroupedInventoryDto> unfiltered =
           SectionFallback.load(
               log,
               "item-filter-options",
-              () -> inventoryClient.groupedItems(listing, InventoryBackendClient.ItemFilter.NONE),
+              () -> inventoryClient.grouped(listing, LagerQuery.emptyItems()),
               null);
       if (unfiltered != null) {
         optionSource = unfiltered;
@@ -702,81 +602,6 @@ public class InventoryPageController {
     model.addAttribute("selectedStolenOnly", filter.stolenOnly());
     model.addAttribute("selectedNonStolenOnly", filter.nonStolenOnly());
     model.addAttribute("selectedItemAttributes", filter.attributes());
-  }
-
-  /**
-   * Fetches one grouped material-inventory result with the material view's filters; used for both
-   * the table read and the unfiltered read behind {@link #resolveLocationFilterOptions}.
-   *
-   * @param listing the grouped listing, {@code /my} or {@code /all}
-   * @param materialIds optional material filter
-   * @param locationIds optional storage-location filter (REQ-INV-040)
-   * @param minQuality optional quality floor
-   * @param jobOrderIds optional job-order filter
-   * @param missionIds optional mission filter
-   * @param personalOnly relay {@code personalOnly=true} (only meaningful on {@code /my})
-   * @param nonPersonalOnly relay {@code nonPersonalOnly=true} (only meaningful on {@code /my})
-   * @param stolen the „gestohlen" narrowing (REQ-INV-053)
-   * @return the grouped result as returned by the backend, may be {@code null}
-   */
-  private List<GroupedInventoryDto> fetchGroupedMaterialInventory(
-      @NotNull InventoryBackendClient.Listing listing,
-      List<UUID> materialIds,
-      List<UUID> locationIds,
-      Integer minQuality,
-      List<UUID> jobOrderIds,
-      List<UUID> missionIds,
-      boolean personalOnly,
-      boolean nonPersonalOnly,
-      @NotNull StolenFilter stolen) {
-    return inventoryClient.groupedMaterials(
-        listing,
-        new InventoryBackendClient.MaterialFilter(
-            materialIds,
-            locationIds,
-            minQuality,
-            jobOrderIds,
-            missionIds,
-            personalOnly,
-            nonPersonalOnly,
-            stolen.stolenOnly(),
-            stolen.nonStolenOnly()));
-  }
-
-  /**
-   * Whether any material-view filter dimension narrows the grouped result.
-   *
-   * @param materialIds the active material filter, if any
-   * @param locationIds the active location filter, if any
-   * @param minQuality the active quality floor, if any
-   * @param jobOrderIds the active job-order filter, if any
-   * @param missionIds the active mission filter, if any
-   * @param personalFlagActive whether a personal/non-personal narrowing flag is set
-   * @return {@code true} when at least one dimension narrows the result
-   */
-  private static boolean anyMaterialFilterActive(
-      List<UUID> materialIds,
-      List<UUID> locationIds,
-      Integer minQuality,
-      List<UUID> jobOrderIds,
-      List<UUID> missionIds,
-      boolean personalFlagActive) {
-    return notEmpty(materialIds)
-        || notEmpty(locationIds)
-        || minQuality != null
-        || notEmpty(jobOrderIds)
-        || notEmpty(missionIds)
-        || personalFlagActive;
-  }
-
-  /**
-   * Whether an id filter list actually narrows anything — a {@code null} or empty list does not.
-   *
-   * @param ids the filter list to test
-   * @return {@code true} when the list holds at least one id
-   */
-  private static boolean notEmpty(List<UUID> ids) {
-    return ids != null && !ids.isEmpty();
   }
 
   /**
@@ -830,41 +655,15 @@ public class InventoryPageController {
    * Renders the squadron-wide inventory list ({@code /inventory/all}), like {@link
    * #viewMyInventory} but over all users in scope and without the personal flags.
    *
-   * @param view {@code "items"} for the game-item view, anything else (or absent) for material
-   * @param materialIds optional material id filter (multi; material view only)
-   * @param minQuality optional minimum-quality filter (material view only)
-   * @param jobOrderIds optional job-order id filter (multi; both views)
-   * @param missionIds optional mission id filter (multi; material view only)
-   * @param gameItemIds optional game-item id filter (multi; items view only)
-   * @param locationIds optional storage-location id filter (multi; both views, REQ-INV-040)
-   * @param stolenOnly when true, show only stock marked „gestohlen" (REQ-INV-053)
-   * @param nonStolenOnly when true, hide stock marked „gestohlen"; mutually exclusive with {@code
-   *     stolenOnly}
-   * @param kinds optional item-category filter (multi; items view only, REQ-INV-063)
-   * @param componentTypes optional ship-component-type filter (multi; items view only)
-   * @param sizes optional component-size filter (multi; items view only)
-   * @param grades optional component-grade filter (multi; items view only)
-   * @param itemClasses optional component-class filter (multi; items view only)
+   * @param requested the Lager filters bound from the query string; the personal flags are ignored
    * @param fragment when true, return the table fragment
+   * @param model model populated with grouped items, filter catalogs and auth-derived UX flags
    * @return either the full {@code inventory-admin} view or its fragment
    */
   @NotNull
   @GetMapping("/all")
   public String viewAllInventory(
-      @RequestParam(required = false) String view,
-      @RequestParam(required = false) List<UUID> materialIds,
-      @RequestParam(required = false) Integer minQuality,
-      @RequestParam(required = false) List<UUID> jobOrderIds,
-      @RequestParam(required = false) List<UUID> missionIds,
-      @RequestParam(required = false) List<UUID> gameItemIds,
-      @RequestParam(required = false) List<UUID> locationIds,
-      @RequestParam(required = false, defaultValue = "false") boolean stolenOnly,
-      @RequestParam(required = false, defaultValue = "false") boolean nonStolenOnly,
-      @RequestParam(required = false) List<String> kinds,
-      @RequestParam(required = false) List<String> componentTypes,
-      @RequestParam(required = false) List<Integer> sizes,
-      @RequestParam(required = false) List<String> grades,
-      @RequestParam(required = false) List<String> itemClasses,
+      @ModelAttribute LagerQuery requested,
       @RequestParam(required = false, defaultValue = "false") boolean fragment,
       Model model) {
     if (!model.containsAttribute("inventoryForm")) {
@@ -873,9 +672,10 @@ public class InventoryPageController {
     if (!model.containsAttribute("inventoryBookOutForm")) {
       model.addAttribute("inventoryBookOutForm", new InventoryBookOutForm());
     }
-    boolean itemsView = isItemsView(view);
+    LagerQuery query = requested.withoutPersonalScope();
+    boolean itemsView = query.itemsView();
     model.addAttribute("view", itemsView ? "items" : "material");
-    StolenFilter stolen = new StolenFilter(stolenOnly, nonStolenOnly);
+    addLagerParameterNames(model);
 
     if (itemsView) {
       addItemViewModel(
@@ -883,15 +683,7 @@ public class InventoryPageController {
           InventoryBackendClient.Listing.ALL,
           "all-item-inventory",
           "error.inventory.global.load",
-          new InventoryBackendClient.ItemFilter(
-              gameItemIds,
-              locationIds,
-              jobOrderIds,
-              false,
-              false,
-              stolen.stolenOnly(),
-              stolen.nonStolenOnly(),
-              new ItemAttributeFilter(kinds, componentTypes, sizes, grades, itemClasses)),
+          query,
           fragment);
       model.addAttribute("authUserId", currentAuthName());
       model.addAttribute("canEditForeignNotes", hasLogisticianOrAbove());
@@ -906,17 +698,7 @@ public class InventoryPageController {
             model,
             "all-material-inventory",
             "error.inventory.global.load",
-            () ->
-                fetchGroupedMaterialInventory(
-                    InventoryBackendClient.Listing.ALL,
-                    materialIds,
-                    locationIds,
-                    minQuality,
-                    jobOrderIds,
-                    missionIds,
-                    false,
-                    false,
-                    stolen));
+            () -> inventoryClient.grouped(InventoryBackendClient.Listing.ALL, query));
 
     model.addAttribute("groupedItems", groupedItems);
     model.addAttribute("items", new ArrayList<>());
@@ -926,26 +708,9 @@ public class InventoryPageController {
         resolveLocationFilterOptions(
             groupedItems,
             fragment,
-            anyMaterialFilterActive(
-                materialIds, locationIds, minQuality, jobOrderIds, missionIds, stolen.active()),
-            () ->
-                fetchGroupedMaterialInventory(
-                    InventoryBackendClient.Listing.ALL,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    false,
-                    false,
-                    StolenFilter.NONE)));
-    model.addAttribute("selectedMaterialIds", materialIds);
-    model.addAttribute("selectedLocationIds", locationIds);
-    model.addAttribute("selectedMinQuality", minQuality);
-    model.addAttribute("selectedJobOrderIds", jobOrderIds);
-    model.addAttribute("selectedMissionIds", missionIds);
-    model.addAttribute("selectedStolenOnly", stolenOnly);
-    model.addAttribute("selectedNonStolenOnly", nonStolenOnly);
+            query.anyActive(),
+            () -> inventoryClient.grouped(InventoryBackendClient.Listing.ALL, LagerQuery.empty())));
+    addSelectedMaterialFilters(model, query);
     model.addAttribute("jobOrders", fetchActiveJobOrders());
     model.addAttribute("missions", fetchMissions());
     model.addAttribute("authUserId", currentAuthName());
@@ -1431,26 +1196,5 @@ public class InventoryPageController {
     }
     return roleHierarchy.getReachableGrantedAuthorities(auth.getAuthorities()).stream()
         .anyMatch(a -> Roles.authority(Roles.LOGISTICIAN).equals(a.getAuthority()));
-  }
-
-  /**
-   * The „gestohlen" narrowing of a grouped Lager read (REQ-INV-053).
-   *
-   * @param stolenOnly relay {@code stolenOnly=true}
-   * @param nonStolenOnly relay {@code nonStolenOnly=true}
-   */
-  private record StolenFilter(boolean stolenOnly, boolean nonStolenOnly) {
-
-    /** No narrowing: stolen and legitimate stock alike. */
-    static final StolenFilter NONE = new StolenFilter(false, false);
-
-    /**
-     * Whether this filter narrows the result.
-     *
-     * @return {@code true} when either flag is set
-     */
-    boolean active() {
-      return stolenOnly || nonStolenOnly;
-    }
   }
 }

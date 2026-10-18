@@ -35,18 +35,36 @@ const ASSOC_EPS = 0.0005;
 
 /**
  * The item-attribute filters of the Lager items view (REQ-INV-063): the query parameter and the
- * multi-select family of each. A family `x` renders the boxes `xCheck`, the select-all box `xAll`
+ * multi-select family of each, read from the `data-attribute-filters` pairs (`param:family`) the
+ * server renders on the tree. A family `x` renders the boxes `xCheck`, the select-all box `xAll`
  * and the header `xHeader`.
  *
- * @type {ReadonlyArray<{ param: string, family: string }>}
+ * @returns {Array<{ param: string, family: string }>} one entry per attribute filter
  */
-const ITEM_ATTRIBUTE_FILTERS = [
-    { param: 'kinds', family: 'kind' },
-    { param: 'componentTypes', family: 'componentType' },
-    { param: 'sizes', family: 'size' },
-    { param: 'grades', family: 'grade' },
-    { param: 'itemClasses', family: 'itemClass' },
-];
+function itemAttributeFilters() {
+    const table = document.getElementById('inventoryTable');
+    const raw = table ? table.getAttribute('data-attribute-filters') : null;
+    if (!raw) return [];
+    return raw
+        .split(',')
+        .filter((pair) => pair.includes(':'))
+        .map((pair) => {
+            const [param, family] = pair.split(':');
+            return { param, family };
+        });
+}
+
+/**
+ * The names of every Lager filter query parameter, read from the `data-filter-params` list the
+ * server renders on the tree.
+ *
+ * @returns {string[]} the parameter names
+ */
+function lagerFilterParams() {
+    const table = document.getElementById('inventoryTable');
+    const raw = table ? table.getAttribute('data-filter-params') : null;
+    return raw ? raw.split(',') : [];
+}
 
 /**
  * Looks up an element by id, typed as an input.
@@ -582,7 +600,7 @@ function createLager(cfg) {
      * @returns {string[]} the parameter names
      */
     function itemAttributeParams() {
-        return ITEM_ATTRIBUTE_FILTERS.map((f) => f.param);
+        return itemAttributeFilters().map((f) => f.param);
     }
 
     /**
@@ -594,7 +612,7 @@ function createLager(cfg) {
     function snapshotItemAttributes() {
         /** @type {KrtItemAttributeSnapshot} */
         const snapshot = {};
-        ITEM_ATTRIBUTE_FILTERS.forEach((f) => {
+        itemAttributeFilters().forEach((f) => {
             const picked = collectChecked(`${f.family}Check`);
             const total = familyBoxes(`${f.family}Check`).length;
             snapshot[f.param] = picked.length === 0 || picked.length === total ? null : picked;
@@ -612,7 +630,7 @@ function createLager(cfg) {
         if (!saved || typeof saved !== 'object') return false;
         const stored = /** @type {Record<string, unknown>} */ (saved);
         let changed = false;
-        ITEM_ATTRIBUTE_FILTERS.forEach((f) => {
+        itemAttributeFilters().forEach((f) => {
             const values = stored[f.param];
             if (!Array.isArray(values) || values.length === 0) return;
             const boxes = familyBoxes(`${f.family}Check`);
@@ -635,7 +653,7 @@ function createLager(cfg) {
      */
     function appendItemAttributeParams(params) {
         const snapshot = snapshotItemAttributes();
-        ITEM_ATTRIBUTE_FILTERS.forEach((f) => {
+        itemAttributeFilters().forEach((f) => {
             (snapshot[f.param] || []).forEach((value) => params.append(f.param, value));
         });
     }
@@ -648,7 +666,7 @@ function createLager(cfg) {
      */
     function countActiveItemAttributes(snapshot) {
         if (!snapshot) return 0;
-        return ITEM_ATTRIBUTE_FILTERS.filter((f) => {
+        return itemAttributeFilters().filter((f) => {
             const values = snapshot[f.param];
             return Array.isArray(values) && values.length > 0;
         }).length;
@@ -656,7 +674,7 @@ function createLager(cfg) {
 
     /** Unticks every item-attribute box and resets the headers. */
     function resetItemAttributes() {
-        ITEM_ATTRIBUTE_FILTERS.forEach((f) => {
+        itemAttributeFilters().forEach((f) => {
             const boxes = familyBoxes(`${f.family}Check`);
             for (let i = 0; i < boxes.length; i++) boxes[i].checked = false;
             const allBox = input(`${f.family}All`);
@@ -669,7 +687,7 @@ function createLager(cfg) {
 
     /** Re-syncs the select-all box and header of every rendered item-attribute filter. */
     function syncItemAttributeStates() {
-        ITEM_ATTRIBUTE_FILTERS.forEach((f) => {
+        itemAttributeFilters().forEach((f) => {
             if (familyBoxes(`${f.family}Check`).length > 0) {
                 updateSelectState(`${f.family}All`, `${f.family}Check`, `${f.family}Header`);
             }
@@ -1752,6 +1770,7 @@ function createLager(cfg) {
         updateSelectState,
         collectChecked,
         itemAttributeParams,
+        lagerFilterParams,
         snapshotItemAttributes,
         restoreItemAttributes,
         appendItemAttributeParams,

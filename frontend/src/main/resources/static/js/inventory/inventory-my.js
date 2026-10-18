@@ -648,19 +648,6 @@ function appendMyStolenFilter(params, value) {
 
 const MY_INVENTORY_FILTER_KEY = 'inventory_my_filters';
 
-const MY_INVENTORY_FILTER_PARAMS = [
-    'materialIds',
-    'gameItemIds',
-    'locationIds',
-    'minQuality',
-    'jobOrderIds',
-    'missionIds',
-    'personalOnly',
-    'nonPersonalOnly',
-    'stolenOnly',
-    'nonStolenOnly',
-];
-
 /**
  * Reads the stored filter preference.
  *
@@ -796,7 +783,7 @@ function restoreMyInventoryFilters() {
         return false;
     }
     if (
-        [...MY_INVENTORY_FILTER_PARAMS, ...myLager.itemAttributeParams()].some((p) => params.has(p))
+        [...myLager.lagerFilterParams(), ...myLager.itemAttributeParams()].some((p) => params.has(p))
     ) {
         persistMyInventoryFilters();
         return false;

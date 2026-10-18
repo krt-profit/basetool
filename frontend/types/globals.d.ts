@@ -615,6 +615,8 @@ interface KrtInventoryLager {
     collectChecked(className: string): string[];
     /** The query parameter names of the item-attribute filters (REQ-INV-063). */
     itemAttributeParams(): string[];
+    /** The names of every Lager filter query parameter, as the server renders them. */
+    lagerFilterParams(): string[];
     /** The item-attribute selection per parameter; null where none or every box is ticked. */
     snapshotItemAttributes(): KrtItemAttributeSnapshot;
     /** Ticks the item-attribute boxes from a stored snapshot; true when a box was ticked. */

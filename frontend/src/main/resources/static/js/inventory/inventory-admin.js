@@ -97,17 +97,6 @@ function appendAdminStolenFilter(params, value) {
 
 const ADMIN_INVENTORY_FILTER_KEY = 'inventory_admin_filters';
 
-const ADMIN_INVENTORY_FILTER_PARAMS = [
-    'materialIds',
-    'gameItemIds',
-    'locationIds',
-    'minQuality',
-    'jobOrderIds',
-    'missionIds',
-    'stolenOnly',
-    'nonStolenOnly',
-];
-
 /**
  * Reads the stored filter preference.
  *
@@ -237,7 +226,7 @@ function restoreAdminInventoryFilters() {
         return false;
     }
     if (
-        [...ADMIN_INVENTORY_FILTER_PARAMS, ...adminLager.itemAttributeParams()].some((p) =>
+        [...adminLager.lagerFilterParams(), ...adminLager.itemAttributeParams()].some((p) =>
             params.has(p),
         )
     ) {

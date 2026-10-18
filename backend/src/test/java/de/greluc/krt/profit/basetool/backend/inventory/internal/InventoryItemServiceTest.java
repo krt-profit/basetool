@@ -280,7 +280,8 @@ class InventoryItemServiceTest {
 
     Page<InventoryItemDto> result =
         inventoryItemService.getAllInventory(
-            null, null, null, jobOrderIds, missionIds, Pageable.unpaged());
+            LagerFilter.builder().jobOrderIds(jobOrderIds).missionIds(missionIds).build(),
+            Pageable.unpaged());
 
     assertNotNull(result);
     assertEquals(1, result.getTotalElements());
@@ -470,7 +471,7 @@ class InventoryItemServiceTest {
 
     List<GroupedInventoryDto> result =
         inventoryItemService.getMyAggregatedInventory(
-            userId, null, null, null, null, null, true, false, false, false);
+            userId, LagerFilter.builder().personalOnly(true).build());
 
     assertNotNull(result);
     verify(inventoryItemRepository)
@@ -517,7 +518,7 @@ class InventoryItemServiceTest {
 
     List<GroupedInventoryDto> result =
         inventoryItemService.getMyAggregatedInventory(
-            userId, null, null, null, null, null, false, true, false, false);
+            userId, LagerFilter.builder().nonPersonalOnly(true).build());
 
     assertNotNull(result);
     verify(inventoryItemRepository)

@@ -19,9 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.web;
 
-import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentType;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.AggregatedInventoryDto;
@@ -48,7 +45,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryMergeCa
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryOrgUnitChangeService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryPoolChangeService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStolenMarkService;
-import de.greluc.krt.profit.basetool.backend.inventory.internal.ItemAttributeFilter;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.LagerFilter;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
@@ -75,6 +72,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -285,71 +283,24 @@ public class InventoryItemController {
    * Returns the calling user's inventory grouped by material or game item with totals and average
    * quality.
    *
-   * @param personalOnly when {@code true}, only the caller's personal rows; defaults to {@code
-   *     false}
-   * @param nonPersonalOnly when {@code true}, only the caller's shared rows; defaults to {@code
-   *     false} and is mutually exclusive with {@code personalOnly}
-   * @param stolenOnly when {@code true}, only stock marked „gestohlen" (REQ-INV-053)
-   * @param nonStolenOnly when {@code true}, only stock not marked „gestohlen"; mutually exclusive
-   *     with {@code stolenOnly}
-   * @param kinds optional category filter ({@code catalog=ITEM} only, REQ-INV-063)
-   * @param componentTypes optional component-type filter ({@code catalog=ITEM} only)
-   * @param sizes optional component-size filter ({@code catalog=ITEM} only)
-   * @param grades optional component-grade filter ({@code catalog=ITEM} only)
-   * @param itemClasses optional component-class filter ({@code catalog=ITEM} only)
-   * @param catalog which stock catalog to group; defaults to {@code MATERIAL}; a filter that does
-   *     not match the catalog is rejected with 400 (REQ-INV-029/031)
-   * @param gameItemIds optional game-item filter ({@code catalog=ITEM} only; 400 otherwise)
-   * @param locationIds optional storage-location filter, valid for both catalogs (REQ-INV-040)
+   * <p>A filter that does not match the catalog is rejected with 400 (REQ-INV-029/031); {@code
+   * personalOnly} and {@code nonPersonalOnly}, like {@code stolenOnly} and {@code nonStolenOnly},
+   * exclude each other and answer empty together (REQ-INV-053).
+   *
+   * @param jwt the caller's token (owner scope)
+   * @param filter the Lager filters bound from the query string
    * @return grouped DTOs
    */
   @GetMapping("/my-inventory/grouped")
   @Transactional(readOnly = true)
   public List<GroupedInventoryDto> getMyGroupedInventory(
-      @AuthenticationPrincipal Jwt jwt,
-      @RequestParam(required = false) List<UUID> materialIds,
-      @RequestParam(required = false) List<UUID> gameItemIds,
-      @RequestParam(required = false) List<UUID> locationIds,
-      @RequestParam(required = false) Integer minQuality,
-      @RequestParam(required = false) List<UUID> jobOrderIds,
-      @RequestParam(required = false) List<UUID> missionIds,
-      @RequestParam(required = false, defaultValue = "false") boolean personalOnly,
-      @RequestParam(required = false, defaultValue = "false") boolean nonPersonalOnly,
-      @RequestParam(required = false, defaultValue = "false") boolean stolenOnly,
-      @RequestParam(required = false, defaultValue = "false") boolean nonStolenOnly,
-      @RequestParam(required = false) List<GameItemKind> kinds,
-      @RequestParam(required = false) List<ShipComponentType> componentTypes,
-      @RequestParam(required = false) List<Integer> sizes,
-      @RequestParam(required = false) List<String> grades,
-      @RequestParam(required = false) List<ShipComponentClass> itemClasses,
-      @RequestParam(required = false, defaultValue = "MATERIAL") InventoryCatalog catalog) {
-    ItemAttributeFilter attributes =
-        new ItemAttributeFilter(kinds, componentTypes, sizes, grades, itemClasses);
-    if (catalog == InventoryCatalog.ITEM) {
-      CatalogFilterGuard.rejectMaterialOnlyFilters(minQuality, missionIds, materialIds);
-      return inventoryAggregationService.getMyAggregatedItemInventory(
-          userService.getUserIdFromJwt(jwt),
-          gameItemIds,
-          locationIds,
-          jobOrderIds,
-          personalOnly,
-          nonPersonalOnly,
-          stolenOnly,
-          nonStolenOnly,
-          attributes);
+      @AuthenticationPrincipal Jwt jwt, @ModelAttribute LagerFilter filter) {
+    filter.requireMatchingCatalog();
+    UUID userId = userService.getUserIdFromJwt(jwt);
+    if (filter.catalog() == InventoryCatalog.ITEM) {
+      return inventoryAggregationService.getMyAggregatedItemInventory(userId, filter);
     }
-    CatalogFilterGuard.rejectItemOnlyFilters(gameItemIds, attributes);
-    return inventoryItemService.getMyAggregatedInventory(
-        userService.getUserIdFromJwt(jwt),
-        materialIds,
-        locationIds,
-        minQuality,
-        jobOrderIds,
-        missionIds,
-        personalOnly,
-        nonPersonalOnly,
-        stolenOnly,
-        nonStolenOnly);
+    return inventoryItemService.getMyAggregatedInventory(userId, filter);
   }
 
   /**
@@ -358,86 +309,27 @@ public class InventoryItemController {
    * catalog-mismatch rejection as {@link #getMyGroupedInventory}.
    *
    * @param jwt the caller's token, resolved to the owning user id
-   * @param materialIds optional material filter ({@code catalog=MATERIAL} only; 400 otherwise)
-   * @param gameItemIds optional game-item filter ({@code catalog=ITEM} only; 400 otherwise)
-   * @param locationIds optional storage-location filter (both catalogs, REQ-INV-040)
-   * @param minQuality optional quality floor; rejected for {@code catalog=ITEM}
-   * @param jobOrderIds optional job-order filter (both catalogs)
-   * @param missionIds optional mission filter; rejected for {@code catalog=ITEM}
-   * @param personalOnly when {@code true}, narrows to the caller's private stock rows
-   * @param nonPersonalOnly when {@code true}, narrows to the caller's shared stock rows; mutually
-   *     exclusive with {@code personalOnly}
-   * @param stolenOnly when {@code true}, only stock marked „gestohlen" (REQ-INV-053)
-   * @param nonStolenOnly when {@code true}, only stock not marked „gestohlen"; mutually exclusive
-   *     with {@code stolenOnly}
-   * @param kinds optional category filter ({@code catalog=ITEM} only, REQ-INV-063)
-   * @param componentTypes optional component-type filter ({@code catalog=ITEM} only)
-   * @param sizes optional component-size filter ({@code catalog=ITEM} only)
-   * @param grades optional component-grade filter ({@code catalog=ITEM} only)
-   * @param itemClasses optional component-class filter ({@code catalog=ITEM} only)
-   * @param catalog which stock catalog to select from; defaults to {@code MATERIAL}
+   * @param filter the Lager filters bound from the query string
    * @return the ids of every matching entry, in creation order
    */
   @GetMapping("/my-inventory/entry-ids")
   @Transactional(readOnly = true)
   public List<UUID> getMyEntryIds(
-      @AuthenticationPrincipal Jwt jwt,
-      @RequestParam(required = false) List<UUID> materialIds,
-      @RequestParam(required = false) List<UUID> gameItemIds,
-      @RequestParam(required = false) List<UUID> locationIds,
-      @RequestParam(required = false) Integer minQuality,
-      @RequestParam(required = false) List<UUID> jobOrderIds,
-      @RequestParam(required = false) List<UUID> missionIds,
-      @RequestParam(required = false, defaultValue = "false") boolean personalOnly,
-      @RequestParam(required = false, defaultValue = "false") boolean nonPersonalOnly,
-      @RequestParam(required = false, defaultValue = "false") boolean stolenOnly,
-      @RequestParam(required = false, defaultValue = "false") boolean nonStolenOnly,
-      @RequestParam(required = false) List<GameItemKind> kinds,
-      @RequestParam(required = false) List<ShipComponentType> componentTypes,
-      @RequestParam(required = false) List<Integer> sizes,
-      @RequestParam(required = false) List<String> grades,
-      @RequestParam(required = false) List<ShipComponentClass> itemClasses,
-      @RequestParam(required = false, defaultValue = "MATERIAL") InventoryCatalog catalog) {
-    ItemAttributeFilter attributes =
-        new ItemAttributeFilter(kinds, componentTypes, sizes, grades, itemClasses);
-    if (catalog == InventoryCatalog.ITEM) {
-      CatalogFilterGuard.rejectMaterialOnlyFilters(minQuality, missionIds, materialIds);
-      return inventoryAggregationService.getMyItemEntryIds(
-          userService.getUserIdFromJwt(jwt),
-          gameItemIds,
-          locationIds,
-          jobOrderIds,
-          personalOnly,
-          nonPersonalOnly,
-          stolenOnly,
-          nonStolenOnly,
-          attributes);
+      @AuthenticationPrincipal Jwt jwt, @ModelAttribute LagerFilter filter) {
+    filter.requireMatchingCatalog();
+    UUID userId = userService.getUserIdFromJwt(jwt);
+    if (filter.catalog() == InventoryCatalog.ITEM) {
+      return inventoryAggregationService.getMyItemEntryIds(userId, filter);
     }
-    CatalogFilterGuard.rejectItemOnlyFilters(gameItemIds, attributes);
-    return inventoryItemService.getMyEntryIds(
-        userService.getUserIdFromJwt(jwt),
-        materialIds,
-        locationIds,
-        minQuality,
-        jobOrderIds,
-        missionIds,
-        personalOnly,
-        nonPersonalOnly,
-        stolenOnly,
-        nonStolenOnly);
+    return inventoryItemService.getMyEntryIds(userId, filter);
   }
 
   /**
    * Squadron-wide flat inventory list (admin/logistician view). A filter that does not match the
-   * catalog is rejected with 400 (REQ-INV-029/031).
+   * catalog is rejected with 400 (REQ-INV-029/031); the personal and stolen flags and the item
+   * attribute filters do not apply to this list.
    *
-   * @param materialIds optional material filter ({@code catalog=MATERIAL} only; 400 otherwise)
-   * @param gameItemIds optional game-item filter ({@code catalog=ITEM} only; 400 otherwise)
-   * @param locationIds optional storage-location filter (both catalogs, REQ-INV-040)
-   * @param minQuality optional quality floor; rejected for {@code catalog=ITEM}
-   * @param jobOrderIds optional job-order filter (both catalogs)
-   * @param missionIds optional mission filter; rejected for {@code catalog=ITEM}
-   * @param catalog which stock catalog to list; defaults to {@code MATERIAL}
+   * @param filter the Lager filters bound from the query string
    * @param page zero-based page index
    * @param size page size
    * @param sort sort spec; {@code null} falls back to the per-catalog default
@@ -447,18 +339,12 @@ public class InventoryItemController {
   @PreAuthorize(INVENTORY_ACCESS)
   @Transactional(readOnly = true)
   public PageResponse<InventoryItemDto> getAllInventory(
-      @RequestParam(required = false) List<UUID> materialIds,
-      @RequestParam(required = false) List<UUID> gameItemIds,
-      @RequestParam(required = false) List<UUID> locationIds,
-      @RequestParam(required = false) Integer minQuality,
-      @RequestParam(required = false) List<UUID> jobOrderIds,
-      @RequestParam(required = false) List<UUID> missionIds,
-      @RequestParam(required = false, defaultValue = "MATERIAL") InventoryCatalog catalog,
+      @ModelAttribute LagerFilter filter,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort) {
-    if (catalog == InventoryCatalog.ITEM) {
-      CatalogFilterGuard.rejectMaterialOnlyFilters(minQuality, missionIds, materialIds);
+    filter.requireMatchingCatalog();
+    if (filter.catalog() == InventoryCatalog.ITEM) {
       Pageable pageable =
           PaginationUtil.createPageRequest(
               page,
@@ -466,11 +352,8 @@ public class InventoryItemController {
               sort != null ? sort : ITEM_FLAT_DEFAULT_SORT,
               ITEM_FLAT_SORT_FIELDS,
               "gameItem.name");
-      return PageResponse.of(
-          inventoryAggregationService.getAllItemInventory(
-              gameItemIds, locationIds, jobOrderIds, pageable));
+      return PageResponse.of(inventoryAggregationService.getAllItemInventory(filter, pageable));
     }
-    CatalogFilterGuard.rejectItemOnlyFilters(gameItemIds, ItemAttributeFilter.NONE);
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page,
@@ -478,10 +361,7 @@ public class InventoryItemController {
             sort != null ? sort : MATERIAL_FLAT_DEFAULT_SORT,
             MATERIAL_FLAT_SORT_FIELDS,
             "quality");
-    Page<InventoryItemDto> p =
-        inventoryItemService.getAllInventory(
-            materialIds, locationIds, minQuality, jobOrderIds, missionIds, pageable);
-    return PageResponse.of(p);
+    return PageResponse.of(inventoryItemService.getAllInventory(filter, pageable));
   }
 
   /**
@@ -500,53 +380,20 @@ public class InventoryItemController {
 
   /**
    * Squadron-wide variant of {@link #getMyGroupedInventory}. A filter that does not match the
-   * catalog is rejected with 400 (REQ-INV-029/031).
+   * catalog is rejected with 400 (REQ-INV-029/031); the personal flags do not apply squadron-wide.
    *
-   * @param materialIds optional material filter ({@code catalog=MATERIAL} only; 400 otherwise)
-   * @param gameItemIds optional game-item filter ({@code catalog=ITEM} only; 400 otherwise)
-   * @param locationIds optional storage-location filter (both catalogs, REQ-INV-040)
-   * @param minQuality optional quality floor; rejected for {@code catalog=ITEM}
-   * @param jobOrderIds optional job-order filter (both catalogs)
-   * @param missionIds optional mission filter; rejected for {@code catalog=ITEM}
-   * @param stolenOnly when {@code true}, only stock marked „gestohlen" (REQ-INV-053)
-   * @param nonStolenOnly when {@code true}, only stock not marked „gestohlen"; mutually exclusive
-   *     with {@code stolenOnly}
-   * @param kinds optional category filter ({@code catalog=ITEM} only, REQ-INV-063)
-   * @param componentTypes optional component-type filter ({@code catalog=ITEM} only)
-   * @param sizes optional component-size filter ({@code catalog=ITEM} only)
-   * @param grades optional component-grade filter ({@code catalog=ITEM} only)
-   * @param itemClasses optional component-class filter ({@code catalog=ITEM} only)
-   * @param catalog which stock catalog to group; defaults to {@code MATERIAL}
+   * @param filter the Lager filters bound from the query string
    * @return grouped DTOs
    */
   @GetMapping("/all/grouped")
   @PreAuthorize(INVENTORY_ACCESS)
   @Transactional(readOnly = true)
-  public List<GroupedInventoryDto> getAllGroupedInventory(
-      @RequestParam(required = false) List<UUID> materialIds,
-      @RequestParam(required = false) List<UUID> gameItemIds,
-      @RequestParam(required = false) List<UUID> locationIds,
-      @RequestParam(required = false) Integer minQuality,
-      @RequestParam(required = false) List<UUID> jobOrderIds,
-      @RequestParam(required = false) List<UUID> missionIds,
-      @RequestParam(required = false, defaultValue = "false") boolean stolenOnly,
-      @RequestParam(required = false, defaultValue = "false") boolean nonStolenOnly,
-      @RequestParam(required = false) List<GameItemKind> kinds,
-      @RequestParam(required = false) List<ShipComponentType> componentTypes,
-      @RequestParam(required = false) List<Integer> sizes,
-      @RequestParam(required = false) List<String> grades,
-      @RequestParam(required = false) List<ShipComponentClass> itemClasses,
-      @RequestParam(required = false, defaultValue = "MATERIAL") InventoryCatalog catalog) {
-    ItemAttributeFilter attributes =
-        new ItemAttributeFilter(kinds, componentTypes, sizes, grades, itemClasses);
-    if (catalog == InventoryCatalog.ITEM) {
-      CatalogFilterGuard.rejectMaterialOnlyFilters(minQuality, missionIds, materialIds);
-      return inventoryAggregationService.getAllAggregatedItemInventory(
-          gameItemIds, locationIds, jobOrderIds, stolenOnly, nonStolenOnly, attributes);
+  public List<GroupedInventoryDto> getAllGroupedInventory(@ModelAttribute LagerFilter filter) {
+    filter.requireMatchingCatalog();
+    if (filter.catalog() == InventoryCatalog.ITEM) {
+      return inventoryAggregationService.getAllAggregatedItemInventory(filter);
     }
-    CatalogFilterGuard.rejectItemOnlyFilters(gameItemIds, attributes);
-    return inventoryItemService.getAllAggregatedInventory(
-        materialIds, locationIds, minQuality, jobOrderIds, missionIds, stolenOnly, nonStolenOnly);
+    return inventoryItemService.getAllAggregatedInventory(filter);
   }
 
   /**
