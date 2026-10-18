@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
-import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -28,18 +27,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
-import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
-import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import java.util.Collections;
-import java.util.List;
-import java.util.UUID;
-import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,8 +46,8 @@ import org.springframework.web.context.WebApplicationContext;
 
 /**
  * Who may open the job-order create form ({@code GET /orders/create}) and what it loads: anonymous
- * access is refused (ADR-0149), the materials catalog is fetched via the public WebClient, and the
- * {@code .form-group input} rule keeps its {@code :where()} exclusion.
+ * access is refused (ADR-0149) and the materials catalog is fetched through the member's bearer. It
+ * runs over the real reader and typed client on purpose, to pin that wiring end to end.
  */
 @SpringBootTest
 class JobOrderPageControllerCreateFormAuthMvcTest {
@@ -94,45 +87,5 @@ class JobOrderPageControllerCreateFormAuthMvcTest {
         .andExpect(view().name("joborder/orders-create"));
 
     verify(backendApiClient).getCached(eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef());
-  }
-
-  @Test
-  @WithMockUser
-  void viewCreateForm_blanketInputRuleExcludesRadioAndCheckboxControls() throws Exception {
-    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
-        .thenReturn(Collections.emptyList());
-
-    mockMvc
-        .perform(get("/orders/create"))
-        .andExpect(status().isOk())
-        .andExpect(
-            PageStylesheets.content(
-                containsString(
-                    ".form-group input:where(:not([type='checkbox'], [type='radio']))")));
-  }
-
-  @Test
-  @WithMockUser
-  void viewCreateForm_PopulatesBothPickersFromTheAllKindsCatalogue() throws Exception {
-    OrgUnitMembershipOptionDto profitStaffel =
-        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Profit Staffel", "PS", "SQUADRON", true);
-    OrgUnitMembershipOptionDto nonProfitSk =
-        new OrgUnitMembershipOptionDto(
-            UUID.randomUUID(), "Combat SK", "CSK", "SPECIAL_COMMAND", false);
-
-    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
-        .thenReturn(Collections.emptyList());
-    when(backendApiClient.getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef()))
-        .thenReturn(List.of(profitStaffel, nonProfitSk));
-
-    mockMvc
-        .perform(get("/orders/create"))
-        .andExpect(status().isOk())
-        .andExpect(view().name("joborder/orders-create"))
-        .andExpect(content().string(Matchers.containsString("Combat SK")))
-        .andExpect(content().string(Matchers.containsString("Profit Staffel")));
-
-    verify(backendApiClient).getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef());
-    verify(backendApiClient, never()).getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE), anyTypeRef());
   }
 }

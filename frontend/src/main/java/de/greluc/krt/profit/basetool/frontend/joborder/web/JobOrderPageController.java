@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
-import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
-import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
@@ -31,24 +29,17 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverIte
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemForm;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverForm;
-import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialDto;
-import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderSettingsDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.RelayParams;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
-import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -56,11 +47,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicReference;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.http.HttpStatus;
@@ -97,11 +85,13 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("isAuthenticated()")
 public class JobOrderPageController {
 
-  /** Sends every job-order read and the catalogue reads of the order pages to the backend. */
+  /** Sends the job-order reads that no page record covers to the backend. */
   private final JobOrderBackendClient jobOrderClient;
 
+  /** Reads the backend data of each job-order page with its defaults and section fallbacks. */
+  private final JobOrderPageReader pageReader;
+
   private final RoleHierarchy roleHierarchy;
-  private final ParallelPageLoader parallelPageLoader;
   private final QualityTierCatalog qualityTierCatalog;
   private final JobOrderItemLines jobOrderItemLines;
 
@@ -133,12 +123,6 @@ public class JobOrderPageController {
 
   /** Page size applied when the request carries none (or a non-whitelisted one). */
   private static final int DEFAULT_PAGE_SIZE = 100;
-
-  /** Days after which an open order turns yellow when the settings are unavailable. */
-  private static final int DEFAULT_AGE_YELLOW_DAYS = 30;
-
-  /** Days after which an open order turns red when the settings are unavailable. */
-  private static final int DEFAULT_AGE_RED_DAYS = 90;
 
   /**
    * Renders the job-order list ({@code /orders}), filtered by scope, status and squadron.
@@ -201,24 +185,23 @@ public class JobOrderPageController {
     int effectivePage = page == null || page < 0 ? 0 : page;
     int effectiveSize = size != null && PAGE_SIZES.contains(size) ? size : DEFAULT_PAGE_SIZE;
 
-    if (!SectionFallback.run(
-        log,
-        "job-order-list",
-        () ->
-            addOrderList(
-                model,
+    JobOrderPageReader.OrderListPage list =
+        pageReader.readOrderList(
+            new JobOrderPageReader.OrderListQuery(
                 ownScope,
                 toProcessScope,
                 effectivePage,
                 effectiveSize,
                 statuses,
-                selectedSquadronIds))) {
+                selectedSquadronIds,
+                !requesterView));
+    if (!list.ordersAvailable()) {
       model.addAttribute("error", "error.joborder.load");
-      model.addAttribute("orders", new ArrayList<JobOrderDto>());
-      model.addAttribute("ordersPage", null);
-      model.addAttribute("ageYellowDays", DEFAULT_AGE_YELLOW_DAYS);
-      model.addAttribute("ageRedDays", DEFAULT_AGE_RED_DAYS);
     }
+    model.addAttribute("orders", list.orders());
+    model.addAttribute("ordersPage", list.ordersPage().orElse(null));
+    model.addAttribute("ageYellowDays", list.ageYellowDays());
+    model.addAttribute("ageRedDays", list.ageRedDays());
 
     model.addAttribute("pageSizes", PAGE_SIZES);
     model.addAttribute(
@@ -229,70 +212,13 @@ public class JobOrderPageController {
             scopeChoice && !SCOPE_ALL.equals(effectiveScope) ? effectiveScope : null));
     model.addAttribute("selectedStatuses", statuses);
     if (!requesterView) {
-      model.addAttribute("squadrons", fetchActiveSquadrons());
+      model.addAttribute("squadrons", list.activeSquadrons());
       model.addAttribute("selectedSquadronIds", selectedSquadronIds);
     }
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
       return "joborder/orders-index :: ordersResults";
     }
     return "joborder/orders-index";
-  }
-
-  /**
-   * Adds one page of the order list and the aging thresholds to the model.
-   *
-   * @param model the list model
-   * @param ownScope whether the requester-redacted own-orders list is read
-   * @param toProcessScope whether the queue of the caller's own units is read
-   * @param page the zero-based page index
-   * @param size the page size
-   * @param statuses the resolved status filter
-   * @param squadronIds the selected squadron ids
-   */
-  private void addOrderList(
-      @NotNull Model model,
-      boolean ownScope,
-      boolean toProcessScope,
-      int page,
-      int size,
-      @NotNull List<String> statuses,
-      @NotNull List<UUID> squadronIds) {
-    PageResponse<JobOrderDto> p =
-        jobOrderClient.orders(ownScope, toProcessScope, page, size, statuses, squadronIds);
-    List<JobOrderDto> orders = new ArrayList<>();
-    if (p != null && p.content() != null) {
-      orders = new ArrayList<>(p.content());
-      if (log.isDebugEnabled()) {
-        for (JobOrderDto order : orders) {
-          for (JobOrderMaterialDto mat : order.materials()) {
-            log.debug(
-                "Received stock for job order #{} ({}): {}/{} (material: {})",
-                order.displayId(),
-                order.id(),
-                mat.currentStock(),
-                mat.amount(),
-                mat.material().name());
-          }
-        }
-      }
-    }
-    model.addAttribute("orders", orders);
-    model.addAttribute("ordersPage", p);
-    addAgeThresholds(model);
-  }
-
-  /**
-   * Adds the aging thresholds of the order list, or the defaults when the settings are unavailable.
-   *
-   * @param model the page model
-   */
-  private void addAgeThresholds(@NotNull Model model) {
-    JobOrderSettingsDto settings =
-        SectionFallback.load(log, "job-order-age-settings", jobOrderClient::settings, null);
-    model.addAttribute(
-        "ageYellowDays", settings != null ? settings.ageYellowDays() : DEFAULT_AGE_YELLOW_DAYS);
-    model.addAttribute(
-        "ageRedDays", settings != null ? settings.ageRedDays() : DEFAULT_AGE_RED_DAYS);
   }
 
   /**
@@ -399,51 +325,36 @@ public class JobOrderPageController {
       @NotNull Model model,
       @Nullable OidcUser principal,
       @Nullable String fragment) {
-    JobOrderDto order = jobOrderClient.order(id);
+    JobOrderPageReader.OrderDetailPage detail =
+        pageReader.readOrderDetail(id, orderCaller(principal), fragment);
+    JobOrderDto order = detail.order();
     boolean requesterView = order.redacted();
     model.addAttribute("requesterView", requesterView);
     model.addAttribute("order", order);
-    model.addAttribute("currentUserId", getCurrentUserId(principal));
+    model.addAttribute("currentUserId", detail.currentUserId().orElse(null));
     model.addAttribute("itemsWithoutMaterials", itemsWithoutDerivedMaterials(order));
 
-    boolean canAssign = !requesterView && isLogistician(principal);
+    boolean canAssign = detail.canAssign();
     model.addAttribute("isLogistician", canAssign);
     if (requesterView || canAssign) {
       model.addAttribute("qualityTiers", qualityTierCatalog.all());
     }
-    if (requesterView) {
-      model.addAttribute("materials", fetchMaterials());
-      if (!model.containsAttribute("jobOrderForm")) {
-        model.addAttribute("jobOrderForm", JobOrderForm.forEdit(order));
-      }
-    }
+    detail.materials().ifPresent(materials -> model.addAttribute("materials", materials));
+    detail.squadrons().ifPresent(squadrons -> model.addAttribute("squadrons", squadrons));
+    detail.requestingOptions().ifPresent(options -> applyOwnerPickerOptions(model, options));
 
-    if (canAssign) {
-      CompletableFuture<List<MaterialDto>> materialsFuture =
-          parallelPageLoader.loadAsync(this::fetchMaterials);
-      CompletableFuture<List<SquadronDto>> squadronsFuture =
-          parallelPageLoader.loadAsync(this::fetchSquadrons);
-      CompletableFuture<List<OrgUnitMembershipOptionDto>> requestingOptionsFuture =
-          parallelPageLoader.loadAsync(this::fetchRequestingOrgUnitOptions);
-      CompletableFuture.allOf(materialsFuture, squadronsFuture, requestingOptionsFuture).join();
-      model.addAttribute("materials", materialsFuture.join());
-      model.addAttribute("squadrons", squadronsFuture.join());
-      applyOwnerPickerOptions(model, requestingOptionsFuture.join());
-
-      if (!model.containsAttribute("jobOrderForm")) {
-        JobOrderForm form = JobOrderForm.forEdit(order);
+    if ((requesterView || canAssign) && !model.containsAttribute("jobOrderForm")) {
+      JobOrderForm form = JobOrderForm.forEdit(order);
+      if (canAssign) {
         form.setRequestingOrgUnitId(
             order.requestingOrgUnit() != null ? order.requestingOrgUnit().id() : null);
         form.setHandle(order.handle());
-        model.addAttribute("jobOrderForm", form);
       }
+      model.addAttribute("jobOrderForm", form);
     }
-
-    if (canAssign && "ITEM".equals(order.type()) && fragment == null) {
-      model.addAttribute("actingUser", fetchActingUser());
-    }
-
-    addAgeThresholds(model);
+    addPart(model, "actingUser", detail.actingUser());
+    model.addAttribute("ageYellowDays", detail.ageYellowDays());
+    model.addAttribute("ageRedDays", detail.ageRedDays());
 
     if (!model.containsAttribute("handoverForm")) {
       JobOrderHandoverForm handoverForm = new JobOrderHandoverForm();
@@ -458,46 +369,38 @@ public class JobOrderPageController {
     model.addAttribute("hasOutstandingItemLines", hasOutstandingItemLines(order));
     model.addAttribute("isFullyDelivered", isFullyDelivered(order));
     model.addAttribute("kpi", computeKpi(order));
+    addPart(model, "itemBlueprintOwners", detail.blueprintOwners());
+    addPart(model, "itemStockByGameItem", detail.itemStockByGameItem());
+    addPart(model, "orphanedInventory", detail.orphanedInventory());
+  }
 
-    if ("ITEM".equals(order.type())
-        && (fragment == null || "blueprint-owners".equalsIgnoreCase(fragment))) {
-      SectionFallback.run(
-          log,
-          "job-order-blueprint-owners",
-          () -> model.addAttribute("itemBlueprintOwners", jobOrderClient.itemBlueprintOwners(id)));
-    }
-
-    if ("ITEM".equals(order.type())
-        && !requesterView
-        && (fragment == null || "items".equalsIgnoreCase(fragment))) {
-      SectionFallback.run(log, "job-order-item-stock", () -> addItemStock(id, model));
-    }
-
-    if (fragment == null) {
-      SectionFallback.run(
-          log,
-          "job-order-orphaned-inventory",
-          () -> model.addAttribute("orphanedInventory", jobOrderClient.orphanedInventory(id)));
+  /**
+   * Adds an optional part under its attribute name, keeping a {@code null} value, and leaves the
+   * attribute out when the part is absent.
+   *
+   * @param model the model
+   * @param name the attribute name
+   * @param part the part
+   */
+  private static void addPart(
+      @NotNull Model model, @NotNull String name, @NotNull JobOrderPageReader.Part<?> part) {
+    if (part.present()) {
+      model.addAttribute(name, part.value());
     }
   }
 
   /**
-   * Adds the stock groups of an item order's lines keyed by their game item.
+   * Describes who looks at an order page for the reader.
    *
-   * @param id the order id
-   * @param model the detail model
+   * @param principal the caller, or {@code null} for anonymous
+   * @return the caller's sign-in state, token user id and Logistician flag
    */
-  private void addItemStock(@NotNull UUID id, @NotNull Model model) {
-    List<JobOrderItemStockGroupDto> stock = jobOrderClient.itemStock(id);
-    Map<UUID, JobOrderItemStockGroupDto> byGameItem = new LinkedHashMap<>();
-    if (stock != null) {
-      for (JobOrderItemStockGroupDto group : stock) {
-        if (group.gameItem() != null && group.gameItem().id() != null) {
-          byGameItem.put(group.gameItem().id(), group);
-        }
-      }
-    }
-    model.addAttribute("itemStockByGameItem", byGameItem);
+  @NotNull
+  private JobOrderPageReader.OrderCaller orderCaller(@Nullable OidcUser principal) {
+    return new JobOrderPageReader.OrderCaller(
+        principal != null,
+        principal != null ? CurrentUser.userId(principal) : null,
+        isLogistician(principal));
   }
 
   /**
@@ -530,11 +433,12 @@ public class JobOrderPageController {
       itemForm.setSource(source);
       model.addAttribute("jobOrderItemForm", itemForm);
     }
-    model.addAttribute("materials", fetchMaterials());
-    model.addAttribute("hasOrderableItems", hasOrderableItems());
-    model.addAttribute("squadrons", fetchSquadrons());
+    JobOrderPageReader.OrderCreatePage create = pageReader.readOrderCreate();
+    model.addAttribute("materials", create.materials());
+    model.addAttribute("hasOrderableItems", create.hasOrderableItems());
+    model.addAttribute("squadrons", create.squadrons());
     model.addAttribute("qualityTiers", qualityTierCatalog.all());
-    addOwnerPickerOptions(model);
+    applyOwnerPickerOptions(model, create.requestingOptions());
     return "joborder/orders-create";
   }
 
@@ -554,21 +458,28 @@ public class JobOrderPageController {
   @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
   public String viewEditItemForm(
       @PathVariable UUID id, Model model, RedirectAttributes redirectAttributes) {
-    AtomicReference<JobOrderDto> loaded = new AtomicReference<>();
-    if (!SectionFallback.run(
-        log, "job-order-item-edit", () -> loaded.set(jobOrderClient.order(id)))) {
-      redirectAttributes.addFlashAttribute("errorToast", "error.joborder.load.details");
-      return "redirect:/orders";
+    JobOrderPageReader.ItemEditPage edit = pageReader.readItemEdit(id);
+    String blocked =
+        switch (edit.access()) {
+          case ORDER_UNAVAILABLE -> {
+            redirectAttributes.addFlashAttribute("errorToast", "error.joborder.load.details");
+            yield "redirect:/orders";
+          }
+          case NOT_AN_ITEM_ORDER -> {
+            redirectAttributes.addFlashAttribute("errorToast", "error.joborder.item.edit.notItem");
+            yield "redirect:/orders/" + id;
+          }
+          case HAS_ITEM_HANDOVERS -> {
+            redirectAttributes.addFlashAttribute(
+                "errorToast", "error.joborder.item.edit.hasHandovers");
+            yield "redirect:/orders/" + id;
+          }
+          case EDITABLE -> null;
+        };
+    if (blocked != null) {
+      return blocked;
     }
-    JobOrderDto order = loaded.get();
-    if (order == null || !"ITEM".equals(order.type())) {
-      redirectAttributes.addFlashAttribute("errorToast", "error.joborder.item.edit.notItem");
-      return "redirect:/orders/" + id;
-    }
-    if (order.itemHandovers() != null && !order.itemHandovers().isEmpty()) {
-      redirectAttributes.addFlashAttribute("errorToast", "error.joborder.item.edit.hasHandovers");
-      return "redirect:/orders/" + id;
-    }
+    JobOrderDto order = edit.order().orElseThrow();
 
     if (!model.containsAttribute("jobOrderForm")) {
       model.addAttribute("jobOrderForm", new JobOrderForm());
@@ -588,11 +499,11 @@ public class JobOrderPageController {
     model.addAttribute(
         "editItems",
         jobOrderItemLines.editPrefill(order.items() != null ? order.items() : List.of()));
-    model.addAttribute("materials", fetchMaterials());
-    model.addAttribute("hasOrderableItems", hasOrderableItems());
-    model.addAttribute("squadrons", fetchSquadrons());
+    model.addAttribute("materials", edit.materials());
+    model.addAttribute("hasOrderableItems", edit.hasOrderableItems());
+    model.addAttribute("squadrons", edit.squadrons());
     model.addAttribute("qualityTiers", qualityTierCatalog.all());
-    addOwnerPickerOptions(model);
+    applyOwnerPickerOptions(model, edit.requestingOptions());
     return "joborder/orders-create";
   }
 
@@ -606,13 +517,7 @@ public class JobOrderPageController {
   @GetMapping("/item-blueprints/{gameItemId}")
   @ResponseBody
   public List<BlueprintReferenceDto> itemBlueprints(@PathVariable UUID gameItemId) {
-    List<BlueprintReferenceDto> result =
-        SectionFallback.load(
-            log,
-            "job-order-item-blueprints",
-            () -> jobOrderClient.itemBlueprints(gameItemId),
-            null);
-    return result != null ? result : List.of();
+    return pageReader.readItemBlueprints(gameItemId);
   }
 
   /**
@@ -651,41 +556,6 @@ public class JobOrderPageController {
       throw new ResponseStatusException(
           HttpStatus.INTERNAL_SERVER_ERROR, "Failed to load inventory items");
     }
-  }
-
-  @NotNull
-  private List<MaterialDto> fetchMaterials() {
-    List<MaterialDto> list =
-        SectionFallback.load(log, "job-order-materials", jobOrderClient::jobOrderMaterials, null);
-    return list != null ? new ArrayList<>(list) : new ArrayList<>();
-  }
-
-  /**
-   * Resolves the acting user, whose id and name seed the production modal's owner picker
-   * (REQ-INV-032).
-   *
-   * @return the acting user, or {@code null} when the lookup fails
-   */
-  @Nullable
-  private UserDto fetchActingUser() {
-    return SectionFallback.load(log, "job-order-acting-user", jobOrderClient::currentUser, null);
-  }
-
-  /**
-   * Probes whether at least one orderable item exists, deciding between the item picker and the
-   * empty banner; fails open on a backend error.
-   *
-   * @return {@code true} when at least one orderable item exists (or the probe could not decide)
-   */
-  private boolean hasOrderableItems() {
-    return SectionFallback.load(
-        log,
-        "job-order-orderable-item-probe",
-        () -> {
-          PageResponse<InventoryGameItemReferenceDto> page = jobOrderClient.orderableItemProbe();
-          return page == null || page.content() == null || !page.content().isEmpty();
-        },
-        true);
   }
 
   /**
@@ -953,64 +823,6 @@ public class JobOrderPageController {
     return (int) Math.max(0, Math.min(100, Math.floor(part * 100.0 / whole + 1e-9)));
   }
 
-  @NotNull
-  private List<SquadronDto> fetchSquadrons() {
-    PageResponse<SquadronDto> p =
-        SectionFallback.load(log, "job-order-squadrons", jobOrderClient::squadrons, null);
-    return p != null && p.content() != null ? new ArrayList<>(p.content()) : new ArrayList<>();
-  }
-
-  /**
-   * The active squadrons offered by the orders-overview multi-squadron filter (REQ-ORDERS-027),
-   * sorted by name. Inactive squadrons are dropped so the picker never lists a retired Staffel.
-   *
-   * @return the active squadrons, name-sorted; never {@code null}
-   */
-  private List<SquadronDto> fetchActiveSquadrons() {
-    return fetchSquadrons().stream()
-        .filter(s -> Boolean.TRUE.equals(s.active()))
-        .sorted(
-            Comparator.comparing(
-                s -> s.name() != null ? s.name() : "", String.CASE_INSENSITIVE_ORDER))
-        .toList();
-  }
-
-  /**
-   * Fetches every active Staffel and Spezialkommando with its profit-eligibility flag from {@code
-   * GET /api/v1/org-units/active}; the fallback for {@link #fetchRequestingOrgUnitOptions}.
-   *
-   * @return picker options or empty list; never {@code null}
-   */
-  private List<OrgUnitMembershipOptionDto> fetchActiveOrgUnitOptions() {
-    List<OrgUnitMembershipOptionDto> options =
-        SectionFallback.load(
-            log, "job-order-active-org-units", jobOrderClient::activeOrgUnits, null);
-    return options != null ? options : List.of();
-  }
-
-  /**
-   * Resolves the requesting-org-unit picker options: every active org unit of all four kinds,
-   * falling back to the Staffel/SK catalog on a backend failure.
-   *
-   * @return requesting-picker options; never {@code null}
-   */
-  private List<OrgUnitMembershipOptionDto> fetchRequestingOrgUnitOptions() {
-    List<OrgUnitMembershipOptionDto> options =
-        SectionFallback.load(
-            log, "job-order-requesting-org-units", jobOrderClient::activeOrgUnitsAllKinds, null);
-    return options != null ? options : fetchActiveOrgUnitOptions();
-  }
-
-  /**
-   * Populates the create/edit form model with the requesting options and their profit-eligible
-   * subset as the responsible options.
-   *
-   * @param model the Thymeleaf model to populate
-   */
-  private void addOwnerPickerOptions(Model model) {
-    applyOwnerPickerOptions(model, fetchRequestingOrgUnitOptions());
-  }
-
   /**
    * Populates the two owner-picker model attributes from an already-fetched requesting-option list.
    *
@@ -1026,21 +838,6 @@ public class JobOrderPageController {
     model.addAttribute("responsibleHasSpecialCommand", containsSpecialCommand(responsibleOptions));
     model.addAttribute("requestingOptions", requestingOptions);
     model.addAttribute("requestingHasSpecialCommand", containsSpecialCommand(requestingOptions));
-  }
-
-  @Contract("null -> null")
-  @Nullable
-  private UUID getCurrentUserId(OidcUser principal) {
-    if (principal == null) {
-      return null;
-    }
-    UUID fromToken = CurrentUser.userId(principal);
-    if (fromToken != null) {
-      return fromToken;
-    }
-    UserDto me =
-        SectionFallback.load(log, "job-order-current-user", jobOrderClient::currentUser, null);
-    return me != null ? me.id() : null;
   }
 
   private boolean isLogistician(OidcUser principal) {

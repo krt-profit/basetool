@@ -41,7 +41,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
@@ -55,7 +54,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
@@ -65,7 +63,6 @@ import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.test.context.support.WithAnonymousUser;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -75,18 +72,11 @@ import org.springframework.web.context.WebApplicationContext;
  * ?fragment=} section swap of {@link JobOrderPageController}'s detail page: the LOGISTICIAN gate,
  * the RFC 7807 error passthrough, and a fragment-sized error response instead of a redirect.
  */
-@SpringBootTest
-class JobOrderPageControllerNoReloadMvcTest {
+class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
 
   @Autowired private WebApplicationContext context;
 
   private MockMvc mockMvc;
-
-  @MockitoBean private BackendApiClient backendApiClient;
-
-  @MockitoBean
-  private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
-      clientRegistrationRepository;
 
   @BeforeEach
   void setup() {
@@ -683,8 +673,11 @@ class JobOrderPageControllerNoReloadMvcTest {
   void viewOrderDetail_AssigneesFragment_RendersTheAssigneesSection() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
-        .thenReturn(materialOrder(orderId, 1L));
+    when(reader.readOrderDetail(eq(orderId), any(), any()))
+        .thenReturn(
+            JobOrderPageStubs.detail(materialOrder(orderId, 1L))
+                .assigning(List.of(), List.of(), List.of())
+                .build());
 
     var result =
         mockMvc
@@ -704,7 +697,7 @@ class JobOrderPageControllerNoReloadMvcTest {
   void viewOrderDetail_FragmentBackendError_ReturnsNonRedirectErrorFragment() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
+    when(reader.readOrderDetail(eq(orderId), any(), any()))
         .thenThrow(new RuntimeException("backend unavailable"));
 
     var result =
