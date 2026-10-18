@@ -292,40 +292,20 @@ public class InventoryCheckoutService {
     AllocationReductions.applyPlan(item, orderReductions, true);
     AllocationReductions.applyPlan(item, missionReductions, false);
 
-    if (remainingAmount <= QUANTITY_EPSILON) {
-      InventoryDonationGuards.requireNoDonation(item);
-      final int removed = stockChangeObserver.beforeDelete(List.of(sourceId), reason);
-      inventoryItemRepository.delete(item);
-      recordBookOutTail(
-          checkoutType,
-          sourceId,
-          sourceLabel,
-          materialName,
-          sourceOwnerId,
-          dto,
-          0.0,
-          financeEntryIds);
-      announceBookedOutByOther(checkoutType, sourceId, sourceOwnerId, currentUserId, bookedOutLot);
-      return new BookOut(null, new StockChangeEffects(0, removed));
-    } else {
-      item.setAmount(remainingAmount);
-      if (!InventoryAllocations.fits(item)) {
-        throw new OverAllocationException();
-      }
-      InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
-      int reduced = stockChangeObserver.lower(sourceId, remainingAmount, reason);
-      recordBookOutTail(
-          checkoutType,
-          sourceId,
-          sourceLabel,
-          materialName,
-          sourceOwnerId,
-          dto,
-          remainingAmount,
-          financeEntryIds);
-      announceBookedOutByOther(checkoutType, sourceId, sourceOwnerId, currentUserId, bookedOutLot);
-      return new BookOut(inventoryItemMapper.toDto(saved), new StockChangeEffects(reduced, 0));
-    }
+    LotRows.Lowered lowered =
+        LotRows.lower(inventoryItemRepository, stockChangeObserver, item, remainingAmount, reason);
+    recordBookOutTail(
+        checkoutType,
+        sourceId,
+        sourceLabel,
+        materialName,
+        sourceOwnerId,
+        dto,
+        lowered.depleted() ? 0.0 : remainingAmount,
+        financeEntryIds);
+    announceBookedOutByOther(checkoutType, sourceId, sourceOwnerId, currentUserId, bookedOutLot);
+    return new BookOut(
+        lowered.depleted() ? null : inventoryItemMapper.toDto(lowered.row()), lowered.offers());
   }
 
   /**
@@ -403,16 +383,14 @@ public class InventoryCheckoutService {
             : ownerScopeService.resolveOrgUnitForPickerOutputNullable(
                 targetUser, dto.targetOwningOrgUnitId());
 
-    InventoryItem newItem = new InventoryItem();
-    newItem.setUser(targetUser);
-    newItem.setOwningOrgUnit(targetOwningOrgUnit);
-    newItem.setMaterial(item.getMaterial());
-    newItem.setGameItem(item.getGameItem());
-    newItem.setLocation(targetLocation);
-    newItem.setQuality(item.getQuality());
-    newItem.setAmount(ScuAmounts.roundToScuScale(dto.amount().doubleValue()));
-    newItem.setPersonal(item.getPersonal());
-    newItem.setStolen(item.getStolen());
+    InventoryItem newItem =
+        LotRows.split(
+            item,
+            dto.amount(),
+            LotRows.Placement.of(item)
+                .withUser(targetUser)
+                .withLocation(targetLocation)
+                .withOwningOrgUnit(targetOwningOrgUnit));
     Map<UUID, Double> orderReductions =
         AllocationReductions.resolveReductionPlan(
             item, dto.jobOrderReductions(), dto.amount(), true);
@@ -423,23 +401,10 @@ public class InventoryCheckoutService {
     final InventoryItem savedNew = inventoryItemRepository.save(newItem);
     AllocationReductions.applyPlan(item, orderReductions, true);
     AllocationReductions.applyPlan(item, missionReductions, false);
-    final StockChangeEffects offers;
-    if (remainingAmount <= QUANTITY_EPSILON) {
-      InventoryDonationGuards.requireNoDonation(item);
-      offers =
-          new StockChangeEffects(
-              0, stockChangeObserver.beforeDelete(List.of(sourceId), offerReason));
-      inventoryItemRepository.delete(item);
-    } else {
-      item.setAmount(remainingAmount);
-      if (!InventoryAllocations.fits(item)) {
-        throw new OverAllocationException();
-      }
-      inventoryItemRepository.saveAndFlush(item);
-      offers =
-          new StockChangeEffects(
-              stockChangeObserver.lower(sourceId, remainingAmount, offerReason), 0);
-    }
+    final StockChangeEffects offers =
+        LotRows.lower(
+                inventoryItemRepository, stockChangeObserver, item, remainingAmount, offerReason)
+            .offers();
     auditRecorder.record(
         AuditEventType.INVENTORY_ITEM_TRANSFERRED,
         sourceId,
@@ -718,30 +683,20 @@ public class InventoryCheckoutService {
     final String materialName = InventoryAuditLabels.catalogName(item);
     final UUID ownerId = item.getUser().getId();
 
-    InventoryItem newItem = new InventoryItem();
-    newItem.setUser(item.getUser());
-    newItem.setOwningOrgUnit(targetOwningOrgUnit);
-    newItem.setMaterial(item.getMaterial());
-    newItem.setGameItem(item.getGameItem());
-    newItem.setLocation(item.getLocation());
-    newItem.setQuality(item.getQuality());
-    newItem.setAmount(ScuAmounts.roundToScuScale(amount));
-    newItem.setPersonal(targetPersonal);
-    newItem.setStolen(item.getStolen());
+    InventoryItem newItem =
+        LotRows.split(
+            item,
+            amount,
+            LotRows.Placement.of(item)
+                .withOwningOrgUnit(targetOwningOrgUnit)
+                .withPersonal(targetPersonal));
     InventoryItem savedNew = inventoryItemRepository.save(newItem);
-
-    if (depleted) {
-      InventoryDonationGuards.requireNoDonation(item);
-      stockChangeObserver.beforeDelete(List.of(sourceId), StockChangeReason.REBOOK);
-      inventoryItemRepository.delete(item);
-    } else {
-      item.setAmount(remainingAmount);
-      if (!InventoryAllocations.fits(item)) {
-        throw new OverAllocationException();
-      }
-      inventoryItemRepository.saveAndFlush(item);
-      stockChangeObserver.lower(sourceId, remainingAmount, StockChangeReason.REBOOK);
-    }
+    LotRows.lower(
+        inventoryItemRepository,
+        stockChangeObserver,
+        item,
+        remainingAmount,
+        StockChangeReason.REBOOK);
 
     auditRecorder.record(
         targetPersonal

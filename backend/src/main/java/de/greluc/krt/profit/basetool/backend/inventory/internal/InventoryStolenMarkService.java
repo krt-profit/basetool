@@ -25,6 +25,8 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
@@ -60,6 +62,7 @@ public class InventoryStolenMarkService {
 
   private final InventoryItemRepository inventoryItemRepository;
   private final StockOfferLookup stockOfferLookup;
+  private final StockChangeObserver stockChangeObserver;
   private final InventoryCheckoutService inventoryCheckoutService;
   private final InventoryItemMapper inventoryItemMapper;
   private final InventoryProperties inventoryProperties;
@@ -213,20 +216,15 @@ public class InventoryStolenMarkService {
     if (refusal != null) {
       throw splitProblem(refusal);
     }
-    InventoryItem part = new InventoryItem();
-    part.setUser(item.getUser());
-    part.setOwningOrgUnit(item.getOwningOrgUnit());
-    part.setMaterial(item.getMaterial());
-    part.setGameItem(item.getGameItem());
-    part.setLocation(item.getLocation());
-    part.setQuality(item.getQuality());
-    part.setAmount(ScuAmounts.roundToScuScale(amount));
-    part.setPersonal(item.getPersonal());
-    part.setStolen(target);
-    final InventoryItem savedPart = inventoryItemRepository.save(part);
-
-    item.setAmount(ScuAmounts.roundToScuScale(InventoryStockDecisions.amountOf(item) - amount));
-    inventoryItemRepository.saveAndFlush(item);
+    final InventoryItem savedPart =
+        inventoryItemRepository.save(
+            LotRows.split(item, amount, LotRows.Placement.of(item).withStolen(target)));
+    LotRows.lower(
+        inventoryItemRepository,
+        stockChangeObserver,
+        item,
+        ScuAmounts.roundToScuScale(InventoryStockDecisions.amountOf(item) - amount),
+        StockChangeReason.REBOOK);
 
     auditRecorder.record(
         target ? AuditEventType.INVENTORY_STOLEN_MARKED : AuditEventType.INVENTORY_STOLEN_UNMARKED,

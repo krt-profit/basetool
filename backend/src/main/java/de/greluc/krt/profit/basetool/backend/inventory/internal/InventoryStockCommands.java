@@ -381,14 +381,15 @@ public class InventoryStockCommands implements StockCommands {
       throw new BadRequestException("Cannot move more than the available amount");
     }
     User user = userRepository.findById(holder).orElseThrow();
-    StockLot targetLot =
-        new StockLot(
-            source.getMaterial(),
-            source.getGameItem(),
-            location,
-            source.getQuality(),
-            Boolean.TRUE.equals(source.getStolen()));
-    InventoryItem target = poolRow(user, poolUnit, targetLot, moved);
+    InventoryItem target =
+        LotRows.split(
+            source,
+            moved,
+            LotRows.Placement.of(source)
+                .withUser(user)
+                .withLocation(location)
+                .withOwningOrgUnit(poolUnit)
+                .withPersonal(false));
     requireWholeUnits(target);
     final String sourceLabel = InventoryAuditLabels.label(source);
     UUID sourceId = source.getId();
@@ -399,18 +400,14 @@ public class InventoryStockCommands implements StockCommands {
         AllocationReductions.resolveReductionPlan(source, null, moved, false);
     AllocationReductions.applyPlan(source, orderPlan, true);
     AllocationReductions.applyPlan(source, missionPlan, false);
-    if (remaining <= QUANTITY_EPSILON) {
-      InventoryDonationGuards.requireNoDonation(source);
-      stockChangeObserver.beforeDelete(List.of(sourceId), StockChangeReason.TRANSFER);
-      inventoryRepository.delete(source);
-    } else {
-      source.setAmount(remaining);
-      if (!InventoryAllocations.fits(source)) {
-        throw new OverAllocationException();
-      }
-      inventoryRepository.saveAndFlush(source);
-      stockChangeObserver.lower(sourceId, remaining, StockChangeReason.TRANSFER);
-    }
+    boolean depleted =
+        LotRows.lower(
+                inventoryRepository,
+                stockChangeObserver,
+                source,
+                remaining,
+                StockChangeReason.TRANSFER)
+            .depleted();
     InventoryItem saved = inventoryRepository.save(target);
     auditRecorder.record(
         AuditEventType.INVENTORY_ITEM_TRANSFERRED,
@@ -422,7 +419,7 @@ public class InventoryStockCommands implements StockCommands {
             .with("newRow", saved.getId())
             .with("pool", poolUnit.getId())
             .with("reason", reason.name())
-            .with("depleted", remaining <= QUANTITY_EPSILON));
+            .with("depleted", depleted));
     return checkoutService.mergeStockIfRequested(saved, true).getId();
   }
 
