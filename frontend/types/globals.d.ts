@@ -611,6 +611,20 @@ interface KrtInventoryLagerConfig {
 /** The item-attribute filter selection of the Lager items view, keyed by query parameter. */
 type KrtItemAttributeSnapshot = Record<string, string[] | null>;
 
+/** The Lager selection a page appends to a request or address (REQ-INV-066). */
+interface KrtLagerSelection {
+    itemsView?: boolean;
+    materials?: string[];
+    gameItems?: string[];
+    locations?: string[];
+    minQuality?: string;
+    jobOrders?: string[];
+    missions?: string[];
+    personal?: boolean;
+    nonPersonal?: boolean;
+    stolen?: string;
+}
+
 /** One page's instance of the shared Lager behaviour, from `krtInventory.createLager`. */
 interface KrtInventoryLager {
     /** Whether the Items (game-item) view is active rather than the Material view. */
@@ -646,6 +660,10 @@ interface KrtInventoryLager {
     collectChecked(className: string): string[];
     /** The query parameter names of the item-attribute filters (REQ-INV-063). */
     itemAttributeParams(): string[];
+    /** The names of every Lager filter query parameter, as the server renders them. */
+    lagerFilterParams(): string[];
+    /** Appends a Lager selection to a query under the server-rendered parameter names. */
+    appendLagerFilterParams(params: URLSearchParams, selection: KrtLagerSelection): void;
     /** The item-attribute selection per parameter; null where none or every box is ticked. */
     snapshotItemAttributes(): KrtItemAttributeSnapshot;
     /** Ticks the item-attribute boxes from a stored snapshot; true when a box was ticked. */

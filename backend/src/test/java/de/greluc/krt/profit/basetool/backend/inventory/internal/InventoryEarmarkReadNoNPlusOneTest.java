@@ -151,11 +151,10 @@ class InventoryEarmarkReadNoNPlusOneTest {
         s ->
             inventoryItemService
                 .getAllInventory(
-                    List.of(s.material().getId()),
-                    List.of(s.location().getId()),
-                    null,
-                    null,
-                    null,
+                    LagerFilter.builder()
+                        .materialIds(List.of(s.material().getId()))
+                        .locationIds(List.of(s.location().getId()))
+                        .build(),
                     page)
                 .getContent());
     reads.put(

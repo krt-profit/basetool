@@ -169,7 +169,11 @@ class InventoryItemServiceAggregateTest {
       stubFindGlobalStacks();
 
       service.getAllAggregatedInventory(
-          null, null, 500, List.of(jobId), List.of(missionId), false, false);
+          LagerFilter.builder()
+              .minQuality(500)
+              .jobOrderIds(List.of(jobId))
+              .missionIds(List.of(missionId))
+              .build());
 
       verify(inventoryItemRepository)
           .findGlobalStacks(

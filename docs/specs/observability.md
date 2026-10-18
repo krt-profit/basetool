@@ -2141,6 +2141,12 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
 > going stale with nothing broken and nothing logged, which is the REQ-FE-010 defect class. The
 > `consume` value of `op` no longer occurs on this service.
 >
+> **After-commit guarantee (ADR-0288).** A write announces through
+> `LiveSyncPublisher.publishAfterCommit`: inside a transaction the frames wait for the commit, are
+> coalesced to one frame per room carrying the union of the sections named, and are dropped on a
+> rollback; outside a transaction they go out at once. The accepted counter therefore counts
+> frames, not calls.
+>
 > Removed with them: the `AppLiveSyncBridgeSilent` and `AppLiveSyncFramesDropped` alerts and their
 > rule tests, and the *App live-sync streams (open)* dashboard panel. The frontend's identically
 > named series are untouched — they were only ever told apart by `job`, which is the arrangement
