@@ -89,9 +89,9 @@
                         <tr>
                             <th>
                                 <div class="hangar-row__ship">
-                                    <span class="hangar-row__pick"><input type="checkbox" id="hangar-select-all" class="hangar-select-all"
+                                    <label class="hangar-row__pick"><input type="checkbox" id="hangar-select-all" class="hangar-select-all"
                                            data-testid="hangar-select-all"
-                                           th:title="#{hangar.bulk.selectAll}" th:aria-label="#{hangar.bulk.selectAll}"></span>
+                                           th:title="#{hangar.bulk.selectAll}" th:aria-label="#{hangar.bulk.selectAll}"></label>
                                     <span th:text="#{hangar.list.ship}">Schiff</span>
                                 </div>
                             </th>
@@ -113,13 +113,13 @@
                                      locName=${ship.location != null ? ship.location.name : null}">
                             <td>
                                 <div class="hangar-row__ship">
-                                    <span class="hangar-row__pick"><input type="checkbox" class="hangar-ship-check"
+                                    <label class="hangar-row__pick"><input type="checkbox" class="hangar-ship-check"
                                            data-testid="hangar-ship-check"
                                            th:value="${ship.id}"
                                            th:data-org-unit-id="${ship.owningSquadron != null ? ship.owningSquadron.id() : ''}"
                                            th:data-org-unit-name="${ship.owningSquadron != null ? ship.owningSquadron.name() : ''}"
                                            th:title="#{hangar.bulk.select(${named ? ship.name : hull})}"
-                                           th:aria-label="#{hangar.bulk.select(${named ? ship.name : hull})}"></span>
+                                           th:aria-label="#{hangar.bulk.select(${named ? ship.name : hull})}"></label>
                                     <span class="hangar-row__name">
                                         <span class="cell-title" th:text="${named ? ship.name : hull}">Iron Mule</span>
                                         <span class="cell-sub"><span th:text="${named ? hull : #messages.msg('hangar.ship.unnamed')}">Drake Cutlass Black</span><span

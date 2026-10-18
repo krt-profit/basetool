@@ -111,6 +111,14 @@
     }
 
     @media (width <= 768px) {
+        .me-table tr.is-row-missing {
+            box-shadow: inset 3px 0 0 var(--color-warning);
+        }
+
+        .me-table tr.is-row-missing td:first-child {
+            box-shadow: none;
+        }
+
         .me-table .me-step-row {
             padding: 0;
         }

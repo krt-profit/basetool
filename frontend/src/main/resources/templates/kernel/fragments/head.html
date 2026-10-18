@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head th:fragment="head(titleContent, additionalLinks)">
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta th:if="${csrfTokenValue != null}" name="_csrf" th:content="${csrfTokenValue}"/>
     <meta th:if="${csrfHeaderName != null}" name="_csrf_header" th:content="${csrfHeaderName}"/>
     <link rel="icon" type="image/svg+xml" th:href="@{/logos/basetool-favicon.svg}">

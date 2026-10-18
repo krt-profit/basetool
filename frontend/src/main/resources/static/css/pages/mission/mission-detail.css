@@ -913,4 +913,9 @@
         font-weight: var(--fw-bold);
         text-transform: none;
     }
+    @media (pointer: coarse) {
+        .multiselect-hint {
+            display: none;
+        }
+    }
 }

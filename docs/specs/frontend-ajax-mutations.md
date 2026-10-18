@@ -15,25 +15,44 @@ child issues (#573–#582).
 
 The foundation lives in [`krt-fetch.js`](../../frontend/src/main/resources/static/js/kernel/krt-fetch.js),
 loaded globally from `kernel/fragments/head.html`. It exposes `window.krtFetch` (`write`, `submitForm`,
-`swap`, `bindSwap`, `syncVersion`, `handleProblem`, `sectionWrite`, `serialize`, plus the
+`swap`, `bindSwap`, `syncVersion`, `handleProblem`, `serialize`, plus the
 re-authentication helpers `maybeReauthenticate` / `reauthRedirect` and the shared
 `ownerOrgUnitRequiredMessage` wording) and `window.krtCsrf` (`headers`, `token`, `headerName`,
 `refresh`). The toast/confirm infrastructure
 (`showFrontendSuccessToast`, `showFrontendErrorToast`, `showKrtConfirm`) is the design-system-mandated
 replacement for native dialogs (see [`ui-design-system.md`](ui-design-system.md)).
 
-**Section-structured pages use the `krtFetch.sectionWrite(config)` factory** (ADR-0069, #924): from
-a config of already-localized i18n lookups (a late-bound dict getter + key prefixes + fallbacks), a
-section→`{container, fragmentValue}` map, a page-URL getter and an optional peer-broadcast closure,
-it returns the page's `{write, refresh, notify}` seam — `write` decorates `krtFetch.write` with the
-section's localized success/error/conflict strings, `refresh` re-renders one or more sections in
-place via `krtFetch.swap` (broadcasting to peers first unless the refresh itself applies a peer
-signal, `{broadcast: false}`), and `notify` is the broadcast-only sibling for handlers that patch
-their own DOM surgically. Every lookup is late-bound (evaluated per call), because the i18n dicts
-and the presence client are published by bootstraps that run after the module loads. mission-detail
-is the canonical consumer (its `window.krtMissionWrite` / `window.krtRefreshMissionSection` /
-`window.krtNotifyMissionChanged` aliases are the factory's three returns); new pages with per-section
-writes reuse the factory instead of hand-rolling the wrapper trio.
+**Section-structured pages use the page-section module** `krtPageSections.create(config)`
+([`kernel/krt-page-sections.js`](../../frontend/src/main/resources/static/js/kernel/krt-page-sections.js),
+ADR-0289, which replaces `krtFetch.sectionWrite` of ADR-0069): a page declares its sections
+once (key to `{container, fragmentValue}`), the live-sync `topic` (a string or a thunk that is
+null while the page has no entity id), the page-URL getter, the late-bound i18n dict and keys,
+and optionally a `receiver` (`coalesceMs`, `busyTest`, `pill`, `events`, `expand`). The module
+owns the whole choreography and returns `{write, refresh, notify, receiver, sections}`:
+
+- `write` decorates `krtFetch.write` with the section's localized success/error/conflict
+  strings and the per-section `serialize` default (ADR-0071). A 409 shows the conflict confirm
+  and neither re-renders nor broadcasts. `propagateVersion: true` writes the response version to
+  the section container and every `[data-version]` in it. It replaces a hand-written
+  `dataset.version =` or `syncVersion` write on a page that patches the DOM without a re-render; a
+  section re-rendered after the write gets its version from the fragment. `refresh: [keys]` re-renders and
+  broadcasts those sections once after a 2xx, before the caller's `onSuccess`.
+- `refresh` re-renders sections in place via `krtFetch.swap` and broadcasts to the topic first
+  (`alsoBroadcast` keys are appended) unless it applies a peer signal, `{broadcast: false}`.
+- `notify` is the broadcast-only sibling for handlers that patch their own DOM.
+- `receiver` is the `krtLiveSync` receiver of the page, built from the same declaration: a peer
+  frame re-renders only the named sections, without an echo.
+- `krtPageSections.publish(topic, keys)` is the one guarded `sendChanged` for a cross-topic
+  poke (a page telling another room that its data changed).
+
+Every lookup is late-bound (evaluated per call), because the i18n dicts and the presence client
+are published by bootstraps that run after the module loads. Pages migrated to the module
+(admin-org-structure, mission-detail, operation-detail, orders-detail, orders-index,
+refinery-orders-details) carry no local `reswap`/`refresh` helper, section map, receiver wiring
+or `dataset.version =` write. New pages with per-section writes use the module; a page still
+on hand-wired `sendChanged`/`createReceiver` is migrated with the next change that touches it
+(tracked in the follow-up issue of ADR-0289). `scripts/krt-page-sections.test.mjs`
+(`:frontend:testPageSectionsJs`) pins the choreography over a fake DOM.
 
 ## Requirements
 
@@ -1138,7 +1157,7 @@ reload-confirm exist to handle.
   caller's fragment refresh (which rewrites the `data-*-version` holder the next write re-reads)
   before the next queued write starts.
 
-The `sectionWrite` seam defaults `serialize` to the section key, so **every** section write (all of
+The `krtPageSections` seam defaults `serialize` to the section key, so **every** section write (all of
 mission-detail's Ziele / Ablauf / frequency / crew / … writes) is auto-serialized by section without a
 per-call-site opt-in. A whole-payload lazy read is required where the payload carries sibling state
 the prior write may have changed (the bank-grant toggle re-reads all three flags at send time, else a
@@ -1179,7 +1198,7 @@ REQ-FE-002).
 
 **Enforced by:** code review + the per-area double-action e2e assertions (REQ-FE-003) extended to the
 type-then-add race · **Code:** `krt-fetch.js` (`runSerialized`, lazy `url`/`payload` in `write` /
-`submitForm`, awaited `onSuccess`, the `sectionWrite` `serialize` default, exposed `krtFetch.serialize`),
+`submitForm`, awaited `onSuccess`, the `krtPageSections` `serialize` default, exposed `krtFetch.serialize`),
 `mission-detail.js` (`objectivesVersion` / `stepsVersion` lazy readers, actual-time / party-lead
 thunks, payout-preference `section:participant`, core-edit `submitForm` on `section:schedule`),
 `operation-detail.js` (`operation:core` serialize + thunk), `bank.js`, `inventory-common.js`
@@ -2826,7 +2845,7 @@ REQ-SEC-012, ADR-0032
 ## Open questions
 
 - None open. The transitional `MissionSubresource` alias was **removed** in #574; mission-detail now
-  calls `krtFetch.write` through the `krtMissionWrite` seam the `krtFetch.sectionWrite` factory
+  calls `krtFetch.write` through the `krtMissionWrite` seam the `krtPageSections.create` module
   returns, so `krt-fetch.js` carries no page-specific code.
 - **Resolved (#574 → #589):** the mission core-edit form (`#mission-form`) is now in-place — it saves
   through the `updateMissionAjax` twin with inline field-error rendering (see REQ-FE-007 above), so

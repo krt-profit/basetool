@@ -102,11 +102,11 @@
                                 <input type="number" class="purchasing-class-advance" min="0" max="100" step="1" inputmode="numeric" th:value="${c.maxAdvancePercent()}"
                                        th:attr="aria-label=#{purchasing.admin.class.advance}"></td>
                             <td th:attr="data-label=#{purchasing.admin.class.known}">
-                                <input type="checkbox" class="purchasing-class-known" th:checked="${c.requiresKnownPartner()}"
-                                       th:attr="aria-label=#{purchasing.admin.class.known}"></td>
+                                <label class="table-check"><input type="checkbox" class="purchasing-class-known" th:checked="${c.requiresKnownPartner()}"
+                                       th:attr="aria-label=#{purchasing.admin.class.known}"></label></td>
                             <td th:attr="data-label=#{purchasing.admin.class.escort}">
-                                <input type="checkbox" class="purchasing-class-escort" th:checked="${c.escortSuggested()}"
-                                       th:attr="aria-label=#{purchasing.admin.class.escort}"></td>
+                                <label class="table-check"><input type="checkbox" class="purchasing-class-escort" th:checked="${c.escortSuggested()}"
+                                       th:attr="aria-label=#{purchasing.admin.class.escort}"></label></td>
                         </tr>
                     </tbody>
                 </table>

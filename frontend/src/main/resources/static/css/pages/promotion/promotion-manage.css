@@ -381,10 +381,12 @@
         display: none;
     }
 
-    @media (width <= 1024px) {
+    @media (width <= 1024px), (pointer: coarse) {
         .pm-filter-option {
             min-height: var(--touch-target);
         }
+    }
+    @media (width <= 1024px) {
         .pm-matrix .pm-member-col {
             width: 11rem;
             min-width: 11rem;

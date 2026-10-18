@@ -38,7 +38,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Tests that every literal i18n key a browser script reads through {@code window.krtI18nText} or a
- * {@code krtFetch.sectionWrite} config is provided by some template, as a {@code data-*} attribute
+ * {@code krtPageSections.create} config is provided by some template, as a {@code data-*} attribute
  * or a bootstrap object property.
  *
  * <p>Scripts are read from every subfolder of {@code static/js} (REQ-OPS-038). Keys built at run
@@ -55,10 +55,10 @@ class I18nDictionaryCoverageTest {
           "krtI18nText\\((?:[^;]*?),\\s*'([A-Za-z_][\\w.\\-\\[\\]]*)'\\s*,?\\s*\\)",
           Pattern.DOTALL);
 
-  /** A {@code sectionWrite} config's dictionary name. */
+  /** A {@code krtPageSections.create} config's dictionary name. */
   private static final Pattern DICT_NAME = Pattern.compile("dictName:\\s*'(\\w+)'");
 
-  /** A {@code sectionWrite} config's {@code …Key: 'message.key'} entry. */
+  /** A {@code krtPageSections.create} config's {@code …Key: 'message.key'} entry. */
   private static final Pattern CONFIG_KEY = Pattern.compile("\\w+Key:\\s*'([\\w.]+)'");
 
   /** A literal user-visible fallback after {@code ||}. */

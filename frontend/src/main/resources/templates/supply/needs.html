@@ -69,9 +69,7 @@
                                     <span th:if="${n.purchasable()}" class="chip chip--primary" data-testid="supply-need-purchasable"
                                           th:text="#{supply.need.purchasable}">Zukauf m&ouml;glich</span>
                                     <span th:if="${n.maxUnitPrice() != null}" class="chip chip--muted"
-                                          th:text="#{supply.need.maxPrice(${#numbers.formatInteger(n.maxUnitPrice(), 1, 'POINT')})}">max. 1.000 aUEC</span>
-                                </span>
-                            </td>
+                                          th:text="#{supply.need.maxPrice(${#numbers.formatInteger(n.maxUnitPrice(), 1, 'POINT')})}">max. 1.000 aUEC</span></span></td>
                             <td th:attr="data-label=#{supply.need.progress}">
                                 <div class="meter supply-meter" aria-hidden="true">
                                     <i class="meter__fill--warning" th:attr="data-krtm-width=${n.fulfilledPercent()}"></i>

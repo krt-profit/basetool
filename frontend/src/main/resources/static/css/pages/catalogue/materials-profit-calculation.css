@@ -163,6 +163,7 @@
     }
 
     .profit-route {
+        min-width: 12rem;
         font-size: var(--fs-xs);
     }
 
@@ -207,7 +208,7 @@
         color: var(--color-danger-text);
     }
 
-    @media (width <= 1024px) {
+    @media (width <= 1024px), (pointer: coarse) {
         .profit-option {
             min-height: var(--touch-target);
         }

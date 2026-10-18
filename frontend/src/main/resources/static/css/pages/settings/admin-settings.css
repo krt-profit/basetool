@@ -20,7 +20,7 @@
             margin: 0 calc(-1 * var(--space-4)) calc(-1 * var(--space-4));
         }
     }
-    @media (width <= 1024px) {
+    @media (width <= 1024px), (pointer: coarse) {
         .krt-switch {
             min-height: var(--touch-target);
         }
