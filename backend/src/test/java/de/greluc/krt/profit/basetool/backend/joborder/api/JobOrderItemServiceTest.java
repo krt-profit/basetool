@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredientKi
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
@@ -44,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.util.Collection;
@@ -595,6 +597,35 @@ class JobOrderItemServiceTest {
     assertThat(service.toItemDtos(order))
         .extracting(dto -> dto.id() + ":" + dto.blueprintStale())
         .containsExactlyInAnyOrder(consistent.getId() + ":false", drifted.getId() + ":true");
+  }
+
+  @Test
+  void toItemDtosCarryAComponentsTypeSizeGradeAndClass() {
+    GameItem shield = gameItem("FR-66", GameItemKind.VEHICLE_ITEM);
+    shield.setWikiType("Shield");
+    shield.setSizeClass(1);
+    shield.setGrade("A");
+    shield.setItemClass(ShipComponentClass.MILITARY);
+    GameItem paint = gameItem("Paint", GameItemKind.VEHICLE_ITEM);
+    paint.setWikiType("Paints");
+    paint.setGrade("A");
+
+    JobOrder order = new JobOrder();
+    order.setType(JobOrderType.ITEM);
+    for (GameItem item : List.of(shield, paint)) {
+      JobOrderItem line = JobOrderItem.builder().amount(1).build();
+      line.setId(UUID.randomUUID());
+      line.setGameItem(item);
+      line.setBlueprint(blueprint(item));
+      order.addItem(line);
+    }
+
+    assertThat(service.toItemDtos(order))
+        .extracting(JobOrderItemDto::gameItem)
+        .containsExactlyInAnyOrder(
+            new GameItemReferenceDto(
+                shield.getId(), "FR-66", "VEHICLE_ITEM", "SHIELD", 1, "A", "MILITARY"),
+            new GameItemReferenceDto(paint.getId(), "Paint", "VEHICLE_ITEM"));
   }
 
   private void stubMapper(Material material) {

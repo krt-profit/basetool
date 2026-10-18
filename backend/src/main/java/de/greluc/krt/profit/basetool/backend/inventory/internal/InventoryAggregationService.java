@@ -68,6 +68,7 @@ public class InventoryAggregationService {
   private final InventoryItemMapper inventoryItemMapper;
   private final MaterialMapper materialMapper;
   private final OwnerScopeService ownerScopeService;
+  private final InventoryItemViewRepository inventoryItemViewRepository;
 
   /**
    * Sums the caller's own stock into one SCU total per material and quality for the blueprint
@@ -375,6 +376,7 @@ public class InventoryAggregationService {
    * @param nonPersonalOnly when {@code true}, narrows to the caller's shared stock rows
    * @param stolenOnly when {@code true}, narrows to stock marked „gestohlen" (REQ-INV-053)
    * @param nonStolenOnly when {@code true}, narrows to stock not marked „gestohlen"
+   * @param attributes the category, component-type, size, grade and class filters (REQ-INV-063)
    * @return item groups, each carrying its sorted stacks and item-wide total
    * @throws NotFoundException when the user id is unknown
    */
@@ -386,13 +388,14 @@ public class InventoryAggregationService {
       boolean personalOnly,
       boolean nonPersonalOnly,
       boolean stolenOnly,
-      boolean nonStolenOnly) {
+      boolean nonStolenOnly,
+      @NotNull ItemAttributeFilter attributes) {
     User user = Entities.require(userRepository.findPlainById(userId), "User not found");
     boolean hasGameItems = gameItemIds != null && !gameItemIds.isEmpty();
     boolean hasLocations = locationIds != null && !locationIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
     List<InventoryItemStackAggregate> stacks =
-        inventoryItemRepository.findUserItemStacks(
+        inventoryItemViewRepository.findUserItemStacks(
             user.getId(),
             hasGameItems,
             hasGameItems ? gameItemIds : null,
@@ -403,7 +406,17 @@ public class InventoryAggregationService {
             personalOnly,
             nonPersonalOnly,
             stolenOnly,
-            nonStolenOnly);
+            nonStolenOnly,
+            attributes.hasKinds(),
+            attributes.kindsOrNull(),
+            attributes.hasWikiTypes(),
+            attributes.wikiTypesOrNull(),
+            attributes.hasSizes(),
+            attributes.sizesOrNull(),
+            attributes.hasGrades(),
+            attributes.gradesOrNull(),
+            attributes.hasItemClasses(),
+            attributes.itemClassesOrNull());
     return buildGroupedFromItemStacks(stacks);
   }
 
@@ -470,6 +483,7 @@ public class InventoryAggregationService {
    * @param nonPersonalOnly when {@code true}, narrows to the caller's shared stock rows
    * @param stolenOnly when {@code true}, narrows to stock marked „gestohlen" (REQ-INV-053)
    * @param nonStolenOnly when {@code true}, narrows to stock not marked „gestohlen"
+   * @param attributes the category, component-type, size, grade and class filters (REQ-INV-063)
    * @return the ids of every matching game-item entry, in creation order; never {@code null}
    * @throws NotFoundException when the user id is unknown
    */
@@ -481,12 +495,13 @@ public class InventoryAggregationService {
       boolean personalOnly,
       boolean nonPersonalOnly,
       boolean stolenOnly,
-      boolean nonStolenOnly) {
+      boolean nonStolenOnly,
+      @NotNull ItemAttributeFilter attributes) {
     User user = Entities.require(userRepository.findPlainById(userId), "User not found");
     boolean hasGameItems = gameItemIds != null && !gameItemIds.isEmpty();
     boolean hasLocations = locationIds != null && !locationIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
-    return inventoryItemRepository.findUserItemEntryIds(
+    return inventoryItemViewRepository.findUserItemEntryIds(
         user.getId(),
         hasGameItems,
         hasGameItems ? gameItemIds : null,
@@ -497,7 +512,17 @@ public class InventoryAggregationService {
         personalOnly,
         nonPersonalOnly,
         stolenOnly,
-        nonStolenOnly);
+        nonStolenOnly,
+        attributes.hasKinds(),
+        attributes.kindsOrNull(),
+        attributes.hasWikiTypes(),
+        attributes.wikiTypesOrNull(),
+        attributes.hasSizes(),
+        attributes.sizesOrNull(),
+        attributes.hasGrades(),
+        attributes.gradesOrNull(),
+        attributes.hasItemClasses(),
+        attributes.itemClassesOrNull());
   }
 
   /**
@@ -510,6 +535,7 @@ public class InventoryAggregationService {
    * @param jobOrderIds optional job-order filter
    * @param stolenOnly when {@code true}, narrows to stock marked „gestohlen" (REQ-INV-053)
    * @param nonStolenOnly when {@code true}, narrows to stock not marked „gestohlen"
+   * @param attributes the category, component-type, size, grade and class filters (REQ-INV-063)
    * @return item groups, each carrying its sorted stacks and item-wide total
    */
   public List<GroupedInventoryDto> getAllAggregatedItemInventory(
@@ -517,13 +543,14 @@ public class InventoryAggregationService {
       List<UUID> locationIds,
       List<UUID> jobOrderIds,
       boolean stolenOnly,
-      boolean nonStolenOnly) {
+      boolean nonStolenOnly,
+      @NotNull ItemAttributeFilter attributes) {
     boolean hasGameItems = gameItemIds != null && !gameItemIds.isEmpty();
     boolean hasLocations = locationIds != null && !locationIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     List<InventoryItemStackAggregate> stacks =
-        inventoryItemRepository.findGlobalItemStacks(
+        inventoryItemViewRepository.findGlobalItemStacks(
             hasGameItems,
             hasGameItems ? gameItemIds : null,
             hasLocations,
@@ -534,7 +561,17 @@ public class InventoryAggregationService {
             scope.activeOrgUnitId(),
             scope.memberOrgUnitIds(),
             stolenOnly,
-            nonStolenOnly);
+            nonStolenOnly,
+            attributes.hasKinds(),
+            attributes.kindsOrNull(),
+            attributes.hasWikiTypes(),
+            attributes.wikiTypesOrNull(),
+            attributes.hasSizes(),
+            attributes.sizesOrNull(),
+            attributes.hasGrades(),
+            attributes.gradesOrNull(),
+            attributes.hasItemClasses(),
+            attributes.itemClassesOrNull());
     return buildGroupedFromItemStacks(stacks);
   }
 

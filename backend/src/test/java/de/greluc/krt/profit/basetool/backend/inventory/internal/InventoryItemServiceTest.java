@@ -112,7 +112,8 @@ class InventoryItemServiceTest {
             gameItemRepository,
             inventoryItemMapper,
             materialMapper,
-            ownerScopeService);
+            ownerScopeService,
+            null);
     realCheckoutService =
         new InventoryCheckoutService(
             inventoryItemRepository,

@@ -33,11 +33,14 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryGameItemReferenceDto;
@@ -47,6 +50,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -83,6 +87,7 @@ class InventoryAggregationServiceTest {
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private MaterialMapper materialMapper;
   @Mock private OwnerScopeService ownerScopeService;
+  @Mock private InventoryItemViewRepository inventoryItemViewRepository;
 
   @InjectMocks private InventoryAggregationService service;
 
@@ -95,9 +100,10 @@ class InventoryAggregationServiceTest {
       stubUser(userId);
       stubUserItemStacks();
 
-      service.getMyAggregatedItemInventory(userId, null, null, null, false, false, false, false);
+      service.getMyAggregatedItemInventory(
+          userId, null, null, null, false, false, false, false, ItemAttributeFilter.NONE);
 
-      verify(inventoryItemRepository)
+      verify(inventoryItemViewRepository)
           .findUserItemStacks(
               eq(userId),
               eq(false),
@@ -109,7 +115,17 @@ class InventoryAggregationServiceTest {
               eq(false),
               eq(false),
               eq(false),
-              eq(false));
+              eq(false),
+              eq(false),
+              isNull(),
+              eq(false),
+              isNull(),
+              eq(false),
+              isNull(),
+              eq(false),
+              isNull(),
+              eq(false),
+              isNull());
     }
 
     @Test
@@ -119,9 +135,9 @@ class InventoryAggregationServiceTest {
       stubUserItemStacks();
 
       service.getMyAggregatedItemInventory(
-          userId, List.of(), null, List.of(), false, false, false, false);
+          userId, List.of(), null, List.of(), false, false, false, false, ItemAttributeFilter.NONE);
 
-      verify(inventoryItemRepository)
+      verify(inventoryItemViewRepository)
           .findUserItemStacks(
               eq(userId),
               eq(false),
@@ -133,7 +149,17 @@ class InventoryAggregationServiceTest {
               eq(false),
               eq(false),
               eq(false),
-              eq(false));
+              eq(false),
+              eq(false),
+              isNull(),
+              eq(false),
+              isNull(),
+              eq(false),
+              isNull(),
+              eq(false),
+              isNull(),
+              eq(false),
+              isNull());
     }
 
     @Test
@@ -145,9 +171,17 @@ class InventoryAggregationServiceTest {
       stubUserItemStacks();
 
       service.getMyAggregatedItemInventory(
-          userId, List.of(gameItemId), null, List.of(jobOrderId), true, false, false, false);
+          userId,
+          List.of(gameItemId),
+          null,
+          List.of(jobOrderId),
+          true,
+          false,
+          false,
+          false,
+          ItemAttributeFilter.NONE);
 
-      verify(inventoryItemRepository)
+      verify(inventoryItemViewRepository)
           .findUserItemStacks(
               eq(userId),
               eq(true),
@@ -159,7 +193,128 @@ class InventoryAggregationServiceTest {
               eq(true),
               eq(false),
               eq(false),
-              eq(false));
+              eq(false),
+              eq(false),
+              isNull(),
+              eq(false),
+              isNull(),
+              eq(false),
+              isNull(),
+              eq(false),
+              isNull(),
+              eq(false),
+              isNull());
+    }
+
+    @Test
+    void myItemStacks_attributeFilters_setTheirFlagsAndForwardTheValues() {
+      UUID userId = UUID.randomUUID();
+      stubUser(userId);
+      stubUserItemStacks();
+
+      service.getMyAggregatedItemInventory(
+          userId,
+          null,
+          null,
+          null,
+          false,
+          false,
+          false,
+          false,
+          new ItemAttributeFilter(
+              List.of(GameItemKind.VEHICLE_ITEM),
+              List.of(ShipComponentType.QUANTUM_DRIVE),
+              List.of(2),
+              List.of("A"),
+              List.of(ShipComponentClass.MILITARY)));
+
+      verify(inventoryItemViewRepository)
+          .findUserItemStacks(
+              eq(userId),
+              eq(false),
+              isNull(),
+              eq(false),
+              isNull(),
+              eq(false),
+              isNull(),
+              eq(false),
+              eq(false),
+              eq(false),
+              eq(false),
+              eq(true),
+              eq(List.of(GameItemKind.VEHICLE_ITEM)),
+              eq(true),
+              eq(List.of("QuantumDrive")),
+              eq(true),
+              eq(List.of(2)),
+              eq(true),
+              eq(List.of("A")),
+              eq(true),
+              eq(List.of(ShipComponentClass.MILITARY)));
+    }
+
+    @Test
+    void allItemStacks_gradeAlone_narrowsToEveryComponentWikiType() {
+      when(ownerScopeService.currentScopePredicate())
+          .thenReturn(new ScopePredicate(true, null, Set.of()));
+      when(inventoryItemViewRepository.findGlobalItemStacks(
+              anyBoolean(),
+              any(),
+              anyBoolean(),
+              any(),
+              anyBoolean(),
+              any(),
+              anyBoolean(),
+              any(),
+              any(),
+              anyBoolean(),
+              anyBoolean(),
+              anyBoolean(),
+              any(),
+              anyBoolean(),
+              any(),
+              anyBoolean(),
+              any(),
+              anyBoolean(),
+              any(),
+              anyBoolean(),
+              any()))
+          .thenReturn(List.of());
+
+      service.getAllAggregatedItemInventory(
+          null,
+          null,
+          null,
+          false,
+          false,
+          new ItemAttributeFilter(null, null, null, List.of("C"), null));
+
+      verify(inventoryItemViewRepository)
+          .findGlobalItemStacks(
+              eq(false),
+              isNull(),
+              eq(false),
+              isNull(),
+              eq(false),
+              isNull(),
+              eq(true),
+              isNull(),
+              eq(Set.of()),
+              eq(false),
+              eq(false),
+              eq(false),
+              isNull(),
+              eq(true),
+              eq(
+                  Arrays.stream(ShipComponentType.values())
+                      .map(ShipComponentType::getWikiType)
+                      .toList()),
+              eq(false),
+              isNull(),
+              eq(true),
+              eq(List.of("C")),
+              eq(false),
+              isNull());
     }
 
     @Test
@@ -171,7 +326,7 @@ class InventoryAggregationServiceTest {
           NotFoundException.class,
           () ->
               service.getMyAggregatedItemInventory(
-                  userId, null, null, null, false, false, false, false));
+                  userId, null, null, null, false, false, false, false, ItemAttributeFilter.NONE));
 
       verifyNoInteractions(inventoryItemRepository);
     }
@@ -182,7 +337,7 @@ class InventoryAggregationServiceTest {
       UUID memberOrgUnitId = UUID.randomUUID();
       when(ownerScopeService.currentScopePredicate())
           .thenReturn(new ScopePredicate(false, activeOrgUnitId, Set.of(memberOrgUnitId)));
-      when(inventoryItemRepository.findGlobalItemStacks(
+      when(inventoryItemViewRepository.findGlobalItemStacks(
               anyBoolean(),
               any(),
               eq(false),
@@ -193,12 +348,23 @@ class InventoryAggregationServiceTest {
               any(),
               any(),
               eq(false),
-              eq(false)))
+              eq(false),
+              anyBoolean(),
+              any(),
+              anyBoolean(),
+              any(),
+              anyBoolean(),
+              any(),
+              anyBoolean(),
+              any(),
+              anyBoolean(),
+              any()))
           .thenReturn(List.of());
 
-      service.getAllAggregatedItemInventory(null, null, null, false, false);
+      service.getAllAggregatedItemInventory(
+          null, null, null, false, false, ItemAttributeFilter.NONE);
 
-      verify(inventoryItemRepository)
+      verify(inventoryItemViewRepository)
           .findGlobalItemStacks(
               eq(false),
               isNull(),
@@ -210,7 +376,17 @@ class InventoryAggregationServiceTest {
               eq(activeOrgUnitId),
               eq(Set.of(memberOrgUnitId)),
               eq(false),
-              eq(false));
+              eq(false),
+              eq(false),
+              isNull(),
+              eq(false),
+              isNull(),
+              eq(false),
+              isNull(),
+              eq(false),
+              isNull(),
+              eq(false),
+              isNull());
     }
 
     @Test
@@ -333,7 +509,7 @@ class InventoryAggregationServiceTest {
       UUID jobOrderId = UUID.randomUUID();
       UUID entry = UUID.randomUUID();
       stubUser(userId);
-      when(inventoryItemRepository.findUserItemEntryIds(
+      when(inventoryItemViewRepository.findUserItemEntryIds(
               any(),
               anyBoolean(),
               any(),
@@ -344,15 +520,33 @@ class InventoryAggregationServiceTest {
               anyBoolean(),
               anyBoolean(),
               eq(false),
-              eq(false)))
+              eq(false),
+              anyBoolean(),
+              any(),
+              anyBoolean(),
+              any(),
+              anyBoolean(),
+              any(),
+              anyBoolean(),
+              any(),
+              anyBoolean(),
+              any()))
           .thenReturn(List.of(entry));
 
       List<UUID> ids =
           service.getMyItemEntryIds(
-              userId, List.of(gameItemId), null, List.of(jobOrderId), true, false, false, false);
+              userId,
+              List.of(gameItemId),
+              null,
+              List.of(jobOrderId),
+              true,
+              false,
+              false,
+              false,
+              ItemAttributeFilter.NONE);
 
       assertEquals(List.of(entry), ids);
-      verify(inventoryItemRepository)
+      verify(inventoryItemViewRepository)
           .findUserItemEntryIds(
               eq(userId),
               eq(true),
@@ -364,7 +558,17 @@ class InventoryAggregationServiceTest {
               eq(true),
               eq(false),
               eq(false),
-              eq(false));
+              eq(false),
+              eq(false),
+              isNull(),
+              eq(false),
+              isNull(),
+              eq(false),
+              isNull(),
+              eq(false),
+              isNull(),
+              eq(false),
+              isNull());
     }
   }
 
@@ -379,7 +583,8 @@ class InventoryAggregationServiceTest {
       stubItemRefMapper();
 
       List<GroupedInventoryDto> result =
-          service.getAllAggregatedItemInventory(null, null, null, false, false);
+          service.getAllAggregatedItemInventory(
+              null, null, null, false, false, ItemAttributeFilter.NONE);
 
       assertEquals(1, result.size());
       GroupedInventoryDto group = result.get(0);
@@ -402,7 +607,8 @@ class InventoryAggregationServiceTest {
       stubItemRefMapper();
 
       List<GroupedInventoryDto> result =
-          service.getAllAggregatedItemInventory(null, null, null, false, false);
+          service.getAllAggregatedItemInventory(
+              null, null, null, false, false, ItemAttributeFilter.NONE);
 
       assertEquals(
           List.of("Coupling", "Shield"), result.stream().map(g -> g.gameItem().name()).toList());
@@ -420,7 +626,11 @@ class InventoryAggregationServiceTest {
       stubItemRefMapper();
 
       List<InventoryStackDto> stacks =
-          service.getAllAggregatedItemInventory(null, null, null, false, false).get(0).stacks();
+          service
+              .getAllAggregatedItemInventory(
+                  null, null, null, false, false, ItemAttributeFilter.NONE)
+              .get(0)
+              .stacks();
 
       assertEquals("A", stacks.get(0).location().name());
       assertEquals(20.0, stacks.get(0).totalAmount(), "location A, larger amount first");
@@ -438,7 +648,10 @@ class InventoryAggregationServiceTest {
       stubItemRefMapper();
 
       GroupedInventoryDto group =
-          service.getAllAggregatedItemInventory(null, null, null, false, false).get(0);
+          service
+              .getAllAggregatedItemInventory(
+                  null, null, null, false, false, ItemAttributeFilter.NONE)
+              .get(0);
 
       assertEquals(0.0, group.totalAmount(), "a null SUM coalesces to 0.0");
       assertEquals(0.0, group.stacks().get(0).totalAmount());
@@ -449,7 +662,11 @@ class InventoryAggregationServiceTest {
     void noStacks_yieldEmptyGroupList() {
       stubGlobalItemStacks();
 
-      assertTrue(service.getAllAggregatedItemInventory(null, null, null, false, false).isEmpty());
+      assertTrue(
+          service
+              .getAllAggregatedItemInventory(
+                  null, null, null, false, false, ItemAttributeFilter.NONE)
+              .isEmpty());
     }
 
     @Test
@@ -457,7 +674,7 @@ class InventoryAggregationServiceTest {
       UUID userId = UUID.randomUUID();
       stubUser(userId);
       GameItem coupling = gameItem("Coupling");
-      when(inventoryItemRepository.findUserItemStacks(
+      when(inventoryItemViewRepository.findUserItemStacks(
               any(),
               anyBoolean(),
               any(),
@@ -468,13 +685,23 @@ class InventoryAggregationServiceTest {
               anyBoolean(),
               anyBoolean(),
               eq(false),
-              eq(false)))
+              eq(false),
+              anyBoolean(),
+              any(),
+              anyBoolean(),
+              any(),
+              anyBoolean(),
+              any(),
+              anyBoolean(),
+              any(),
+              anyBoolean(),
+              any()))
           .thenReturn(List.of(agg(coupling, location("A"), 4.0, 3L)));
       stubItemRefMapper();
 
       List<GroupedInventoryDto> result =
           service.getMyAggregatedItemInventory(
-              userId, null, null, null, false, false, false, false);
+              userId, null, null, null, false, false, false, false, ItemAttributeFilter.NONE);
 
       assertEquals(1, result.size());
       assertEquals("Coupling", result.get(0).gameItem().name());
@@ -618,7 +845,7 @@ class InventoryAggregationServiceTest {
 
   /** Stubs the owner-scoped item stack query to return no stacks (filter-routing verifications). */
   private void stubUserItemStacks() {
-    when(inventoryItemRepository.findUserItemStacks(
+    when(inventoryItemViewRepository.findUserItemStacks(
             any(),
             anyBoolean(),
             any(),
@@ -629,7 +856,17 @@ class InventoryAggregationServiceTest {
             anyBoolean(),
             anyBoolean(),
             eq(false),
-            eq(false)))
+            eq(false),
+            anyBoolean(),
+            any(),
+            anyBoolean(),
+            any(),
+            anyBoolean(),
+            any(),
+            anyBoolean(),
+            any(),
+            anyBoolean(),
+            any()))
         .thenReturn(List.of());
   }
 
@@ -643,7 +880,7 @@ class InventoryAggregationServiceTest {
     lenient()
         .when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(true, null, Set.of()));
-    when(inventoryItemRepository.findGlobalItemStacks(
+    when(inventoryItemViewRepository.findGlobalItemStacks(
             anyBoolean(),
             any(),
             eq(false),
@@ -654,7 +891,17 @@ class InventoryAggregationServiceTest {
             any(),
             any(),
             eq(false),
-            eq(false)))
+            eq(false),
+            anyBoolean(),
+            any(),
+            anyBoolean(),
+            any(),
+            anyBoolean(),
+            any(),
+            anyBoolean(),
+            any(),
+            anyBoolean(),
+            any()))
         .thenReturn(List.of(aggregates));
   }
 

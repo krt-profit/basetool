@@ -385,10 +385,12 @@ public class InventoryWriteController {
       model.addAttribute("showBookOutModal", id);
       if (fromAdminListing) {
         return inventoryPageController.viewAllInventory(
-            null, null, null, null, null, null, null, false, false, false, model);
+            null, null, null, null, null, null, null, false, false, null, null, null, null, null,
+            false, model);
       }
       return inventoryPageController.viewMyInventory(
-          null, null, null, null, null, null, null, false, false, false, false, false, model);
+          null, null, null, null, null, null, null, false, false, false, false, null, null, null,
+          null, null, false, model);
     }
 
     try {

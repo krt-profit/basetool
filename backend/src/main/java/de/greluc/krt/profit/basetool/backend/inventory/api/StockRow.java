@@ -122,6 +122,16 @@ public interface StockRow {
   Boolean getPersonal();
 
   /**
+   * Tells whether the row belongs to its lot's personal part: a personal row, or a shared row
+   * outside any unit's pool (REQ-INV-060, REQ-XCH-016).
+   *
+   * @return {@code true} when the row counts as personal stock
+   */
+  default boolean countsAsPersonal() {
+    return Boolean.TRUE.equals(getPersonal()) || getOwningOrgUnit() == null;
+  }
+
+  /**
    * Sums the amounts of the row's job-order slices (its job-order allocations must be loaded).
    *
    * @return the total earmarked to job orders

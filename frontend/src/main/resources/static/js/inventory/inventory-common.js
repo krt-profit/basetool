@@ -34,6 +34,21 @@ import { krtHerkunft } from '/js/inventory/inventory-herkunft.js';
 const ASSOC_EPS = 0.0005;
 
 /**
+ * The item-attribute filters of the Lager items view (REQ-INV-063): the query parameter and the
+ * multi-select family of each. A family `x` renders the boxes `xCheck`, the select-all box `xAll`
+ * and the header `xHeader`.
+ *
+ * @type {ReadonlyArray<{ param: string, family: string }>}
+ */
+const ITEM_ATTRIBUTE_FILTERS = [
+    { param: 'kinds', family: 'kind' },
+    { param: 'componentTypes', family: 'componentType' },
+    { param: 'sizes', family: 'size' },
+    { param: 'grades', family: 'grade' },
+    { param: 'itemClasses', family: 'itemClass' },
+];
+
+/**
  * Looks up an element by id, typed as an input.
  *
  * @param {string} id the element id
@@ -559,6 +574,106 @@ function createLager(cfg) {
             if (boxes[i].checked) values.push(boxes[i].value);
         }
         return values;
+    }
+
+    /**
+     * The query parameter names of the item-attribute filters.
+     *
+     * @returns {string[]} the parameter names
+     */
+    function itemAttributeParams() {
+        return ITEM_ATTRIBUTE_FILTERS.map((f) => f.param);
+    }
+
+    /**
+     * The item-attribute selection, keyed by query parameter.
+     *
+     * @returns {KrtItemAttributeSnapshot} the ticked values per parameter; null where none or
+     *     every box is ticked
+     */
+    function snapshotItemAttributes() {
+        /** @type {KrtItemAttributeSnapshot} */
+        const snapshot = {};
+        ITEM_ATTRIBUTE_FILTERS.forEach((f) => {
+            const picked = collectChecked(`${f.family}Check`);
+            const total = familyBoxes(`${f.family}Check`).length;
+            snapshot[f.param] = picked.length === 0 || picked.length === total ? null : picked;
+        });
+        return snapshot;
+    }
+
+    /**
+     * Ticks the item-attribute boxes from a stored snapshot.
+     *
+     * @param {unknown} saved the stored snapshot
+     * @returns {boolean} true when at least one box was ticked
+     */
+    function restoreItemAttributes(saved) {
+        if (!saved || typeof saved !== 'object') return false;
+        const stored = /** @type {Record<string, unknown>} */ (saved);
+        let changed = false;
+        ITEM_ATTRIBUTE_FILTERS.forEach((f) => {
+            const values = stored[f.param];
+            if (!Array.isArray(values) || values.length === 0) return;
+            const boxes = familyBoxes(`${f.family}Check`);
+            if (boxes.length === 0) return;
+            for (let i = 0; i < boxes.length; i++) {
+                const on = values.indexOf(boxes[i].value) >= 0;
+                boxes[i].checked = on;
+                if (on) changed = true;
+            }
+            updateSelectState(`${f.family}All`, `${f.family}Check`, `${f.family}Header`);
+        });
+        return changed;
+    }
+
+    /**
+     * Appends the ticked item-attribute values to a query under their parameter name; a family
+     * with none or every box ticked narrows nothing and appends nothing.
+     *
+     * @param {URLSearchParams} params the query to extend
+     */
+    function appendItemAttributeParams(params) {
+        const snapshot = snapshotItemAttributes();
+        ITEM_ATTRIBUTE_FILTERS.forEach((f) => {
+            (snapshot[f.param] || []).forEach((value) => params.append(f.param, value));
+        });
+    }
+
+    /**
+     * The number of item-attribute filters a snapshot narrows by.
+     *
+     * @param {KrtItemAttributeSnapshot | null | undefined} snapshot the selection
+     * @returns {number} the count
+     */
+    function countActiveItemAttributes(snapshot) {
+        if (!snapshot) return 0;
+        return ITEM_ATTRIBUTE_FILTERS.filter((f) => {
+            const values = snapshot[f.param];
+            return Array.isArray(values) && values.length > 0;
+        }).length;
+    }
+
+    /** Unticks every item-attribute box and resets the headers. */
+    function resetItemAttributes() {
+        ITEM_ATTRIBUTE_FILTERS.forEach((f) => {
+            const boxes = familyBoxes(`${f.family}Check`);
+            for (let i = 0; i < boxes.length; i++) boxes[i].checked = false;
+            const allBox = input(`${f.family}All`);
+            if (allBox) allBox.checked = false;
+            if (document.getElementById(`${f.family}Header`)) {
+                updateSelectState(`${f.family}All`, `${f.family}Check`, `${f.family}Header`);
+            }
+        });
+    }
+
+    /** Re-syncs the select-all box and header of every rendered item-attribute filter. */
+    function syncItemAttributeStates() {
+        ITEM_ATTRIBUTE_FILTERS.forEach((f) => {
+            if (familyBoxes(`${f.family}Check`).length > 0) {
+                updateSelectState(`${f.family}All`, `${f.family}Check`, `${f.family}Header`);
+            }
+        });
     }
 
     /**
@@ -1636,6 +1751,13 @@ function createLager(cfg) {
         toggleSelectAll,
         updateSelectState,
         collectChecked,
+        itemAttributeParams,
+        snapshotItemAttributes,
+        restoreItemAttributes,
+        appendItemAttributeParams,
+        countActiveItemAttributes,
+        resetItemAttributes,
+        syncItemAttributeStates,
         bind,
     };
 }

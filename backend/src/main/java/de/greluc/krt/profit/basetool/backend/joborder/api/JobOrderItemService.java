@@ -322,7 +322,7 @@ public class JobOrderItemService {
     Blueprint blueprint = item.getBlueprint();
     return new JobOrderItemDto(
         item.getId(),
-        gameItem == null ? null : gameItemRef(gameItem),
+        gameItem == null ? null : GameItemReferenceDto.of(gameItem),
         blueprint == null ? null : blueprintRef(blueprint),
         item.getAmount(),
         item.getManufacturedAmount(),
@@ -447,19 +447,12 @@ public class JobOrderItemService {
           }
         }
         subAssemblies.add(
-            new SubAssemblySuggestionDto(gameItemRef(subItem), perUnit * scaledBy, subBlueprints));
+            new SubAssemblySuggestionDto(
+                GameItemReferenceDto.of(subItem), perUnit * scaledBy, subBlueprints));
       }
     }
     return new ItemDerivationDto(
         blueprintRef(blueprint), scaledBy, materials, subAssemblies, unresolved);
-  }
-
-  @NotNull
-  private GameItemReferenceDto gameItemRef(@NotNull GameItem gameItem) {
-    return new GameItemReferenceDto(
-        gameItem.getId(),
-        gameItem.getName(),
-        gameItem.getKind() == null ? null : gameItem.getKind().name());
   }
 
   @NotNull

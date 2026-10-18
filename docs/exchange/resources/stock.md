@@ -170,12 +170,13 @@ After the material, location, unit and stolen steps above, a share is decided in
 | The lot's personal amount must equal `expectedQuantity` | `rejected` `VERSION_CONFLICT` |
 | `quantity` is at most `expectedQuantity` | `rejected` `QUANTITY_ABOVE_EXPECTED` |
 | A `quantity` of 0 | `unchanged` |
-| The member's personal stock holds `quantity`; shared stock outside any unit is not taken | `rejected` `INSUFFICIENT_STOCK` |
+| The lot's personal amount holds `quantity` | `rejected` `INSUFFICIENT_STOCK` |
 | None of it is reserved for a job order, mission or donation | `rejected` `STOCK_EARMARKED` |
 | The move leaves every row at least what it offers on the Material Exchange | `rejected` `STOCK_OFFERED` |
 
 A share takes the member's personal stock already marked for the target unit first, then
-personal stock without a unit, then the rest, the oldest first. The stolen marking, the quality
+personal stock without a unit, then the rest, then shared stock outside any unit, the oldest
+first. Everything `split.personal` shows can therefore be shared. The stolen marking, the quality
 and the location stay as they are.
 
 ### Taking stock back from a unit's pool
