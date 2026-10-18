@@ -94,7 +94,7 @@
 
             <fieldset class="form-section">
                 <legend class="form-section__head" th:text="|2 · #{refineryorder.form.section.time}|">2 · Zeit</legend>
-                <div class="form-grid form-grid--3">
+                <div class="form-grid form-grid--3 rod-time">
                     <div class="form-group datetime-split-group" th:attr="data-validate-not-past='false', data-error-past=#{validation.datetime.past}">
                         <label for="startedAtDate" th:text="#{refineryorder.form.startedAt}">Startdatum</label>
                         <div class="rod-start">

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Raffinerieauftrag: Felder überlappen nicht mehr.** Beim Anlegen und Bearbeiten verdeckt „Jetzt“ das Uhrzeitfeld nicht mehr, und Start, Dauer, Fertig am sowie die Materialzeile behalten ihren Abstand; ist das Formular zu schmal, brechen die Felder um. Die Auf-/Ab-Pfeile eines Zahlenfelds stehen app-weit mit Abstand zur Zahl (REQ-UI-028).
+
 ## [v1.18.0](https://github.com/krt-profit/basetool/releases/tag/v1.18.0) - 2026-10-18
 
 ### Added
