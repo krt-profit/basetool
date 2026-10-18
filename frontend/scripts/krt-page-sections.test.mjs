@@ -440,6 +440,47 @@ await test('onError sees a non-409 failure and a page without sections can write
     assert.deepEqual(plain(seen), [500]);
 });
 
+await test('submitForm applies the same decoration, refresh and 409 routing as write', async () => {
+    const h = harness([
+        new Response('{}', { status: 200, headers: JSON_TYPE }),
+        new Response('{"code":"OPTIMISTIC_LOCK"}', { status: 409, headers: PROBLEM_TYPE }),
+    ]);
+    const sections = h.krtPageSections.create(declaration());
+    const seen = [];
+    const ok = await sections.submitForm({
+        method: 'POST',
+        url: '/api/x',
+        formData: new URLSearchParams({ a: '1' }),
+        refresh: ['a'],
+        onSuccess: () => seen.push('success'),
+    });
+    assert.equal(ok.ok, true);
+    assert.deepEqual(plain(seen), ['success']);
+    assert.deepEqual(plain(h.live.sent), [{ topic: 'room:1', keys: ['a'] }]);
+    const failed = await sections.submitForm({
+        method: 'POST',
+        url: '/api/x',
+        formData: new URLSearchParams({ a: '1' }),
+        onConflict: (body) => seen.push(`conflict:${body.code}`),
+    });
+    assert.equal(failed.status, 409);
+    assert.deepEqual(plain(seen), ['success', 'conflict:OPTIMISTIC_LOCK']);
+});
+
+await test('a conflict string passed to a write wins over the derived one', async () => {
+    const h = harness([
+        new Response('{"code":"OPTIMISTIC_LOCK"}', { status: 409, headers: PROBLEM_TYPE }),
+    ]);
+    const sections = h.krtPageSections.create(declaration());
+    await sections.write({
+        method: 'PATCH',
+        url: '/api/x',
+        payload: {},
+        conflict: { title: 'Own title' },
+    });
+    assert.deepEqual(h.ui.confirms, ['Own title']);
+});
+
 await test('publish is a no-op without a topic', async () => {
     const h = harness();
     h.krtPageSections.publish(null, ['a']);

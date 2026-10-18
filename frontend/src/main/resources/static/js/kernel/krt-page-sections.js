@@ -164,13 +164,16 @@ function create(config) {
                     : undefined,
                 successMessage: t(k.successKey) || opts.successMessage,
                 errorMessage: t(k.errorKey) || opts.errorMessage,
-                conflict: {
-                    title: t(k.conflictTitleKey),
-                    reloadLabel: t(k.reloadLabelKey),
-                    dismissLabel: t(k.dismissLabelKey),
-                    reloadQuestion: t(k.reloadQuestionKey),
-                    reloadDetailFallback: t(k.reloadDetailKey),
-                },
+                conflict: Object.assign(
+                    {
+                        title: t(k.conflictTitleKey),
+                        reloadLabel: t(k.reloadLabelKey),
+                        dismissLabel: t(k.dismissLabelKey),
+                        reloadQuestion: t(k.reloadQuestionKey),
+                        reloadDetailFallback: t(k.reloadDetailKey),
+                    },
+                    opts.conflict,
+                ),
                 /**
                  * @param {number} status the HTTP status
                  * @param {any} body the parsed body
