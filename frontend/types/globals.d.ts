@@ -282,7 +282,7 @@ interface KrtPageSectionsConfig {
     /** Message-key prefixes used to derive the per-section localized strings. */
     keys?: Record<string, string>;
     /** Maps a section key to its swap container and Thymeleaf fragment value. */
-    sections: Record<string, { container: string; fragmentValue: string }>;
+    sections: Record<string, { container: string; fragmentValue?: string }>;
     /**
      * Late-bound accessor for the URL the section fragments are fetched from. Null while the
      * entity has no id; `refresh()` then resolves false instead of fetching.
@@ -335,7 +335,7 @@ interface KrtPageSections {
     /** The receiver of a peer's change, or null when the page declared none or has no topic. */
     receiver: KrtReceiver | null;
     /** The declared sections. */
-    sections: Record<string, { container: string; fragmentValue: string }>;
+    sections: Record<string, { container: string; fragmentValue?: string }>;
 }
 
 /** The page-section module installed by `kernel/krt-page-sections.js` (ADR-0289). */

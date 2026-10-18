@@ -18,9 +18,7 @@
  */
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
-
-const UNIT_SECTIONS = { ships: { container: '#squadron-results' } };
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 
 /**
  * Opens or closes the owner rows of one ship type in the org-unit overview.
@@ -122,18 +120,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const unitTopic = resultsContainer ? resultsContainer.dataset.liveSyncTopic || '' : '';
     if (unitTopic) {
-        krtLiveSync.createReceiver({
-            topic: unitTopic,
-            sections: UNIT_SECTIONS,
-            coalesceMs: 1500,
-            refresh() {
+        krtPageSections.create({
+            sections: { ships: { container: '#squadron-results' } },
+            pageUrl() {
                 const query = new URLSearchParams(window.location.search).toString();
-                krtFetch.swap({
-                    url: `/hangar/squadron${query ? `?${query}` : ''}`,
-                    container: '#squadron-results',
-                    history: false,
-                });
+                return `/hangar/squadron${query ? `?${query}` : ''}`;
             },
+            topic: unitTopic,
+            receiver: { coalesceMs: 1500 },
         });
     }
 });
