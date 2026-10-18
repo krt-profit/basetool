@@ -1840,6 +1840,28 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(containsString("/inventory/my?view=items")));
   }
 
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void lagerTreeCarriesTheFilterParameterNamesForTheScripts() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    for (String path : new String[] {"/inventory/my", "/inventory/all"}) {
+      mockMvc
+          .perform(get(path))
+          .andExpect(status().isOk())
+          .andExpect(
+              content()
+                  .string(
+                      containsString(
+                          "data-filter-params=\"view=view,materials=materialIds,gameItems=gameItemIds,")))
+          .andExpect(
+              content()
+                  .string(containsString("data-attribute-filters=\"kinds:kind,componentTypes:")));
+    }
+  }
+
   /**
    * {@code /inventory/my?view=items} renders the game-item tree with whole-unit amounts, without
    * quality or mission filter, and with the item filter bar (REQ-INV-030).

@@ -249,6 +249,27 @@ public record LagerQuery(
   }
 
   /**
+   * The query parameters the page scripts build requests from, as {@code slot=name} pairs: the
+   * script's own slot name and the parameter name it appends the slot under.
+   *
+   * @return the pairs, the view switch first
+   */
+  public static @NotNull List<String> parameterSlots() {
+    return List.of(
+        "view=" + P_VIEW,
+        "materials=" + P_MATERIAL_IDS,
+        "gameItems=" + P_GAME_ITEM_IDS,
+        "locations=" + P_LOCATION_IDS,
+        "minQuality=" + P_MIN_QUALITY,
+        "jobOrders=" + P_JOB_ORDER_IDS,
+        "missions=" + P_MISSION_IDS,
+        "personal=" + P_PERSONAL_ONLY,
+        "nonPersonal=" + P_NON_PERSONAL_ONLY,
+        "stolen=" + P_STOLEN_ONLY,
+        "nonStolen=" + P_NON_STOLEN_ONLY);
+  }
+
+  /**
    * The item-attribute filters as {@code parameter:family} pairs: the query parameter and the
    * multi-select family of the page elements that edit it.
    *

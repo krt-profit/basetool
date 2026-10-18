@@ -33,15 +33,13 @@ script. Each new filter touched thirty to forty files.
    `data-attribute-filters`; the page scripts read them instead of repeating them.
 4. **URL and REST parameter names are unchanged**, so bookmarks and the end-to-end tests keep
    working. The squadron-wide reads ignore the personal flags and the flat lists ignore the stolen
-   flags, as before; `openapi.json` lists the shared filter set on those endpoints.
+   flags and the attribute lists, as before; `openapi.json` lists the shared filter set on those endpoints.
 
 ## Consequences
 
 - A new filter touches the two records, the repository query and the template.
 - The `entry-ids` and `grouped` requests send their parameters in one canonical order.
 - A malformed filter value fails the binding with 400 instead of a parameter type mismatch.
-- The squadron-wide flat list now rejects an attribute filter on the material catalog, as the
-  grouped list does.
 
 ## Alternatives considered
 

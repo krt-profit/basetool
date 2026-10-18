@@ -181,6 +181,39 @@ class LagerQueryTest {
   }
 
   @Test
+  void contradictoryFlagPairsPassThroughForTheBackendToAnswerEmpty() {
+    LagerQuery query =
+        LagerQuery.fromParams(
+            Map.of(
+                "personalOnly", List.of("true"),
+                "nonPersonalOnly", List.of("true"),
+                "stolenOnly", List.of("true"),
+                "nonStolenOnly", List.of("true")));
+
+    assertThat(query.backendParams().keySet())
+        .containsExactly("personalOnly", "nonPersonalOnly", "stolenOnly", "nonStolenOnly");
+    assertThat(LagerQuery.fromParams(query.urlParams())).isEqualTo(query);
+    assertThat(query.anyActive()).isTrue();
+  }
+
+  @Test
+  void parameterSlotsNameEveryParameterTheScriptsAppend() {
+    assertThat(LagerQuery.parameterSlots())
+        .containsExactly(
+            "view=view",
+            "materials=materialIds",
+            "gameItems=gameItemIds",
+            "locations=locationIds",
+            "minQuality=minQuality",
+            "jobOrders=jobOrderIds",
+            "missions=missionIds",
+            "personal=personalOnly",
+            "nonPersonal=nonPersonalOnly",
+            "stolen=stolenOnly",
+            "nonStolen=nonStolenOnly");
+  }
+
+  @Test
   void aNonItemsViewValueIsTheMaterialView() {
     assertThat(LagerQuery.fromParams(Map.of("view", List.of("other"))).itemsView()).isFalse();
   }

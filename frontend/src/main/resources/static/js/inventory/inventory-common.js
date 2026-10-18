@@ -55,15 +55,34 @@ function itemAttributeFilters() {
 }
 
 /**
- * The names of every Lager filter query parameter, read from the `data-filter-params` list the
- * server renders on the tree.
+ * The Lager filter query parameter names by slot, read from the `data-filter-params` pairs
+ * (`slot=name`) the server renders on the tree.
  *
- * @returns {string[]} the parameter names
+ * @returns {Record<string, string>} the parameter name of each slot
  */
-function lagerFilterParams() {
+function lagerParamNames() {
     const table = document.getElementById('inventoryTable');
     const raw = table ? table.getAttribute('data-filter-params') : null;
-    return raw ? raw.split(',') : [];
+    /** @type {Record<string, string>} */
+    const names = {};
+    if (!raw) return names;
+    raw.split(',').forEach((pair) => {
+        const [slot, name] = pair.split('=');
+        if (slot && name) names[slot] = name;
+    });
+    return names;
+}
+
+/**
+ * The names of every Lager filter query parameter.
+ *
+ * @returns {string[]} the parameter names, without the view switch
+ */
+function lagerFilterParams() {
+    const names = lagerParamNames();
+    return Object.keys(names)
+        .filter((slot) => slot !== 'view')
+        .map((slot) => names[slot]);
 }
 
 /**
@@ -127,7 +146,9 @@ function createLager(cfg) {
      */
     function lagerIsItemsView() {
         try {
-            return new URLSearchParams(window.location.search).get('view') === 'items';
+            return (
+                new URLSearchParams(window.location.search).get(lagerParamNames().view) === 'items'
+            );
         } catch {
             return false;
         }
@@ -601,6 +622,30 @@ function createLager(cfg) {
      */
     function itemAttributeParams() {
         return itemAttributeFilters().map((f) => f.param);
+    }
+
+    /**
+     * Appends the current Lager selection to a query under the server-rendered parameter names:
+     * the view switch, the id filters, the quality floor, the personal and stolen narrowing and
+     * the item attributes.
+     *
+     * @param {URLSearchParams} params the query to extend
+     * @param {KrtLagerSelection} selection the selection to append
+     */
+    function appendLagerFilterParams(params, selection) {
+        const names = lagerParamNames();
+        if (selection.itemsView) params.append(names.view, 'items');
+        (selection.materials || []).forEach((v) => params.append(names.materials, v));
+        (selection.gameItems || []).forEach((v) => params.append(names.gameItems, v));
+        (selection.locations || []).forEach((v) => params.append(names.locations, v));
+        if (selection.minQuality) params.append(names.minQuality, selection.minQuality);
+        (selection.jobOrders || []).forEach((v) => params.append(names.jobOrders, v));
+        (selection.missions || []).forEach((v) => params.append(names.missions, v));
+        if (selection.personal) params.append(names.personal, 'true');
+        if (selection.nonPersonal) params.append(names.nonPersonal, 'true');
+        if (selection.stolen === 'only') params.append(names.stolen, 'true');
+        else if (selection.stolen === 'non') params.append(names.nonStolen, 'true');
+        appendItemAttributeParams(params);
     }
 
     /**
@@ -1771,6 +1816,7 @@ function createLager(cfg) {
         collectChecked,
         itemAttributeParams,
         lagerFilterParams,
+        appendLagerFilterParams,
         snapshotItemAttributes,
         restoreItemAttributes,
         appendItemAttributeParams,

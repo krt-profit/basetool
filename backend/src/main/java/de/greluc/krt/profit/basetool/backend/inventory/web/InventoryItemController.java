@@ -327,8 +327,8 @@ public class InventoryItemController {
 
   /**
    * Squadron-wide flat inventory list (admin/logistician view). A filter that does not match the
-   * catalog (including an item attribute filter on the material catalog) is rejected with 400
-   * (REQ-INV-029/031); the personal and stolen flags do not apply to this list.
+   * catalog is rejected with 400 (REQ-INV-029/031); the personal and stolen flags and the item
+   * attribute lists do not apply to this list.
    *
    * @param filter the Lager filters bound from the query string
    * @param page zero-based page index
@@ -344,7 +344,7 @@ public class InventoryItemController {
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort) {
-    filter.requireMatchingCatalog();
+    filter.withoutAttributes().requireMatchingCatalog();
     if (filter.catalog() == InventoryCatalog.ITEM) {
       Pageable pageable =
           PaginationUtil.createPageRequest(

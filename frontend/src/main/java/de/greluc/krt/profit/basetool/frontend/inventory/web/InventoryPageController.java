@@ -528,7 +528,7 @@ public class InventoryPageController {
    * @param model the model to fill
    */
   private static void addLagerParameterNames(@NotNull Model model) {
-    model.addAttribute("lagerFilterParams", String.join(",", LagerQuery.filterParameterNames()));
+    model.addAttribute("lagerFilterParams", String.join(",", LagerQuery.parameterSlots()));
     model.addAttribute("lagerAttributeFilters", String.join(",", LagerQuery.attributeFilters()));
   }
 

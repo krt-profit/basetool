@@ -239,31 +239,24 @@ function clearBulkSelection() {
 }
 
 function fetchAllMatchingEntryIds() {
-    const itemsView = myLager.lagerIsItemsView();
-    const activeMaterials = myLager.collectChecked('matCheck');
-    const activeGameItems = myLager.collectChecked('gameItemCheck');
-    const activeLocations = myLager.collectChecked('locCheck');
-    const activeJobOrders = myLager.collectChecked('jobOrderCheck');
-    const activeMissions = myLager.collectChecked('missionCheck');
     const minQualitySelect = /** @type {HTMLSelectElement | null} */ (
         document.getElementById('minQuality')
     );
-    const minQuality = minQualitySelect ? minQualitySelect.value : '';
-    const personalOnly = personalScopeIs('personal');
-    const nonPersonalOnly = personalScopeIs('shared');
+    const selection = {
+        itemsView: myLager.lagerIsItemsView(),
+        materials: myLager.collectChecked('matCheck'),
+        gameItems: myLager.collectChecked('gameItemCheck'),
+        locations: myLager.collectChecked('locCheck'),
+        minQuality: minQualitySelect ? minQualitySelect.value : '',
+        jobOrders: myLager.collectChecked('jobOrderCheck'),
+        missions: myLager.collectChecked('missionCheck'),
+        personal: personalScopeIs('personal'),
+        nonPersonal: personalScopeIs('shared'),
+        stolen: myStolenFilterValue(),
+    };
 
     const url = new URL(`${window.location.origin}/inventory/my/entry-ids`);
-    if (itemsView) url.searchParams.append('view', 'items');
-    activeMaterials.forEach((m) => url.searchParams.append('materialIds', m));
-    activeGameItems.forEach((g) => url.searchParams.append('gameItemIds', g));
-    activeLocations.forEach((l) => url.searchParams.append('locationIds', l));
-    if (minQuality) url.searchParams.append('minQuality', minQuality);
-    activeJobOrders.forEach((j) => url.searchParams.append('jobOrderIds', j));
-    activeMissions.forEach((m) => url.searchParams.append('missionIds', m));
-    if (personalOnly) url.searchParams.append('personalOnly', 'true');
-    if (nonPersonalOnly) url.searchParams.append('nonPersonalOnly', 'true');
-    appendMyStolenFilter(url.searchParams, myStolenFilterValue());
-    myLager.appendItemAttributeParams(url.searchParams);
+    myLager.appendLagerFilterParams(url.searchParams, selection);
 
     return krtFetch.getJson(url.toString());
 }
@@ -635,17 +628,6 @@ function myStolenFilterValue() {
     return el ? el.value : '';
 }
 
-/**
- * Appends the backend flag of a „gestohlen" filter value to a query.
- *
- * @param {URLSearchParams} params the query to extend
- * @param {string} value the filter value ('', 'non' or 'only')
- */
-function appendMyStolenFilter(params, value) {
-    if (value === 'only') params.append('stolenOnly', 'true');
-    else if (value === 'non') params.append('nonStolenOnly', 'true');
-}
-
 const MY_INVENTORY_FILTER_KEY = 'inventory_my_filters';
 
 /**
@@ -863,19 +845,21 @@ function filterMyInventory() {
     persistMyInventoryFilters();
     krtFilterPanel.refresh('myFilterPanel');
     krtFilterChips.refresh();
-    const itemsView = myLager.lagerIsItemsView();
-    const activeMaterials = myLager.collectChecked('matCheck');
-    const activeGameItems = myLager.collectChecked('gameItemCheck');
-    const activeLocations = myLager.collectChecked('locCheck');
-    const activeJobOrders = myLager.collectChecked('jobOrderCheck');
-    const activeMissions = myLager.collectChecked('missionCheck');
     const minQualitySelect = /** @type {HTMLSelectElement | null} */ (
         document.getElementById('minQuality')
     );
-    const minQuality = minQualitySelect ? minQualitySelect.value : '';
-    const personalOnly = personalScopeIs('personal');
-    const nonPersonalOnly = personalScopeIs('shared');
-    const stolenFilter = myStolenFilterValue();
+    const selection = {
+        itemsView: myLager.lagerIsItemsView(),
+        materials: myLager.collectChecked('matCheck'),
+        gameItems: myLager.collectChecked('gameItemCheck'),
+        locations: myLager.collectChecked('locCheck'),
+        minQuality: minQualitySelect ? minQualitySelect.value : '',
+        jobOrders: myLager.collectChecked('jobOrderCheck'),
+        missions: myLager.collectChecked('missionCheck'),
+        personal: personalScopeIs('personal'),
+        nonPersonal: personalScopeIs('shared'),
+        stolen: myStolenFilterValue(),
+    };
 
     const container = document.getElementById('myInventoryTableContainer');
     if (!container) return;
@@ -884,30 +868,10 @@ function filterMyInventory() {
 
     const url = new URL(`${window.location.origin}/inventory/my`);
     url.searchParams.append('fragment', 'true');
-    if (itemsView) url.searchParams.append('view', 'items');
-    activeMaterials.forEach((m) => url.searchParams.append('materialIds', m));
-    activeGameItems.forEach((g) => url.searchParams.append('gameItemIds', g));
-    activeLocations.forEach((l) => url.searchParams.append('locationIds', l));
-    if (minQuality) url.searchParams.append('minQuality', minQuality);
-    activeJobOrders.forEach((j) => url.searchParams.append('jobOrderIds', j));
-    activeMissions.forEach((m) => url.searchParams.append('missionIds', m));
-    if (personalOnly) url.searchParams.append('personalOnly', 'true');
-    if (nonPersonalOnly) url.searchParams.append('nonPersonalOnly', 'true');
-    appendMyStolenFilter(url.searchParams, stolenFilter);
-    myLager.appendItemAttributeParams(url.searchParams);
+    myLager.appendLagerFilterParams(url.searchParams, selection);
 
     const visibleUrl = new URL(`${window.location.origin}/inventory/my`);
-    if (itemsView) visibleUrl.searchParams.append('view', 'items');
-    activeMaterials.forEach((m) => visibleUrl.searchParams.append('materialIds', m));
-    activeGameItems.forEach((g) => visibleUrl.searchParams.append('gameItemIds', g));
-    activeLocations.forEach((l) => visibleUrl.searchParams.append('locationIds', l));
-    if (minQuality) visibleUrl.searchParams.append('minQuality', minQuality);
-    activeJobOrders.forEach((j) => visibleUrl.searchParams.append('jobOrderIds', j));
-    activeMissions.forEach((m) => visibleUrl.searchParams.append('missionIds', m));
-    if (personalOnly) visibleUrl.searchParams.append('personalOnly', 'true');
-    if (nonPersonalOnly) visibleUrl.searchParams.append('nonPersonalOnly', 'true');
-    appendMyStolenFilter(visibleUrl.searchParams, stolenFilter);
-    myLager.appendItemAttributeParams(visibleUrl.searchParams);
+    myLager.appendLagerFilterParams(visibleUrl.searchParams, selection);
     try {
         window.history.replaceState({}, '', visibleUrl.toString());
     } catch {}
