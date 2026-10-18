@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.18.0](https://github.com/krt-profit/basetool/releases/tag/v1.18.0) - 2026-10-18
+
 ### Added
 
 - **Lager: Komponententyp, Größe und Grad am Item.** In „Mein Lager", im Globalen Lager und in der Item-Übersicht zeigt eine Schiffskomponente ihren Typ („Schild", „Kühler", „Quantenantrieb", …) statt „Schiffskomponente" und daneben Größe und Grad, z. B. `S1 · A`. Lackierungen und Flair zeigen weiterhin nur ihre Kategorie; `InventoryGameItemReferenceDto` liefert dafür `componentType`, `size` und `grade` (REQ-INV-061).
@@ -13,9 +15,13 @@
 - **Lager: nach Komponentenklasse filtern.** Die Item-Ansicht von „Mein Lager" und dem Globalen Lager filtert zusätzlich nach Klasse (Militär, Zivil, Industrie, Stealth, Wettkampf), auch kombiniert, z. B. „militärische S2-Quantenantriebe"; Items ohne Klasse fallen dabei heraus. Neuer Backend-Parameter `itemClasses` (REQ-INV-063).
 
 - **Item-Auswahl: Größe, Grad und Klasse.** Beim Einbuchen ins Lager und beim Anlegen eines Auftrags zeigt die Item-Suche eine Schiffskomponente als z. B. `FR-66 · S1 · A · Militär`, damit gleichnamige Varianten unterscheidbar sind; andere Items zeigen weiter nur ihren Namen. Dasselbe Label tragen beim Bearbeiten eines Item-Auftrags die bestehenden Zeilen und die vorgeschlagenen Unterbaugruppen. Die Auftragszeilen des Backends (`GameItemReferenceDto`) liefern dafür `componentType`, `size`, `grade` und `itemClass`, die Frontend-Endpunkte `label` (REQ-INV-064).
+
 - **Aufträge: Komponententyp, Größe, Grad und Klasse am Item.** In der Item-Tabelle eines Item-Auftrags, bei der Item-Übergabe samt Verlauf und in der Itemsammelübersicht zeigt eine Schiffskomponente dieselben Chips wie das Lager, z. B. `FR-66 [SCHILD] [S1 · A] [MILITÄR]`; andere Items zeigen ihre Kategorie (REQ-ORDERS-045).
+
 - **Materialbörse und Bedarf & Spenden: Komponententyp, Größe, Grad und Klasse am Item.** Item-Angebote und -Gesuche sowie Bedarfe und Spenden für ein Item zeigen dieselben Chips wie das Lager, z. B. `FR-66 [SCHILD] [S1 · A] [MILITÄR]`. Die Backend-DTOs der Börse liefern dafür ein neues Feld `gameItem`; bei Bedarf und Spenden trägt `gameItem` jetzt Kategorie, Typ, Größe, Grad und Klasse (REQ-MARKET-023, REQ-SUP-022).
+
 - **Exchange: Komponentendaten für verbundene Anwendungen.** Lose in `/me/stock` und `/org-stock` sowie Item-Zeilen in `/me/org-demand` tragen für eine Schiffskomponente das optionale Feld `component` mit `componentType`, `size`, `grade` und `itemClass` als stabile Codes, damit Anwendungen wie VerseKit dieselben Chips zeigen wie das Basetool. Ohne neuen Scope; neues Schema `component.schema.json` (REQ-XCH-049).
+
 - **Exchange: Logistiker-Kennzeichen je Einheit.** Jede Einheit in `units` von `GET /exchange/v1/org-stock` trägt `logistician`, ob das Mitglied dort Logistiker ist. Verbundene Anwendungen wie VerseKit müssen die Einheiten nicht mehr per `/org-stock/members` durchprobieren; die wiederkehrenden `403`-Warnungen im Backend-Log entfallen damit (REQ-XCH-042).
 
 - **Schnellzugriff: mehr Seiten, mehr Aktionen, tolerantere Suche.** `Strg`/`⌘` + `K` findet jetzt auch Reiter-Seiten wie „Mein Lager“, „Globales Lager“, „Hangar der Org-Einheit“ sowie – wenn du sie sehen darfst – die Reiter von „Bedarf & Spenden“ und „Ankauf“, und bietet die Aktionen „Neue Mission anlegen“, „Neuen Raffinerieauftrag anlegen“, „In mein Lager einbuchen“, „Ins globale Lager einbuchen“ (Logistiker), „Handbuch öffnen“, Sprachwechsel und „Administration öffnen“ (Admins). Menüfilter und Schnellzugriff finden „ü“ auch als „ue“ und hören auf Suchbegriffe („Schiffe“ → Hangar); besuchte Rechtsseiten erscheinen unter „Zuletzt besucht“ (neuer Endpunkt `GET /quick-access/entries`, ADR-0282, REQ-UI-026).
@@ -23,12 +29,15 @@
 ### Changed
 
 - **Aufträge: Bearbeiten verlangt die Version.** Eine Auftragsänderung mit Versionsfeld (Status, Blueprint-Zählweise, Bearbeiten, Bearbeiten als Auftraggeber) ohne `version` antwortet jetzt mit 409 statt eine gleichzeitige Änderung still zu überschreiben (REQ-ORDERS-046).
+
 - **Missionen und Aufträge: Zugriff wird am geladenen Datensatz geprüft.** Ablauf, Teilnehmer, Einheiten, Crews und Co-Manager einer Mission sowie Auftragsänderungen prüft jetzt ein Edit-Modul pro Aggregat, auch für Aufrufe ohne HTTP-Anfrage; der Endpunkt prüft nur noch die Rolle. Eine unbekannte Mission oder ein unbekannter Auftrag antwortet dort mit 404 statt 403 (REQ-SEC-085, ADR-0287).
 
 ### Fixed
 
 - **Komponenten-Angaben auf Handy und Tablet.** Im Lager stehen die Spalte „Bestand" und lange Item-Namen wieder vollständig da, statt abgeschnitten oder aus dem Bild geschoben zu werden; in Auftrag, Spendenliste und Item-Auswahl brechen Name, Typ, Größe und Klasse sauber um, die Auswahlliste bleibt lesbar (Frontend, REQ-UI-009).
+
 - **Lager: Filter-Auswahllisten und „Alle zurücksetzen".** Eine offene Auswahlliste (Typ, Größe, Klasse) überdeckt die Felder darunter nicht mehr, sondern schiebt sie nach unten. „Alle zurücksetzen" zeigt danach zuverlässig wieder alle Gegenstände statt einer älteren, noch gefilterten Antwort (Frontend).
+
 - **Handy und Tablet: Checkboxen, Eingabefelder und schwebende Elemente.** Checkboxen und Radio-Buttons bleiben auf Touch-Geräten kleine Kästchen statt hoher Balken, das Label ist die 44-px-Tippfläche; Schalter behalten ihre Form. Eingabefelder sind dort mindestens 16 px groß, damit iOS beim Antippen nicht mehr hineinzoomt; Toast und „Aktualisierungen verfügbar" liegen über statt auf der Tab-Leiste (Frontend, REQ-UI-009).
 
 - **Tablet im Querformat voll bedienbar.** Auf Touch-Geräten gelten die 44-px-Tippflächen und die 16-px-Eingabefelder jetzt unabhängig von der Breite, also auch auf einem quer gehaltenen iPad (Frontend, REQ-UI-009).
