@@ -20,7 +20,7 @@
 import { genericError } from '/js/bank/bank-messages.js';
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 
 /**
  * Maps a grant flag name onto the row attribute the next toggle click reads.
@@ -107,9 +107,7 @@ export function initGrantMatrix() {
             errorMessage: genericError(),
             onSuccess(payload) {
                 applyGrantFlagResult(flagButton, row, flag, newValue, payload);
-                if (typeof krtLiveSync.sendChanged === 'function') {
-                    krtLiveSync.sendChanged('bank', ['grants']);
-                }
+                krtPageSections.publish('bank', ['grants']);
             },
             onError(status, payload) {
                 const message = payload && payload.message ? payload.message : genericError();

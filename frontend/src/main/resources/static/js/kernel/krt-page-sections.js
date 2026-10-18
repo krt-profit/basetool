@@ -72,7 +72,8 @@ function create(config) {
     }
 
     /**
-     * Re-renders one or more sections in place and broadcasts the change once.
+     * Re-renders one or more sections in place and broadcasts the change once. Sections that share a
+     * container and fragment are fetched once.
      *
      * @param {string | string[]} sectionKeys the sections to re-render
      * @param {KrtSectionRefreshOpts} [opts] `broadcast: false` suppresses the peer broadcast
@@ -83,6 +84,8 @@ function create(config) {
         if (!opts || opts.broadcast !== false) {
             broadcast(list);
         }
+        /** @type {Map<string, Promise<boolean>>} */
+        const swapped = new Map();
         return Promise.all(
             list.map((sectionKey) => {
                 const cfg = sections[sectionKey];
@@ -90,8 +93,13 @@ function create(config) {
                 if (!cfg || !url || !document.querySelector(cfg.container)) {
                     return Promise.resolve(false);
                 }
+                const swapKey = `${cfg.container}|${cfg.fragmentValue || ''}`;
+                const pending = swapped.get(swapKey);
+                if (pending) {
+                    return pending;
+                }
                 const dict = /** @type {KrtI18nDict} */ ((config.dict && config.dict()) || {});
-                return krtFetch.swap({
+                const swap = krtFetch.swap({
                     url,
                     container: cfg.container,
                     fragmentValue: cfg.fragmentValue,
@@ -99,6 +107,8 @@ function create(config) {
                     preserveScroll: true,
                     errorMessage: dict[(config.keys || {}).refreshErrorKey] || '',
                 });
+                swapped.set(swapKey, swap);
+                return swap;
             }),
         );
     }

@@ -18,44 +18,7 @@
  */
 
 import { bankRefreshError } from '/js/bank/bank-messages.js';
-import { krtFetch } from '/js/kernel/krt-fetch.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
-
-const BANK_ACCOUNT_SECTIONS = {
-    account: { container: '#bank-account-results', fragmentValue: 'accountBody' },
-    bookings: { container: '#bank-account-results', fragmentValue: 'accountBody' },
-    chart: { container: '#bank-account-results', fragmentValue: 'accountBody' },
-};
-
-const ORGUNIT_ACCOUNT_SECTIONS = {
-    account: {
-        container: '#org-unit-bank-settings-results',
-        fragmentValue: 'orgUnitBankSettings',
-    },
-    bookings: {
-        container: '#org-unit-bank-bookings-results',
-        fragmentValue: 'orgUnitBankBookings',
-    },
-    chart: {
-        container: '#org-unit-bank-chart-results',
-        fragmentValue: 'orgUnitBalanceChart',
-    },
-};
-
-const BANK_STAFF_SECTIONS = {
-    grid: { container: '#bank-grid-results', fragmentValue: 'bankGrid' },
-    requestQueue: { container: '#bank-request-queue-results', fragmentValue: 'requestQueue' },
-    manage: { container: '#bank-manage-results', fragmentValue: 'manageBody' },
-    grants: { container: '#bank-grants-results', fragmentValue: 'grantsMatrix' },
-};
-
-const ORGUNIT_BANK_SECTIONS = {
-    orgUnitBank: { container: '#org-unit-bank-results', fragmentValue: 'orgUnitBank' },
-    orgUnitBankSettings: {
-        container: '#org-unit-bank-settings-results',
-        fragmentValue: 'orgUnitBankSettings',
-    },
-};
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 
 /**
  * Reads the localized "updates available" pill label from `<main data-bank-livesync-updates>`.
@@ -82,33 +45,28 @@ function bankAccountId() {
 }
 
 /**
- * Builds a live-sync receiver refresh closure for one section map. It re-renders each present
- * container once (deduplicated by container) from the viewer's own pathname and query.
+ * Declares one bank room's sections, topic and receiver.
  *
- * @param {Record<string, {container: string, fragmentValue: string}>} sectionMap the section →
- *     {container, fragmentValue} map for the room
- * @returns {(keys: string[]) => void} the refresh handler passed to createReceiver
+ * @param {{ topic: string, coalesceMs?: number, sections: Record<string, { container: string, fragmentValue: string }> }} room
+ *     the room's topic, receiver coalescing delay and section map
+ * @returns {KrtPageSections} the room's section seam
  */
-function makeBankReceiverRefresh(sectionMap) {
-    return function (keys) {
-        const url = window.location.pathname + window.location.search;
-        const errorMessage = bankRefreshError();
-        /** @type {Record<string, boolean>} */
-        const done = {};
-        keys.forEach((key) => {
-            const cfg = sectionMap[key];
-            if (!cfg || done[cfg.container] || !document.querySelector(cfg.container)) {
-                return;
-            }
-            done[cfg.container] = true;
-            krtFetch.swap({
-                url,
-                container: cfg.container,
-                fragmentValue: cfg.fragmentValue,
-                errorMessage,
-            });
-        });
-    };
+function bankRoom(room) {
+    return krtPageSections.create({
+        dict() {
+            return { 'bank.refresh.error': bankRefreshError() };
+        },
+        keys: { refreshErrorKey: 'bank.refresh.error' },
+        sections: room.sections,
+        pageUrl() {
+            return window.location.pathname + window.location.search;
+        },
+        topic: room.topic,
+        receiver: {
+            coalesceMs: room.coalesceMs,
+            pill: { label: bankLiveSyncUpdates },
+        },
+    });
 }
 
 /**
@@ -116,22 +74,24 @@ function makeBankReceiverRefresh(sectionMap) {
  * and the single-account room (REQ-FE-015).
  */
 export function initLiveSyncReceivers() {
-    function pill() {
-        return { label: bankLiveSyncUpdates };
-    }
-
     const hasStaffRoom =
         document.querySelector('#bank-grid-results') ||
         document.querySelector('#bank-request-queue-results') ||
         document.querySelector('#bank-manage-results') ||
         document.querySelector('#bank-grants-results');
     if (hasStaffRoom) {
-        krtLiveSync.createReceiver({
+        bankRoom({
             topic: 'bank',
-            sections: BANK_STAFF_SECTIONS,
             coalesceMs: 1500,
-            refresh: makeBankReceiverRefresh(BANK_STAFF_SECTIONS),
-            pill: pill(),
+            sections: {
+                grid: { container: '#bank-grid-results', fragmentValue: 'bankGrid' },
+                requestQueue: {
+                    container: '#bank-request-queue-results',
+                    fragmentValue: 'requestQueue',
+                },
+                manage: { container: '#bank-manage-results', fragmentValue: 'manageBody' },
+                grants: { container: '#bank-grants-results', fragmentValue: 'grantsMatrix' },
+            },
         });
     }
 
@@ -139,25 +99,49 @@ export function initLiveSyncReceivers() {
         document.querySelector('#org-unit-bank-results') ||
         document.querySelector('#org-unit-bank-settings-results');
     if (hasOrgUnitRoom) {
-        krtLiveSync.createReceiver({
+        bankRoom({
             topic: 'orgunit-bank',
-            sections: ORGUNIT_BANK_SECTIONS,
             coalesceMs: 1500,
-            refresh: makeBankReceiverRefresh(ORGUNIT_BANK_SECTIONS),
-            pill: pill(),
+            sections: {
+                orgUnitBank: {
+                    container: '#org-unit-bank-results',
+                    fragmentValue: 'orgUnitBank',
+                },
+                orgUnitBankSettings: {
+                    container: '#org-unit-bank-settings-results',
+                    fragmentValue: 'orgUnitBankSettings',
+                },
+            },
         });
     }
 
     const accountId = bankAccountId();
-    if (accountId) {
-        const sectionMap = document.querySelector('#bank-account-results')
-            ? BANK_ACCOUNT_SECTIONS
-            : ORGUNIT_ACCOUNT_SECTIONS;
-        krtLiveSync.createReceiver({
+    if (accountId && document.querySelector('#bank-account-results')) {
+        bankRoom({
             topic: `bank:${accountId}`,
-            sections: sectionMap,
-            refresh: makeBankReceiverRefresh(sectionMap),
-            pill: pill(),
+            sections: {
+                account: { container: '#bank-account-results', fragmentValue: 'accountBody' },
+                bookings: { container: '#bank-account-results', fragmentValue: 'accountBody' },
+                chart: { container: '#bank-account-results', fragmentValue: 'accountBody' },
+            },
+        });
+    } else if (accountId) {
+        bankRoom({
+            topic: `bank:${accountId}`,
+            sections: {
+                account: {
+                    container: '#org-unit-bank-settings-results',
+                    fragmentValue: 'orgUnitBankSettings',
+                },
+                bookings: {
+                    container: '#org-unit-bank-bookings-results',
+                    fragmentValue: 'orgUnitBankBookings',
+                },
+                chart: {
+                    container: '#org-unit-bank-chart-results',
+                    fragmentValue: 'orgUnitBalanceChart',
+                },
+            },
         });
     }
 }
@@ -201,9 +185,6 @@ function resolveBankLiveSyncAccount(form, ref) {
  * @param {HTMLFormElement} form the form whose write just succeeded
  */
 export function publishBankLiveSync(form) {
-    if (typeof krtLiveSync.sendChanged !== 'function') {
-        return;
-    }
     const spec = form.getAttribute('data-livesync');
     if (!spec) {
         return;
@@ -238,6 +219,6 @@ export function publishBankLiveSync(form) {
                 return;
             }
             sent[key] = true;
-            krtLiveSync.sendChanged(topic, sections);
+            krtPageSections.publish(topic, sections);
         });
 }

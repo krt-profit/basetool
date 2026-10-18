@@ -355,6 +355,22 @@ await test('a page that declares neither dict nor keys still refreshes and recei
     assert.equal(h.elements['#a'].innerHTML, 'fresh frag-a');
 });
 
+await test('sections sharing a container and fragment are fetched once', async () => {
+    const h = harness();
+    const sections = h.krtPageSections.create(
+        declaration({
+            sections: {
+                a: { container: '#a', fragmentValue: 'frag-a' },
+                alias: { container: '#a', fragmentValue: 'frag-a' },
+                b: { container: '#b', fragmentValue: 'frag-b' },
+            },
+        }),
+    );
+    const flags = await sections.refresh(['a', 'alias', 'b']);
+    assert.deepEqual(plain(flags), [true, true, true]);
+    assert.equal(fragmentCalls(h).length, 2);
+});
+
 await test('publish is a no-op without a topic', async () => {
     const h = harness();
     h.krtPageSections.publish(null, ['a']);

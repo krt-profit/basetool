@@ -431,42 +431,33 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void bankStaffAccountSeamMap_matchesTheBankAccountTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank-livesync.js", "BANK_ACCOUNT_SECTIONS");
+    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank-livesync.js", "sections", 2);
     assertThat(jsKeys)
-        .as(
-            "BANK_ACCOUNT_SECTIONS keys in bank-livesync.js vs LiveSyncTopicClass.BANK_ACCOUNT"
-                + " whitelist")
+        .as("sections keys in bank-livesync.js vs LiveSyncTopicClass.BANK_ACCOUNT" + " whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.BANK_ACCOUNT.allowedSections());
   }
 
   @Test
   void orgUnitAccountSeamMap_matchesTheBankAccountTopicWhitelist() throws IOException {
-    Set<String> jsKeys =
-        seamMapKeys("/static/js/bank/bank-livesync.js", "ORGUNIT_ACCOUNT_SECTIONS");
+    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank-livesync.js", "sections", 3);
     assertThat(jsKeys)
-        .as(
-            "ORGUNIT_ACCOUNT_SECTIONS keys in bank-livesync.js vs LiveSyncTopicClass.BANK_ACCOUNT"
-                + " whitelist")
+        .as("sections keys in bank-livesync.js vs LiveSyncTopicClass.BANK_ACCOUNT" + " whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.BANK_ACCOUNT.allowedSections());
   }
 
   @Test
   void bankStaffSeamMap_matchesTheBankStaffTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank-livesync.js", "BANK_STAFF_SECTIONS");
+    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank-livesync.js", "sections", 0);
     assertThat(jsKeys)
-        .as(
-            "BANK_STAFF_SECTIONS keys in bank-livesync.js vs LiveSyncTopicClass.BANK_STAFF"
-                + " whitelist")
+        .as("sections keys in bank-livesync.js vs LiveSyncTopicClass.BANK_STAFF" + " whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.BANK_STAFF.allowedSections());
   }
 
   @Test
   void orgUnitBankSeamMap_matchesTheOrgUnitBankTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank-livesync.js", "ORGUNIT_BANK_SECTIONS");
+    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank-livesync.js", "sections", 1);
     assertThat(jsKeys)
-        .as(
-            "ORGUNIT_BANK_SECTIONS keys in bank-livesync.js vs LiveSyncTopicClass.ORGUNIT_BANK"
-                + " whitelist")
+        .as("sections keys in bank-livesync.js vs LiveSyncTopicClass.ORGUNIT_BANK" + " whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.ORGUNIT_BANK.allowedSections());
   }
 
@@ -607,8 +598,23 @@ class LiveSyncSectionMapParityTest {
    * @throws IOException if the resource cannot be read
    */
   private static Set<String> seamMapKeys(String resource, String variableName) throws IOException {
+    return seamMapKeys(resource, variableName, 0);
+  }
+
+  /**
+   * Reads the section keys of the {@code occurrence}-th (zero-based) declaration of the seam map in
+   * a module that declares several.
+   *
+   * @param resource the classpath resource of the module
+   * @param variableName the seam-map variable or property name
+   * @param occurrence which declaration of that name to read
+   * @return the section keys in declaration order
+   * @throws IOException if the resource cannot be read
+   */
+  private static Set<String> seamMapKeys(String resource, String variableName, int occurrence)
+      throws IOException {
     String js = readResource(resource);
-    String objectLiteral = extractObjectLiteral(js, variableName);
+    String objectLiteral = extractObjectLiteral(js, variableName, occurrence);
     Set<String> keys = new LinkedHashSet<>();
     Matcher matcher = SEAM_ENTRY.matcher(objectLiteral);
     while (matcher.find()) {
@@ -631,10 +637,14 @@ class LiveSyncSectionMapParityTest {
    * @param variableName the seam-map variable name
    * @return the object-literal body between its outer braces
    */
-  private static String extractObjectLiteral(String js, String variableName) {
+  private static String extractObjectLiteral(String js, String variableName, int occurrence) {
     Matcher declaration =
         Pattern.compile("\\b" + Pattern.quote(variableName) + "\\s*[=:]\\s*\\{").matcher(js);
-    assertThat(declaration.find())
+    boolean found = false;
+    for (int i = 0; i <= occurrence; i++) {
+      found = declaration.find();
+    }
+    assertThat(found)
         .as(
             "%s = { or %s: { declaration present (not just a comment mention)",
             variableName, variableName)
