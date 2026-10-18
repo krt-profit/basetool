@@ -18,6 +18,7 @@
 
 ### Fixed
 
+- **Lager: Filter-Auswahllisten und „Alle zurücksetzen".** Eine offene Auswahlliste (Typ, Größe, Klasse) überdeckt die Felder darunter nicht mehr, sondern schiebt sie nach unten. „Alle zurücksetzen" zeigt danach zuverlässig wieder alle Gegenstände statt einer älteren, noch gefilterten Antwort (Frontend).
 - **Handy und Tablet: Checkboxen, Eingabefelder und schwebende Elemente.** Checkboxen und Radio-Buttons bleiben auf Touch-Geräten kleine Kästchen statt hoher Balken, das Label ist die 44-px-Tippfläche; Schalter behalten ihre Form. Eingabefelder sind dort mindestens 16 px groß, damit iOS beim Antippen nicht mehr hineinzoomt; Toast und „Aktualisierungen verfügbar" liegen über statt auf der Tab-Leiste (Frontend, REQ-UI-009).
 
 - **Tablet im Querformat voll bedienbar.** Auf Touch-Geräten gelten die 44-px-Tippflächen und die 16-px-Eingabefelder jetzt unabhängig von der Breite, also auch auf einem quer gehaltenen iPad (Frontend, REQ-UI-009).
