@@ -3110,8 +3110,30 @@
           "units" : {
             "type" : "array",
             "items" : {
-              "$ref" : "#/components/schemas/ExchangeOrgUnitDto"
+              "$ref" : "#/components/schemas/ExchangeOrgStockPoolDto"
             }
+          }
+        }
+      },
+      "ExchangeOrgStockPoolDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "kind" : {
+            "type" : "string",
+            "enum" : [ "SQUADRON", "SPECIAL_COMMAND", "BEREICH", "ORGANISATIONSLEITUNG" ]
+          },
+          "logistician" : {
+            "type" : "boolean"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "shorthand" : {
+            "type" : "string"
           }
         }
       },

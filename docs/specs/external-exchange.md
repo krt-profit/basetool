@@ -2445,7 +2445,10 @@ other units never appear; the admin all-scope and pin never apply.
   „gestohlen", the amount and, per dimension, the amount earmarked to job orders and to missions.
 - **Units.** Every snapshot page and feed page lists the units the member currently reads. A unit
   that is no longer listed — the member left it — is gone for the client with all its lots; a
-  departure takes effect on the next request.
+  departure takes effect on the next request. Each listed unit carries `logistician`, whether the
+  member is a Logistician of exactly that unit by the rule of REQ-XCH-043, read at that request
+  and independent of the client's scopes, so a client learns where the writes, the roster and the
+  targets of REQ-XCH-045 are open without probing them.
 - **Feed.** Org stock is its own feed resource, keyed by unit instead of by member, with the
   cursor, tombstone, 90-day retention and `410 CURSOR_EXPIRED` rules of REQ-XCH-013. Its entries are
   `ORG_STOCK` rows of `exchange_change` that carry the unit (`org_unit_id`) and no member, and a feed
@@ -2464,7 +2467,8 @@ other units never appear; the admin all-scope and pin never apply.
 - **Gates.** The pending-approval, role and terms gates of REQ-XCH-009 apply. A client may cache
   org stock for up to 7 days.
 - **Wire shape.** The answer is `page.schema.json#/$defs/orgStockPage`: the page members of
-  REQ-XCH-013 plus `units[]` of `org-unit.schema.json`, its lots `org-stock-lot.schema.json` with
+  REQ-XCH-013 plus `units[]` of `org-unit.schema.json` with its optional `logistician` always
+  set, its lots `org-stock-lot.schema.json` with
   `unit` `{id, name}` and `earmarked` `{jobOrders, missions}` as quantities in the lot's unit. A
   snapshot pages by each lot's lowest row id, as `/me/stock` does, and its last page carries the
   feed cursor it was taken at (REQ-XCH-013); a feed page answers each changed lot once, with its
@@ -2491,6 +2495,9 @@ other units never appear; the admin all-scope and pin never apply.
   *`ExchangeChangeFeedTriggerIntegrationTest`, `ExchangeOrgStockControllerTest`.*
 - [x] After the member leaves a unit, the next page no longer lists the unit or its lots; after
   joining one, the feed delivers its pool. *`ExchangeOrgStockControllerTest`.*
+- [x] Every listed unit carries `logistician`, `true` exactly for the units the member is a
+  Logistician of, with or without `exchange.orgstock.details` and also for an empty pool.
+  *`ExchangeOrgStockControllerTest`.*
 - [x] A holder's name change or name withholding announces their lots (with REQ-XCH-043/-044).
   *`ExchangeOrgStockDetailsControllerTest`.*
 

@@ -76,7 +76,8 @@ class ExchangeOrgStockRouteTest {
                  "earmarked":{"jobOrders":{"amount":2,"unit":"SCU"},
                               "missions":{"amount":0,"unit":"SCU"}}}],
        "removed":[],
-       "units":[{"id":"%1$s","name":"Staffel Iridium","shorthand":"IRI","kind":"SQUADRON"}],
+       "units":[{"id":"%1$s","name":"Staffel Iridium","shorthand":"IRI","kind":"SQUADRON",
+                 "logistician":true}],
        "nextCursor":null,"hasMore":false}
       """
           .formatted(UNIT, UUID.randomUUID());
@@ -138,7 +139,18 @@ class ExchangeOrgStockRouteTest {
         .andExpect(jsonPath("$.items.length()").value(1))
         .andExpect(jsonPath("$.items[0].unit.id").value(UNIT.toString()))
         .andExpect(jsonPath("$.items[0].earmarked.jobOrders.amount").value(2))
-        .andExpect(jsonPath("$.units[0].kind").value("SQUADRON"));
+        .andExpect(jsonPath("$.units[0].kind").value("SQUADRON"))
+        .andExpect(jsonPath("$.units[0].logistician").value(true));
+  }
+
+  @Test
+  void aUnitWhoseLogisticianFlagIsNoBooleanIsARelayFailure() throws Exception {
+    when(relay.forward(any(), anyString(), any(), any(), any()))
+        .thenReturn(ok(PAGE.replace("\"logistician\":true", "\"logistician\":\"yes\"")));
+
+    call(TOKEN, PATH)
+        .andExpect(status().isBadGateway())
+        .andExpect(jsonPath("$.code").value(ExchangeRelay.RELAY_FAILED));
   }
 
   @Test

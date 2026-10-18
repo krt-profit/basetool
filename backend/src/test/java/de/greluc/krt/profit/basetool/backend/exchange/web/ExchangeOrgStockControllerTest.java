@@ -225,6 +225,41 @@ class ExchangeOrgStockControllerTest {
   }
 
   @Test
+  void everyUnitTellsWhetherTheMemberIsALogisticianOfItAlsoForAnEmptyPool() throws Exception {
+    UUID flagged = orgUnit("SPECIAL_COMMAND", null);
+    UUID plain = orgUnit("SQUADRON", null);
+    joins(member, flagged, "MEMBER");
+    jdbc.update(
+        "UPDATE org_unit_membership SET is_logistician = true WHERE user_id = ? AND org_unit_id ="
+            + " ?",
+        member,
+        flagged);
+    joins(member, plain, "MEMBER");
+
+    String cursor =
+        read(relayed(get(PATH)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items.length()").value(0))
+            .andExpect(jsonPath("$.units.length()").value(2))
+            .andExpect(jsonPath("$.units[?(@.id == '" + flagged + "')].logistician").value(true))
+            .andExpect(jsonPath("$.units[?(@.id == '" + plain + "')].logistician").value(false))
+            .andReturn()
+            .getResponse()
+            .getContentAsString()
+            .replaceAll("(?s).*\"nextCursor\":\"([^\"]+)\".*", "$1");
+
+    jdbc.update(
+        "UPDATE org_unit_membership SET is_logistician = true WHERE user_id = ? AND org_unit_id ="
+            + " ?",
+        member,
+        plain);
+
+    read(relayed(get(PATH).param("cursor", cursor)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.units[?(@.id == '" + plain + "')].logistician").value(true));
+  }
+
+  @Test
   void theSameMaterialAtTheSamePlaceInTwoUnitsIsTwoLots() throws Exception {
     UUID staffel = orgUnit("SQUADRON", null);
     UUID kommando = orgUnit("SPECIAL_COMMAND", null);

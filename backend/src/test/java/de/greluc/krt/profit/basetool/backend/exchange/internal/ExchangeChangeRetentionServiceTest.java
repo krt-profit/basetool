@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockPoolDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
@@ -156,7 +156,7 @@ class ExchangeChangeRetentionServiceTest {
               assertThat(e.status()).isEqualTo(HttpStatus.GONE);
             });
     assertThat(orgStockService.page(caller, at, 10, false).units())
-        .extracting(ExchangeOrgUnitDto::id)
+        .extracting(ExchangeOrgStockPoolDto::id)
         .containsExactly(pool);
   }
 

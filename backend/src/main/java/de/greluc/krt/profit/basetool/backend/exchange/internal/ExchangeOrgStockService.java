@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeEarma
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockEntryDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockLotDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockPageDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockPoolDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockUnitDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeQuantityDto;
@@ -77,12 +78,12 @@ public class ExchangeOrgStockService {
    * The pools one request reads.
    *
    * @param byId the units the member reads, by id
-   * @param units the same units in their listing order
+   * @param units the same units in their listing order, each with the member's Logistician flag
    * @param detailed the units among them whose lots carry their entries
    */
   private record Pools(
       @NotNull Map<UUID, ExchangeOrgUnitDto> byId,
-      @NotNull List<ExchangeOrgUnitDto> units,
+      @NotNull List<ExchangeOrgStockPoolDto> units,
       @NotNull Set<UUID> detailed) {}
 
   /**
@@ -103,12 +104,13 @@ public class ExchangeOrgStockService {
     List<ExchangeOrgUnitDto> units = orgUnitService.orgUnits(caller.member()).items();
     Map<UUID, ExchangeOrgUnitDto> byId =
         units.stream().collect(Collectors.toMap(ExchangeOrgUnitDto::id, Function.identity()));
-    Set<UUID> detailed = new HashSet<>();
-    if (details) {
-      detailed.addAll(orgUnitService.logisticianUnits(caller.member()));
-      detailed.retainAll(byId.keySet());
-    }
-    Pools pools = new Pools(byId, units, detailed);
+    Set<UUID> logistician = new HashSet<>(orgUnitService.logisticianUnits(caller.member()));
+    logistician.retainAll(byId.keySet());
+    List<ExchangeOrgStockPoolDto> listed =
+        units.stream()
+            .map(unit -> ExchangeOrgStockPoolDto.of(unit, logistician.contains(unit.id())))
+            .toList();
+    Pools pools = new Pools(byId, listed, details ? logistician : Set.of());
     ExchangeOrgStockPageDto page;
     if (cursor == null) {
       page = snapshot(caller, pools, feedReader.snapshotStart(), FIRST, size);

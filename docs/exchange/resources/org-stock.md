@@ -104,12 +104,17 @@ A [`page`](../schemas/) of org-stock lots with one more member, `units`: the
 that is no longer listed — the member left it — is gone for your client together with all its lots;
 a departure takes effect on the next request.
 
+Each unit in `units` carries `logistician`: whether the member is a Logistician of exactly that unit
+(see [Entries](#entries)). It is current on every page, also for a pool that holds no stock. Offer
+[writes](#writing), the [roster](#the-roster) and the [targets](#the-targets) only for a unit with
+`logistician: true`; the others answer them `403 NOT_PERMITTED`. Do not probe the roster to find out.
+
 ```json
 {
   "items": [ ],
   "removed": [],
   "units": [
-    {"id": "7d1c2f4e-3b8a-4c55-9e21-6a0f3b2d9c10", "name": "Iridium", "shorthand": "IRI", "kind": "SQUADRON"}
+    {"id": "7d1c2f4e-3b8a-4c55-9e21-6a0f3b2d9c10", "name": "Iridium", "shorthand": "IRI", "kind": "SQUADRON", "logistician": true}
   ],
   "nextCursor": "f1.4711.0",
   "hasMore": false

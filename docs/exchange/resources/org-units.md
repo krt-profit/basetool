@@ -55,5 +55,6 @@ then areas, squadrons and special commands, each by name:
 - `id` is opaque: store it and send it back, never parse it.
 - `name` and `shorthand` are what the Basetool shows; both can change when the unit is renamed, so
   key anything you keep by `id`.
+- This list carries no `logistician`; the units of the [org stock](org-stock.md#the-answer) do.
 
 Read the list again when you offer the choice; a membership can end or begin at any time.
