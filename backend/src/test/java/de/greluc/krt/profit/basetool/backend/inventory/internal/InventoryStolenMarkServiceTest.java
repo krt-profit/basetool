@@ -37,6 +37,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
@@ -68,6 +70,7 @@ class InventoryStolenMarkServiceTest {
 
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private MaterialExchangeOfferRepository materialExchangeOfferRepository;
+  @Mock private StockChangeObserver stockChangeObserver;
   @Mock private InventoryCheckoutService inventoryCheckoutService;
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private AuditService auditService;
@@ -89,6 +92,7 @@ class InventoryStolenMarkServiceTest {
     return new InventoryStolenMarkService(
         inventoryItemRepository,
         new MaterialExchangeStockOfferLookup(materialExchangeOfferRepository),
+        stockChangeObserver,
         inventoryCheckoutService,
         inventoryItemMapper,
         new InventoryProperties(enabled),
@@ -212,6 +216,7 @@ class InventoryStolenMarkServiceTest {
     assertThat(item.getStolen()).isFalse();
     assertThat(item.getAmount()).isEqualTo(6.0);
     verify(inventoryItemRepository).saveAndFlush(item);
+    verify(stockChangeObserver).lower(item.getId(), 6.0, StockChangeReason.REBOOK);
     verify(auditService)
         .record(
             eq(AuditEventType.INVENTORY_STOLEN_MARKED), eq(item.getId()), any(), eq(CALLER), any());

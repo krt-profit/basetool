@@ -25,6 +25,8 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryNotices;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.TransferredLot;
@@ -79,6 +81,7 @@ public class InventoryPoolChangeService {
   private final OrgUnitMembershipQueryService membershipQueryService;
   private final OwnerScopeService ownerScopeService;
   private final StockOfferLookup stockOfferLookup;
+  private final StockChangeObserver stockChangeObserver;
   private final InventoryCheckoutService inventoryCheckoutService;
   private final InventoryItemMapper inventoryItemMapper;
   private final UserRepository userRepository;
@@ -316,19 +319,18 @@ public class InventoryPoolChangeService {
     if (refusal != null) {
       throw splitProblem(refusal);
     }
-    InventoryItem part = new InventoryItem();
-    part.setUser(item.getUser());
-    part.setOwningOrgUnit(target);
-    part.setMaterial(item.getMaterial());
-    part.setGameItem(item.getGameItem());
-    part.setLocation(item.getLocation());
-    part.setQuality(item.getQuality());
-    part.setAmount(ScuAmounts.roundToScuScale(amount));
-    part.setPersonal(false);
-    part.setStolen(item.getStolen());
-    final InventoryItem savedPart = inventoryItemRepository.save(part);
-    item.setAmount(ScuAmounts.roundToScuScale(amountOf(item) - amount));
-    inventoryItemRepository.saveAndFlush(item);
+    final InventoryItem savedPart =
+        inventoryItemRepository.save(
+            LotRows.split(
+                item,
+                amount,
+                LotRows.Placement.of(item).withOwningOrgUnit(target).withPersonal(false)));
+    LotRows.lower(
+        inventoryItemRepository,
+        stockChangeObserver,
+        item,
+        ScuAmounts.roundToScuScale(amountOf(item) - amount),
+        StockChangeReason.REBOOK);
     return savedPart;
   }
 
