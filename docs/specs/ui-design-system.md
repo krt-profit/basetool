@@ -710,11 +710,19 @@ a geometric check had no rule for:
   basis on the phone, so two pickers that cannot share a row each take one.
 - **Headings keep their order on the phone.** An unstyled `h2` / `h3` defaulted to 24px and outgrew
   the 22.4px page title; on the phone they are 1.2rem and 1.05rem. A heading hyphenates only with five
-  letters on each side of the break (`hyphenate-limit-chars: 12 5 5`), so a compound breaks at its
+  letters before and six after the break (`hyphenate-limit-chars: 12 5 6`), so a compound breaks at its
   joint („Benachrichtigungs-regeln") rather than one syllable from the end.
 - **A name is not cut where a touch cannot reveal it.** A truncated name with a `title` tooltip is
   unreadable on a touch screen; the price matrix's terminal and material names wrap onto a second
   line instead of ending in an ellipsis.
+- **A form grid inside a narrow dialog is one column.** `.krt-modal` is a size container; below
+  34rem its `.form-grid` collapses to a single column, so a 440px dialog no longer splits its fields
+  into two 190px columns. Field labels of a `.kv-list` hyphenate instead of breaking a word without a
+  hyphen („Handelsbeauftrag / ter").
+- **Mouse-only hints stay off touch screens.** „Strg+Klick für Mehrfachauswahl" is hidden under
+  `(pointer: coarse)`, where the browser shows its own multi-pick.
+- **The sign-in form follows the same 16px rule** (`krt-login-v3.css`), since it is the first screen
+  of the installed app.
 - **A scrolling tab strip shows its current tab.** On `/purchasing/report` the active tab was the
   fourth of four and loaded off-screen; `common-handlers.js` scrolls the strip, never the page, so
   the current `.tab-nav` or `.krt-segmented` item is in view.

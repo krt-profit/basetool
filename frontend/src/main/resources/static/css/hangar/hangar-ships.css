@@ -110,7 +110,6 @@
             order: 1;
             margin-left: 0;
         }
-        .hangar-table .cell-title,
         .hangar-table .cell-sub {
             white-space: nowrap;
             overflow: hidden;

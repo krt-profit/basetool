@@ -239,6 +239,9 @@ class TouchClassLayoutE2eTest {
           new int[] {1280, 800},
           new int[] {1600, 900});
 
+  /** Upper bound of the width-based touch block; mirrors {@code width <= 1024px} in the app. */
+  private static final int TOUCH_BREAKPOINT = 1024;
+
   /** The device classes held by a finger, so the touch floors apply at any width. */
   private static final Set<String> TOUCH_DEVICES =
       Set.of("375x812", "810x1080", "1024x768", "1180x820");
@@ -491,6 +494,35 @@ class TouchClassLayoutE2eTest {
   }
 
   /**
+   * Decides whether the touch floors apply to this measurement.
+   *
+   * <p>Up to the touch breakpoint the width decides; above it the app switches its touch ergonomics
+   * on by {@code (pointer: coarse)}, so a touch class is held to them only where the engine reports
+   * that pointer.
+   *
+   * @param page the loaded page, whose media queries are read
+   * @param deviceLabel {@code WxH}
+   * @param width viewport width in CSS pixels
+   * @return whether the 44px and 16px floors are asserted
+   */
+  private static boolean touchApplies(Page page, String deviceLabel, int width) {
+    if (!TOUCH_DEVICES.contains(deviceLabel)) {
+      return false;
+    }
+    if (width <= TOUCH_BREAKPOINT) {
+      return true;
+    }
+    boolean coarse =
+        Boolean.TRUE.equals(page.evaluate("() => matchMedia('(pointer: coarse)').matches"));
+    if (!coarse) {
+      System.out.printf(
+          "[touch-layout] %-22s %s reports no coarse pointer; touch floors not asserted%n",
+          deviceLabel, ENGINE);
+    }
+    return coarse;
+  }
+
+  /**
    * Loads one page at one device class, screenshots it, and returns its findings.
    *
    * @param page the page to navigate; its context already carries the viewport and the session
@@ -550,6 +582,7 @@ class TouchClassLayoutE2eTest {
       return findings;
     }
     measured.add(path);
+    boolean touch = touchApplies(page, deviceLabel, width);
 
     @SuppressWarnings("unchecked")
     Map<String, Object> probe =
@@ -564,7 +597,7 @@ class TouchClassLayoutE2eTest {
                     "phoneMaxWidth",
                     PHONE_MAX_WIDTH,
                     "touch",
-                    TOUCH_DEVICES.contains(deviceLabel),
+                    touch,
                     "minInputFontPx",
                     MIN_INPUT_FONT_PX,
                     "retiredGray",
@@ -636,7 +669,7 @@ class TouchClassLayoutE2eTest {
 
     printDiagnostics(where, probe);
     findings.addAll(checkGeometry(where, probe, width, height));
-    findings.addAll(collectOffenders(where, probe, TOUCH_DEVICES.contains(deviceLabel)));
+    findings.addAll(collectOffenders(where, probe, touch));
     findings.addAll(checkPagePatterns(where, probe));
     return findings;
   }

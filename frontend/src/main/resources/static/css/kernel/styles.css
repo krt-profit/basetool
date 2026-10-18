@@ -1178,7 +1178,7 @@
         h2,
         h3 {
             hyphens: auto;
-            hyphenate-limit-chars: 12 5 5;
+            hyphenate-limit-chars: 12 5 6;
             overflow-wrap: anywhere;
         }
 
@@ -2188,6 +2188,8 @@
         font-size: var(--fs-sm);
         text-transform: uppercase;
         letter-spacing: 0.04em;
+        hyphens: auto;
+        hyphenate-limit-chars: 10 4 4;
         margin: 0;
     }
 
@@ -5008,6 +5010,7 @@
             input:is([type='checkbox'], [type='radio']) + input[type='hidden'] + label
         ) {
             display: inline-flex;
+            flex-wrap: nowrap;
             align-items: center;
             gap: var(--space-2);
             min-height: var(--touch-target);
@@ -5929,6 +5932,7 @@
         max-width: 440px;
         max-height: 90vh;
         max-height: 90dvh;
+        container: krt-modal / inline-size;
         display: flex;
         background: var(--color-bg-dark-gray);
         border: var(--border-hairline);
@@ -6787,7 +6791,7 @@
         font-size: 1.75rem;
         overflow-wrap: anywhere;
         hyphens: auto;
-        hyphenate-limit-chars: 12 5 5;
+        hyphenate-limit-chars: 12 5 6;
     }
     .page-actions {
         display: flex;
@@ -7511,6 +7515,12 @@
     }
     .form-grid .span-all {
         grid-column: 1 / -1;
+    }
+    @container krt-modal (width < 34rem) {
+        .form-grid,
+        .form-grid--3 {
+            grid-template-columns: minmax(0, 1fr);
+        }
     }
     .form-grid > .form-group {
         margin: 0;
