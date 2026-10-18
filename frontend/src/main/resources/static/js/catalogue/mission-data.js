@@ -23,6 +23,7 @@ import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 
 const MISSION_KINDS = ['squadrons', 'jobtypes', 'freqtypes'];
@@ -119,60 +120,53 @@ function onMissionKindKeydown(e) {
     selectMissionKind(rows[idx].getAttribute('data-md-kind'), true);
 }
 
+const missionData = krtPageSections.create({
+    sections: {
+        squadrons: { container: '#squadrons-results', fragmentValue: 'squadrons-results' },
+        jobtypes: { container: '#jobtypes-results', fragmentValue: 'jobtypes-results' },
+        freqtypes: { container: '#freqtypes-results', fragmentValue: 'freqtypes-results' },
+    },
+    pageUrl() {
+        return `/admin/mission-data?${missionFilterParams()}`;
+    },
+});
+
 /**
- * Maps a form action to the id of the result section it changes.
+ * Maps a form action to the key of the result section it changes.
  *
  * @param {string} action the form's action URL
- * @returns {string | null} the section id, or null for an unknown action
+ * @returns {string | null} the section key, or null for an unknown action
  */
 function missionSectionForAction(action) {
-    if (action.indexOf('/squadrons') !== -1) return 'squadrons-results';
-    if (action.indexOf('/job-types') !== -1) return 'jobtypes-results';
-    if (action.indexOf('/frequency-types') !== -1) return 'freqtypes-results';
+    if (action.indexOf('/squadrons') !== -1) return 'squadrons';
+    if (action.indexOf('/job-types') !== -1) return 'jobtypes';
+    if (action.indexOf('/frequency-types') !== -1) return 'freqtypes';
     return null;
 }
 
 /**
- * Re-renders the result section a form action changed.
- *
- * @param {string} action the form's action URL
- */
-function reswapMissionSection(action) {
-    const section = missionSectionForAction(action);
-    if (section) {
-        krtFetch.swap({
-            url: `/admin/mission-data?${missionFilterParams()}`,
-            container: `#${section}`,
-            fragmentValue: section,
-            history: false,
-        });
-    }
-}
-
-/**
- * Submits a mission-data form through krtFetch and re-renders the affected section.
+ * Submits a mission-data form through the section seam and re-renders the affected section.
  *
  * @param {HTMLFormElement} form the form to submit
  * @param {string} successMessage the already-localized success toast
- * @param {(() => void) | null} onSuccess runs after a successful save, before the re-render
+ * @param {(() => void) | null} onSuccess runs after a successful save and the re-render
  */
 function missionWrite(form, successMessage, onSuccess) {
-    const action = /** @type {string} */ (form.getAttribute('action'));
-    krtFetch.submitForm({
+    const section = missionSectionForAction(/** @type {string} */ (form.getAttribute('action')));
+    missionData.submitForm({
         form,
         submitter: form.querySelector('button[type="submit"]'),
         successMessage,
         errorMessage: MISSION_MSG.error,
         conflict: MISSION_CONFLICT,
+        refresh: section ? [section] : undefined,
         onSuccess() {
             if (typeof onSuccess === 'function') {
                 onSuccess();
             }
-            reswapMissionSection(action);
         },
     });
 }
-
 document.addEventListener('DOMContentLoaded', () => {
     /**
      * Looks up a control of one of the data dialogs by id; the dialogs always render them.
@@ -467,15 +461,7 @@ function setupDragAndDrop(containerId, reorderUrl) {
         );
         const newOrderIds = rows.map((row) => row.dataset.id);
 
-        const reswapFreqTypes = function () {
-            krtFetch.swap({
-                url: `/admin/mission-data?${missionFilterParams()}`,
-                container: '#freqtypes-results',
-                fragmentValue: 'freqtypes-results',
-                history: false,
-            });
-        };
-        krtFetch
+        missionData
             .write({
                 method: 'POST',
                 url: reorderUrl,
@@ -483,16 +469,12 @@ function setupDragAndDrop(containerId, reorderUrl) {
                 toast: false,
                 errorMessage: MISSION_MSG.error,
                 conflict: MISSION_CONFLICT,
-                onError(status) {
-                    if (status === 409) {
-                        return false;
-                    }
+                onError() {
                     showFrontendErrorToast(MISSION_MSG.error);
                     return true;
                 },
             })
-            .then(reswapFreqTypes);
-
+            .then(() => missionData.refresh('freqtypes'));
         draggedRow = null;
     });
 
