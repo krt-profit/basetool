@@ -45,9 +45,14 @@
         font-size: 0.85rem;
     }
 
-    @media (width <= 1024px) {
+    @media (width <= 1024px), (pointer: coarse) {
         .audit-event-filter select {
             min-height: var(--touch-target);
+        }
+
+        .audit-details {
+            white-space: normal;
+            overflow-wrap: anywhere;
         }
     }
 

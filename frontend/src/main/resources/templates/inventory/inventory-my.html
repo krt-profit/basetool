@@ -229,7 +229,7 @@
         <div class="overflow-x-auto" id="myInventoryTableContainer" th:fragment="inventoryTableFragment">
             <div class="table-responsive">
             <th:block th:if="${view != 'items'}">
-            <div class="tree-table lager-material-tree" id="inventoryTable" th:classappend="${#lists.isEmpty(groupedItems)} ? 'tree-table--empty'" th:data-user-id="${#authentication.name}" th:data-member-id="${currentMemberId}">
+            <div class="tree-table lager-material-tree" id="inventoryTable" th:classappend="${#lists.isEmpty(groupedItems)} ? 'tree-table--empty'" th:data-user-id="${#authentication.name}" th:data-member-id="${currentMemberId}" th:data-filter-params="${lagerFilterParams}" th:data-attribute-filters="${lagerAttributeFilters}">
                 <div class="tree-row tree-head" th:unless="${#lists.isEmpty(groupedItems)}">
                     <div class="tree-cell" th:text="#{inventory.tree.stock}">Bestand</div>
                     <div class="tree-cell" th:text="#{inventory.tree.context}">Kontext / Zuordnung</div>
@@ -303,7 +303,7 @@
             </div>
             </th:block>
             <th:block th:if="${view == 'items'}">
-            <div class="tree-table lager-items-tree" th:id="'inventoryTable'" th:classappend="${#lists.isEmpty(groupedItems)} ? 'tree-table--empty'" th:data-user-id="${#authentication.name}" th:data-member-id="${currentMemberId}">
+            <div class="tree-table lager-items-tree" th:id="'inventoryTable'" th:classappend="${#lists.isEmpty(groupedItems)} ? 'tree-table--empty'" th:data-user-id="${#authentication.name}" th:data-member-id="${currentMemberId}" th:data-filter-params="${lagerFilterParams}" th:data-attribute-filters="${lagerAttributeFilters}">
                 <div class="tree-row tree-head" th:unless="${#lists.isEmpty(groupedItems)}">
                     <div class="tree-cell" th:text="#{inventory.tree.stock}">Bestand</div>
                     <div class="tree-cell" th:text="#{inventory.tree.context}">Kontext / Zuordnung</div>

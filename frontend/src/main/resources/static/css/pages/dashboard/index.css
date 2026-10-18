@@ -233,7 +233,9 @@
         .home-grid {
             grid-template-columns: minmax(0, 1fr);
         }
+    }
 
+    @media (width <= 1024px), (pointer: coarse) {
         .home-card-link {
             min-height: var(--touch-target);
         }

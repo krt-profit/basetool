@@ -19,12 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -32,6 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
+import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.AggregatedMaterialDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.ClaimDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderBlueprintOwnerDto;
@@ -41,34 +39,31 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverEntryDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemMaterialDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderRequiredBlueprintDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import de.greluc.krt.profit.basetool.frontend.support.QualityTierTestData;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.IdTokenClaimNames;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -78,24 +73,41 @@ import org.springframework.web.context.WebApplicationContext;
  * Verifies the ITEM-order branch of the order detail page: the ordered-items table, the aggregated
  * materials panel and the warning for items without a procurable material.
  */
-@SpringBootTest
-class JobOrderItemDetailRenderTest {
+class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
 
   @Autowired private WebApplicationContext context;
 
   private MockMvc mockMvc;
-
-  @MockitoBean private BackendApiClient backendApiClient;
-
-  @MockitoBean
-  private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
-      clientRegistrationRepository;
 
   @BeforeEach
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
         .thenReturn(LayoutResponses.capabilities(true, true, true));
+  }
+
+  private void stubDetail(UUID orderId, UUID userId, JobOrderDto order) {
+    when(reader.readOrderDetail(eq(orderId), any(), any()))
+        .thenReturn(logisticianDetail(order, userId).build());
+  }
+
+  private void stubDetail(
+      UUID orderId, UUID userId, JobOrderDto order, List<JobOrderItemStockGroupDto> stock) {
+    Map<UUID, JobOrderItemStockGroupDto> byGameItem = new LinkedHashMap<>();
+    stock.forEach(group -> byGameItem.put(group.gameItem().id(), group));
+    when(reader.readOrderDetail(eq(orderId), any(), any()))
+        .thenReturn(logisticianDetail(order, userId).itemStock(byGameItem).build());
+  }
+
+  private void stubDetail(UUID orderId, UUID userId, JobOrderDto order, UserDto actingUser) {
+    when(reader.readOrderDetail(eq(orderId), any(), any()))
+        .thenReturn(logisticianDetail(order, userId).actingUser(actingUser).build());
+  }
+
+  private static JobOrderPageStubs.DetailBuilder logisticianDetail(JobOrderDto order, UUID userId) {
+    return JobOrderPageStubs.detail(order)
+        .assigning(List.of(), List.of(), List.of())
+        .currentUserId(userId);
   }
 
   private OAuth2AuthenticationToken logisticianToken(UUID userId) {
@@ -216,8 +228,7 @@ class JobOrderItemDetailRenderTest {
             null,
             false);
 
-    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
-        .thenReturn(order);
+    stubDetail(orderId, userId, order);
 
     MvcResult result =
         mockMvc
@@ -331,8 +342,7 @@ class JobOrderItemDetailRenderTest {
             1L,
             null,
             false);
-    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
-        .thenReturn(order);
+    stubDetail(orderId, userId, order);
 
     String html =
         mockMvc
@@ -410,8 +420,7 @@ class JobOrderItemDetailRenderTest {
             1L,
             null,
             false);
-    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
-        .thenReturn(order);
+    stubDetail(orderId, userId, order);
 
     String html =
         mockMvc
@@ -493,8 +502,7 @@ class JobOrderItemDetailRenderTest {
             1L,
             null,
             false);
-    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
-        .thenReturn(order);
+    stubDetail(orderId, userId, order);
 
     String html =
         mockMvc
@@ -593,8 +601,7 @@ class JobOrderItemDetailRenderTest {
             null,
             false);
 
-    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
-        .thenReturn(order);
+    stubDetail(orderId, userId, order);
 
     MvcResult result =
         mockMvc
@@ -682,8 +689,7 @@ class JobOrderItemDetailRenderTest {
             1L,
             null,
             false);
-    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
-        .thenReturn(order);
+    stubDetail(orderId, userId, order);
 
     String html =
         mockMvc
@@ -739,8 +745,7 @@ class JobOrderItemDetailRenderTest {
             1L,
             null,
             false);
-    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
-        .thenReturn(order);
+    stubDetail(orderId, userId, order);
 
     String html =
         mockMvc
@@ -805,8 +810,7 @@ class JobOrderItemDetailRenderTest {
             1L,
             null,
             false);
-    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
-        .thenReturn(order);
+    stubDetail(orderId, userId, order);
 
     String html =
         mockMvc
@@ -891,8 +895,6 @@ class JobOrderItemDetailRenderTest {
   void itemOrder_memberSeesBlueprintCoverageSection() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
-        .thenReturn(oneLineItemOrder(orderId));
     JobOrderItemBlueprintOwnersDto coverage =
         new JobOrderItemBlueprintOwnersDto(
             List.of(
@@ -901,11 +903,9 @@ class JobOrderItemDetailRenderTest {
             List.of(
                 new JobOrderBlueprintOwnerDto("Alice", List.of("A03 Sniper Rifle"), true),
                 new JobOrderBlueprintOwnerDto("Carla", List.of("A03 Sniper Rifle"), false)));
-    when(backendApiClient.get(
-            eq("/api/v1/orders/{id}/item-blueprint-owners"),
-            eq(JobOrderItemBlueprintOwnersDto.class),
-            eq(orderId)))
-        .thenReturn(coverage);
+    when(reader.readOrderDetail(eq(orderId), any(), any()))
+        .thenReturn(
+            logisticianDetail(oneLineItemOrder(orderId), userId).blueprintOwners(coverage).build());
 
     String html =
         mockMvc
@@ -948,18 +948,14 @@ class JobOrderItemDetailRenderTest {
   void itemOrder_blueprintOwnersFragment_rendersOnlyThePanel() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
-        .thenReturn(oneLineItemOrder(orderId));
     JobOrderItemBlueprintOwnersDto coverage =
         new JobOrderItemBlueprintOwnersDto(
             List.of(
                 new JobOrderRequiredBlueprintDto("a03 sniper rifle", "A03 Sniper Rifle", 1, true)),
             List.of(new JobOrderBlueprintOwnerDto("Alice", List.of("A03 Sniper Rifle"), true)));
-    when(backendApiClient.get(
-            eq("/api/v1/orders/{id}/item-blueprint-owners"),
-            eq(JobOrderItemBlueprintOwnersDto.class),
-            eq(orderId)))
-        .thenReturn(coverage);
+    when(reader.readOrderDetail(eq(orderId), any(), any()))
+        .thenReturn(
+            logisticianDetail(oneLineItemOrder(orderId), userId).blueprintOwners(coverage).build());
 
     String html =
         mockMvc
@@ -983,37 +979,10 @@ class JobOrderItemDetailRenderTest {
   }
 
   @Test
-  void itemOrder_nonBlueprintFragmentSwap_doesNotFetchBlueprintCoverage() throws Exception {
-    UUID orderId = UUID.randomUUID();
-    UUID userId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
-        .thenReturn(oneLineItemOrder(orderId));
-
-    mockMvc
-        .perform(
-            get("/orders/" + orderId)
-                .param("fragment", "items")
-                .with(authentication(logisticianToken(userId))))
-        .andExpect(status().isOk());
-
-    verify(backendApiClient, never())
-        .get(
-            eq("/api/v1/orders/{id}/item-blueprint-owners"),
-            eq(JobOrderItemBlueprintOwnersDto.class),
-            eq(orderId));
-  }
-
-  @Test
   void itemOrder_nonMember_blueprintCoverageSectionOmitted() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
-        .thenReturn(oneLineItemOrder(orderId));
-    when(backendApiClient.get(
-            eq("/api/v1/orders/{id}/item-blueprint-owners"),
-            eq(JobOrderItemBlueprintOwnersDto.class),
-            eq(orderId)))
-        .thenThrow(new RuntimeException("forbidden"));
+    stubDetail(orderId, userId, oneLineItemOrder(orderId));
 
     String html =
         mockMvc
@@ -1032,31 +1001,29 @@ class JobOrderItemDetailRenderTest {
   void itemOrder_productionModal_rendersBookInSection() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
-        .thenReturn(oneLineItemOrder(orderId));
-    when(backendApiClient.get(
-            eq("/api/v1/users/me"),
-            eq(de.greluc.krt.profit.basetool.frontend.identity.model.UserDto.class)))
-        .thenReturn(
-            new de.greluc.krt.profit.basetool.frontend.identity.model.UserDto(
-                userId,
-                "logistician",
-                "Logi Stician",
-                "Logi Stician",
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                true,
-                false,
-                true,
-                null,
-                null,
-                1L,
-                null,
-                null));
+    stubDetail(
+        orderId,
+        userId,
+        oneLineItemOrder(orderId),
+        new de.greluc.krt.profit.basetool.frontend.identity.model.UserDto(
+            userId,
+            "logistician",
+            "Logi Stician",
+            "Logi Stician",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            true,
+            false,
+            true,
+            null,
+            null,
+            1L,
+            null,
+            null));
 
     String html =
         mockMvc
@@ -1090,30 +1057,6 @@ class JobOrderItemDetailRenderTest {
     assertThat(allocateTag).as("allocate checkbox defaults on").contains("checked");
   }
 
-  @Test
-  void detailRender_logistician_fetchesEachFanOutLookupExactlyOnce() throws Exception {
-    UUID orderId = UUID.randomUUID();
-    UUID userId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
-        .thenReturn(oneLineItemOrder(orderId));
-    when(backendApiClient.getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef()))
-        .thenReturn(
-            List.of(
-                new OrgUnitMembershipOptionDto(
-                    UUID.randomUUID(), "Profit Spezialkommando", "PSK", "SPECIAL_COMMAND", true)));
-
-    mockMvc
-        .perform(get("/orders/" + orderId).with(authentication(logisticianToken(userId))))
-        .andExpect(status().isOk());
-
-    verify(backendApiClient, times(1))
-        .getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef());
-    verify(backendApiClient, never()).get(eq("/api/v1/users?size=1000"), anyTypeRef());
-    verify(backendApiClient, times(1))
-        .getCached(eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef());
-    verify(backendApiClient, times(2)).getCached(eq(CachedCatalog.SQUADRONS), anyTypeRef());
-  }
-
   /**
    * One earmarked-stock group for the inline-expand render tests. {@code gameItemId} must match the
    * ordered line's game item so the template's per-item lookup finds the stock.
@@ -1145,10 +1088,11 @@ class JobOrderItemDetailRenderTest {
     UUID userId = UUID.randomUUID();
     UUID entryId = UUID.randomUUID();
     UUID gameItemId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
-        .thenReturn(oneLineItemOrder(orderId, gameItemId));
-    when(backendApiClient.get(eq("/api/v1/orders/{id}/item-stock"), anyTypeRef(), eq(orderId)))
-        .thenReturn(List.of(itemStockGroup(entryId, gameItemId)));
+    stubDetail(
+        orderId,
+        userId,
+        oneLineItemOrder(orderId, gameItemId),
+        List.of(itemStockGroup(entryId, gameItemId)));
 
     String html =
         mockMvc
@@ -1192,10 +1136,7 @@ class JobOrderItemDetailRenderTest {
             List.of(
                 new de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockEntryDto(
                     entryId, 7L, null, null, null, null, 4L, 3L, false)));
-    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
-        .thenReturn(oneLineItemOrder(orderId, gameItemId));
-    when(backendApiClient.get(eq("/api/v1/orders/{id}/item-stock"), anyTypeRef(), eq(orderId)))
-        .thenReturn(List.of(redacted));
+    stubDetail(orderId, userId, oneLineItemOrder(orderId, gameItemId), List.of(redacted));
 
     String html =
         mockMvc
@@ -1219,10 +1160,7 @@ class JobOrderItemDetailRenderTest {
   void itemOrder_noEarmarkedStock_rendersNoInlineStock() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
-        .thenReturn(oneLineItemOrder(orderId));
-    when(backendApiClient.get(eq("/api/v1/orders/{id}/item-stock"), anyTypeRef(), eq(orderId)))
-        .thenReturn(List.of());
+    stubDetail(orderId, userId, oneLineItemOrder(orderId), List.of());
 
     String html =
         mockMvc
@@ -1247,10 +1185,11 @@ class JobOrderItemDetailRenderTest {
     UUID userId = UUID.randomUUID();
     UUID entryId = UUID.randomUUID();
     UUID gameItemId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
-        .thenReturn(oneLineItemOrder(orderId, gameItemId));
-    when(backendApiClient.get(eq("/api/v1/orders/{id}/item-stock"), anyTypeRef(), eq(orderId)))
-        .thenReturn(List.of(itemStockGroup(entryId, gameItemId)));
+    stubDetail(
+        orderId,
+        userId,
+        oneLineItemOrder(orderId, gameItemId),
+        List.of(itemStockGroup(entryId, gameItemId)));
 
     String html =
         mockMvc
@@ -1280,10 +1219,7 @@ class JobOrderItemDetailRenderTest {
     GameItemReferenceDto shield =
         new GameItemReferenceDto(
             UUID.randomUUID(), "FR-66", "VEHICLE_ITEM", "SHIELD", 1, "A", "MILITARY");
-    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
-        .thenReturn(oneLineItemOrder(orderId, shield));
-    when(backendApiClient.get(eq("/api/v1/orders/{id}/item-stock"), anyTypeRef(), eq(orderId)))
-        .thenReturn(List.of());
+    stubDetail(orderId, userId, oneLineItemOrder(orderId, shield), List.of());
 
     String html =
         mockMvc
@@ -1315,10 +1251,7 @@ class JobOrderItemDetailRenderTest {
   void itemOrder_nonComponentLine_rendersNameAndCategoryOnly() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
-        .thenReturn(oneLineItemOrder(orderId, UUID.randomUUID()));
-    when(backendApiClient.get(eq("/api/v1/orders/{id}/item-stock"), anyTypeRef(), eq(orderId)))
-        .thenReturn(List.of());
+    stubDetail(orderId, userId, oneLineItemOrder(orderId, UUID.randomUUID()), List.of());
 
     String html =
         mockMvc
@@ -1381,8 +1314,7 @@ class JobOrderItemDetailRenderTest {
             1L,
             null,
             false);
-    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
-        .thenReturn(order);
+    stubDetail(orderId, userId, order);
 
     String html =
         mockMvc
@@ -1395,8 +1327,6 @@ class JobOrderItemDetailRenderTest {
     assertThat(html)
         .as("no inline item stock on a material order")
         .doesNotContain("class=\"od-item-stock-inline\"");
-    verify(backendApiClient, never())
-        .get(eq("/api/v1/orders/{id}/item-stock"), anyTypeRef(), eq(orderId));
   }
 
   @Test
@@ -1453,8 +1383,7 @@ class JobOrderItemDetailRenderTest {
             1L,
             null,
             false);
-    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
-        .thenReturn(order);
+    stubDetail(orderId, userId, order);
 
     String html =
         mockMvc

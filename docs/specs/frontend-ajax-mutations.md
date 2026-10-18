@@ -2798,6 +2798,14 @@ A backend failure is mapped once, by `BackendErrorMapper` (REQ-FE-029), and answ
   expired session redirects to the login instead of rendering its sections' error banners. It logs
   every other failure once and answers the fallback. A pure parse fallback (`Instant.parse`,
   `Long.parseLong`, `UUID.fromString`, `RoundingMode.valueOf`) catches its specific exception.
+- **A page reader is the place a page's section fallbacks live.** Where a page has section
+  fallbacks, defaults or parallel loads, a per-domain page reader above the typed client reads it as
+  one immutable record (ADR-0291; the job-order pages are the pilot, `JobOrderPageReader`). The
+  reader owns the defaults, the `SectionFallback` calls with their existing section names and the
+  parallel load, marks an unavailable part explicitly instead of with `null`, and lets a
+  `ReauthenticationRequiredException` through; the controller only maps the record into the model and
+  holds no `SectionFallback.load(…, null)` and no re-defaulting. A page with one plain call keeps
+  calling the typed client.
 - **The number only shrinks.** The broad catch clauses (`Exception`, `RuntimeException`,
   `Throwable`, alone or in a multi-catch) of every file in a `web` package are frozen per file in
   `frontend/src/test/resources/architecture/broad-catch-ratchet.properties`. A file above its count
@@ -2821,7 +2829,11 @@ A backend failure is mapped once, by `BackendErrorMapper` (REQ-FE-029), and answ
   each migrated controller answers a page GET with an expired session with the redirect to
   `/oauth2/authorization/keycloak`.
 
-**Enforced by:** `BroadCatchRatchetTest`, `SectionFallbackTest`, the `…ReauthMvcTest` of each
+- [x] The job-order order list, detail, create and item-edit pages read their backend data through
+  `JobOrderPageReader`; `JobOrderPageReaderTest` stubs the typed client by method and
+  `JobOrderPageControllerReaderTest` stubs the reader.
+
+**Enforced by:** `BroadCatchRatchetTest`, `SectionFallbackTest`, `JobOrderPageReaderTest`, the `…ReauthMvcTest` of each
 migrated page controller, the controller tests of the changed handlers · **Code:**
 `kernel/web/GlobalExceptionHandler`, `kernel/web/BackendErrorResponses`, `kernel/web/SectionFallback` · **Related:** REQ-FE-029,
 REQ-SEC-012, ADR-0032

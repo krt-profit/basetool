@@ -23,7 +23,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
@@ -32,7 +31,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,8 +38,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /** The unit hangar rooms hear a committed ship change once per unit (ADR-0260). */
 @ExtendWith(MockitoExtension.class)
@@ -54,40 +50,13 @@ class HangarUnitLiveSyncTest {
 
   @InjectMocks private HangarUnitLiveSync liveSync;
 
-  @AfterEach
-  void tearDown() {
-    if (TransactionSynchronizationManager.isSynchronizationActive()) {
-      TransactionSynchronizationManager.clearSynchronization();
-    }
-    TransactionSynchronizationManager.unbindResourceIfPossible(liveSync);
-  }
-
   @Test
-  @DisplayName("after the commit each touched unit and the all-units room hear one frame")
-  void publishesOncePerUnitAfterTheCommit() {
-    TransactionSynchronizationManager.initSynchronization();
-
-    liveSync.shipsChanged(Arrays.asList(unit(UNIT_A), null));
-    liveSync.unitsChanged(List.of(UNIT_A, UNIT_B));
-    verifyNoInteractions(relayService);
-
-    complete(TransactionSynchronization.STATUS_COMMITTED);
+  @DisplayName("each touched unit and the all-units room are announced once, after the commit")
+  void announcesEachUnitAndTheAllUnitsRoom() {
+    liveSync.shipsChanged(Arrays.asList(unit(UNIT_A), unit(UNIT_B), unit(UNIT_A), null));
 
     assertThat(publishedTopics())
         .containsExactly("hangar-unit:" + UNIT_A, "hangar-unit:" + UNIT_B, "hangar-units");
-    assertThat(TransactionSynchronizationManager.getResource(liveSync)).isNull();
-  }
-
-  @Test
-  @DisplayName("a rolled-back write announces nothing")
-  void rollbackAnnouncesNothing() {
-    TransactionSynchronizationManager.initSynchronization();
-
-    liveSync.unitsChanged(List.of(UNIT_A));
-    complete(TransactionSynchronization.STATUS_ROLLED_BACK);
-
-    verifyNoInteractions(relayService);
-    assertThat(TransactionSynchronizationManager.getResource(liveSync)).isNull();
   }
 
   @Test
@@ -99,28 +68,13 @@ class HangarUnitLiveSyncTest {
   }
 
   /**
-   * Runs the registered synchronizations as a transaction manager would at the end.
-   *
-   * @param status the completion status
-   */
-  private static void complete(int status) {
-    List<TransactionSynchronization> synchronizations =
-        TransactionSynchronizationManager.getSynchronizations();
-    if (status == TransactionSynchronization.STATUS_COMMITTED) {
-      synchronizations.forEach(TransactionSynchronization::afterCommit);
-    }
-    synchronizations.forEach(s -> s.afterCompletion(status));
-    TransactionSynchronizationManager.clearSynchronization();
-  }
-
-  /**
    * Reads the canonical topics the relay was handed, in order.
    *
    * @return the topics
    */
   private List<String> publishedTopics() {
     ArgumentCaptor<LiveSyncTopic> topics = ArgumentCaptor.forClass(LiveSyncTopic.class);
-    verify(relayService, atLeastOnce()).publish(topics.capture(), eq(List.of("ships")));
+    verify(relayService, atLeastOnce()).publishAfterCommit(topics.capture(), eq(List.of("ships")));
     return topics.getAllValues().stream().map(LiveSyncTopic::canonical).toList();
   }
 

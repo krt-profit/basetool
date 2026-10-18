@@ -39,7 +39,7 @@ import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemPerso
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemPoolChangeDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemStolenMarkDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryMergeCandidatesDto;
-import de.greluc.krt.profit.basetool.frontend.inventory.model.ItemAttributeFilter;
+import de.greluc.krt.profit.basetool.frontend.inventory.model.LagerQuery;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
@@ -125,83 +125,6 @@ public class InventoryBackendClient {
   }
 
   /**
-   * The filters of the item view of a Lager listing (REQ-INV-030, REQ-INV-040, REQ-INV-053,
-   * REQ-INV-063).
-   *
-   * @param gameItemIds the game items to narrow to, or {@code null}
-   * @param locationIds the storage locations to narrow to, or {@code null}
-   * @param jobOrderIds the job orders to narrow to, or {@code null}
-   * @param personalOnly whether only the caller's personal entries are listed
-   * @param nonPersonalOnly whether only the caller's shared entries are listed
-   * @param stolenOnly whether only stock marked „gestohlen" is listed
-   * @param nonStolenOnly whether stock marked „gestohlen" is hidden
-   * @param attributes the category, component-type, size, grade and class filters
-   */
-  public record ItemFilter(
-      @Nullable List<UUID> gameItemIds,
-      @Nullable List<UUID> locationIds,
-      @Nullable List<UUID> jobOrderIds,
-      boolean personalOnly,
-      boolean nonPersonalOnly,
-      boolean stolenOnly,
-      boolean nonStolenOnly,
-      @NotNull ItemAttributeFilter attributes) {
-
-    /** No narrowing at all. */
-    public static final ItemFilter NONE =
-        new ItemFilter(null, null, null, false, false, false, false, ItemAttributeFilter.NONE);
-
-    /**
-     * Whether any dimension narrows the result.
-     *
-     * @return {@code true} when an id list is non-empty, a flag is set or an attribute narrows
-     */
-    public boolean anyActive() {
-      return notEmpty(gameItemIds)
-          || notEmpty(locationIds)
-          || notEmpty(jobOrderIds)
-          || personalOnly
-          || nonPersonalOnly
-          || stolenOnly
-          || nonStolenOnly
-          || !attributes.isEmpty();
-    }
-
-    private static boolean notEmpty(@Nullable List<UUID> ids) {
-      return ids != null && !ids.isEmpty();
-    }
-  }
-
-  /**
-   * The filters of the material view of a Lager listing (REQ-INV-040, REQ-INV-053).
-   *
-   * @param materialIds the materials to narrow to, or {@code null}
-   * @param locationIds the storage locations to narrow to, or {@code null}
-   * @param minQuality the quality floor, or {@code null}
-   * @param jobOrderIds the job orders to narrow to, or {@code null}
-   * @param missionIds the missions to narrow to, or {@code null}
-   * @param personalOnly whether only the caller's personal entries are listed
-   * @param nonPersonalOnly whether only the caller's shared entries are listed
-   * @param stolenOnly whether only stock marked „gestohlen" is listed
-   * @param nonStolenOnly whether stock marked „gestohlen" is hidden
-   */
-  public record MaterialFilter(
-      @Nullable List<UUID> materialIds,
-      @Nullable List<UUID> locationIds,
-      @Nullable Integer minQuality,
-      @Nullable List<UUID> jobOrderIds,
-      @Nullable List<UUID> missionIds,
-      boolean personalOnly,
-      boolean nonPersonalOnly,
-      boolean stolenOnly,
-      boolean nonStolenOnly) {
-
-    /** No narrowing at all. */
-    public static final MaterialFilter NONE =
-        new MaterialFilter(null, null, null, null, null, false, false, false, false);
-  }
-
-  /**
    * Reads one page of the squadron-wide aggregated Lager, by material or by game item
    * (REQ-INV-030).
    *
@@ -268,105 +191,29 @@ public class InventoryBackendClient {
   }
 
   /**
-   * Reads the item view of a grouped Lager listing (REQ-INV-030).
+   * Reads a grouped Lager listing, the item view or the material view as the query selects
+   * (REQ-INV-030).
    *
    * @param listing the listing
-   * @param filter the item view's filters
+   * @param query the Lager filters; the squadron-wide listing ignores the personal flags
    * @return the groups, or {@code null} when the backend sent no body
    */
   @Nullable
-  public List<GroupedInventoryDto> groupedItems(
-      @NotNull Listing listing, @NotNull ItemFilter filter) {
-    UriComponentsBuilder uriBuilder =
-        UriComponentsBuilder.fromPath(groupedPath(listing)).queryParam("catalog", "ITEM");
-    appendIdParams(uriBuilder, "gameItemIds", filter.gameItemIds());
-    appendIdParams(uriBuilder, "locationIds", filter.locationIds());
-    appendIdParams(uriBuilder, "jobOrderIds", filter.jobOrderIds());
-    appendFlags(
-        uriBuilder,
-        filter.personalOnly(),
-        filter.nonPersonalOnly(),
-        filter.stolenOnly(),
-        filter.nonStolenOnly());
-    appendAttributeParams(uriBuilder, filter.attributes());
-    return backendApiClient.get(uriBuilder.build().toUriString(), GROUPED_INVENTORY_LIST);
+  public List<GroupedInventoryDto> grouped(@NotNull Listing listing, @NotNull LagerQuery query) {
+    return backendApiClient.get(backendUri(groupedPath(listing), query), GROUPED_INVENTORY_LIST);
   }
 
   /**
-   * Reads the material view of a grouped Lager listing.
+   * Reads the ids of every own entry matching the Lager filters, for the item view or the material
+   * view as the query selects (REQ-INV-034).
    *
-   * @param listing the listing
-   * @param filter the material view's filters
-   * @return the groups, or {@code null} when the backend sent no body
-   */
-  @Nullable
-  public List<GroupedInventoryDto> groupedMaterials(
-      @NotNull Listing listing, @NotNull MaterialFilter filter) {
-    UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromPath(groupedPath(listing));
-    appendIdParams(uriBuilder, "materialIds", filter.materialIds());
-    appendIdParams(uriBuilder, "locationIds", filter.locationIds());
-    if (filter.minQuality() != null) {
-      uriBuilder.queryParam("minQuality", filter.minQuality());
-    }
-    appendIdParams(uriBuilder, "jobOrderIds", filter.jobOrderIds());
-    appendIdParams(uriBuilder, "missionIds", filter.missionIds());
-    appendFlags(
-        uriBuilder,
-        filter.personalOnly(),
-        filter.nonPersonalOnly(),
-        filter.stolenOnly(),
-        filter.nonStolenOnly());
-    return backendApiClient.get(uriBuilder.build().toUriString(), GROUPED_INVENTORY_LIST);
-  }
-
-  /**
-   * Reads the ids of every own entry matching the item view's filters (REQ-INV-034).
-   *
-   * @param filter the item view's filters
+   * @param query the Lager filters
    * @return the ids, or {@code null} when the backend sent no body
    */
   @Nullable
-  public List<UUID> myItemEntryIds(@NotNull ItemFilter filter) {
-    UriComponentsBuilder uriBuilder =
-        UriComponentsBuilder.fromPath("/api/v1/inventory/my-inventory/entry-ids");
-    uriBuilder.queryParam("catalog", "ITEM");
-    appendIdParams(uriBuilder, "gameItemIds", filter.gameItemIds());
-    appendIdParams(uriBuilder, "jobOrderIds", filter.jobOrderIds());
-    appendIdParams(uriBuilder, "locationIds", filter.locationIds());
-    appendFlags(
-        uriBuilder,
-        filter.personalOnly(),
-        filter.nonPersonalOnly(),
-        filter.stolenOnly(),
-        filter.nonStolenOnly());
-    appendAttributeParams(uriBuilder, filter.attributes());
-    return backendApiClient.get(uriBuilder.build().toUriString(), UUID_LIST);
-  }
-
-  /**
-   * Reads the ids of every own entry matching the material view's filters (REQ-INV-034).
-   *
-   * @param filter the material view's filters
-   * @return the ids, or {@code null} when the backend sent no body
-   */
-  @Nullable
-  public List<UUID> myMaterialEntryIds(@NotNull MaterialFilter filter) {
-    UriComponentsBuilder uriBuilder =
-        UriComponentsBuilder.fromPath("/api/v1/inventory/my-inventory/entry-ids");
-    appendIdParams(uriBuilder, "materialIds", filter.materialIds());
-    if (filter.minQuality() != null) {
-      uriBuilder.queryParam("minQuality", filter.minQuality());
-    }
-    appendIdParams(uriBuilder, "jobOrderIds", filter.jobOrderIds());
-    appendIdParams(uriBuilder, "missionIds", filter.missionIds());
-    appendIdParams(uriBuilder, "locationIds", filter.locationIds());
-    appendFlags(
-        uriBuilder,
-        filter.personalOnly(),
-        filter.nonPersonalOnly(),
-        filter.stolenOnly(),
-        filter.nonStolenOnly());
-    return backendApiClient.get(uriBuilder.build().toUriString(), UUID_LIST);
+  public List<UUID> myEntryIds(@NotNull LagerQuery query) {
+    return backendApiClient.get(
+        backendUri("/api/v1/inventory/my-inventory/entry-ids", query), UUID_LIST);
   }
 
   /**
@@ -900,65 +747,18 @@ public class InventoryBackendClient {
   }
 
   /**
-   * Appends one repeated query parameter per id; a {@code null} or empty list appends nothing.
+   * Builds the backend URI of a Lager read from its path and the query's backend parameters.
    *
-   * @param uriBuilder the builder
-   * @param name the parameter name
-   * @param ids the ids, or {@code null}
+   * @param path the backend resource path
+   * @param query the Lager filters
+   * @return the URI with the query parameters appended
    */
-  private static void appendIdParams(
-      @NotNull UriComponentsBuilder uriBuilder, @NotNull String name, @Nullable List<UUID> ids) {
-    if (ids == null || ids.isEmpty()) {
-      return;
-    }
-    for (UUID id : ids) {
-      uriBuilder.queryParam(name, id.toString());
-    }
-  }
-
-  /**
-   * Appends one repeated query parameter per category, component type, size, grade and class
-   * (REQ-INV-063).
-   *
-   * @param uriBuilder the builder
-   * @param attributes the item-attribute filters
-   */
-  private static void appendAttributeParams(
-      @NotNull UriComponentsBuilder uriBuilder, @NotNull ItemAttributeFilter attributes) {
-    attributes.kinds().forEach(kind -> uriBuilder.queryParam("kinds", kind));
-    attributes.componentTypes().forEach(type -> uriBuilder.queryParam("componentTypes", type));
-    attributes.sizes().forEach(size -> uriBuilder.queryParam("sizes", size));
-    attributes.grades().forEach(grade -> uriBuilder.queryParam("grades", grade));
-    attributes.itemClasses().forEach(itemClass -> uriBuilder.queryParam("itemClasses", itemClass));
-  }
-
-  /**
-   * Appends the set personal and „gestohlen" narrowing flags.
-   *
-   * @param uriBuilder the builder
-   * @param personalOnly relay {@code personalOnly=true}
-   * @param nonPersonalOnly relay {@code nonPersonalOnly=true}
-   * @param stolenOnly relay {@code stolenOnly=true}
-   * @param nonStolenOnly relay {@code nonStolenOnly=true}
-   */
-  private static void appendFlags(
-      @NotNull UriComponentsBuilder uriBuilder,
-      boolean personalOnly,
-      boolean nonPersonalOnly,
-      boolean stolenOnly,
-      boolean nonStolenOnly) {
-    if (personalOnly) {
-      uriBuilder.queryParam("personalOnly", true);
-    }
-    if (nonPersonalOnly) {
-      uriBuilder.queryParam("nonPersonalOnly", true);
-    }
-    if (stolenOnly) {
-      uriBuilder.queryParam("stolenOnly", true);
-    }
-    if (nonStolenOnly) {
-      uriBuilder.queryParam("nonStolenOnly", true);
-    }
+  @NotNull
+  private static String backendUri(@NotNull String path, @NotNull LagerQuery query) {
+    return UriComponentsBuilder.fromPath(path)
+        .queryParams(query.backendParams())
+        .build()
+        .toUriString();
   }
 
   /**

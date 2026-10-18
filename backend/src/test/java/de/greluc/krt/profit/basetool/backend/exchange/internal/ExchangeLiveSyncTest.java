@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -30,16 +29,13 @@ import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import java.util.List;
 import java.util.UUID;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
-import org.springframework.transaction.support.TransactionSynchronizationUtils;
 
-/** The frames an exchange write raises, and that they wait for the commit (REQ-XCH-013). */
+/** The after-commit announcements an exchange write raises (REQ-XCH-013). */
 @ExtendWith(MockitoExtension.class)
 class ExchangeLiveSyncTest {
 
@@ -48,46 +44,28 @@ class ExchangeLiveSyncTest {
   @Mock private LiveSyncPublisher publisher;
   @InjectMocks private ExchangeLiveSync liveSync;
 
-  @AfterEach
-  void tearDown() {
-    if (TransactionSynchronizationManager.isSynchronizationActive()) {
-      TransactionSynchronizationManager.clearSynchronization();
-    }
-  }
-
   @Test
-  void aShipWriteRefreshesOnlyTheMembersOwnHangarOnceCommitted() {
-    TransactionSynchronizationManager.initSynchronization();
-
+  void aShipWriteRefreshesOnlyTheMembersOwnHangar() {
     liveSync.hangarChanged(MEMBER);
-    verify(publisher, never()).publish(any(), anyList());
 
-    TransactionSynchronizationUtils.triggerAfterCommit();
     verify(publisher)
-        .publish(eq(LiveSyncTopic.of(LiveSyncTopicClass.HANGAR_OWN, MEMBER)), eq(List.of("ships")));
-  }
-
-  @Test
-  void aRolledBackWriteRaisesNoFrame() {
-    TransactionSynchronizationManager.initSynchronization();
-
-    liveSync.blueprintsChanged(MEMBER);
-    TransactionSynchronizationManager.clearSynchronization();
-
-    verify(publisher, never()).publish(any(), anyList());
+        .publishAfterCommit(
+            eq(LiveSyncTopic.of(LiveSyncTopicClass.HANGAR_OWN, MEMBER)), eq(List.of("ships")));
   }
 
   @Test
   void aStockWriteRefreshesTheLagerAndTheBoardOnlyWhenOffersChanged() {
     liveSync.stockChanged(false);
     verify(publisher)
-        .publish(eq(LiveSyncTopic.global(LiveSyncTopicClass.INVENTORY_ALL)), eq(List.of("stock")));
+        .publishAfterCommit(
+            eq(LiveSyncTopic.global(LiveSyncTopicClass.INVENTORY_ALL)), eq(List.of("stock")));
     verify(publisher, never())
-        .publish(eq(LiveSyncTopic.global(LiveSyncTopicClass.MATERIALBOARD)), anyList());
+        .publishAfterCommit(eq(LiveSyncTopic.global(LiveSyncTopicClass.MATERIALBOARD)), anyList());
 
     liveSync.stockChanged(true);
     verify(publisher)
-        .publish(eq(LiveSyncTopic.global(LiveSyncTopicClass.MATERIALBOARD)), eq(List.of("board")));
+        .publishAfterCommit(
+            eq(LiveSyncTopic.global(LiveSyncTopicClass.MATERIALBOARD)), eq(List.of("board")));
   }
 
   @Test
@@ -95,7 +73,7 @@ class ExchangeLiveSyncTest {
     liveSync.blueprintsChanged(MEMBER);
 
     verify(publisher)
-        .publish(
+        .publishAfterCommit(
             eq(LiveSyncTopic.of(LiveSyncTopicClass.BLUEPRINTS_OWN, MEMBER)), eq(List.of("list")));
   }
 }

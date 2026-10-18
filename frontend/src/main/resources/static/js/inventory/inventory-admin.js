@@ -84,29 +84,7 @@ function adminStolenFilterValue() {
     return el ? el.value : '';
 }
 
-/**
- * Appends the backend flag of a „gestohlen" filter value to a query.
- *
- * @param {URLSearchParams} params the query to extend
- * @param {string} value the filter value ('', 'non' or 'only')
- */
-function appendAdminStolenFilter(params, value) {
-    if (value === 'only') params.append('stolenOnly', 'true');
-    else if (value === 'non') params.append('nonStolenOnly', 'true');
-}
-
 const ADMIN_INVENTORY_FILTER_KEY = 'inventory_admin_filters';
-
-const ADMIN_INVENTORY_FILTER_PARAMS = [
-    'materialIds',
-    'gameItemIds',
-    'locationIds',
-    'minQuality',
-    'jobOrderIds',
-    'missionIds',
-    'stolenOnly',
-    'nonStolenOnly',
-];
 
 /**
  * Reads the stored filter preference.
@@ -237,7 +215,7 @@ function restoreAdminInventoryFilters() {
         return false;
     }
     if (
-        [...ADMIN_INVENTORY_FILTER_PARAMS, ...adminLager.itemAttributeParams()].some((p) =>
+        [...adminLager.lagerFilterParams(), ...adminLager.itemAttributeParams()].some((p) =>
             params.has(p),
         )
     ) {
@@ -310,18 +288,19 @@ function filterInventory() {
     persistAdminInventoryFilters();
     krtFilterPanel.refresh('globalFilterPanel');
     krtFilterChips.refresh();
-    const itemsView = adminLager.lagerIsItemsView();
-    const activeMats = adminLager.collectChecked('matCheck');
-    const activeGameItems = adminLager.collectChecked('gameItemCheck');
-    const activeLocations = adminLager.collectChecked('locCheck');
-    const activeJobOrders = adminLager.collectChecked('jobOrderCheck');
-    const activeMissions = adminLager.collectChecked('missionCheck');
-
     const minQualitySelect = /** @type {HTMLSelectElement | null} */ (
         document.getElementById('minQuality')
     );
-    const minQuality = minQualitySelect ? minQualitySelect.value : '';
-    const stolenFilter = adminStolenFilterValue();
+    const selection = {
+        itemsView: adminLager.lagerIsItemsView(),
+        materials: adminLager.collectChecked('matCheck'),
+        gameItems: adminLager.collectChecked('gameItemCheck'),
+        locations: adminLager.collectChecked('locCheck'),
+        minQuality: minQualitySelect ? minQualitySelect.value : '',
+        jobOrders: adminLager.collectChecked('jobOrderCheck'),
+        missions: adminLager.collectChecked('missionCheck'),
+        stolen: adminStolenFilterValue(),
+    };
 
     const container = document.getElementById('tableContainer');
     if (!container) return;
@@ -332,32 +311,16 @@ function filterInventory() {
     const url = new URL(`${window.location.origin}/inventory/all`);
     url.searchParams.append('fragment', 'true');
 
-    if (itemsView) url.searchParams.append('view', 'items');
-    activeMats.forEach((m) => url.searchParams.append('materialIds', m));
-    activeGameItems.forEach((g) => url.searchParams.append('gameItemIds', g));
-    activeLocations.forEach((l) => url.searchParams.append('locationIds', l));
-    if (minQuality) url.searchParams.append('minQuality', minQuality);
-    activeJobOrders.forEach((j) => url.searchParams.append('jobOrderIds', j));
-    activeMissions.forEach((m) => url.searchParams.append('missionIds', m));
-    appendAdminStolenFilter(url.searchParams, stolenFilter);
-    adminLager.appendItemAttributeParams(url.searchParams);
+    adminLager.appendLagerFilterParams(url.searchParams, selection);
 
     const visibleUrl = new URL(`${window.location.origin}/inventory/all`);
-    if (itemsView) visibleUrl.searchParams.append('view', 'items');
-    activeMats.forEach((m) => visibleUrl.searchParams.append('materialIds', m));
-    activeGameItems.forEach((g) => visibleUrl.searchParams.append('gameItemIds', g));
-    activeLocations.forEach((l) => visibleUrl.searchParams.append('locationIds', l));
-    if (minQuality) visibleUrl.searchParams.append('minQuality', minQuality);
-    activeJobOrders.forEach((j) => visibleUrl.searchParams.append('jobOrderIds', j));
-    activeMissions.forEach((m) => visibleUrl.searchParams.append('missionIds', m));
-    appendAdminStolenFilter(visibleUrl.searchParams, stolenFilter);
-    adminLager.appendItemAttributeParams(visibleUrl.searchParams);
+    adminLager.appendLagerFilterParams(visibleUrl.searchParams, selection);
     try {
         window.history.replaceState({}, '', visibleUrl.toString());
     } catch {}
 
     krtFetch
-        .get(url.toString())
+        .get(url.toString(), { key: 'inventory-admin-table' })
         .then((response) => {
             if (!response || !response.ok) {
                 throw new Error(`Inventory fragment refused (${response ? response.status : 0})`);
@@ -369,6 +332,7 @@ function filterInventory() {
             adminLager.restoreExpandedTree();
         })
         .catch((error) => {
+            if (error instanceof DOMException && error.name === 'AbortError') return;
             console.error('Error fetching filtered inventory:', error);
             container.style.opacity = '1.0';
             container.style.pointerEvents = 'auto';

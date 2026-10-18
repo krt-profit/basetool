@@ -79,7 +79,7 @@
     }
 
     .legal-toc a {
-        display: inline-block;
+        display: block;
         padding: var(--space-1) 0;
     }
 

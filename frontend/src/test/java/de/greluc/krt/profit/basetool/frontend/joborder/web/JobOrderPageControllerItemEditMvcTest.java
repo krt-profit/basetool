@@ -19,12 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -38,8 +38,6 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateJobOrderItemR
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
@@ -47,15 +45,14 @@ import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOpt
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -65,17 +62,10 @@ import org.springframework.web.context.WebApplicationContext;
  * JobOrderPageController}) and the update relay in {@link JobOrderWriteController}, including the
  * blocked cases (non-item order, order with deliveries).
  */
-@SpringBootTest
-class JobOrderPageControllerItemEditMvcTest {
+class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
 
   @Autowired private WebApplicationContext context;
   private MockMvc mockMvc;
-
-  @MockitoBean private BackendApiClient backendApiClient;
-
-  @MockitoBean
-  private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
-      clientRegistrationRepository;
 
   @BeforeEach
   void setup() {
@@ -110,9 +100,8 @@ class JobOrderPageControllerItemEditMvcTest {
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void editForm_itemOrderNoHandovers_rendersCreateFormInEditMode() throws Exception {
     UUID id = UUID.randomUUID();
-    doReturn(order(id, "ITEM", List.of()))
-        .when(backendApiClient)
-        .get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(id));
+    when(reader.readItemEdit(id))
+        .thenReturn(JobOrderPageStubs.editable(order(id, "ITEM", List.of()), List.of(), List.of()));
 
     mockMvc
         .perform(get("/orders/" + id + "/items/edit"))
@@ -151,16 +140,16 @@ class JobOrderPageControllerItemEditMvcTest {
             1L,
             null,
             false);
-    doReturn(order)
-        .when(backendApiClient)
-        .get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(id));
-    doReturn(
-            List.of(
-                new OrgUnitMembershipOptionDto(
-                    responsibleId, "ARGON", "ARG", "SPECIAL_COMMAND", true),
-                new OrgUnitMembershipOptionDto(requestingId, "CERBERUS", "CER", "SQUADRON", true)))
-        .when(backendApiClient)
-        .getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef());
+    when(reader.readItemEdit(id))
+        .thenReturn(
+            JobOrderPageStubs.editable(
+                order,
+                List.of(),
+                List.of(
+                    new OrgUnitMembershipOptionDto(
+                        responsibleId, "ARGON", "ARG", "SPECIAL_COMMAND", true),
+                    new OrgUnitMembershipOptionDto(
+                        requestingId, "CERBERUS", "CER", "SQUADRON", true))));
 
     String html =
         mockMvc
@@ -201,9 +190,11 @@ class JobOrderPageControllerItemEditMvcTest {
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void editForm_nonItemOrder_redirectsWithError() throws Exception {
     UUID id = UUID.randomUUID();
-    doReturn(order(id, "MATERIAL", List.of()))
-        .when(backendApiClient)
-        .get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(id));
+    when(reader.readItemEdit(id))
+        .thenReturn(
+            JobOrderPageStubs.blocked(
+                JobOrderPageReader.ItemEditAccess.NOT_AN_ITEM_ORDER,
+                Optional.of(order(id, "MATERIAL", List.of()))));
 
     mockMvc
         .perform(get("/orders/" + id + "/items/edit"))
@@ -219,9 +210,11 @@ class JobOrderPageControllerItemEditMvcTest {
     JobOrderItemHandoverDto handover =
         new JobOrderItemHandoverDto(
             UUID.randomUUID(), id, Instant.now(), "R", null, null, List.of(), 1L);
-    doReturn(order(id, "ITEM", List.of(handover)))
-        .when(backendApiClient)
-        .get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(id));
+    when(reader.readItemEdit(id))
+        .thenReturn(
+            JobOrderPageStubs.blocked(
+                JobOrderPageReader.ItemEditAccess.HAS_ITEM_HANDOVERS,
+                Optional.of(order(id, "ITEM", List.of(handover)))));
 
     mockMvc
         .perform(get("/orders/" + id + "/items/edit"))
@@ -306,9 +299,8 @@ class JobOrderPageControllerItemEditMvcTest {
             1L,
             null,
             false);
-    doReturn(order)
-        .when(backendApiClient)
-        .get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(id));
+    when(reader.readItemEdit(id))
+        .thenReturn(JobOrderPageStubs.editable(order, List.of(), List.of()));
 
     mockMvc
         .perform(get("/orders/" + id + "/items/edit"))

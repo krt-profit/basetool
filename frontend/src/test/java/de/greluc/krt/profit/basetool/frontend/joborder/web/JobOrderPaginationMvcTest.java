@@ -19,11 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -32,7 +30,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
@@ -42,9 +39,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -54,18 +49,11 @@ import org.springframework.web.context.WebApplicationContext;
  * the page nav and the 50/100/200 size picker render, and every link keeps the status and scope
  * filters.
  */
-@SpringBootTest
-class JobOrderPaginationMvcTest {
+class JobOrderPaginationMvcTest extends JobOrderPageMvcTestBase {
 
   @Autowired private WebApplicationContext context;
 
   private MockMvc mockMvc;
-
-  @MockitoBean private BackendApiClient backendApiClient;
-
-  @MockitoBean
-  private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
-      clientRegistrationRepository;
 
   @BeforeEach
   void setup() {
@@ -75,7 +63,7 @@ class JobOrderPaginationMvcTest {
   }
 
   /**
-   * Builds a page envelope with empty content for the mocked backend.
+   * Builds a page envelope with empty content for the stubbed reader.
    *
    * @param pageIndex zero-based page index to report
    * @param pageSize page size to report
@@ -90,8 +78,7 @@ class JobOrderPaginationMvcTest {
   @Test
   @WithMockUser
   void viewOrders_multiPageResult_rendersPaginationAndSizePicker() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/orders?"), anyTypeRef(), any(Object[].class)))
-        .thenReturn(page(1, 100, 300));
+    when(reader.readOrderList(any())).thenReturn(JobOrderPageStubs.list(page(1, 100, 300)));
 
     mockMvc
         .perform(get("/orders").param("page", "1"))
@@ -110,8 +97,7 @@ class JobOrderPaginationMvcTest {
   @Test
   @WithMockUser
   void viewOrders_withStatusFilter_keepsFilterInPaginationLinks() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/orders?"), anyTypeRef(), any(Object[].class)))
-        .thenReturn(page(1, 100, 300));
+    when(reader.readOrderList(any())).thenReturn(JobOrderPageStubs.list(page(1, 100, 300)));
 
     mockMvc
         .perform(get("/orders").param("status", "COMPLETED").param("page", "1"))
@@ -158,8 +144,7 @@ class JobOrderPaginationMvcTest {
   @Test
   @WithMockUser
   void viewOrders_fragmentResults_rendersOnlyTableFragment() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/orders?"), anyTypeRef(), any(Object[].class)))
-        .thenReturn(pageWithOneOrder(300));
+    when(reader.readOrderList(any())).thenReturn(JobOrderPageStubs.list(pageWithOneOrder(300)));
 
     mockMvc
         .perform(get("/orders").param("fragment", "results"))
@@ -173,8 +158,7 @@ class JobOrderPaginationMvcTest {
   @Test
   @WithMockUser
   void viewOrders_singleShortPage_rendersNeitherPageNavNorSizePicker() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/orders?"), anyTypeRef(), any(Object[].class)))
-        .thenReturn(page(0, 100, 5));
+    when(reader.readOrderList(any())).thenReturn(JobOrderPageStubs.list(page(0, 100, 5)));
 
     mockMvc
         .perform(get("/orders"))

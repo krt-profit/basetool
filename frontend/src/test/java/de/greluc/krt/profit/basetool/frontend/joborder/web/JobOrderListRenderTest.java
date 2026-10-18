@@ -19,9 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -31,7 +30,6 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.AggregatedMaterialDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.GameItemReferenceDto;
@@ -45,9 +43,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -57,18 +53,11 @@ import org.springframework.web.context.WebApplicationContext;
  * Verifies that the order list renders an ITEM order's material column as its aggregated materials
  * with collection progress ({@code currentStock / totalQuantity}).
  */
-@SpringBootTest
-class JobOrderListRenderTest {
+class JobOrderListRenderTest extends JobOrderPageMvcTestBase {
 
   @Autowired private WebApplicationContext context;
 
   private MockMvc mockMvc;
-
-  @MockitoBean private BackendApiClient backendApiClient;
-
-  @MockitoBean
-  private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
-      clientRegistrationRepository;
 
   @BeforeEach
   void setup() {
@@ -146,16 +135,9 @@ class JobOrderListRenderTest {
             null,
             false);
 
-    when(backendApiClient.get(
-            eq(
-                "/api/v1/orders?page={page}&size={size}&sort=priority,asc"
-                    + "&status={status},{status}"),
-            anyTypeRef(),
-            eq(0),
-            eq(100),
-            eq("OPEN"),
-            eq("IN_PROGRESS")))
-        .thenReturn(new PageResponse<>(List.of(order), 0, 1000, 1L, 1, List.of()));
+    when(reader.readOrderList(any()))
+        .thenReturn(
+            JobOrderPageStubs.list(new PageResponse<>(List.of(order), 0, 1000, 1L, 1, List.of())));
 
     MvcResult result = mockMvc.perform(get("/orders")).andExpect(status().isOk()).andReturn();
 
@@ -193,16 +175,9 @@ class JobOrderListRenderTest {
             null,
             false);
 
-    when(backendApiClient.get(
-            eq(
-                "/api/v1/orders?page={page}&size={size}&sort=priority,asc"
-                    + "&status={status},{status}"),
-            anyTypeRef(),
-            eq(0),
-            eq(100),
-            eq("OPEN"),
-            eq("IN_PROGRESS")))
-        .thenReturn(new PageResponse<>(List.of(order), 0, 1000, 1L, 1, List.of()));
+    when(reader.readOrderList(any()))
+        .thenReturn(
+            JobOrderPageStubs.list(new PageResponse<>(List.of(order), 0, 1000, 1L, 1, List.of())));
 
     MvcResult result = mockMvc.perform(get("/orders")).andExpect(status().isOk()).andReturn();
 

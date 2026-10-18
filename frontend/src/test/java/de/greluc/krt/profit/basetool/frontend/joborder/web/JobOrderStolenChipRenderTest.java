@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -33,7 +33,6 @@ import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverItemDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
@@ -49,14 +48,12 @@ import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.IdTokenClaimNames;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -65,20 +62,13 @@ import org.springframework.web.context.WebApplicationContext;
  * Renders the order detail page through the real Thymeleaf template and pins the stolen danger chip
  * on the linked-but-unneeded inventory rows and on the material handover lines (REQ-INV-053).
  */
-@SpringBootTest
-class JobOrderStolenChipRenderTest {
+class JobOrderStolenChipRenderTest extends JobOrderPageMvcTestBase {
 
   private static final String STOLEN_CHIP = "data-testid=\"stolen-chip\"";
 
   @Autowired private WebApplicationContext context;
 
   private MockMvc mockMvc;
-
-  @MockitoBean private BackendApiClient backendApiClient;
-
-  @MockitoBean
-  private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
-      clientRegistrationRepository;
 
   @BeforeEach
   void setup() {
@@ -90,10 +80,9 @@ class JobOrderStolenChipRenderTest {
   @Test
   void orderDetail_orphanedInventory_marksOnlyTheStolenRow() throws Exception {
     UUID orderId = UUID.randomUUID();
-    stubOrder(materialOrder(orderId, List.of()));
-    when(backendApiClient.get(
-            eq("/api/v1/orders/{id}/allocations/orphaned"), anyTypeRef(), eq(orderId)))
-        .thenReturn(List.of(inventory("Titanium", false), inventory("Quantanium", true)));
+    stubOrder(
+        materialOrder(orderId, List.of()),
+        List.of(inventory("Titanium", false), inventory("Quantanium", true)));
 
     String html = render(orderId);
 
@@ -138,10 +127,8 @@ class JobOrderStolenChipRenderTest {
     stubOrder(
         materialOrder(
             orderId,
-            List.of(handover(orderId, List.of(handoverItem(material("Titanium"), false))))));
-    when(backendApiClient.get(
-            eq("/api/v1/orders/{id}/allocations/orphaned"), anyTypeRef(), eq(orderId)))
-        .thenReturn(List.of(inventory("Laranite", false)));
+            List.of(handover(orderId, List.of(handoverItem(material("Titanium"), false))))),
+        List.of(inventory("Laranite", false)));
 
     String html = render(orderId);
 
@@ -151,13 +138,27 @@ class JobOrderStolenChipRenderTest {
   }
 
   /**
-   * Stubs the order read the detail page issues first.
+   * Stubs the reader's detail page of a logistician with no orphaned inventory.
    *
-   * @param order the order the backend returns.
+   * @param order the order the reader returns.
    */
   private void stubOrder(@NotNull JobOrderDto order) {
-    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(order.id())))
-        .thenReturn(order);
+    stubOrder(order, List.of());
+  }
+
+  /**
+   * Stubs the reader's detail page of a logistician.
+   *
+   * @param order the order the reader returns.
+   * @param orphaned the orphaned inventory rows the reader returns.
+   */
+  private void stubOrder(@NotNull JobOrderDto order, @NotNull List<InventoryItemDto> orphaned) {
+    when(reader.readOrderDetail(eq(order.id()), any(), any()))
+        .thenReturn(
+            JobOrderPageStubs.detail(order)
+                .assigning(List.of(), List.of(), List.of())
+                .orphanedInventory(orphaned)
+                .build());
   }
 
   /**
