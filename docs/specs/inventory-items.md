@@ -180,7 +180,7 @@ e.g. `FR-66 [SCHILD] [S1 · A]`.
   no query per row.
 - The Mein Lager and Globales Lager item group rows render from one shared fragment
   (`inventory/fragments/inventory-item-group :: itemGroupRow`), and all three surfaces render the
-  chips from `itemChips`.
+  chips from `kernel/fragments/item-chips :: itemChips`, which the job orders reuse (REQ-ORDERS-045).
 - Up to tablet width (≤ 1024 px), where the tree takes its content width, the chips move to a
   second line under the name, so they do not widen the name column; the aggregated table stacks
   its cells on a phone as before.
@@ -196,7 +196,7 @@ e.g. `FR-66 [SCHILD] [S1 · A]`.
 **Enforced by:** `ShipComponentTypeTest`, `InventoryItemMapperTest` reference cases,
 `InventoryLagerPatternRenderTest` / `InventoryIndexListPatternRenderTest` chip cases,
 `ShipComponentTypeMessageCoverageTest` · **Code:** `ShipComponentType`,
-`InventoryItemMapper#gameItemToReferenceDto`, `inventory-item-group.html` · **Issues:** #2719
+`InventoryItemMapper#gameItemToReferenceDto`, `inventory-item-group.html`, `item-chips.html` · **Issues:** #2719
 
 ### REQ-INV-062 — Component class as a coloured chip
 
@@ -225,7 +225,7 @@ after its size/grade chip, e.g. `FR-66 [SCHILD] [S1 · A] [MILITÄR]`.
 **Enforced by:** `InventoryItemMapperTest` class cases, `InventoryLagerPatternRenderTest` /
 `InventoryIndexListPatternRenderTest` class cases, `ShipComponentTypeMessageCoverageTest`,
 `ItemClassChipContrastTest` · **Code:** `InventoryItemMapper#gameItemToReferenceDto`,
-`inventory-item-group.html`, `styles.css` · **Issues:** #2720
+`item-chips.html`, `styles.css` · **Issues:** #2720
 
 ### REQ-INV-063 — The Lager items view filters by category, component type, size, grade and class
 
