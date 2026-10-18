@@ -278,6 +278,31 @@ the frontend `ItemAttributeFilter`, `InventoryPageController#addItemViewModel`,
 `ItemAttributeOptions`, `inventory-item-attribute-filters.html`, `inventory-common.js` · **Issues:**
 #2721, #2722
 
+### REQ-INV-064 — The item pickers show size, grade and class
+
+The game-item picker of the Lager book-in (Einbuchen, `remote-game-items`) and the item picker of
+the job-order form label a ship component with its size, grade and class, so a member tells
+look-alike variants apart, e.g. `FR-66 · S1 · A · Militär`.
+
+- The label uses the Lager chips' rules and messages (REQ-INV-061, REQ-INV-062): only a ship
+  component gets the extra parts, a missing value is left out, and a class without a label is
+  never shown as raw upstream text. Every other item keeps its plain name.
+- The search still matches by name only (REQ-FE-016); the extra parts are display.
+- The frontend proxies `GET /inventory/item-search` and `GET /orders/item-search` return
+  `{id, name, label}` per match, the label built in the request's locale by `ItemPickerLabels`.
+  Both pickers show `label`.
+
+**Acceptance**
+
+- [x] Searching „FR-66" while booking in shows `FR-66 · S1 · A · Militär` as the option label.
+- [x] The job-order item search shows the same label.
+- [x] A non-component item shows its plain name.
+
+**Enforced by:** `ItemPickerLabelsTest`, `InventoryPageControllerMvcTest` item-search cases,
+`JobOrderItemSearchControllerMvcTest` · **Code:** `ItemPickerLabels`, `ItemPickerOption`,
+`InventoryPageController#itemSearch`, `JobOrderItemSearchController`,
+`krt-catalog-search.js`, `orders-create.js` · **Issues:** #2723
+
 ## Out of scope
 
 Non-blueprint items and the "Mein Inventar" boundary (design §11). Materialbörse stock-backed

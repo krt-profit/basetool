@@ -244,7 +244,7 @@
   <module name="FileLength">
     <property name="id" value="fileLengthJobOrderPageController"/>
     <property name="fileExtensions" value="java"/>
-    <property name="max" value="1154"/>
+    <property name="max" value="1134"/>
   </module>
   <module name="SuppressionSingleFilter">
     <property name="id" value="fileLength"/>

@@ -26,6 +26,7 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtEnhanceComboboxes, krtSearchableSelect } from '/js/kernel/krt-searchable-select.js';
+import { toGameItemOption } from '/js/kernel/krt-catalog-search.js';
 
 /** @typedef {ApiDto<'MaterialDto'> & {id: string}} OrderMaterial */
 /** @typedef {ApiDto<'BlueprintReferenceDto'> & {id: string}} OrderBlueprint */
@@ -485,10 +486,8 @@ let itemLineIndex = 0;
 function fetchItemOptions(query) {
     return krtFetch
         .getJson(`/orders/item-search?q=${encodeURIComponent(query || '')}`)
-        .then((/** @type {ApiDto<'InventoryGameItemReferenceDto'>[] | null} */ list) => {
-            return (list || []).map((gi) => {
-                return { value: gi.id, label: gi.name };
-            });
+        .then((/** @type {{id: string, name?: string, label?: string}[] | null} */ list) => {
+            return (list || []).map(toGameItemOption);
         })
         .catch(() => {
             return [];

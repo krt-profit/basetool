@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,11 +47,11 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC tests for the item picker's search proxy ({@code GET /orders/item-search}): id and name are
- * mapped, and a backend failure yields an empty list.
+ * MVC tests for the item picker's search proxy ({@code GET /orders/item-search}): id, name and
+ * option label are mapped (REQ-INV-064), and a backend failure yields an empty list.
  */
 @SpringBootTest
-class JobOrderPageControllerItemSearchMvcTest {
+class JobOrderItemSearchControllerMvcTest {
 
   @Autowired private WebApplicationContext context;
   private MockMvc mockMvc;
@@ -85,7 +86,32 @@ class JobOrderPageControllerItemSearchMvcTest {
         .andExpect(status().isOk())
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$[0].id").value(id.toString()))
-        .andExpect(jsonPath("$[0].name").value("P8-SC SMG"));
+        .andExpect(jsonPath("$[0].name").value("P8-SC SMG"))
+        .andExpect(jsonPath("$[0].label").value("P8-SC SMG"));
+  }
+
+  @Test
+  @WithMockUser
+  void itemSearch_labelsAComponentWithSizeGradeAndClass() throws Exception {
+    UUID id = UUID.randomUUID();
+    PageResponse<InventoryGameItemReferenceDto> page =
+        new PageResponse<>(
+            List.of(
+                new InventoryGameItemReferenceDto(
+                    id, "FR-66", "Gorgon", "SHIP_ITEM", "SHIELD", 1, "A", "MILITARY")),
+            0,
+            25,
+            1L,
+            1,
+            List.of());
+    doReturn(page).when(backendApiClient).get(any(), anyTypeRef(), any(Object[].class));
+
+    mockMvc
+        .perform(get("/orders/item-search").param("q", "FR-66").locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].id").value(id.toString()))
+        .andExpect(jsonPath("$[0].name").value("FR-66"))
+        .andExpect(jsonPath("$[0].label").value("FR-66 · S1 · A · Militär"));
   }
 
   @Test

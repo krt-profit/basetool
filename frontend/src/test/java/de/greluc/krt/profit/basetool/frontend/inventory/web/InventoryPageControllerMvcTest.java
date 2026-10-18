@@ -63,6 +63,7 @@ import jakarta.servlet.http.Cookie;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -636,7 +637,36 @@ class InventoryPageControllerMvcTest {
         .perform(get("/inventory/item-search").param("q", "Quantum"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].id").value(itemId.toString()))
-        .andExpect(jsonPath("$[0].name").value("Quantum Drive"));
+        .andExpect(jsonPath("$[0].name").value("Quantum Drive"))
+        .andExpect(jsonPath("$[0].label").value("Quantum Drive"));
+  }
+
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void itemSearch_labelsAComponentWithSizeGradeAndClass() throws Exception {
+    UUID itemId = UUID.randomUUID();
+    PageResponse<InventoryGameItemReferenceDto> page =
+        new PageResponse<>(
+            List.of(
+                new InventoryGameItemReferenceDto(
+                    itemId, "FR-66", "Gorgon", "SHIP_ITEM", "SHIELD", 1, "A", "MILITARY")),
+            0,
+            50,
+            1,
+            1,
+            Collections.emptyList());
+    when(backendApiClient.get(
+            eq("/api/v1/game-items?size=" + PickerSearch.PAGE_SIZE + "&sort=name,asc&q={q}"),
+            anyTypeRef(),
+            eq("FR-66")))
+        .thenReturn(page);
+
+    mockMvc
+        .perform(get("/inventory/item-search").param("q", "FR-66").locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].id").value(itemId.toString()))
+        .andExpect(jsonPath("$[0].name").value("FR-66"))
+        .andExpect(jsonPath("$[0].label").value("FR-66 · S1 · A · Militär"));
   }
 
   @Test

@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderReferenceDt
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.ItemPickerOption;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MissionReferenceDto;
@@ -41,6 +42,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.ItemPickerLabels;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.PickerSearch;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
@@ -121,6 +123,9 @@ public class InventoryPageController {
 
   /** Resolves ADMIN/OFFICER onto LOGISTICIAN so the gate is asked, not enumerated. */
   private final RoleHierarchy roleHierarchy;
+
+  /** Labels the item picker's search results with size, grade and class (REQ-INV-064). */
+  private final ItemPickerLabels itemPickerLabels;
 
   /**
    * Exposes the caller's {@code app_user.id} to the Lager pages as {@code currentMemberId}, the id
@@ -405,26 +410,23 @@ public class InventoryPageController {
   }
 
   /**
-   * JSON proxy for the {@code remote-game-items} combobox (REQ-FE-016): searches bookable game
-   * items by name via the authenticated client and returns a flat list, empty on backend failure.
+   * JSON proxy for the {@code remote-game-items} combobox (REQ-FE-016, REQ-INV-064): searches
+   * bookable game items by name via the authenticated client and returns a flat list of labelled
+   * options, empty on backend failure.
    *
    * @param q the case-insensitive item-name search term; {@code null}/blank matches all
-   * @return up to {@link PickerSearch#PAGE_SIZE} matching bookable game-item references, never
-   *     {@code null}
+   * @return up to {@link PickerSearch#PAGE_SIZE} matching bookable game-item options, never {@code
+   *     null}
    */
   @GetMapping("/item-search")
   @ResponseBody
-  public List<InventoryGameItemReferenceDto> itemSearch(@RequestParam(required = false) String q) {
+  public List<ItemPickerOption> itemSearch(@RequestParam(required = false) String q) {
     return SectionFallback.load(
         log,
         "item-search",
-        () -> {
-          PageResponse<InventoryGameItemReferenceDto> page =
-              inventoryClient.itemCatalog(PickerSearch.PAGE_SIZE, q == null ? "" : q);
-          return page != null && page.content() != null
-              ? page.content()
-              : List.<InventoryGameItemReferenceDto>of();
-        },
+        () ->
+            itemPickerLabels.options(
+                inventoryClient.itemCatalog(PickerSearch.PAGE_SIZE, q == null ? "" : q)),
         List.of());
   }
 
