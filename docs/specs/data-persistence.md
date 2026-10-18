@@ -1274,6 +1274,39 @@ Production held no value outside the range when the checks were added (read-only
 **Enforced by:** `V261QualityTierMigrationTest`, `QualityTierServiceTest` · **Code:** `Quality`,
 `QualityValue`, V265, `ScWikiBlueprintSyncService`, `P4kImportService`
 
+### REQ-DATA-024 — a game item's size, grade and class come from the SC Wiki only (ADR-0283)
+
+A `game_item` row carries a ship component's **size** (`size_class`), **grade** (`grade`) and
+**class** (`item_class`). All three are written by the SC Wiki item sync and by nothing else: the
+P4K import and the UEX sync leave them alone.
+
+- **Class.** The sync binds the payload's top-level `class` key and maps it to
+  `ShipComponentClass` (`MILITARY`, `CIVILIAN`, `INDUSTRIAL`, `STEALTH`, `COMPETITION`), matched
+  trimmed and case-insensitively. The column is a fixed value set: a CHECK constraint
+  (`ck_game_item_item_class`, V307) admits exactly the enum's names or `NULL`.
+- **An unknown class value** is stored as no class. The sync logs it once per value and backend process
+  (WARN; values compared case-insensitively, at most 32 distinct ones remembered, each
+  length-capped), increments `basetool_catalogue_item_class_unknown_total` once per affected item,
+  and carries on — one new in-game class never fails a sync, and it never disappears silently.
+- **An absent field keeps the stored value.** A payload whose `size`, `grade` or `class` is missing
+  or blank leaves the column as it is; only a present value overwrites it. A present but
+  non-numeric `size` still clears `size_class`, and a present but unknown `class` still clears
+  `item_class`.
+- The binding stays inside the captured key set of REQ-DATA-015: `class` is part of the
+  `/api/items` key set already.
+
+**Acceptance**
+
+- [x] After a wiki item sync, a payload with `class: "Military"` stores `MILITARY`.
+- [x] An unknown class leaves the column empty, increments the counter once per item, and the item
+  is still written.
+- [x] A payload without `size`, `grade` and `class` keeps the three stored values.
+- [x] The CHECK constraint holds exactly the enum's values (`V307MigrationTest`).
+
+**Enforced by:** `ShipComponentClassTest`, `ScWikiItemSyncServiceClosureTest` class cases,
+`V307MigrationTest`, `ExternalCatalogueMappingTest` · **Code:** `ShipComponentClass`,
+`ScWikiItemSyncService#applyWikiFields`, V307 · **Issues:** #2720
+
 ## Out of scope
 
 **Material-amount SCU-scale storage and rounding** (the `@PrePersist`/`@PreUpdate` HALF_UP-to-three-

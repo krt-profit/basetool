@@ -207,7 +207,10 @@ class InventoryIndexListPatternRenderTest {
         .doesNotContain("Max. Qualit");
   }
 
-  /** A ship component shows its type and size/grade chips instead of the category (REQ-INV-061). */
+  /**
+   * A ship component shows its type, size/grade and class chips instead of the category
+   * (REQ-INV-061, REQ-INV-062).
+   */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void itemsViewShowsComponentTypeAndSizeGradeChips() throws Exception {
@@ -215,7 +218,7 @@ class InventoryIndexListPatternRenderTest {
         new AggregatedInventoryDto(
             null,
             new InventoryGameItemReferenceDto(
-                GAME_ITEM_ID, "FR-66", "Gorgon", "VEHICLE_ITEM", "SHIELD", 1, "A"),
+                GAME_ITEM_ID, "FR-66", "Gorgon", "VEHICLE_ITEM", "SHIELD", 1, "A", "STEALTH"),
             null,
             null,
             2.0);
@@ -226,6 +229,7 @@ class InventoryIndexListPatternRenderTest {
         .containsPattern("data-testid=\"item-component-type\"[^>]*>Schild<")
         .containsPattern(
             "class=\"chip chip--data\"[^>]*data-testid=\"item-size-grade\"[^>]*>S1 · A<")
+        .containsPattern("class=\"chip chip--item-class-stealth\"[^>]*>Stealth<")
         .doesNotContain("data-testid=\"item-kind\"")
         .doesNotContain("Schiffskomponente");
   }

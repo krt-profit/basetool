@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiItemSyncService;
@@ -38,7 +39,9 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncEventType;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiDimensionDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiItemDto;
+import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
 import java.util.HashMap;
@@ -159,6 +162,7 @@ class ScWikiItemSyncServiceClosureTest {
             "Helmet",
             "1",
             "A",
+            null,
             "common",
             2.5,
             new ScWikiDimensionDto(0.3, 0.4, 0.35),
@@ -205,6 +209,7 @@ class ScWikiItemSyncServiceClosureTest {
             "Hadanite",
             "hadanite_cls",
             "Mineral",
+            null,
             null,
             null,
             null,
@@ -358,6 +363,114 @@ class ScWikiItemSyncServiceClosureTest {
         "the per-item write must run in its own transaction so a deadlock isolates to one item");
   }
 
+  @Test
+  void fillClosureItem_bindsTheWikiClass() {
+    UUID uuid = UUID.randomUUID();
+    GameItem existing = existingShield(uuid);
+    when(gameItemRepository.findByExternalUuid(uuid)).thenReturn(Optional.of(existing));
+
+    service.fillClosureItemWithinTransaction(
+        UUID.randomUUID(), uuid, componentDto(uuid, "1", "A", "Military"), Instant.now());
+
+    assertEquals(ShipComponentClass.MILITARY, existing.getItemClass());
+    assertEquals(1, existing.getSizeClass());
+    assertEquals("A", existing.getGrade());
+    assertEquals(0.0, unknownClassCount(), "a known class must not count as unknown");
+  }
+
+  @Test
+  void fillClosureItem_storesNoClassAndCounts_whenTheWikiClassIsUnknown() {
+    UUID first = UUID.randomUUID();
+    UUID second = UUID.randomUUID();
+    GameItem firstItem = existingShield(first);
+    firstItem.setItemClass(ShipComponentClass.CIVILIAN);
+    GameItem secondItem = existingShield(second);
+    when(gameItemRepository.findByExternalUuid(first)).thenReturn(Optional.of(firstItem));
+    when(gameItemRepository.findByExternalUuid(second)).thenReturn(Optional.of(secondItem));
+
+    ScWikiItemSyncService.ClosureOutcome outcome =
+        service.fillClosureItemWithinTransaction(
+            UUID.randomUUID(), first, componentDto(first, "1", "A", "Prototype"), Instant.now());
+    service.fillClosureItemWithinTransaction(
+        UUID.randomUUID(), second, componentDto(second, "2", "B", "Prototype"), Instant.now());
+
+    assertEquals(ScWikiItemSyncService.ClosureOutcome.FILLED, outcome);
+    assertNull(firstItem.getItemClass(), "an unknown upstream class is stored as no class");
+    assertNull(secondItem.getItemClass());
+    assertEquals(2.0, unknownClassCount(), "every item with an unknown class is counted");
+  }
+
+  @Test
+  void fillClosureItem_keepsStoredSizeGradeAndClass_whenThePayloadOmitsThem() {
+    UUID uuid = UUID.randomUUID();
+    GameItem existing = existingShield(uuid);
+    existing.setSizeClass(1);
+    existing.setGrade("A");
+    existing.setItemClass(ShipComponentClass.MILITARY);
+    when(gameItemRepository.findByExternalUuid(uuid)).thenReturn(Optional.of(existing));
+
+    service.fillClosureItemWithinTransaction(
+        UUID.randomUUID(), uuid, componentDto(uuid, null, " ", null), Instant.now());
+
+    assertEquals(1, existing.getSizeClass());
+    assertEquals("A", existing.getGrade());
+    assertEquals(ShipComponentClass.MILITARY, existing.getItemClass());
+    assertEquals(0.0, unknownClassCount(), "an absent class is not an unknown one");
+  }
+
+  @Test
+  void syncItems_registersTheUnknownClassCounterAtZero() {
+    when(gameItemRepository.findAllExternalUuids()).thenReturn(List.of());
+    when(blueprintRepository.findReferencedItemUuids()).thenReturn(List.of());
+
+    service.syncItems();
+
+    Counter counter = meterRegistry.find(MetricNames.CATALOGUE_ITEM_CLASS_UNKNOWN).counter();
+    assertNotNull(counter, "an enabled run must register the counter so increase() sees it rise");
+    assertEquals(0.0, counter.count());
+  }
+
+  private double unknownClassCount() {
+    Counter counter = meterRegistry.find(MetricNames.CATALOGUE_ITEM_CLASS_UNKNOWN).counter();
+    return counter == null ? 0.0 : counter.count();
+  }
+
+  private static GameItem existingShield(UUID uuid) {
+    GameItem item = new GameItem();
+    item.setId(UUID.randomUUID());
+    item.setExternalUuid(uuid);
+    item.setName("FR-66");
+    item.setKind(GameItemKind.VEHICLE_ITEM);
+    item.setSourceSystems(GameItemSourceSystem.BOTH);
+    return item;
+  }
+
+  private static ScWikiItemDto componentDto(
+      UUID uuid, String size, String grade, String itemClass) {
+    return new ScWikiItemDto(
+        uuid,
+        "fr-66",
+        "FR-66",
+        "SHLD_GODI_S01_FR66",
+        "Ship.Shield",
+        "Shield",
+        "Shield",
+        "Shield",
+        "UNDEFINED",
+        "Undefined",
+        size,
+        grade,
+        itemClass,
+        "common",
+        1.0,
+        null,
+        null,
+        Map.of("en_EN", "desc"),
+        Boolean.TRUE,
+        Boolean.FALSE,
+        "4.8.0-LIVE");
+  }
+
   private static ScWikiItemDto itemDto(UUID uuid) {
     return new ScWikiItemDto(
         uuid,
@@ -372,6 +485,7 @@ class ScWikiItemSyncServiceClosureTest {
         "subTypeLabel",
         "1",
         "A",
+        null,
         "common",
         1.0,
         null,

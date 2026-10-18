@@ -43,6 +43,7 @@ import java.util.UUID;
  * @param subTypeLabel Wiki sub-type display label
  * @param size raw size token, parsed to an integer size class by the sync
  * @param grade item grade
+ * @param itemClass the in-game component class, e.g. {@code "Military"}, mapped by the sync
  * @param rarity item rarity
  * @param mass mass in kg
  * @param dimension bounding-box dimensions
@@ -66,6 +67,7 @@ public record ScWikiItemDto(
     @JsonProperty("sub_type_label") String subTypeLabel,
     @JsonProperty("size") String size,
     @JsonProperty("grade") String grade,
+    @JsonProperty("class") String itemClass,
     @JsonProperty("rarity") String rarity,
     @JsonProperty("mass") Double mass,
     @JsonProperty("dimension") ScWikiDimensionDto dimension,
