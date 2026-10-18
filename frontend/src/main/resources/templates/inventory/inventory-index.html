@@ -3,6 +3,7 @@
 <head>
     <title th:text="#{nav.inventory} + ' - ' + ${appTitle}">Lagerverwaltung - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
+<link rel="stylesheet" th:href="@{/css/inventory/inventory-lager.css}">
 <link rel="stylesheet" th:href="@{/css/pages/inventory/inventory-index.css}">
     </th:block>
 </head>
@@ -97,9 +98,7 @@
                             </a>
                         </td>
                         <td>
-                            <span th:if="${item.gameItem.kind != null}"
-                                  th:with="kindKey=|inventory.items.kind.${item.gameItem.kind}|"
-                                  th:text="${#messages.msgOrNull(kindKey)} ?: ${item.gameItem.kind}">Art</span>
+                            <span class="lager-item-chips" th:insert="~{inventory/fragments/inventory-item-group :: itemChips(${item.gameItem})}"></span>
                         </td>
                         <td class="num" th:text="|${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'} #{material.quantity.piece}|">10 Stück</td>
                         <td class="cell-actions"><svg class="row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg></td>

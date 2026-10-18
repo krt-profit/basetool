@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Lager: Komponententyp, Größe und Grad am Item.** In „Mein Lager", im Globalen Lager und in der Item-Übersicht zeigt eine Schiffskomponente ihren Typ („Schild", „Kühler", „Quantenantrieb", …) statt „Schiffskomponente" und daneben Größe und Grad, z. B. `S1 · A`. Lackierungen und Flair zeigen weiterhin nur ihre Kategorie; `InventoryGameItemReferenceDto` liefert dafür `componentType`, `size` und `grade` (REQ-INV-061).
+
 ### Fixed
 
 - **Exchange: Bestätigungslink bleibt bei erneut gesendeter Massenänderung gültig.** Sendet eine verbundene Anwendung einen zur Bestätigung zurückgehaltenen Änderungssatz unverändert erneut, solange er noch wartet, antwortet das Gateway mit demselben `confirmationUrl`, statt ihn neu abzulegen und den Link ungültig zu machen, den das Mitglied gerade bekommen hat. Solche Wiederholungen zählen in der neuen Metrik `basetool_ingest_exchange_mass_changes_repeated_total` mit Alarm `ExchangeHeldBatchResent`, `ExchangeGuardStorm` zählt nur noch verschiedene zurückgehaltene Änderungssätze (Ingest, ADR-0281, REQ-XCH-021).

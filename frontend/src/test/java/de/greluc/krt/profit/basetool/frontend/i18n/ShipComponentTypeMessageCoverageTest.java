@@ -1,0 +1,135 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.i18n;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Tests that every {@code ShipComponentType} the backend can send has an {@code
+ * inventory.items.componentType.*} label in all three bundles (REQ-INV-061).
+ *
+ * <p>The enum is read from the backend's source file, since the frontend holds no backend classes.
+ */
+class ShipComponentTypeMessageCoverageTest {
+
+  /** The enum whose constants must each have a label. */
+  private static final Path SHIP_COMPONENT_TYPE =
+      resolveModuleRelative(
+          "../backend/src/main/java/de/greluc/krt/profit/basetool/backend/catalogue/api/ShipComponentType.java");
+
+  /** The three bundles, by the name a failure should name. */
+  private static final Map<String, Path> BUNDLES =
+      Map.of(
+          "messages.properties",
+          resolveModuleRelative("src/main/resources/messages.properties"),
+          "messages_de.properties",
+          resolveModuleRelative("src/main/resources/messages_de.properties"),
+          "messages_en.properties",
+          resolveModuleRelative("src/main/resources/messages_en.properties"));
+
+  /** An enum constant: an upper-snake identifier opening its constructor arguments. */
+  private static final Pattern CONSTANT =
+      Pattern.compile("^\\s{2}([A-Z][A-Z0-9_]*)\\(", Pattern.MULTILINE);
+
+  @Test
+  void everyShipComponentTypeHasALabelInEveryBundle() throws IOException {
+    Set<String> constants = shipComponentTypes();
+    assertThat(constants)
+        .as("parsed ShipComponentType constants from " + SHIP_COMPONENT_TYPE.toAbsolutePath())
+        .hasSizeGreaterThan(5);
+
+    Map<String, List<String>> missingByBundle = new LinkedHashMap<>();
+    for (Map.Entry<String, Path> bundle : BUNDLES.entrySet()) {
+      String content = Files.readString(bundle.getValue(), StandardCharsets.UTF_8);
+      List<String> missing = new ArrayList<>();
+      for (String constant : constants) {
+        if (!content.contains("inventory.items.componentType." + constant + "=")) {
+          missing.add(constant);
+        }
+      }
+      if (!missing.isEmpty()) {
+        missingByBundle.put(bundle.getKey(), missing);
+      }
+    }
+
+    assertThat(missingByBundle)
+        .as(
+            "A component type without a label falls back to the category chip in the Lager. Add"
+                + " inventory.items.componentType.<TYPE> to the bundle named here -- umlauts as"
+                + " \\\\uXXXX in the .properties files.")
+        .isEmpty();
+  }
+
+  /**
+   * The enum's constants, read from the backend source.
+   *
+   * @return the constant names in declaration order
+   * @throws IOException when the source file cannot be read
+   */
+  private static Set<String> shipComponentTypes() throws IOException {
+    assertThat(Files.isRegularFile(SHIP_COMPONENT_TYPE))
+        .as("ShipComponentType.java not found at " + SHIP_COMPONENT_TYPE.toAbsolutePath())
+        .isTrue();
+    String source = Files.readString(SHIP_COMPONENT_TYPE, StandardCharsets.UTF_8);
+    int body = source.indexOf("public enum ShipComponentType");
+    assertThat(body).as("the enum declaration").isGreaterThan(0);
+
+    Set<String> out = new LinkedHashSet<>();
+    Matcher m = CONSTANT.matcher(source.substring(body));
+    while (m.find()) {
+      out.add(m.group(1));
+    }
+    return out;
+  }
+
+  /**
+   * Resolves a path given relative to the frontend module root, tolerating a run from the
+   * repository root.
+   *
+   * @param relative the module-relative path
+   * @return the path that exists, or the module-relative one when neither does
+   */
+  private static Path resolveModuleRelative(String relative) {
+    Path direct = Paths.get(relative);
+    if (Files.exists(direct)) {
+      return direct;
+    }
+    Path fromRepoRoot = Paths.get("frontend").resolve(relative);
+    if (Files.exists(fromRepoRoot)) {
+      return fromRepoRoot;
+    }
+    return direct;
+  }
+}

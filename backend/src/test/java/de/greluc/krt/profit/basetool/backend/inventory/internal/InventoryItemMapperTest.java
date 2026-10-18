@@ -21,12 +21,15 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.inventory.api.DonationEarmark;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
@@ -282,5 +285,56 @@ class InventoryItemMapperTest {
   void nullSafety_shouldReturnNull_whenSourceNull() {
     assertNull(mapper.toDto(null));
     assertNull(mapper.locationToDto(null));
+    assertNull(mapper.gameItemToReferenceDto(null));
+  }
+
+  @Test
+  void gameItemToReferenceDto_component_carriesTypeSizeAndGrade() {
+    GameItem shield = gameItem("FR-66", GameItemKind.VEHICLE_ITEM, "Shield", 1, "A");
+
+    InventoryGameItemReferenceDto dto = mapper.gameItemToReferenceDto(shield);
+
+    assertNotNull(dto);
+    assertEquals("VEHICLE_ITEM", dto.kind());
+    assertEquals("SHIELD", dto.componentType());
+    assertEquals(1, dto.size());
+    assertEquals("A", dto.grade());
+  }
+
+  @Test
+  void gameItemToReferenceDto_nonComponent_dropsSizeAndGrade() {
+    GameItem paint = gameItem("Aurora Paint", GameItemKind.VEHICLE_ITEM, "Paints", 1, "A");
+
+    InventoryGameItemReferenceDto dto = mapper.gameItemToReferenceDto(paint);
+
+    assertNotNull(dto);
+    assertEquals("VEHICLE_ITEM", dto.kind());
+    assertNull(dto.componentType());
+    assertNull(dto.size());
+    assertNull(dto.grade());
+  }
+
+  @Test
+  void gameItemToReferenceDto_componentWithoutSizeAndGrade_keepsTypeOnly() {
+    GameItem cooler = gameItem("Bracer", GameItemKind.VEHICLE_ITEM, "Cooler", null, " ");
+
+    InventoryGameItemReferenceDto dto = mapper.gameItemToReferenceDto(cooler);
+
+    assertNotNull(dto);
+    assertEquals("COOLER", dto.componentType());
+    assertNull(dto.size());
+    assertNull(dto.grade());
+  }
+
+  private static GameItem gameItem(
+      String name, GameItemKind kind, String wikiType, Integer size, String grade) {
+    GameItem item = new GameItem();
+    item.setId(UUID.randomUUID());
+    item.setName(name);
+    item.setKind(kind);
+    item.setWikiType(wikiType);
+    item.setSizeClass(size);
+    item.setGrade(grade);
+    return item;
   }
 }

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<div th:fragment="itemGroupRow(group, toggleTrigger, contextText, selectTrigger)"
+     class="tree-row tree-row--group" th:data-trigger="${toggleTrigger}" th:data-game-item-id="${group.gameItem.id}">
+    <div class="tree-cell tree-name lager-item-name">
+        <span class="tree-chevron toggle-icon">▶</span>
+        <span class="tree-label" th:text="${group.gameItem.name}">Item</span>
+        <span class="lager-item-chips" th:insert="~{inventory/fragments/inventory-item-group :: itemChips(${group.gameItem})}"></span>
+    </div>
+    <div class="tree-cell lager-cell-muted">
+        <span th:if="${group.gameItem.manufacturer != null}" th:text="|${group.gameItem.manufacturer} · |">Hersteller · </span>
+        <span th:text="${contextText}">5 Stacks</span>
+    </div>
+    <div class="tree-cell tree-cell--num tree-amount">
+        <span><span th:text="${group.totalAmount != null ? #numbers.formatInteger(group.totalAmount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">St&uuml;ck</span></span>
+    </div>
+    <div class="tree-cell lager-cell-select" th:if="${selectTrigger != null}">
+        <input type="checkbox" class="item-checkbox group-select-all" th:data-game-item-id="${group.gameItem.id}" th:title="#{inventory.bulk.checkout.select.all}" th:aria-label="#{inventory.bulk.checkout.select.all}" th:data-trigger="${selectTrigger}">
+    </div>
+    <div class="tree-cell" th:if="${selectTrigger == null}"></div>
+</div>
+
+<th:block th:fragment="itemChips(gameItem)"
+          th:with="typeLabel=${gameItem.componentType != null} ? ${#messages.msgOrNull('inventory.items.componentType.' + gameItem.componentType)} : null">
+    <span th:if="${typeLabel != null}" class="chip chip--muted" data-testid="item-component-type" th:text="${typeLabel}">Schild</span>
+    <span th:if="${typeLabel == null and gameItem.kind != null}" class="chip chip--muted" data-testid="item-kind"
+          th:with="kindKey=|inventory.items.kind.${gameItem.kind}|"
+          th:text="${#messages.msgOrNull(kindKey)} ?: ${gameItem.kind}">Art</span>
+    <span th:if="${typeLabel != null and (gameItem.size != null or gameItem.grade != null)}" class="chip chip--data" data-testid="item-size-grade"
+          th:title="#{inventory.items.sizeGrade.title}"
+          th:text="${gameItem.size != null and gameItem.grade != null} ? #{inventory.items.sizeGrade(${gameItem.size}, ${gameItem.grade})} : (${gameItem.size != null} ? #{inventory.items.size(${gameItem.size})} : #{inventory.items.grade(${gameItem.grade})})">S1 · A</span>
+</th:block>
+
+</body>
+</html>
