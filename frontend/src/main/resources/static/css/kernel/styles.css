@@ -7371,15 +7371,11 @@
             color: var(--color-gray-2-text);
         }
         .data-table--stack
-            td:not(:first-child, .cell-status, .cell-actions):has(
-                ~ td:not(.cell-status, .cell-actions, :has(> :is(div, p, ul, ol, table, form)))
+            td:not(:first-child, .cell-status, .cell-actions, .cell-block):has(
+                ~ td:not(.cell-status, .cell-actions, .cell-block)
             )::after {
             content: '\00a0\00b7';
             margin: 0 0.4em 0 0;
-        }
-        .data-table--stack
-            td:has(> :is(div, p, ul, ol, table, form, .progress, .krt-progress))::after {
-            content: none;
         }
         .data-table--stack td[data-label]:not(:first-child, .cell-status)::before {
             content: attr(data-label) ': ';

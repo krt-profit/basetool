@@ -37,6 +37,16 @@
         min-width: 0;
     }
 
+    @media (width > 768px) {
+        .demand-table > tbody > tr > td:first-child {
+            min-width: 13rem;
+        }
+
+        .demand-table > tbody > tr > td:not(:first-child) {
+            white-space: nowrap;
+        }
+    }
+
     .demand-orders-toggle .demand-orders-count,
     .demand-orders-toggle .toggle-icon {
         flex: none;

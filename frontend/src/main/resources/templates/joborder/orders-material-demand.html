@@ -186,7 +186,7 @@
                                     th:classappend="${row.outstandingAmount() != null and row.outstandingAmount() <= 0} ? 'demand-covered' : ''">
                                     <th:block th:replace="~{joborder/fragments/material-amount :: amount(${row.outstandingAmount()}, ${row.material().quantityType()})}" />
                                 </td>
-                                <td class="demand-coverage" data-testid="demand-coverage">
+                                <td class="demand-coverage cell-block" data-testid="demand-coverage">
                                     <span class="demand-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"
                                           th:aria-valuenow="${#numbers.formatInteger(coveredPct, 1)}"
                                           th:aria-label="#{orders.demand.coverage.aria(${#numbers.formatInteger(coveredPct, 1)})}"

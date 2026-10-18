@@ -359,9 +359,11 @@
         align-items: center;
     }
 
-    .oc-bereich-col > .oc-caption {
-        max-width: var(--oc-box-w);
-        text-align: center;
+    @media (width > 768px) {
+        .oc-bereich-col > .oc-caption {
+            max-width: var(--oc-box-w);
+            text-align: center;
+        }
     }
 
     .oc-fan--bereiche .oc-caption,
