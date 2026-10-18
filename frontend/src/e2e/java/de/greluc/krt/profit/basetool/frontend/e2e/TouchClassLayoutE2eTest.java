@@ -55,9 +55,11 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *       main} reserves the fixed tab bar, and {@code fixed} with matching {@code main} bottom
  *       padding above;
  *   <li>no element is cut off beyond the viewport outside a fitting scroll container;
+ *   <li>no floating element other than a dialog or the drawer overlaps the phone tab bar;
  *   <li>wide tables scroll inside their own container;
  *   <li>form controls fit the viewport and reach the 44px touch floor by their effective hit area
  *       (dense row actions excepted);
+ *   <li>on the touch classes no text-entry control renders its text below 16px;
  *   <li>on the phone class no {@code .card} is wider inside than its own box, a {@code
  *       .table-responsive} scroller in it excepted;
  *   <li>the page head's primary action lies within the first viewport;
@@ -104,14 +106,6 @@ class TouchClassLayoutE2eTest {
   private static final int TOUCH_TARGET_FLOOR = 44;
 
   /**
-   * Upper bound of the touch classes, and therefore of the 44px floor.
-   *
-   * <p>Mirrors the app's own `width <= 1024px` touch block. Above it a control may be as dense as
-   * the design wants — a mouse hits a 24px row action, a thumb does not.
-   */
-  private static final int TOUCH_CLASS_MAX_WIDTH = 1024;
-
-  /**
    * Upper bound of REQ-UI-009's Smartphone class, and the breakpoint the footer behaviour turns on.
    *
    * <p>Mirrors the {@code width <= 768px} media query in {@code styles.css}; the two must move
@@ -124,6 +118,12 @@ class TouchClassLayoutE2eTest {
    * --touch-target-dense} in {@code styles.css}.
    */
   private static final int DENSE_ACTION_FLOOR = 32;
+
+  /**
+   * Smallest font size, in CSS pixels, a text-entry control may render on a touch class; below it
+   * iOS zooms the page in when the control takes focus.
+   */
+  private static final int MIN_INPUT_FONT_PX = 16;
 
   /** Sub-pixel slack, for the same reason the sibling layout guard carries one. */
   private static final double SLACK_PX = 1.0;
@@ -226,16 +226,25 @@ class TouchClassLayoutE2eTest {
   private static final String DEVICE_FILTER = System.getProperty("e2e.device", "").trim();
 
   /**
-   * The five device classes of REQ-UI-009, ordered narrow to wide: the phone (375×812), the tablet
-   * in both orientations (810×1080, 1024×768), desktop (1280×800) and ultra-wide (1600×900).
+   * The device classes of REQ-UI-009, ordered narrow to wide: the phone (375×812), the tablet in
+   * both orientations (810×1080, 1024×768) plus a landscape tablet above the touch breakpoint
+   * (1180×820), desktop (1280×800) and ultra-wide (1600×900).
    */
   private static final List<int[]> DEVICE_CLASSES =
       List.of(
           new int[] {375, 812},
           new int[] {810, 1080},
           new int[] {1024, 768},
+          new int[] {1180, 820},
           new int[] {1280, 800},
           new int[] {1600, 900});
+
+  /** Upper bound of the width-based touch block; mirrors {@code width <= 1024px} in the app. */
+  private static final int TOUCH_BREAKPOINT = 1024;
+
+  /** The device classes held by a finger, so the touch floors apply at any width. */
+  private static final Set<String> TOUCH_DEVICES =
+      Set.of("375x812", "810x1080", "1024x768", "1180x820");
 
   private static Playwright playwright;
   private static Browser browser;
@@ -290,7 +299,7 @@ class TouchClassLayoutE2eTest {
                   .setIgnoreHTTPSErrors(true)
                   .setStorageStatePath(storageState)
                   .setViewportSize(width, height)
-                  .setHasTouch(true)
+                  .setHasTouch(TOUCH_DEVICES.contains(deviceLabel))
                   .setIsMobile(width <= PHONE_MAX_WIDTH && ENGINE_SUPPORTS_IS_MOBILE))) {
         Page page = context.newPage();
         Set<String> measured = new LinkedHashSet<>();
@@ -485,6 +494,35 @@ class TouchClassLayoutE2eTest {
   }
 
   /**
+   * Decides whether the touch floors apply to this measurement.
+   *
+   * <p>Up to the touch breakpoint the width decides; above it the app switches its touch ergonomics
+   * on by {@code (pointer: coarse)}, so a touch class is held to them only where the engine reports
+   * that pointer.
+   *
+   * @param page the loaded page, whose media queries are read
+   * @param deviceLabel {@code WxH}
+   * @param width viewport width in CSS pixels
+   * @return whether the 44px and 16px floors are asserted
+   */
+  private static boolean touchApplies(Page page, String deviceLabel, int width) {
+    if (!TOUCH_DEVICES.contains(deviceLabel)) {
+      return false;
+    }
+    if (width <= TOUCH_BREAKPOINT) {
+      return true;
+    }
+    boolean coarse =
+        Boolean.TRUE.equals(page.evaluate("() => matchMedia('(pointer: coarse)').matches"));
+    if (!coarse) {
+      System.out.printf(
+          "[touch-layout] %-22s %s reports no coarse pointer; touch floors not asserted%n",
+          deviceLabel, ENGINE);
+    }
+    return coarse;
+  }
+
+  /**
    * Loads one page at one device class, screenshots it, and returns its findings.
    *
    * @param page the page to navigate; its context already carries the viewport and the session
@@ -544,6 +582,9 @@ class TouchClassLayoutE2eTest {
       return findings;
     }
     measured.add(path);
+    boolean touch = touchApplies(page, deviceLabel, width);
+    page.evaluate(
+        "() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))");
 
     @SuppressWarnings("unchecked")
     Map<String, Object> probe =
@@ -557,6 +598,10 @@ class TouchClassLayoutE2eTest {
                     width,
                     "phoneMaxWidth",
                     PHONE_MAX_WIDTH,
+                    "touch",
+                    touch,
+                    "minInputFontPx",
+                    MIN_INPUT_FONT_PX,
                     "retiredGray",
                     RETIRED_GRAY,
                     "maxCtas",
@@ -626,7 +671,7 @@ class TouchClassLayoutE2eTest {
 
     printDiagnostics(where, probe);
     findings.addAll(checkGeometry(where, probe, width, height));
-    findings.addAll(collectOffenders(where, probe, width));
+    findings.addAll(collectOffenders(where, probe, touch));
     findings.addAll(checkPagePatterns(where, probe));
     return findings;
   }
@@ -695,6 +740,9 @@ class TouchClassLayoutE2eTest {
     }
     for (Object offender : list(probe.get("nestedHudBoxes"))) {
       findings.add(where + ": nested .hud-box — " + offender);
+    }
+    for (Object offender : list(probe.get("lineEndDots"))) {
+      findings.add(where + ": stacked-row separator dot at the end of a line — " + offender);
     }
     List<Object> gray = list(probe.get("retiredGrayTexts"));
     for (Object offender : gray) {
@@ -830,12 +878,18 @@ class TouchClassLayoutE2eTest {
    *
    * @param where {@code WxH /path}
    * @param probe the page-side measurement
-   * @param width viewport width in CSS pixels, which decides whether the touch floors apply
+   * @param touch whether the device class is held by a finger, which decides whether the touch
+   *     floors apply
    * @return one line per finding
    */
-  private static List<String> collectOffenders(String where, Map<String, Object> probe, int width) {
+  private static List<String> collectOffenders(
+      String where, Map<String, Object> probe, boolean touch) {
     List<String> findings = new ArrayList<>();
-    if (width <= TOUCH_CLASS_MAX_WIDTH) {
+    for (Object offender : list(probe.get("smallTextEntries"))) {
+      findings.add(
+          where + ": text entry below " + MIN_INPUT_FONT_PX + "px zooms iOS — " + offender);
+    }
+    if (touch) {
       for (Object offender : list(probe.get("badControls"))) {
         findings.add(where + ": form control — " + offender);
       }
@@ -884,7 +938,8 @@ class TouchClassLayoutE2eTest {
    */
   private static final String PROBE_JS =
       """
-      ({ slack, deviceWidth, phoneMaxWidth, retiredGray, maxCtas, maxListed }) => {
+      ({ slack, deviceWidth, phoneMaxWidth, touch, minInputFontPx, retiredGray, maxCtas,
+         maxListed }) => {
         const vw = Math.min(window.innerWidth, deviceWidth);
         const layoutWidth = window.innerWidth;
         const vh = window.innerHeight;
@@ -1002,6 +1057,10 @@ class TouchClassLayoutE2eTest {
           }
         }
 
+        const TEXT_ENTRY = 'select, textarea, input:not([type="checkbox"], [type="radio"],'
+          + ' [type="range"], [type="color"], [type="file"], [type="button"], [type="submit"],'
+          + ' [type="reset"], [type="image"], [type="hidden"])';
+        const smallTextEntries = [];
         const badControls = [];
         if (DENSE_SET_EMPTY) {
           badControls.push('the dense-floor set is EMPTY — no stylesheet declaring'
@@ -1026,6 +1085,10 @@ class TouchClassLayoutE2eTest {
                 + 'px tall, floor ' + floor + 'px');
             }
           }
+          if (touch && smallTextEntries.length < maxListed && c.matches(TEXT_ENTRY)
+              && parseFloat(cs.fontSize) < minInputFontPx - 0.01) {
+            smallTextEntries.push(label(c) + ' renders its text at ' + cs.fontSize);
+          }
         }
 
         const overlaps = [];
@@ -1038,6 +1101,25 @@ class TouchClassLayoutE2eTest {
               && t.right > b.left + slack && t.top < b.bottom && t.bottom > b.top) {
             overlaps.push('the wordmark runs to ' + Math.round(t.right)
               + 'px, under the notification bell which starts at ' + Math.round(b.left) + 'px');
+          }
+        }
+
+        if (tabbarHeight > 0) {
+          const tr = tabbar.getBoundingClientRect();
+          for (const el of document.body.querySelectorAll('*')) {
+            if (overlaps.length >= maxListed) break;
+            if (el === tabbar || tabbar.contains(el) || el.contains(tabbar)) continue;
+            const ecs = getComputedStyle(el);
+            if (ecs.position !== 'fixed' || ecs.display === 'none' || ecs.visibility === 'hidden'
+                || parseFloat(ecs.opacity) === 0) continue;
+            if (el.closest('.sidebar, .sidebar-overlay, dialog, .krt-modal-overlay')) continue;
+            const er = el.getBoundingClientRect();
+            if (er.width === 0 || er.height === 0 || er.width >= vw - slack) continue;
+            if (er.bottom > tr.top + slack && er.top < tr.bottom && er.right > tr.left
+                && er.left < tr.right) {
+              overlaps.push(label(el) + ' floats over the tab bar (' + Math.round(er.top) + '..'
+                + Math.round(er.bottom) + 'px, tab bar from ' + Math.round(tr.top) + 'px)');
+            }
           }
         }
 
@@ -1165,6 +1247,44 @@ class TouchClassLayoutE2eTest {
           label(el) + (shown(el) ? '' : ' (hidden)') + ' inside '
             + label(el.parentElement.closest('.hud-box')));
 
+        const lineEndDots = [];
+        for (const row of document.querySelectorAll('.data-table--stack > tbody > tr')) {
+          const cells = Array.from(row.cells).filter((c, i) => i > 0
+            && !c.classList.contains('cell-status') && !c.classList.contains('cell-actions')
+            && c.getClientRects().length > 0);
+          cells.forEach((cell, i) => {
+            const next = cells[i + 1];
+            if (!next || !getComputedStyle(cell, '::after').content.includes('\\u00b7')) return;
+            if (next.getBoundingClientRect().top < cell.getBoundingClientRect().bottom - 1) return;
+            if (lineEndDots.length < maxListed) lineEndDots.push(label(cell));
+          });
+          for (const cell of cells) {
+            for (const sub of cell.querySelectorAll('.cell-sub')) {
+              const prev = sub.previousElementSibling;
+              const rects = sub.getClientRects();
+              if (!prev || rects.length === 0
+                  || !getComputedStyle(sub, '::before').content.includes('\\u00b7')) continue;
+              const prevRects = prev.getClientRects();
+              const prevLast = prevRects[prevRects.length - 1];
+              const walker = document.createTreeWalker(sub, NodeFilter.SHOW_TEXT);
+              let textTop = null;
+              for (let n = walker.nextNode(); n && textTop === null; n = walker.nextNode()) {
+                const at = n.textContent.search(/\\S/);
+                if (at < 0) continue;
+                const range = document.createRange();
+                range.setStart(n, at);
+                range.setEnd(n, at + 1);
+                textTop = range.getBoundingClientRect().top;
+              }
+              const startsLine = prevLast && rects[0].top >= prevLast.bottom - 1;
+              const alone = textTop !== null && textTop >= rects[0].bottom - 1;
+              if ((startsLine || alone) && lineEndDots.length < maxListed) {
+                lineEndDots.push(label(sub) + (startsLine ? ' (dot starts a line)' : ''));
+              }
+            }
+          }
+        }
+
         const retiredGrayTexts = [];
         let retiredGrayCount = 0;
         for (const el of document.body.querySelectorAll('*')) {
@@ -1188,10 +1308,10 @@ class TouchClassLayoutE2eTest {
                  overflowXBody: getComputedStyle(document.body).overflowX,
                  footerPosition: footer ? getComputedStyle(footer).position : '(no footer)',
                  headerHeight, footerHeight, tabbarHeight, mainPaddingBottom, footerHeightVar,
-                 cutOff, unscrollableTables, badControls, modalIssues, overlaps,
+                 cutOff, unscrollableTables, badControls, smallTextEntries, modalIssues, overlaps,
                  cardOverflows, cardOverflowCount, primaryAction, primaryIssue,
                  ctaCrowds, ctaCrowdCount, nestedHudBoxes, nestedHudCount: nested.length,
-                 retiredGrayTexts, retiredGrayCount,
+                 retiredGrayTexts, retiredGrayCount, lineEndDots,
                  modalCount: document.querySelectorAll('%s').length };
       }
       """

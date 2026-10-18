@@ -352,6 +352,20 @@
         min-width: 100%;
     }
 
+    .oc-bereich-col {
+        display: flex;
+        flex: 0 0 auto;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    @media (width > 768px) {
+        .oc-bereich-col > .oc-caption {
+            max-width: var(--oc-box-w);
+            text-align: center;
+        }
+    }
+
     .oc-fan--bereiche .oc-caption,
     .oc-bereich-row .oc-caption {
         margin-bottom: 0.6rem;
@@ -571,6 +585,7 @@
         }
 
         .oc-col,
+        .oc-bereich-col,
         .oc-bereich-body {
             align-items: stretch;
         }

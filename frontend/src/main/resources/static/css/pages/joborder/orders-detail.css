@@ -118,9 +118,28 @@
         font-weight: var(--fw-regular);
     }
 
-    .od-item-cell .od-prod-toggle {
-        margin-right: var(--space-1);
-        vertical-align: middle;
+    .od-item-head {
+        display: flex;
+        flex-wrap: nowrap;
+        align-items: flex-start;
+        gap: var(--space-1);
+    }
+    .od-item-head .od-prod-toggle {
+        flex: none;
+        margin-top: 0.15em;
+    }
+    @media (width > 768px) {
+        .od-items-table .od-item-cell {
+            min-width: 15rem;
+        }
+    }
+    .od-item-main {
+        flex: 1 1 0;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-1) var(--space-2);
+        min-width: 0;
     }
     .od-item-name {
         color: var(--color-white);

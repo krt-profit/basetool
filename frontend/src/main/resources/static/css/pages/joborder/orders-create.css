@@ -143,5 +143,11 @@
         .oc-line-fields {
             flex-wrap: wrap;
         }
+        .oc-line-fields > .flex-2 {
+            flex: 1 1 100%;
+        }
+        .oc-line-fields > .flex-1 {
+            flex: 1 1 8rem;
+        }
     }
 }

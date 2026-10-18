@@ -1400,7 +1400,7 @@
                     <select name="jobTypeIds" id="edit-crew-jobs" multiple class="crew-jobs-select">
                         <option th:each="job : ${crewJobTypes}" th:value="${job.id}" th:text="${job.name}" th:selected="${crewForm.jobTypeIds != null and crewForm.jobTypeIds.contains(job.id)}">Gunner</option>
                     </select>
-                    <small class="text-muted" th:text="#{general.multiselect}">Strg+Klick f&uuml;r Mehrfachauswahl</small>
+                    <small class="text-muted multiselect-hint" th:text="#{general.multiselect}">Strg+Klick f&uuml;r Mehrfachauswahl</small>
                     <div th:if="${#fields.hasErrors('jobTypeIds')}" th:errors="*{jobTypeIds}" class="field-error"></div>
                 </div>
                 </div>

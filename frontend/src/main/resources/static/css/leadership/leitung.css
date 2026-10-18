@@ -182,12 +182,14 @@
             border-bottom: var(--border-hairline);
         }
 
-        .leitung-tree__row {
-            min-height: var(--touch-target);
-        }
-
         .leitung-detail {
             padding: var(--space-4);
+        }
+    }
+
+    @media (width <= 1024px), (pointer: coarse) {
+        .leitung-tree__row {
+            min-height: var(--touch-target);
         }
     }
 

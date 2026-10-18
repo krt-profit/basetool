@@ -62,7 +62,12 @@
         }
 
         .terms-accept-scroll {
-            max-height: 18rem;
+            max-height: none;
+            overflow-y: visible;
+        }
+
+        .terms-accept-actions form .btn {
+            width: 100%;
         }
     }
 }

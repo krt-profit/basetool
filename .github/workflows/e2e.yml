@@ -135,7 +135,7 @@ jobs:
       fail-fast: false
       matrix:
         browser: [chromium, firefox, webkit]
-        device: ['375x812', '810x1080', '1024x768', '1280x800', '1600x900']
+        device: ['375x812', '810x1080', '1024x768', '1180x820', '1280x800', '1600x900']
 
     steps:
       - name: Checkout
