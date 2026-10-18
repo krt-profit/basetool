@@ -22,8 +22,12 @@ package de.greluc.krt.profit.basetool.backend.supply.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
@@ -219,5 +223,47 @@ class SupplyMapperTest {
     assertThat(SupplyMapper.acceptsPledges(NeedStatus.OPEN)).isTrue();
     assertThat(SupplyMapper.acceptsPledges(NeedStatus.PAUSED)).isFalse();
     assertThat(SupplyMapper.acceptsPledges(NeedStatus.FULFILLED)).isFalse();
+  }
+
+  @Test
+  void aNeedAndADonationForAShieldCarryItsTypeSizeGradeAndClass() {
+    GameItem shield = new GameItem();
+    shield.setId(UUID.randomUUID());
+    shield.setName("FR-66");
+    shield.setKind(GameItemKind.VEHICLE_ITEM);
+    shield.setWikiType("Shield");
+    shield.setSizeClass(1);
+    shield.setGrade("A");
+    shield.setItemClass(ShipComponentClass.MILITARY);
+    SupplyNeed need = purchasableNeed();
+    need.setMaterial(null);
+    need.setGameItem(shield);
+    SupplyDonation donation = donation(DonationStatus.PLEDGED);
+    donation.setMaterial(null);
+    donation.setGameItem(shield);
+    GameItemReferenceDto expected =
+        new GameItemReferenceDto(
+            shield.getId(), "FR-66", "VEHICLE_ITEM", "SHIELD", 1, "A", "MILITARY");
+
+    assertThat(mapper.toDto(need, needContext(false, false, Set.of(), false)).gameItem())
+        .isEqualTo(expected);
+    assertThat(mapper.toDto(donation, donationContext(DONOR, false, false, Set.of())).gameItem())
+        .isEqualTo(expected);
+  }
+
+  @Test
+  void aGameItemThatIsNoComponentCarriesItsKindOnly() {
+    GameItem paint = new GameItem();
+    paint.setId(UUID.randomUUID());
+    paint.setName("Paint");
+    paint.setKind(GameItemKind.VEHICLE_ITEM);
+    paint.setWikiType("Paints");
+    paint.setGrade("A");
+    SupplyNeed need = purchasableNeed();
+    need.setMaterial(null);
+    need.setGameItem(paint);
+
+    assertThat(mapper.toDto(need, needContext(false, false, Set.of(), false)).gameItem())
+        .isEqualTo(new GameItemReferenceDto(paint.getId(), "Paint", "VEHICLE_ITEM"));
   }
 }

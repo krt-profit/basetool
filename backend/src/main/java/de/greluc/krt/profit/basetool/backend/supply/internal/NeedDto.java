@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.supply.internal;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedPriority;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedStatus;
 import de.greluc.krt.profit.basetool.backend.supply.api.PurchaseReason;
@@ -37,7 +38,8 @@ import org.jetbrains.annotations.Nullable;
  * @param orgUnitName the raising unit's name
  * @param orgUnitShorthand the raising unit's shorthand
  * @param material the material, or {@code null} for a game-item need
- * @param gameItem the game item, or {@code null} for a material need
+ * @param gameItem the game item with a component's type, size, grade and class (REQ-SUP-022), or
+ *     {@code null} for a material need
  * @param quantityType {@code SCU}, {@code PIECE} or {@code ITEM}
  * @param qualityTier the tier of a material need, or {@code null}
  * @param amount the amount asked for
@@ -61,7 +63,7 @@ public record NeedDto(
     String orgUnitName,
     String orgUnitShorthand,
     @Nullable SupplyRefDto material,
-    @Nullable SupplyRefDto gameItem,
+    @Nullable GameItemReferenceDto gameItem,
     String quantityType,
     @Nullable SupplyTierRefDto qualityTier,
     Double amount,

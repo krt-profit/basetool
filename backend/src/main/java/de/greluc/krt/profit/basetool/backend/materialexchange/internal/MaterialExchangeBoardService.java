@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
@@ -107,6 +108,9 @@ public class MaterialExchangeBoardService {
    */
   private final OrgUnitRepository orgUnitRepository;
 
+  /** Resolves a page's item offers to their game items in one batch (REQ-MARKET-023). */
+  private final ExchangeItemReferences exchangeItemReferences;
+
   /**
    * Returns a page of the board, either all offers or the caller's own, with the toolbar filters
    * and sort applied; list DTOs never carry interessenten names.
@@ -158,6 +162,8 @@ public class MaterialExchangeBoardService {
     Map<UUID, List<OrgUnitReferenceDto>> badges =
         ownerOrgUnitBadges(ownerIdsOf(offers.getContent()));
     Map<UUID, StockRow> rows = rowsOf(offers.getContent());
+    Map<String, GameItemReferenceDto> gameItems =
+        exchangeItemReferences.byProductKey(itemProductKeysOf(offers.getContent()));
 
     Page<MaterialExchangeOfferDto> dtos =
         offers.map(
@@ -165,6 +171,7 @@ public class MaterialExchangeBoardService {
                 toDto(
                     offer,
                     rows.get(offer.getInventoryItemId()),
+                    gameItemOf(offer, gameItems),
                     viewerId,
                     badges.getOrDefault(ownerIdOf(offer), List.of()),
                     counts.getOrDefault(offer.getId(), 0L).intValue(),
@@ -311,7 +318,11 @@ public class MaterialExchangeBoardService {
         ownerId == null
             ? List.of()
             : ownerOrgUnitBadges(Set.of(ownerId)).getOrDefault(ownerId, List.of());
-    return toDto(offer, rowOf(offer), viewerId, badges, count, viewerInterested, names);
+    GameItemReferenceDto gameItem =
+        offer.getKind() == MaterialExchangeOfferKind.ITEM
+            ? exchangeItemReferences.ofProductKey(offer.getItemProductKey())
+            : null;
+    return toDto(offer, rowOf(offer), gameItem, viewerId, badges, count, viewerInterested, names);
   }
 
   /**
@@ -319,6 +330,7 @@ public class MaterialExchangeBoardService {
    *
    * @param offer the offer.
    * @param item the offer's Lager row with its material, or {@code null} for an offer without one.
+   * @param gameItem the game item an item offer names, or {@code null}.
    * @param viewerId the requesting member, or {@code null}.
    * @param ownerOrgUnits the Anbieter's affiliation badges (Staffel(n) then SK(s)), never {@code
    *     null}.
@@ -331,6 +343,7 @@ public class MaterialExchangeBoardService {
   private MaterialExchangeOfferDto toDto(
       MaterialExchangeOffer offer,
       @Nullable StockRow item,
+      @Nullable GameItemReferenceDto gameItem,
       @Nullable UUID viewerId,
       List<OrgUnitReferenceDto> ownerOrgUnits,
       int interestCount,
@@ -361,6 +374,7 @@ public class MaterialExchangeBoardService {
         offer.getKind(),
         material,
         itemName,
+        gameItem,
         itemQuantity,
         userMapper.toReferenceDto(offer.getOwner()),
         ownerOrgUnits,
@@ -390,6 +404,36 @@ public class MaterialExchangeBoardService {
         .map(MaterialExchangeBoardService::ownerIdOf)
         .filter(Objects::nonNull)
         .collect(Collectors.toSet());
+  }
+
+  /**
+   * The product keys of a page's item offers, the input of the batched game-item resolution.
+   *
+   * @param offers the board page's offers
+   * @return the item offers' product keys; material offers contribute nothing
+   */
+  private static List<String> itemProductKeysOf(@NotNull Collection<MaterialExchangeOffer> offers) {
+    return offers.stream()
+        .filter(offer -> offer.getKind() == MaterialExchangeOfferKind.ITEM)
+        .map(MaterialExchangeOffer::getItemProductKey)
+        .filter(Objects::nonNull)
+        .toList();
+  }
+
+  /**
+   * Looks up the game item of one offer in a page's resolved references.
+   *
+   * @param offer the offer
+   * @param gameItems product key to reference for the page
+   * @return the reference of an item offer, or {@code null}
+   */
+  @Nullable
+  private static GameItemReferenceDto gameItemOf(
+      @NotNull MaterialExchangeOffer offer, @NotNull Map<String, GameItemReferenceDto> gameItems) {
+    String key = offer.getItemProductKey();
+    return offer.getKind() == MaterialExchangeOfferKind.ITEM && key != null
+        ? gameItems.get(key)
+        : null;
   }
 
   /**

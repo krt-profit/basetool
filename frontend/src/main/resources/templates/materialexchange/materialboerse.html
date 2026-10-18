@@ -137,6 +137,7 @@
                             <span class="mb-mrow-mat">
                                 <span class="mb-mrow-name" th:text="${offer.kind() == 'ITEM' ? offer.itemName() : offer.material().name()}">Material</span>
                                 <span th:if="${offer.kind() == 'ITEM'}" class="mb-kind-tag" th:text="#{materialboerse.kind.item}">Item</span>
+                                <span th:if="${offer.gameItem() != null}" class="mb-item-chips" data-testid="mb-item-chips" th:insert="~{kernel/fragments/item-chips :: itemChips(${offer.gameItem()})}"></span>
                                 <span th:if="${offer.stolen()}" class="chip chip--danger" data-testid="stolen-chip" th:title="#{inventory.stolen.chip.title}" th:text="#{inventory.stolen.chip}">Gestohlen</span>
                             </span>
                             <span class="mb-mrow-sub">
@@ -170,6 +171,7 @@
                                     <h2>
                                         <span th:text="${offer.kind() == 'ITEM' ? offer.itemName() : offer.material().name()}">Material</span>
                                         <span th:if="${offer.kind() == 'ITEM'}" class="mb-kind-tag" th:text="#{materialboerse.kind.item}">Item</span>
+                                        <span th:if="${offer.gameItem() != null}" class="mb-item-chips" data-testid="mb-item-chips" th:insert="~{kernel/fragments/item-chips :: itemChips(${offer.gameItem()})}"></span>
                                         <span th:if="${offer.stolen()}" class="chip chip--danger" data-testid="stolen-chip" th:title="#{inventory.stolen.chip.title}" th:text="#{inventory.stolen.chip}">Gestohlen</span>
                                     </h2>
                                     <p class="mb-dp-owner">

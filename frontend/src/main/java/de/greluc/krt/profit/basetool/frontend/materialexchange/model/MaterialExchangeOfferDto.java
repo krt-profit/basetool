@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.materialexchange.model;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BackendEnumAsString;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.OrgUnitReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
@@ -40,6 +41,8 @@ import java.util.UUID;
  * @param kind the offer kind name (MATERIAL / ITEM); drives which branch is rendered.
  * @param material the offered material reference for a material offer, else {@code null}.
  * @param itemName the offered item's display name for an item offer, else {@code null}.
+ * @param gameItem the game item an item row names, with a component's type, size, grade and class
+ *     (REQ-MARKET-023), or {@code null} for a material row or an item outside the catalogue.
  * @param itemQuantity the offered whole-piece quantity for an item offer, else {@code null}.
  * @param owner the offering player (the Anbieter).
  * @param ownerOrgUnits every badge-kind org unit the Anbieter belongs to (Staffel(n) first, then
@@ -67,6 +70,7 @@ public record MaterialExchangeOfferDto(
     @BackendEnumAsString String kind,
     MaterialReferenceDto material,
     String itemName,
+    GameItemReferenceDto gameItem,
     Integer itemQuantity,
     UserReferenceDto owner,
     List<OrgUnitReferenceDto> ownerOrgUnits,

@@ -693,6 +693,39 @@ EN + base bundles, `{lieferant}`/`{material}` placeholders).
 `notification/api/NotificationType`,
 `db/migration/V225__seed_material_exchange_request_fulfillment_notification_rule.sql`
 
+### REQ-MARKET-023 — Item offers and requests show a component's type, size, grade and class
+
+An item offer and an item request show the Lager chips beside the item's name, in the board row and
+in the detail, e.g. `FR-66 [SCHILD] [S1 · A] [MILITÄR]`, so a member sees which variant is offered
+or wanted.
+
+- The chips follow the Lager rules (REQ-INV-061, REQ-INV-062): only a ship component gets the
+  type, size/grade and class chips; every other item shows its category chip. A material row and an
+  item whose product names no catalogued game item render as before, with the plain name only.
+- `MaterialExchangeOfferDto` and `MaterialRequestDto` carry a `gameItem` reference
+  (`GameItemReferenceDto`), resolved from the row's blueprint product key to the product's output
+  item. The flat `itemName` stays the displayed name.
+- A board page resolves all its item rows in two queries (`ExchangeItemReferences`): one scan of the
+  active blueprint products, one batch load of the game items. A page without an item row issues
+  neither, so no read adds a query per row.
+- The chips sit in the list and detail fragments the live refresh fetches (REQ-MARKET-001), so a
+  peer's change keeps them. The change is read-only; the `MARKET` audit trail is unchanged.
+
+**Acceptance**
+
+- [x] An item offer and an item request for FR-66 show `[SCHILD] [S1 · A] [MILITÄR]` in the row and
+  the detail, also after an in-place refresh of the list.
+- [x] Material offers and requests render as before.
+- [x] The game items of a board page resolve in one batch.
+
+**Enforced by:** `MaterialboersePatternRenderTest` chip cases, `ExchangeItemReferencesTest`,
+`MaterialExchangeServiceTest` and `MaterialRequestServiceTest` game-item cases,
+`BlueprintProductServiceTest#outputItemIdsByProductKey_*` · **Code:**
+`ExchangeItemReferences`, `BlueprintProducts#outputItemIdsByProductKey`,
+`MaterialExchangeBoardService`, `MaterialRequestBoardService`, `materialexchange/materialboerse.html`,
+`materialexchange/fragments/materialgesuch-board.html`, `kernel/fragments/item-chips.html` ·
+**Issues:** #2725
+
 ## Monitoring
 
 Active offers and active requests are exported as the gauges

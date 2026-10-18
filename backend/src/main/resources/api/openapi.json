@@ -81158,7 +81158,7 @@
             "type" : "boolean"
           },
           "gameItem" : {
-            "$ref" : "#/components/schemas/SupplyRefDto"
+            "$ref" : "#/components/schemas/GameItemReferenceDto"
           },
           "id" : {
             "type" : "string",
@@ -83636,6 +83636,9 @@
             "type" : "number",
             "format" : "double"
           },
+          "gameItem" : {
+            "$ref" : "#/components/schemas/GameItemReferenceDto"
+          },
           "id" : {
             "type" : "string",
             "format" : "uuid"
@@ -84075,6 +84078,9 @@
       "MaterialRequestDto" : {
         "type" : "object",
         "properties" : {
+          "gameItem" : {
+            "$ref" : "#/components/schemas/GameItemReferenceDto"
+          },
           "id" : {
             "type" : "string",
             "format" : "uuid"
@@ -85016,7 +85022,7 @@
             "format" : "double"
           },
           "gameItem" : {
-            "$ref" : "#/components/schemas/SupplyRefDto"
+            "$ref" : "#/components/schemas/GameItemReferenceDto"
           },
           "id" : {
             "type" : "string",

@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintProductService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -104,6 +105,7 @@ class MaterialExchangeServiceTest {
   @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private BlueprintProductService blueprintProductService;
   @Mock private OwnerScopeService ownerScopeService;
+  @Mock private ExchangeItemReferences exchangeItemReferences;
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private ObjectProvider<MaterialExchangeService> selfProvider;
 
@@ -946,6 +948,32 @@ class MaterialExchangeServiceTest {
 
     assertThat(freeItem.getItemQuantity()).isEqualTo(7);
     assertThat(dto.itemQuantity()).isEqualTo(7);
+  }
+
+  /** An item offer's detail carries the game item its product names (REQ-MARKET-023). */
+  @Test
+  void detail_itemOfferCarriesItsGameItem() {
+    GameItem gameItem = gameItem("Shield");
+    InventoryItem row = itemStockRow(owner, gameItem, 2.0);
+    MaterialExchangeOffer itemOffer = stockBackedItemOffer(offerId, row, owner, 1);
+    GameItemReferenceDto reference =
+        new GameItemReferenceDto(
+            gameItem.getId(), "Shield", "VEHICLE_ITEM", "SHIELD", 1, "A", "MILITARY");
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
+    when(offerRepository.findWithDetailById(offerId)).thenReturn(Optional.of(itemOffer));
+    when(exchangeItemReferences.ofProductKey("prod-key")).thenReturn(reference);
+
+    assertThat(boardService.detail(offerId).gameItem()).isEqualTo(reference);
+  }
+
+  /** A material offer names no game item and resolves none. */
+  @Test
+  void detail_materialOfferCarriesNoGameItem() {
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
+    when(offerRepository.findWithDetailById(offerId)).thenReturn(Optional.of(offer));
+
+    assertThat(boardService.detail(offerId).gameItem()).isNull();
+    verify(exchangeItemReferences, never()).ofProductKey(any());
   }
 
   /**

@@ -1,6 +1,13 @@
 @layer base, components, page, utilities;
 
 @layer page {
+    .mb-item-chips {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: var(--space-1);
+        align-items: center;
+        vertical-align: middle;
+    }
     .mb-create[hidden] {
         display: none;
     }

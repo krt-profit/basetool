@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.blueprint.api;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -57,6 +58,15 @@ public interface BlueprintProducts {
    */
   @NotNull
   Optional<ResolvedProduct> resolveByGameItem(@Nullable UUID gameItemId);
+
+  /**
+   * Resolves product keys to the game item each product produces, in one pass over the catalogue.
+   *
+   * @param productKeys the normalized product keys
+   * @return product key to output-item id; keys without an active product or output item are absent
+   */
+  @NotNull
+  Map<String, UUID> outputItemIdsByProductKey(@NotNull Collection<String> productKeys);
 
   /**
    * Indexes every active recipe's lower-cased {@code scwiki_key} to the normalized product keys it
