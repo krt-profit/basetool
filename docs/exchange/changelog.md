@@ -5,6 +5,11 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
 
 ## 2026-10-18
 
+- **New: ship component data.** A game item that is a ship component carries the optional
+  `component`: `componentType`, `size`, `grade` and `itemClass` as stable codes. It sits beside
+  `material` on the lots of `/me/stock` and `/org-stock`, and beside `item` on the item lines of
+  `/me/org-demand` and its orders ([stock](resources/stock.md#component)). No new scope. New
+  `component.schema.json`; `stock-lot`, `org-stock-lot` and `org-demand` gain `component`.
 - **Fixed: a share takes all of `split.personal`.** A `share` also takes the member's shared stock
   outside any unit, after the personal stock, so a share up to `split.personal` no longer fails
   with `INSUFFICIENT_STOCK` ([stock](resources/stock.md#sharing-into-a-units-pool)).

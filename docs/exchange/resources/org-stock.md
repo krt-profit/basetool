@@ -26,6 +26,7 @@ single entries are an extra, see [Entries](#entries).
 | `unit` | `{id, name}` of the unit whose pool holds the lot. |
 | `material` | `{bt, name}`: a material, or a game item, as in a [stock lot](stock.md#a-lot). |
 | `materialKind` | Materials only, as in a [stock lot](stock.md#material-kind). |
+| `component` | Ship components only, as in a [stock lot](stock.md#component). |
 | `location` | `{name, uex?}` of the warehouse location. |
 | `quality` | 0 to 1000; an item lot has 0. |
 | `stolen` | Whether the stock is marked stolen. |

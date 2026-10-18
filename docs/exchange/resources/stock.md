@@ -15,6 +15,7 @@ shows. It has no row id. Stock another member holds is never in a lot.
 | `key` | Opaque identifier of the lot. |
 | `material` | `{bt, name}`: a material, or a game item. `bt` is its Basetool id. |
 | `materialKind` | Materials only, see [below](#material-kind). |
+| `component` | Ship components only, see [below](#component). |
 | `location` | `{name, uex?}` of the warehouse location. |
 | `quality` | 0 to 1000. Every material lot has the quality it is booked at; an item lot has 0. |
 | `stolen` | Whether the stock is marked stolen. |
@@ -74,6 +75,33 @@ a lot's quality.
 | `sellable` | UEX: a terminal buys it. |
 
 The six UEX flags are left out for a material UEX does not know.
+
+### Component
+
+`component` carries the ship component data of a game item as stable codes, the same data the
+Basetool shows as chips next to the item. Only a ship component carries it; a material or any
+other item has none. It is output only: change sets never send it.
+
+| Field | Meaning |
+| --- | --- |
+| `componentType` | The kind of component. Always present. |
+| `size` | The size as an integer, shown as `S1`, `S2`, … |
+| `grade` | The grade as a string, usually one letter such as `A`. |
+| `itemClass` | `MILITARY`, `CIVILIAN`, `INDUSTRIAL`, `STEALTH` or `COMPETITION`. |
+
+`componentType` is one of `SHIELD`, `COOLER`, `POWER_PLANT`, `QUANTUM_DRIVE`, `JUMP_DRIVE`,
+`RADAR`, `WEAPON_GUN`, `WEAPON_MINING`, `MISSILE_LAUNCHER`, `MISSILE`, `BOMB_LAUNCHER`, `BOMB`,
+`TURRET`, `EMP`, `QUANTUM_INTERDICTION_GENERATOR`, `TRACTOR_BEAM`, `TOWING_BEAM`, `SALVAGE_HEAD`
+and `LIFE_SUPPORT_GENERATOR`. A key the Basetool does not know for the component is left out. A
+later release may add values to `componentType` and `itemClass`; map a value you do not know to
+`UNKNOWN`.
+
+```json
+{
+  "material": {"bt": "4a7c9e12-5b3d-4f81-a6e0-8d2c1b0f9e34", "name": "FR-66"},
+  "component": {"componentType": "SHIELD", "size": 1, "grade": "A", "itemClass": "MILITARY"}
+}
+```
 
 ## Reading the lots — `GET /exchange/v1/me/stock`
 

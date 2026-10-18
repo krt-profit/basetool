@@ -2632,9 +2632,30 @@
           }
         }
       },
+      "ExchangeComponentDto" : {
+        "type" : "object",
+        "properties" : {
+          "componentType" : {
+            "type" : "string"
+          },
+          "grade" : {
+            "type" : "string"
+          },
+          "itemClass" : {
+            "type" : "string"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
       "ExchangeDemandItemDto" : {
         "type" : "object",
         "properties" : {
+          "component" : {
+            "$ref" : "#/components/schemas/ExchangeComponentDto"
+          },
           "craftableByMe" : {
             "type" : "boolean"
           },
@@ -2720,6 +2741,9 @@
       "ExchangeDemandOrderItemDto" : {
         "type" : "object",
         "properties" : {
+          "component" : {
+            "$ref" : "#/components/schemas/ExchangeComponentDto"
+          },
           "item" : {
             "$ref" : "#/components/schemas/ExchangeItemRefDto"
           },
@@ -3009,6 +3033,9 @@
       "ExchangeOrgStockLotDto" : {
         "type" : "object",
         "properties" : {
+          "component" : {
+            "$ref" : "#/components/schemas/ExchangeComponentDto"
+          },
           "earmarked" : {
             "$ref" : "#/components/schemas/ExchangeEarmarkedDto"
           },
@@ -3556,6 +3583,9 @@
       "ExchangeStockLotDto" : {
         "type" : "object",
         "properties" : {
+          "component" : {
+            "$ref" : "#/components/schemas/ExchangeComponentDto"
+          },
           "key" : {
             "type" : "string"
           },

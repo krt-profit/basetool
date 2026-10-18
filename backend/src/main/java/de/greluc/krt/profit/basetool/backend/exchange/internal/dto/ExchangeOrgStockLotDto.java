@@ -33,6 +33,7 @@ import org.jetbrains.annotations.Unmodifiable;
  * @param unit the unit whose pool holds the lot
  * @param material the material or item, with its id as {@code bt}
  * @param materialKind the material's classification, or {@code null} for an item
+ * @param component the item's ship component data, or {@code null} for a material or another item
  * @param location the location
  * @param quality the quality, {@code 0} for an item
  * @param stolen whether the lot is marked stolen
@@ -47,6 +48,7 @@ public record ExchangeOrgStockLotDto(
     @NotNull ExchangeOrgStockUnitDto unit,
     @NotNull ExchangeItemRefDto material,
     @Nullable ExchangeMaterialKindDto materialKind,
+    @Nullable ExchangeComponentDto component,
     @NotNull ExchangeLocationDto location,
     int quality,
     boolean stolen,

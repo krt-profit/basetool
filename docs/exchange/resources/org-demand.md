@@ -48,6 +48,7 @@ An [`org-demand`](../schemas/) document:
   "items": [
     {
       "item": {"bt": "i-panther", "name": "CF-337 Panther Repeater"},
+      "component": {"componentType": "WEAPON_GUN", "size": 3},
       "openQuantity": {"amount": 2, "unit": "PIECE"},
       "craftableByMe": true
     }
@@ -70,6 +71,7 @@ An [`org-demand`](../schemas/) document:
 | Field | Meaning |
 | --- | --- |
 | `item` | The game item; `bt` is its Basetool id. |
+| `component` | Ship components only, as in a [stock lot](stock.md#component). |
 | `openQuantity` | Pieces ordered, minus delivered, minus already reserved for the order. |
 | `craftableByMe` | The member holds a blueprint that produces it; variants count when the order counts them. |
 
@@ -125,7 +127,7 @@ stay exactly as above, and the orders of the member's other units stay summed th
 | `handle` | The requester as the order's author typed it — free text, not a member account. Absent when empty. |
 | `comment` | The order's comment, free text. Absent when empty. |
 | `materials` | Per material and quality floor, what this order still needs: its requirement minus the stock booked to it, never below zero. For an item order, what its items are made of. |
-| `items` | For an item order, per game item: ordered minus delivered minus reserved. Empty for a material order. |
+| `items` | For an item order, per game item: `item`, `component` for a ship component and `openQuantity`, ordered minus delivered minus reserved. Empty for a material order. |
 
 Lines with nothing open are left out. An order never names who works on it.
 

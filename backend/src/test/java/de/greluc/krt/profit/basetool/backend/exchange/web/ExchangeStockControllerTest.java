@@ -202,7 +202,38 @@ class ExchangeStockControllerTest {
         .andExpect(jsonPath("$.items[0].quality").value(0))
         .andExpect(jsonPath("$.items[0].quantity.unit").value("PIECE"))
         .andExpect(jsonPath("$.items[0].quantity.amount").value(2))
-        .andExpect(jsonPath("$.items[0].materialKind").doesNotExist());
+        .andExpect(jsonPath("$.items[0].materialKind").doesNotExist())
+        .andExpect(jsonPath("$.items[0].component").doesNotExist());
+  }
+
+  @Test
+  void aShipComponentLotCarriesItsTypeSizeGradeAndClass() throws Exception {
+    UUID shield = component("Shield", 1, "A", "MILITARY");
+    stock(member, shield, location("Lorville " + UUID.randomUUID()), 1);
+
+    read(relayed(get(PATH)))
+        .andExpect(jsonPath("$.items[0].material.bt").value(shield.toString()))
+        .andExpect(jsonPath("$.items[0].component.componentType").value("SHIELD"))
+        .andExpect(jsonPath("$.items[0].component.size").value(1))
+        .andExpect(jsonPath("$.items[0].component.grade").value("A"))
+        .andExpect(jsonPath("$.items[0].component.itemClass").value("MILITARY"));
+  }
+
+  @Test
+  void aComponentWithAnUnknownClassCarriesTheOtherKeysAndAMaterialLotNone() throws Exception {
+    UUID cooler = component("Cooler", 2, "B", null);
+    UUID ore = material("RAW", "SCU", 44);
+    UUID hurston = location("Hurston " + UUID.randomUUID());
+    stock(member, cooler, hurston, 1);
+    stock(member, ore, null, hurston, 500, 3, true, false, null);
+
+    read(relayed(get(PATH)))
+        .andExpect(jsonPath("$.items.length()").value(2))
+        .andExpect(jsonPath("$.items[?(@.quality == 0)].component.componentType").value("COOLER"))
+        .andExpect(jsonPath("$.items[?(@.quality == 0)].component.size").value(2))
+        .andExpect(jsonPath("$.items[?(@.quality == 0)].component.grade").value("B"))
+        .andExpect(jsonPath("$.items[?(@.quality == 0)].component.itemClass").isEmpty())
+        .andExpect(jsonPath("$.items[?(@.quality == 500)].component").isEmpty());
   }
 
   @Test
@@ -596,6 +627,50 @@ class ExchangeStockControllerTest {
         "Helmet " + id);
     items.add(id);
     return id;
+  }
+
+  /**
+   * Seeds a ship component.
+   *
+   * @param wikiType the SC Wiki item type
+   * @param size the size, or {@code null}
+   * @param grade the grade, or {@code null}
+   * @param itemClass the stored class, or {@code null}
+   * @return its id
+   */
+  private @NotNull UUID component(
+      @NotNull String wikiType,
+      @Nullable Integer size,
+      @Nullable String grade,
+      @Nullable String itemClass) {
+    UUID id = UUID.randomUUID();
+    jdbc.update(
+        """
+        INSERT INTO game_item (id, name, kind, source_systems, wiki_type, size_class, grade,
+                               item_class)
+        VALUES (?, ?, 'GENERIC', 'UEX_ONLY', ?, ?, ?, ?)
+        """,
+        id,
+        "Component " + id,
+        wikiType,
+        size,
+        grade,
+        itemClass);
+    items.add(id);
+    return id;
+  }
+
+  /**
+   * Inserts and commits a personal item row.
+   *
+   * @param owner the owner
+   * @param item the item
+   * @param location the location
+   * @param amount the pieces
+   */
+  private void stock(
+      @NotNull UUID owner, @NotNull UUID item, @NotNull UUID location, double amount) {
+    stock(owner, null, item, location, null, amount, true, false, null);
   }
 
   /**

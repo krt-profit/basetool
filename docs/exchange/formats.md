@@ -71,6 +71,13 @@ material to its own lists. `commodity` is true for a material listed in UEX's co
 ores and refined metals included. None of it decides the quality; see
 [stock](resources/stock.md#material-kind).
 
+## Component — `component`
+
+Read-only: `{componentType, size?, grade?, itemClass?}` of a game item that is a ship component,
+as stable codes. A material or another item carries none, and an unknown key is left out. New
+`componentType` and `itemClass` values may appear within v1; map an unknown one to `UNKNOWN`. See
+[stock](resources/stock.md#component).
+
 ## Offline file — `envelope`
 
 The wrapper of a file a client writes for the member:
