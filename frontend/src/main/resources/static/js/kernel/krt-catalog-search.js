@@ -38,9 +38,23 @@ function toLocationOption(row) {
     return { value: row.id, label: row.name };
 }
 
-/** @param {ApiDto<'GameItemReferenceDto'>} row */
-function toGameItemOption(row) {
-    return { value: row.id, label: row.name || row.id };
+/**
+ * A game-item picker option from `/inventory/item-search` and `/orders/item-search` (REQ-INV-064).
+ *
+ * @typedef {object} ItemPickerOption
+ * @property {string} id the game item's id
+ * @property {string} [name] the item's name
+ * @property {string} [label] the name, and for a ship component its size, grade and class
+ */
+
+/**
+ * Maps a game-item search result to a combobox option labelled with its size, grade and class.
+ *
+ * @param {ItemPickerOption} row the search result
+ * @returns {CatalogOption} the option
+ */
+export function toGameItemOption(row) {
+    return { value: row.id, label: row.label || row.name || row.id };
 }
 
 /**

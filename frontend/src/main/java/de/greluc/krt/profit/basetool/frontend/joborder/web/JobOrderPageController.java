@@ -44,7 +44,6 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemRefe
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
-import de.greluc.krt.profit.basetool.frontend.kernel.web.PickerSearch;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.RelayParams;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
@@ -676,25 +675,6 @@ public class JobOrderPageController {
         "job-order-item-derivation",
         () -> jobOrderClient.itemDerivation(blueprintId, amount),
         null);
-  }
-
-  /**
-   * JSON proxy for the item-order picker's live search by item name.
-   *
-   * @param q the case-insensitive item-name search term ({@code null} / blank = first page)
-   * @return up to {@link PickerSearch#PAGE_SIZE} matching orderable item references, or an empty
-   *     list on failure
-   */
-  @GetMapping("/item-search")
-  @ResponseBody
-  public List<InventoryGameItemReferenceDto> itemSearch(@RequestParam(required = false) String q) {
-    PageResponse<InventoryGameItemReferenceDto> page =
-        SectionFallback.load(
-            log,
-            "job-order-item-search",
-            () -> jobOrderClient.searchOrderableItems(q == null ? "" : q, PickerSearch.PAGE_SIZE),
-            null);
-    return page != null && page.content() != null ? page.content() : List.of();
   }
 
   /**

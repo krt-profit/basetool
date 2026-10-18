@@ -44,6 +44,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemRefe
 import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.ItemPickerLabels;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -91,7 +92,9 @@ class InventoryPageControllerTest {
   void setUp() {
     backendApiClient = mock(BackendApiClient.class);
     InventoryBackendClient inventoryClient = new InventoryBackendClient(backendApiClient);
-    controller = new InventoryPageController(inventoryClient, PARALLEL, ROLE_HIERARCHY);
+    controller =
+        new InventoryPageController(
+            inventoryClient, PARALLEL, ROLE_HIERARCHY, mock(ItemPickerLabels.class));
     writeController = new InventoryWriteController(inventoryClient, controller);
   }
 
