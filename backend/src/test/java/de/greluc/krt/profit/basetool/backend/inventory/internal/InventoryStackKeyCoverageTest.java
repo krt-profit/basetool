@@ -24,23 +24,26 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.jpa.repository.Query;
 
 /**
- * Holds every stack-key query of {@link InventoryItemRepository} to the full stock identity
- * (REQ-INV-053): a query that groups or matches by the {@code personal} flag must treat the
- * „gestohlen" marker the same way, or stolen stock would be laundered into a legitimate stack.
+ * Holds every stack-key query of {@link InventoryItemRepository} and {@link
+ * InventoryItemViewRepository} to the full stock identity (REQ-INV-053): a query that groups or
+ * matches by the {@code personal} flag must treat the „gestohlen" marker the same way, or stolen
+ * stock would be laundered into a legitimate stack.
  */
 class InventoryStackKeyCoverageTest {
 
   /**
-   * Returns the JPQL of every {@link Query}-annotated method of the repository with its name.
+   * Returns the JPQL of every {@link Query}-annotated method of both repositories with its name.
    *
    * @return pairs of method name and query text
    */
   private static List<String[]> queries() {
-    return Arrays.stream(InventoryItemRepository.class.getDeclaredMethods())
+    return Stream.of(InventoryItemRepository.class, InventoryItemViewRepository.class)
+        .flatMap(repository -> Arrays.stream(repository.getDeclaredMethods()))
         .filter(m -> m.isAnnotationPresent(Query.class))
         .map(m -> new String[] {m.getName(), m.getAnnotation(Query.class).value()})
         .toList();

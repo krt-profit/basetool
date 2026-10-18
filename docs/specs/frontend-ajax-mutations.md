@@ -1659,7 +1659,8 @@ values are registered in `krt-catalog-search.js`: `remote-materials`,
 `remote-materials-joborder` (orders lines), `remote-materials-raw` (refinery inputs),
 `remote-locations`, and `remote-game-items` (the inventory item mode's bookable-item picker — the
 one **authenticated** relay, `GET /inventory/item-search`, onto the role-gated (full set) backend
-`/api/v1/game-items`, REQ-INV-029). Each marker carries its kind-specific default
+`/api/v1/game-items`, REQ-INV-029; its options and the orders item picker's are labelled with a
+component's size, grade and class, REQ-INV-064). Each marker carries its kind-specific default
 placeholder / no-results wording via the `krtComboboxI18n.kinds` map (REQ-FE-011) — the material and
 location pickers say "Material/Ort suchen oder wählen…", never the user-picker text.
 Server-rendered edit/redisplay states seed exactly

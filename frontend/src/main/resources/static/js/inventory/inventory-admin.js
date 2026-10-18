@@ -161,6 +161,7 @@ function adminInventoryFilterSelection(className) {
  * @property {string[] | null} [missions] the mission filter
  * @property {string} [minQuality] the minimum quality
  * @property {string} stolen the stolen filter value
+ * @property {KrtItemAttributeSnapshot} [attributes] the item-attribute filters (items view)
  */
 
 /**
@@ -175,6 +176,7 @@ function snapshotAdminInventoryFilters() {
             locations: adminInventoryFilterSelection('locCheck'),
             jobOrders: adminInventoryFilterSelection('jobOrderCheck'),
             stolen: adminStolenFilterValue(),
+            attributes: adminLager.snapshotItemAttributes(),
         };
     }
     const minQualitySelect = /** @type {HTMLSelectElement | null} */ (
@@ -234,7 +236,11 @@ function restoreAdminInventoryFilters() {
     } catch (_e) {
         return false;
     }
-    if (ADMIN_INVENTORY_FILTER_PARAMS.some((p) => params.has(p))) {
+    if (
+        [...ADMIN_INVENTORY_FILTER_PARAMS, ...adminLager.itemAttributeParams()].some((p) =>
+            params.has(p),
+        )
+    ) {
         persistAdminInventoryFilters();
         return false;
     }
@@ -249,6 +255,7 @@ function restoreAdminInventoryFilters() {
             [saved.locations, 'locCheck', 'itemLocAll', 'itemLocationHeader'],
             [saved.jobOrders, 'jobOrderCheck', 'itemJobOrderAll', 'itemJobOrderHeader'],
         ];
+        if (adminLager.restoreItemAttributes(saved.attributes)) changed = true;
     } else {
         families = [
             [saved.materials, 'matCheck', 'matAll', 'materialHeader'],
@@ -295,7 +302,7 @@ function countActiveAdminInventoryFilters() {
     });
     if (typeof snapshot.minQuality === 'string' && snapshot.minQuality !== '') active++;
     if (snapshot.stolen === 'non' || snapshot.stolen === 'only') active++;
-    return active;
+    return active + adminLager.countActiveItemAttributes(snapshot.attributes);
 }
 
 /** Re-pulls the grouped table with the current filters and mirrors them into the address. */
@@ -333,6 +340,7 @@ function filterInventory() {
     activeJobOrders.forEach((j) => url.searchParams.append('jobOrderIds', j));
     activeMissions.forEach((m) => url.searchParams.append('missionIds', m));
     appendAdminStolenFilter(url.searchParams, stolenFilter);
+    adminLager.appendItemAttributeParams(url.searchParams);
 
     const visibleUrl = new URL(`${window.location.origin}/inventory/all`);
     if (itemsView) visibleUrl.searchParams.append('view', 'items');
@@ -343,6 +351,7 @@ function filterInventory() {
     activeJobOrders.forEach((j) => visibleUrl.searchParams.append('jobOrderIds', j));
     activeMissions.forEach((m) => visibleUrl.searchParams.append('missionIds', m));
     appendAdminStolenFilter(visibleUrl.searchParams, stolenFilter);
+    adminLager.appendItemAttributeParams(visibleUrl.searchParams);
     try {
         window.history.replaceState({}, '', visibleUrl.toString());
     } catch {}
@@ -444,6 +453,7 @@ function resetInventoryFilter() {
         adminLager.updateSelectState('itemJobOrderAll', 'jobOrderCheck', 'itemJobOrderHeader');
     if (document.getElementById('missionHeader'))
         adminLager.updateSelectState('missionAll', 'missionCheck', 'missionHeader');
+    adminLager.resetItemAttributes();
     filterInventory();
 }
 
@@ -492,6 +502,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ) {
         adminLager.updateSelectState('missionAll', 'missionCheck', 'missionHeader');
     }
+    adminLager.syncItemAttributeStates();
     krtFilterPanel.registerCounter('globalFilterPanel', countActiveAdminInventoryFilters);
     krtFilterPanel.refresh('globalFilterPanel');
     krtFilterChips.refresh();

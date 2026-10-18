@@ -37,10 +37,12 @@ import org.jetbrains.annotations.Unmodifiable;
 public interface RebookCommands {
 
   /**
-   * Rebooks part or all of the member's stock of a lot between personal and the named pool. The
-   * member stays the holder; the stolen marker, the quality and the location carry over. Each moved
-   * row is audited as {@code INVENTORY_ITEM_DEPERSONALIZED} or {@code INVENTORY_ITEM_PERSONALIZED}
-   * under the current request's authentication.
+   * Rebooks part or all of the member's stock of a lot between personal and the named pool. A share
+   * takes the lot's personal part ({@link StockRow#countsAsPersonal}): the personal rows first,
+   * then the shared rows outside any pool. The member stays the holder; the stolen marker, the
+   * quality and the location carry over. Each moved personal row is audited as {@code
+   * INVENTORY_ITEM_DEPERSONALIZED} or {@code INVENTORY_ITEM_PERSONALIZED}, each moved shared row
+   * outside a pool as {@code INVENTORY_POOL_CHANGED}, under the current request's authentication.
    *
    * @param rebook the rebooking
    * @param dryRun whether to decide it only and write nothing

@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemNoteUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemPersonalRebookDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryStackDto;
+import de.greluc.krt.profit.basetool.frontend.inventory.model.ItemAttributeFilter;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
@@ -43,6 +44,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemRefe
 import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.ItemPickerLabels;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -90,7 +92,9 @@ class InventoryPageControllerTest {
   void setUp() {
     backendApiClient = mock(BackendApiClient.class);
     InventoryBackendClient inventoryClient = new InventoryBackendClient(backendApiClient);
-    controller = new InventoryPageController(inventoryClient, PARALLEL, ROLE_HIERARCHY);
+    controller =
+        new InventoryPageController(
+            inventoryClient, PARALLEL, ROLE_HIERARCHY, mock(ItemPickerLabels.class));
     writeController = new InventoryWriteController(inventoryClient, controller);
   }
 
@@ -331,7 +335,8 @@ class InventoryPageControllerTest {
 
     String view =
         controller.viewMyInventory(
-            null, null, null, null, null, null, null, false, false, false, false, false, model);
+            null, null, null, null, null, null, null, false, false, false, false, null, null, null,
+            null, null, false, model);
 
     assertEquals("inventory/inventory-my", view);
     assertTrue(model.containsAttribute("items"));
@@ -360,6 +365,11 @@ class InventoryPageControllerTest {
             false,
             false,
             false,
+            null,
+            null,
+            null,
+            null,
+            null,
             false,
             model);
 
@@ -390,7 +400,8 @@ class InventoryPageControllerTest {
 
     String view =
         controller.viewMyInventory(
-            null, null, null, null, null, null, null, true, false, false, false, false, model);
+            null, null, null, null, null, null, null, true, false, false, false, null, null, null,
+            null, null, false, model);
 
     assertEquals("inventory/inventory-my", view);
     assertEquals(true, model.getAttribute("selectedPersonalOnly"));
@@ -414,7 +425,8 @@ class InventoryPageControllerTest {
 
     String view =
         controller.viewMyInventory(
-            null, null, null, null, null, null, null, false, true, false, false, false, model);
+            null, null, null, null, null, null, null, false, true, false, false, null, null, null,
+            null, null, false, model);
 
     assertEquals("inventory/inventory-my", view);
     assertEquals(true, model.getAttribute("selectedNonPersonalOnly"));
@@ -441,7 +453,8 @@ class InventoryPageControllerTest {
 
     String view =
         controller.viewMyInventory(
-            null, null, null, null, null, null, null, false, false, false, false, true, model);
+            null, null, null, null, null, null, null, false, false, false, false, null, null, null,
+            null, null, true, model);
 
     assertEquals("inventory/inventory-my :: inventoryTableFragment", view);
   }
@@ -466,7 +479,12 @@ class InventoryPageControllerTest {
             false,
             false,
             false,
-            false);
+            false,
+            null,
+            null,
+            null,
+            null,
+            null);
 
     assertEquals(List.of(entryA, entryB), ids);
     org.mockito.ArgumentCaptor<String> urlCaptor =
@@ -490,7 +508,22 @@ class InventoryPageControllerTest {
 
     List<UUID> ids =
         controller.myEntryIds(
-            "items", null, null, null, null, List.of(gameItemId), null, true, false, false, false);
+            "items",
+            null,
+            null,
+            null,
+            null,
+            List.of(gameItemId),
+            null,
+            true,
+            false,
+            false,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null);
 
     assertEquals(List.of(entry), ids);
     org.mockito.ArgumentCaptor<String> urlCaptor =
@@ -509,7 +542,8 @@ class InventoryPageControllerTest {
     assertEquals(
         List.of(),
         controller.myEntryIds(
-            null, null, null, null, null, null, null, false, false, false, false));
+            null, null, null, null, null, null, null, false, false, false, false, null, null, null,
+            null, null));
   }
 
   @Test
@@ -530,6 +564,11 @@ class InventoryPageControllerTest {
             null,
             false,
             false,
+            null,
+            null,
+            null,
+            null,
+            null,
             false,
             model);
 
@@ -1110,6 +1149,11 @@ class InventoryPageControllerTest {
             false,
             false,
             false,
+            null,
+            null,
+            null,
+            null,
+            null,
             false,
             model);
 
@@ -1181,10 +1225,128 @@ class InventoryPageControllerTest {
         false,
         false,
         false,
+        null,
+        null,
+        null,
+        null,
+        null,
         false,
         model);
 
     assertEquals(List.of(other, picked), model.getAttribute("locations"));
+  }
+
+  /**
+   * REQ-INV-063: the item-attribute filters reach the backend, are echoed into the model, and their
+   * options come from the unfiltered stock so an active filter never narrows its own options.
+   */
+  @Test
+  void viewMyInventory_itemAttributeFilters_forwardedAndOptionsComeFromUnfilteredStock() {
+    Model model = new ConcurrentModel();
+    InventoryGameItemReferenceDto drive =
+        new InventoryGameItemReferenceDto(
+            UUID.randomUUID(), "FR-66", null, "VEHICLE_ITEM", "QUANTUM_DRIVE", 2, "A", "MILITARY");
+    InventoryGameItemReferenceDto shield =
+        new InventoryGameItemReferenceDto(
+            UUID.randomUUID(), "Rampart", null, "VEHICLE_ITEM", "SHIELD", 1, "C", "CIVILIAN");
+    InventoryGameItemReferenceDto rifle =
+        new InventoryGameItemReferenceDto(UUID.randomUUID(), "P4-AR", null, "WEAPON");
+    GroupedInventoryDto driveGroup =
+        new GroupedInventoryDto(null, drive, 1.0, null, null, List.of());
+    GroupedInventoryDto shieldGroup =
+        new GroupedInventoryDto(null, shield, 1.0, null, null, List.of());
+    GroupedInventoryDto rifleGroup =
+        new GroupedInventoryDto(null, rifle, 1.0, null, null, List.of());
+    when(backendApiClient.get(anyString(), anyTypeRef()))
+        .thenAnswer(
+            invocation -> {
+              String url = invocation.getArgument(0);
+              if (url.contains("/api/v1/inventory/my-inventory/grouped")) {
+                return url.contains("itemClasses=")
+                    ? List.of(driveGroup)
+                    : List.of(driveGroup, shieldGroup, rifleGroup);
+              }
+              return List.of();
+            });
+
+    controller.viewMyInventory(
+        "items",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        false,
+        false,
+        false,
+        false,
+        null,
+        List.of("QUANTUM_DRIVE"),
+        List.of(2),
+        null,
+        List.of("MILITARY"),
+        false,
+        model);
+
+    assertEquals(List.of(driveGroup), model.getAttribute("groupedItems"));
+    assertEquals(
+        new ItemAttributeOptions(
+            List.of("VEHICLE_ITEM", "WEAPON"),
+            List.of("QUANTUM_DRIVE", "SHIELD"),
+            List.of(1, 2),
+            List.of("A", "C"),
+            List.of("CIVILIAN", "MILITARY")),
+        model.getAttribute("itemAttributeOptions"));
+    assertEquals(List.of(drive, shield, rifle), model.getAttribute("gameItems"));
+    assertEquals(
+        new ItemAttributeFilter(
+            null, List.of("QUANTUM_DRIVE"), List.of(2), null, List.of("MILITARY")),
+        model.getAttribute("selectedItemAttributes"));
+    org.mockito.ArgumentCaptor<String> urlCaptor =
+        org.mockito.ArgumentCaptor.forClass(String.class);
+    org.mockito.Mockito.verify(backendApiClient, org.mockito.Mockito.atLeastOnce())
+        .get(urlCaptor.capture(), anyTypeRef());
+    assertTrue(
+        urlCaptor.getAllValues().stream()
+            .anyMatch(
+                u ->
+                    u.contains("/api/v1/inventory/my-inventory/grouped")
+                        && u.contains("componentTypes=QUANTUM_DRIVE")
+                        && u.contains("sizes=2")
+                        && u.contains("itemClasses=MILITARY")),
+        "the attribute filters must be forwarded");
+  }
+
+  /** REQ-INV-063: "Alle markieren" selects with the same attribute filters as the table. */
+  @Test
+  void myEntryIds_itemAttributeFilters_forwarded() {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of());
+
+    controller.myEntryIds(
+        "items",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        false,
+        false,
+        false,
+        false,
+        List.of("WEAPON"),
+        null,
+        null,
+        List.of("B"),
+        List.of("STEALTH"));
+
+    org.mockito.ArgumentCaptor<String> urlCaptor =
+        org.mockito.ArgumentCaptor.forClass(String.class);
+    org.mockito.Mockito.verify(backendApiClient).get(urlCaptor.capture(), anyTypeRef());
+    assertTrue(urlCaptor.getValue().contains("kinds=WEAPON"));
+    assertTrue(urlCaptor.getValue().contains("grades=B"));
+    assertTrue(urlCaptor.getValue().contains("itemClasses=STEALTH"));
   }
 
   /** REQ-INV-040: the shared "Globales Lager" relays the same filter. */
@@ -1196,7 +1358,22 @@ class InventoryPageControllerTest {
 
     String view =
         controller.viewAllInventory(
-            null, null, null, null, null, null, List.of(locationId), false, false, false, model);
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            List.of(locationId),
+            false,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            model);
 
     assertEquals("inventory/inventory-admin", view);
     assertEquals(List.of(locationId), model.getAttribute("selectedLocationIds"));
@@ -1223,9 +1400,39 @@ class InventoryPageControllerTest {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of());
 
     controller.myEntryIds(
-        null, null, null, null, null, null, List.of(locationId), false, false, false, false);
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        List.of(locationId),
+        false,
+        false,
+        false,
+        false,
+        null,
+        null,
+        null,
+        null,
+        null);
     controller.myEntryIds(
-        "items", null, null, null, null, null, List.of(locationId), false, false, false, false);
+        "items",
+        null,
+        null,
+        null,
+        null,
+        null,
+        List.of(locationId),
+        false,
+        false,
+        false,
+        false,
+        null,
+        null,
+        null,
+        null,
+        null);
 
     org.mockito.ArgumentCaptor<String> urlCaptor =
         org.mockito.ArgumentCaptor.forClass(String.class);

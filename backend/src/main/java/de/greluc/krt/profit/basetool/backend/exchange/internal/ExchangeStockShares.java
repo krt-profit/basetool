@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStock
 import de.greluc.krt.profit.basetool.backend.inventory.api.RebookCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -238,16 +239,13 @@ public class ExchangeStockShares {
   }
 
   /**
-   * Picks the rows that count as the lot's personal stock: the personal rows and shared rows
-   * outside any unit.
+   * Picks the rows the Lager counts as the lot's personal stock.
    *
    * @param rows the lot's rows
    * @return the personal rows
    */
   static @NotNull List<StockRow> personalRows(@NotNull List<StockRow> rows) {
-    return rows.stream()
-        .filter(row -> Boolean.TRUE.equals(row.getPersonal()) || row.getOwningOrgUnit() == null)
-        .toList();
+    return rows.stream().filter(StockRow::countsAsPersonal).toList();
   }
 
   /**
@@ -261,9 +259,9 @@ public class ExchangeStockShares {
       @NotNull List<StockRow> rows, @NotNull String unit) {
     Map<UUID, BigDecimal> pools = new HashMap<>();
     for (StockRow row : rows) {
-      if (!Boolean.TRUE.equals(row.getPersonal()) && row.getOwningOrgUnit() != null) {
-        pools.merge(
-            row.getOwningOrgUnit().getId(), BigDecimal.valueOf(row.getAmount()), BigDecimal::add);
+      OrgUnit pool = row.getOwningOrgUnit();
+      if (!row.countsAsPersonal() && pool != null) {
+        pools.merge(pool.getId(), BigDecimal.valueOf(row.getAmount()), BigDecimal::add);
       }
     }
     pools.replaceAll((_, amount) -> round(amount, unit));

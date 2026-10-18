@@ -960,9 +960,13 @@ of the member's own direct memberships, the set `GET /me/org-units` returns; an 
 leadership seat adds nothing (`NOT_A_MEMBER`). `expectedQuantity` is the lot's `split.personal` as
 the earlier ops of the batch leave it, compared under the lot lock (`VERSION_CONFLICT`); a
 `quantity` above it is refused (`QUANTITY_ABOVE_EXPECTED`), and a fraction of a piece is
-`UNIT_MISMATCH`. The rows are those the Lager's `RebookCommands` takes (REQ-INV-060), with its
-refusals answered per op as `INSUFFICIENT_STOCK`, `STOCK_EARMARKED` and `STOCK_OFFERED`. A share is
-audited by the Lager's `INVENTORY_ITEM_DEPERSONALIZED` under the client, journaled as
+`UNIT_MISMATCH`. The rows are those the Lager's `RebookCommands` takes (REQ-INV-060): the
+personal rows first, then the member's shared rows without a unit, so everything `split.personal`
+shows can be shared; the batch's ledger reads the Lager's `StockRow.countsAsPersonal`, and the
+split's query counts the same rows. Its
+refusals are answered per op as `INSUFFICIENT_STOCK`, `STOCK_EARMARKED` and `STOCK_OFFERED`. A
+share is audited by the Lager under the client, `INVENTORY_ITEM_DEPERSONALIZED` for the part from
+personal rows and `INVENTORY_POOL_CHANGED` for the part from shared rows without a unit, journaled as
 `STOCK_SHARE` under the lot's key, never counted as a removal by the mass-change guard, and
 decided without a write by `dryRun`. An undo moves the shared amount back to personal, then sets
 the lot's quantity back; a pool that no longer holds it leaves the lot skipped as `GONE`.
@@ -1042,6 +1046,11 @@ production had landed at quality 0 (203 journal entries, 36 lots).
   share of every lot is never held back as a mass change. *`ExchangeStockShareControllerTest`.*
 - [x] An undo takes a share back to personal and sets the lot back; a share whose pool stock is
   gone is skipped as `GONE`. *`ExchangeUndoControllerTest`.*
+- [x] On a lot holding personal, pooled and shared rows without a unit, a share of the whole
+  `split.personal` succeeds, its part beyond the personal rows taken from the rows without a unit
+  and audited as a pool change; one more is refused; `dryRun` decides the same without writing; an
+  undo restores `split.personal`. *`ExchangeStockShareControllerTest`, `ExchangeUndoControllerTest`
+  (#2731).*
 - [x] An unshare with a matching `expectedQuantity` moves exactly `quantity` of the member's own
   rows in the pool back to personal; the lot keeps its `key` and total, its `split` and feed show
   the move, and it is audited under the client and journaled as `STOCK_UNSHARE`.
