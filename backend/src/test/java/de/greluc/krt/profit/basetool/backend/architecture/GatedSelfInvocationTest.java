@@ -176,7 +176,7 @@ class GatedSelfInvocationTest {
   @Test
   @DisplayName("the finance-entry and promotion-category writes keep their service gates")
   void theOnlyRealServiceGatesStay() throws NoSuchMethodException {
-    String financeGate = "@missionSecurityService.canEditFinanceEntry(#entryId, authentication)";
+    String financeGate = "@missionAccessPolicy.canEditFinanceEntry(#entryId, authentication)";
     assertThat(gate(MissionFinanceEntryService.class, "updateEntry")).isEqualTo(financeGate);
     assertThat(gate(MissionFinanceEntryService.class, "deleteEntry")).isEqualTo(financeGate);
     for (String write : new String[] {"create", "update", "delete"}) {

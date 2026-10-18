@@ -35,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
 @Transactional
+@org.springframework.security.test.context.support.WithMockUser(roles = "ADMIN")
 class MissionManagerIntegrationTest {
 
   @Autowired private MissionService missionService;

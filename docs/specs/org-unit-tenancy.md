@@ -263,7 +263,7 @@ as the owning scope:
   (`AuthHelperService.isMemberOrAbove()`), so not to an account below member.
 
 Editing follows the normal mission-management gate: `OwnerScopeService.canEditMission` is a no-op
-(returns `true`) for an ownerless mission, so `MissionSecurityService.canManageMission` decides via
+(returns `true`) for an ownerless mission, so `MissionAccessPolicy.canManageMission` decides via
 its usual elevated-role-or-owner/manager check (owner, co-managers, mission-managers/officers,
 admins) — the same path as a normal mission, minus the squadron-scope narrowing. The list queries
 (`searchMissions`, `findAllActiveReference`) carry a `viewerIsMemberOrAbove` flag so an internal
@@ -671,7 +671,7 @@ served by `MissionService.updateOwningOrgUnit` and recorded as the audited
 
 **Permission — two orthogonal gates.**
 
-1. Per-mission write gate `@missionSecurityService.canChangeOwner` — the same gate as the user-owner
+1. Per-mission write gate `@missionAccessPolicy.canChangeOwner` — the same gate as the user-owner
    change beside it: admin, a scope-officer who may edit the mission, or the mission owner.
 2. Target gate `OwnerScopeService.resolveReassignTargetOrgUnit` — an **admin** may assign to any
    OrgUnit or to ownerless; a **non-admin** may only pick a target that is one of their direct
@@ -872,7 +872,7 @@ Every entity whose rows belong to an owning or responsible org unit carries the 
   injects a bean writing tenant data or the org-unit tree (`save*`, `delete*` or a `@Modifying`
   query on its repository) has each write mapping with a `UUID` path variable checked: the effective
   `@PreAuthorize` must gate **every** top-level `or` branch on a scope bean (`ownerScopeService`,
-  `accessGateService`, `missionSecurityService`, `specialCommandSecurityService`,
+  `accessGateService`, `missionAccessPolicy`, `specialCommandSecurityService`,
   `orgRoleManagementSecurityService`) or on `hasRole('ADMIN')` alone, read from the SpEL syntax tree.
   A handler whose scope check lives in the service layer is listed with its reason and must reach a
   `can*` call on a scope service, or a method whose own `@PreAuthorize` is scope-gated, within three

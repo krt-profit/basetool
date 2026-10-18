@@ -33,7 +33,7 @@ only permitted if it passes **both**:
    a concrete role. Evaluated *first*.
 2. **Method-level `@PreAuthorize`** on controller/service — the inner gate.
    Refined via Spring Security SpEL, often with the beans
-   `@ownerScopeService`, `@missionSecurityService`, `@specialCommandSecurityService`,
+   `@ownerScopeService`, `@missionAccessPolicy`, `@specialCommandSecurityService`,
    `@orgRoleManagementSecurityService`, `@bankSecurityService` and `@authHelperService`.
 
 The frontend adds a third, coarser gate of its own — the `@PreAuthorize` on its page and proxy
@@ -259,7 +259,7 @@ every `BANK_EMPLOYEE` check (REQ-BANK-007).
 | **Bank Management** | *(none — "see everything" visibility comes from the role itself, ADR-0011)*                                                                                      |
 
 Of the seeded permissions only three are read anywhere: `HANGAR_READ` / `HANGAR_WRITE` (hangar URL
-rule and the hangar list / delete-all gates) and `MISSION_MANAGE` (`MissionSecurityService` treats it
+rule and the hangar list / delete-all gates) and `MISSION_MANAGE` (`MissionAccessPolicy` treats it
 like `ROLE_MISSION_MANAGER`, still scope-checked). `MISSION_READ`, `MISSION_WRITE`, `USER_MANAGE`
 and `ROLE_MANAGE` are seeded but checked by no endpoint — every member- and role-management
 endpoint has been `hasRole('ADMIN')` since the Phase-4 lockdown.
@@ -494,7 +494,10 @@ on Staffel or SK) are part of the job-order workflow: only they may **view** job
 (list/detail), **edit** them (status/priority/materials/handover,
 reassign) and set/withdraw **material claims** — the profit gate
 (`canViewJobOrders`) is folded into `canSeeJobOrder` and `canEditJobOrder` and
-also applies to the role-only claim endpoints. Anyone who is exclusively in
+also applies to the role-only claim endpoints. The status, blueprint-counting, full and requester
+edits, the reassignment and the material and stock unlinks are decided by `JobOrderEditor` on the
+loaded order (`canEditJobOrder` resp. the requester rule, REQ-SEC-085); their endpoints keep only
+the role, and an edit that carries a version requires it (REQ-ORDERS-046). Anyone who is exclusively in
 non-profit-eligible units cannot browse the order queue, but **can now view and
 edit their own placed orders within limits** — the requesting-owner escape
 (REQ-ORDERS-023, ADR-0091): they see the orders their own org unit requested under
@@ -549,11 +552,11 @@ Staffel stay invisible (REQ-ROLE-002, finding SEC-01).
 |:-----------------------------------------------------------------------------------------------------------------------------|:------:|:----:|:--:|:-------:|:-----:|
 | Read a mission in scope — list, search, `/next`, detail (`isMemberOrAbove()` + `canSeeMission`; peer-redacted below Logistician, §1.3) |   ✅⁴   |  ✅   | ✅  |    ✅    |   ✅   |
 | **Create** mission (`isMemberOrAbove()`)                                                                                     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| **Join** (sign yourself up, with the sign-up sheet's answers, ADR-0170) (`POST /{id}/join`, `canSeeMission`)                 |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Check in/out / change payout preference / edit / leave a participant row (`canAccessParticipant`)                            |   ✅¹   |  ✅   | ✅  |    ✅    |   ✅   |
+| **Join** (sign yourself up, with the sign-up sheet's answers, ADR-0170) (`POST /{id}/join`, read gate⁸)                      |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Check in/out / change payout preference / edit / leave a participant row (participant gate⁸)                                |   ✅¹   |  ✅   | ✅  |    ✅    |   ✅   |
 | Record and maintain an **external** participant (`canSeeMission` to record, `canManageMission` to change someone else's row) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | **Manage** mission (edit, sub-missions, participants/units/crew/steps/objectives/frequencies, party lead) (`canManageMission`) |   ✅²⁶  |  ✅²⁶ | ✅³ |   ✅³    |   ✅   |
-| Add/remove **co-managers** (`canManageManagers`)                                                                             |   ✅²   |  ✅²  | ✅³ |   ✅³    |   ✅   |
+| Add/remove **co-managers** (manage gate⁸)                                                                                    |   ✅²   |  ✅²  | ✅³ |   ✅³    |   ✅   |
 | Change the **owner** (`canChangeOwner`)                                                                                      |   ✅⁷   |  ✅⁷  | ✅⁷ |   ✅³    |   ✅   |
 | Reassign **owning org unit** ("Zugeordnete Einheit"; `canChangeOwner` + assignable-target scope⁵, REQ-ORG-018)               |   ✅⁷   |  ✅⁷  | ✅⁷ |   ✅³    |   ✅   |
 | **Delete** mission (`hasRole('ADMIN')`)                                                                                      |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
@@ -577,6 +580,11 @@ or to ownerless; a non-admin may only pick a direct membership or a unit within 
 change them only through the API.
 ⁷ Only as the mission's **owner** — a co-manager or a Mission-Manager does not pass
 `canChangeOwner`, so nobody can displace the owner they manage for.
+⁸ Decided by `MissionEditor` on the loaded mission (`MissionAccessPolicy.canEdit`, REQ-SEC-085):
+the read gate is `canSeeMission`, the participant gate the own linked row or the manage rule, the
+manage gate `canManageMission`. The endpoint itself only requires authentication, and member-or-above
+for the read and participant gates. The same edit module decides the timeline, unit and crew edits
+of the manage row above.
 
 > **The external participant replaced the guest sign-up (ADR-0159, decision D4).** A named person
 > without an account is still recorded on an Einsatz — the row shape is unchanged, `user_id IS NULL`

@@ -33,9 +33,11 @@ import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionEditor;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionEditorFixture;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionNotificationPublisher;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
-import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.UUID;
@@ -56,7 +58,9 @@ class MissionEinsatzleiterConstraintTest {
 
   @Mock private MissionRepository missionRepository;
 
-  @Mock private MissionSecurityService missionSecurityService;
+  @Mock private MissionEditor missionEditor;
+
+  @Mock private MissionAccessPolicy missionAccessPolicy;
 
   @Mock private org.springframework.security.core.Authentication authentication;
   @Mock private JobTypeRepository jobTypeRepository;
@@ -64,6 +68,11 @@ class MissionEinsatzleiterConstraintTest {
   @Mock private AuditService auditService;
   @Mock private MissionNotificationPublisher notificationPublisher;
   @InjectMocks private MissionParticipantService missionParticipantService;
+
+  @BeforeEach
+  void wireMissionEditor() {
+    MissionEditorFixture.delegate(missionEditor, missionRepository, auditService);
+  }
 
   private UUID missionId;
   private Mission mission;
@@ -95,7 +104,7 @@ class MissionEinsatzleiterConstraintTest {
 
   @Test
   void assigningEinsatzleiterToASecondParticipant_throws409() {
-    when(missionSecurityService.canManageLoadedMission(any(), any())).thenReturn(true);
+    when(missionAccessPolicy.canManageLoadedMission(any(), any())).thenReturn(true);
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
     when(jobTypeRepository.findById(einsatzleiter.getId())).thenReturn(Optional.of(einsatzleiter));
 
@@ -119,7 +128,7 @@ class MissionEinsatzleiterConstraintTest {
 
   @Test
   void assigningEinsatzleiterWhenNobodyElseHoldsIt_succeeds() {
-    when(missionSecurityService.canManageLoadedMission(any(), any())).thenReturn(true);
+    when(missionAccessPolicy.canManageLoadedMission(any(), any())).thenReturn(true);
     p1.setPlannedMissionJobType(null);
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
     when(jobTypeRepository.findById(einsatzleiter.getId())).thenReturn(Optional.of(einsatzleiter));

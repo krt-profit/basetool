@@ -50,6 +50,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 @SpringBootTest
 @Transactional
+@org.springframework.security.test.context.support.WithMockUser(roles = "ADMIN")
 class MissionUnitFrequencyTest {
 
   @Autowired private WebApplicationContext context;

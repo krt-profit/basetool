@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.backend.mission.internal;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
-import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeRepository;
@@ -65,7 +64,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Units and crews are locked per row and never save the mission, so their edits never collide
  * with other mission sections. Updates check the client-echoed {@code expectedVersion} via {@link
  * OptimisticLock#checkOptionalClient}, because a full-form rewrite never trips the entity
- * {@code @Version}.
+ * {@code @Version}. Every edit runs through {@link MissionEditor} behind the manage gate.
  */
 @Service
 @RequiredArgsConstructor
@@ -92,8 +91,8 @@ public class MissionStructureService {
   /** Repository used to resolve a unit's optional explicit responsible {@link User}. */
   private final UserRepository userRepository;
 
-  /** Records the state-mutating unit/crew activities into the audit log (REQ-AUDIT-001). */
-  private final AuditRecorder auditRecorder;
+  /** Runs the load, manage gate and audit of every unit and crew edit. */
+  private final MissionEditor missionEditor;
 
   /** Publishes the mission notifications (REQ-MISSION-021…029). */
   private final MissionNotificationPublisher notificationPublisher;
@@ -114,7 +113,42 @@ public class MissionStructureService {
       Double frequency,
       UUID responsibleUserId,
       String note) {
-    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
+    return missionEditor.edit(
+        missionId,
+        MissionGate.MANAGE,
+        mission ->
+            appendUnit(
+                mission,
+                new UnitAttributes(
+                    name, shipTypeId, shipId, highValueUnit, frequency, responsibleUserId, note)));
+  }
+
+  /**
+   * The editable attributes of one unit.
+   *
+   * @param name display name, blank derives from ship / ship type
+   * @param shipTypeId ship type, or {@code null}
+   * @param shipId ship, or {@code null}
+   * @param highValueUnit high-value-unit flag
+   * @param frequency comms frequency (100.00–999.99), or {@code null}
+   * @param responsibleUserId explicit responsible person, or {@code null}
+   * @param note free-text planning note
+   */
+  private record UnitAttributes(
+      String name,
+      UUID shipTypeId,
+      UUID shipId,
+      boolean highValueUnit,
+      Double frequency,
+      UUID responsibleUserId,
+      String note) {}
+
+  private MissionEdit appendUnit(@NotNull Mission mission, @NotNull UnitAttributes attributes) {
+    final String name = attributes.name();
+    final UUID shipTypeId = attributes.shipTypeId();
+    final UUID shipId = attributes.shipId();
+    final Double frequency = attributes.frequency();
+    final UUID responsibleUserId = attributes.responsibleUserId();
 
     MissionUnit missionUnit = new MissionUnit();
     missionUnit.setMission(mission);
@@ -147,8 +181,8 @@ public class MissionStructureService {
     if (responsibleUserId != null) {
       notificationPublisher.responsibilityAssigned(mission, responsibleUserId, "UNIT_RESPONSIBLE");
     }
-    missionUnit.setNote(StringNormalization.trimToNull(note));
-    missionUnit.setHighValueUnit(highValueUnit);
+    missionUnit.setNote(StringNormalization.trimToNull(attributes.note()));
+    missionUnit.setHighValueUnit(attributes.highValueUnit());
 
     if (frequency != null) {
       double roundedFrequency =
@@ -165,13 +199,8 @@ public class MissionStructureService {
     if (missionUnit.getShip() != null) {
       notificationPublisher.shipAssigned(mission, missionUnit, missionUnit.getShip());
     }
-    auditRecorder.record(
-        AuditEventType.MISSION_UNIT_ADDED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("unit", missionUnit.getId()));
-    return mission;
+    return MissionEdit.audited(
+        AuditEventType.MISSION_UNIT_ADDED, AuditDetails.of("unit", missionUnit.getId()));
   }
 
   /**
@@ -243,7 +272,27 @@ public class MissionStructureService {
       Double frequency,
       UUID responsibleUserId,
       String note) {
-    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
+    return missionEditor.edit(
+        missionId,
+        MissionGate.MANAGE,
+        mission ->
+            rewriteUnit(
+                mission,
+                unitId,
+                expectedVersion,
+                new UnitAttributes(
+                    name, shipTypeId, shipId, highValueUnit, frequency, responsibleUserId, note)));
+  }
+
+  private MissionEdit rewriteUnit(
+      @NotNull Mission mission,
+      @NotNull UUID unitId,
+      Long expectedVersion,
+      @NotNull UnitAttributes attributes) {
+    final UUID shipTypeId = attributes.shipTypeId();
+    final UUID shipId = attributes.shipId();
+    final Double frequency = attributes.frequency();
+    final UUID responsibleUserId = attributes.responsibleUserId();
 
     MissionUnit missionUnit =
         Entities.require(
@@ -254,14 +303,14 @@ public class MissionStructureService {
         missionUnit.getVersion(), expectedVersion, MissionUnit.class, unitId);
 
     final Ship previousShip = missionUnit.getShip();
-    missionUnit.setHighValueUnit(highValueUnit);
+    missionUnit.setHighValueUnit(attributes.highValueUnit());
     final UUID previousResponsible =
         missionUnit.getResponsibleUser() == null ? null : missionUnit.getResponsibleUser().getId();
     missionUnit.setResponsibleUser(resolveResponsibleUser(responsibleUserId));
     if (responsibleUserId != null && !responsibleUserId.equals(previousResponsible)) {
       notificationPublisher.responsibilityAssigned(mission, responsibleUserId, "UNIT_RESPONSIBLE");
     }
-    missionUnit.setNote(StringNormalization.trimToNull(note));
+    missionUnit.setNote(StringNormalization.trimToNull(attributes.note()));
 
     if (shipTypeId != null) {
       ShipType shipType =
@@ -293,7 +342,7 @@ public class MissionStructureService {
       missionUnit.setShip(null);
     }
 
-    missionUnit.setName(resolveUnitName(name, missionUnit));
+    missionUnit.setName(resolveUnitName(attributes.name(), missionUnit));
 
     if (frequency != null) {
       double roundedFrequency =
@@ -309,13 +358,8 @@ public class MissionStructureService {
 
     missionUnitRepository.save(missionUnit);
     announceShipChange(mission, missionUnit, previousShip);
-    auditRecorder.record(
-        AuditEventType.MISSION_UNIT_UPDATED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("unit", unitId));
-    return mission;
+    return MissionEdit.audited(
+        AuditEventType.MISSION_UNIT_UPDATED, AuditDetails.of("unit", unitId));
   }
 
   /**
@@ -400,21 +444,16 @@ public class MissionStructureService {
    */
   @Transactional
   public Mission removeMissionUnit(@NotNull UUID missionId, @NotNull UUID unitId) {
-    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
-
-    boolean removed = mission.getAssignedUnits().removeIf(u -> u.getId().equals(unitId));
-
-    if (!removed) {
-      throw new NotFoundException("MissionUnit not found in this mission");
-    }
-
-    auditRecorder.record(
-        AuditEventType.MISSION_UNIT_REMOVED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("unit", unitId));
-    return mission;
+    return missionEditor.edit(
+        missionId,
+        MissionGate.MANAGE,
+        mission -> {
+          if (!mission.getAssignedUnits().removeIf(u -> u.getId().equals(unitId))) {
+            throw new NotFoundException("MissionUnit not found in this mission");
+          }
+          return MissionEdit.audited(
+              AuditEventType.MISSION_UNIT_REMOVED, AuditDetails.of("unit", unitId));
+        });
   }
 
   /**
@@ -427,8 +466,17 @@ public class MissionStructureService {
       @NotNull UUID missionUnitId,
       @NotNull UUID participantId,
       @NotNull Set<UUID> jobTypeIds) {
-    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
+    return missionEditor.edit(
+        missionId,
+        MissionGate.MANAGE,
+        mission -> appendCrew(mission, missionUnitId, participantId, jobTypeIds));
+  }
 
+  private MissionEdit appendCrew(
+      @NotNull Mission mission,
+      @NotNull UUID missionUnitId,
+      @NotNull UUID participantId,
+      @NotNull Set<UUID> jobTypeIds) {
     MissionUnit missionShip =
         Entities.require(
             mission.getAssignedUnits().stream()
@@ -462,13 +510,10 @@ public class MissionStructureService {
 
     missionShip.getCrew().add(crew);
     missionCrewRepository.save(crew);
-    auditRecorder.record(
+    return MissionEdit.audited(
         AuditEventType.MISSION_CREW_ADDED,
-        mission.getId(),
-        mission.getName(),
         participant.getUser() != null ? participant.getUser().getId() : null,
         AuditDetails.of("unit", missionUnitId).with("crew", crew.getId()));
-    return mission;
   }
 
   /**
@@ -490,34 +535,28 @@ public class MissionStructureService {
       @NotNull UUID crewId,
       Long expectedVersion,
       @NotNull Set<UUID> jobTypeIds) {
-    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
-
-    MissionUnit missionUnit =
-        Entities.require(
-            mission.getAssignedUnits().stream()
-                .filter(u -> u.getId().equals(missionUnitId))
-                .findFirst(),
-            "MissionUnit not found");
-
-    MissionCrew crew =
-        Entities.require(
-            missionUnit.getCrew().stream().filter(c -> c.getId().equals(crewId)).findFirst(),
-            "Crew member not found in this unit");
-
-    OptimisticLock.checkOptionalClient(
-        crew.getVersion(), expectedVersion, MissionCrew.class, crewId);
-
-    Set<JobType> jobTypes = validateAndFetchJobTypes(jobTypeIds);
-    crew.setJobTypes(jobTypes);
-
-    missionCrewRepository.save(crew);
-    auditRecorder.record(
-        AuditEventType.MISSION_CREW_UPDATED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("unit", missionUnitId).with("crew", crewId));
-    return mission;
+    return missionEditor.edit(
+        missionId,
+        MissionGate.MANAGE,
+        mission -> {
+          MissionUnit missionUnit =
+              Entities.require(
+                  mission.getAssignedUnits().stream()
+                      .filter(u -> u.getId().equals(missionUnitId))
+                      .findFirst(),
+                  "MissionUnit not found");
+          MissionCrew crew =
+              Entities.require(
+                  missionUnit.getCrew().stream().filter(c -> c.getId().equals(crewId)).findFirst(),
+                  "Crew member not found in this unit");
+          OptimisticLock.checkOptionalClient(
+              crew.getVersion(), expectedVersion, MissionCrew.class, crewId);
+          crew.setJobTypes(validateAndFetchJobTypes(jobTypeIds));
+          missionCrewRepository.save(crew);
+          return MissionEdit.audited(
+              AuditEventType.MISSION_CREW_UPDATED,
+              AuditDetails.of("unit", missionUnitId).with("crew", crewId));
+        });
   }
 
   /**
@@ -527,28 +566,23 @@ public class MissionStructureService {
   @Transactional
   public Mission removeCrewFromShip(
       @NotNull UUID missionId, @NotNull UUID missionUnitId, @NotNull UUID crewId) {
-    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
-
-    MissionUnit missionUnit =
-        Entities.require(
-            mission.getAssignedUnits().stream()
-                .filter(u -> u.getId().equals(missionUnitId))
-                .findFirst(),
-            "MissionUnit not found");
-
-    boolean removed = missionUnit.getCrew().removeIf(c -> c.getId().equals(crewId));
-
-    if (!removed) {
-      throw new NotFoundException("Crew member not found in this unit");
-    }
-
-    auditRecorder.record(
-        AuditEventType.MISSION_CREW_REMOVED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("unit", missionUnitId).with("crew", crewId));
-    return mission;
+    return missionEditor.edit(
+        missionId,
+        MissionGate.MANAGE,
+        mission -> {
+          MissionUnit missionUnit =
+              Entities.require(
+                  mission.getAssignedUnits().stream()
+                      .filter(u -> u.getId().equals(missionUnitId))
+                      .findFirst(),
+                  "MissionUnit not found");
+          if (!missionUnit.getCrew().removeIf(c -> c.getId().equals(crewId))) {
+            throw new NotFoundException("Crew member not found in this unit");
+          }
+          return MissionEdit.audited(
+              AuditEventType.MISSION_CREW_REMOVED,
+              AuditDetails.of("unit", missionUnitId).with("crew", crewId));
+        });
   }
 
   /**

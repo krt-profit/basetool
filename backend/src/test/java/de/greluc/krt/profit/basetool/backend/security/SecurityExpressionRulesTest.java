@@ -32,7 +32,6 @@ import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
-import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgRoleManagementSecurityService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandSecurityService;
@@ -69,15 +68,14 @@ class SecurityExpressionRulesTest {
           Map.entry("ownerScopeService", 3),
           Map.entry("operationAccessPolicy", 8),
           Map.entry("refineryAccessPolicy", 8),
-          Map.entry("missionSecurityService", 38),
+          Map.entry("missionAccessPolicy", 19),
           Map.entry("authHelperService", 15),
           Map.entry("exchangeGate", 14),
           Map.entry("orgRoleManagementSecurityService", 13),
           Map.entry("bankSecurityService", 10),
           Map.entry("specialCommandSecurityService", 5),
           Map.entry("connectedAppsGate", 1),
-          Map.entry("jobOrderAccessPolicy", 29),
-          Map.entry("missionAccessPolicy", 6),
+          Map.entry("jobOrderAccessPolicy", 20),
           Map.entry("inventoryAccessPolicy", 9),
           Map.entry("hangarAccessPolicy", 2),
           Map.entry("blueprintAccessPolicy", 1));
@@ -91,7 +89,7 @@ class SecurityExpressionRulesTest {
           Map.entry("ownerScopeService", OwnerScopeService.class),
           Map.entry("operationAccessPolicy", OperationAccessPolicy.class),
           Map.entry("refineryAccessPolicy", RefineryAccessPolicy.class),
-          Map.entry("missionSecurityService", MissionSecurityService.class),
+          Map.entry("missionAccessPolicy", MissionAccessPolicy.class),
           Map.entry("authHelperService", AuthHelperService.class),
           Map.entry("exchangeGate", ExchangeGate.class),
           Map.entry("orgRoleManagementSecurityService", OrgRoleManagementSecurityService.class),
@@ -99,7 +97,6 @@ class SecurityExpressionRulesTest {
           Map.entry("specialCommandSecurityService", SpecialCommandSecurityService.class),
           Map.entry("connectedAppsGate", ConnectedAppsGate.class),
           Map.entry("jobOrderAccessPolicy", JobOrderAccessPolicy.class),
-          Map.entry("missionAccessPolicy", MissionAccessPolicy.class),
           Map.entry("inventoryAccessPolicy", InventoryAccessPolicy.class),
           Map.entry("hangarAccessPolicy", HangarAccessPolicy.class),
           Map.entry("blueprintAccessPolicy", BlueprintAccessPolicy.class));

@@ -36,6 +36,8 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionObjective;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionObjectiveKind;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionStep;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionEditor;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionEditorFixture;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionObjectiveRepository;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionStepRepository;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionTimelineService;
@@ -60,10 +62,17 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class MissionTimelineCreateSeedTest {
 
   @Mock private MissionRepository missionRepository;
+
+  @Mock private MissionEditor missionEditor;
   @Mock private MissionObjectiveRepository missionObjectiveRepository;
   @Mock private MissionStepRepository missionStepRepository;
   @Mock private AuditService auditService;
   @InjectMocks private MissionTimelineService timelineService;
+
+  @BeforeEach
+  void wireMissionEditor() {
+    MissionEditorFixture.delegate(missionEditor, missionRepository, auditService);
+  }
 
   private UUID missionId;
   private Mission mission;

@@ -201,7 +201,8 @@ class OwnerScopeServiceTest {
     UserAccessPolicy userAccessPolicy =
         new UserAccessPolicy(accessGateService, authHelper, orgUnitMembershipRepository);
     refineryPolicy = new RefineryAccessPolicy(service, refineryOrderRepository, userAccessPolicy);
-    missionPolicy = new MissionAccessPolicy(service, authHelper, missionRepository);
+    missionPolicy =
+        new MissionAccessPolicy(service, authHelper, missionRepository, null, null, null, null);
     inventoryPolicy = new InventoryAccessPolicy(service, inventoryItemRepository, userAccessPolicy);
     hangarPolicy = new HangarAccessPolicy(service, shipRepository);
     jobOrderPolicy =

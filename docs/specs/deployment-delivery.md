@@ -2745,7 +2745,7 @@ frontend reached 19 by giving two mocks the field name the other classes use. Of
 backend contexts, 16 pin a property or configuration under test (rate limiting, CSRF, management
 port, scrape credentials, tracing, query timeout, the exchange mirror, stolen-stock marking, change
 retention, a statement inspector, a test-only controller), 14 mock a bean that a security bean
-reaches (`OwnerScopeService`, `MissionSecurityService`, `UserService`, `KeycloakService`, the role
+reaches (`OwnerScopeService`, `MissionAccessPolicy`, `UserService`, `KeycloakService`, the role
 and squadron repositories, …) and 2 spy on exchange beans for their own scenario. Sharing the
 security-mock ones would put a mock under security, so the backend stays two above the cache limit
 of 32.
@@ -2757,7 +2757,7 @@ of 32.
 - [x] A planted `@SpringBootTest` class with a `@MockitoBean JwtDecoder` failed the backend
   `TestContextBudgetTest` (35 > 34) with the grouping.
 - [x] `UserService` planted into `@LeafServiceMockTest`'s set failed `LeafServiceMockSecurityTest`
-  with `userService <- missionSecurityService`; `BeanReachTest` covers the walk.
+  with `userService <- missionAccessPolicy`; `BeanReachTest` covers the walk.
 - [x] The full backend, frontend and ingest suites are green.
 
 **Enforced by:** `*/…/architecture/TestContextBudgetTest` ·

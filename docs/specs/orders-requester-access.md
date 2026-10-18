@@ -25,7 +25,8 @@ creator column — a legacy of the anonymous request form it once had; there is 
 
 ### REQ-ORDERS-023 — Requesting-owner may view and edit their own order within limits
 
-A member of a job order's **requesting org unit** (Auftraggeber) MAY:
+A member of a job order's **requesting org unit** (Auftraggeber) MAY (both requester edits run through `JobOrderEditor` and require the order's `version`,
+[REQ-ORDERS-046](aggregate-edit-modules.md#req-orders-046--a-job-order-edit-that-carries-a-version-requires-it)):
 
 - **View** the order — reached via a dedicated `GET /api/v1/orders/requested` list (the "Meine
   Aufträge" surface) and the order-detail page. The response is **redacted**: it drops the

@@ -69,6 +69,8 @@ class MissionParticipantServiceTest {
   private static final UUID MISSION_ID = UUID.randomUUID();
 
   @Mock private MissionRepository missionRepository;
+
+  @Mock private MissionEditor missionEditor;
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private UserRepository userRepository;
   @Mock private MemberPayoutSettings memberPayoutSettings;
@@ -84,6 +86,11 @@ class MissionParticipantServiceTest {
 
   @Mock private MissionNotificationPublisher notificationPublisher;
   @InjectMocks private MissionParticipantService missionParticipantService;
+
+  @BeforeEach
+  void wireMissionEditor() {
+    MissionEditorFixture.delegate(missionEditor, missionRepository, auditRecorder);
+  }
 
   /** Stubs the resolver's pass-through default leniently. */
   @BeforeEach

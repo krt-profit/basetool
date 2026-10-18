@@ -256,7 +256,9 @@ class MissionAccessPolicyDifferentialTest {
               new OrgUnitStampingService(
                   resolver, accessGateService, authHelper, memberships, orgUnits));
       scopeHub = new ScopeHubMissionGates(accessGateService, authHelper, repository);
-      policy = new MissionAccessPolicy(ownerScopeService, authHelper, repository);
+      policy =
+          new MissionAccessPolicy(
+              ownerScopeService, authHelper, repository, null, null, null, null);
     }
 
     private static Mission mission(UUID unit, boolean internal, Mission parent) {

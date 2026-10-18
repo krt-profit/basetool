@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
@@ -52,6 +53,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class MissionStructureShipNoticeTest {
 
   @Mock private MissionRepository missionRepository;
+
+  @Mock private MissionEditor missionEditor;
   @Mock private MissionUnitRepository missionUnitRepository;
   @Mock private ShipRepository shipRepository;
 
@@ -62,6 +65,12 @@ class MissionStructureShipNoticeTest {
   @Mock private de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder auditRecorder;
 
   @InjectMocks private MissionStructureService service;
+
+  @BeforeEach
+  void wireMissionEditor() {
+    MissionEditorFixture.delegate(
+        missionEditor, missionRepository, org.mockito.Mockito.mock(AuditRecorder.class));
+  }
 
   private Mission mission;
   private MissionUnit unit;

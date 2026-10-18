@@ -37,6 +37,8 @@ import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionStep;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionEditor;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionEditorFixture;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionStepRepository;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionTimelineService;
 import java.util.Comparator;
@@ -63,9 +65,16 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 class MissionStepServiceTest {
 
   @Mock private MissionRepository missionRepository;
+
+  @Mock private MissionEditor missionEditor;
   @Mock private MissionStepRepository missionStepRepository;
   @Mock private AuditService auditService;
   @InjectMocks private MissionTimelineService timelineService;
+
+  @BeforeEach
+  void wireMissionEditor() {
+    MissionEditorFixture.delegate(missionEditor, missionRepository, auditService);
+  }
 
   private UUID missionId;
   private Mission mission;

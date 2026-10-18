@@ -85,7 +85,7 @@ every frontend `@PreAuthorize` with a literal role are migrated the same way.
 
 - **Programmatic authority-string comparisons** outside `@PreAuthorize` — backend
   `AuthHelperService.hasReachableRole(...)` call sites (`BankSecurityService`,
-  `MissionSecurityService`, `OwnerScopeService`, `OrgUnitBankAccessService`) and frontend raw
+  `MissionAccessPolicy`, `OwnerScopeService`, `OrgUnitBankAccessService`) and frontend raw
   `getAuthority().equals("ROLE_X")` / `"ROLE_X".equals(...)` checks (`BackendRoleSyncFilter`,
   `InventoryPageController`, `JobOrderPageController`, `OperationPageController`,
   `RefineryOrderPageController`) now reference `Roles`/`Permissions` constants and the
@@ -301,7 +301,7 @@ class rename, a moved bean or a changed signature therefore has to fail the buil
   accepts one less or more). 166 references to 8 beans on 2026-10-02.
 - **Explicit bean names.** Every bean a security expression names declares that name in its
   stereotype (`@Service("ownerScopeService")`, `@Component("exchangeGate")`, …), so renaming the
-  class cannot rename the bean: `ownerScopeService`, `missionSecurityService`, `authHelperService`,
+  class cannot rename the bean: `ownerScopeService`, `missionAccessPolicy`, `authHelperService`,
   `orgRoleManagementSecurityService`, `bankSecurityService`, `specialCommandSecurityService`,
   `exchangeGate`, `connectedAppsGate`.
 - **A ratchet per bean.** The number of references to each bean may not fall below its recorded
@@ -327,7 +327,7 @@ class rename, a moved bean or a changed signature therefore has to fail the buil
 **Enforced by:** `SecurityExpressionBeanResolutionTest`, `SecurityExpressionRulesTest`,
 `SecurityExpressionAnalyzerTest` · **Code:** the explicit names on `OwnerScopeService`,
 `OperationAccessPolicy`,
-`MissionSecurityService`, `AuthHelperService`, `OrgRoleManagementSecurityService`,
+`MissionAccessPolicy`, `AuthHelperService`, `OrgRoleManagementSecurityService`,
 `BankSecurityService`, `SpecialCommandSecurityService`, `ExchangeGate`, `ConnectedAppsGate` ·
 **Related:** REQ-SEC-002, REQ-OBS-020, plan guard G-04
 ([`DOMAIN_MODULARISATION_PLAN.md`](../archive/DOMAIN_MODULARISATION_PLAN.md) §6.1)
@@ -386,7 +386,7 @@ The flat authority is the OR-union over *all* of a caller's memberships and ther
 **no** OrgUnit context on its own — it MUST never authorise a write against another OrgUnit's
 aggregate by itself. Every elevated-mission-role write path (mission edit, manager/owner change,
 **and participant management** — check-in/out, attribute edit, payout-preference, removal) gates the
-flat role behind `OwnerScopeService.canEditMission(...)`; `MissionSecurityService.canAccessParticipant`
+flat role behind `OwnerScopeService.canEditMission(...)`; `MissionAccessPolicy.canAccessLoadedParticipant`
 does so by delegating its management branch to `canManageMission` rather than short-circuiting on the
 bare `ROLE_MISSION_MANAGER` authority. (Unlinked **guest** participants stay openly editable per
 REQ-SEC-009; this scope gate applies only to *user-linked* participants.)
@@ -1179,7 +1179,7 @@ so a bare id was not an authorization secret.
   returned the plaintext **once** in the create response (`MissionParticipantDto.guestEditToken`).
   `V239` dropped the column; the DTO field is gone from both modules.
 - Every subsequent guest-row mutate/delete **was** authorised by
-  `MissionSecurityService.canAccessParticipant` iff the caller (a) presented a token (header
+  `MissionAccessPolicy.canAccessLoadedParticipant` iff the caller (a) presented a token (header
   `X-Guest-Edit-Token`) that hashed to the stored hash, OR (b) held a mission-management role in
   scope (`canManageMission`). Only branch (b) survives, and it is now unconditional.
 - **The token proves *which row*, never *whether the mission is still open*.** Branch (a) MUST
@@ -1227,9 +1227,9 @@ record of what was once true and why.
   survived, and the only one there is now. It is what an external participant's row hangs off
   (REQ-SEC-052, D4).
 
-**Enforced by:** `MissionSecurityServiceTest` (the surviving `canAccessParticipant` cases) and
+**Enforced by:** `MissionAccessPolicyGateTest` (the surviving `canAccessLoadedParticipant` cases) and
 `MissionAccessControlTest`. `GuestParticipantTokenServiceTest` and `MissionGuestAccessTest` went
-with the service and the flow they tested; the token cases inside `MissionSecurityServiceTest` went
+with the service and the flow they tested; the token cases inside the former `MissionSecurityServiceTest` went
 with the token. **Migration:** V177, undone by `V239`. **Security audit:** finding M1.
 
 ### REQ-SEC-065 — Mission finance-entry writes are owning-OrgUnit-scoped for officers
@@ -1237,7 +1237,7 @@ with the token. **Migration:** V177, undone by `V239`. **Security audit:** findi
 > **Renumbered 2026-09-22:** this requirement was `REQ-SEC-019` until 2026-09-22; that id also named the Discord-link indicator in member management in [`discord-integration.md`](discord-integration.md), which keeps it.
 
 `MissionFinanceEntry` edit/delete (`PUT`/`DELETE /api/v1/missions/{missionId}/finance-entries/{entryId}`) gates on
-`MissionSecurityService.canEditFinanceEntry`. `ROLE_OFFICER` is a flat, cross-squadron realm
+`MissionAccessPolicy.canEditFinanceEntry`. `ROLE_OFFICER` is a flat, cross-squadron realm
 authority, so — like every other mission write (`canManageMission`, `canManageManagers`,
 `canChangeOwner`, hardened under audit AUTHZ-1) — an officer may edit/delete a finance entry only when
 the entry's mission is within their owning-OrgUnit scope (`OwnerScopeService.canEditMission`). Only
@@ -1250,7 +1250,7 @@ participant who is still a registered participant) is unchanged.
   mission (even a B-internal mission they cannot read).
 - [x] An officer in scope, an admin, and the entry owner-participant are allowed.
 
-**Enforced by:** `MissionSecurityServiceTest`
+**Enforced by:** `MissionAccessPolicyGateTest`
 (`canEditFinanceEntry_OfficerForeignOrgUnit_ShouldReturnFalse`, `…_OfficerInScope_*`, `…_Admin_*`,
 `…_OwnerStillParticipant_*`). **Security audit:** finding H1.
 
@@ -3380,7 +3380,7 @@ invisible from the anonymous surface.
 
 ### REQ-SEC-042 — Booking into a mission ledger is a write, and is gated like one
 
-`POST /api/v1/missions/{missionId}/finance-entries` MUST be authorized by `MissionSecurityService#canCreateFinanceEntry`:
+`POST /api/v1/missions/{missionId}/finance-entries` MUST be authorized by `MissionAccessPolicy#canCreateFinanceEntry`:
 a caller who may manage the mission (ADMIN; an OFFICER / MISSION_MANAGER whose owning-OrgUnit scope
 covers it; the owner or a co-manager) may book for any of its participants, and every other member
 may book **only against their own participant row** on that mission.
@@ -3436,9 +3436,9 @@ and detail pages map to a message naming the mission field.
 - [x] Saving an order with its mission unchanged does not re-check participation.
 - [x] Clearing the mission is always allowed.
 
-**Enforced by:** `MissionSecurityServiceTest`, `MissionFinanceEntryControllerSecurityTest`,
+**Enforced by:** `MissionAccessPolicyGateTest`, `MissionFinanceEntryControllerSecurityTest`,
 `RefineryOrderServiceLifecycleTest`, `RefineryOrderTest`, `RefineryOrderFailureToastTest` ·
-**Code:** `MissionSecurityService#canCreateFinanceEntry`,
+**Code:** `MissionAccessPolicy#canCreateFinanceEntry`,
 `MissionFinanceEntryController#createFinanceEntry`, `RefineryOrderService#resolveMissionForOwner` ·
 **Related:** REQ-SEC-006, REQ-SEC-009
 

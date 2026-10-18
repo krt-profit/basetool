@@ -127,7 +127,7 @@
   <module name="FileLength">
     <property name="id" value="fileLengthMissionController"/>
     <property name="fileExtensions" value="java"/>
-    <property name="max" value="1405"/>
+    <property name="max" value="1386"/>
   </module>
   <module name="SuppressionSingleFilter">
     <property name="id" value="fileLength"/>
@@ -244,7 +244,7 @@
   <module name="FileLength">
     <property name="id" value="fileLengthJobOrderService"/>
     <property name="fileExtensions" value="java"/>
-    <property name="max" value="1156"/>
+    <property name="max" value="1131"/>
   </module>
   <module name="SuppressionSingleFilter">
     <property name="id" value="fileLength"/>
@@ -283,7 +283,7 @@
   <module name="FileLength">
     <property name="id" value="fileLengthJobOrderController"/>
     <property name="fileExtensions" value="java"/>
-    <property name="max" value="1114"/>
+    <property name="max" value="1097"/>
   </module>
   <module name="SuppressionSingleFilter">
     <property name="id" value="fileLength"/>

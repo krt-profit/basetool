@@ -159,7 +159,14 @@ class JobOrderServiceTest {
             jobOrderPriorityService,
             qualityTierService,
             orgUnitAccessPolicy,
-            actingUserService());
+            actingUserService(),
+            new JobOrderEditor(
+                jobOrderRepository,
+                jobOrderAccessPolicy,
+                auditService,
+                eventPublisher,
+                jobOrderStockProjectionService));
+    lenient().when(jobOrderAccessPolicy.canEdit(any(), any())).thenReturn(true);
     jobOrderQueryService =
         new JobOrderQueryService(
             jobOrderRepository,
@@ -629,21 +636,6 @@ class JobOrderServiceTest {
 
     assertEquals(JobOrderStatus.IN_PROGRESS, jobOrder.getStatus());
     assertNotNull(result);
-    verify(inventoryItemRepository, never()).deleteJobOrderAllocationsByJobOrder(any());
-  }
-
-  @Test
-  void updateJobOrderStatus_VersionMismatch_ShouldThrow409() {
-    jobOrder.setVersion(5L);
-    jobOrder.setStatus(JobOrderStatus.OPEN);
-    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
-
-    assertThrows(
-        org.springframework.orm.ObjectOptimisticLockingFailureException.class,
-        () ->
-            jobOrderService.updateJobOrderStatus(
-                orderId, new UpdateJobOrderStatusDto(JobOrderStatus.COMPLETED, 1L)));
-    verify(jobOrderRepository, never()).save(any());
     verify(inventoryItemRepository, never()).deleteJobOrderAllocationsByJobOrder(any());
   }
 
@@ -1742,18 +1734,7 @@ class JobOrderServiceTest {
 
       assertThrows(
           de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
-          () -> jobOrderService.updateItemJobOrder(orderId, oneLine(null)));
-      verify(jobOrderItemService, never()).buildItemLine(any());
-    }
-
-    @Test
-    void versionMismatch_throws409() {
-      JobOrder order = itemOrder();
-      when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.of(order));
-
-      assertThrows(
-          org.springframework.orm.ObjectOptimisticLockingFailureException.class,
-          () -> jobOrderService.updateItemJobOrder(orderId, oneLine(99L)));
+          () -> jobOrderService.updateItemJobOrder(orderId, oneLine(1L)));
       verify(jobOrderItemService, never()).buildItemLine(any());
     }
 
@@ -2031,18 +2012,6 @@ class JobOrderServiceTest {
       assertThrows(
           BadRequestException.class,
           () -> jobOrderService.updateBlueprintVariantCounting(orderId, false, null));
-      verify(jobOrderRepository, never()).saveAndFlush(any());
-      verify(auditService, never()).record(any(), any(), any(), any(), any());
-    }
-
-    @Test
-    void versionMismatch_throwsOptimisticLockingFailure() {
-      JobOrder order = itemOrder(true, 5L);
-      when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.of(order));
-
-      assertThrows(
-          org.springframework.orm.ObjectOptimisticLockingFailureException.class,
-          () -> jobOrderService.updateBlueprintVariantCounting(orderId, false, 99L));
       verify(jobOrderRepository, never()).saveAndFlush(any());
       verify(auditService, never()).record(any(), any(), any(), any(), any());
     }

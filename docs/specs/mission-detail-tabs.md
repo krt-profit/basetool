@@ -384,7 +384,7 @@ counter) and shown **read-only** in the Übersicht as an `<ol class="ablauf">` c
 steps are authored the whole Ablauf tile is omitted** from the Übersicht — no empty
 "Noch keine Schritte." placeholder — and reappears in place through the `['steps','overview']`
 section swap once the first step is added (owner request 2026-07-01). Edit-authorised
-users (`mission.canEdit` / `@missionSecurityService.canManageMission`) toggle a step's shared `done`
+users (`mission.canEdit` / the manage gate of `MissionEditor`) toggle a step's shared `done`
 check directly on the overview checklist; the state is visible to every viewer. A member below
 Logistician sees the Ablauf read-only (it is non-PII planning data, forwarded like
 units/frequencies; ADR-0044). It used to be forwarded to the anonymous tier too; that tier is gone
@@ -609,7 +609,7 @@ frequencies, units and Ablauf steps.
 The three mutations go through dedicated slim endpoints: `POST …/missions/{id}/frequencies/custom`
 (add) and `PUT …/missions/{id}/frequencies/custom/{freqId}` (edit) each return the updated slim
 frequency list; delete reuses the generic `DELETE …/missions/{id}/frequencies/{freqId}`. All are
-`@PreAuthorize @missionSecurityService.canManageMission`. The edit path optimistic-locks on the
+`@PreAuthorize @missionAccessPolicy.canManageMission`. The edit path optimistic-locks on the
 frequency row's own `@Version` (a stale echo surfaces as HTTP 409) and rejects reaching a typed row
 through the custom path; the mission's `frequencies` collection is `@OptimisticLock(excluded = true)`,
 so a frequency change never 409s a concurrent core/schedule/flags edit. The editor and overview Funk
