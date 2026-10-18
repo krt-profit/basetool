@@ -199,20 +199,8 @@ public class InventoryPoolChangeService {
       throw new BadRequestException("The holder is not a direct member of the target org unit");
     }
     OrgUnit target = Entities.require(orgUnitRepository.findById(targetId), "Org unit not found");
-    double held = item.getAmount() != null ? item.getAmount() : 0.0;
-    double moved = amount == null ? held : amount;
-    boolean whole = Math.abs(moved - held) <= QUANTITY_EPSILON;
-    InventoryItem result = whole ? moveWholeRow(item, target) : splitOff(item, moved, target);
-    auditRecorder.record(
-        AuditEventType.INVENTORY_POOL_CHANGED,
-        item.getId(),
-        InventoryAuditLabels.label(item),
-        holderId,
-        AuditDetails.of("fromOrgUnit", orgUnitRef(source))
-            .with("toOrgUnit", orgUnitRef(target))
-            .with("amount", moved)
-            .with("split", !whole)
-            .with("newRow", whole ? "-" : result.getId()));
+    double moved = amount == null ? amountOf(item) : amount;
+    InventoryItem result = moveInto(item, orgUnitRef(source), target, moved);
     if (!holderId.equals(actorId)) {
       eventPublisher.publishEvent(
           InventoryNotices.poolChangedByOther(
@@ -229,6 +217,68 @@ public class InventoryPoolChangeService {
                   item.getLocation() != null ? item.getLocation().getName() : null)));
     }
     return inventoryCheckoutService.mergeStockIfRequested(result, mergeStock);
+  }
+
+  /**
+   * Moves a locked shared row without an org unit, or a part of it, into the pool of the named unit
+   * for a lot rebooking that already decided the amount (REQ-INV-060); joins the caller's
+   * transaction and audits the move as {@code INVENTORY_POOL_CHANGED} from {@code none}.
+   *
+   * @param item the locked shared row without an org unit
+   * @param amount the part to move, at most the row's movable stock
+   * @param target the org unit whose pool receives the stock
+   * @return the row that holds the moved stock afterwards, merged or not
+   * @throws BadRequestException when the row is personal or in a pool, or the part is invalid
+   * @throws BusinessConflictException when the part would leave the row below its Materialbörse
+   *     offer
+   * @throws OverAllocationException when the rest could no longer carry the row's earmarks
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  @NotNull
+  InventoryItem moveUnitlessRowIntoPool(
+      @NotNull InventoryItem item, double amount, @NotNull OrgUnit target) {
+    if (Boolean.TRUE.equals(item.getPersonal()) || item.getOwningOrgUnit() != null) {
+      throw new BadRequestException("Only a shared row without an org unit can move this way");
+    }
+    return inventoryCheckoutService.mergeStockIfRequested(
+        moveInto(item, "none", target, amount), false);
+  }
+
+  /**
+   * Moves the row, or a part of it, into the target's pool and audits it as {@code
+   * INVENTORY_POOL_CHANGED}.
+   *
+   * @param item the locked shared row
+   * @param from the audited source pool, {@code kind:id} or {@code none}
+   * @param target the receiving unit
+   * @param amount the part to move
+   * @return the row that holds the moved stock, before any merge
+   */
+  private @NotNull InventoryItem moveInto(
+      @NotNull InventoryItem item, @NotNull String from, @NotNull OrgUnit target, double amount) {
+    boolean whole = Math.abs(amount - amountOf(item)) <= QUANTITY_EPSILON;
+    InventoryItem result = whole ? moveWholeRow(item, target) : splitOff(item, amount, target);
+    auditRecorder.record(
+        AuditEventType.INVENTORY_POOL_CHANGED,
+        item.getId(),
+        InventoryAuditLabels.label(item),
+        item.getUser().getId(),
+        AuditDetails.of("fromOrgUnit", from)
+            .with("toOrgUnit", orgUnitRef(target))
+            .with("amount", amount)
+            .with("split", !whole)
+            .with("newRow", whole ? "-" : result.getId()));
+    return result;
+  }
+
+  /**
+   * Returns a row's amount.
+   *
+   * @param item the row
+   * @return the amount, {@code 0} when unset
+   */
+  private static double amountOf(@NotNull InventoryItem item) {
+    return item.getAmount() != null ? item.getAmount() : 0.0;
   }
 
   /**

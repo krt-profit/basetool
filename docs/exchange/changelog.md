@@ -5,6 +5,9 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
 
 ## 2026-10-18
 
+- **Fixed: a share takes all of `split.personal`.** A `share` also takes the member's shared stock
+  outside any unit, after the personal stock, so a share up to `split.personal` no longer fails
+  with `INSUFFICIENT_STOCK` ([stock](resources/stock.md#sharing-into-a-units-pool)).
 - **Clarified: an identical resend of a held batch keeps its link.** While a batch held for the
   member's confirmation still waits, resending it byte for byte from the same installation answers
   the same `409 MASS_CHANGE_CONFIRMATION_REQUIRED` with the same `confirmationUrl`, instead of

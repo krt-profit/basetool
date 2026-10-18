@@ -46,7 +46,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The Lager's rebooking of a member's own lot between personal and one pool (REQ-INV-060), each
- * moved row split off through the web's own Umbuchung ({@link InventoryCheckoutService#rebookRow}).
+ * moved row split off through the web's own Umbuchung ({@link InventoryCheckoutService#rebookRow}),
+ * or, for a shared row outside any pool, through {@link
+ * InventoryPoolChangeService#moveUnitlessRowIntoPool}.
  */
 @Service
 @RequiredArgsConstructor
@@ -57,6 +59,7 @@ public class InventoryRebookCommands implements RebookCommands {
 
   private final InventoryItemRepository inventoryRepository;
   private final InventoryCheckoutService checkoutService;
+  private final InventoryPoolChangeService poolChangeService;
   private final OrgUnitMembershipQueryService membershipQueryService;
   private final OrgUnitRepository orgUnitRepository;
   private final StockOfferLookup stockOfferLookup;
@@ -111,8 +114,12 @@ public class InventoryRebookCommands implements RebookCommands {
       if (take <= EPSILON) {
         continue;
       }
-      checkoutService.rebookRow(
-          source, take, !toPool, toPool ? pool : source.getOwningOrgUnit(), false);
+      if (toPool && !Boolean.TRUE.equals(source.getPersonal())) {
+        poolChangeService.moveUnitlessRowIntoPool(source, take, Objects.requireNonNull(pool));
+      } else {
+        checkoutService.rebookRow(
+            source, take, !toPool, toPool ? pool : source.getOwningOrgUnit(), false);
+      }
       left = ScuAmounts.roundToScuScale(left - take);
     }
     Map<UUID, RebookRowState> after = states(lockLotRows(rebook.member(), lot));
@@ -216,17 +223,18 @@ public class InventoryRebookCommands implements RebookCommands {
   }
 
   /**
-   * Orders the member's personal rows of the lot for a share: the rows stamped with the target
-   * unit, then the rows without a unit, then the rest, each group oldest first.
+   * Orders the rows of the lot's personal part for a share: the personal rows stamped with the
+   * target unit, then those without a unit, then the other personal rows, then the shared rows
+   * outside any pool, each group oldest first.
    *
    * @param lotRows the member's rows of the lot
    * @param poolUnitId the target unit
-   * @return the personal rows in the order a share takes them
+   * @return the rows in the order a share takes them
    */
   private static @NotNull List<InventoryItem> shareSources(
       @NotNull List<InventoryItem> lotRows, @NotNull UUID poolUnitId) {
     return lotRows.stream()
-        .filter(row -> Boolean.TRUE.equals(row.getPersonal()))
+        .filter(InventoryItem::countsAsPersonal)
         .sorted(
             Comparator.comparingInt((InventoryItem row) -> shareGroup(row, poolUnitId))
                 .thenComparing(oldestFirst()))
@@ -234,13 +242,17 @@ public class InventoryRebookCommands implements RebookCommands {
   }
 
   /**
-   * Returns a personal row's place in the share order.
+   * Returns a row's place in the share order.
    *
-   * @param row the row
+   * @param row a row of the lot's personal part
    * @param poolUnitId the target unit
-   * @return {@code 0} for the target unit, {@code 1} for no unit, {@code 2} for another unit
+   * @return {@code 0} for a personal row of the target unit, {@code 1} for one without a unit,
+   *     {@code 2} for one of another unit, {@code 3} for a shared row outside any pool
    */
   private static int shareGroup(@NotNull InventoryItem row, @NotNull UUID poolUnitId) {
+    if (!Boolean.TRUE.equals(row.getPersonal())) {
+      return 3;
+    }
     OrgUnit unit = row.getOwningOrgUnit();
     if (unit == null) {
       return 1;
