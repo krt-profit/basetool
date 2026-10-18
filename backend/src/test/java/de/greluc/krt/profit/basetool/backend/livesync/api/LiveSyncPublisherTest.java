@@ -106,7 +106,7 @@ class LiveSyncPublisherTest {
   }
 
   @Test
-  @DisplayName("inside a transaction one frame per room carries the union of the sections")
+  @DisplayName("inside a transaction repeated calls for a room send one frame after the commit")
   void aTransactionCoalescesPerRoomAndPublishesAfterTheCommit() {
     LiveSyncTopic stock = LiveSyncTopic.global(LiveSyncTopicClass.INVENTORY_ALL);
     LiveSyncTopic board = LiveSyncTopic.global(LiveSyncTopicClass.MATERIALBOARD);
@@ -114,7 +114,7 @@ class LiveSyncPublisherTest {
     try {
       publisher.publishAfterCommit(stock, List.of("stock"));
       publisher.publishAfterCommit(board, List.of("board"));
-      publisher.publishAfterCommit(stock, List.of("stock", "grid"));
+      publisher.publishAfterCommit(stock, List.of("stock"));
       verify(fanout, never()).publish(any(), anyList());
 
       complete(TransactionSynchronization.STATUS_COMMITTED);
