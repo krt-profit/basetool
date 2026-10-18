@@ -316,8 +316,8 @@ public class JobOrderPageReader {
         catalogs.squadrons(),
         catalogs.requestingOptions(),
         actingUser,
-        settings != null ? settings.ageYellowDays() : DEFAULT_AGE_YELLOW_DAYS,
-        settings != null ? settings.ageRedDays() : DEFAULT_AGE_RED_DAYS,
+        yellowDays(settings),
+        redDays(settings),
         itemOrder && (fragment == null || "blueprint-owners".equalsIgnoreCase(fragment))
             ? blueprintOwners(id)
             : Part.absent(),
@@ -459,12 +459,7 @@ public class JobOrderPageReader {
     }
     JobOrderSettingsDto settings = settings();
     return new OrderListPage(
-        true,
-        orders,
-        Optional.ofNullable(p),
-        settings != null ? settings.ageYellowDays() : DEFAULT_AGE_YELLOW_DAYS,
-        settings != null ? settings.ageRedDays() : DEFAULT_AGE_RED_DAYS,
-        List.of());
+        true, orders, Optional.ofNullable(p), yellowDays(settings), redDays(settings), List.of());
   }
 
   private static void logStock(@NotNull List<JobOrderDto> orders) {
@@ -482,6 +477,14 @@ public class JobOrderPageReader {
             mat.material().name());
       }
     }
+  }
+
+  private static int yellowDays(@Nullable JobOrderSettingsDto settings) {
+    return settings != null ? settings.ageYellowDays() : DEFAULT_AGE_YELLOW_DAYS;
+  }
+
+  private static int redDays(@Nullable JobOrderSettingsDto settings) {
+    return settings != null ? settings.ageRedDays() : DEFAULT_AGE_RED_DAYS;
   }
 
   @Nullable

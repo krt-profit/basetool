@@ -30,7 +30,6 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.AggregatedMaterialDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.GameItemReferenceDto;
@@ -44,9 +43,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -56,20 +53,11 @@ import org.springframework.web.context.WebApplicationContext;
  * Verifies that the order list renders an ITEM order's material column as its aggregated materials
  * with collection progress ({@code currentStock / totalQuantity}).
  */
-@SpringBootTest
-class JobOrderListRenderTest {
+class JobOrderListRenderTest extends JobOrderPageMvcTestBase {
 
   @Autowired private WebApplicationContext context;
 
   private MockMvc mockMvc;
-
-  @MockitoBean private BackendApiClient backendApiClient;
-
-  @MockitoBean private JobOrderPageReader reader;
-
-  @MockitoBean
-  private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
-      clientRegistrationRepository;
 
   @BeforeEach
   void setup() {

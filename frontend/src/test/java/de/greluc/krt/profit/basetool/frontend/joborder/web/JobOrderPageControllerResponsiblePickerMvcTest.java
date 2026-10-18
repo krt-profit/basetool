@@ -27,7 +27,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import java.util.List;
@@ -36,9 +35,7 @@ import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -49,8 +46,7 @@ import org.springframework.web.context.WebApplicationContext;
  * responsible picker offers only profit-eligible units, so Bereiche and the Organisationsleitung
  * appear only as requesters.
  */
-@SpringBootTest
-class JobOrderPageControllerResponsiblePickerMvcTest {
+class JobOrderPageControllerResponsiblePickerMvcTest extends JobOrderPageMvcTestBase {
 
   private static final String ACTIVE_URI = "/api/v1/org-units/active";
   private static final String ALL_KINDS_URI = "/api/v1/org-units/active-all-kinds";
@@ -58,14 +54,6 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
 
   @Autowired private WebApplicationContext context;
   private MockMvc mockMvc;
-
-  @MockitoBean private BackendApiClient backendApiClient;
-
-  @MockitoBean private JobOrderPageReader reader;
-
-  @MockitoBean
-  private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
-      clientRegistrationRepository;
 
   @BeforeEach
   void setup() {

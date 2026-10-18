@@ -30,7 +30,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
@@ -40,9 +39,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -52,20 +49,11 @@ import org.springframework.web.context.WebApplicationContext;
  * the page nav and the 50/100/200 size picker render, and every link keeps the status and scope
  * filters.
  */
-@SpringBootTest
-class JobOrderPaginationMvcTest {
+class JobOrderPaginationMvcTest extends JobOrderPageMvcTestBase {
 
   @Autowired private WebApplicationContext context;
 
   private MockMvc mockMvc;
-
-  @MockitoBean private BackendApiClient backendApiClient;
-
-  @MockitoBean private JobOrderPageReader reader;
-
-  @MockitoBean
-  private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
-      clientRegistrationRepository;
 
   @BeforeEach
   void setup() {

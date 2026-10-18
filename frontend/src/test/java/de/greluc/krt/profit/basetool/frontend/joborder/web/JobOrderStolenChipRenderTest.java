@@ -33,7 +33,6 @@ import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverItemDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
@@ -49,14 +48,12 @@ import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.IdTokenClaimNames;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -65,22 +62,13 @@ import org.springframework.web.context.WebApplicationContext;
  * Renders the order detail page through the real Thymeleaf template and pins the stolen danger chip
  * on the linked-but-unneeded inventory rows and on the material handover lines (REQ-INV-053).
  */
-@SpringBootTest
-class JobOrderStolenChipRenderTest {
+class JobOrderStolenChipRenderTest extends JobOrderPageMvcTestBase {
 
   private static final String STOLEN_CHIP = "data-testid=\"stolen-chip\"";
 
   @Autowired private WebApplicationContext context;
 
   private MockMvc mockMvc;
-
-  @MockitoBean private BackendApiClient backendApiClient;
-
-  @MockitoBean private JobOrderPageReader reader;
-
-  @MockitoBean
-  private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
-      clientRegistrationRepository;
 
   @BeforeEach
   void setup() {

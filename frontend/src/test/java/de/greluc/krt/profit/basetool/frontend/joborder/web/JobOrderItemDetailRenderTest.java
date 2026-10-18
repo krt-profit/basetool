@@ -42,7 +42,6 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemMateria
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderRequiredBlueprintDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.GameItemReferenceDto;
@@ -59,14 +58,12 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.IdTokenClaimNames;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -76,20 +73,11 @@ import org.springframework.web.context.WebApplicationContext;
  * Verifies the ITEM-order branch of the order detail page: the ordered-items table, the aggregated
  * materials panel and the warning for items without a procurable material.
  */
-@SpringBootTest
-class JobOrderItemDetailRenderTest {
+class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
 
   @Autowired private WebApplicationContext context;
 
   private MockMvc mockMvc;
-
-  @MockitoBean private BackendApiClient backendApiClient;
-
-  @MockitoBean private JobOrderPageReader reader;
-
-  @MockitoBean
-  private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
-      clientRegistrationRepository;
 
   @BeforeEach
   void setup() {

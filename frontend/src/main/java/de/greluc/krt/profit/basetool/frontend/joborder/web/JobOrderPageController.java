@@ -459,20 +459,25 @@ public class JobOrderPageController {
   public String viewEditItemForm(
       @PathVariable UUID id, Model model, RedirectAttributes redirectAttributes) {
     JobOrderPageReader.ItemEditPage edit = pageReader.readItemEdit(id);
-    switch (edit.access()) {
-      case ORDER_UNAVAILABLE -> {
-        redirectAttributes.addFlashAttribute("errorToast", "error.joborder.load.details");
-        return "redirect:/orders";
-      }
-      case NOT_AN_ITEM_ORDER -> {
-        redirectAttributes.addFlashAttribute("errorToast", "error.joborder.item.edit.notItem");
-        return "redirect:/orders/" + id;
-      }
-      case HAS_ITEM_HANDOVERS -> {
-        redirectAttributes.addFlashAttribute("errorToast", "error.joborder.item.edit.hasHandovers");
-        return "redirect:/orders/" + id;
-      }
-      default -> {}
+    String blocked =
+        switch (edit.access()) {
+          case ORDER_UNAVAILABLE -> {
+            redirectAttributes.addFlashAttribute("errorToast", "error.joborder.load.details");
+            yield "redirect:/orders";
+          }
+          case NOT_AN_ITEM_ORDER -> {
+            redirectAttributes.addFlashAttribute("errorToast", "error.joborder.item.edit.notItem");
+            yield "redirect:/orders/" + id;
+          }
+          case HAS_ITEM_HANDOVERS -> {
+            redirectAttributes.addFlashAttribute(
+                "errorToast", "error.joborder.item.edit.hasHandovers");
+            yield "redirect:/orders/" + id;
+          }
+          case EDITABLE -> null;
+        };
+    if (blocked != null) {
+      return blocked;
     }
     JobOrderDto order = edit.order().orElseThrow();
 
