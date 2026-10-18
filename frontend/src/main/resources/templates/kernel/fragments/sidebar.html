@@ -57,9 +57,9 @@
                 </div>
                 <div class="nav-mode nav-mode-main" data-nav-mode="main">
                     <div class="nav-top" th:data-nav-group="#{nav.group.general}">
-                        <a th:href="@{/}" class="nav-top-link" data-nav-icon="list"
+                        <a th:href="@{/}" th:data-nav-keywords="#{palette.keywords.home}" class="nav-top-link" data-nav-icon="list"
                            th:text="#{nav.home}">Home</a>
-                        <a th:href="@{/notifications}" class="nav-top-link" data-testid="nav-notifications"
+                        <a th:href="@{/notifications}" th:data-nav-keywords="#{palette.keywords.notifications}" class="nav-top-link" data-testid="nav-notifications"
                            data-nav-icon="bell">
                             <span class="nav-top-label" th:text="#{nav.notifications}">Notifications</span>
                             <span class="nav-count-pill" data-notif-badge
@@ -76,8 +76,8 @@
                             <svg class="krt-icon nav-group-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
                         </button>
                         <div class="nav-group-links" id="nav-group-missions">
-                            <a th:href="@{/missions}" class="nav-link" data-testid="nav-missions" th:text="#{nav.missions}">Missions</a>
-                            <a th:href="@{/operations}" class="nav-link" th:text="#{nav.operations}">Operations</a>
+                            <a th:href="@{/missions}" th:data-nav-keywords="#{palette.keywords.missions}" class="nav-link" data-testid="nav-missions" th:text="#{nav.missions}">Missions</a>
+                            <a th:href="@{/operations}" th:data-nav-keywords="#{palette.keywords.operations}" class="nav-link" th:text="#{nav.operations}">Operations</a>
                         </div>
                     </section>
                     <section class="nav-group" data-group-key="logistics" data-nav-icon="bookout"
@@ -89,17 +89,17 @@
                             <svg class="krt-icon nav-group-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
                         </button>
                         <div class="nav-group-links" id="nav-group-logistics">
-                            <a th:href="@{/hangar}" class="nav-link" data-testid="nav-hangar" th:text="#{nav.hangar}">Hangar</a>
-                            <a th:href="@{/inventory}" class="nav-link" th:text="#{nav.inventory}">Lager</a>
-                            <a th:href="@{/materialboerse}" class="nav-link" data-testid="nav-materialboerse"
+                            <a th:href="@{/hangar}" th:data-nav-keywords="#{palette.keywords.hangar}" class="nav-link" data-testid="nav-hangar" th:text="#{nav.hangar}">Hangar</a>
+                            <a th:href="@{/inventory}" th:data-nav-keywords="#{palette.keywords.inventory}" class="nav-link" th:text="#{nav.inventory}">Lager</a>
+                            <a th:href="@{/materialboerse}" th:data-nav-keywords="#{palette.keywords.materialboerse}" class="nav-link" data-testid="nav-materialboerse"
                                sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).KRT_MEMBER)"
                                th:text="#{nav.materialboerse}">Materialbörse</a>
-                            <a th:href="@{/refinery-orders}" class="nav-link" data-testid="nav-refinery" th:text="#{nav.refinery}">Raffinerie</a>
-                            <a th:href="@{/orders}" class="nav-link" th:if="${canViewJobOrders}" data-testid="nav-orders" th:text="#{nav.orders}">Aufträge</a>
-                            <a th:href="@{/orders}" class="nav-link" th:if="${!canViewJobOrders and canViewOwnJobOrders}" data-testid="nav-orders-own" th:text="#{nav.orders.own}">Meine Aufträge</a>
-                            <a th:href="@{/orders/material-demand}" class="nav-link" th:if="${canViewJobOrders}" data-testid="nav-orders-material-demand" th:text="#{nav.orders.materialDemand}">Materialbedarf</a>
+                            <a th:href="@{/refinery-orders}" th:data-nav-keywords="#{palette.keywords.refinery}" class="nav-link" data-testid="nav-refinery" th:text="#{nav.refinery}">Raffinerie</a>
+                            <a th:href="@{/orders}" th:data-nav-keywords="#{palette.keywords.orders}" class="nav-link" th:if="${canViewJobOrders}" data-testid="nav-orders" th:text="#{nav.orders}">Aufträge</a>
+                            <a th:href="@{/orders}" th:data-nav-keywords="#{palette.keywords.orders}" class="nav-link" th:if="${!canViewJobOrders and canViewOwnJobOrders}" data-testid="nav-orders-own" th:text="#{nav.orders.own}">Meine Aufträge</a>
+                            <a th:href="@{/orders/material-demand}" th:data-nav-keywords="#{palette.keywords.materialDemand}" class="nav-link" th:if="${canViewJobOrders}" data-testid="nav-orders-material-demand" th:text="#{nav.orders.materialDemand}">Materialbedarf</a>
                             <a th:href="@{/orders/create}" class="nav-link" th:unless="${canViewJobOrders or canViewOwnJobOrders}" data-testid="nav-orders-create" th:text="#{orders.create.link}">Auftrag anlegen</a>
-                            <a th:href="@{/blueprint-overview}" class="nav-link" th:if="${canSeeBlueprintOverview}" data-testid="nav-blueprint-overview" th:text="#{nav.blueprint_overview}">Blueprint Availability</a>
+                            <a th:href="@{/blueprint-overview}" th:data-nav-keywords="#{palette.keywords.blueprintOverview}" class="nav-link" th:if="${canSeeBlueprintOverview}" data-testid="nav-blueprint-overview" th:text="#{nav.blueprint_overview}">Blueprint Availability</a>
                         </div>
                     </section>
                     <section class="nav-group" data-group-key="trade" data-nav-icon="swap"
@@ -111,9 +111,9 @@
                             <svg class="krt-icon nav-group-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
                         </button>
                         <div class="nav-group-links" id="nav-group-trade">
-                            <a th:href="@{/materials}" class="nav-link" th:text="#{nav.materials.list}">Material-Liste</a>
+                            <a th:href="@{/materials}" th:data-nav-keywords="#{palette.keywords.materials}" class="nav-link" th:text="#{nav.materials.list}">Material-Liste</a>
                             <a th:href="@{/materials/overview}" class="nav-link" th:text="#{nav.materials.overview}">Material-Übersicht</a>
-                            <a th:href="@{/materials/profit-calculation}" class="nav-link" th:text="#{nav.materials.profit_calculation}">Profitberechnung</a>
+                            <a th:href="@{/materials/profit-calculation}" th:data-nav-keywords="#{palette.keywords.profit}" class="nav-link" th:text="#{nav.materials.profit_calculation}">Profitberechnung</a>
                         </div>
                     </section>
                     <section class="nav-group" data-group-key="supply" data-nav-icon="download"
@@ -125,9 +125,9 @@
                             <svg class="krt-icon nav-group-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
                         </button>
                         <div class="nav-group-links" id="nav-group-supply">
-                            <a th:href="@{/supply/needs}" th:if="${supplyEnabled}" class="nav-link" data-testid="nav-supply-needs" th:text="#{nav.supply.needs}">Bedarf</a>
-                            <a th:href="@{/supply/donations/mine}" th:if="${supplyEnabled}" class="nav-link" data-testid="nav-supply-mine" th:text="#{nav.supply.mine}">Meine Spenden</a>
-                            <a th:href="@{/purchasing/deals}" th:if="${purchasingEnabled}" class="nav-link" data-testid="nav-purchasing-deals" th:text="#{nav.purchasing.deals}">Ankauf</a>
+                            <a th:href="@{/supply/needs}" th:data-nav-keywords="#{palette.keywords.supplyNeeds}" th:if="${supplyEnabled}" class="nav-link" data-testid="nav-supply-needs" th:text="#{nav.supply.needs}">Bedarf</a>
+                            <a th:href="@{/supply/donations/mine}" th:data-nav-keywords="#{palette.keywords.supplyMine}" th:if="${supplyEnabled}" class="nav-link" data-testid="nav-supply-mine" th:text="#{nav.supply.mine}">Meine Spenden</a>
+                            <a th:href="@{/purchasing/deals}" th:data-nav-keywords="#{palette.keywords.purchasing}" th:if="${purchasingEnabled}" class="nav-link" data-testid="nav-purchasing-deals" th:text="#{nav.purchasing.deals}">Ankauf</a>
                         </div>
                     </section>
                     <section class="nav-group" data-group-key="organisation" data-nav-icon="users"
@@ -139,9 +139,9 @@
                             <svg class="krt-icon nav-group-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
                         </button>
                         <div class="nav-group-links" id="nav-group-organisation">
-                            <a th:href="@{/org-chart}" class="nav-link" data-testid="nav-org-chart" th:text="#{nav.orgChart}">Organigramm</a>
+                            <a th:href="@{/org-chart}" th:data-nav-keywords="#{palette.keywords.orgChart}" class="nav-link" data-testid="nav-org-chart" th:text="#{nav.orgChart}">Organigramm</a>
                             <a th:href="@{/organisation/leitung}" class="nav-link" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER)" data-testid="nav-leitung" th:text="#{nav.leitung}">Leitung</a>
-                            <a th:href="@{/org-unit-bank}" class="nav-link" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).MISSION_MANAGER,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).KRT_MEMBER)" data-testid="nav-org-unit-bank" th:text="#{nav.bank.myOrgUnit}">Org-Einheits-Bank</a>
+                            <a th:href="@{/org-unit-bank}" th:data-nav-keywords="#{palette.keywords.bank}" class="nav-link" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).MISSION_MANAGER,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).KRT_MEMBER)" data-testid="nav-org-unit-bank" th:text="#{nav.bank.myOrgUnit}">Org-Einheits-Bank</a>
                         </div>
                     </section>
                     <section class="nav-group" data-group-key="promotion" data-nav-icon="user-plus"
@@ -153,7 +153,7 @@
                             <svg class="krt-icon nav-group-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
                         </button>
                         <div class="nav-group-links" id="nav-group-promotion">
-                            <a th:href="@{/promotion/overview}" class="nav-link" th:text="#{nav.promotion.overview}">Beförderungssystem</a>
+                            <a th:href="@{/promotion/overview}" th:data-nav-keywords="#{palette.keywords.promotion}" class="nav-link" th:text="#{nav.promotion.overview}">Beförderungssystem</a>
                             <a th:href="@{/promotion/my-evaluations}" class="nav-link" th:text="#{nav.promotion.my_evaluations}">Meine Bewertungen</a>
                             <a th:href="@{/promotion/manage}" class="nav-link" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER)" th:text="#{nav.promotion.manage}">Bewertungsverwaltung</a>
                             <a th:href="@{/promotion/admin/topics}" class="nav-link" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER)" th:text="#{nav.promotion.admin_topics}">Themenbereiche</a>
@@ -170,10 +170,10 @@
                             <svg class="krt-icon nav-group-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
                         </button>
                         <div class="nav-group-links" id="nav-group-bank">
-                            <a th:href="@{/bank}" class="nav-link" data-testid="nav-bank" th:text="#{nav.bank.dashboard}">Bank-Dashboard</a>
+                            <a th:href="@{/bank}" th:data-nav-keywords="#{palette.keywords.bank}" class="nav-link" data-testid="nav-bank" th:text="#{nav.bank.dashboard}">Bank-Dashboard</a>
                             <a th:href="@{/bank/manage}" class="nav-link" data-testid="nav-bank-manage" th:text="#{nav.bank.manage}">Bankverwaltung</a>
                             <a th:href="@{/bank/grants}" class="nav-link" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).BANK_MANAGEMENT)" data-testid="nav-bank-grants" th:text="#{nav.bank.grants}">Berechtigungen</a>
-                            <a th:href="@{/bank/requests}" class="nav-link" data-testid="nav-bank-requests" th:text="#{nav.bank.requests}">Anträge</a>
+                            <a th:href="@{/bank/requests}" th:data-nav-keywords="#{palette.keywords.bankRequests}" class="nav-link" data-testid="nav-bank-requests" th:text="#{nav.bank.requests}">Anträge</a>
                         </div>
                     </section>
                     <section class="nav-group" data-group-key="resources" data-nav-icon="external-link"
@@ -185,7 +185,7 @@
                             <svg class="krt-icon nav-group-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
                         </button>
                         <div class="nav-group-links" id="nav-group-resources">
-                            <a th:href="@{/sc-links}" class="nav-link" data-testid="nav-sc-links" th:text="#{nav.scLinks}">Star-Citizen-Links</a>
+                            <a th:href="@{/sc-links}" th:data-nav-keywords="#{palette.keywords.scLinks}" class="nav-link" data-testid="nav-sc-links" th:text="#{nav.scLinks}">Star-Citizen-Links</a>
                         </div>
                     </section>
                     <section class="nav-group nav-group-filter-only" data-group-key="personal" data-nav-icon="user"
@@ -197,10 +197,10 @@
                             <svg class="krt-icon nav-group-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
                         </button>
                         <div class="nav-group-links" id="nav-group-personal">
-                            <a th:href="@{/personal-inventory}" class="nav-link" data-nav-skip th:text="#{nav.personal.items}">Mein Inventar</a>
-                            <a th:href="@{/personal-inventory/blueprints}" class="nav-link" data-nav-skip th:text="#{nav.personal.blueprints}">Meine Blueprints</a>
-                            <a th:href="@{/profile}" class="nav-link" data-nav-skip th:text="#{nav.profile}">Profile</a>
-                            <a th:href="@{/connected-apps}" class="nav-link" data-nav-skip th:text="#{nav.personal.connectedApps}">Verbundene Anwendungen</a>
+                            <a th:href="@{/personal-inventory}" th:data-nav-keywords="#{palette.keywords.personalItems}" class="nav-link" data-nav-skip th:text="#{nav.personal.items}">Mein Inventar</a>
+                            <a th:href="@{/personal-inventory/blueprints}" th:data-nav-keywords="#{palette.keywords.personalBlueprints}" class="nav-link" data-nav-skip th:text="#{nav.personal.blueprints}">Meine Blueprints</a>
+                            <a th:href="@{/profile}" th:data-nav-keywords="#{palette.keywords.profile}" class="nav-link" data-nav-skip th:text="#{nav.profile}">Profile</a>
+                            <a th:href="@{/connected-apps}" th:data-nav-keywords="#{palette.keywords.connectedApps}" class="nav-link" data-nav-skip th:text="#{nav.personal.connectedApps}">Verbundene Anwendungen</a>
                         </div>
                     </section>
                 </div>
@@ -215,7 +215,7 @@
                             <svg class="krt-icon nav-group-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
                         </button>
                         <div class="nav-group-links" id="nav-group-admin-members">
-                            <a th:href="@{/members}" class="nav-link" th:text="#{nav.members}">Mitgliederverwaltung</a>
+                            <a th:href="@{/members}" th:data-nav-keywords="#{palette.keywords.members}" class="nav-link" th:text="#{nav.members}">Mitgliederverwaltung</a>
                             <a th:href="@{/admin/special-commands}" class="nav-link" th:text="#{nav.admin.specialcommands}">Spezialkommandos</a>
                             <a th:href="@{/admin/org-structure}" class="nav-link" data-testid="nav-admin-org-structure" th:text="#{nav.admin.orgStructure}">Organisationsstruktur</a>
                             <a th:href="@{/admin/announcement}" class="nav-link" th:text="#{info.title}">Informationen</a>
@@ -264,8 +264,8 @@
                             <svg class="krt-icon nav-group-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
                         </button>
                         <div class="nav-group-links" id="nav-group-admin-system">
-                            <a th:href="@{/admin/audit-log}" class="nav-link" data-testid="nav-admin-audit-log" th:text="#{nav.admin.auditLog}">Audit-Logs</a>
-                            <a th:href="@{/admin/settings}" class="nav-link" th:text="#{nav.admin.settings}">Systemeinstellungen</a>
+                            <a th:href="@{/admin/audit-log}" th:data-nav-keywords="#{palette.keywords.auditLog}" class="nav-link" data-testid="nav-admin-audit-log" th:text="#{nav.admin.auditLog}">Audit-Logs</a>
+                            <a th:href="@{/admin/settings}" th:data-nav-keywords="#{palette.keywords.settings}" class="nav-link" th:text="#{nav.admin.settings}">Systemeinstellungen</a>
                             <a th:href="@{/admin/exchange-clients}" class="nav-link" data-testid="nav-admin-exchange-clients" th:text="#{nav.admin.exchangeClients}">Verbundene Anwendungen</a>
                             <a th:href="@{/admin/supply}" class="nav-link" data-testid="nav-admin-supply" th:text="#{nav.admin.supply}">Bedarf &amp; Spenden</a>
                             <a th:href="@{/admin/purchasing}" class="nav-link" data-testid="nav-admin-purchasing" th:text="#{nav.admin.purchasing}">Ankauf</a>
@@ -318,10 +318,10 @@
             <div class="nav-personal" id="nav-personal" hidden sec:authorize="isAuthenticated()"
                  th:data-nav-group="#{nav.section.personal}" data-nav-icon="user">
                 <span class="nav-personal-title" th:text="#{nav.section.personal}">Persönlich</span>
-                <a th:href="@{/personal-inventory}" class="nav-link" th:text="#{nav.personal.items}">Mein Inventar</a>
-                <a th:href="@{/personal-inventory/blueprints}" class="nav-link" th:text="#{nav.personal.blueprints}">Meine Blueprints</a>
-                <a th:href="@{/profile}" class="nav-link" th:text="#{nav.profile}">Profile</a>
-                <a th:href="@{/connected-apps}" class="nav-link" data-testid="nav-connected-apps" th:text="#{nav.personal.connectedApps}">Verbundene Anwendungen</a>
+                <a th:href="@{/personal-inventory}" th:data-nav-keywords="#{palette.keywords.personalItems}" class="nav-link" th:text="#{nav.personal.items}">Mein Inventar</a>
+                <a th:href="@{/personal-inventory/blueprints}" th:data-nav-keywords="#{palette.keywords.personalBlueprints}" class="nav-link" th:text="#{nav.personal.blueprints}">Meine Blueprints</a>
+                <a th:href="@{/profile}" th:data-nav-keywords="#{palette.keywords.profile}" class="nav-link" th:text="#{nav.profile}">Profile</a>
+                <a th:href="@{/connected-apps}" th:data-nav-keywords="#{palette.keywords.connectedApps}" class="nav-link" data-testid="nav-connected-apps" th:text="#{nav.personal.connectedApps}">Verbundene Anwendungen</a>
             </div>
             <div class="nav-user-row">
                 <button type="button" class="nav-user-toggle" data-testid="nav-user-toggle"

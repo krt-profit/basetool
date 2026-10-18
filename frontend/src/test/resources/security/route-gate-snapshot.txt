@@ -562,6 +562,7 @@
 /purchasing/delegates GET -> PurchasingPageController#delegates gate=class:isAuthenticated() layout=yes
 /purchasing/partners GET -> PurchasingPageController#partners gate=class:isAuthenticated() layout=yes
 /purchasing/report GET -> PurchasingPageController#report gate=class:isAuthenticated() layout=yes
+/quick-access/entries GET headers=[X-Requested-With=XMLHttpRequest] -> QuickAccessController#entries gate=class:isAuthenticated() layout=no
 /refinery-orders GET -> RefineryOrderPageController#viewOrders gate=method:isAuthenticated() layout=yes
 /refinery-orders/create GET -> RefineryOrderPageController#viewCreateForm gate=method:isAuthenticated() layout=yes
 /refinery-orders/create POST -> RefineryOrderWriteController#createOrder gate=method:isAuthenticated() layout=yes

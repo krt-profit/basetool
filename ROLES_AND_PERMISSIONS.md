@@ -1211,7 +1211,12 @@ the public surface (REQ-FE-025, `RouteGateSnapshotTest`, whose committed snapsho
 gate). The table names the **frontend** gate of each screen and how the
 navigation (`kernel/fragments/sidebar.html`) shows it; what the screen then *contains* is decided by the
 backend gates of §3. The quick access (`Ctrl`/`⌘` + `K`, REQ-UI-026) reads its pages from that
-rendered menu, so it offers exactly the screens the „Navigation“ column grants and nothing more. Page controllers live under `frontend/.../<domain>/web/`.
+rendered menu, so it offers exactly the screens the „Navigation“ column grants and nothing more. It
+adds the tabs a screen shows under the same condition: „Mein Lager“, „Globales Lager“ and the
+hangar's „Org-Einheit“ tab for every member, the sync-report tabs for `ADMIN`, and — read on demand
+from `GET /quick-access/entries` (`isAuthenticated()`, ADR-0282) — the supply and purchasing tabs
+for the members those pages show them to. Its actions follow the same buttons: „Ins globale Lager
+einbuchen“ only for `LOGISTICIAN`, „Administration öffnen“ only for `ADMIN`. Page controllers live under `frontend/.../<domain>/web/`.
 
 | Screen (route)                                                                                                                       | Frontend gate                                                           | Navigation                                                                     |
 |:-------------------------------------------------------------------------------------------------------------------------------------|:------------------------------------------------------------------------|:-------------------------------------------------------------------------------|
