@@ -40,9 +40,10 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>The list-side half of the rule is {@link JobOrderScope#PREDICATE}; both widen together.
  *
- * <p>Invoked from SpEL as {@code @jobOrderAccessPolicy}. Unknown ids are refused. The queue
- * capability itself ({@code canViewJobOrders}) stays with the scope kernel, which the identity and
- * exchange modules ask too. Read-only transactional.
+ * <p>{@link JobOrderEditor} asks {@link #canEdit} on the loaded order; the remaining endpoints
+ * invoke the id-based gates from SpEL as {@code @jobOrderAccessPolicy}. Unknown ids are refused.
+ * The queue capability itself ({@code canViewJobOrders}) stays with the scope kernel, which the
+ * identity and exchange modules ask too. Read-only transactional.
  */
 @Service(JobOrderAccessPolicy.BEAN_NAME)
 @RequiredArgsConstructor
@@ -129,6 +130,20 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy {
   }
 
   /**
+   * Decides whether the caller passes {@code gate} on the already-loaded order.
+   *
+   * @param order the loaded order the edit targets
+   * @param gate the access the edit demands
+   * @return {@code true} iff the caller passes the gate
+   */
+  public boolean canEdit(@NotNull JobOrder order, @NotNull JobOrderGate gate) {
+    return switch (gate) {
+      case EDIT -> canEditJobOrderRow(order);
+      case REQUESTER -> isOrderRequesterRow(order) && !orderHasAnyDelivery(order.getId());
+    };
+  }
+
+  /**
    * Checks whether the caller may read job order {@code jobOrderId} as a member of the org unit
    * that placed it (REQ-ORDERS-023), independent of the profit eligibility.
    *
@@ -149,7 +164,7 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy {
   public boolean canEditJobOrderAsRequester(@NotNull UUID jobOrderId) {
     return jobOrderRepository
         .findById(jobOrderId)
-        .map(o -> isOrderRequesterRow(o) && !orderHasAnyDelivery(o.getId()))
+        .map(o -> canEdit(o, JobOrderGate.REQUESTER))
         .orElse(false);
   }
 

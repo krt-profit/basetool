@@ -53,9 +53,9 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.AddMissionStepRequ
 import de.greluc.krt.profit.basetool.backend.mission.internal.AddUnitRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.JoinMissionRequest;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionPeerRedactor;
-import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionStructureService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionTimelineService;
@@ -123,7 +123,7 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>Section patches ({@code /core}, {@code /schedule}, {@code /flags}) are versioned
  * independently, and {@code .../slim} endpoints return only the affected sub-DTO. Responses for
  * callers below Logistician pass through {@link MissionPeerRedactor#cleanupMissionForPeer}
- * (REQ-SEC-007); authorisation is delegated to {@link MissionSecurityService}.
+ * (REQ-SEC-007); authorisation is delegated to {@link MissionAccessPolicy}.
  */
 @RestController
 @RequestMapping("/api/v1/missions")
@@ -141,7 +141,7 @@ public class MissionController {
   private final MissionMapper missionMapper;
   private final UserMapper userMapper;
   private final ShipMapper shipMapper;
-  private final MissionSecurityService missionSecurityService;
+  private final MissionAccessPolicy missionAccessPolicy;
   private final AuthHelperService authHelperService;
   private final MissionPeerRedactor missionPeerRedactor;
   private final ParticipantTargetResolver participantTargetResolver;
@@ -261,7 +261,7 @@ public class MissionController {
    * @return the persisted parent DTO with the new sub-mission attached
    */
   @PostMapping("/{id}/sub-missions")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @PreAuthorize("@missionAccessPolicy.canManageMission(#id, authentication)")
   @Operation(summary = "Create a sub-mission")
   public MissionDto createSubMission(
       @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull CreateMissionRequest request) {
@@ -277,7 +277,7 @@ public class MissionController {
    * @return the persisted DTO
    */
   @PatchMapping("/{id}/core")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @PreAuthorize("@missionAccessPolicy.canManageMission(#id, authentication)")
   @Operation(
       summary = "Patch mission core section",
       description =
@@ -309,7 +309,7 @@ public class MissionController {
    * @return the persisted DTO
    */
   @PatchMapping("/{id}/schedule")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @PreAuthorize("@missionAccessPolicy.canManageMission(#id, authentication)")
   @Operation(
       summary = "Patch mission schedule section",
       description =
@@ -339,7 +339,7 @@ public class MissionController {
    * @return the persisted DTO
    */
   @PatchMapping("/{id}/flags")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @PreAuthorize("@missionAccessPolicy.canManageMission(#id, authentication)")
   @Operation(
       summary = "Patch mission flags section",
       description = "Patches only the flags section (e.g. isInternal) of a mission.")
@@ -385,9 +385,7 @@ public class MissionController {
               + " desired job type and the payout preference; omitting it (or either field) keeps"
               + " the pre-2026-09-02 behaviour, including the profile-default payout chain of"
               + " REQ-MISSION-002.")
-  @PreAuthorize(
-      "isAuthenticated() and @authHelperService.isMemberOrAbove()"
-          + " and @missionAccessPolicy.canSeeMission(#id)")
+  @PreAuthorize("isAuthenticated() and @authHelperService.isMemberOrAbove()")
   public MissionDto joinMission(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
@@ -414,7 +412,7 @@ public class MissionController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}/owner")
-  @PreAuthorize("@missionSecurityService.canChangeOwner(#id, authentication)")
+  @PreAuthorize("@missionAccessPolicy.canChangeOwner(#id, authentication)")
   @Operation(
       summary = "Change the owner of a mission (version-checked)",
       description =
@@ -452,7 +450,7 @@ public class MissionController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}/owning-org-unit")
-  @PreAuthorize("@missionSecurityService.canChangeOwner(#id, authentication)")
+  @PreAuthorize("@missionAccessPolicy.canChangeOwner(#id, authentication)")
   @Operation(
       summary = "Reassign the owning org unit of a mission (version-checked)",
       description =
@@ -493,7 +491,7 @@ public class MissionController {
    * @return the updated mission DTO
    */
   @PutMapping("/{id}/party-lead")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @PreAuthorize("isAuthenticated()")
   @Operation(
       summary = "Set or clear the party lead of a mission",
       description =
@@ -571,7 +569,7 @@ public class MissionController {
    * @return the updated unit list
    */
   @PostMapping("/{id}/units")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @PreAuthorize("isAuthenticated()")
   @Operation(
       summary = "Add a unit to a mission (slim response)",
       description =
@@ -603,7 +601,7 @@ public class MissionController {
    * @return the updated unit DTO
    */
   @PutMapping("/{id}/units/{unitId}")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @PreAuthorize("isAuthenticated()")
   @Operation(
       summary = "Update a mission unit (slim response)",
       description = "Updates a unit and returns only the updated unit as a slim DTO.")
@@ -634,7 +632,7 @@ public class MissionController {
    * @return 204 No Content
    */
   @DeleteMapping("/{id}/units/{unitId}")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @PreAuthorize("isAuthenticated()")
   @Operation(
       summary = "Delete a mission unit (slim response)",
       description = "Deletes a unit and returns 204 No Content.")
@@ -653,7 +651,7 @@ public class MissionController {
    * @return the mission's ordered Ablauf steps after the add
    */
   @PostMapping("/{id}/steps")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @PreAuthorize("isAuthenticated()")
   @Operation(
       summary = "Add an Ablauf step to a mission (slim response)",
       description =
@@ -675,7 +673,7 @@ public class MissionController {
    * @return the mission's ordered Ablauf steps after the edit
    */
   @PutMapping("/{id}/steps/{stepId}")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @PreAuthorize("isAuthenticated()")
   @Operation(
       summary = "Update an Ablauf step (slim response)",
       description = "Edits a step's title / time-place hint and returns the ordered step list.")
@@ -698,7 +696,7 @@ public class MissionController {
    * @return the mission's ordered Ablauf steps after the removal
    */
   @DeleteMapping("/{id}/steps/{stepId}")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @PreAuthorize("isAuthenticated()")
   @Operation(
       summary = "Delete an Ablauf step (slim response)",
       description = "Removes a step, re-packs the order, and returns the ordered step list.")
@@ -718,7 +716,7 @@ public class MissionController {
    * @return the mission's ordered Ablauf steps after the reorder
    */
   @PutMapping("/{id}/steps/reorder")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @PreAuthorize("isAuthenticated()")
   @Operation(
       summary = "Reorder a mission's Ablauf steps (slim response)",
       description = "Reorders the procedure timeline and returns the ordered step list.")
@@ -739,7 +737,7 @@ public class MissionController {
    * @return the mission's ordered Ablauf steps after the toggle
    */
   @PatchMapping("/{id}/steps/{stepId}/done")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @PreAuthorize("isAuthenticated()")
   @Operation(
       summary = "Toggle an Ablauf step's done flag (slim response)",
       description = "Sets a step's shared done flag and returns the ordered step list.")
@@ -771,7 +769,7 @@ public class MissionController {
    * @return the mission's ordered goals after the add
    */
   @PostMapping("/{id}/objectives")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @PreAuthorize("isAuthenticated()")
   @Operation(
       summary = "Add a goal (Ziel) to a mission (slim response)",
       description =
@@ -794,7 +792,7 @@ public class MissionController {
    * @return the mission's ordered goals after the edit
    */
   @PutMapping("/{id}/objectives/{objectiveId}")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @PreAuthorize("isAuthenticated()")
   @Operation(
       summary = "Update a mission goal (slim response)",
       description = "Edits a goal's text / classification and returns the ordered goal list.")
@@ -817,7 +815,7 @@ public class MissionController {
    * @return the mission's ordered goals after the removal
    */
   @DeleteMapping("/{id}/objectives/{objectiveId}")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @PreAuthorize("isAuthenticated()")
   @Operation(
       summary = "Delete a mission goal (slim response)",
       description = "Removes a goal, re-packs the order, and returns the ordered goal list.")
@@ -837,7 +835,7 @@ public class MissionController {
    * @return the mission's ordered goals after the reorder
    */
   @PutMapping("/{id}/objectives/reorder")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @PreAuthorize("isAuthenticated()")
   @Operation(
       summary = "Reorder a mission's goals (slim response)",
       description = "Reorders the goal list and returns the ordered goal list.")
@@ -866,7 +864,7 @@ public class MissionController {
    * @return the candidate ships for this mission's unit ship pickers
    */
   @GetMapping("/{id}/unit-ship-options")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @PreAuthorize("@missionAccessPolicy.canManageMission(#id, authentication)")
   @Transactional(readOnly = true)
   @Operation(
       summary = "List selectable ships for a mission's units",
@@ -890,7 +888,7 @@ public class MissionController {
    * @return the updated crew list of the unit
    */
   @PostMapping("/{id}/units/{missionUnitId}/crew")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @PreAuthorize("isAuthenticated()")
   @Operation(
       summary = "Add crew to a mission unit (slim response)",
       description =
@@ -917,7 +915,7 @@ public class MissionController {
    * @return the updated crew DTO
    */
   @PutMapping("/{id}/units/{missionUnitId}/crew/{crewId}")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @PreAuthorize("isAuthenticated()")
   @Operation(
       summary = "Update crew in a mission unit (slim response)",
       description = "Updates a crew member and returns only the updated crew entry as a slim DTO.")
@@ -943,7 +941,7 @@ public class MissionController {
    * @return 204 No Content
    */
   @DeleteMapping("/{id}/units/{missionUnitId}/crew/{crewId}")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @PreAuthorize("isAuthenticated()")
   @Operation(
       summary = "Remove crew from a mission unit (slim response)",
       description = "Removes a crew member and returns 204 No Content.")
@@ -964,10 +962,7 @@ public class MissionController {
    * @return the updated participant DTO
    */
   @PutMapping("/{id}/participants/{participantId}")
-  @PreAuthorize(
-      "isAuthenticated() and @authHelperService.isMemberOrAbove()"
-          + " and @missionSecurityService.canAccessParticipant(#id, #participantId,"
-          + " authentication)")
+  @PreAuthorize("isAuthenticated() and @authHelperService.isMemberOrAbove()")
   @Operation(
       summary = "Update a participant (slim response)",
       description = "Updates a participant and returns only the updated participant as a slim DTO.")
@@ -1001,10 +996,7 @@ public class MissionController {
    * @return the updated participant DTO, redacted below Logistician (REQ-SEC-007)
    */
   @PostMapping("/{id}/participants/{participantId}/check-in")
-  @PreAuthorize(
-      "isAuthenticated() and @authHelperService.isMemberOrAbove()"
-          + " and @missionSecurityService.canAccessParticipant(#id, #participantId,"
-          + " authentication)")
+  @PreAuthorize("isAuthenticated() and @authHelperService.isMemberOrAbove()")
   @Operation(
       summary = "Check in a participant (slim response)",
       description =
@@ -1023,10 +1015,7 @@ public class MissionController {
    * @return the updated participant DTO, redacted below Logistician (REQ-SEC-007)
    */
   @PostMapping("/{id}/participants/{participantId}/check-out")
-  @PreAuthorize(
-      "isAuthenticated() and @authHelperService.isMemberOrAbove()"
-          + " and @missionSecurityService.canAccessParticipant(#id, #participantId,"
-          + " authentication)")
+  @PreAuthorize("isAuthenticated() and @authHelperService.isMemberOrAbove()")
   @Operation(
       summary = "Check out a participant (slim response)",
       description =
@@ -1046,10 +1035,7 @@ public class MissionController {
    * @return the updated participant DTO, redacted below Logistician (REQ-SEC-007)
    */
   @PutMapping("/{id}/participants/{participantId}/payout-preference")
-  @PreAuthorize(
-      "isAuthenticated() and @authHelperService.isMemberOrAbove()"
-          + " and @missionSecurityService.canAccessParticipant(#id, #participantId,"
-          + " authentication)")
+  @PreAuthorize("isAuthenticated() and @authHelperService.isMemberOrAbove()")
   @Operation(
       summary = "Update payout preference for a participant (slim response)",
       description =
@@ -1081,9 +1067,7 @@ public class MissionController {
               + " guestName (case-insensitive resolution against registered users). Callers may"
               + " always add themselves; adding anyone else is restricted to"
               + " managers/officers/admins.")
-  @PreAuthorize(
-      "isAuthenticated() and @authHelperService.isMemberOrAbove()"
-          + " and @missionAccessPolicy.canSeeMission(#id)")
+  @PreAuthorize("isAuthenticated() and @authHelperService.isMemberOrAbove()")
   public List<MissionParticipantDto> addParticipantSlim(
       @PathVariable @NotNull UUID id,
       @RequestBody @Valid @NotNull AddExternalParticipantRequest request,
@@ -1111,10 +1095,7 @@ public class MissionController {
    * @return 204 No Content
    */
   @DeleteMapping("/{id}/participants/{participantId}")
-  @PreAuthorize(
-      "isAuthenticated() and @authHelperService.isMemberOrAbove()"
-          + " and @missionSecurityService.canAccessParticipant(#id, #participantId,"
-          + " authentication)")
+  @PreAuthorize("isAuthenticated() and @authHelperService.isMemberOrAbove()")
   @Operation(
       summary = "Remove a participant (slim response)",
       description = "Removes a participant and returns 204 No Content.")
@@ -1134,7 +1115,7 @@ public class MissionController {
    * @return unassigned participant DTOs
    */
   @GetMapping("/{id}/participants/unassigned")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @PreAuthorize("@missionAccessPolicy.canManageMission(#id, authentication)")
   @Operation(
       summary = "Get unassigned participants",
       description =
@@ -1154,7 +1135,7 @@ public class MissionController {
    * @return the updated frequency list
    */
   @PostMapping("/{id}/frequencies")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @PreAuthorize("@missionAccessPolicy.canManageMission(#id, authentication)")
   @Operation(
       summary = "Add or update a frequency for a mission (slim response)",
       description =
@@ -1174,7 +1155,7 @@ public class MissionController {
    * @return 204 No Content
    */
   @DeleteMapping("/{id}/frequencies/{frequencyId}")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @PreAuthorize("@missionAccessPolicy.canManageMission(#id, authentication)")
   @Operation(
       summary = "Remove a frequency from a mission (slim response)",
       description = "Removes a frequency and returns 204 No Content.")
@@ -1192,7 +1173,7 @@ public class MissionController {
    * @return the updated frequency list
    */
   @PostMapping("/{id}/frequencies/custom")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @PreAuthorize("@missionAccessPolicy.canManageMission(#id, authentication)")
   @Operation(
       summary = "Add a custom (mission-specific) frequency (slim response)",
       description =
@@ -1214,7 +1195,7 @@ public class MissionController {
    * @return the updated frequency list
    */
   @PutMapping("/{id}/frequencies/custom/{frequencyId}")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @PreAuthorize("@missionAccessPolicy.canManageMission(#id, authentication)")
   @Operation(
       summary = "Update a custom (mission-specific) frequency (slim response)",
       description =
@@ -1239,7 +1220,7 @@ public class MissionController {
    * @return the updated manager list
    */
   @PostMapping("/{id}/managers/{userId}")
-  @PreAuthorize("@missionSecurityService.canManageManagers(#id, authentication)")
+  @PreAuthorize("isAuthenticated()")
   @Operation(
       summary = "Add a manager to a mission (slim response)",
       description = "Adds a manager and returns the updated manager list as UserReferenceDto.")
@@ -1257,7 +1238,7 @@ public class MissionController {
    * @return 204 No Content
    */
   @DeleteMapping("/{id}/managers/{userId}")
-  @PreAuthorize("@missionSecurityService.canManageManagers(#id, authentication)")
+  @PreAuthorize("isAuthenticated()")
   @Operation(
       summary = "Remove a manager from a mission (slim response)",
       description = "Removes a manager and returns 204 No Content.")
@@ -1300,7 +1281,7 @@ public class MissionController {
 
     if (target.userId() != null
         && (callerId == null || !target.userId().equals(callerId))
-        && !missionSecurityService.canManageMission(id, authentication)) {
+        && !missionAccessPolicy.canManageMission(id, authentication)) {
       throw new AccessDeniedException("Only mission managers may add other users as participants.");
     }
     return target;

@@ -30,7 +30,8 @@ import org.jetbrains.annotations.Unmodifiable;
  *
  * @param items the lots on this page
  * @param removed the tombstones on this page; always empty on a snapshot page
- * @param units the units whose pools the member reads; a unit not listed is gone with its lots
+ * @param units the units whose pools the member reads, each telling whether the member is a
+ *     Logistician of it; a unit not listed is gone with its lots
  * @param nextCursor the next snapshot page, after the last snapshot page the feed position the
  *     snapshot was taken at, or the next feed position
  * @param hasMore whether a further page is ready now
@@ -38,6 +39,6 @@ import org.jetbrains.annotations.Unmodifiable;
 public record ExchangeOrgStockPageDto(
     @NotNull @Unmodifiable List<ExchangeOrgStockLotDto> items,
     @NotNull @Unmodifiable List<ExchangeTombstoneDto> removed,
-    @NotNull @Unmodifiable List<ExchangeOrgUnitDto> units,
+    @NotNull @Unmodifiable List<ExchangeOrgStockPoolDto> units,
     @Nullable String nextCursor,
     boolean hasMore) {}

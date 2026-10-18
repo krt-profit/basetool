@@ -38,6 +38,7 @@ import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -58,8 +59,8 @@ class MissionControllerSecurityTest {
   @MockitoBean private MissionStructureService missionStructureService;
 
   @MockitoBean
-  private de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService
-      missionSecurityService;
+  private de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy
+      missionAccessPolicy;
 
   @BeforeEach
   void setUp() {
@@ -72,7 +73,7 @@ class MissionControllerSecurityTest {
     UUID unitId = UUID.randomUUID();
     UUID crewId = UUID.randomUUID();
 
-    when(missionSecurityService.canManageMission(any(UUID.class), ArgumentMatchers.any()))
+    when(missionAccessPolicy.canManageMission(any(UUID.class), ArgumentMatchers.any()))
         .thenReturn(true);
     de.greluc.krt.profit.basetool.backend.mission.api.MissionCrew crew =
         new de.greluc.krt.profit.basetool.backend.mission.api.MissionCrew();
@@ -108,6 +109,9 @@ class MissionControllerSecurityTest {
     UUID unitId = UUID.randomUUID();
     UUID crewId = UUID.randomUUID();
 
+    when(missionStructureService.updateCrewInShip(any(), any(), any(), any(), any()))
+        .thenThrow(new AccessDeniedException("Caller may not edit mission " + missionId));
+
     mockMvc
         .perform(
             put("/api/v1/missions/{id}/units/{unitId}/crew/{crewId}", missionId, unitId, crewId)
@@ -131,6 +135,9 @@ class MissionControllerSecurityTest {
     UUID unitId = UUID.randomUUID();
     UUID crewId = UUID.randomUUID();
 
+    when(missionStructureService.updateCrewInShip(any(), any(), any(), any(), any()))
+        .thenThrow(new AccessDeniedException("Caller may not edit mission " + missionId));
+
     mockMvc
         .perform(
             put("/api/v1/missions/{id}/units/{unitId}/crew/{crewId}", missionId, unitId, crewId)
@@ -144,7 +151,7 @@ class MissionControllerSecurityTest {
   void updateOwningOrgUnit_WhenCanChangeOwner_ShouldReturn200() throws Exception {
     UUID missionId = UUID.randomUUID();
 
-    when(missionSecurityService.canChangeOwner(any(UUID.class), any())).thenReturn(true);
+    when(missionAccessPolicy.canChangeOwner(any(UUID.class), any())).thenReturn(true);
     when(missionService.updateOwningOrgUnit(any(), any(), any())).thenReturn(new Mission());
 
     mockMvc
@@ -174,7 +181,6 @@ class MissionControllerSecurityTest {
     UUID missionId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
 
-    when(missionSecurityService.canManageManagers(any(UUID.class), any())).thenReturn(true);
     when(missionParticipantService.addManager(any(), any())).thenReturn(new Mission());
 
     mockMvc
@@ -186,11 +192,12 @@ class MissionControllerSecurityTest {
   }
 
   @Test
-  void addManager_WithoutPermission_ShouldReturn403() throws Exception {
+  void addManager_WhenTheEditModuleRefuses_ShouldReturn403() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
 
-    when(missionSecurityService.canManageManagers(any(UUID.class), any())).thenReturn(false);
+    when(missionParticipantService.addManager(any(), any()))
+        .thenThrow(new AccessDeniedException("Caller may not edit mission " + missionId));
 
     mockMvc
         .perform(

@@ -52,7 +52,7 @@ import org.springframework.transaction.annotation.Transactional;
  * CRUD and aggregation for mission finance entries (income and expense rows of a participant).
  * Totals include the profit of refinery orders linked to the mission.
  *
- * <p>Update and delete are gated by {@link MissionSecurityService#canEditFinanceEntry}.
+ * <p>Update and delete are gated by {@link MissionAccessPolicy#canEditFinanceEntry}.
  */
 @Slf4j
 @Service
@@ -184,7 +184,7 @@ public class MissionFinanceEntryService {
    * @throws BusinessConflictException when the supplied version no longer matches
    */
   @Transactional
-  @PreAuthorize("@missionSecurityService.canEditFinanceEntry(#entryId, authentication)")
+  @PreAuthorize("@missionAccessPolicy.canEditFinanceEntry(#entryId, authentication)")
   public MissionFinanceEntryDto updateEntry(
       UUID missionId, UUID entryId, MissionFinanceEntryUpdateDto dto) {
     MissionFinanceEntry entry = requireEntryOf(missionId, entryId);
@@ -216,7 +216,7 @@ public class MissionFinanceEntryService {
    * @throws NotFoundException when the entry does not exist or belongs to another mission
    */
   @Transactional
-  @PreAuthorize("@missionSecurityService.canEditFinanceEntry(#entryId, authentication)")
+  @PreAuthorize("@missionAccessPolicy.canEditFinanceEntry(#entryId, authentication)")
   public void deleteEntry(UUID missionId, UUID entryId) {
     MissionFinanceEntry entry = requireEntryOf(missionId, entryId);
 

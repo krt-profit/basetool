@@ -39,7 +39,6 @@ import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -105,7 +104,7 @@ public class JobOrderAssigneeService {
     auditRecorder.record(
         AuditEventType.JOB_ORDER_ASSIGNEE_ADDED,
         saved.getId(),
-        orderLabel(saved),
+        JobOrderAuditLabel.of(saved),
         userId,
         AuditDetails.of("assignee", userId));
     return jobOrderStockProjectionService.mapToDtoWithStock(saved);
@@ -134,7 +133,7 @@ public class JobOrderAssigneeService {
       auditRecorder.record(
           AuditEventType.JOB_ORDER_ASSIGNEE_REMOVED,
           saved.getId(),
-          orderLabel(saved),
+          JobOrderAuditLabel.of(saved),
           userId,
           AuditDetails.of("assignee", userId));
     }
@@ -206,31 +205,17 @@ public class JobOrderAssigneeService {
       auditRecorder.record(
           AuditEventType.JOB_ORDER_ASSIGNEE_NOTE_SET,
           saved.getId(),
-          orderLabel(saved),
+          JobOrderAuditLabel.of(saved),
           userId,
           AuditDetails.of("assignee", userId).with("noteLength", trimmed.length()));
     } else {
       auditRecorder.record(
           AuditEventType.JOB_ORDER_ASSIGNEE_NOTE_CLEARED,
           saved.getId(),
-          orderLabel(saved),
+          JobOrderAuditLabel.of(saved),
           userId,
           AuditDetails.of("assignee", userId));
     }
     return jobOrderStockProjectionService.mapToDtoWithStock(saved);
-  }
-
-  /**
-   * Composes the audit subject label {@code #<displayId> '<handle>'} for a job order
-   * (REQ-AUDIT-001).
-   *
-   * <p>The handle names a person (the order's contact), so the label is treated as personal data
-   * and excluded from the data-subject export (REQ-SEC-058).
-   *
-   * @param jobOrder the order
-   * @return the {@code #<displayId> '<handle>'} label
-   */
-  private static String orderLabel(@NotNull JobOrder jobOrder) {
-    return JobOrderAuditLabel.of(jobOrder.getDisplayId());
   }
 }

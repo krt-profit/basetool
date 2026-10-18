@@ -27,14 +27,14 @@ import org.springframework.stereotype.Service;
 
 /**
  * Implements {@link MissionViewerAccess} for the mission mapper by resolving the caller's
- * authentication and delegating to {@link MissionSecurityService} (ADR-0047).
+ * authentication and delegating to {@link MissionAccessPolicy} (ADR-0047).
  */
 @Service
 @RequiredArgsConstructor
 public class MissionViewerAccessService implements MissionViewerAccess {
 
   private final AuthHelperService authHelperService;
-  private final MissionSecurityService missionSecurityService;
+  private final MissionAccessPolicy missionAccessPolicy;
 
   /**
    * Delegates to {@link AuthHelperService#isAuthenticated()}.
@@ -58,7 +58,7 @@ public class MissionViewerAccessService implements MissionViewerAccess {
   }
 
   /**
-   * Delegates to {@link MissionSecurityService#canManageMission(UUID,
+   * Delegates to {@link MissionAccessPolicy#canManageMission(UUID,
    * org.springframework.security.core.Authentication)} with the caller's authentication.
    *
    * @param missionId the mission to check; never {@code null}.
@@ -66,20 +66,18 @@ public class MissionViewerAccessService implements MissionViewerAccess {
    */
   @Override
   public boolean canManageMission(UUID missionId) {
-    return missionSecurityService.canManageMission(
-        missionId, authHelperService.rawAuthentication());
+    return missionAccessPolicy.canManageMission(missionId, authHelperService.rawAuthentication());
   }
 
   /**
-   * Delegates to {@link MissionSecurityService#canManageManagers(UUID,
-   * org.springframework.security.core.Authentication)} with the caller's authentication.
+   * Applies the manage rule of {@link MissionAccessPolicy#canManageMission(UUID,
+   * org.springframework.security.core.Authentication)}, which also governs the co-manager list.
    *
    * @param missionId the mission to check; never {@code null}.
    * @return {@code true} iff the caller may manage the mission's managers.
    */
   @Override
   public boolean canManageManagers(UUID missionId) {
-    return missionSecurityService.canManageManagers(
-        missionId, authHelperService.rawAuthentication());
+    return missionAccessPolicy.canManageMission(missionId, authHelperService.rawAuthentication());
   }
 }

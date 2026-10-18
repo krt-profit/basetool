@@ -263,7 +263,7 @@ class MaterialClaimIntegrationTest {
             "orph",
             null,
             List.of(new CreateJobOrderMaterialDto(s.matA(), 650, 10.0)),
-            null);
+            jobOrderRepository.findById(s.orderId()).orElseThrow().getVersion());
     jobOrderService.updateJobOrder(s.orderId(), update);
 
     List<MaterialClaim> remaining =

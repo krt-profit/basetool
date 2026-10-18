@@ -48,6 +48,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 /**
  * Proves under real contention that same-section writers to a mission produce exactly one winner
@@ -55,6 +59,10 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
  */
 @SpringBootTest
 class MissionSectionLockConcurrencyTest {
+
+  private static final Authentication RACER =
+      new UsernamePasswordAuthenticationToken(
+          "section-racer", "n/a", List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
 
   private static final int THREADS = 5;
   private static final int START_TIMEOUT_SECONDS = 5;
@@ -212,7 +220,12 @@ class MissionSectionLockConcurrencyTest {
                       otherErrors.incrementAndGet();
                       return;
                     }
-                    action.accept(index);
+                    SecurityContextHolder.getContext().setAuthentication(RACER);
+                    try {
+                      action.accept(index);
+                    } finally {
+                      SecurityContextHolder.clearContext();
+                    }
                     successes.incrementAndGet();
                   } catch (ObjectOptimisticLockingFailureException conflict) {
                     conflicts.incrementAndGet();

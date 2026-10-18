@@ -51,6 +51,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 @SpringBootTest
 @Transactional
+@org.springframework.security.test.context.support.WithMockUser(roles = "ADMIN")
 class MissionTimeTest {
 
   @Autowired private WebApplicationContext context;

@@ -44,8 +44,8 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.JoinMissionRequest;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
-import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.PatchMissionCoreRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.PatchMissionFlagsRequest;
@@ -90,7 +90,7 @@ class MissionControllerLifecycleTest {
   @Mock private UserService userService;
   @Mock private MissionMapper missionMapper;
   @Mock private UserMapper userMapper;
-  @Mock private MissionSecurityService missionSecurityService;
+  @Mock private MissionAccessPolicy missionAccessPolicy;
 
   @Mock
   private de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService authHelperService;
@@ -117,7 +117,7 @@ class MissionControllerLifecycleTest {
             missionMapper,
             userMapper,
             null,
-            missionSecurityService,
+            missionAccessPolicy,
             authHelperService,
             missionPeerRedactor,
             new de.greluc.krt.profit.basetool.backend.mission.internal.ParticipantTargetResolver(

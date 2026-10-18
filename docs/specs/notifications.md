@@ -735,7 +735,7 @@ never the editing member's personal name (no PII in params).
   bundles, named placeholders `{displayId}`/`{orgUnit}`/`{requester}`).
 
 **Enforced by:** `JobOrderServiceTest`, `MessageBundleConsistencyTest` · **Code:**
-`joborder/api/events/JobOrderUpdatedByRequesterEvent`, `joborder/internal/JobOrderService#publishJobOrderUpdatedByRequester`,
+`joborder/api/events/JobOrderUpdatedByRequesterEvent`, `joborder/internal/JobOrderService#updatedByRequesterEvent` (published by `JobOrderEditor`),
 `notification/api/NotificationEventType`, `notification/api/NotificationType`,
 `db/migration/V214__seed_job_order_requester_update_notification_rule.sql` · **Issues:** #1186
 

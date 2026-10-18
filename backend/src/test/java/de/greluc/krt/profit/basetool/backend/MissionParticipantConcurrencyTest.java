@@ -49,6 +49,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 /**
  * Verifies that {@code N} users can sign up to the same mission in parallel without any {@link
@@ -61,6 +65,10 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
  */
 @SpringBootTest
 class MissionParticipantConcurrencyTest {
+
+  private static final Authentication SIGNER =
+      new UsernamePasswordAuthenticationToken(
+          "concurrent-signer", "n/a", List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
 
   private static final int THREADS = 5;
   private static final int START_TIMEOUT_SECONDS = 5;
@@ -142,8 +150,13 @@ class MissionParticipantConcurrencyTest {
                       otherErrorCount.incrementAndGet();
                       return;
                     }
-                    missionParticipantService.addParticipant(
-                        missionId, userId, null, null, null, null, null);
+                    SecurityContextHolder.getContext().setAuthentication(SIGNER);
+                    try {
+                      missionParticipantService.addParticipant(
+                          missionId, userId, null, null, null, null, null);
+                    } finally {
+                      SecurityContextHolder.clearContext();
+                    }
                     successCount.incrementAndGet();
                   } catch (ObjectOptimisticLockingFailureException unexpected) {
                     conflictCount.incrementAndGet();
@@ -242,8 +255,13 @@ class MissionParticipantConcurrencyTest {
                       otherErrorCount.incrementAndGet();
                       return;
                     }
-                    missionParticipantService.addParticipant(
-                        missionId, userId, null, null, null, null, null);
+                    SecurityContextHolder.getContext().setAuthentication(SIGNER);
+                    try {
+                      missionParticipantService.addParticipant(
+                          missionId, userId, null, null, null, null, null);
+                    } finally {
+                      SecurityContextHolder.clearContext();
+                    }
                     successCount.incrementAndGet();
                   } catch (DuplicateEntityException expected) {
                     rejectedByInMemoryCheck.incrementAndGet();

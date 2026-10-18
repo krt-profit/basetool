@@ -14,6 +14,11 @@ so moving or renaming a class fails the build instead of quietly leaving a gate 
 Where a gate can still live in more than one place — a `SecurityConfig` URL rule, a controller
 annotation, a service annotation — the backend's authorization matrix pins all three for every
 operation in one reviewed file, so a move that drops one shows up as a diff (REQ-SEC-074).
+For the Mission and Job Order edits the business gate has moved off the annotation: one edit
+module per aggregate (`MissionEditor`, `JobOrderEditor`) loads the aggregate, decides the access
+on it through the module's policy, checks the version, and records the audit event, so a caller
+without an HTTP request meets the same gate; the controller keeps a coarse role gate (REQ-SEC-085,
+ADR-0287).
 
 Beyond roles there are three mechanisms that are easy to miss:
 

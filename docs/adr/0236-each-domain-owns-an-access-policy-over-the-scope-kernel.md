@@ -1,7 +1,8 @@
 # ADR-0236 — Each domain owns an access policy over the scope kernel
 
-- **Status:** Accepted — implementation pending (plan Phases 2 to 4). Amends
-  [ADR-0065](0065-ownerscope-and-orgunitbank-service-split.md).
+- **Status:** Accepted — §6 implemented for the mission and job-order edits by
+  [ADR-0287](0287-mission-and-job-order-each-edit-through-one-edit-module.md); the rest pending (plan
+  Phases 2 to 4). Amends [ADR-0065](0065-ownerscope-and-orgunitbank-service-split.md).
 - **Date:** 2026-09-29
 - **Deciders:** @greluc (the plan decided on 2026-09-29)
 - **Related:** [domain modularisation plan](../archive/DOMAIN_MODULARISATION_PLAN.md) §5.4, §7.5 ·

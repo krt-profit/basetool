@@ -353,7 +353,7 @@ public class MaterialClaimService implements ClaimBucketSource {
     auditRecorder.record(
         AuditEventType.JOB_ORDER_CLAIM_UPSERTED,
         order.getId(),
-        orderLabel(order),
+        JobOrderAuditLabel.of(order),
         null,
         AuditDetails.of("claim", saved.getId())
             .with("material", dto.materialId())
@@ -393,7 +393,7 @@ public class MaterialClaimService implements ClaimBucketSource {
     auditRecorder.record(
         AuditEventType.JOB_ORDER_CLAIM_WITHDRAWN,
         order.getId(),
-        orderLabel(order),
+        JobOrderAuditLabel.of(order),
         null,
         AuditDetails.of("claim", claimId)
             .with("material", claimMaterialId)
@@ -711,16 +711,5 @@ public class MaterialClaimService implements ClaimBucketSource {
    */
   private static double round3(double value) {
     return Math.round(value * 1000.0) / 1000.0;
-  }
-
-  /**
-   * Composes the audit subject label for the claim's parent order — {@code #<displayId>
-   * '<handle>'}.
-   *
-   * @param order the parent order
-   * @return the {@code #<displayId> '<handle>'} label
-   */
-  private static String orderLabel(@NotNull JobOrder order) {
-    return JobOrderAuditLabel.of(order.getDisplayId());
   }
 }

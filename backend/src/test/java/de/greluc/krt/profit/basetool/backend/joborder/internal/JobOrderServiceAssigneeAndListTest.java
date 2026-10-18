@@ -141,7 +141,15 @@ class JobOrderServiceAssigneeAndListTest {
             null,
             null,
             null,
-            actingUserService());
+            actingUserService(),
+            new JobOrderEditor(
+                jobOrderRepository,
+                jobOrderAccessPolicy,
+                auditService,
+                org.mockito.Mockito.mock(
+                    org.springframework.context.ApplicationEventPublisher.class),
+                jobOrderStockProjectionService));
+    lenient().when(jobOrderAccessPolicy.canEdit(any(), any())).thenReturn(true);
     queryService =
         new JobOrderQueryService(
             jobOrderRepository,

@@ -34,7 +34,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -107,7 +106,7 @@ public class JobOrderPriorityService {
     auditRecorder.record(
         AuditEventType.JOB_ORDER_PRIORITY_CHANGED,
         targetOrder.getId(),
-        orderLabel(targetOrder),
+        JobOrderAuditLabel.of(targetOrder),
         null,
         AuditDetails.of("fromPriority", oldPriority).with("toPriority", targetOrder.getPriority()));
     return jobOrderStockProjectionService.mapToDtoWithStock(targetOrder);
@@ -135,16 +134,5 @@ public class JobOrderPriorityService {
       }
       currentPriority++;
     }
-  }
-
-  /**
-   * Composes the audit subject label {@code #<displayId> '<handle>'} of a job order
-   * (REQ-AUDIT-001). The handle names a person and is treated as personal data (REQ-SEC-058).
-   *
-   * @param jobOrder the order
-   * @return the {@code #<displayId> '<handle>'} label
-   */
-  private static String orderLabel(@NotNull JobOrder jobOrder) {
-    return JobOrderAuditLabel.of(jobOrder.getDisplayId());
   }
 }

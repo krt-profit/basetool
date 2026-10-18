@@ -63,6 +63,7 @@ import org.springframework.web.context.WebApplicationContext;
  */
 @SpringBootTest
 @Transactional
+@org.springframework.security.test.context.support.WithMockUser(roles = "ADMIN")
 class MissionUnitShipOptionsTest {
 
   @Autowired private WebApplicationContext context;
