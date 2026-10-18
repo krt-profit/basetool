@@ -160,7 +160,7 @@ The building blocks are in §5.5; every rule is in
 one resource past the guard's limit, the backend writes nothing and answers
 `MASS_CHANGE_CONFIRMATION_REQUIRED`. The gateway stages the batch in Redis and answers `409` with a
 link to `/connected-apps/confirm`. A client that resends the identical batch while it still waits
-gets the same link from the gateway, and nothing reaches the backend (ADR-0280). That page consumes the staging only by an explicit request
+gets the same link from the gateway, and nothing reaches the backend (ADR-0281). That page consumes the staging only by an explicit request
 (ADR-0110) and keeps the batch in the member's server session. The backend checks switch, client,
 capability and disconnects again, shows a dry run, and on confirmation applies it without the guard
 as the installation's own write; „Verwerfen" drops it.

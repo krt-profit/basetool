@@ -68,7 +68,7 @@ public class HandoffStagingService {
   /**
    * Prefix of the digest of a client's staged mass change, {@code
    * ingest:handoff-digest:mass:<client>:<sub>}, which names the staged batch's handoff id so a
-   * byte-identical resend gets the same confirmation link (REQ-XCH-021, ADR-0280); not under {@link
+   * byte-identical resend gets the same confirmation link (REQ-XCH-021, ADR-0281); not under {@link
    * #KEY_PREFIX}.
    */
   static final String MASS_CHANGE_DIGEST_PREFIX = "ingest:handoff-digest:mass:";
@@ -160,7 +160,7 @@ public class HandoffStagingService {
 
   /**
    * Finds the client's staged mass change for the member when it carries the given digest and the
-   * member has not opened it yet (REQ-XCH-021, ADR-0280).
+   * member has not opened it yet (REQ-XCH-021, ADR-0281).
    *
    * <p>Best-effort: a Redis failure or an unreadable entry yields {@code null}, so the change set
    * is relayed as if nothing were staged.

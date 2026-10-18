@@ -1386,7 +1386,7 @@ counts per client, writer and pool instead, with its own removals (REQ-XCH-046).
   so neither needed a change.
 - [x] While a held batch waits unopened, a byte-identical resend of it by the same installation to the
   same resource gets the same `confirmationUrl`, is neither relayed nor staged again, and counts as a
-  repeat, not as a held batch (ADR-0280).
+  repeat, not as a held batch (ADR-0281).
   *`ExchangeChangeRouteTest.aResentHeldMassChangeGetsTheStagedLinkWithoutBeingRelayedOrStagedAgain`,
   `HandoffStagingServiceTest.shouldFindTheLiveMassChangeOfARecordedDigestUntilItIsConsumed`,
   `RedisAclIngestIntegrationTest.theMassChangeDigestRunsUnderTheIngestUser`.*
@@ -1418,7 +1418,7 @@ client's (owner decision 2026-09-27) — at most `app.exchange.store.max-mass-ch
 the staged value with its wrapper — is `413 BATCH_TOO_LARGE`, checked before staging and never
 cached.
 
-A client that resends a held batch must not evict the link the member was just shown (ADR-0280).
+A client that resends a held batch must not evict the link the member was just shown (ADR-0281).
 Beside the staged batch the gateway records `ingest:handoff-digest:mass:<client>:<sub>` for the
 handoff's lifetime: the SHA-256 of the installation's key thumbprint, the resource and the change set
 as the gateway serializes it, with the handoff id and the guard's `detail`. Before relaying a change

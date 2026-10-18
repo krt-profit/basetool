@@ -41,7 +41,7 @@ import tools.jackson.databind.JsonNode;
 /**
  * Answers change sets the mass-change guard held back: the {@code 409} with the confirmation link,
  * and a byte-identical resend of a held batch that still waits for the member with the same link,
- * without relaying it (REQ-XCH-021, ADR-0280).
+ * without relaying it (REQ-XCH-021, ADR-0281).
  */
 @Slf4j
 @Component

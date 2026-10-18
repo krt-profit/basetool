@@ -1,4 +1,4 @@
-# ADR-0280 — A resent held batch gets the staged confirmation link and is not relayed
+# ADR-0281 — A resent held batch gets the staged confirmation link and is not relayed
 
 - **Status:** Accepted
 - **Date:** 2026-10-18

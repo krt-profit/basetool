@@ -462,7 +462,7 @@
       },
       "type": "timeseries",
       "title": "Mass changes/day: staged, resent and confirmed",
-      "description": "Change sets the mass-change guard held back and the gateway staged for the member's confirmation, per client, the resends of a still-waiting held batch the gateway answered with the same link (ADR-0280; ExchangeHeldBatchResent), and the ones members confirmed, per client and resource (REQ-XCH-021).",
+      "description": "Change sets the mass-change guard held back and the gateway staged for the member's confirmation, per client, the resends of a still-waiting held batch the gateway answered with the same link (ADR-0281; ExchangeHeldBatchResent), and the ones members confirmed, per client and resource (REQ-XCH-021).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

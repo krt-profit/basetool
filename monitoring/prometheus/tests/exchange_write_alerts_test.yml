@@ -102,7 +102,7 @@ tests:
               client_id: versekit
             exp_annotations:
               summary: "An exchange client keeps resending a held batch"
-              description: "One registered client (client_id) resent a change set more than 10 times in the last hour while the mass-change guard's held batch still waited for the member. The gateway answers each resend with the same confirmation link and relays nothing, so members are not harmed, but the client ignores the contract's 'do not retry the batch' and burns its members' write quota. Tell the client's author (REQ-XCH-021, ADR-0280)."
+              description: "One registered client (client_id) resent a change set more than 10 times in the last hour while the mass-change guard's held batch still waited for the member. The gateway answers each resend with the same confirmation link and relays nothing, so members are not harmed, but the client ignores the contract's 'do not retry the batch' and burns its members' write quota. Tell the client's author (REQ-XCH-021, ADR-0281)."
 
   - name: silent - a few resends of a held batch
     interval: 1m
