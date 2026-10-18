@@ -98,7 +98,7 @@ class LiveSyncSectionMapParityTest {
     sections.add("stats");
     assertThat(common)
         .as("a donation write must refresh the peers' statistics")
-        .contains("sendChanged(STATS_TOPIC, ['stats'])");
+        .contains("publish(STATS_TOPIC, ['stats'])");
 
     assertThat(sections)
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.SUPPLY_NEEDS.allowedSections());

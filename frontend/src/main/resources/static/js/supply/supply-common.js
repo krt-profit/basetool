@@ -22,7 +22,7 @@
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 
 /**
  * Looks up an element by id and returns it as the given control type; the supply templates always
@@ -114,40 +114,23 @@ const receivers = new WeakMap();
  */
 export function bindResults(cfg) {
     const container = document.querySelector(cfg.containerSelector);
-    const topic = container ? container.getAttribute('data-live-sync-topic') || '' : '';
-    const sections = { [cfg.section]: { container: cfg.containerSelector } };
-
-    function reswap() {
-        const query = new URLSearchParams(window.location.search);
-        query.set('fragment', 'results');
-        krtFetch.swap({
-            url: `${cfg.listUrl}?${query.toString()}`,
-            container: cfg.containerSelector,
-            history: false,
-        });
-    }
-
-    if (container) {
-        receivers.set(
-            container,
-            krtLiveSync.createReceiver({
-                topic,
-                sections,
-                coalesceMs: 1500,
-                refresh() {
-                    reswap();
-                },
-            }),
-        );
+    const seam = krtPageSections.create({
+        sections: { [cfg.section]: { container: cfg.containerSelector } },
+        pageUrl() {
+            return `${cfg.listUrl}${window.location.search}`;
+        },
+        topic() {
+            return container ? container.getAttribute('data-live-sync-topic') || null : null;
+        },
+        receiver: container ? { coalesceMs: 1500, retargetable: true } : undefined,
+    });
+    if (container && seam.receiver) {
+        receivers.set(container, seam.receiver);
     }
     krtFetch.bindSwap({ container: cfg.containerSelector, history: true });
 
     return function afterWrite() {
-        reswap();
-        const current = container ? container.getAttribute('data-live-sync-topic') || '' : '';
-        if (current && typeof krtLiveSync.sendChanged === 'function') {
-            krtLiveSync.sendChanged(current, Object.keys(sections));
-        }
+        seam.refresh(cfg.section);
     };
 }
 
@@ -168,9 +151,7 @@ export function retargetResults(containerSelector, topic) {
 
 /** Tells the statistics page of the peers that a donation changed. */
 export function announceStats() {
-    if (typeof krtLiveSync.sendChanged === 'function') {
-        krtLiveSync.sendChanged(STATS_TOPIC, ['stats']);
-    }
+    krtPageSections.publish(STATS_TOPIC, ['stats']);
 }
 
 /**

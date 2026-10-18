@@ -307,6 +307,8 @@ interface KrtPageSectionsConfig {
         pill?: { id?: string; label?: () => string | null | undefined };
         /** An extra test that keeps a section from refreshing while it returns true. */
         busyTest?: (sectionKey: string, container: Element | '' | null) => boolean;
+        /** Builds the receiver although the topic is not known yet, for a later `retarget`. */
+        retargetable?: boolean;
         /** Maps the sections a peer changed to the sections to re-render. */
         expand?: (sectionKeys: string[]) => string[];
     };

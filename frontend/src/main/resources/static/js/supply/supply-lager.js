@@ -21,7 +21,7 @@
 
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { field, numberOrNull, select, sendWrite, textOrNull } from '/js/supply/supply-common.js';
 
@@ -137,12 +137,9 @@ document.addEventListener('DOMContentLoaded', () => {
             afterWrite() {
                 krtModal.close(modal);
                 document.dispatchEvent(new CustomEvent('krt:inventory-changed'));
-                if (typeof krtLiveSync.sendChanged === 'function') {
-                    krtLiveSync.sendChanged('inventory', ['stock']);
-                    krtLiveSync.sendChanged('supply-needs', ['mine', 'stats']);
-                    if (unitId)
-                        krtLiveSync.sendChanged(`supply-donations:${unitId}`, ['donations']);
-                }
+                krtPageSections.publish('inventory', ['stock']);
+                krtPageSections.publish('supply-needs', ['mine', 'stats']);
+                if (unitId) krtPageSections.publish(`supply-donations:${unitId}`, ['donations']);
             },
         });
     });

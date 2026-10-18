@@ -371,6 +371,15 @@ await test('sections sharing a container and fragment are fetched once', async (
     assert.equal(fragmentCalls(h).length, 2);
 });
 
+await test('a retargetable receiver is built before the topic is known', async () => {
+    const h = harness();
+    const sections = h.krtPageSections.create(
+        declaration({ topic: () => null, receiver: { retargetable: true } }),
+    );
+    assert.equal(h.live.receivers.length, 1);
+    assert.equal(typeof sections.receiver.retarget, 'function');
+});
+
 await test('publish is a no-op without a topic', async () => {
     const h = harness();
     h.krtPageSections.publish(null, ['a']);

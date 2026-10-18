@@ -182,7 +182,12 @@ function create(config) {
     /** @type {KrtReceiver | null} */
     let receiver = null;
     const receiverCfg = config.receiver;
-    if (receiverCfg && (topicOf() || (receiverCfg.events && receiverCfg.events.changed))) {
+    if (
+        receiverCfg &&
+        (topicOf() ||
+            receiverCfg.retargetable ||
+            (receiverCfg.events && receiverCfg.events.changed))
+    ) {
         const expand = receiverCfg.expand;
         receiver = krtLiveSync.createReceiver({
             topic: topicOf() || undefined,
