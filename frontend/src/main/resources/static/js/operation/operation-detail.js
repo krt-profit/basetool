@@ -25,16 +25,9 @@ import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { operationHooks } from '/js/operation/operation-hooks.js';
-
-const OPERATION_SECTIONS = {
-    overview: { container: '#op-overview-results', fragmentValue: 'overview' },
-    missions: { container: '#op-missions-results', fragmentValue: 'missions' },
-    payout: { container: '#op-payout-results', fragmentValue: 'payout' },
-    finance: { container: '#op-finance-results', fragmentValue: 'finance' },
-};
 
 /**
  * The sections a peer change re-renders: the overview aggregates the KPI bar, the per-mission
@@ -52,41 +45,34 @@ function withOverview(keys) {
 }
 
 function initOperationDetail() {
-    const operationSeam = krtFetch.sectionWrite({
+    const operation = krtPageSections.create({
         dict() {
             return { 'operation.section.refresh.error': OPS_DETAIL_MSG.sectionRefreshError };
         },
         keys: { refreshErrorKey: 'operation.section.refresh.error' },
-        sections: OPERATION_SECTIONS,
+        sections: {
+            overview: { container: '#op-overview-results', fragmentValue: 'overview' },
+            missions: { container: '#op-missions-results', fragmentValue: 'missions' },
+            payout: { container: '#op-payout-results', fragmentValue: 'payout' },
+            finance: { container: '#op-finance-results', fragmentValue: 'finance' },
+        },
         pageUrl() {
             return window.operationId ? `/operations/${window.operationId}` : null;
         },
-        broadcast(keys) {
-            if (window.operationId && typeof krtLiveSync.sendChanged === 'function') {
-                krtLiveSync.sendChanged(`operation:${window.operationId}`, keys);
-            }
+        topic() {
+            return window.operationId ? `operation:${window.operationId}` : null;
         },
-    });
-    operationHooks.refreshSection = operationSeam.refresh;
-    operationHooks.notifyChanged = operationSeam.notify;
-
-    if (window.operationId) {
-        krtLiveSync.createReceiver({
-            topic: `operation:${window.operationId}`,
-            sections: OPERATION_SECTIONS,
-            /** @param {string[] | string} keys the changed section keys */
-            refresh(keys) {
-                if (operationHooks.refreshSection) {
-                    operationHooks.refreshSection(withOverview(keys), { broadcast: false });
-                }
-            },
+        receiver: {
+            expand: withOverview,
             pill: {
                 label() {
                     return OPS_DETAIL_MSG.livesyncUpdates;
                 },
             },
-        });
-    }
+        },
+    });
+    operationHooks.refreshSection = operation.refresh;
+    operationHooks.notifyChanged = operation.notify;
 
     /**
      * Writes a text into the element with the given id, when both exist.

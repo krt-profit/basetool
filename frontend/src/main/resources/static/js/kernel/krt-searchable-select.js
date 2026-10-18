@@ -70,16 +70,19 @@ function findLabel(select, uid) {
  * @param {string} query the lower-cased filter text (may be empty)
  */
 function appendHighlighted(el, label, query) {
+    const span = document.createElement('span');
+    span.className = 'krt-combobox__label';
+    el.appendChild(span);
     const at = query ? label.toLowerCase().indexOf(query) : -1;
     if (at < 0) {
-        el.appendChild(document.createTextNode(label));
+        span.appendChild(document.createTextNode(label));
         return;
     }
-    el.appendChild(document.createTextNode(label.slice(0, at)));
+    span.appendChild(document.createTextNode(label.slice(0, at)));
     const mark = document.createElement('mark');
     mark.textContent = label.slice(at, at + query.length);
-    el.appendChild(mark);
-    el.appendChild(document.createTextNode(label.slice(at + query.length)));
+    span.appendChild(mark);
+    span.appendChild(document.createTextNode(label.slice(at + query.length)));
 }
 
 /**

@@ -127,7 +127,7 @@
         color: var(--color-gray-2-text);
     }
 
-    @media (width <= 1024px) {
+    @media (width <= 1024px), (pointer: coarse) {
         .unit-flag {
             min-height: var(--touch-target);
         }

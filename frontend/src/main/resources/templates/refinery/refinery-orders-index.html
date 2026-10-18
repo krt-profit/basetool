@@ -79,7 +79,7 @@
                         <span th:if="${row.state().name() == 'RUNNING' or row.ready()}" class="meter refinery-meter" aria-hidden="true"
                               ><i th:classappend="${row.ready()} ? 'meter__fill--success'" th:attr="data-krtm-width=${row.progressPercent()}"></i></span>
                     </td>
-                    <td th:attr="data-label=#{refineryorder.index.owner}" th:text="${o.owner != null ? o.owner.effectiveName : '—'}">greluc</td>
+                    <td class="refinery-owner" th:attr="data-label=#{refineryorder.index.owner}" th:text="${o.owner != null ? o.owner.effectiveName : '—'}">greluc</td>
                     <td class="cell-actions">
                         <a th:if="${row.storable()}" th:hidden="${!row.ready()}" class="btn btn-ghost btn-xs" data-refinery-store
                            data-testid="refinery-row-store" th:href="@{/refinery-orders/{id}(id=${o.id},store='open')}"

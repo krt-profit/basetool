@@ -24,7 +24,7 @@ import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';
 import { krtRefineryYield } from '/js/refinery/refinery-yield-badge.js';
@@ -38,12 +38,7 @@ import { krtRefineryYield } from '/js/refinery/refinery-yield-badge.js';
 
 krtRefineryYield.init(MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP);
 
-const REFINERY_ORDER_SECTIONS = {
-    order: { container: '#refinery-order-results', fragmentValue: 'order' },
-    store: { container: '#refinery-store-results', fragmentValue: 'store' },
-};
-
-/** @type {KrtSectionWriter | null} */
+/** @type {KrtPageSections | null} */
 let refinerySeam = null;
 
 /** The refinery-order:{id} room this page publishes to, or null before the id bootstrap ran. */
@@ -58,33 +53,22 @@ function refineryStoreModalOpen() {
 }
 
 function initRefineryOrdersDetails() {
-    refinerySeam = krtFetch.sectionWrite({
+    refinerySeam = krtPageSections.create({
         dict() {
             return {
                 'refineryorder.section.refresh.error': REFINERY_DETAIL_MSG.sectionRefreshError,
             };
         },
         keys: { refreshErrorKey: 'refineryorder.section.refresh.error' },
-        sections: REFINERY_ORDER_SECTIONS,
+        sections: {
+            order: { container: '#refinery-order-results', fragmentValue: 'order' },
+            store: { container: '#refinery-store-results', fragmentValue: 'store' },
+        },
         pageUrl() {
             return window.refineryOrderId ? `/refinery-orders/${window.refineryOrderId}` : null;
         },
-        broadcast(keys) {
-            const topic = refineryTopic();
-            if (topic && typeof krtLiveSync.sendChanged === 'function') {
-                krtLiveSync.sendChanged(topic, keys);
-            }
-        },
-    });
-
-    if (refineryTopic()) {
-        krtLiveSync.createReceiver({
-            topic: refineryTopic() ?? undefined,
-            sections: REFINERY_ORDER_SECTIONS,
-            /** @param {string[]} keys the changed sections to re-render */
-            refresh(keys) {
-                refinerySeam?.refresh(keys, { broadcast: false });
-            },
+        topic: refineryTopic,
+        receiver: {
             busyTest() {
                 return refineryStoreModalOpen();
             },
@@ -93,8 +77,8 @@ function initRefineryOrdersDetails() {
                     return REFINERY_DETAIL_MSG.livesyncUpdates;
                 },
             },
-        });
-    }
+        },
+    });
 }
 
 initRefineryOrdersDetails();
@@ -949,9 +933,8 @@ function refineryStoreJobOrderIds(form) {
  * @param {string[]} jobOrderIds the job orders that received stored output
  */
 function crossPublishStoredStock(jobOrderIds) {
-    if (typeof krtLiveSync.sendChanged !== 'function') return;
     jobOrderIds.forEach((jobOrderId) => {
-        krtLiveSync.sendChanged(`order:${jobOrderId}`, ['materials', 'aggregated']);
+        krtPageSections.publish(`order:${jobOrderId}`, ['materials', 'aggregated']);
     });
 }
 

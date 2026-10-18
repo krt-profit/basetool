@@ -17,72 +17,44 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
-
-const ORG_STRUCTURE_SECTIONS = {
-    units: { container: '#org-structure-units', fragmentValue: 'units' },
-    forms: { container: '#org-structure-forms', fragmentValue: 'forms' },
-};
-
-const ORG_STRUCTURE_CHART_SECTION = 'chart';
 
 function initAdminOrgStructure() {
     const i18n = readMessages();
 
-    const orgStructureSeam = krtFetch.sectionWrite({
+    const orgStructure = krtPageSections.create({
         dict() {
             return { 'admin.orgStructure.refresh.error': i18n.refreshError };
         },
         keys: { refreshErrorKey: 'admin.orgStructure.refresh.error' },
-        sections: ORG_STRUCTURE_SECTIONS,
+        sections: {
+            units: { container: '#org-structure-units', fragmentValue: 'units' },
+            forms: { container: '#org-structure-forms', fragmentValue: 'forms' },
+        },
         pageUrl() {
             return '/admin/org-structure';
         },
-        broadcast(keys) {
-            if (typeof krtLiveSync.sendChanged === 'function') {
-                krtLiveSync.sendChanged(
-                    'org-structure',
-                    keys.concat([ORG_STRUCTURE_CHART_SECTION]),
-                );
-            }
-        },
-    });
-
-    function refreshOrgStructureAfterCreate() {
-        return orgStructureSeam.refresh(Object.keys(ORG_STRUCTURE_SECTIONS));
-    }
-
-    function refreshOrgStructureAfterParentChange() {
-        return orgStructureSeam.refresh(['units']);
-    }
-
-    krtLiveSync.createReceiver({
         topic: 'org-structure',
-        sections: ORG_STRUCTURE_SECTIONS,
-        coalesceMs: 1500,
-        /**
-         * @param {string[]} keys the sections to re-render
-         */
-        refresh(keys) {
-            orgStructureSeam.refresh(keys, { broadcast: false });
-        },
-        /**
-         * @param {string} sectionKey the section about to be replaced
-         * @returns {boolean} true while the section holds unsaved input
-         */
-        busyTest(sectionKey) {
-            if (sectionKey !== 'forms') {
-                return false;
-            }
-            return Array.prototype.some.call(
-                document.querySelectorAll('#ol-form input, #bereich-form input'),
-                (el) => {
-                    return el.value.trim() !== '';
-                },
-            );
+        alsoBroadcast: ['chart'],
+        receiver: {
+            coalesceMs: 1500,
+            /**
+             * @param {string} sectionKey the section about to be replaced
+             * @returns {boolean} true while the section holds unsaved input
+             */
+            busyTest(sectionKey) {
+                if (sectionKey !== 'forms') {
+                    return false;
+                }
+                return Array.prototype.some.call(
+                    document.querySelectorAll('#ol-form input, #bereich-form input'),
+                    (el) => {
+                        return el.value.trim() !== '';
+                    },
+                );
+            },
         },
     });
 
@@ -119,7 +91,7 @@ function initAdminOrgStructure() {
 
     krtEvents.on('submit', 'os-create-ol', (form, event) => {
         event.preventDefault();
-        krtFetch.write({
+        orgStructure.write({
             method: 'POST',
             url: '/admin/org-structure/organisationsleitung',
             payload: {
@@ -130,13 +102,13 @@ function initAdminOrgStructure() {
             successMessage: i18n.saved,
             errorMessage: i18n.error,
             submitter: form.querySelector('button[type="submit"]'),
-            onSuccess: refreshOrgStructureAfterCreate,
+            refresh: ['units', 'forms'],
         });
     });
 
     krtEvents.on('submit', 'os-create-bereich', (form, event) => {
         event.preventDefault();
-        krtFetch.write({
+        orgStructure.write({
             method: 'POST',
             url: '/admin/org-structure/bereiche',
             payload: {
@@ -149,7 +121,7 @@ function initAdminOrgStructure() {
             successMessage: i18n.saved,
             errorMessage: i18n.error,
             submitter: form.querySelector('button[type="submit"]'),
-            onSuccess: refreshOrgStructureAfterCreate,
+            refresh: ['units', 'forms'],
         });
     });
 
@@ -159,7 +131,7 @@ function initAdminOrgStructure() {
             return;
         }
         const id = row.getAttribute('data-org-unit-id');
-        krtFetch.write({
+        orgStructure.write({
             method: 'PATCH',
             url: `/admin/org-structure/org-units/${encodeURIComponent(String(id))}/parent`,
             serialize: `org-unit:${id}`,
@@ -173,7 +145,7 @@ function initAdminOrgStructure() {
             successMessage: i18n.saved,
             errorMessage: i18n.error,
             submitter: select,
-            onSuccess: refreshOrgStructureAfterParentChange,
+            refresh: ['units'],
         });
     });
 }

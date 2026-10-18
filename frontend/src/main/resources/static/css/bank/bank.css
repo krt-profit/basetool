@@ -93,6 +93,7 @@
     }
 
     .kpi-card-top .chip {
+        flex-shrink: 0;
         font-size: 0.55rem;
     }
 
@@ -401,14 +402,21 @@
         color: var(--color-gray-2-text);
     }
 
-    .bank-check-label {
+    .bank-check-label,
+    .bank-form-row label.bank-check-label {
         display: flex;
+        flex-wrap: nowrap;
         align-items: center;
         gap: 8px;
         font-size: 0.78rem;
         color: var(--color-white);
         text-transform: none;
         letter-spacing: normal;
+    }
+
+    .bank-check-label > input + span {
+        flex: 0 1 auto;
+        min-width: 0;
     }
 
     .bank-check-inline {
@@ -562,7 +570,9 @@
         .bank-acc-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
         }
+    }
 
+    @media (width <= 1024px), (pointer: coarse) {
         .matrix-flag {
             width: var(--touch-target-dense);
             height: var(--touch-target-dense);

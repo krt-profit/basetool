@@ -28,6 +28,9 @@
         .supply-row-actions {
             flex-wrap: nowrap;
         }
+        .supply-donor {
+            white-space: nowrap;
+        }
         .supply-table thead th {
             position: sticky;
             top: var(--krt-header-height, 0);

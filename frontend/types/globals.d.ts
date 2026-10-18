@@ -194,8 +194,12 @@ interface KrtWriteOpts extends KrtSendOpts {
      * `url`/`payload` so a queued write re-reads its version.
      */
     serialize?: string;
-    /** Section key resolved against the dictionary by a `sectionWrite` wrapper. */
+    /** Section key resolved against the dictionary by a `krtPageSections` write. */
     sectionKey?: string;
+    /** With `sectionKey`: writes the response version to every `[data-version]` of the section. */
+    propagateVersion?: boolean;
+    /** After a 2xx, re-renders these sections and broadcasts once, before `onSuccess`. */
+    refresh?: string | string[];
 }
 
 /** Options for {@linkcode KrtFetchApi.submitForm}. */
@@ -213,7 +217,7 @@ interface KrtSubmitFormOpts extends KrtSendOpts {
     formData?: FormData | URLSearchParams;
     /** Lock-scope key, as on {@linkcode KrtWriteOpts.serialize}. */
     serialize?: string;
-    /** Section key resolved against the dictionary by a `sectionWrite` wrapper. */
+    /** Section key resolved against the dictionary by a `krtPageSections` write. */
     sectionKey?: string;
 }
 
@@ -269,8 +273,8 @@ interface KrtSwapOpts {
     errorMessage?: string;
 }
 
-/** Configuration for {@linkcode KrtFetchApi.sectionWrite}. */
-interface KrtSectionWriteConfig {
+/** Configuration for {@linkcode KrtPageSectionsApi.create}. */
+interface KrtPageSectionsConfig {
     /** Late-bound accessor for the page's i18n dictionary. */
     dict(): KrtI18nDict | null | undefined;
     /** The dictionary's global name, used to report a missing string as `NAME[key]`. */
@@ -284,14 +288,31 @@ interface KrtSectionWriteConfig {
      * entity has no id; `refresh()` then resolves false instead of fetching.
      */
     pageUrl(): string | null;
+    /** The live-sync topic room, or a thunk for it; null while the page has no entity id. */
+    topic?: string | null | (() => string | null);
+    /** Section keys added to every broadcast of this page, such as a dependent chart. */
+    alsoBroadcast?: string[];
     /**
-     * Late-bound peer-notification closure called by `refresh`/`notify` with the changed section
-     * keys, to publish them to the page's live-sync room (REQ-FE-010).
+     * Replaces the default broadcast to `topic`; called by `refresh` and `notify` with the changed
+     * section keys (REQ-FE-010).
      */
     broadcast?(sectionKeys: string[]): void;
+    /** Builds the receiver for a peer's change; omit for a page that only publishes. */
+    receiver?: {
+        /** Base delay in milliseconds used to coalesce inbound changes. */
+        coalesceMs?: number;
+        /** Document events that drive the receiver instead of a subscription. */
+        events?: { changed?: string; resync?: string };
+        /** The stale-data pill shown while sections are deferred. */
+        pill?: { id?: string; label?: () => string | null | undefined };
+        /** An extra test that keeps a section from refreshing while it returns true. */
+        busyTest?: (sectionKey: string, container: Element | '' | null) => boolean;
+        /** Maps the sections a peer changed to the sections to re-render. */
+        expand?: (sectionKeys: string[]) => string[];
+    };
 }
 
-/** Options for {@linkcode KrtSectionWriter.refresh}. */
+/** Options for {@linkcode KrtPageSections.refresh}. */
 interface KrtSectionRefreshOpts {
     /**
      * `false` suppresses the peer broadcast; required when applying a peer's inbound signal, to
@@ -300,8 +321,8 @@ interface KrtSectionRefreshOpts {
     broadcast?: boolean;
 }
 
-/** The `{write, refresh, notify}` trio returned by {@linkcode KrtFetchApi.sectionWrite}. */
-interface KrtSectionWriter {
+/** The seam `krtPageSections.create` returns for one page. */
+interface KrtPageSections {
     /** {@linkcode KrtFetchApi.write} with the section's localized strings applied. */
     write(opts: KrtWriteOpts): Promise<KrtWriteResult>;
     /**
@@ -311,6 +332,18 @@ interface KrtSectionWriter {
     refresh(sectionKeys: string | string[], opts?: KrtSectionRefreshOpts): Promise<boolean[]>;
     /** Broadcast-only sibling of `refresh` for handlers that already patched the DOM. */
     notify(sectionKeys: string | string[]): void;
+    /** The receiver of a peer's change, or null when the page declared none or has no topic. */
+    receiver: KrtReceiver | null;
+    /** The declared sections. */
+    sections: Record<string, { container: string; fragmentValue: string }>;
+}
+
+/** The page-section module installed by `kernel/krt-page-sections.js` (ADR-0289). */
+interface KrtPageSectionsApi {
+    /** Declares a page's sections once and returns the seam that owns the choreography. */
+    create(config: KrtPageSectionsConfig): KrtPageSections;
+    /** Broadcasts changed section keys to a topic's peers; a no-op without a topic. */
+    publish(topic: string | null | undefined, sectionKeys: string | string[]): void;
 }
 
 /**
@@ -371,8 +404,6 @@ interface KrtFetchApi {
     maybeReauthenticate(response: Response): boolean;
     /** Redirects the window to a same-origin re-authentication path. */
     reauthRedirect(url?: string): void;
-    /** Builds a section-scoped `{write, refresh, notify}` wrapper for a page. */
-    sectionWrite(config: KrtSectionWriteConfig): KrtSectionWriter;
     /** Runs `task` after the previous task with the same key settled. */
     serialize<T>(key: string, task: () => Promise<T>): Promise<T>;
     /** The CSRF helpers, re-exported for call sites that already hold `krtFetch`. */

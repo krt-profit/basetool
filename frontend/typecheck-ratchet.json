@@ -127,6 +127,7 @@
       "kernel/krt-live-sync.js",
       "kernel/krt-modal.js",
       "kernel/krt-overflow-menu.js",
+      "kernel/krt-page-sections.js",
       "kernel/krt-palette.js",
       "kernel/krt-search.js",
       "kernel/krt-searchable-select.js",

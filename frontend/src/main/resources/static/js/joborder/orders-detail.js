@@ -23,7 +23,7 @@ import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { joborderHooks } from '/js/joborder/joborder-hooks.js';
 
@@ -42,31 +42,8 @@ export function resetInventoryCache() {
     handoverTierSuggestion = new Map();
 }
 
-const ORDER_SECTIONS = {
-    header: { container: '#order-header-results', fragmentValue: 'header' },
-    kpi: { container: '#order-kpi-results', fragmentValue: 'kpi' },
-    materials: { container: '#order-materials-results', fragmentValue: 'materials' },
-    aggregated: { container: '#order-aggregated-results', fragmentValue: 'aggregated' },
-    items: { container: '#order-items-results', fragmentValue: 'items' },
-    'item-stock': { container: '#order-items-results', fragmentValue: 'items' },
-    handovers: { container: '#order-handovers-results', fragmentValue: 'handovers' },
-    'item-handovers': {
-        container: '#order-item-handovers-results',
-        fragmentValue: 'item-handovers',
-    },
-    'item-handover-lines': {
-        container: '#item-handover-lines',
-        fragmentValue: 'item-handover-lines',
-    },
-    'blueprint-owners': {
-        container: '#blueprint-owners-section',
-        fragmentValue: 'blueprint-owners',
-    },
-    assignees: { container: '#order-assignees-results', fragmentValue: 'assignees' },
-};
-
 function initOrdersDetail() {
-    const orderSeam = krtFetch.sectionWrite({
+    const order = krtPageSections.create({
         dict() {
             return {
                 'orders.section.refresh.error':
@@ -76,29 +53,35 @@ function initOrdersDetail() {
             };
         },
         keys: { refreshErrorKey: 'orders.section.refresh.error' },
-        sections: ORDER_SECTIONS,
+        sections: {
+            header: { container: '#order-header-results', fragmentValue: 'header' },
+            kpi: { container: '#order-kpi-results', fragmentValue: 'kpi' },
+            materials: { container: '#order-materials-results', fragmentValue: 'materials' },
+            aggregated: { container: '#order-aggregated-results', fragmentValue: 'aggregated' },
+            items: { container: '#order-items-results', fragmentValue: 'items' },
+            'item-stock': { container: '#order-items-results', fragmentValue: 'items' },
+            handovers: { container: '#order-handovers-results', fragmentValue: 'handovers' },
+            'item-handovers': {
+                container: '#order-item-handovers-results',
+                fragmentValue: 'item-handovers',
+            },
+            'item-handover-lines': {
+                container: '#item-handover-lines',
+                fragmentValue: 'item-handover-lines',
+            },
+            'blueprint-owners': {
+                container: '#blueprint-owners-section',
+                fragmentValue: 'blueprint-owners',
+            },
+            assignees: { container: '#order-assignees-results', fragmentValue: 'assignees' },
+        },
         pageUrl() {
             return window.orderId ? `/orders/${window.orderId}` : null;
         },
-        broadcast(keys) {
-            if (window.orderId && typeof krtLiveSync.sendChanged === 'function') {
-                krtLiveSync.sendChanged(`order:${window.orderId}`, keys);
-            }
+        topic() {
+            return window.orderId ? `order:${window.orderId}` : null;
         },
-    });
-    joborderHooks.refreshOrderSection = orderSeam.refresh;
-    joborderHooks.notifyOrderChanged = orderSeam.notify;
-
-    if (window.orderId) {
-        krtLiveSync.createReceiver({
-            topic: `order:${window.orderId}`,
-            sections: ORDER_SECTIONS,
-            /** @param {string[]} keys the section keys to re-fetch */
-            refresh(keys) {
-                if (joborderHooks.refreshOrderSection) {
-                    joborderHooks.refreshOrderSection(keys, { broadcast: false });
-                }
-            },
+        receiver: {
             pill: {
                 label() {
                     return typeof KRT_ORDER_LIVESYNC_UPDATES !== 'undefined'
@@ -106,16 +89,16 @@ function initOrdersDetail() {
                         : undefined;
                 },
             },
-        });
-    }
+        },
+    });
+    joborderHooks.refreshOrderSection = order.refresh;
+    joborderHooks.notifyOrderChanged = order.notify;
 }
 
 initOrdersDetail();
 
 export function _publishOrdersQueue() {
-    if (typeof krtLiveSync.sendChanged === 'function') {
-        krtLiveSync.sendChanged('orders', ['queue', 'demand']);
-    }
+    krtPageSections.publish('orders', ['queue', 'demand']);
 }
 
 /**
