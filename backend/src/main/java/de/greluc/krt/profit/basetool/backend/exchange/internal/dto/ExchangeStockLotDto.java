@@ -31,6 +31,7 @@ import org.jetbrains.annotations.Nullable;
  * @param key the opaque key the feed and its tombstones use for the lot
  * @param material the material or item, with its id as {@code bt}
  * @param materialKind the material's classification, or {@code null} for an item
+ * @param component the item's ship component data, or {@code null} for a material or another item
  * @param location the location
  * @param quality the quality, {@code 0} for an item
  * @param stolen whether the lot is marked stolen
@@ -42,6 +43,7 @@ public record ExchangeStockLotDto(
     @NotNull String key,
     @NotNull ExchangeItemRefDto material,
     @Nullable ExchangeMaterialKindDto materialKind,
+    @Nullable ExchangeComponentDto component,
     @NotNull ExchangeLocationDto location,
     int quality,
     boolean stolen,

@@ -19,14 +19,20 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One open item line of a single detailed item order: ordered less delivered less earmarked
- * (REQ-XCH-047).
+ * (REQ-XCH-047); absent optional fields are left out.
  *
  * @param item the game item, with its id as {@code bt}
+ * @param component the item's ship component data, or {@code null} for another item
  * @param openQuantity the pieces the order still needs
  */
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record ExchangeDemandOrderItemDto(
-    @NotNull ExchangeItemRefDto item, @NotNull ExchangeQuantityDto openQuantity) {}
+    @NotNull ExchangeItemRefDto item,
+    @Nullable ExchangeComponentDto component,
+    @NotNull ExchangeQuantityDto openQuantity) {}

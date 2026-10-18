@@ -33,8 +33,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionOwnership;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionStructureService;
 import de.greluc.krt.profit.basetool.backend.platform.api.GlobalExceptionHandler;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,6 +64,10 @@ class MissionOwnerChangeControllerTest {
   private MockMvc mockMvc;
 
   @MockitoBean private MissionService missionService;
+
+  @MockitoBean private MissionParticipantService missionParticipantService;
+
+  @MockitoBean private MissionStructureService missionStructureService;
   @MockitoBean private MissionSecurityService missionSecurityService;
 
   private final UUID missionId = UUID.randomUUID();

@@ -44,6 +44,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.JoinMissionRequest;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.PatchMissionCoreRequest;
@@ -84,6 +85,8 @@ import org.springframework.security.oauth2.jwt.Jwt;
 class MissionControllerLifecycleTest {
 
   @Mock private MissionService missionService;
+
+  @Mock private MissionParticipantService missionParticipantService;
   @Mock private UserService userService;
   @Mock private MissionMapper missionMapper;
   @Mock private UserMapper userMapper;
@@ -107,6 +110,9 @@ class MissionControllerLifecycleTest {
     controller =
         new MissionController(
             missionService,
+            null,
+            missionParticipantService,
+            null,
             userService,
             missionMapper,
             userMapper,
@@ -484,7 +490,8 @@ class MissionControllerLifecycleTest {
     Mission persisted = new Mission();
     MissionDto dto = fullMissionDto(missionId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
-    when(missionService.addParticipant(missionId, callerId, null, null, null, null, null))
+    when(missionParticipantService.addParticipant(
+            missionId, callerId, null, null, null, null, null))
         .thenReturn(persisted);
     when(missionMapper.toDto(persisted)).thenReturn(dto);
     when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
@@ -492,7 +499,8 @@ class MissionControllerLifecycleTest {
     MissionDto result = controller.joinMission(jwt, missionId, null);
 
     assertThat(result).isSameAs(dto);
-    verify(missionService).addParticipant(missionId, callerId, null, null, null, null, null);
+    verify(missionParticipantService)
+        .addParticipant(missionId, callerId, null, null, null, null, null);
   }
 
   @Test
@@ -504,7 +512,7 @@ class MissionControllerLifecycleTest {
     Mission persisted = new Mission();
     MissionDto dto = fullMissionDto(missionId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
-    when(missionService.addParticipant(
+    when(missionParticipantService.addParticipant(
             missionId, callerId, null, desiredJobTypeId, null, null, PayoutPreference.DONATE))
         .thenReturn(persisted);
     when(missionMapper.toDto(persisted)).thenReturn(dto);
@@ -515,7 +523,7 @@ class MissionControllerLifecycleTest {
             jwt, missionId, new JoinMissionRequest(desiredJobTypeId, PayoutPreference.DONATE));
 
     assertThat(result).isSameAs(dto);
-    verify(missionService)
+    verify(missionParticipantService)
         .addParticipant(
             missionId, callerId, null, desiredJobTypeId, null, null, PayoutPreference.DONATE);
   }
@@ -528,7 +536,7 @@ class MissionControllerLifecycleTest {
     Mission persisted = new Mission();
     MissionDto dto = fullMissionDto(missionId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
-    when(missionService.addParticipant(
+    when(missionParticipantService.addParticipant(
             missionId, callerId, null, null, null, null, PayoutPreference.PAYOUT))
         .thenReturn(persisted);
     when(missionMapper.toDto(persisted)).thenReturn(dto);
@@ -539,7 +547,7 @@ class MissionControllerLifecycleTest {
             jwt, missionId, new JoinMissionRequest(null, PayoutPreference.PAYOUT));
 
     assertThat(result).isSameAs(dto);
-    verify(missionService)
+    verify(missionParticipantService)
         .addParticipant(missionId, callerId, null, null, null, null, PayoutPreference.PAYOUT);
   }
 
@@ -555,7 +563,8 @@ class MissionControllerLifecycleTest {
     Mission persisted = new Mission();
     MissionDto full = fullMissionDto(missionId, false);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
-    when(missionService.addParticipant(missionId, callerId, null, null, null, null, null))
+    when(missionParticipantService.addParticipant(
+            missionId, callerId, null, null, null, null, null))
         .thenReturn(persisted);
     when(missionMapper.toDto(persisted)).thenReturn(full);
     when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
@@ -653,7 +662,7 @@ class MissionControllerLifecycleTest {
     MissionParticipantDto dto =
         new MissionParticipantDto(
             UUID.randomUUID(), null, null, null, null, null, null, null, null, null, 1L);
-    when(missionService.getUnassignedParticipants(id)).thenReturn(List.of(raw));
+    when(missionParticipantService.getUnassignedParticipants(id)).thenReturn(List.of(raw));
     when(missionMapper.toDto(raw)).thenReturn(dto);
 
     List<MissionParticipantDto> result = controller.getUnassignedParticipants(id);
@@ -697,14 +706,14 @@ class MissionControllerLifecycleTest {
     SetPartyLeadRequest request = new SetPartyLeadRequest(userId, null, 3L);
     Mission persisted = new Mission();
     MissionDto dto = fullMissionDto(id);
-    when(missionService.setPartyLead(id, userId, null, 3L)).thenReturn(persisted);
+    when(missionParticipantService.setPartyLead(id, userId, null, 3L)).thenReturn(persisted);
     when(missionMapper.toDto(persisted)).thenReturn(dto);
 
     MissionDto result = controller.setPartyLead(id, request);
 
     assertThat(result).isSameAs(dto);
     verify(userService, never()).findMatchesByExactName(any());
-    verify(missionService).setPartyLead(id, userId, null, 3L);
+    verify(missionParticipantService).setPartyLead(id, userId, null, 3L);
   }
 
   @Test
@@ -717,13 +726,13 @@ class MissionControllerLifecycleTest {
     Mission persisted = new Mission();
     MissionDto dto = fullMissionDto(id);
     when(userService.findMatchesByExactName("Alice")).thenReturn(List.of(matched));
-    when(missionService.setPartyLead(id, resolvedId, null, 1L)).thenReturn(persisted);
+    when(missionParticipantService.setPartyLead(id, resolvedId, null, 1L)).thenReturn(persisted);
     when(missionMapper.toDto(persisted)).thenReturn(dto);
 
     MissionDto result = controller.setPartyLead(id, request);
 
     assertThat(result).isSameAs(dto);
-    verify(missionService).setPartyLead(id, resolvedId, null, 1L);
+    verify(missionParticipantService).setPartyLead(id, resolvedId, null, 1L);
   }
 
   @Test
@@ -733,13 +742,13 @@ class MissionControllerLifecycleTest {
     Mission persisted = new Mission();
     MissionDto dto = fullMissionDto(id);
     when(userService.findMatchesByExactName("Stranger")).thenReturn(List.of());
-    when(missionService.setPartyLead(id, null, "Stranger", 0L)).thenReturn(persisted);
+    when(missionParticipantService.setPartyLead(id, null, "Stranger", 0L)).thenReturn(persisted);
     when(missionMapper.toDto(persisted)).thenReturn(dto);
 
     MissionDto result = controller.setPartyLead(id, request);
 
     assertThat(result).isSameAs(dto);
-    verify(missionService).setPartyLead(id, null, "Stranger", 0L);
+    verify(missionParticipantService).setPartyLead(id, null, "Stranger", 0L);
   }
 
   @Test
@@ -758,7 +767,7 @@ class MissionControllerLifecycleTest {
     } catch (BusinessConflictException expected) {
     }
 
-    verify(missionService, never()).setPartyLead(any(), any(), any(), any());
+    verify(missionParticipantService, never()).setPartyLead(any(), any(), any(), any());
   }
 
   @Test
@@ -767,13 +776,13 @@ class MissionControllerLifecycleTest {
     SetPartyLeadRequest request = new SetPartyLeadRequest(null, null, 4L);
     Mission persisted = new Mission();
     MissionDto dto = fullMissionDto(id);
-    when(missionService.setPartyLead(id, null, null, 4L)).thenReturn(persisted);
+    when(missionParticipantService.setPartyLead(id, null, null, 4L)).thenReturn(persisted);
     when(missionMapper.toDto(persisted)).thenReturn(dto);
 
     MissionDto result = controller.setPartyLead(id, request);
 
     assertThat(result).isSameAs(dto);
     verify(userService, never()).findMatchesByExactName(any());
-    verify(missionService).setPartyLead(id, null, null, 4L);
+    verify(missionParticipantService).setPartyLead(id, null, null, 4L);
   }
 }

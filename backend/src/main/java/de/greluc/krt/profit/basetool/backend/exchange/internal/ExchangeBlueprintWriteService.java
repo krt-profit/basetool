@@ -19,6 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.AMBIGUOUS;
+import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.REJECTED;
+import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.UNCHANGED;
+import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.UNMATCHED;
+
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintProducts;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintSource;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.DefaultBlueprintKeys;
@@ -34,9 +39,6 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChang
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemRef;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveRequest;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
-import io.micrometer.core.instrument.MeterRegistry;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -54,29 +56,13 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Applies a client's blueprint changes to the member's set: adds and removes, planned as a whole,
  * checked against the mass-change guard, and written through the web's own paths with every entry
- * journaled (REQ-XCH-014, REQ-XCH-015, REQ-XCH-021, REQ-XCH-022, ADR-0218).
+ * journaled (REQ-XCH-014, REQ-XCH-015, REQ-XCH-021, REQ-XCH-022, ADR-0218, ADR-0285).
  */
 @Service
 @RequiredArgsConstructor
-public class ExchangeBlueprintWriteService {
-
-  /** The result of an op whose state was already what it asked for. */
-  static final String UNCHANGED = "unchanged";
-
-  /** The result of an op whose reference matched no product. */
-  static final String UNMATCHED = "unmatched";
-
-  /** The result of an op whose reference matched several products. */
-  static final String AMBIGUOUS = "ambiguous";
-
-  /** The result of an op the server refused. */
-  static final String REJECTED = "rejected";
-
-  /** The outcome label of an applied op. */
-  static final String APPLIED = "applied";
-
-  /** The outcome label of a change set the guard held back. */
-  static final String HELD = "held";
+public class ExchangeBlueprintWriteService
+    implements ExchangeChangeSetAdapter<
+        ExchangeBlueprintChangeSet, ExchangeBlueprintWriteService.Change> {
 
   /** The refusal of removing a default-granted blueprint. */
   static final String DEFAULT_NOT_REMOVABLE = "DEFAULT_NOT_REMOVABLE";
@@ -100,7 +86,7 @@ public class ExchangeBlueprintWriteService {
   private final ExchangeChangeRepository changeRepository;
   private final ExchangeJournalService journalService;
   private final ExchangeMassChangeGuard guard;
-  private final MeterRegistry meterRegistry;
+  private final ExchangeChangeSetRunner runner;
   private final ExchangeLiveSync liveSync;
 
   /**
@@ -115,7 +101,7 @@ public class ExchangeBlueprintWriteService {
   @Transactional
   public @NotNull ExchangeChangeResultDto apply(
       @NotNull ExchangeCaller caller, @NotNull ExchangeBlueprintChangeSet changeSet) {
-    return run(caller, changeSet, true);
+    return runner.run(caller, this, changeSet, true);
   }
 
   /**
@@ -129,85 +115,99 @@ public class ExchangeBlueprintWriteService {
   @Transactional
   public @NotNull ExchangeChangeResultDto applyConfirmed(
       @NotNull ExchangeCaller caller, @NotNull ExchangeBlueprintChangeSet changeSet) {
-    return run(caller, changeSet, false);
+    return runner.run(caller, this, changeSet, false);
+  }
+
+  @Override
+  public @NotNull ExchangeResource resource() {
+    return ExchangeResource.BLUEPRINT;
+  }
+
+  @Override
+  public boolean dryRun(@NotNull ExchangeBlueprintChangeSet changeSet) {
+    return changeSet.dryRun();
+  }
+
+  @Override
+  public @Nullable String opId(@NotNull ExchangeBlueprintChangeSet changeSet, int index) {
+    return changeSet.ops().get(index).opId();
   }
 
   /**
-   * Plans a change set, asks the guard when told to, and applies it.
+   * Counts the batch's removals against the member's blueprints.
    *
    * @param caller the caller
    * @param changeSet the changes
-   * @param guarded whether the mass-change guard decides
-   * @return the result
+   * @param plan the plan
+   * @return {@code true} when the member must confirm the batch
    */
-  private @NotNull ExchangeChangeResultDto run(
+  @Override
+  public boolean holdsBack(
       @NotNull ExchangeCaller caller,
       @NotNull ExchangeBlueprintChangeSet changeSet,
-      boolean guarded) {
-    List<Planned> plan = plan(caller, changeSet.ops());
-    long removals = plan.stream().filter(p -> p instanceof Change change && !change.add()).count();
-    if (guarded
-        && !changeSet.dryRun()
-        && guard.requiresConfirmation(
-            caller,
-            ExchangeResource.BLUEPRINT,
-            blueprintRepository.countByOwnerUserId(caller.member()),
-            removals)) {
-      counter(caller, HELD).increment();
-      throw ExchangeProblemException.massChangeConfirmationRequired();
-    }
-    UUID batch = UUID.randomUUID();
-    int applied = 0;
-    int unchanged = 0;
-    List<ExchangeChangeResultDto.OpResult> results = new ArrayList<>();
-    for (int i = 0; i < plan.size(); i++) {
-      String opId = changeSet.ops().get(i).opId();
-      switch (plan.get(i)) {
-        case Change change -> {
-          if (!changeSet.dryRun()) {
-            execute(caller, batch, change);
-            counter(caller, APPLIED).increment();
-          }
-          applied++;
+      @NotNull List<Planned<Change>> plan) {
+    long removals =
+        plan.stream()
+            .filter(p -> p instanceof Write<Change>(Change change) && !change.add())
+            .count();
+    return guard.requiresConfirmation(
+        caller,
+        ExchangeResource.BLUEPRINT,
+        blueprintRepository.countByOwnerUserId(caller.member()),
+        removals);
+  }
+
+  /**
+   * Writes the planned adds and removes, refreshing the member's blueprints afterwards.
+   *
+   * @param caller the caller
+   * @param batch the change set's id
+   * @param plan the plan
+   * @param dryRun whether nothing is written
+   * @return the execution
+   */
+  @Override
+  public @NotNull Execution<Change> start(
+      @NotNull ExchangeCaller caller,
+      @NotNull UUID batch,
+      @NotNull List<Planned<Change>> plan,
+      boolean dryRun) {
+    return new Execution<>() {
+      @Override
+      public @NotNull Outcome run(@NotNull Change change) {
+        if (!dryRun) {
+          execute(caller, batch, change);
         }
-        case Skip skip -> {
-          if (UNCHANGED.equals(skip.result())) {
-            unchanged++;
-          }
-          if (!changeSet.dryRun()) {
-            counter(caller, skip.result()).increment();
-          }
-          results.add(new ExchangeChangeResultDto.OpResult(i, opId, skip.result(), skip.reason()));
-        }
+        return Outcome.APPLIED;
       }
-    }
-    if (!changeSet.dryRun() && applied > 0) {
-      liveSync.blueprintsChanged(caller.member());
-    }
-    return new ExchangeChangeResultDto(
-        changeSet.dryRun(),
-        applied,
-        unchanged,
-        plan.size() - applied - unchanged,
-        results,
-        null,
-        null,
-        null);
+
+      @Override
+      public @NotNull Effects effects() {
+        return Effects.NONE;
+      }
+
+      @Override
+      public void announce() {
+        liveSync.blueprintsChanged(caller.member());
+      }
+    };
   }
 
   /**
    * Decides every op against the member's current set, in order, as if the earlier ops had run.
    *
    * @param caller the caller
-   * @param ops the ops
+   * @param changeSet the changes
    * @return one plan per op
    */
-  private @NotNull List<Planned> plan(
-      @NotNull ExchangeCaller caller, @NotNull List<ExchangeBlueprintChangeSet.Op> ops) {
+  @Override
+  public @NotNull List<Planned<Change>> plan(
+      @NotNull ExchangeCaller caller, @NotNull ExchangeBlueprintChangeSet changeSet) {
+    List<ExchangeBlueprintChangeSet.Op> ops = changeSet.ops();
     Map<Integer, ExchangeResolveResponse.Result> resolved = resolve(ops);
     Map<String, String> keysByBt = new HashMap<>();
     Map<String, Boolean> owned = new LinkedHashMap<>();
-    List<Planned> plan = new ArrayList<>();
+    List<Planned<Change>> plan = new ArrayList<>();
     for (int i = 0; i < ops.size(); i++) {
       ExchangeBlueprintChangeSet.Op op = ops.get(i);
       String productKey;
@@ -216,20 +216,20 @@ public class ExchangeBlueprintWriteService {
       } else if (op.ref() != null) {
         ExchangeResolveResponse.Result result = Objects.requireNonNull(resolved.get(i));
         if (result.status() == ExchangeResolveResponse.Status.UNMATCHED) {
-          plan.add(new Skip(UNMATCHED, UNMATCHED_REASON));
+          plan.add(ExchangeChangeSetAdapter.skip(UNMATCHED, UNMATCHED_REASON));
           continue;
         }
         if (result.status() == ExchangeResolveResponse.Status.AMBIGUOUS) {
-          plan.add(new Skip(AMBIGUOUS, AMBIGUOUS_REASON));
+          plan.add(ExchangeChangeSetAdapter.skip(AMBIGUOUS, AMBIGUOUS_REASON));
           continue;
         }
         productKey = productKeyOf(Objects.requireNonNull(result.ref()).bt(), keysByBt);
       } else {
-        plan.add(new Skip(UNMATCHED, UNMATCHED_REASON));
+        plan.add(ExchangeChangeSetAdapter.skip(UNMATCHED, UNMATCHED_REASON));
         continue;
       }
       if (productKey == null) {
-        plan.add(new Skip(UNMATCHED, UNMATCHED_REASON));
+        plan.add(ExchangeChangeSetAdapter.skip(UNMATCHED, UNMATCHED_REASON));
         continue;
       }
       boolean present =
@@ -238,20 +238,20 @@ public class ExchangeBlueprintWriteService {
               k -> blueprintRepository.existsByOwnerUserIdAndProductKey(caller.member(), k));
       if ("add".equals(op.op())) {
         if (present) {
-          plan.add(new Skip(UNCHANGED, null));
+          plan.add(ExchangeChangeSetAdapter.skip(UNCHANGED, null));
         } else if (!Boolean.TRUE.equals(op.override()) && removedElsewhere(caller, productKey)) {
-          plan.add(new Skip(REJECTED, REMOVED_ELSEWHERE));
+          plan.add(ExchangeChangeSetAdapter.skip(REJECTED, REMOVED_ELSEWHERE));
         } else {
           owned.put(productKey, true);
-          plan.add(new Change(true, productKey, op));
+          plan.add(ExchangeChangeSetAdapter.write(new Change(true, productKey, op)));
         }
       } else if (!present) {
-        plan.add(new Skip(UNCHANGED, null));
+        plan.add(ExchangeChangeSetAdapter.skip(UNCHANGED, null));
       } else if (defaultKeys.isDefault(productKey)) {
-        plan.add(new Skip(REJECTED, DEFAULT_NOT_REMOVABLE));
+        plan.add(ExchangeChangeSetAdapter.skip(REJECTED, DEFAULT_NOT_REMOVABLE));
       } else {
         owned.put(productKey, false);
-        plan.add(new Change(false, productKey, op));
+        plan.add(ExchangeChangeSetAdapter.write(new Change(false, productKey, op)));
       }
     }
     return plan;
@@ -350,9 +350,9 @@ public class ExchangeBlueprintWriteService {
           blueprintRepository
               .findByOwnerUserIdAndProductKey(caller.member(), planned.productKey())
               .orElseThrow();
-      Map<String, Object> after = state(added);
+      ExchangeBlueprintJournal.State after = ExchangeBlueprintJournal.State.of(added);
       if (Boolean.TRUE.equals(planned.op().override())) {
-        after.put("override", true);
+        after = after.overriding();
       }
       journalService.record(
           caller,
@@ -361,13 +361,13 @@ public class ExchangeBlueprintWriteService {
           planned.productKey(),
           false,
           null,
-          after);
+          after.toJournal());
     } else {
       PersonalBlueprint removed =
           blueprintRepository
               .findByOwnerUserIdAndProductKey(caller.member(), planned.productKey())
               .orElseThrow();
-      Map<String, Object> before = state(removed);
+      Map<String, Object> before = ExchangeBlueprintJournal.State.of(removed).toJournal();
       blueprintService.delete(caller.member(), removed.getId());
       journalService.record(
           caller,
@@ -381,63 +381,12 @@ public class ExchangeBlueprintWriteService {
   }
 
   /**
-   * Captures what an undo needs to restore a blueprint.
-   *
-   * @param blueprint the blueprint
-   * @return its product, name, acquisition date and note
-   */
-  private static @NotNull Map<String, Object> state(@NotNull PersonalBlueprint blueprint) {
-    Map<String, Object> state = new LinkedHashMap<>();
-    state.put("productKey", blueprint.getProductKey());
-    state.put("productName", blueprint.getProductName());
-    Instant acquiredAt = blueprint.getAcquiredAt();
-    if (acquiredAt != null) {
-      state.put("acquiredAt", acquiredAt.toString());
-    }
-    if (blueprint.getNote() != null) {
-      state.put("note", blueprint.getNote());
-    }
-    return state;
-  }
-
-  /**
-   * Returns the write counter of the caller's client and one outcome.
-   *
-   * @param caller the caller, whose client the relay bounded by the registry
-   * @param outcome the outcome
-   * @return the counter
-   */
-  private io.micrometer.core.instrument.Counter counter(
-      @NotNull ExchangeCaller caller, @NotNull String outcome) {
-    return meterRegistry.counter(
-        MetricNames.EXCHANGE_WRITES,
-        MetricNames.TAG_CLIENT_ID,
-        caller.clientId(),
-        MetricNames.TAG_RESOURCE,
-        ExchangeResource.BLUEPRINT.name().toLowerCase(java.util.Locale.ROOT),
-        MetricNames.TAG_OUTCOME,
-        outcome);
-  }
-
-  /** What one op of a change set will do. */
-  private sealed interface Planned permits Change, Skip {}
-
-  /**
    * An op that changes the member's set.
    *
    * @param add {@code true} for an add, {@code false} for a removal
    * @param productKey the product it acts on
    * @param op the op
    */
-  private record Change(
-      boolean add, @NotNull String productKey, @NotNull ExchangeBlueprintChangeSet.Op op)
-      implements Planned {}
-
-  /**
-   * An op that changes nothing.
-   *
-   * @param result its result
-   * @param reason its refusal code, or {@code null}
-   */
-  private record Skip(@NotNull String result, @Nullable String reason) implements Planned {}
+  record Change(
+      boolean add, @NotNull String productKey, @NotNull ExchangeBlueprintChangeSet.Op op) {}
 }

@@ -29,8 +29,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionStructureService;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -57,6 +59,10 @@ class MissionControllerCreatePathTest {
   private MockMvc mockMvc;
 
   @MockitoBean private MissionService missionService;
+
+  @MockitoBean private MissionParticipantService missionParticipantService;
+
+  @MockitoBean private MissionStructureService missionStructureService;
   @MockitoBean private MissionSecurityService missionSecurityService;
 
   @BeforeEach

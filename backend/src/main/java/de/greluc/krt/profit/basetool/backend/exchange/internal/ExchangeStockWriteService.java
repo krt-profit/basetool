@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
-import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.APPLIED;
 import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.REJECTED;
 import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.UNCHANGED;
 import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.round;
@@ -42,8 +41,6 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
-import io.micrometer.core.instrument.MeterRegistry;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.util.ArrayList;
@@ -51,9 +48,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -67,7 +62,6 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -82,17 +76,19 @@ import tools.jackson.databind.ObjectMapper;
  * book-out, which lowers linked Materialbörse offers and audits each offer it lowers or removes;
  * they are counted in the result. A share moves part of a lot's personal stock into the pool of one
  * of the member's direct units, an unshare moves the member's own stock in a pool back to personal,
- * both through the Lager's rebooking ({@link ExchangeStockShares}).
+ * both through the Lager's rebooking ({@link ExchangeStockShares}). The {@link
+ * ExchangeChangeSetRunner} runs the change set (ADR-0285).
  */
 @Service
 @RequiredArgsConstructor
-public class ExchangeStockWriteService {
+public class ExchangeStockWriteService
+    implements ExchangeChangeSetAdapter<
+        ExchangeStockChangeSet, ExchangeStockWriteService.StockWrite> {
 
   /** The share of a lot a batch may take within the window before it counts as a removal. */
   private static final BigDecimal REMOVAL_SHARE = new BigDecimal("0.1");
 
   private static final Pattern LOT_KEY_SEPARATOR = Pattern.compile("\\|");
-  private static final String HELD = "held";
   private static final String CLIENT_CHANNEL = "client";
 
   /** The refusal of a quantity whose unit is not the material's. */
@@ -128,7 +124,7 @@ public class ExchangeStockWriteService {
   private final ExchangeJournalService journalService;
   private final ExchangeJournalRepository journalRepository;
   private final ExchangeMassChangeGuard guard;
-  private final MeterRegistry meterRegistry;
+  private final ExchangeChangeSetRunner runner;
   private final ObjectMapper objectMapper;
   private final ExchangeLiveSync liveSync;
   private final Clock clock = Clock.systemUTC();
@@ -146,7 +142,7 @@ public class ExchangeStockWriteService {
   @Transactional
   public @NotNull ExchangeChangeResultDto apply(
       @NotNull ExchangeCaller caller, @NotNull ExchangeStockChangeSet changeSet) {
-    return run(caller, changeSet, true);
+    return runner.run(caller, this, changeSet, true);
   }
 
   /**
@@ -160,86 +156,94 @@ public class ExchangeStockWriteService {
   @Transactional
   public @NotNull ExchangeChangeResultDto applyConfirmed(
       @NotNull ExchangeCaller caller, @NotNull ExchangeStockChangeSet changeSet) {
-    return run(caller, changeSet, false);
+    return runner.run(caller, this, changeSet, false);
+  }
+
+  @Override
+  public @NotNull ExchangeResource resource() {
+    return ExchangeResource.STOCK;
+  }
+
+  @Override
+  public boolean dryRun(@NotNull ExchangeStockChangeSet changeSet) {
+    return changeSet.dryRun();
+  }
+
+  @Override
+  public @Nullable String opId(@NotNull ExchangeStockChangeSet changeSet, int index) {
+    return changeSet.ops().get(index).opId();
   }
 
   /**
-   * Plans a change set, asks the guard when told to, and applies it.
+   * Counts the batch's removals by the stock rules against the member's lots.
    *
    * @param caller the caller
    * @param changeSet the changes
-   * @param guarded whether the mass-change guard decides
-   * @return the result
+   * @param plan the plan
+   * @return {@code true} when the member must confirm the batch
    */
-  private @NotNull ExchangeChangeResultDto run(
-      @NotNull ExchangeCaller caller, @NotNull ExchangeStockChangeSet changeSet, boolean guarded) {
-    List<Planned> plan = plan(caller, changeSet.ops());
+  @Override
+  public boolean holdsBack(
+      @NotNull ExchangeCaller caller,
+      @NotNull ExchangeStockChangeSet changeSet,
+      @NotNull List<Planned<StockWrite>> plan) {
+    return guard.requiresConfirmation(
+        caller,
+        ExchangeResource.STOCK,
+        lotCount(caller.member()),
+        removals(caller, plan, moves(plan)));
+  }
+
+  /**
+   * Marks the stolen twins of the batch, then books, rebooks and journals each planned change, and
+   * refreshes the Lager pages afterwards.
+   *
+   * @param caller the caller
+   * @param batch the change set's id
+   * @param plan the plan
+   * @param dryRun whether nothing is written; shares and unshares still ask the Lager
+   * @return the execution
+   */
+  @Override
+  public @NotNull Execution<StockWrite> start(
+      @NotNull ExchangeCaller caller,
+      @NotNull UUID batch,
+      @NotNull List<Planned<StockWrite>> plan,
+      boolean dryRun) {
     Set<Change> moves = moves(plan);
-    if (guarded
-        && !changeSet.dryRun()
-        && guard.requiresConfirmation(
-            caller,
-            ExchangeResource.STOCK,
-            lotCount(caller.member()),
-            removals(caller, plan, moves))) {
-      counter(caller, HELD).increment();
-      throw ExchangeProblemException.massChangeConfirmationRequired();
-    }
-    UUID batch = UUID.randomUUID();
-    int applied = 0;
-    int unchanged = 0;
     OfferEffects offers = new OfferEffects();
     Map<Change, BigDecimal> flipped =
-        changeSet.dryRun() || !inventoryProperties.stolenMarkingEnabled()
+        dryRun || !inventoryProperties.stolenMarkingEnabled()
             ? Map.of()
             : flipStolen(caller.member(), plan);
-    List<ExchangeChangeResultDto.OpResult> results = new ArrayList<>();
     Set<String> touched = new HashSet<>();
     Set<String> refused = new HashSet<>();
-    for (int i = 0; i < plan.size(); i++) {
-      String opId = changeSet.ops().get(i).opId();
-      Planned planned = plan.get(i);
-      if (planned instanceof Rebooking rebooking) {
-        planned = runRebooking(caller, batch, rebooking, changeSet.dryRun(), touched, refused);
+    return new Execution<>() {
+      @Override
+      public @NotNull Outcome run(@NotNull StockWrite write) {
+        return switch (write) {
+          case Rebooking rebooking ->
+              runRebooking(caller, batch, rebooking, dryRun, touched, refused);
+          case Change change -> {
+            if (!dryRun) {
+              execute(caller, batch, change, moves, flipped, offers, touched);
+            }
+            touched.add(change.lot().key());
+            yield Outcome.APPLIED;
+          }
+        };
       }
-      switch (planned) {
-        case Change change -> {
-          if (!changeSet.dryRun()) {
-            execute(caller, batch, change, moves, flipped, offers, touched);
-            counter(caller, APPLIED).increment();
-          }
-          touched.add(change.lot().key());
-          applied++;
-        }
-        case Rebooking _ -> {
-          if (!changeSet.dryRun()) {
-            counter(caller, APPLIED).increment();
-          }
-          applied++;
-        }
-        case Skip skip -> {
-          if (UNCHANGED.equals(skip.result())) {
-            unchanged++;
-          }
-          if (!changeSet.dryRun()) {
-            counter(caller, skip.result()).increment();
-          }
-          results.add(new ExchangeChangeResultDto.OpResult(i, opId, skip.result(), skip.reason()));
-        }
+
+      @Override
+      public @NotNull Effects effects() {
+        return new Effects(offers.reduced, offers.removed, null);
       }
-    }
-    if (!changeSet.dryRun() && applied > 0) {
-      liveSync.stockChanged(offers.reduced + offers.removed > 0);
-    }
-    return new ExchangeChangeResultDto(
-        changeSet.dryRun(),
-        applied,
-        unchanged,
-        plan.size() - applied - unchanged,
-        results,
-        offers.reduced,
-        offers.removed,
-        null);
+
+      @Override
+      public void announce() {
+        liveSync.stockChanged(offers.reduced + offers.removed > 0);
+      }
+    };
   }
 
   /**
@@ -320,13 +324,16 @@ public class ExchangeStockWriteService {
    * names in the order of the lots' keys.
    *
    * @param caller the caller
-   * @param ops the ops
+   * @param changeSet the changes
    * @return one plan per op
+   * @throws BadRequestException when a share or unshare names no org unit
    */
-  private @NotNull List<Planned> plan(
-      @NotNull ExchangeCaller caller, @NotNull List<ExchangeStockChangeSet.Op> ops) {
+  @Override
+  public @NotNull List<Planned<StockWrite>> plan(
+      @NotNull ExchangeCaller caller, @NotNull ExchangeStockChangeSet changeSet) {
+    List<ExchangeStockChangeSet.Op> ops = changeSet.ops();
     Map<Integer, ExchangeLotCatalogue.Entry> catalogue = resolve(ops);
-    List<Skip> early = new ArrayList<>(ops.size());
+    List<Planned<StockWrite>> early = new ArrayList<>(ops.size());
     List<Lot> lots = new ArrayList<>(ops.size());
     for (int i = 0; i < ops.size(); i++) {
       ExchangeStockChangeSet.Op op = ops.get(i);
@@ -334,23 +341,23 @@ public class ExchangeStockWriteService {
         throw new BadRequestException("A share or unshare names its org unit");
       }
       ExchangeLotCatalogue.Entry entry = Objects.requireNonNull(catalogue.get(i));
-      Skip skip = null;
+      Planned<StockWrite> skip = null;
       Lot lot = null;
       if (entry.result() != null) {
-        skip = new Skip(entry.result(), entry.reason());
+        skip = ExchangeChangeSetAdapter.skip(entry.result(), entry.reason());
       } else {
         Optional<Location> location = locationResolver.resolve(op.location());
         String unit = entry.unit();
         if (location.isEmpty()) {
-          skip = new Skip(REJECTED, LOCATION_UNKNOWN);
+          skip = ExchangeChangeSetAdapter.skip(REJECTED, LOCATION_UNKNOWN);
         } else if (!unit.equals(op.quantity().unit())
             || !unit.equals(op.expectedQuantity().unit())
             || (ExchangeStockShares.isRebooking(op)
                 && !ExchangeStockShares.isWhole(op.quantity(), unit))) {
-          skip = new Skip(REJECTED, UNIT_MISMATCH);
+          skip = ExchangeChangeSetAdapter.skip(REJECTED, UNIT_MISMATCH);
         } else if (Boolean.TRUE.equals(op.stolen())
             && !inventoryProperties.stolenMarkingEnabled()) {
-          skip = new Skip(REJECTED, STOLEN_MARKING_DISABLED);
+          skip = ExchangeChangeSetAdapter.skip(REJECTED, STOLEN_MARKING_DISABLED);
         } else {
           Integer quality = entry.material() == null ? null : op.quality();
           lot =
@@ -368,7 +375,7 @@ public class ExchangeStockWriteService {
             ops.stream().anyMatch(op -> ExchangeStockChangeSet.SHARE.equals(op.op()))
                 ? membershipQueryService.findDirectMembershipOrgUnitIds(caller.member())
                 : Set.of());
-    List<Planned> plan = new ArrayList<>();
+    List<Planned<StockWrite>> plan = new ArrayList<>();
     for (int i = 0; i < ops.size(); i++) {
       if (early.get(i) != null) {
         plan.add(early.get(i));
@@ -387,32 +394,33 @@ public class ExchangeStockWriteService {
         ExchangeStockShares.Move move = decision.move();
         plan.add(
             move != null
-                ? new Rebooking(move)
-                : new Skip(decision.refusal() == null ? UNCHANGED : REJECTED, decision.refusal()));
+                ? ExchangeChangeSetAdapter.write(new Rebooking(move))
+                : ExchangeChangeSetAdapter.skip(
+                    decision.refusal() == null ? UNCHANGED : REJECTED, decision.refusal()));
         continue;
       }
       if (current.compareTo(expected) != 0) {
-        plan.add(new Skip(REJECTED, VERSION_CONFLICT));
+        plan.add(ExchangeChangeSetAdapter.skip(REJECTED, VERSION_CONFLICT));
         continue;
       }
       if (current.compareTo(target) == 0) {
-        plan.add(new Skip(UNCHANGED, null));
+        plan.add(ExchangeChangeSetAdapter.skip(UNCHANGED, null));
         continue;
       }
       if (current.signum() == 0
           && !Boolean.TRUE.equals(op.override())
           && removedElsewhere(caller, lot.key())) {
-        plan.add(new Skip(REJECTED, REMOVED_ELSEWHERE));
+        plan.add(ExchangeChangeSetAdapter.skip(REJECTED, REMOVED_ELSEWHERE));
         continue;
       }
       if (target.compareTo(current) < 0
           && current.subtract(target).compareTo(round(free(rows), unit)) > 0) {
-        plan.add(new Skip(REJECTED, STOCK_EARMARKED));
+        plan.add(ExchangeChangeSetAdapter.skip(REJECTED, STOCK_EARMARKED));
         continue;
       }
       quantities.put(lot.key(), target);
       ledger.changed(lot.key(), unit, rows, current, target);
-      plan.add(new Change(lot, current, target, rows));
+      plan.add(ExchangeChangeSetAdapter.write(new Change(lot, current, target, rows)));
     }
     return plan;
   }
@@ -430,9 +438,9 @@ public class ExchangeStockWriteService {
    *     added
    * @param refused the lots whose earlier rebooking the Lager refused; the move's lot is added on a
    *     refusal
-   * @return the move when it ran or would run, else the skip of its refusal
+   * @return {@code applied} when the move ran or would run, else its refusal
    */
-  private @NotNull Planned runRebooking(
+  private @NotNull Outcome runRebooking(
       @NotNull ExchangeCaller caller,
       @NotNull UUID batch,
       @NotNull Rebooking rebooking,
@@ -441,17 +449,17 @@ public class ExchangeStockWriteService {
       @NotNull Set<String> refused) {
     String key = rebooking.move().key();
     if (refused.contains(key)) {
-      return new Skip(REJECTED, VERSION_CONFLICT);
+      return Outcome.rejected(VERSION_CONFLICT);
     }
     if (!(dryRun && touched.contains(key))) {
       String refusal = shares.run(caller, batch, rebooking.move(), dryRun);
       if (refusal != null) {
         refused.add(key);
-        return new Skip(REJECTED, refusal);
+        return Outcome.rejected(refusal);
       }
     }
     touched.add(key);
-    return rebooking;
+    return Outcome.APPLIED;
   }
 
   /**
@@ -538,10 +546,11 @@ public class ExchangeStockWriteService {
    * @param plan the plan
    * @return the falling lots whose whole fall is covered
    */
-  private static @NotNull Set<Change> moves(@NotNull List<Planned> plan) {
+  private static @NotNull Set<Change> moves(@NotNull List<Planned<StockWrite>> plan) {
     Map<UUID, BigDecimal> rises = new HashMap<>();
-    for (Planned planned : plan) {
-      if (planned instanceof Change change && change.target().compareTo(change.current()) > 0) {
+    for (Planned<StockWrite> planned : plan) {
+      if (planned instanceof Write<StockWrite>(Change change)
+          && change.target().compareTo(change.current()) > 0) {
         rises.merge(
             change.lot().catalogueId(),
             change.target().subtract(change.current()),
@@ -549,8 +558,9 @@ public class ExchangeStockWriteService {
       }
     }
     Set<Change> moves = Collections.newSetFromMap(new IdentityHashMap<>());
-    for (Planned planned : plan) {
-      if (planned instanceof Change change && change.target().compareTo(change.current()) < 0) {
+    for (Planned<StockWrite> planned : plan) {
+      if (planned instanceof Write<StockWrite>(Change change)
+          && change.target().compareTo(change.current()) < 0) {
         BigDecimal fall = change.current().subtract(change.target());
         BigDecimal left = rises.getOrDefault(change.lot().catalogueId(), BigDecimal.ZERO);
         if (left.compareTo(fall) >= 0) {
@@ -573,16 +583,17 @@ public class ExchangeStockWriteService {
    * @return the amount each change had marked, by change; the rest of it is booked
    */
   private @NotNull Map<Change, BigDecimal> flipStolen(
-      @NotNull UUID member, @NotNull List<Planned> plan) {
+      @NotNull UUID member, @NotNull List<Planned<StockWrite>> plan) {
     IdentityHashMap<Change, BigDecimal> flipped = new IdentityHashMap<>();
     IdentityHashMap<Change, BigDecimal> room = new IdentityHashMap<>();
-    for (Planned planned : plan) {
-      if (planned instanceof Change change && change.target().compareTo(change.current()) > 0) {
+    for (Planned<StockWrite> planned : plan) {
+      if (planned instanceof Write<StockWrite>(Change change)
+          && change.target().compareTo(change.current()) > 0) {
         room.put(change, change.target().subtract(change.current()));
       }
     }
-    for (Planned planned : plan) {
-      if (!(planned instanceof Change falling)
+    for (Planned<StockWrite> planned : plan) {
+      if (!(planned instanceof Write<StockWrite>(Change falling))
           || falling.target().compareTo(falling.current()) >= 0) {
         continue;
       }
@@ -671,10 +682,12 @@ public class ExchangeStockWriteService {
    * @return the removals
    */
   private long removals(
-      @NotNull ExchangeCaller caller, @NotNull List<Planned> plan, @NotNull Set<Change> moves) {
+      @NotNull ExchangeCaller caller,
+      @NotNull List<Planned<StockWrite>> plan,
+      @NotNull Set<Change> moves) {
     long removals = 0;
-    for (Planned planned : plan) {
-      if (planned instanceof Change change && isRemoval(caller, change, moves)) {
+    for (Planned<StockWrite> planned : plan) {
+      if (planned instanceof Write<StockWrite>(Change change) && isRemoval(caller, change, moves)) {
         removals++;
       }
     }
@@ -717,10 +730,8 @@ public class ExchangeStockWriteService {
             ExchangeResource.STOCK,
             lotKey,
             clock.instant().minus(ExchangeMassChangeGuard.WINDOW))
-        .map(entry -> entry.getBeforeState())
-        .map(json -> objectMapper.readTree(json).get("quantity"))
-        .filter(JsonNode::isNumber)
-        .map(JsonNode::decimalValue);
+        .map(ExchangeJournalEntry::getBeforeState)
+        .map(json -> ExchangeStockJournal.State.read(objectMapper.readTree(json)).quantity());
   }
 
   /**
@@ -763,8 +774,8 @@ public class ExchangeStockWriteService {
         ExchangeJournalAction.STOCK_SET_QUANTITY,
         change.lot().key(),
         isRemoval(caller, change, moves),
-        state(change.current(), change.lot().unit()),
-        state(change.target(), change.lot().unit()));
+        ExchangeStockJournal.State.of(change.current(), change.lot().unit()).toJournal(),
+        ExchangeStockJournal.State.of(change.target(), change.lot().unit()).toJournal());
   }
 
   /**
@@ -841,39 +852,6 @@ public class ExchangeStockWriteService {
     return free;
   }
 
-  /**
-   * Captures a lot's quantity for the journal.
-   *
-   * @param quantity the quantity
-   * @param unit the unit
-   * @return the state
-   */
-  static @NotNull Map<String, Object> state(@NotNull BigDecimal quantity, @NotNull String unit) {
-    Map<String, Object> state = new LinkedHashMap<>();
-    state.put("quantity", quantity);
-    state.put("unit", unit);
-    return state;
-  }
-
-  /**
-   * Returns the write counter of the caller's client and one outcome.
-   *
-   * @param caller the caller, whose client the relay bounded by the registry
-   * @param outcome the outcome
-   * @return the counter
-   */
-  private io.micrometer.core.instrument.Counter counter(
-      @NotNull ExchangeCaller caller, @NotNull String outcome) {
-    return meterRegistry.counter(
-        MetricNames.EXCHANGE_WRITES,
-        MetricNames.TAG_CLIENT_ID,
-        caller.clientId(),
-        MetricNames.TAG_RESOURCE,
-        ExchangeResource.STOCK.name().toLowerCase(Locale.ROOT),
-        MetricNames.TAG_OUTCOME,
-        outcome);
-  }
-
   /** The offers the change set's book-outs lowered or removed. */
   private static final class OfferEffects {
 
@@ -944,15 +922,15 @@ public class ExchangeStockWriteService {
     }
   }
 
-  /** What one op of a change set will do. */
-  private sealed interface Planned permits Change, Rebooking, Skip {}
+  /** One change a planned op writes. */
+  sealed interface StockWrite permits Change, Rebooking {}
 
   /**
    * An op that moves part of a lot's stock between personal and a pool.
    *
    * @param move the share or unshare
    */
-  private record Rebooking(@NotNull ExchangeStockShares.Move move) implements Planned {}
+  private record Rebooking(@NotNull ExchangeStockShares.Move move) implements StockWrite {}
 
   /**
    * An op that changes a lot.
@@ -967,13 +945,5 @@ public class ExchangeStockWriteService {
       @NotNull BigDecimal current,
       @NotNull BigDecimal target,
       @NotNull List<StockRow> rows)
-      implements Planned {}
-
-  /**
-   * An op that changes nothing.
-   *
-   * @param result its result
-   * @param reason its refusal code, or {@code null}
-   */
-  private record Skip(@NotNull String result, @Nullable String reason) implements Planned {}
+      implements StockWrite {}
 }

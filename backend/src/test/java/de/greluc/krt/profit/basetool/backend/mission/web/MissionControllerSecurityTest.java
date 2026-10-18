@@ -27,7 +27,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionStructureService;
 import java.util.Collections;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,6 +52,10 @@ class MissionControllerSecurityTest {
   private MockMvc mockMvc;
 
   @MockitoBean private MissionService missionService;
+
+  @MockitoBean private MissionParticipantService missionParticipantService;
+
+  @MockitoBean private MissionStructureService missionStructureService;
 
   @MockitoBean
   private de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService
@@ -77,7 +83,8 @@ class MissionControllerSecurityTest {
     unit.setCrew(new java.util.LinkedHashSet<>(java.util.List.of(crew)));
     Mission mission = new Mission();
     mission.setAssignedUnits(new java.util.LinkedHashSet<>(java.util.List.of(unit)));
-    when(missionService.updateCrewInShip(any(), any(), any(), any(), any())).thenReturn(mission);
+    when(missionStructureService.updateCrewInShip(any(), any(), any(), any(), any()))
+        .thenReturn(mission);
 
     mockMvc
         .perform(
@@ -168,7 +175,7 @@ class MissionControllerSecurityTest {
     UUID userId = UUID.randomUUID();
 
     when(missionSecurityService.canManageManagers(any(UUID.class), any())).thenReturn(true);
-    when(missionService.addManager(any(), any())).thenReturn(new Mission());
+    when(missionParticipantService.addManager(any(), any())).thenReturn(new Mission());
 
     mockMvc
         .perform(

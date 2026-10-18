@@ -919,7 +919,11 @@ plans the ops in order — an add of an owned product and a remove of a missing 
 remove of a default `rejected DEFAULT_NOT_REMOVABLE`, an add against another's tombstone `rejected
 REMOVED_ELSEWHERE` — then asks the mass-change guard, and writes through the web's own add and
 delete, so the Blueprints audit names the client; each written entry is journaled. `dryRun` plans
-only. `basetool_exchange_writes_total{resource,outcome}` counts the ops.
+only. `basetool_exchange_writes_total{resource,outcome}` counts the ops. The change sets of every
+resource — blueprints, stock, ships and the org stock — run through one runner
+(`ExchangeChangeSetRunner`, ADR-0285) with the resource's write service as its adapter: a dry run
+counts nothing, a held change set counts one `held` and writes nothing, and the result lists every
+op that was not applied, alike for every resource. *`ExchangeChangeSetRunnerTest`.*
 
 **Status:** read and write sides built in the backend, and the gateway's read route (`GET
 /exchange/v1/me/blueprints`) and write route (`POST …/changes`) — WP 4.1 (#2084); the corpus round
@@ -939,7 +943,8 @@ material lot keeps the quality the client sends**, whatever the material's kind;
 quality 0. `materialKind` classifies a material for the client's own lists — `type`, `commodity`
 (listed in UEX's commodity catalogue, ores and refined metals included) and the UEX flags
 `mineral`, `harvestable`, `raw`, `refined`, `buyable`, `sellable` where UEX knows them — and never
-decides the quality. Writes are audited in the Lager domain with the external client.
+decides the quality. An item lot of a ship component carries `component` (REQ-XCH-049). Writes are
+audited in the Lager domain with the external client.
 
 A lot carries an additive `split` (`exchange.stock.read`, no new scope): `personal`, the member's
 personal rows, and `pools`, one entry `{orgUnit: {id}, quantity}` per unit in whose pool the
@@ -1490,10 +1495,16 @@ the same undo for every member of one client at once (REQ-XCH-034).
   `version`, a removed ship comes back in its earlier unit, an earlier unit the member has left is
   not restored and does not fail the undo, and an entry journaled without `orgUnit` leaves the unit
   alone. *`ExchangeUndoControllerTest`.*
+- [x] Each resource's journal state is written and read back by one class, a snapshot reads back as
+  the state it was taken from, and an entry in the shape an earlier writer journaled still undoes.
+  *`ExchangeJournalStateTest`.*
 
 The journal is `exchange_journal`: one row per written entry with the client, installation, change
 set, resource, key, action, whether it counts as a removal, the entry before and after as JSON, the
-writing transaction's id and the time. It is written in the write's own transaction, purged with the
+writing transaction's id and the time. Each resource's state is a typed record that one class per
+resource writes, reads back and restores (`ExchangeBlueprintJournal`, `ExchangeStockJournal`,
+`ExchangeShipJournal`, `ExchangeOrgStockJournal`; ADR-0285), in the same JSON keys for every version
+of the writer. It is written in the write's own transaction, purged with the
 change feed after 90 days by `exchange_change_retention`, exported under Art. 15, stays with the
 source account on a merge, and its states are searched by the Personensuche.
 
@@ -2845,6 +2856,45 @@ registry's check constraint gains the scope (`V292`), and the provisioner create
 
 **Enforced by:** the tests above · **Code:** `ExchangeOrgUnitController`, `ExchangeOrgUnitService`,
 `ExchangeController#orgUnits` · **Status:** built (#2598)
+
+### REQ-XCH-049 — Ship components carry their type, size, grade and class
+
+A game item that is a ship component carries the optional, output-only `component`
+(`component.schema.json`) beside its item reference: `componentType`, `size`, `grade` and
+`itemClass`. It appears on the lots of `GET /exchange/v1/me/stock` and `GET /exchange/v1/org-stock`
+beside `material`, and on the item lines of `GET /exchange/v1/me/org-demand` and of its detailed
+orders (REQ-XCH-047) beside `item`. The rule is the Basetool's own (REQ-INV-061, REQ-INV-062,
+`GameItemReferenceDto.of`): `component` is present once the item's SC Wiki type is a
+`ShipComponentType`, a material or another item carries none, and a key the item does not know is
+left out — a blank grade included. The values are stable codes, never labels: `componentType` is
+the `ShipComponentType` name, `itemClass` the `ShipComponentClass` name, `size` an integer and
+`grade` a string of at most 32 characters. The schema lists both code sets; a new value is
+additive within `v1` (ADR-0219, REQ-XCH-026) and a reader maps an unknown one to `UNKNOWN`.
+
+The field comes with the existing read scopes, as `split` did (REQ-XCH-016); no scope is added. The
+shared `item-ref` schema is unchanged, so change sets and resolve requests are unaffected. The stock
+and org-stock reads take the four columns from the `game_item` row their native query already
+joins, and the demand reads them from the game items its orders already load, so no read adds a
+query per lot or line.
+
+**Acceptance**
+
+- [x] An S1 grade A military shield lot in `/me/stock` and `/org-stock` carries
+  `{componentType: SHIELD, size: 1, grade: A, itemClass: MILITARY}`.
+  *`ExchangeStockControllerTest`, `ExchangeOrgStockControllerTest`.*
+- [x] An open org-demand item line and a detailed order's item line of that shield carry the same
+  object. *`ExchangeDemandServiceTest`.*
+- [x] Material lots and other items carry no `component`; a component with an unknown class carries
+  the other keys. *`ExchangeStockControllerTest`, `ExchangeComponentDtoTest`.*
+- [x] The schema's code lists equal `ShipComponentType` and `ShipComponentClass`, so the gateway
+  never refuses a component the backend writes. *`ExchangeComponentSchemaParityTest`.*
+- [x] Schemas, fixtures, wire contract, goldens and the relay OpenAPI hold the field.
+  *`ExchangeContractTest`, `ExchangeWireContractTest`, `ExchangeGoldenAnswerTest`,
+  `OpenApiGeneratorTest`.*
+
+**Enforced by:** the tests above · **Code:** `ExchangeComponentDto`, `ExchangeStockFeedService`,
+`ExchangeOrgStockService`, `ExchangeDemandService`, `InventoryItemRepository#EXCHANGE_LOTS` and
+`#EXCHANGE_ORG_LOTS` · **Status:** built (#2748)
 
 ## Threat model
 

@@ -22,11 +22,13 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintFamilies;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintOwnerProduct;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeComponentDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeDemandItemDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeDemandMaterialDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeDemandOrderDto;
@@ -324,7 +326,7 @@ public class ExchangeDemandService {
         }
         ItemLine item =
             lines.computeIfAbsent(
-                line.getGameItem().getId(), _ -> new ItemLine(line.getGameItem().getName()));
+                line.getGameItem().getId(), _ -> new ItemLine(line.getGameItem()));
         String output = line.getBlueprint() == null ? null : line.getBlueprint().getOutputName();
         boolean variants =
             order.isCountBlueprintsWithVariants() && !familyResolver.isMagazine(output);
@@ -343,7 +345,8 @@ public class ExchangeDemandService {
           if (line.open > 0) {
             result.add(
                 new ExchangeDemandItemDto(
-                    new ExchangeItemRefDto(gameItemId.toString(), cut(line.name)),
+                    new ExchangeItemRefDto(gameItemId.toString(), cut(line.item.getName())),
+                    ExchangeComponentDto.of(line.item),
                     new ExchangeQuantityDto(
                         ExchangeStockFeedService.amount(line.open, QuantityType.PIECE.name()),
                         QuantityType.PIECE.name()),
@@ -477,10 +480,10 @@ public class ExchangeDemandService {
     if (order.getType() != JobOrderType.ITEM) {
       return List.of();
     }
-    Map<UUID, String> names = new HashMap<>();
+    Map<UUID, GameItem> gameItems = new HashMap<>();
     for (JobOrderItem line : order.getItems()) {
       if (line.getGameItem() != null) {
-        names.putIfAbsent(line.getGameItem().getId(), line.getGameItem().getName());
+        gameItems.putIfAbsent(line.getGameItem().getId(), line.getGameItem());
       }
     }
     List<ExchangeDemandOrderItemDto> lines = new ArrayList<>();
@@ -488,11 +491,11 @@ public class ExchangeDemandService {
         .forEach(
             (gameItemId, open) -> {
               if (open > 0) {
+                GameItem gameItem = Objects.requireNonNull(gameItems.get(gameItemId));
                 lines.add(
                     new ExchangeDemandOrderItemDto(
-                        new ExchangeItemRefDto(
-                            gameItemId.toString(),
-                            cut(Objects.requireNonNull(names.get(gameItemId)))),
+                        new ExchangeItemRefDto(gameItemId.toString(), cut(gameItem.getName())),
+                        ExchangeComponentDto.of(gameItem),
                         new ExchangeQuantityDto(
                             ExchangeStockFeedService.amount(open, QuantityType.PIECE.name()),
                             QuantityType.PIECE.name())));
@@ -587,8 +590,8 @@ public class ExchangeDemandService {
   /** The running total of one game item. */
   private static final class ItemLine {
 
-    /** The game item's name. */
-    private final String name;
+    /** The game item. */
+    private final GameItem item;
 
     /** The pieces still needed. */
     private int open;
@@ -599,10 +602,10 @@ public class ExchangeDemandService {
     /**
      * Starts a line.
      *
-     * @param name the game item's name
+     * @param item the game item
      */
-    private ItemLine(@NotNull String name) {
-      this.name = name;
+    private ItemLine(@NotNull GameItem item) {
+      this.item = item;
     }
   }
 }

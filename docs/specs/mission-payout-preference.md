@@ -47,7 +47,7 @@ the new participant's `payoutPreference` is **seeded from the user's default**. 
 `UserPayoutPreferenceValidationTest` (`@Valid` → 400 on a missing preference/version),
 `ProfileControllerTest`. **Code:** `MemberPayoutSetting` in `mission.api` (table `member_payout_setting`, migration `V283`, which copied the former `app_user.default_payout_preference` of V142; the old column stays until a later release drops it),
 `MemberPayoutSettings`, `MyPayoutPreferenceController` `/api/v1/missions/me/payout-preference`,
-`MissionParticipantService#addParticipant` (reached through `MissionService#addParticipant`),
+`MissionParticipantService#addParticipant` (called by `MissionController`),
 `frontend/.../ProfileController` (`POST /profile/payout-preference`) + `templates/identity/profile.html`.
 **Issues:** #469.
 

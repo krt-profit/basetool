@@ -36,7 +36,9 @@ import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFrequency;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionUnit;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionStructureService;
 import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -65,6 +67,10 @@ class MissionControllerSlimEndpointsTest {
   private MockMvc mockMvc;
 
   @MockitoBean private MissionService missionService;
+
+  @MockitoBean private MissionParticipantService missionParticipantService;
+
+  @MockitoBean private MissionStructureService missionStructureService;
 
   @MockitoBean
   private de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService
@@ -103,7 +109,7 @@ class MissionControllerSlimEndpointsTest {
     UUID missionId = UUID.randomUUID();
     UUID unitId = UUID.randomUUID();
     when(missionSecurityService.canManageMission(any(UUID.class), any())).thenReturn(true);
-    when(missionService.addUnitToMission(
+    when(missionStructureService.addUnitToMission(
             any(), any(), any(), any(), anyBoolean(), any(), any(), any()))
         .thenReturn(missionWithUnit(unitId));
 
@@ -124,7 +130,7 @@ class MissionControllerSlimEndpointsTest {
     UUID missionId = UUID.randomUUID();
     UUID unitId = UUID.randomUUID();
     when(missionSecurityService.canManageMission(any(UUID.class), any())).thenReturn(true);
-    when(missionService.updateMissionUnit(
+    when(missionStructureService.updateMissionUnit(
             any(), any(), any(), any(), any(), any(), anyBoolean(), any(), any(), any()))
         .thenReturn(missionWithUnit(unitId));
 
@@ -144,7 +150,7 @@ class MissionControllerSlimEndpointsTest {
     UUID missionId = UUID.randomUUID();
     UUID unitId = UUID.randomUUID();
     when(missionSecurityService.canManageMission(any(UUID.class), any())).thenReturn(true);
-    when(missionService.removeMissionUnit(any(), any())).thenReturn(new Mission());
+    when(missionStructureService.removeMissionUnit(any(), any())).thenReturn(new Mission());
 
     mockMvc
         .perform(
@@ -167,7 +173,7 @@ class MissionControllerSlimEndpointsTest {
     mission.setManagers(managers);
 
     when(missionSecurityService.canManageManagers(any(UUID.class), any())).thenReturn(true);
-    when(missionService.addManager(any(), any())).thenReturn(mission);
+    when(missionParticipantService.addManager(any(), any())).thenReturn(mission);
 
     mockMvc
         .perform(
@@ -184,7 +190,7 @@ class MissionControllerSlimEndpointsTest {
     UUID missionId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     when(missionSecurityService.canManageManagers(any(UUID.class), any())).thenReturn(true);
-    when(missionService.removeManager(any(), any())).thenReturn(new Mission());
+    when(missionParticipantService.removeManager(any(), any())).thenReturn(new Mission());
 
     mockMvc
         .perform(
@@ -358,7 +364,7 @@ class MissionControllerSlimEndpointsTest {
 
     when(userService.getUserIdFromJwt(any())).thenReturn(userId);
     when(missionSecurityService.canManageMission(any(UUID.class), any())).thenReturn(false);
-    when(missionService.addParticipant(any(), any(), any(), any(), any(), any(), any()))
+    when(missionParticipantService.addParticipant(any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(missionWithParticipant(participantId, userId));
 
     mockMvc
@@ -413,7 +419,7 @@ class MissionControllerSlimEndpointsTest {
     set.add(p);
     mission.setParticipants(set);
 
-    when(missionService.addParticipant(any(), any(), any(), any(), any(), any(), any()))
+    when(missionParticipantService.addParticipant(any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(mission);
 
     mockMvc
@@ -447,7 +453,7 @@ class MissionControllerSlimEndpointsTest {
 
     when(missionSecurityService.canAccessParticipant(any(UUID.class), any(UUID.class), any()))
         .thenReturn(true);
-    when(missionService.updateParticipantAttributes(
+    when(missionParticipantService.updateParticipantAttributes(
             any(UUID.class),
             any(UUID.class),
             any(),
@@ -496,7 +502,7 @@ class MissionControllerSlimEndpointsTest {
 
     when(userService.getUserIdFromJwt(any())).thenReturn(callerId);
     when(missionSecurityService.canManageMission(any(UUID.class), any())).thenReturn(true);
-    when(missionService.addParticipant(any(), any(), any(), any(), any(), any(), any()))
+    when(missionParticipantService.addParticipant(any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(missionWithParticipant(participantId, otherId));
 
     mockMvc
@@ -529,7 +535,7 @@ class MissionControllerSlimEndpointsTest {
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isConflict());
 
-    org.mockito.Mockito.verify(missionService, org.mockito.Mockito.never())
+    org.mockito.Mockito.verify(missionParticipantService, org.mockito.Mockito.never())
         .addParticipant(any(), any(), any(), any(), any(), any(), any());
   }
 
@@ -544,7 +550,7 @@ class MissionControllerSlimEndpointsTest {
     registered.setUsername("alice");
     when(userService.findMatchesByExactName("alice")).thenReturn(java.util.List.of(registered));
     when(userService.getUserIdFromJwt(any())).thenReturn(callerId);
-    when(missionService.addParticipant(any(), any(), any(), any(), any(), any(), any()))
+    when(missionParticipantService.addParticipant(any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(missionWithParticipant(participantId, callerId));
 
     mockMvc
@@ -562,7 +568,7 @@ class MissionControllerSlimEndpointsTest {
     org.mockito.ArgumentCaptor<UUID> userIdCaptor = org.mockito.ArgumentCaptor.forClass(UUID.class);
     org.mockito.ArgumentCaptor<String> guestNameCaptor =
         org.mockito.ArgumentCaptor.forClass(String.class);
-    org.mockito.Mockito.verify(missionService)
+    org.mockito.Mockito.verify(missionParticipantService)
         .addParticipant(
             any(), userIdCaptor.capture(), guestNameCaptor.capture(), any(), any(), any(), any());
     org.junit.jupiter.api.Assertions.assertEquals(
@@ -596,7 +602,7 @@ class MissionControllerSlimEndpointsTest {
                         .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isForbidden());
 
-    org.mockito.Mockito.verify(missionService, org.mockito.Mockito.never())
+    org.mockito.Mockito.verify(missionParticipantService, org.mockito.Mockito.never())
         .addParticipant(any(), any(), any(), any(), any(), any(), any());
   }
 
@@ -608,7 +614,7 @@ class MissionControllerSlimEndpointsTest {
 
     when(userService.getUserIdFromJwt(any())).thenReturn(callerId);
     when(missionSecurityService.canManageMission(any(UUID.class), any())).thenReturn(false);
-    when(missionService.addParticipant(any(), any(), any(), any(), any(), any(), any()))
+    when(missionParticipantService.addParticipant(any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(missionWithParticipant(participantId, callerId));
 
     mockMvc
@@ -623,7 +629,7 @@ class MissionControllerSlimEndpointsTest {
         .andExpect(status().isOk());
 
     org.mockito.ArgumentCaptor<UUID> userIdCaptor = org.mockito.ArgumentCaptor.forClass(UUID.class);
-    org.mockito.Mockito.verify(missionService)
+    org.mockito.Mockito.verify(missionParticipantService)
         .addParticipant(any(), userIdCaptor.capture(), any(), any(), any(), any(), any());
     org.junit.jupiter.api.Assertions.assertEquals(
         callerId,
@@ -666,7 +672,7 @@ class MissionControllerSlimEndpointsTest {
     UUID otherUserId = UUID.randomUUID();
     UUID guestParticipantId = UUID.randomUUID();
 
-    when(missionService.addParticipant(any(), any(), any(), any(), any(), any(), any()))
+    when(missionParticipantService.addParticipant(any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(missionWithOtherUserAndGuest(otherUserId, guestParticipantId));
 
     String body =
@@ -701,7 +707,7 @@ class MissionControllerSlimEndpointsTest {
 
     when(userService.getUserIdFromJwt(any())).thenReturn(callerId);
     when(missionSecurityService.canManageMission(any(UUID.class), any())).thenReturn(true);
-    when(missionService.addParticipant(any(), any(), any(), any(), any(), any(), any()))
+    when(missionParticipantService.addParticipant(any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(missionWithOtherUserAndGuest(otherUserId, guestParticipantId));
 
     String body =

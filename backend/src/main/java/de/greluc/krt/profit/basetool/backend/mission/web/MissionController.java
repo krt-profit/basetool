@@ -53,9 +53,12 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.AddMissionStepRequ
 import de.greluc.krt.profit.basetool.backend.mission.internal.AddUnitRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.JoinMissionRequest;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionPeerRedactor;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionStructureService;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionTimelineService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.ParticipantTargetResolver;
 import de.greluc.krt.profit.basetool.backend.mission.internal.ParticipantTargetResolver.ParticipantTarget;
 import de.greluc.krt.profit.basetool.backend.mission.internal.PatchMissionCoreRequest;
@@ -131,6 +134,9 @@ import org.springframework.web.bind.annotation.RestController;
 public class MissionController {
 
   private final MissionService missionService;
+  private final MissionTimelineService missionTimelineService;
+  private final MissionParticipantService missionParticipantService;
+  private final MissionStructureService missionStructureService;
   private final UserService userService;
   private final MissionMapper missionMapper;
   private final UserMapper userMapper;
@@ -388,7 +394,7 @@ public class MissionController {
       @RequestBody(required = false) @Valid JoinMissionRequest request) {
     MissionDto dto =
         missionMapper.toDto(
-            missionService.addParticipant(
+            missionParticipantService.addParticipant(
                 id,
                 userService.getUserIdFromJwt(jwt),
                 null,
@@ -514,7 +520,7 @@ public class MissionController {
             request.userId(), request.guestName(), "Party lead name is ambiguous.");
     return redactForPeer(
         missionMapper.toDto(
-            missionService.setPartyLead(
+            missionParticipantService.setPartyLead(
                 id, target.userId(), target.guestName(), request.version())));
   }
 
@@ -575,7 +581,7 @@ public class MissionController {
   public List<MissionUnitDto> addUnitSlim(
       @PathVariable @NotNull UUID id, @Valid @RequestBody @NotNull AddUnitRequest request) {
     var mission =
-        missionService.addUnitToMission(
+        missionStructureService.addUnitToMission(
             id,
             request.name(),
             request.shipTypeId(),
@@ -606,7 +612,7 @@ public class MissionController {
       @PathVariable @NotNull UUID unitId,
       @Valid @RequestBody @NotNull UpdateUnitRequest request) {
     var mission =
-        missionService.updateMissionUnit(
+        missionStructureService.updateMissionUnit(
             id,
             unitId,
             request.version(),
@@ -634,7 +640,7 @@ public class MissionController {
       description = "Deletes a unit and returns 204 No Content.")
   public ResponseEntity<Void> deleteUnitSlim(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID unitId) {
-    missionService.removeMissionUnit(id, unitId);
+    missionStructureService.removeMissionUnit(id, unitId);
     return ResponseEntity.noContent().build();
   }
 
@@ -656,7 +662,7 @@ public class MissionController {
   public List<MissionStepDto> addStepSlim(
       @PathVariable @NotNull UUID id, @Valid @RequestBody @NotNull AddMissionStepRequest request) {
     var mission =
-        missionService.addStep(id, request.title(), request.meta(), request.stepsVersion());
+        missionTimelineService.addStep(id, request.title(), request.meta(), request.stepsVersion());
     return toStepDtos(mission);
   }
 
@@ -678,7 +684,7 @@ public class MissionController {
       @PathVariable @NotNull UUID stepId,
       @Valid @RequestBody @NotNull UpdateMissionStepRequest request) {
     var mission =
-        missionService.updateStep(
+        missionTimelineService.updateStep(
             id, stepId, request.title(), request.meta(), request.stepsVersion());
     return toStepDtos(mission);
   }
@@ -700,7 +706,7 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID stepId,
       @RequestParam @NotNull Long stepsVersion) {
-    var mission = missionService.deleteStep(id, stepId, stepsVersion);
+    var mission = missionTimelineService.deleteStep(id, stepId, stepsVersion);
     return toStepDtos(mission);
   }
 
@@ -719,7 +725,8 @@ public class MissionController {
   public List<MissionStepDto> reorderStepsSlim(
       @PathVariable @NotNull UUID id,
       @Valid @RequestBody @NotNull ReorderMissionStepsRequest request) {
-    var mission = missionService.reorderSteps(id, request.stepIds(), request.stepsVersion());
+    var mission =
+        missionTimelineService.reorderSteps(id, request.stepIds(), request.stepsVersion());
     return toStepDtos(mission);
   }
 
@@ -740,7 +747,8 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID stepId,
       @Valid @RequestBody @NotNull ToggleMissionStepRequest request) {
-    var mission = missionService.toggleStepDone(id, stepId, request.done(), request.stepsVersion());
+    var mission =
+        missionTimelineService.toggleStepDone(id, stepId, request.done(), request.stepsVersion());
     return toStepDtos(mission);
   }
 
@@ -772,7 +780,7 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @Valid @RequestBody @NotNull AddMissionObjectiveRequest request) {
     var mission =
-        missionService.addObjective(
+        missionTimelineService.addObjective(
             id, request.title(), request.kind(), request.objectivesVersion());
     return toObjectiveDtos(mission);
   }
@@ -795,7 +803,7 @@ public class MissionController {
       @PathVariable @NotNull UUID objectiveId,
       @Valid @RequestBody @NotNull UpdateMissionObjectiveRequest request) {
     var mission =
-        missionService.updateObjective(
+        missionTimelineService.updateObjective(
             id, objectiveId, request.title(), request.kind(), request.objectivesVersion());
     return toObjectiveDtos(mission);
   }
@@ -817,7 +825,7 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID objectiveId,
       @RequestParam @NotNull Long objectivesVersion) {
-    var mission = missionService.deleteObjective(id, objectiveId, objectivesVersion);
+    var mission = missionTimelineService.deleteObjective(id, objectiveId, objectivesVersion);
     return toObjectiveDtos(mission);
   }
 
@@ -837,7 +845,8 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @Valid @RequestBody @NotNull ReorderMissionObjectivesRequest request) {
     var mission =
-        missionService.reorderObjectives(id, request.objectiveIds(), request.objectivesVersion());
+        missionTimelineService.reorderObjectives(
+            id, request.objectiveIds(), request.objectivesVersion());
     return toObjectiveDtos(mission);
   }
 
@@ -867,7 +876,9 @@ public class MissionController {
               + "mission. Restricted to callers who may manage the mission.")
   public List<ShipDto> getUnitShipOptions(@PathVariable @NotNull UUID id) {
     return redactShipsForPeer(
-        missionService.getSelectableUnitShips(id).stream().map(shipMapper::toDto).toList());
+        missionStructureService.getSelectableUnitShips(id).stream()
+            .map(shipMapper::toDto)
+            .toList());
   }
 
   /**
@@ -891,7 +902,8 @@ public class MissionController {
     Set<UUID> jobTypeIds =
         request.jobTypeIds() != null ? request.jobTypeIds() : Collections.emptySet();
     var mission =
-        missionService.addCrewToShip(id, missionUnitId, request.participantId(), jobTypeIds);
+        missionStructureService.addCrewToShip(
+            id, missionUnitId, request.participantId(), jobTypeIds);
     return missionMapper.toDto(findUnit(mission, missionUnitId)).crew();
   }
 
@@ -917,7 +929,8 @@ public class MissionController {
     Set<UUID> jobTypeIds =
         request.jobTypeIds() != null ? request.jobTypeIds() : Collections.emptySet();
     var mission =
-        missionService.updateCrewInShip(id, missionUnitId, crewId, request.version(), jobTypeIds);
+        missionStructureService.updateCrewInShip(
+            id, missionUnitId, crewId, request.version(), jobTypeIds);
     return missionMapper.toDto(findCrew(findUnit(mission, missionUnitId), crewId));
   }
 
@@ -938,7 +951,7 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID missionUnitId,
       @PathVariable @NotNull UUID crewId) {
-    missionService.removeCrewFromShip(id, missionUnitId, crewId);
+    missionStructureService.removeCrewFromShip(id, missionUnitId, crewId);
     return ResponseEntity.noContent().build();
   }
 
@@ -964,7 +977,7 @@ public class MissionController {
       @RequestBody @Valid @NotNull UpdateParticipantRequest request,
       Authentication authentication) {
     var mission =
-        missionService.updateParticipantAttributes(
+        missionParticipantService.updateParticipantAttributes(
             id,
             participantId,
             request.desiredMissionJobTypeId(),
@@ -998,7 +1011,7 @@ public class MissionController {
           "Checks in a participant and returns only the updated participant as a slim DTO.")
   public MissionParticipantDto checkInParticipantSlim(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID participantId) {
-    var mission = missionService.checkIn(id, participantId);
+    var mission = missionParticipantService.checkIn(id, participantId);
     return redactForPeer(missionMapper.toDto(findParticipant(mission, participantId)));
   }
 
@@ -1020,7 +1033,7 @@ public class MissionController {
           "Checks out a participant and returns only the updated participant as a slim DTO.")
   public MissionParticipantDto checkOutParticipantSlim(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID participantId) {
-    var mission = missionService.checkOut(id, participantId);
+    var mission = missionParticipantService.checkOut(id, participantId);
     return redactForPeer(missionMapper.toDto(findParticipant(mission, participantId)));
   }
 
@@ -1045,7 +1058,8 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
       @RequestBody @Valid @NotNull UpdatePayoutPreferenceRequest request) {
-    var mission = missionService.updatePayoutPreference(id, participantId, request.preference());
+    var mission =
+        missionParticipantService.updatePayoutPreference(id, participantId, request.preference());
     return redactForPeer(missionMapper.toDto(findParticipant(mission, participantId)));
   }
 
@@ -1076,7 +1090,7 @@ public class MissionController {
       Authentication authentication) {
     ParticipantTarget target = resolveParticipantTarget(id, request, authentication);
     var mission =
-        missionService.addParticipant(
+        missionParticipantService.addParticipant(
             id,
             target.userId(),
             target.guestName(),
@@ -1108,7 +1122,7 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
       Authentication authentication) {
-    missionService.removeParticipant(id, participantId);
+    missionParticipantService.removeParticipant(id, participantId);
     return ResponseEntity.noContent().build();
   }
 
@@ -1127,7 +1141,9 @@ public class MissionController {
           "Returns all participants of a mission that are not yet assigned to any unit crew.")
   public List<MissionParticipantDto> getUnassignedParticipants(@PathVariable @NotNull UUID id) {
     return redactParticipantsForPeer(
-        missionService.getUnassignedParticipants(id).stream().map(missionMapper::toDto).toList());
+        missionParticipantService.getUnassignedParticipants(id).stream()
+            .map(missionMapper::toDto)
+            .toList());
   }
 
   /**
@@ -1229,7 +1245,7 @@ public class MissionController {
       description = "Adds a manager and returns the updated manager list as UserReferenceDto.")
   public List<UserReferenceDto> addManagerSlim(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
-    var mission = missionService.addManager(id, userId);
+    var mission = missionParticipantService.addManager(id, userId);
     return mission.getManagers().stream().map(userMapper::toReferenceDto).toList();
   }
 
@@ -1247,7 +1263,7 @@ public class MissionController {
       description = "Removes a manager and returns 204 No Content.")
   public ResponseEntity<Void> removeManagerSlim(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
-    missionService.removeManager(id, userId);
+    missionParticipantService.removeManager(id, userId);
     return ResponseEntity.noContent().build();
   }
 

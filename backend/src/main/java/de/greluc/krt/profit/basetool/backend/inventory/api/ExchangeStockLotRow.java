@@ -134,6 +134,35 @@ public interface ExchangeStockLotRow {
   String getGameItemName();
 
   /**
+   * The item's SC Wiki type, or {@code null} for a material lot or when unknown.
+   *
+   * @return the wiki type
+   */
+  String getGameItemWikiType();
+
+  /**
+   * The item's size class, or {@code null} for a material lot or when unknown.
+   *
+   * @return the size
+   */
+  Integer getGameItemSize();
+
+  /**
+   * The item's grade, or {@code null} for a material lot or when unknown.
+   *
+   * @return the grade
+   */
+  String getGameItemGrade();
+
+  /**
+   * The item's stored {@code ShipComponentClass} name, or {@code null} for a material lot or when
+   * unknown.
+   *
+   * @return the class
+   */
+  String getGameItemClass();
+
+  /**
    * The location's name.
    *
    * @return the name

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeComponentDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemRefDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeLocationDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeMaterialKindDto;
@@ -215,6 +216,13 @@ public class ExchangeStockFeedService {
         lot.getLotKey(),
         ref,
         kind,
+        material
+            ? null
+            : ExchangeComponentDto.of(
+                lot.getGameItemWikiType(),
+                lot.getGameItemSize(),
+                lot.getGameItemGrade(),
+                lot.getGameItemClass()),
         new ExchangeLocationDto(cut(lot.getLocationName()), uex(lot)),
         lot.getQuality(),
         lot.getStolen(),

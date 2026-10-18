@@ -135,17 +135,16 @@ public class ExchangeStockShares {
     }
     if (!dryRun) {
       boolean share = move.direction() == RebookCommands.RebookDirection.TO_POOL;
-      Map<String, Object> after = ExchangeStockWriteService.state(move.total(), move.unit());
-      after.put("orgUnit", move.orgUnitId().toString());
-      after.put(share ? "shared" : "unshared", move.amount());
       journalService.record(
           caller,
           batch,
           share ? ExchangeJournalAction.STOCK_SHARE : ExchangeJournalAction.STOCK_UNSHARE,
           move.key(),
           false,
-          ExchangeStockWriteService.state(move.total(), move.unit()),
-          after);
+          ExchangeStockJournal.State.of(move.total(), move.unit()).toJournal(),
+          ExchangeStockJournal.State.moved(
+                  move.total(), move.unit(), move.orgUnitId(), share, move.amount())
+              .toJournal());
     }
     return null;
   }
