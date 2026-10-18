@@ -726,6 +726,9 @@ a geometric check had no rule for:
   starts a new line (`stack-line-end`, measured on the page). The status bar of a stacked row runs
   along the card's edge, not over its first cell. A list rendered inline puts its comma after
   an item, never before the next one. A count beside a name (`(1)`) never wraps on its own.
+- **A tree table fits the touch classes.** Up to 1024px or on a coarse pointer a `.tree-table`
+  takes no more width than its columns' minimum and a row's name wraps instead of truncating, so
+  the first column and its chips never slide out of the scroll area.
 - **A chip never shrinks below its text.** In a flex row whose children may shrink, the chip
   declares `flex-shrink: 0` and the name beside it gives way.
 - **A required star is drawn once.** The automatic star of a required field steps back when the label

@@ -20,6 +20,7 @@
 
 ### Fixed
 
+- **Komponenten-Angaben auf Handy und Tablet.** Im Lager stehen die Spalte „Bestand" und lange Item-Namen wieder vollständig da, statt abgeschnitten oder aus dem Bild geschoben zu werden; in Auftrag, Spendenliste und Item-Auswahl brechen Name, Typ, Größe und Klasse sauber um, die Auswahlliste bleibt lesbar (Frontend, REQ-UI-009).
 - **Lager: Filter-Auswahllisten und „Alle zurücksetzen".** Eine offene Auswahlliste (Typ, Größe, Klasse) überdeckt die Felder darunter nicht mehr, sondern schiebt sie nach unten. „Alle zurücksetzen" zeigt danach zuverlässig wieder alle Gegenstände statt einer älteren, noch gefilterten Antwort (Frontend).
 - **Handy und Tablet: Checkboxen, Eingabefelder und schwebende Elemente.** Checkboxen und Radio-Buttons bleiben auf Touch-Geräten kleine Kästchen statt hoher Balken, das Label ist die 44-px-Tippfläche; Schalter behalten ihre Form. Eingabefelder sind dort mindestens 16 px groß, damit iOS beim Antippen nicht mehr hineinzoomt; Toast und „Aktualisierungen verfügbar" liegen über statt auf der Tab-Leiste (Frontend, REQ-UI-009).
 

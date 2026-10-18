@@ -644,6 +644,13 @@
         text-overflow: ellipsis;
     }
 
+    @media (width <= 1024px), (pointer: coarse) {
+        .tree-name .tree-label {
+            white-space: normal;
+            overflow-wrap: break-word;
+        }
+    }
+
     .tree-chevron {
         flex: none;
         width: 14px;
@@ -1054,7 +1061,7 @@
 
     @media (width <= 1024px) {
         .tree-table {
-            width: max-content;
+            width: min-content;
         }
 
         .tree-row--leaf {
