@@ -19,7 +19,7 @@
 
 import { showKrtConfirm } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
 import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
 import { krtOverflowMenu } from '/js/kernel/krt-overflow-menu.js';
@@ -730,11 +730,11 @@ function initMaterialboerse() {
     }
 
     function notifyPeersBoard() {
-        krtLiveSync.sendChanged(MATERIALBOARD_TOPIC, ['board']);
+        boardSections.notify('board');
     }
 
     function notifyPeersRequests() {
-        krtLiveSync.sendChanged(MATERIALBOARD_TOPIC, ['requests']);
+        boardSections.notify('requests');
     }
 
     /**
@@ -897,30 +897,24 @@ function initMaterialboerse() {
         });
     }
 
-    /** @type {number | null} */
-    let peerTimer = null;
-    /**
-     * Re-renders the list after a peer changed the board, unless a dialog is open.
-     *
-     * @param {string[]} sections the section keys the peer changed
-     */
-    function onPeerChanged(sections) {
-        const secs = Array.isArray(sections) ? sections : [];
-        if (peerTimer) {
-            clearTimeout(peerTimer);
-        }
-        peerTimer = setTimeout(() => {
-            if (anyModalOpen()) {
-                return;
-            }
-            const key = activeMode() === 'requests' ? 'requests' : 'board';
-            if (secs.length === 0 || secs.indexOf(key) >= 0) {
-                swapList();
-            }
-        }, 400);
-    }
-    krtLiveSync.subscribe(MATERIALBOARD_TOPIC, { onChanged: onPeerChanged });
-
+    const boardSections = krtPageSections.create({
+        sections: {
+            board: { container: '#mb-listwrap', fragmentValue: 'list' },
+            requests: { container: '#mg-listwrap', fragmentValue: 'list' },
+        },
+        pageUrl() {
+            return `/materialboerse?${params().toString()}`;
+        },
+        topic: MATERIALBOARD_TOPIC,
+        receiver: {
+            coalesceMs: 400,
+            busyTest: anyModalOpen,
+            expand(keys) {
+                const key = activeMode() === 'requests' ? 'requests' : 'board';
+                return keys.length === 0 || keys.indexOf(key) >= 0 ? [key] : [];
+            },
+        },
+    });
     document.addEventListener('krt:swapped', () => {
         applyAgo(document);
         selectedId = readSelectedId();

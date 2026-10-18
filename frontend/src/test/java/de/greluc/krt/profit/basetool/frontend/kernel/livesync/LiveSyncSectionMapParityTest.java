@@ -472,6 +472,14 @@ class LiveSyncSectionMapParityTest {
         .containsExactlyInAnyOrder("board", "requests");
   }
 
+  @Test
+  void materialboardSeamMap_matchesTheMaterialboardTopicWhitelist() throws IOException {
+    Set<String> jsKeys = seamMapKeys("/static/js/materialexchange/materialboerse.js", "sections");
+    assertThat(jsKeys)
+        .as("sections keys in materialboerse.js vs LiveSyncTopicClass.MATERIALBOARD whitelist")
+        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.MATERIALBOARD.allowedSections());
+  }
+
   /**
    * Verifies that every Materialbörse {@code sendChanged} call sends only keys in {@link
    * LiveSyncTopicClass#MATERIALBOARD}'s whitelist.
@@ -481,7 +489,7 @@ class LiveSyncSectionMapParityTest {
     Set<String> whitelist = LiveSyncTopicClass.MATERIALBOARD.allowedSections();
     Pattern sendChanged =
         Pattern.compile(
-            "sendChanged\\(\\s*(?:'materialboard'|\"materialboard\"|MATERIALBOARD_TOPIC)\\s*,"
+            "(?:sendChanged|publish)\\(\\s*(?:'materialboard'|\"materialboard\"|MATERIALBOARD_TOPIC)\\s*,"
                 + "\\s*\\[([^\\]]*)\\]");
     int callsSeen = 0;
     for (String module :
