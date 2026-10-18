@@ -220,12 +220,6 @@ function stepsVersion() {
     const v = holder ? Number(holder.getAttribute('data-steps-version')) : null;
     return v === null || Number.isNaN(v) ? null : v;
 }
-function refreshSteps() {
-    if (missionHooks.refresh) {
-        return missionHooks.refresh(['steps', 'overview']);
-    }
-    return Promise.resolve();
-}
 /**
  * Writes to the steps section.
  *
@@ -234,7 +228,7 @@ function refreshSteps() {
  */
 function writeStep(opts) {
     return missionHooks.write(
-        Object.assign({ sectionKey: 'steps', onSuccess: refreshSteps }, opts),
+        Object.assign({ sectionKey: 'steps', refresh: ['steps', 'overview'] }, opts),
     );
 }
 
@@ -509,12 +503,6 @@ function initMissionDetail() {
         const v = holder ? Number(holder.getAttribute('data-objectives-version')) : null;
         return v === null || Number.isNaN(v) ? null : v;
     }
-    function refreshObjectives() {
-        if (missionHooks.refresh) {
-            return missionHooks.refresh(['objectives', 'overview']);
-        }
-        return Promise.resolve();
-    }
     /**
      * Writes to the objectives section.
      *
@@ -523,7 +511,7 @@ function initMissionDetail() {
      */
     function writeObjective(opts) {
         return missionHooks.write(
-            Object.assign({ sectionKey: 'objectives', onSuccess: refreshObjectives }, opts),
+            Object.assign({ sectionKey: 'objectives', refresh: ['objectives', 'overview'] }, opts),
         );
     }
     /**

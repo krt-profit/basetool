@@ -17,7 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
@@ -59,14 +58,6 @@ function initAdminOrgStructure() {
         },
     });
 
-    function refreshOrgStructureAfterCreate() {
-        return orgStructure.refresh(Object.keys(orgStructure.sections));
-    }
-
-    function refreshOrgStructureAfterParentChange() {
-        return orgStructure.refresh(['units']);
-    }
-
     function readMessages() {
         const holder = document.getElementById('os-i18n');
         const data = holder ? holder.dataset : {};
@@ -100,7 +91,7 @@ function initAdminOrgStructure() {
 
     krtEvents.on('submit', 'os-create-ol', (form, event) => {
         event.preventDefault();
-        krtFetch.write({
+        orgStructure.write({
             method: 'POST',
             url: '/admin/org-structure/organisationsleitung',
             payload: {
@@ -111,13 +102,13 @@ function initAdminOrgStructure() {
             successMessage: i18n.saved,
             errorMessage: i18n.error,
             submitter: form.querySelector('button[type="submit"]'),
-            onSuccess: refreshOrgStructureAfterCreate,
+            refresh: ['units', 'forms'],
         });
     });
 
     krtEvents.on('submit', 'os-create-bereich', (form, event) => {
         event.preventDefault();
-        krtFetch.write({
+        orgStructure.write({
             method: 'POST',
             url: '/admin/org-structure/bereiche',
             payload: {
@@ -130,7 +121,7 @@ function initAdminOrgStructure() {
             successMessage: i18n.saved,
             errorMessage: i18n.error,
             submitter: form.querySelector('button[type="submit"]'),
-            onSuccess: refreshOrgStructureAfterCreate,
+            refresh: ['units', 'forms'],
         });
     });
 
@@ -140,7 +131,7 @@ function initAdminOrgStructure() {
             return;
         }
         const id = row.getAttribute('data-org-unit-id');
-        krtFetch.write({
+        orgStructure.write({
             method: 'PATCH',
             url: `/admin/org-structure/org-units/${encodeURIComponent(String(id))}/parent`,
             serialize: `org-unit:${id}`,
@@ -154,7 +145,7 @@ function initAdminOrgStructure() {
             successMessage: i18n.saved,
             errorMessage: i18n.error,
             submitter: select,
-            onSuccess: refreshOrgStructureAfterParentChange,
+            refresh: ['units'],
         });
     });
 }
