@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.supply.model;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BackendEnumAsString;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.GameItemReferenceDto;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -34,7 +35,8 @@ import java.util.UUID;
  * @param orgUnitName the raising unit's name
  * @param orgUnitShorthand the raising unit's shorthand
  * @param material the material, or {@code null} for a game-item need
- * @param gameItem the game item, or {@code null} for a material need
+ * @param gameItem the game item with a component's type, size, grade and class (REQ-SUP-022), or
+ *     {@code null} for a material need
  * @param quantityType {@code SCU}, {@code PIECE} or {@code ITEM}
  * @param qualityTier the tier of a material need, or {@code null}
  * @param amount the amount asked for
@@ -59,7 +61,7 @@ public record NeedDto(
     String orgUnitName,
     String orgUnitShorthand,
     SupplyRefDto material,
-    SupplyRefDto gameItem,
+    GameItemReferenceDto gameItem,
     String quantityType,
     SupplyTierRefDto qualityTier,
     Double amount,

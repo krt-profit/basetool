@@ -197,6 +197,7 @@ class MaterialExchangeControllerTest {
         new MaterialReferenceDto(UUID.randomUUID(), "Agricium", QuantityType.SCU),
         null,
         null,
+        null,
         new UserReferenceDto(UUID.randomUUID(), "Anbieter", "Anbieter", "Anbieter", null),
         List.of(),
         false,

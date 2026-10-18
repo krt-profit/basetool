@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.supply.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
@@ -265,8 +266,8 @@ public class SupplyMapper {
     return material == null ? null : new SupplyRefDto(material.getId(), material.getName());
   }
 
-  private static @Nullable SupplyRefDto gameItemRef(@Nullable GameItem gameItem) {
-    return gameItem == null ? null : new SupplyRefDto(gameItem.getId(), gameItem.getName());
+  private static @Nullable GameItemReferenceDto gameItemRef(@Nullable GameItem gameItem) {
+    return gameItem == null ? null : GameItemReferenceDto.of(gameItem);
   }
 
   private static @Nullable SupplyTierRefDto tierRef(@Nullable QualityTier tier) {

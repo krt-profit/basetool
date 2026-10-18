@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
@@ -34,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintProductService;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
@@ -58,6 +61,7 @@ import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -71,6 +75,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
@@ -93,6 +99,7 @@ class MaterialRequestServiceTest {
   @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private BlueprintProductService blueprintProductService;
   @Mock private OwnerScopeService ownerScopeService;
+  @Mock private ExchangeItemReferences exchangeItemReferences;
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private ObjectProvider<MaterialRequestService> selfProvider;
 
@@ -141,6 +148,49 @@ class MaterialRequestServiceTest {
     lenient()
         .when(orgUnitMembershipRepository.findAllByIdUserIdInAndKindIn(any(), any()))
         .thenReturn(List.of());
+  }
+
+  /** A board page resolves its item requests' game items in one batch (REQ-MARKET-023). */
+  @Test
+  void board_itemRequestCarriesItsGameItemResolvedForThePage() {
+    MaterialExchangeRequest helmet = itemRequest(UUID.randomUUID(), owner);
+    GameItemReferenceDto reference =
+        new GameItemReferenceDto(UUID.randomUUID(), "Venture Helmet", "ARMOR");
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
+    when(requestRepository.findBoard(
+            any(), anyBoolean(), any(), anyInt(), any(), any(), any(Pageable.class)))
+        .thenReturn(new PageImpl<>(List.of(request, helmet)));
+    when(exchangeItemReferences.byProductKey(List.of("venture_helmet")))
+        .thenReturn(Map.of("venture_helmet", reference));
+
+    List<MaterialRequestDto> board =
+        boardService.board(null, null, null, null, null, 0, 50).content();
+
+    assertThat(board).extracting(MaterialRequestDto::gameItem).containsExactly(null, reference);
+    verify(exchangeItemReferences, never()).ofProductKey(any());
+  }
+
+  /** An item request's detail carries the game item its product names (REQ-MARKET-023). */
+  @Test
+  void detail_itemRequestCarriesItsGameItem() {
+    MaterialExchangeRequest helmet = itemRequest(requestId, owner);
+    GameItemReferenceDto reference =
+        new GameItemReferenceDto(UUID.randomUUID(), "Venture Helmet", "ARMOR");
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
+    when(requestRepository.findWithDetailById(requestId)).thenReturn(Optional.of(helmet));
+    when(exchangeItemReferences.ofProductKey("venture_helmet")).thenReturn(reference);
+
+    assertThat(boardService.detail(requestId).gameItem()).isEqualTo(reference);
+  }
+
+  /** A material request names no game item and resolves none. */
+  @Test
+  void detail_materialRequestCarriesNoGameItem() {
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
+    when(requestRepository.findWithDetailById(requestId)).thenReturn(Optional.of(request));
+
+    assertThat(boardService.detail(requestId).gameItem()).isNull();
+    verify(exchangeItemReferences, never()).ofProductKey(any());
   }
 
   /** A non-owner viewer sees only the supplier count — never the names (REQ-MARKET-019). */

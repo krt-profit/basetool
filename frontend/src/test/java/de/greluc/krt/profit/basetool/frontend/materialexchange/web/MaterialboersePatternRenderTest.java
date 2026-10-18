@@ -31,6 +31,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
@@ -60,6 +61,18 @@ import org.springframework.web.context.WebApplicationContext;
  */
 @SpringBootTest
 class MaterialboersePatternRenderTest {
+
+  /** FR-66, a military size-1 grade-A shield. */
+  private static final GameItemReferenceDto SHIELD =
+      new GameItemReferenceDto(
+          UUID.randomUUID(), "FR-66", "VEHICLE_ITEM", "SHIELD", 1, "A", "MILITARY");
+
+  /** The chips of {@link #SHIELD} in the order the item-chips fragment renders them. */
+  private static final String SHIELD_CHIPS =
+      "data-testid=\"item-component-type\">Schild</span>\\s*<span class=\"chip chip--data\""
+          + " data-testid=\"item-size-grade\"[^>]*>S1 · A</span>\\s*<span"
+          + " data-testid=\"item-class\"[^>]*class=\"chip chip--item-class-military\"[^>]*>"
+          + "Militär</span>";
 
   @Autowired private WebApplicationContext context;
 
@@ -96,6 +109,7 @@ class MaterialboersePatternRenderTest {
         new MaterialReferenceDto(UUID.randomUUID(), "Quantanium", "SCU"),
         null,
         null,
+        null,
         new UserReferenceDto(UUID.randomUUID(), "Vexx", "Vexx", "Vexx", null),
         List.of(),
         false,
@@ -122,6 +136,7 @@ class MaterialboersePatternRenderTest {
         UUID.fromString("00000000-0000-0000-0000-000000000072"),
         "MATERIAL",
         new MaterialReferenceDto(UUID.randomUUID(), "Laranite", "SCU"),
+        null,
         null,
         null,
         16.0,
@@ -159,7 +174,15 @@ class MaterialboersePatternRenderTest {
 
   /** Stubs the counts of both views and a one-request Gesuche board. */
   private void stubRequests() {
-    MaterialRequestDto request = request();
+    stubRequests(request());
+  }
+
+  /**
+   * Stubs the counts of both views and a Gesuche board holding the given request.
+   *
+   * @param request the request the backend returns
+   */
+  private void stubRequests(@NotNull MaterialRequestDto request) {
     when(backendApiClient.get(contains("/material-exchange/counts"), anyClass()))
         .thenReturn(new MaterialExchangeCountsDto(38, 5));
     when(backendApiClient.get(contains("/material-exchange/requests/counts"), anyClass()))
@@ -297,5 +320,113 @@ class MaterialboersePatternRenderTest {
         .contains("data-requests-all=\"12\"")
         .contains("data-offers-all=\"38\"")
         .doesNotContain("class=\"page-head\"");
+  }
+
+  /**
+   * Someone else's item offer of the FR-66 shield.
+   *
+   * @return the offer
+   */
+  private static @NotNull MaterialExchangeOfferDto shieldOffer() {
+    return new MaterialExchangeOfferDto(
+        UUID.fromString("00000000-0000-0000-0000-000000000073"),
+        "ITEM",
+        null,
+        "FR-66",
+        SHIELD,
+        2,
+        new UserReferenceDto(UUID.randomUUID(), "Vexx", "Vexx", "Vexx", null),
+        List.of(),
+        false,
+        null,
+        null,
+        null,
+        Instant.now(),
+        "",
+        0,
+        null,
+        false,
+        "ACTIVE",
+        0L,
+        false);
+  }
+
+  /**
+   * Someone else's item request for the FR-66 shield.
+   *
+   * @return the request
+   */
+  private static @NotNull MaterialRequestDto shieldRequest() {
+    return new MaterialRequestDto(
+        UUID.fromString("00000000-0000-0000-0000-000000000074"),
+        "ITEM",
+        null,
+        "FR-66",
+        SHIELD,
+        1,
+        null,
+        null,
+        new UserReferenceDto(UUID.randomUUID(), "Nyx", "Nyx", "Nyx", null),
+        List.of(),
+        false,
+        Instant.now(),
+        "",
+        0,
+        null,
+        false,
+        "ACTIVE",
+        0L);
+  }
+
+  /** An item offer shows the shield's type, size, grade and class in its row and its detail. */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void anItemOfferShowsTheComponentChips() throws Exception {
+    stubOffers(List.of(shieldOffer()));
+
+    String html = render("");
+
+    String row =
+        html.substring(
+            html.indexOf("data-testid=\"mb-offer-row\""), html.indexOf("id=\"mb-detail\""));
+    assertThat(row).contains("data-testid=\"mb-item-chips\"").containsPattern(SHIELD_CHIPS);
+    assertThat(html.substring(html.indexOf("id=\"mb-detail\"")))
+        .contains("data-testid=\"mb-item-chips\"")
+        .containsPattern(SHIELD_CHIPS);
+  }
+
+  /** The list fragment of a live refresh still carries the chips. */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void theLiveRefreshedListKeepsTheComponentChips() throws Exception {
+    stubOffers(List.of(shieldOffer()));
+
+    assertThat(render("fragment=list"))
+        .doesNotContain("class=\"page-head\"")
+        .containsPattern(SHIELD_CHIPS);
+  }
+
+  /** An item request shows the shield's chips, in a live-refreshed board fragment too. */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void anItemRequestShowsTheComponentChips() throws Exception {
+    stubRequests(shieldRequest());
+
+    String html = render("view=requests&fragment=board");
+
+    assertThat(html.substring(html.indexOf("data-testid=\"mb-request-row\"")))
+        .contains("data-testid=\"mb-item-chips\"")
+        .containsPattern(SHIELD_CHIPS);
+  }
+
+  /** A material offer and a material request carry no item chips. */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void materialRowsCarryNoItemChips() throws Exception {
+    stubOffers(List.of(offer()));
+    assertThat(render("")).doesNotContain("mb-item-chips");
+
+    stubRequests();
+    assertThat(render("view=requests")).doesNotContain("mb-item-chips");
   }
 }

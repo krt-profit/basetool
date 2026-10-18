@@ -330,4 +330,28 @@ class BlueprintProductServiceTest {
 
     assertTrue(service.resolveRecipe("ghost").isEmpty());
   }
+
+  @Test
+  void outputItemIdsByProductKey_resolvesTheWantedKeysInOneScan() {
+    UUID shieldId = UUID.randomUUID();
+    UUID pistolId = UUID.randomUUID();
+    when(blueprintRepository.findActiveProductRows(""))
+        .thenReturn(
+            List.of(
+                row("FR-66", "BP_FR66", null, shieldId),
+                row("Arclight Pistol", "BP_A", null, pistolId),
+                row("No Output", "BP_N", null, null)));
+
+    Map<String, UUID> ids =
+        service.outputItemIdsByProductKey(List.of("fr-66", "no output", "ghost"));
+
+    assertEquals(Map.of("fr-66", shieldId), ids);
+    verify(blueprintRepository).findActiveProductRows("");
+  }
+
+  @Test
+  void outputItemIdsByProductKey_skipsTheScanWithoutAKey() {
+    assertTrue(service.outputItemIdsByProductKey(List.of()).isEmpty());
+    verify(blueprintRepository, org.mockito.Mockito.never()).findActiveProductRows(anyString());
+  }
 }

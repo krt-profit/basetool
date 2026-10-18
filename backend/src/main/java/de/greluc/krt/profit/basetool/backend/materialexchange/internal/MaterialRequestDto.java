@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitReferenceDto;
@@ -41,6 +42,8 @@ import org.jetbrains.annotations.Nullable;
  * @param kind whether this is a catalogue-material request or a blueprint-product item request.
  * @param material the requested material for a material request, else {@code null}.
  * @param itemName the requested item's display name for an item request, else {@code null}.
+ * @param gameItem the game item an item row names, with a component's type, size, grade and class
+ *     (REQ-MARKET-023), or {@code null} for a material row or an item outside the catalogue.
  * @param itemQuantity the requested whole-piece quantity for an item request, else {@code null}.
  * @param requestedAmount the requested quantity in the material's own unit for a material request,
  *     else {@code null}.
@@ -62,6 +65,7 @@ public record MaterialRequestDto(
     MaterialExchangeRequestKind kind,
     @Nullable MaterialReferenceDto material,
     @Nullable String itemName,
+    @Nullable GameItemReferenceDto gameItem,
     @Nullable Integer itemQuantity,
     @Nullable Double requestedAmount,
     Integer minQuality,

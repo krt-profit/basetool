@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.supply.model;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BackendEnumAsString;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.GameItemReferenceDto;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -32,7 +33,8 @@ import java.util.UUID;
  * @param receivingOrgUnitId the receiving unit
  * @param receivingOrgUnitName the receiving unit's name
  * @param material the material, or {@code null} for a game item
- * @param gameItem the game item, or {@code null} for a material
+ * @param gameItem the game item with a component's type, size, grade and class (REQ-SUP-022), or
+ *     {@code null} for a material
  * @param quality the quality of a material donation, or {@code null}
  * @param quantityType {@code SCU}, {@code PIECE} or {@code ITEM}
  * @param pledgedAmount the pledged amount
@@ -55,7 +57,7 @@ public record DonationDto(
     UUID receivingOrgUnitId,
     String receivingOrgUnitName,
     SupplyRefDto material,
-    SupplyRefDto gameItem,
+    GameItemReferenceDto gameItem,
     Integer quality,
     String quantityType,
     Double pledgedAmount,

@@ -156,6 +156,30 @@ public class BlueprintProductService implements BlueprintProducts {
   }
 
   /**
+   * Resolves product keys to the game item each product produces, in one scan of the active
+   * recipes; an empty input issues no query.
+   *
+   * @param productKeys the normalized product keys
+   * @return product key to output-item id; keys without an active product or output item are absent
+   */
+  @Override
+  @NotNull
+  public Map<String, UUID> outputItemIdsByProductKey(@NotNull Collection<String> productKeys) {
+    if (productKeys.isEmpty()) {
+      return Map.of();
+    }
+    Map<String, ProductAccumulator> products = buildProductMap("");
+    Map<String, UUID> ids = new HashMap<>();
+    for (String key : productKeys) {
+      ProductAccumulator product = key == null ? null : products.get(key);
+      if (product != null && product.outputItemId != null) {
+        ids.put(key, product.outputItemId);
+      }
+    }
+    return ids;
+  }
+
+  /**
    * Resolves a normalized product key to the recipe graph of its representative recipe: build slots
    * with ingredients and per-quality stat modifiers, plus the variant count.
    *

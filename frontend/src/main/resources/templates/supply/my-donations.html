@@ -53,6 +53,7 @@
                             <td>
                                 <span class="cell-title" th:text="${d.material() != null ? d.material().name() : d.gameItem().name()}">Quantanium</span>
                                 <span class="cell-sub">
+                                    <span th:if="${d.gameItem() != null}" class="supply-item-chips" data-testid="supply-item-chips" th:insert="~{kernel/fragments/item-chips :: itemChips(${d.gameItem()})}"></span>
                                     <span th:if="${d.quality() != null}" th:text="#{supply.donation.quality(${#strings.toString(d.quality())})}">Q500</span>
                                     <span th:if="${d.fromStock()}" class="chip chip--muted" th:text="#{supply.donation.fromStock}">aus dem Lager</span>
                                 </span>
