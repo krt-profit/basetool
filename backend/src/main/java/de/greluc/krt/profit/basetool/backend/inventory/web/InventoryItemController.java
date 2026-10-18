@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.web;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentType;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.AggregatedInventoryDto;
@@ -45,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryMergeCa
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryOrgUnitChangeService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryPoolChangeService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStolenMarkService;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.ItemAttributeFilter;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
@@ -289,6 +292,10 @@ public class InventoryItemController {
    * @param stolenOnly when {@code true}, only stock marked „gestohlen" (REQ-INV-053)
    * @param nonStolenOnly when {@code true}, only stock not marked „gestohlen"; mutually exclusive
    *     with {@code stolenOnly}
+   * @param kinds optional category filter ({@code catalog=ITEM} only, REQ-INV-063)
+   * @param componentTypes optional component-type filter ({@code catalog=ITEM} only)
+   * @param sizes optional component-size filter ({@code catalog=ITEM} only)
+   * @param grades optional component-grade filter ({@code catalog=ITEM} only)
    * @param catalog which stock catalog to group; defaults to {@code MATERIAL}; a filter that does
    *     not match the catalog is rejected with 400 (REQ-INV-029/031)
    * @param gameItemIds optional game-item filter ({@code catalog=ITEM} only; 400 otherwise)
@@ -309,9 +316,14 @@ public class InventoryItemController {
       @RequestParam(required = false, defaultValue = "false") boolean nonPersonalOnly,
       @RequestParam(required = false, defaultValue = "false") boolean stolenOnly,
       @RequestParam(required = false, defaultValue = "false") boolean nonStolenOnly,
+      @RequestParam(required = false) List<GameItemKind> kinds,
+      @RequestParam(required = false) List<ShipComponentType> componentTypes,
+      @RequestParam(required = false) List<Integer> sizes,
+      @RequestParam(required = false) List<String> grades,
       @RequestParam(required = false, defaultValue = "MATERIAL") InventoryCatalog catalog) {
+    ItemAttributeFilter attributes = new ItemAttributeFilter(kinds, componentTypes, sizes, grades);
     if (catalog == InventoryCatalog.ITEM) {
-      rejectMaterialOnlyFilters(minQuality, missionIds, materialIds);
+      CatalogFilterGuard.rejectMaterialOnlyFilters(minQuality, missionIds, materialIds);
       return inventoryAggregationService.getMyAggregatedItemInventory(
           userService.getUserIdFromJwt(jwt),
           gameItemIds,
@@ -320,9 +332,10 @@ public class InventoryItemController {
           personalOnly,
           nonPersonalOnly,
           stolenOnly,
-          nonStolenOnly);
+          nonStolenOnly,
+          attributes);
     }
-    rejectItemOnlyFilters(gameItemIds);
+    CatalogFilterGuard.rejectItemOnlyFilters(gameItemIds, attributes);
     return inventoryItemService.getMyAggregatedInventory(
         userService.getUserIdFromJwt(jwt),
         materialIds,
@@ -354,6 +367,10 @@ public class InventoryItemController {
    * @param stolenOnly when {@code true}, only stock marked „gestohlen" (REQ-INV-053)
    * @param nonStolenOnly when {@code true}, only stock not marked „gestohlen"; mutually exclusive
    *     with {@code stolenOnly}
+   * @param kinds optional category filter ({@code catalog=ITEM} only, REQ-INV-063)
+   * @param componentTypes optional component-type filter ({@code catalog=ITEM} only)
+   * @param sizes optional component-size filter ({@code catalog=ITEM} only)
+   * @param grades optional component-grade filter ({@code catalog=ITEM} only)
    * @param catalog which stock catalog to select from; defaults to {@code MATERIAL}
    * @return the ids of every matching entry, in creation order
    */
@@ -371,9 +388,14 @@ public class InventoryItemController {
       @RequestParam(required = false, defaultValue = "false") boolean nonPersonalOnly,
       @RequestParam(required = false, defaultValue = "false") boolean stolenOnly,
       @RequestParam(required = false, defaultValue = "false") boolean nonStolenOnly,
+      @RequestParam(required = false) List<GameItemKind> kinds,
+      @RequestParam(required = false) List<ShipComponentType> componentTypes,
+      @RequestParam(required = false) List<Integer> sizes,
+      @RequestParam(required = false) List<String> grades,
       @RequestParam(required = false, defaultValue = "MATERIAL") InventoryCatalog catalog) {
+    ItemAttributeFilter attributes = new ItemAttributeFilter(kinds, componentTypes, sizes, grades);
     if (catalog == InventoryCatalog.ITEM) {
-      rejectMaterialOnlyFilters(minQuality, missionIds, materialIds);
+      CatalogFilterGuard.rejectMaterialOnlyFilters(minQuality, missionIds, materialIds);
       return inventoryAggregationService.getMyItemEntryIds(
           userService.getUserIdFromJwt(jwt),
           gameItemIds,
@@ -382,9 +404,10 @@ public class InventoryItemController {
           personalOnly,
           nonPersonalOnly,
           stolenOnly,
-          nonStolenOnly);
+          nonStolenOnly,
+          attributes);
     }
-    rejectItemOnlyFilters(gameItemIds);
+    CatalogFilterGuard.rejectItemOnlyFilters(gameItemIds, attributes);
     return inventoryItemService.getMyEntryIds(
         userService.getUserIdFromJwt(jwt),
         materialIds,
@@ -429,7 +452,7 @@ public class InventoryItemController {
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort) {
     if (catalog == InventoryCatalog.ITEM) {
-      rejectMaterialOnlyFilters(minQuality, missionIds, materialIds);
+      CatalogFilterGuard.rejectMaterialOnlyFilters(minQuality, missionIds, materialIds);
       Pageable pageable =
           PaginationUtil.createPageRequest(
               page,
@@ -441,7 +464,7 @@ public class InventoryItemController {
           inventoryAggregationService.getAllItemInventory(
               gameItemIds, locationIds, jobOrderIds, pageable));
     }
-    rejectItemOnlyFilters(gameItemIds);
+    CatalogFilterGuard.rejectItemOnlyFilters(gameItemIds, ItemAttributeFilter.NONE);
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page,
@@ -482,6 +505,10 @@ public class InventoryItemController {
    * @param stolenOnly when {@code true}, only stock marked „gestohlen" (REQ-INV-053)
    * @param nonStolenOnly when {@code true}, only stock not marked „gestohlen"; mutually exclusive
    *     with {@code stolenOnly}
+   * @param kinds optional category filter ({@code catalog=ITEM} only, REQ-INV-063)
+   * @param componentTypes optional component-type filter ({@code catalog=ITEM} only)
+   * @param sizes optional component-size filter ({@code catalog=ITEM} only)
+   * @param grades optional component-grade filter ({@code catalog=ITEM} only)
    * @param catalog which stock catalog to group; defaults to {@code MATERIAL}
    * @return grouped DTOs
    */
@@ -497,13 +524,18 @@ public class InventoryItemController {
       @RequestParam(required = false) List<UUID> missionIds,
       @RequestParam(required = false, defaultValue = "false") boolean stolenOnly,
       @RequestParam(required = false, defaultValue = "false") boolean nonStolenOnly,
+      @RequestParam(required = false) List<GameItemKind> kinds,
+      @RequestParam(required = false) List<ShipComponentType> componentTypes,
+      @RequestParam(required = false) List<Integer> sizes,
+      @RequestParam(required = false) List<String> grades,
       @RequestParam(required = false, defaultValue = "MATERIAL") InventoryCatalog catalog) {
+    ItemAttributeFilter attributes = new ItemAttributeFilter(kinds, componentTypes, sizes, grades);
     if (catalog == InventoryCatalog.ITEM) {
-      rejectMaterialOnlyFilters(minQuality, missionIds, materialIds);
+      CatalogFilterGuard.rejectMaterialOnlyFilters(minQuality, missionIds, materialIds);
       return inventoryAggregationService.getAllAggregatedItemInventory(
-          gameItemIds, locationIds, jobOrderIds, stolenOnly, nonStolenOnly);
+          gameItemIds, locationIds, jobOrderIds, stolenOnly, nonStolenOnly, attributes);
     }
-    rejectItemOnlyFilters(gameItemIds);
+    CatalogFilterGuard.rejectItemOnlyFilters(gameItemIds, attributes);
     return inventoryItemService.getAllAggregatedInventory(
         materialIds, locationIds, minQuality, jobOrderIds, missionIds, stolenOnly, nonStolenOnly);
   }
@@ -617,40 +649,6 @@ public class InventoryItemController {
             ? Math.min(size, STACK_ENTRIES_MAX_SIZE)
             : STACK_ENTRIES_DEFAULT_SIZE;
     return PageRequest.of(resolvedPage, resolvedSize);
-  }
-
-  /**
-   * Rejects the material-only filters {@code minQuality}, {@code missionIds} and {@code
-   * materialIds} on a {@code catalog=ITEM} read (REQ-INV-029/031).
-   *
-   * @param minQuality the quality floor; must be {@code null} for the item catalog
-   * @param missionIds the mission filter; must be {@code null} or empty for the item catalog
-   * @param materialIds the material filter; must be {@code null} or empty for the item catalog
-   * @throws BadRequestException when any material-only filter is present
-   */
-  private static void rejectMaterialOnlyFilters(
-      Integer minQuality, List<UUID> missionIds, List<UUID> materialIds) {
-    if (minQuality != null) {
-      throw new BadRequestException("minQuality is not supported for catalog=ITEM");
-    }
-    if (missionIds != null && !missionIds.isEmpty()) {
-      throw new BadRequestException("missionIds is not supported for catalog=ITEM");
-    }
-    if (materialIds != null && !materialIds.isEmpty()) {
-      throw new BadRequestException("materialIds is not supported for catalog=ITEM");
-    }
-  }
-
-  /**
-   * Rejects the item-only {@code gameItemIds} filter on a {@code catalog=MATERIAL} read.
-   *
-   * @param gameItemIds the game-item filter; must be {@code null} or empty for the material catalog
-   * @throws BadRequestException when the item-only filter is present
-   */
-  private static void rejectItemOnlyFilters(List<UUID> gameItemIds) {
-    if (gameItemIds != null && !gameItemIds.isEmpty()) {
-      throw new BadRequestException("gameItemIds is not supported for catalog=MATERIAL");
-    }
   }
 
   /**

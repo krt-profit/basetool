@@ -291,6 +291,53 @@ class InventoryLagerPatternRenderTest {
   }
 
   /**
+   * Both Lager items views render the category, component-type, size and grade filters with
+   * translated options drawn from the stock, and tick the values the address carries (REQ-INV-063).
+   */
+  @Test
+  @WithMockUser(roles = "LOGISTICIAN")
+  void lagerItemsViewsRenderTheAttributeFiltersFromTheStock() throws Exception {
+    String my =
+        main(
+            render(
+                "/inventory/my?view=items&sizes=1",
+                "/inventory/my-inventory/grouped",
+                itemGroups()));
+    String global =
+        main(render("/inventory/all?view=items", "/inventory/all/grouped", itemGroups()));
+
+    for (String[] page : new String[][] {{my, "inv-my"}, {global, "inv-admin"}}) {
+      assertThat(page[0])
+          .contains("data-testid=\"item-kind-filter\"")
+          .contains("data-testid=\"item-componentType-filter\"")
+          .contains("data-testid=\"item-size-filter\"")
+          .contains("data-testid=\"item-grade-filter\"")
+          .contains("data-chip-label=\"Kategorie\"")
+          .contains("data-chip-label=\"Komponententyp\"")
+          .contains("data-chip-label=\"Größe\"")
+          .contains("data-chip-label=\"Grad\"")
+          .contains("data-trigger=\"" + page[1] + "-update-state\"")
+          .containsPattern(
+              "<span>Schiffskomponente</span>\\s*<input type=\"checkbox\" class=\"kindCheck\""
+                  + " name=\"kinds\" value=\"VEHICLE_ITEM\"")
+          .containsPattern(
+              "<span>Kühler</span>\\s*<input type=\"checkbox\" class=\"componentTypeCheck\""
+                  + " name=\"componentTypes\" value=\"COOLER\"")
+          .containsPattern(
+              "<span>Schild</span>\\s*<input type=\"checkbox\" class=\"componentTypeCheck\""
+                  + " name=\"componentTypes\" value=\"SHIELD\"")
+          .containsPattern(
+              "<span>S1</span>\\s*<input type=\"checkbox\" class=\"sizeCheck\" name=\"sizes\""
+                  + " value=\"1\"")
+          .containsPattern(
+              "<span>A</span>\\s*<input type=\"checkbox\" class=\"gradeCheck\" name=\"grades\""
+                  + " value=\"A\"");
+    }
+    assertThat(my).containsPattern("name=\"sizes\" value=\"1\"[^>]*checked");
+    assertThat(global).doesNotContainPattern("name=\"sizes\" value=\"1\"[^>]*checked");
+  }
+
+  /**
    * The Globales Lager items view renders the same group row with the chips (REQ-INV-061,
    * REQ-INV-062).
    */

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<th:block th:fragment="itemAttributeFilters(triggerPrefix)">
+    <th:block th:replace="~{inventory/fragments/inventory-item-attribute-filters :: attributeFilter(${triggerPrefix}, 'kind', 'kinds', 'inventory.items.filter.kind', ${itemAttributeOptions.kinds}, ${selectedItemAttributes.kinds}, 'message', 'inventory.items.kind.')}"></th:block>
+    <th:block th:replace="~{inventory/fragments/inventory-item-attribute-filters :: attributeFilter(${triggerPrefix}, 'componentType', 'componentTypes', 'inventory.items.filter.componentType', ${itemAttributeOptions.componentTypes}, ${selectedItemAttributes.componentTypes}, 'message', 'inventory.items.componentType.')}"></th:block>
+    <th:block th:replace="~{inventory/fragments/inventory-item-attribute-filters :: attributeFilter(${triggerPrefix}, 'size', 'sizes', 'inventory.items.filter.size', ${itemAttributeOptions.sizes}, ${selectedItemAttributes.sizes}, 'size', null)}"></th:block>
+    <th:block th:replace="~{inventory/fragments/inventory-item-attribute-filters :: attributeFilter(${triggerPrefix}, 'grade', 'grades', 'inventory.items.filter.grade', ${itemAttributeOptions.grades}, ${selectedItemAttributes.grades}, 'raw', null)}"></th:block>
+</th:block>
+
+<div th:fragment="attributeFilter(triggerPrefix, family, paramName, titleKey, options, selected, labelMode, labelPrefix)"
+     class="lager-filter-field"
+     th:with="checkClass=${family + 'Check'}, allId=${family + 'All'}, headerId=${family + 'Header'}, optionsId=${family + 'Options'}">
+    <span class="form-label-xs" th:text="#{${titleKey}}">Kategorie</span>
+    <input type="hidden" th:name="${family + 'Filter'}" value=""
+           th:attr="data-chip-family=${checkClass},data-chip-all=${allId},data-chip-header=${headerId},data-chip-label=#{${titleKey}}">
+    <div class="multi-select-container" th:id="${family + 'FilterContainer'}" data-filter-chip-ignore
+         th:attr="data-testid=${'item-' + family + '-filter'}">
+        <div class="multi-select-header" th:id="${headerId}"
+             th:attr="data-trigger=${triggerPrefix + '-toggle-multi'},data-multi-target=${optionsId}"
+             th:data-all="#{filter.all}" th:data-selected="#{filter.selected}">
+            <span class="selected-text" th:id="${family + 'SelectedText'}" th:text="#{filter.all}">Alle</span>
+        </div>
+        <div class="multi-select-options" th:id="${optionsId}">
+            <label class="multi-select-option">
+                <span th:text="#{filter.all}">Alle</span>
+                <input type="checkbox" th:id="${allId}" value="ALL"
+                       th:attr="data-trigger=${triggerPrefix + '-toggle-all'},data-all-id=${allId},data-check-class=${checkClass},data-header-id=${headerId}">
+            </label>
+            <label class="multi-select-option" th:each="value : ${options}">
+                <span th:text="${labelMode == 'size'} ? #{inventory.items.size(${value})} : (${labelMode == 'message'} ? (${#messages.msgOrNull(labelPrefix + value)} ?: ${value}) : ${value})">Wert</span>
+                <input type="checkbox" th:class="${checkClass}" th:name="${paramName}" th:value="${value}"
+                       th:checked="${selected != null and selected.contains(value)}"
+                       th:attr="data-trigger=${triggerPrefix + '-update-state'},data-all-id=${allId},data-check-class=${checkClass},data-header-id=${headerId}">
+            </label>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

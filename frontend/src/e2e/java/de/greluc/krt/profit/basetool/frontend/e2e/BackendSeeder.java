@@ -1968,6 +1968,35 @@ public final class BackendSeeder {
   }
 
   /**
+   * Turns a seeded game item into a ship component over JDBC: category {@code VEHICLE_ITEM}, the
+   * given SC Wiki type, size and grade (REQ-INV-061). Local-stack only.
+   *
+   * @param gameItemId the id of a game item seeded via {@link #seedOrderableItem}
+   * @param wikiType the SC Wiki item type, e.g. {@code QuantumDrive}
+   * @param size the component size
+   * @param grade the component grade
+   */
+  public void makeShipComponent(String gameItemId, String wikiType, int size, String grade) {
+    try (Connection connection = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASSWORD);
+        PreparedStatement ps =
+            connection.prepareStatement(
+                "UPDATE game_item SET kind = 'VEHICLE_ITEM', wiki_type = ?, size_class = ?,"
+                    + " grade = ? WHERE id = ?")) {
+      ps.setString(1, wikiType);
+      ps.setInt(2, size);
+      ps.setString(3, grade);
+      ps.setObject(4, UUID.fromString(gameItemId));
+      if (ps.executeUpdate() != 1) {
+        throw new IllegalStateException("No game item " + gameItemId);
+      }
+    } catch (IllegalStateException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.makeShipComponent failed", e);
+    }
+  }
+
+  /**
    * Makes a material sellable by seeding over JDBC a {@code terminal} and a {@code material_price}
    * row with a positive sell price. Each call uses a fresh terminal. Local-stack only.
    *

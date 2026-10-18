@@ -203,6 +203,7 @@
                             </div>
                         </div>
                     </div>
+                    <th:block th:replace="~{inventory/fragments/inventory-item-attribute-filters :: itemAttributeFilters('inv-my')}"></th:block>
                     <div class="lager-filter-field">
                         <label for="itemStolenFilter" class="form-label-xs" th:text="#{inventory.stolen.filter.label}">Gestohlen:</label>
                         <select id="itemStolenFilter" name="stolen" class="lager-filter-select" data-trigger="inv-my-filter" data-testid="stolen-filter" th:attr="data-chip-label=#{inventory.stolen.chip}">

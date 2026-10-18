@@ -263,6 +263,7 @@ function fetchAllMatchingEntryIds() {
     if (personalOnly) url.searchParams.append('personalOnly', 'true');
     if (nonPersonalOnly) url.searchParams.append('nonPersonalOnly', 'true');
     appendMyStolenFilter(url.searchParams, myStolenFilterValue());
+    myLager.appendItemAttributeParams(url.searchParams);
 
     return krtFetch.getJson(url.toString());
 }
@@ -715,6 +716,7 @@ function myInventoryFilterSelection(className) {
  * @property {boolean} personalOnly whether only personal entries are shown
  * @property {boolean} nonPersonalOnly whether only shared entries are shown
  * @property {string} stolen the stolen filter value
+ * @property {KrtItemAttributeSnapshot} [attributes] the item-attribute filters (items view)
  */
 
 /**
@@ -731,6 +733,7 @@ function snapshotMyInventoryFilters() {
             personalOnly: personalScopeIs('personal'),
             nonPersonalOnly: personalScopeIs('shared'),
             stolen: myStolenFilterValue(),
+            attributes: myLager.snapshotItemAttributes(),
         };
     }
     const minQualitySelect = /** @type {HTMLSelectElement | null} */ (
@@ -792,7 +795,9 @@ function restoreMyInventoryFilters() {
     } catch (_e) {
         return false;
     }
-    if (MY_INVENTORY_FILTER_PARAMS.some((p) => params.has(p))) {
+    if (
+        [...MY_INVENTORY_FILTER_PARAMS, ...myLager.itemAttributeParams()].some((p) => params.has(p))
+    ) {
         persistMyInventoryFilters();
         return false;
     }
@@ -807,6 +812,7 @@ function restoreMyInventoryFilters() {
             [saved.locations, 'locCheck', 'itemLocAll', 'itemLocationHeader'],
             [saved.jobOrders, 'jobOrderCheck', 'itemJobOrderAll', 'itemJobOrderHeader'],
         ];
+        if (myLager.restoreItemAttributes(saved.attributes)) changed = true;
     } else {
         families = [
             [saved.materials, 'matCheck', 'matAll', 'materialHeader'],
@@ -859,7 +865,7 @@ function countActiveMyInventoryFilters() {
     });
     if (typeof snapshot.minQuality === 'string' && snapshot.minQuality !== '') active++;
     if (snapshot.stolen === 'non' || snapshot.stolen === 'only') active++;
-    return active;
+    return active + myLager.countActiveItemAttributes(snapshot.attributes);
 }
 
 /** Re-pulls the grouped table with the current filters and mirrors them into the address. */
@@ -899,6 +905,7 @@ function filterMyInventory() {
     if (personalOnly) url.searchParams.append('personalOnly', 'true');
     if (nonPersonalOnly) url.searchParams.append('nonPersonalOnly', 'true');
     appendMyStolenFilter(url.searchParams, stolenFilter);
+    myLager.appendItemAttributeParams(url.searchParams);
 
     const visibleUrl = new URL(`${window.location.origin}/inventory/my`);
     if (itemsView) visibleUrl.searchParams.append('view', 'items');
@@ -911,6 +918,7 @@ function filterMyInventory() {
     if (personalOnly) visibleUrl.searchParams.append('personalOnly', 'true');
     if (nonPersonalOnly) visibleUrl.searchParams.append('nonPersonalOnly', 'true');
     appendMyStolenFilter(visibleUrl.searchParams, stolenFilter);
+    myLager.appendItemAttributeParams(visibleUrl.searchParams);
     try {
         window.history.replaceState({}, '', visibleUrl.toString());
     } catch {}
@@ -975,6 +983,7 @@ function resetMyInventoryFilter() {
         myLager.updateSelectState('itemJobOrderAll', 'jobOrderCheck', 'itemJobOrderHeader');
     if (document.getElementById('missionHeader'))
         myLager.updateSelectState('missionAll', 'missionCheck', 'missionHeader');
+    myLager.resetItemAttributes();
     filterMyInventory();
 }
 
@@ -1065,6 +1074,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ) {
         myLager.updateSelectState('missionAll', 'missionCheck', 'missionHeader');
     }
+    myLager.syncItemAttributeStates();
     krtFilterPanel.registerCounter('myFilterPanel', countActiveMyInventoryFilters);
     krtFilterPanel.refresh('myFilterPanel');
     krtFilterChips.refresh();
