@@ -26,9 +26,21 @@
     }
 
     .demand-table .demand-orders-toggle {
+        flex-wrap: nowrap;
         min-height: var(--touch-target);
         padding: 0;
         border: 0;
+    }
+
+    .demand-orders-toggle .cell-title {
+        flex: 0 1 auto;
+        min-width: 0;
+    }
+
+    .demand-orders-toggle .demand-orders-count,
+    .demand-orders-toggle .toggle-icon {
+        flex: none;
+        white-space: nowrap;
     }
 
     .demand-table .demand-orders-cell {

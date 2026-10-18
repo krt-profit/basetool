@@ -165,7 +165,7 @@
                                             th:aria-label="#{orders.demand.orders.toggle}">
                                         <span class="toggle-icon" aria-hidden="true">&#9654;</span>
                                         <span class="cell-title" th:text="${row.material().name()}" th:title="${row.material().name()}">Titanium</span>
-                                        <span class="text-muted"
+                                        <span class="text-muted demand-orders-count"
                                               th:text="'(' + ${row.orders() != null ? row.orders().size() : 0} + ')'">(0)</span>
                                     </button>
                                 </td>

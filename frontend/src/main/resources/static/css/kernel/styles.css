@@ -1480,6 +1480,11 @@
         color: var(--color-primary);
     }
 
+    .form-group:has([required]) > label:has(.req)::after,
+    label:has(.req):has(+ [required])::after {
+        content: none;
+    }
+
     .form-label {
         display: block;
         color: var(--color-gray-1);
@@ -7367,10 +7372,14 @@
         }
         .data-table--stack
             td:not(:first-child, .cell-status, .cell-actions):has(
-                ~ td:not(.cell-status, .cell-actions)
+                ~ td:not(.cell-status, .cell-actions, :has(> :is(div, p, ul, ol, table, form)))
             )::after {
-            content: '\00b7';
-            margin: 0 0.4em;
+            content: '\00a0\00b7';
+            margin: 0 0.4em 0 0;
+        }
+        .data-table--stack
+            td:has(> :is(div, p, ul, ol, table, form, .progress, .krt-progress))::after {
+            content: none;
         }
         .data-table--stack td[data-label]:not(:first-child, .cell-status)::before {
             content: attr(data-label) ': ';
@@ -8106,6 +8115,18 @@
 
     .form-row:has(> .form-group.datetime-split-group) {
         row-gap: 0;
+    }
+
+    @media (width > 768px) {
+        .form-grid--3 > .form-group.datetime-split-group {
+            grid-column: span 2;
+        }
+    }
+
+    @container krt-modal (width < 34rem) {
+        .form-grid--3 > .form-group.datetime-split-group {
+            grid-column: auto;
+        }
     }
 
     .master-row.is-active {

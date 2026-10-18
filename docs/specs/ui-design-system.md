@@ -719,6 +719,14 @@ a geometric check had no rule for:
   34rem its `.form-grid` collapses to a single column, so a 440px dialog no longer splits its fields
   into two 190px columns. Field labels of a `.kv-list` hyphenate instead of breaking a word without a
   hyphen („Handelsbeauftrag / ter").
+- **A separator stays with what it separates.** The `·` between the cells of a stacked table row
+  carries a no-break space before it, and a cell holding a block (a progress bar, a list) draws none,
+  so no line starts with a lone dot. A list rendered inline puts its comma after an item, never
+  before the next one. A count beside a name (`(1)`) never wraps on its own.
+- **A chip never shrinks below its text.** In a flex row whose children may shrink, the chip
+  declares `flex-shrink: 0` and the name beside it gives way.
+- **A required star is drawn once.** The automatic star of a required field steps back when the label
+  already carries its own `.req`.
 - **Mouse-only hints stay off touch screens.** „Strg+Klick für Mehrfachauswahl" is hidden under
   `(pointer: coarse)`, where the browser shows its own multi-pick.
 - **The sign-in form follows the same 16px rule** (`krt-login-v3.css`), since it is the first screen

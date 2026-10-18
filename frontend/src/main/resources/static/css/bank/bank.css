@@ -93,6 +93,7 @@
     }
 
     .kpi-card-top .chip {
+        flex-shrink: 0;
         font-size: 0.55rem;
     }
 

@@ -98,9 +98,9 @@
 
         <th:block th:if="${ol == null and !#lists.isEmpty(orgChart.bereiche())}">
             <div class="oc-bereich-row">
-                <th:block th:each="b : ${orgChart.bereiche()}">
+                <div class="oc-bereich-col" th:each="b : ${orgChart.bereiche()}">
                     <th:block th:replace="~{orgchart/fragments/org-chart-node :: ocBereich(${b})}"></th:block>
-                </th:block>
+                </div>
             </div>
         </th:block>
 
