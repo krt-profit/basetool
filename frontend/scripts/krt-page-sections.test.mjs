@@ -106,8 +106,10 @@ function fakeElement(id, children = 0) {
  * container the fragment query names.
  *
  * @param {Array<Response>} writes the responses to hand the PATCHes, one per call
+ * @param {Record<string, string>} serverKeys the rendered section keys by topic class, as the head's
+ *     meta elements carry them
  */
-function harness(writes = []) {
+function harness(writes = [], serverKeys = {}) {
     const calls = [];
     const elements = {
         '#a': fakeElement('a', 2),
@@ -115,8 +117,13 @@ function harness(writes = []) {
     };
     const ui = { errors: [], successes: [], confirms: [] };
     const live = { sent: [], receivers: [] };
+    const reports = { warnings: [], errors: [] };
     const context = {
-        console: { warn() {}, log() {}, error() {} },
+        console: {
+            warn: (m) => reports.warnings.push(m),
+            log() {},
+            error: (m) => reports.errors.push(m),
+        },
         Response,
         Headers,
         AbortController,
@@ -131,7 +138,18 @@ function harness(writes = []) {
         __ui: ui,
         __live: live,
         document: {
-            querySelector: (sel) => elements[sel] || null,
+            querySelector(sel) {
+                const meta =
+                    /^meta\[name="krt-live-sync-sections"\]\[data-topic-class="([A-Z_]+)"\]$/.exec(
+                        sel,
+                    );
+                if (meta) {
+                    return meta[1] in serverKeys
+                        ? { getAttribute: (k) => (k === 'content' ? serverKeys[meta[1]] : null) }
+                        : null;
+                }
+                return elements[sel] || null;
+            },
             querySelectorAll: () => [],
             addEventListener() {},
             dispatchEvent() {},
@@ -155,7 +173,7 @@ function harness(writes = []) {
     vm.createContext(context);
     vm.runInContext(SOURCE, context);
     context.window.krtI18nText = (v, k) => v || k;
-    return { krtPageSections: context.krtPageSections, calls, elements, ui, live };
+    return { krtPageSections: context.krtPageSections, calls, elements, ui, live, reports };
 }
 
 /** The declaration every case starts from. */
@@ -486,6 +504,39 @@ await test('publish is a no-op without a topic', async () => {
     h.krtPageSections.publish(null, ['a']);
     h.krtPageSections.publish('room:2', ['a']);
     assert.deepEqual(plain(h.live.sent), [{ topic: 'room:2', keys: ['a'] }]);
+});
+
+await test('the section keys the server rendered bound the wired sections', async () => {
+    const h = harness([], { ROOM: 'a,b,c' });
+    const seam = h.krtPageSections.create(declaration({ topicClass: 'ROOM' }));
+    assert.deepEqual(plain(seam.allowedKeys), ['a', 'b', 'c']);
+    assert.deepEqual(Object.keys(seam.sections), ['a', 'b']);
+    assert.deepEqual(h.reports.errors, []);
+});
+
+await test('a wired key the server did not render is reported and dropped', async () => {
+    const h = harness([], { ROOM: 'a' });
+    const seam = h.krtPageSections.create(declaration({ topicClass: 'ROOM' }));
+    assert.deepEqual(Object.keys(seam.sections), ['a']);
+    assert.equal(h.reports.errors.length, 1);
+    assert.match(h.reports.errors[0], /'b'.*ROOM/);
+    assert.deepEqual(await seam.refresh('b', { broadcast: false }), [false]);
+});
+
+await test('a topic class without a rendered meta warns and keeps the wiring', async () => {
+    const h = harness([], {});
+    const seam = h.krtPageSections.create(declaration({ topicClass: 'ROOM' }));
+    assert.equal(seam.allowedKeys, null);
+    assert.deepEqual(Object.keys(seam.sections), ['a', 'b']);
+    assert.equal(h.reports.warnings.length, 1);
+});
+
+await test('a page without a topic class reads no server keys', async () => {
+    const h = harness([], { ROOM: 'a' });
+    const seam = h.krtPageSections.create(declaration());
+    assert.equal(seam.allowedKeys, null);
+    assert.deepEqual(Object.keys(seam.sections), ['a', 'b']);
+    assert.deepEqual(h.reports.warnings, []);
 });
 
 if (failures > 0) {

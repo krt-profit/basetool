@@ -29,6 +29,7 @@ function initAdminOrgStructure() {
             return { 'admin.orgStructure.refresh.error': i18n.refreshError };
         },
         keys: { refreshErrorKey: 'admin.orgStructure.refresh.error' },
+        topicClass: 'ORG_STRUCTURE',
         sections: {
             units: { container: '#org-structure-units', fragmentValue: 'units' },
             forms: { container: '#org-structure-forms', fragmentValue: 'forms' },

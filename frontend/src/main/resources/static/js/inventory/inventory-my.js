@@ -942,6 +942,7 @@ function resetMyInventoryFilter() {
 }
 
 const inventoryMy = krtPageSections.create({
+    topicClass: 'INVENTORY_ALL',
     sections: {
         stock: { container: '#myInventoryTableContainer', fragmentValue: 'stock' },
     },
@@ -963,6 +964,7 @@ document.addEventListener('krt:inventory-changed', () => {
 });
 
 krtPageSections.create({
+    topicClass: 'ORDERS_QUEUE',
     sections: {
         demand: { container: '#myInventoryTableContainer' },
     },

@@ -121,6 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const unitTopic = resultsContainer ? resultsContainer.dataset.liveSyncTopic || '' : '';
     if (unitTopic) {
         krtPageSections.create({
+            topicClass: 'HANGAR_UNIT',
             sections: { ships: { container: '#squadron-results' } },
             pageUrl() {
                 const query = new URLSearchParams(window.location.search).toString();

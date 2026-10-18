@@ -110,11 +110,13 @@ const receivers = new WeakMap();
  * @param {string} cfg.containerSelector the selector of the results container
  * @param {string} cfg.listUrl the URL of the current list, fragment parameter included
  * @param {string} cfg.section the section key of the container
+ * @param {string} cfg.topicClass the LiveSyncTopicClass that allows the section key
  * @returns {() => void} the function to call after an own write
  */
 export function bindResults(cfg) {
     const container = document.querySelector(cfg.containerSelector);
     const seam = krtPageSections.create({
+        topicClass: cfg.topicClass,
         sections: { [cfg.section]: { container: cfg.containerSelector } },
         pageUrl() {
             return `${cfg.listUrl}${window.location.search}`;

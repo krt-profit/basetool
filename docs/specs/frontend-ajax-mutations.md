@@ -25,10 +25,13 @@ replacement for native dialogs (see [`ui-design-system.md`](ui-design-system.md)
 **Section-structured pages use the page-section module** `krtPageSections.create(config)`
 ([`kernel/krt-page-sections.js`](../../frontend/src/main/resources/static/js/kernel/krt-page-sections.js),
 ADR-0289, which replaces `krtFetch.sectionWrite` of ADR-0069): a page declares its sections
-once (key to `{container, fragmentValue}`), the live-sync `topic` (a string or a thunk that is
+once (key to `{container, fragmentValue}`), the `topicClass` whose server-rendered keys bound it, the live-sync `topic` (a string or a thunk that is
 null while the page has no entity id), the page-URL getter, the late-bound i18n dict and keys (both optional for a page that only
 receives), and optionally a `receiver` (`coalesceMs`, `busyTest`, `pill`, `events`, `expand`). The module
-owns the whole choreography and returns `{write, refresh, notify, receiver, sections}`:
+owns the whole choreography and returns `{write, refresh, notify, receiver, sections, allowedKeys}`.
+The head renders one `meta[name="krt-live-sync-sections"]` per `LiveSyncTopicClass` carrying its`n`allowedSections` (`liveSyncSectionKeys`, `LiveSyncSectionKeysTest`): `create` reads the meta of
+`topicClass` and logs and drops a wired key the server did not render, so the relay whitelist is the
+only list of allowed keys (ADR-0289 amendment, #2762):
 
 - `write` decorates `krtFetch.write` with the section's localized success/error/conflict
   strings and the per-section `serialize` default (ADR-0071). A 409 shows the conflict confirm

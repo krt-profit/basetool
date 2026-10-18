@@ -34,6 +34,54 @@ function publish(topic, keys) {
 }
 
 /**
+ * Reads the section keys the server allows for a topic class from the head's
+ * `meta[name="krt-live-sync-sections"]`.
+ *
+ * @param {string | undefined} topicClass the `LiveSyncTopicClass` name
+ * @returns {string[] | null} the allowed keys, or null without a topic class or a rendered meta
+ */
+function allowedKeysOf(topicClass) {
+    if (!topicClass) {
+        return null;
+    }
+    const meta = document.querySelector(
+        `meta[name="krt-live-sync-sections"][data-topic-class="${topicClass}"]`,
+    );
+    const content = meta ? meta.getAttribute('content') : null;
+    if (content === null) {
+        console.warn(`[krtPageSections] no server-rendered section keys for ${topicClass}`);
+        return null;
+    }
+    return content.split(',').filter(Boolean);
+}
+
+/**
+ * Keeps the wired sections the server allows and reports the others.
+ *
+ * @param {Record<string, { container: string; fragmentValue?: string }>} wired the page's wiring
+ * @param {string[] | null} allowed the server's keys, null to keep every wired key
+ * @param {string | undefined} topicClass the topic class, for the report
+ * @returns {Record<string, { container: string; fragmentValue?: string }>} the allowed wiring
+ */
+function allowedWiring(wired, allowed, topicClass) {
+    if (!allowed) {
+        return wired;
+    }
+    /** @type {Record<string, { container: string; fragmentValue?: string }>} */
+    const kept = {};
+    Object.keys(wired).forEach((sectionKey) => {
+        if (allowed.indexOf(sectionKey) === -1) {
+            console.error(
+                `[krtPageSections] section '${sectionKey}' is not allowed for ${topicClass}`,
+            );
+            return;
+        }
+        kept[sectionKey] = wired[sectionKey];
+    });
+    return kept;
+}
+
+/**
  * Declares a page's sections once and returns the seam that owns the whole live-update
  * choreography: the write with its 409 handling and version propagation, the in-place re-render,
  * the peer broadcast and the receiver for a peer's change (REQ-FE-001…010, ADR-0289).
@@ -45,7 +93,8 @@ function publish(topic, keys) {
  * @returns {KrtPageSections} the page's section seam
  */
 function create(config) {
-    const sections = config.sections || {};
+    const allowedKeys = allowedKeysOf(config.topicClass);
+    const sections = allowedWiring(config.sections || {}, allowedKeys, config.topicClass);
     const alsoBroadcast = config.alsoBroadcast || [];
 
     /** @returns {string | null} the topic room, or null while the page has no entity id */
@@ -254,7 +303,7 @@ function create(config) {
         });
     }
 
-    return { write, submitForm, refresh, notify, receiver, sections };
+    return { write, submitForm, refresh, notify, receiver, sections, allowedKeys };
 }
 
 /** @type {KrtPageSectionsApi} */

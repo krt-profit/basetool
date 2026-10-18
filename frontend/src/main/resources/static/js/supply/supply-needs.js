@@ -39,6 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
         containerSelector: '#supply-needs-results',
         listUrl: '/supply/needs',
         section: 'needs',
+        topicClass: 'SUPPLY_NEEDS',
     });
     bindFilterForm({
         formId: 'supply-needs-filter',

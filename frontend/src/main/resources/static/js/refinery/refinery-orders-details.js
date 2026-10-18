@@ -60,6 +60,7 @@ function initRefineryOrdersDetails() {
             };
         },
         keys: { refreshErrorKey: 'refineryorder.section.refresh.error' },
+        topicClass: 'REFINERY_ORDER',
         sections: {
             order: { container: '#refinery-order-results', fragmentValue: 'order' },
             store: { container: '#refinery-store-results', fragmentValue: 'store' },

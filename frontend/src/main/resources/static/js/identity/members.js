@@ -31,6 +31,7 @@ import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 
 const members = krtPageSections.create({
+    topicClass: 'MEMBERS',
     sections: {
         roster: { container: '#members-results', fragmentValue: 'results' },
     },

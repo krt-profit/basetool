@@ -65,6 +65,7 @@ function initOrdersDetail() {
             reloadQuestionKey: 'orders.conflict.reload.question',
             reloadDetailKey: 'orders.conflict.detail',
         },
+        topicClass: 'ORDER',
         sections: {
             header: { container: '#order-header-results', fragmentValue: 'header' },
             kpi: { container: '#order-kpi-results', fragmentValue: 'kpi' },

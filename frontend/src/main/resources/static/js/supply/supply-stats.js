@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!document.querySelector('#supply-stats-results')) return;
     krtPageSections.create({
+        topicClass: 'SUPPLY_NEEDS',
         sections: { stats: { container: '#supply-stats-results' } },
         pageUrl() {
             return `${window.location.pathname}${window.location.search}`;

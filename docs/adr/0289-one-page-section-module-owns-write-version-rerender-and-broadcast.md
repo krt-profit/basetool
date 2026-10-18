@@ -32,9 +32,8 @@ Its seam is covered by a node test over a fake DOM running the real `krt-fetch.j
 ## Consequences
 
 - A migrated page has no local reswap/refresh helper, section map, receiver wiring or version write.
-- The section keys still exist in the relay whitelist (`LiveSyncTopicClass`) and in the page's
-  declaration. Rendering the allowed keys and versions into `data-*` attributes from the server, so
-  no JS copy remains, is a possible next step and not part of this decision.
+- The section keys exist in the relay whitelist (`LiveSyncTopicClass`) and in the page's
+  declaration; the amendment below makes the whitelist the one list the page reads.
 - Pages not yet migrated keep working unchanged and move with the next change that touches them.
 
 ## Amendment: remaining pages (#2757)
@@ -52,3 +51,22 @@ Migrating the remaining pages widens the declaration without changing the decisi
 - `refresh` fetches sections that share a container and fragment once.
 
 These widen the declaration and do not change who owns the choreography.
+
+## Amendment: the server renders the allowed section keys (#2762)
+
+The head fragment renders one `<meta name="krt-live-sync-sections" data-topic-class="MISSION"
+ content="crew,finance,...">` per `LiveSyncTopicClass`, from `allowedSections()` through the `liveSyncSectionKeys`
+bean, so every page carries the whitelist and `LiveSyncTopicClass` stays the single
+source of the key list.
+
+- `krtPageSections.create` takes `topicClass`, reads the meta of that class and keeps only the wired
+  sections the server allows. A wired key the server did not render is logged and dropped, a missing
+  meta is logged and leaves the wiring as declared. The seam exposes the list as `allowedKeys`.
+- `sections:` in a page module is the container and fragment wiring per key, not a list of the
+  allowed keys; a key the page does not wire is simply not re-rendered.
+- Versions are not duplicated into the head: a section container already renders its own
+  `data-version` and a re-render or `propagateVersion` refreshes it, so the echo needs no second
+  source.
+- `LiveSyncSectionKeysTest` pins the rendered head against the enum. `LiveSyncSectionMapParityTest` keeps
+  checking that a page wires every key of its room, and that every `topicClass` names an existing class
+  and every live seam declares one.

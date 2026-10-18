@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
         containerSelector: '#supply-mine-results',
         listUrl: '/supply/donations/mine',
         section: 'mine',
+        topicClass: 'SUPPLY_NEEDS',
     });
     initPledgeModal(afterWrite);
 

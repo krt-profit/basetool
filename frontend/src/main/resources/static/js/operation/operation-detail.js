@@ -50,6 +50,7 @@ function initOperationDetail() {
             return { 'operation.section.refresh.error': OPS_DETAIL_MSG.sectionRefreshError };
         },
         keys: { refreshErrorKey: 'operation.section.refresh.error' },
+        topicClass: 'OPERATION',
         sections: {
             overview: { container: '#op-overview-results', fragmentValue: 'overview' },
             missions: { container: '#op-missions-results', fragmentValue: 'missions' },
