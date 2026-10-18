@@ -1874,6 +1874,10 @@ whole app.
    the square `.filter-count`.
 5. **Muted text** is `--color-gray-2-text`; quality and other data values are `--data-fg`, orange is
    for identity and actions.
+6. **Fields keep their distance.** A control never overlaps or touches its neighbour: fields in one
+   row keep at least `--space-2` between them, and a row too narrow for its fields wraps or stacks
+   by the width of its form (a container query), not only by the viewport. A number input's
+   up/down buttons sit `--space-2` away from the value.
 
 **Enforced by:** `PagePatternFragmentsRenderTest`, the per-page pattern render tests,
 `SegmentedControlLayoutTest`, `AccessibleTextTintTest`, `ColourTokenCopyTest`, `CustomPropertyExistenceTest`, Stylelint ·

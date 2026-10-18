@@ -18,6 +18,7 @@
     }
     .rod-form {
         max-width: none;
+        container: rod-form / inline-size;
     }
     .rod-form > .form-actions--sticky {
         justify-content: flex-end;
@@ -36,15 +37,26 @@
         gap: var(--space-4);
         font-size: var(--fs-sm);
     }
+    .rod-time {
+        grid-template-columns: max-content minmax(0, 1fr) minmax(0, 1fr);
+    }
+    .rod-time > .form-group.datetime-split-group {
+        grid-column: auto;
+    }
     .rod-start,
     .rod-duration {
         display: flex;
         align-items: center;
         gap: var(--space-2);
     }
+    .rod-start {
+        flex-wrap: wrap;
+    }
     .rod-start .datetime-split-inputs {
-        flex: 1 1 auto;
-        min-width: 0;
+        flex: 0 0 auto;
+        flex-wrap: wrap;
+        width: auto;
+        max-width: 100%;
     }
     .rod-duration input {
         flex: 1 1 0;
@@ -235,7 +247,13 @@
             order: -1;
         }
     }
-    @media (width <= 768px) {
+    @container rod-form (width < 52rem) {
+        .rod-time {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .rod-time > .form-group.datetime-split-group {
+            grid-column: 1 / -1;
+        }
         .rod-good--head,
         .rod-good__arrow {
             display: none;
@@ -266,6 +284,11 @@
             overflow: visible;
             white-space: normal;
             clip-path: none;
+        }
+    }
+    @container rod-form (width < 30rem) {
+        .rod-time {
+            grid-template-columns: minmax(0, 1fr);
         }
     }
 }
