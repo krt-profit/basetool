@@ -39,9 +39,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.AllocationReductionDto;
@@ -54,7 +51,6 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTrans
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTransferredToUserEvent;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.TransferredLot;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mission.api.FinanceType;
@@ -63,9 +59,10 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
-import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSaleIncome;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.math.BigDecimal;
 import java.util.List;
@@ -76,7 +73,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -94,21 +90,17 @@ class InventoryItemServiceBookOutTest {
 
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private UserRepository userRepository;
-  @Mock private MaterialRepository materialRepository;
   @Mock private LocationRepository locationRepository;
-  @Mock private JobOrderRepository jobOrderRepository;
-  @Mock private MissionRepository missionRepository;
   @Mock private MissionFinanceEntryRepository missionFinanceEntryRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private StockOfferLookup stockOfferLookup;
   @Mock private StockChangeObserver offerRatchet;
   @Mock private InventoryItemMapper inventoryItemMapper;
-  @Mock private MaterialMapper materialMapper;
   @Mock private OwnerScopeService ownerScopeService;
 
   @Mock private AuditService auditService;
   @Mock private ApplicationEventPublisher eventPublisher;
-  @InjectMocks private InventoryCheckoutService service;
+  private InventoryCheckoutService service;
 
   private static final UUID ITEM_ID = UUID.randomUUID();
   private static final UUID OWNER_ID = UUID.randomUUID();
@@ -121,11 +113,19 @@ class InventoryItemServiceBookOutTest {
 
   @BeforeEach
   void setUpEntities() {
-    org.springframework.test.util.ReflectionTestUtils.setField(
-        service,
-        "stockSoldForTarget",
-        new de.greluc.krt.profit.basetool.backend.mission.internal.MissionSaleIncome(
-            missionParticipantRepository, missionFinanceEntryRepository));
+    service =
+        new InventoryCheckoutService(
+            inventoryItemRepository,
+            userRepository,
+            locationRepository,
+            new MissionSaleIncome(missionParticipantRepository, missionFinanceEntryRepository),
+            null,
+            stockOfferLookup,
+            offerRatchet,
+            inventoryItemMapper,
+            ownerScopeService,
+            auditService,
+            eventPublisher);
     owner = new User();
     owner.setId(OWNER_ID);
     owner.setUsername("alice");
@@ -221,20 +221,59 @@ class InventoryItemServiceBookOutTest {
 
       verify(inventoryItemRepository).saveAndFlush(item);
     }
+  }
 
-    @Test
-    void amountExceedsAvailable_throwsBadRequest() {
-      InventoryItem item = newItem(5.0, 1L);
+  @Nested
+  class RefusalTests {
+
+    private void assertRefused(InventoryItem item, InventoryItemBookOutDto dto, String detail) {
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-      assertThrows(
-          BadRequestException.class,
-          () ->
-              service.bookOutInventoryItem(
-                  ITEM_ID,
-                  newDto(10.0, null, null, CheckoutType.DISCARD, null, null, 1L),
-                  OWNER_ID,
-                  false));
+      BadRequestException ex =
+          assertThrows(
+              BadRequestException.class,
+              () -> service.bookOutInventoryItem(ITEM_ID, dto, OWNER_ID, false));
+
+      assertEquals(detail, ex.getMessage());
+      verify(inventoryItemRepository, never()).save(any());
+      verify(inventoryItemRepository, never()).saveAndFlush(any());
+      verify(inventoryItemRepository, never()).delete(any());
+      verify(auditService, never()).record(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void exceedsStock_isABadRequest() {
+      assertRefused(
+          newItem(5.0, 1L),
+          newDto(10.0, null, null, CheckoutType.DISCARD, null, null, 1L),
+          "Cannot book out more than the available amount");
+    }
+
+    @Test
+    void fractionalAmount_isABadRequestNamingTheStock() {
+      assertRefused(
+          newGameItemRow(10.0, 1L),
+          newDto(1.5, null, null, CheckoutType.DISCARD, null, null, 1L),
+          "Amount must be a whole number for item stock");
+    }
+
+    @Test
+    void missionEarmarkOnItemStock_isABadRequest() {
+      assertRefused(
+          newGameItemRow(10.0, 1L),
+          new InventoryItemBookOutDto(
+              2.0,
+              null,
+              null,
+              CheckoutType.DISCARD,
+              null,
+              null,
+              1L,
+              null,
+              null,
+              null,
+              List.of(new AllocationReductionDto(UUID.randomUUID(), 1.0))),
+          "Game-item stock carries no mission earmarks");
     }
   }
 
@@ -541,8 +580,7 @@ class InventoryItemServiceBookOutTest {
 
       InventoryItem source = newItem(10.0, 1L);
 
-      de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron orgA =
-          new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
+      Squadron orgA = new Squadron();
       orgA.setId(UUID.randomUUID());
       InventoryItem foreignOrgTarget = new InventoryItem();
       foreignOrgTarget.setId(UUID.randomUUID());
@@ -554,8 +592,7 @@ class InventoryItemServiceBookOutTest {
       foreignOrgTarget.setAmount(6.0);
       foreignOrgTarget.setOwningOrgUnit(orgA);
 
-      de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron orgB =
-          new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
+      Squadron orgB = new Squadron();
       orgB.setId(UUID.randomUUID());
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(source));
@@ -580,11 +617,48 @@ class InventoryItemServiceBookOutTest {
       assertEquals(4.0, newRow.getAmount(), "the inserted row carries the moved amount");
     }
 
+    @Test
+    void transferWithTargetOwningOrgUnitId_routesThroughResolver() {
+      UUID targetUserId = UUID.randomUUID();
+      UUID pickedOrgUnitId = UUID.randomUUID();
+      User targetUser = new User();
+      targetUser.setId(targetUserId);
+      Squadron picked = new Squadron();
+      picked.setId(pickedOrgUnitId);
+      InventoryItem item = newItem(10.0, 1L);
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+      when(userRepository.findById(targetUserId)).thenReturn(Optional.of(targetUser));
+      when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(targetUser, pickedOrgUnitId))
+          .thenReturn(picked);
+      when(inventoryItemRepository.save(any(InventoryItem.class)))
+          .thenAnswer(inv -> inv.getArgument(0));
+
+      service.bookOutInventoryItem(
+          ITEM_ID,
+          new InventoryItemBookOutDto(
+              5.0,
+              targetUserId,
+              null,
+              CheckoutType.TRANSFER,
+              null,
+              null,
+              1L,
+              pickedOrgUnitId,
+              null,
+              null,
+              null),
+          OWNER_ID,
+          false);
+
+      ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
+      verify(inventoryItemRepository).save(captor.capture());
+      assertSame(targetUser, captor.getValue().getUser());
+      assertSame(picked, captor.getValue().getOwningOrgUnit());
+    }
+
     /**
-     * Pins change #7: a PARTIAL cross-user transfer persists the reduced source row via {@code
-     * saveAndFlush} (not a plain {@code save}) so the row's @Version stays current within the
-     * transaction and no future in-place consumer of a transfer can 409, while the brand-new target
-     * row is still inserted via a plain {@code save}.
+     * A partial transfer flushes the reduced source row so its version stays current, and inserts
+     * the target row with a plain save.
      */
     @Test
     void partialTransfer_flushesReducedSourceRow() {
@@ -1322,146 +1396,6 @@ class InventoryItemServiceBookOutTest {
   class GameItemRowTests {
 
     @Test
-    void bookOut_itemRow_fractionalAmount_throwsBadRequest() {
-      InventoryItem item = newGameItemRow(10.0, 1L);
-      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
-
-      BadRequestException ex =
-          assertThrows(
-              BadRequestException.class,
-              () ->
-                  service.bookOutInventoryItem(
-                      ITEM_ID,
-                      newDto(1.5, null, null, CheckoutType.DISCARD, null, null, 1L),
-                      OWNER_ID,
-                      false));
-      assertEquals("Amount must be a whole number for item stock", ex.getMessage());
-      verify(inventoryItemRepository, never()).save(any());
-      verify(inventoryItemRepository, never()).saveAndFlush(any());
-      verify(inventoryItemRepository, never()).delete(any());
-    }
-
-    @Test
-    void bookOut_pieceMaterial_fractionalAmount_throwsBadRequest() {
-      InventoryItem item = newItem(10.0, 1L);
-      item.getMaterial().setQuantityType(QuantityType.PIECE);
-      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
-
-      BadRequestException ex =
-          assertThrows(
-              BadRequestException.class,
-              () ->
-                  service.bookOutInventoryItem(
-                      ITEM_ID,
-                      newDto(2.5, null, null, CheckoutType.DISCARD, null, null, 1L),
-                      OWNER_ID,
-                      false));
-      assertEquals("Amount must be a whole number for PIECE materials", ex.getMessage());
-      verify(inventoryItemRepository, never()).save(any());
-      verify(inventoryItemRepository, never()).saveAndFlush(any());
-      verify(inventoryItemRepository, never()).delete(any());
-    }
-
-    @Test
-    void bookOut_pieceMaterial_legacyFractionalRow_fullDepletion_isAllowed() {
-      InventoryItem item = newItem(1.5, 1L);
-      item.getMaterial().setQuantityType(QuantityType.PIECE);
-      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
-
-      InventoryItemDto result =
-          service.bookOutInventoryItem(
-              ITEM_ID,
-              newDto(1.5, null, null, CheckoutType.DISCARD, null, null, 1L),
-              OWNER_ID,
-              false);
-
-      assertNull(result, "a full depletion returns null");
-      verify(inventoryItemRepository).delete(item);
-      verify(inventoryItemRepository, never()).saveAndFlush(any());
-    }
-
-    @Test
-    void bookOut_pieceMaterial_legacyFractionalRow_partialFractionalAmount_throwsBadRequest() {
-      InventoryItem item = newItem(1.5, 1L);
-      item.getMaterial().setQuantityType(QuantityType.PIECE);
-      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
-
-      BadRequestException ex =
-          assertThrows(
-              BadRequestException.class,
-              () ->
-                  service.bookOutInventoryItem(
-                      ITEM_ID,
-                      newDto(0.5, null, null, CheckoutType.DISCARD, null, null, 1L),
-                      OWNER_ID,
-                      false));
-      assertEquals("Amount must be a whole number for PIECE materials", ex.getMessage());
-      verify(inventoryItemRepository, never()).saveAndFlush(any());
-      verify(inventoryItemRepository, never()).delete(any());
-    }
-
-    @Test
-    void bookOut_itemRow_legacyFractionalRow_fullDepletion_isAllowed() {
-      InventoryItem item = newGameItemRow(1.5, 1L);
-      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
-
-      InventoryItemDto result =
-          service.bookOutInventoryItem(
-              ITEM_ID,
-              newDto(1.5, null, null, CheckoutType.DISCARD, null, null, 1L),
-              OWNER_ID,
-              false);
-
-      assertNull(result, "a full depletion returns null");
-      verify(inventoryItemRepository).delete(item);
-      verify(inventoryItemRepository, never()).saveAndFlush(any());
-    }
-
-    @Test
-    void bookOut_itemRow_legacyFractionalRow_partialFractionalAmount_throwsBadRequest() {
-      InventoryItem item = newGameItemRow(1.5, 1L);
-      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
-
-      BadRequestException ex =
-          assertThrows(
-              BadRequestException.class,
-              () ->
-                  service.bookOutInventoryItem(
-                      ITEM_ID,
-                      newDto(0.5, null, null, CheckoutType.DISCARD, null, null, 1L),
-                      OWNER_ID,
-                      false));
-      assertEquals("Amount must be a whole number for item stock", ex.getMessage());
-      verify(inventoryItemRepository, never()).saveAndFlush(any());
-      verify(inventoryItemRepository, never()).delete(any());
-    }
-
-    @Test
-    void bookOut_itemRow_missionReductions_throwsBadRequest() {
-      InventoryItem item = newGameItemRow(10.0, 1L);
-      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
-      InventoryItemBookOutDto dto =
-          new InventoryItemBookOutDto(
-              2.0,
-              null,
-              null,
-              CheckoutType.DISCARD,
-              null,
-              null,
-              1L,
-              null,
-              null,
-              null,
-              List.of(new AllocationReductionDto(UUID.randomUUID(), 1.0)));
-
-      assertThrows(
-          BadRequestException.class,
-          () -> service.bookOutInventoryItem(ITEM_ID, dto, OWNER_ID, false));
-      verify(inventoryItemRepository, never()).save(any());
-      verify(inventoryItemRepository, never()).delete(any());
-    }
-
-    @Test
     void transfer_itemRow_copiesGameItemOntoMovedRow() {
       UUID targetUserId = UUID.randomUUID();
       User targetUser = new User();
@@ -1612,83 +1546,6 @@ class InventoryItemServiceBookOutTest {
         null,
         null,
         missionReductions);
-  }
-
-  @Test
-  void bookOutInventoryItem_transferWithTargetOwningOrgUnitId_routesThroughResolver() {
-    UUID itemId = UUID.randomUUID();
-    UUID targetUserId = UUID.randomUUID();
-    UUID pickedOrgUnitId = UUID.randomUUID();
-
-    de.greluc.krt.profit.basetool.backend.identity.api.User owner =
-        new de.greluc.krt.profit.basetool.backend.identity.api.User();
-    owner.setId(UUID.randomUUID());
-    de.greluc.krt.profit.basetool.backend.identity.api.User targetUser =
-        new de.greluc.krt.profit.basetool.backend.identity.api.User();
-    targetUser.setId(targetUserId);
-    de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron picked =
-        new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
-    picked.setId(pickedOrgUnitId);
-
-    de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem item =
-        new de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem();
-    item.setId(itemId);
-    item.setVersion(1L);
-    item.setAmount(10.0);
-    item.setUser(owner);
-    de.greluc.krt.profit.basetool.backend.catalogue.api.Location loc =
-        new de.greluc.krt.profit.basetool.backend.catalogue.api.Location();
-    loc.setId(UUID.randomUUID());
-    item.setLocation(loc);
-    item.setMaterial(new de.greluc.krt.profit.basetool.backend.catalogue.api.Material());
-    item.setPersonal(false);
-
-    org.mockito.Mockito.when(inventoryItemRepository.findById(itemId))
-        .thenReturn(java.util.Optional.of(item));
-    org.mockito.Mockito.when(userRepository.findById(targetUserId))
-        .thenReturn(java.util.Optional.of(targetUser));
-    org.mockito.Mockito.when(
-            ownerScopeService.resolveOrgUnitForPickerOutputNullable(targetUser, pickedOrgUnitId))
-        .thenReturn(picked);
-    org.mockito.ArgumentCaptor<
-            de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem>
-        captor =
-            org.mockito.ArgumentCaptor.forClass(
-                de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem.class);
-    org.mockito.Mockito.when(
-            inventoryItemRepository.save(
-                any(de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem.class)))
-        .thenAnswer(i -> i.getArguments()[0]);
-
-    InventoryItemBookOutDto dto =
-        new InventoryItemBookOutDto(
-            5.0,
-            targetUserId,
-            null,
-            CheckoutType.TRANSFER,
-            null,
-            null,
-            1L,
-            pickedOrgUnitId,
-            null,
-            null,
-            null);
-
-    service.bookOutInventoryItem(itemId, dto, owner.getId(), false);
-
-    org.mockito.Mockito.verify(inventoryItemRepository, org.mockito.Mockito.atLeastOnce())
-        .save(captor.capture());
-    java.util.List<de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem> saved =
-        captor.getAllValues();
-    de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem newRow =
-        saved.stream()
-            .filter(i -> i.getUser() == targetUser)
-            .findFirst()
-            .orElseThrow(() -> new AssertionError("expected a save for the new transfer row"));
-    org.junit.jupiter.api.Assertions.assertSame(
-        picked,
-        newRow.getOwningOrgUnit(),
-        "picker output must flow through resolveOrgUnitForPickerOutputNullable on the new row");
   }
 
   private static InventoryItemDto sentinelDto(Double amount) {

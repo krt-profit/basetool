@@ -1709,8 +1709,10 @@ the web maps a refusal to its existing problem, a command to its refusal value.
   values. *`InventoryItemServiceBookOutTest`, `InventoryItemServicePersonalRebookTest`,
   `InventoryPoolChangeIntegrationTest`, `InventoryStolenMarkServiceTest`, `RebookCommandsTest`, the
   exchange org-stock tests.*
-- [ ] The mock-heavy web-service tests of the book-out and the Umbuchung shrink to adapter tests
-  once their refusal cases are covered by the decision tests.
+- [x] The mock-heavy web-service tests of the book-out and the Umbuchung shrink to adapter tests
+  once their refusal cases are covered by the decision tests. *One adapter test per refusal in
+  `InventoryItemServiceBookOutTest` and `InventoryItemServicePersonalRebookTest`; the rule
+  permutations live in `InventoryStockDecisionsTest`.*
 
 **Enforced by:** `InventoryStockDecisionsTest`, `RebookCommandsTest`,
 `InventoryItemServiceBookOutTest`, `InventoryItemServicePersonalRebookTest` · **Code:**
