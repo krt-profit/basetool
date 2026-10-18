@@ -156,6 +156,7 @@ class MaterialRequestControllerTest {
         new MaterialReferenceDto(UUID.randomUUID(), "Agricium", QuantityType.SCU),
         null,
         null,
+        null,
         120.0,
         600,
         new UserReferenceDto(UUID.randomUUID(), "Suchende", "Suchende", "Suchende", null),

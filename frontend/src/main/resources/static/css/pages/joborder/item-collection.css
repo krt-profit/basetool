@@ -79,6 +79,13 @@
     .collection-group__title {
         font-weight: var(--fw-bold);
     }
+    .collection-group__item,
+    .collection-group__chips {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: var(--space-1);
+        align-items: center;
+    }
 
     @media (width <= 768px) {
         .collection-group__head th {

@@ -1,6 +1,13 @@
 @layer base, components, page, utilities;
 
 @layer page {
+    .supply-item-chips {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: var(--space-1);
+        align-items: center;
+        vertical-align: middle;
+    }
     .supply-tabs {
         margin-bottom: var(--space-4);
     }

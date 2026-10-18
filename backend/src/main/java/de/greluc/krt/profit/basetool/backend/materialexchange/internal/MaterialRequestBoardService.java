@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
@@ -99,6 +100,9 @@ public class MaterialRequestBoardService {
    */
   private final OrgUnitRepository orgUnitRepository;
 
+  /** Resolves a page's item requests to their game items in one batch (REQ-MARKET-023). */
+  private final ExchangeItemReferences exchangeItemReferences;
+
   /**
    * Returns a page of the board, either all requests or the caller's own, with the toolbar filters
    * and sort applied; list DTOs never carry supplier names.
@@ -147,12 +151,15 @@ public class MaterialRequestBoardService {
             : interestRepository.findRequestIdsInterestedByViewer(viewerId, requestIds);
     Map<UUID, List<OrgUnitReferenceDto>> badges =
         ownerOrgUnitBadges(ownerIdsOf(requests.getContent()));
+    Map<String, GameItemReferenceDto> gameItems =
+        exchangeItemReferences.byProductKey(itemProductKeysOf(requests.getContent()));
 
     Page<MaterialRequestDto> dtos =
         requests.map(
             request ->
                 toDto(
                     request,
+                    gameItemOf(request, gameItems),
                     viewerId,
                     badges.getOrDefault(ownerIdOf(request), List.of()),
                     counts.getOrDefault(request.getId(), 0L).intValue(),
@@ -220,13 +227,18 @@ public class MaterialRequestBoardService {
         ownerId == null
             ? List.of()
             : ownerOrgUnitBadges(Set.of(ownerId)).getOrDefault(ownerId, List.of());
-    return toDto(request, viewerId, badges, count, viewerInterested, names);
+    GameItemReferenceDto gameItem =
+        request.getKind() == MaterialExchangeRequestKind.ITEM
+            ? exchangeItemReferences.ofProductKey(request.getItemProductKey())
+            : null;
+    return toDto(request, gameItem, viewerId, badges, count, viewerInterested, names);
   }
 
   /**
    * Assembles the request DTO from the entity and the viewer-relative facts.
    *
    * @param request the request.
+   * @param gameItem the game item an item request names, or {@code null}.
    * @param viewerId the requesting member, or {@code null}.
    * @param ownerOrgUnits the requester's affiliation badges (Staffel(n) then SK(s)), never {@code
    *     null}.
@@ -238,6 +250,7 @@ public class MaterialRequestBoardService {
   @NotNull
   private MaterialRequestDto toDto(
       MaterialExchangeRequest request,
+      @Nullable GameItemReferenceDto gameItem,
       @Nullable UUID viewerId,
       List<OrgUnitReferenceDto> ownerOrgUnits,
       int interestCount,
@@ -262,6 +275,7 @@ public class MaterialRequestBoardService {
         request.getKind(),
         material,
         itemName,
+        gameItem,
         itemQuantity,
         requestedAmount,
         request.getMinQuality(),
@@ -289,6 +303,38 @@ public class MaterialRequestBoardService {
         .map(MaterialRequestBoardService::ownerIdOf)
         .filter(Objects::nonNull)
         .collect(Collectors.toSet());
+  }
+
+  /**
+   * The product keys of a page's item requests, the input of the batched game-item resolution.
+   *
+   * @param requests the board page's requests
+   * @return the item requests' product keys; material requests contribute nothing
+   */
+  private static List<String> itemProductKeysOf(
+      @NotNull Collection<MaterialExchangeRequest> requests) {
+    return requests.stream()
+        .filter(request -> request.getKind() == MaterialExchangeRequestKind.ITEM)
+        .map(MaterialExchangeRequest::getItemProductKey)
+        .filter(Objects::nonNull)
+        .toList();
+  }
+
+  /**
+   * Looks up the game item of one request in a page's resolved references.
+   *
+   * @param request the request
+   * @param gameItems product key to reference for the page
+   * @return the reference of an item request, or {@code null}
+   */
+  @Nullable
+  private static GameItemReferenceDto gameItemOf(
+      @NotNull MaterialExchangeRequest request,
+      @NotNull Map<String, GameItemReferenceDto> gameItems) {
+    String key = request.getItemProductKey();
+    return request.getKind() == MaterialExchangeRequestKind.ITEM && key != null
+        ? gameItems.get(key)
+        : null;
   }
 
   /**

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitReferenceDto;
@@ -41,6 +42,8 @@ import org.jetbrains.annotations.Nullable;
  * @param kind whether this is a Lager-backed material offer or a blueprint-product item offer.
  * @param material the offered material for a material offer, else {@code null}.
  * @param itemName the offered item's display name for an item offer, else {@code null}.
+ * @param gameItem the game item an item row names, with a component's type, size, grade and class
+ *     (REQ-MARKET-023), or {@code null} for a material row or an item outside the catalogue.
  * @param itemQuantity the offered whole-piece quantity for an item offer, else {@code null}.
  * @param owner the offering player (the Anbieter).
  * @param ownerOrgUnits the Anbieter's badge-kind org units, Staffeln first, then Spezialkommandos,
@@ -66,6 +69,7 @@ public record MaterialExchangeOfferDto(
     MaterialExchangeOfferKind kind,
     @Nullable MaterialReferenceDto material,
     @Nullable String itemName,
+    @Nullable GameItemReferenceDto gameItem,
     @Nullable Integer itemQuantity,
     UserReferenceDto owner,
     List<OrgUnitReferenceDto> ownerOrgUnits,

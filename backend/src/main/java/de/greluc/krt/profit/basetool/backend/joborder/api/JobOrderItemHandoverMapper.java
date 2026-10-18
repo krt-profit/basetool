@@ -58,19 +58,14 @@ public interface JobOrderItemHandoverMapper {
   JobOrderItemHandoverEntryDto toDto(JobOrderItemHandoverEntry entry);
 
   /**
-   * Projects a {@link GameItem} to the slim reference used in handover entries.
+   * Projects a {@link GameItem} to the slim reference used in handover entries, with its component
+   * data when it is a ship component (REQ-ORDERS-045).
    *
    * @param gameItem the catalogue entity, or {@code null}
    * @return the slim reference, or {@code null} when the input is {@code null}
    */
   @Nullable
-  default GameItemReferenceDto toGameItemReference(GameItem gameItem) {
-    if (gameItem == null) {
-      return null;
-    }
-    return new GameItemReferenceDto(
-        gameItem.getId(),
-        gameItem.getName(),
-        gameItem.getKind() == null ? null : gameItem.getKind().name());
+  default GameItemReferenceDto toGameItemReference(@Nullable GameItem gameItem) {
+    return gameItem == null ? null : GameItemReferenceDto.of(gameItem);
   }
 }

@@ -213,6 +213,30 @@ below (REQ-UI-027).
 **Enforced by:** manual check · **Code:** `static/css/pages/supply/supply.css`,
 `static/js/kernel/krt-overflow-menu.js`, `static/js/kernel/common-handlers.js`
 
+### REQ-SUP-022 — Needs and donations show a component's type, size, grade and class
+
+A need and a donation for a game item show the Lager chips beside the item's name on the needs list,
+„Meine Spenden" and „Eingehende Spenden", e.g. `FR-66 [SCHILD] [S1 · A] [MILITÄR]`.
+
+- The chips follow the Lager rules (REQ-INV-061, REQ-INV-062): only a ship component gets the
+  type, size/grade and class chips; every other item shows its category chip. A material need or
+  donation renders as before.
+- `NeedDto.gameItem` and `DonationDto.gameItem` are a `GameItemReferenceDto`
+  (`GameItemReferenceDto.of`), read from the `game_item` row the list reads already fetch, so no
+  read adds a query per row.
+- The chips sit in the result fragments the live refresh fetches (REQ-SUP-018). The change is
+  read-only; the `SUPPLY` audit trail is unchanged.
+
+**Acceptance**
+
+- [x] A need, the caller's own donation and an incoming donation for FR-66 show `[SCHILD] [S1 · A] [MILITÄR]`,
+  also in a refreshed result fragment.
+- [x] Material needs and donations render as before.
+
+**Enforced by:** `SupplyItemChipsRenderTest`, `SupplyMapperTest` game-item cases · **Code:**
+`SupplyMapper`, `supply/needs.html`, `supply/my-donations.html`, `supply/incoming-donations.html`,
+`kernel/fragments/item-chips.html` · **Issues:** #2725
+
 ## Out of scope
 
 Money, deals and partners ([`purchasing.md`](purchasing.md)); profit medals; any `/exchange/v1`

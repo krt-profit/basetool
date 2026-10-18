@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<th:block th:fragment="itemChips(gameItem)"
+          th:with="typeLabel=${gameItem.componentType != null} ? ${#messages.msgOrNull('inventory.items.componentType.' + gameItem.componentType)} : null,
+                   classLabel=${gameItem.componentType != null and gameItem.itemClass != null} ? ${#messages.msgOrNull('inventory.items.itemClass.' + gameItem.itemClass)} : null">
+    <span th:if="${typeLabel != null}" class="chip chip--muted" data-testid="item-component-type" th:text="${typeLabel}">Schild</span>
+    <span th:if="${typeLabel == null and gameItem.kind != null}" class="chip chip--muted" data-testid="item-kind"
+          th:with="kindKey=|inventory.items.kind.${gameItem.kind}|"
+          th:text="${#messages.msgOrNull(kindKey)} ?: ${gameItem.kind}">Art</span>
+    <span th:if="${typeLabel != null and (gameItem.size != null or gameItem.grade != null)}" class="chip chip--data" data-testid="item-size-grade"
+          th:title="#{inventory.items.sizeGrade.title}"
+          th:text="${gameItem.size != null and gameItem.grade != null} ? #{inventory.items.sizeGrade(${gameItem.size}, ${gameItem.grade})} : (${gameItem.size != null} ? #{inventory.items.size(${gameItem.size})} : #{inventory.items.grade(${gameItem.grade})})">S1 · A</span>
+    <span th:if="${typeLabel != null and classLabel != null}" data-testid="item-class"
+          th:class="|chip chip--item-class-${#strings.toLowerCase(gameItem.itemClass)}|"
+          th:title="#{inventory.items.itemClass.title}"
+          th:text="${classLabel}">Milit&auml;r</span>
+</th:block>
+
+</body>
+</html>

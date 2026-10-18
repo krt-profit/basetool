@@ -1676,6 +1676,48 @@ direction. It joins the caller's transaction, after the caller has taken the mem
 `inventory/internal/InventoryRebookCommands`, `InventoryCheckoutService#rebookRow` · **Issues:**
 #2693, #2694
 
+### REQ-INV-065 — Each stock rule of the Lager is decided once, for the web and the commands
+
+The Lager's stock rules for a book-out, a row's Umbuchung, a split of a row (the pool change of
+REQ-INV-059 and the stolen marking of REQ-INV-053) and a lot rebooking (REQ-INV-060) live in one
+decision module (ADR-0284). Each decision is a pure function over the rows loaded under the
+operation's lock; it reads no repository and returns a refusal value instead of throwing. The web
+services and the published commands (`PoolEntryCommands`, `RebookCommands`) are adapters over it:
+the web maps a refusal to its existing problem, a command to its refusal value.
+
+- **Book-out, sale and transfer:** no more than the row holds; no fraction of whole-unit stock unless
+  it is the whole row; no mission deduction on item stock.
+- **Umbuchung of a row:** a positive amount, no more than the row holds, no fraction of whole-unit
+  stock unless it is the whole row; a shared row earmarked to a job order or mission does not become
+  personal. A donation pledge does not keep a row shared.
+- **Split of a part into a new row:** a positive part, no more than the row holds, whole on
+  whole-unit stock; the rest stays at or above the row's Materialbörse offer and carries every
+  job-order, mission and donation earmark of the row.
+- **Lot rebooking:** the rules and order of REQ-INV-060; the decision also names the amount each
+  source row gives.
+- **Whole units** are counted in one place: game-item stock and `PIECE` materials.
+- The HTTP status, the problem detail and the refusal values stay as each surface defines them, and
+  each mutation keeps its audit event (REQ-AUDIT-001). A command answers a fraction of piece or item
+  stock as `UNIT_MISMATCH`, also in a dry run. Both surfaces compare an amount with the row's amount
+  exactly, and a split's rest with the offer and the earmarks within `1e-6`.
+
+**Acceptance**
+
+- [x] Each refusal of each decision is covered on plain rows without mocks.
+  *`InventoryStockDecisionsTest`.*
+- [x] The web services and the commands keep their status codes, problem details and refusal
+  values. *`InventoryItemServiceBookOutTest`, `InventoryItemServicePersonalRebookTest`,
+  `InventoryPoolChangeIntegrationTest`, `InventoryStolenMarkServiceTest`, `RebookCommandsTest`, the
+  exchange org-stock tests.*
+- [x] The mock-heavy web-service tests of the book-out and the Umbuchung shrink to adapter tests
+  once their refusal cases are covered by the decision tests. *One adapter test per refusal in
+  `InventoryItemServiceBookOutTest` and `InventoryItemServicePersonalRebookTest`; the rule
+  permutations live in `InventoryStockDecisionsTest`.*
+
+**Enforced by:** `InventoryStockDecisionsTest`, `RebookCommandsTest`,
+`InventoryItemServiceBookOutTest`, `InventoryItemServicePersonalRebookTest` · **Code:**
+`inventory/internal/InventoryStockDecisions`, `InventoryItem#countsWholeUnits` · **Issues:** #2732
+
 ## Out of scope
 
 - Tenancy / visibility scope of inventory (strict-staffel Lager-View) is governed by

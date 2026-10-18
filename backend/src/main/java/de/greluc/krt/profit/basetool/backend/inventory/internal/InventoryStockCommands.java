@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.AllocationReductionDto;
@@ -471,11 +470,7 @@ public class InventoryStockCommands implements StockCommands {
    * @throws BadRequestException when a game item or piece-counted material row holds a fraction
    */
   private static void requireWholeUnits(@NotNull InventoryItem item) {
-    boolean whole =
-        item.getGameItem() != null
-            || (item.getMaterial() != null
-                && item.getMaterial().getQuantityType() == QuantityType.PIECE);
-    if (whole && item.getAmount() % 1 != 0) {
+    if (item.countsWholeUnits() && item.getAmount() % 1 != 0) {
       throw new BadRequestException("This stock is counted in whole units");
     }
   }

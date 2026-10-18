@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.supply.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.supply.api.DeclineReason;
 import de.greluc.krt.profit.basetool.backend.supply.api.DonationStatus;
 import java.time.Instant;
@@ -34,7 +35,8 @@ import org.jetbrains.annotations.Nullable;
  * @param receivingOrgUnitId the receiving unit
  * @param receivingOrgUnitName the receiving unit's name
  * @param material the material, or {@code null} for a game item
- * @param gameItem the game item, or {@code null} for a material
+ * @param gameItem the game item with a component's type, size, grade and class (REQ-SUP-022), or
+ *     {@code null} for a material
  * @param quality the quality of a material donation, or {@code null}
  * @param quantityType {@code SCU}, {@code PIECE} or {@code ITEM}
  * @param pledgedAmount the pledged amount
@@ -56,7 +58,7 @@ public record DonationDto(
     UUID receivingOrgUnitId,
     String receivingOrgUnitName,
     @Nullable SupplyRefDto material,
-    @Nullable SupplyRefDto gameItem,
+    @Nullable GameItemReferenceDto gameItem,
     @Nullable Integer quality,
     String quantityType,
     Double pledgedAmount,

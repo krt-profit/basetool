@@ -21,6 +21,7 @@
                     <span class="mb-mrow-mat">
                         <span class="mb-mrow-name" th:text="${request.kind() == 'ITEM' ? request.itemName() : request.material().name()}">Material</span>
                         <span th:if="${request.kind() == 'ITEM'}" class="mb-kind-tag" th:text="#{materialboerse.kind.item}">Item</span>
+                        <span th:if="${request.gameItem() != null}" class="mb-item-chips" data-testid="mb-item-chips" th:insert="~{kernel/fragments/item-chips :: itemChips(${request.gameItem()})}"></span>
                     </span>
                     <span class="mb-mrow-sub">
                         <span class="mb-mrow-owner" th:text="${request.owner().effectiveName()}">Spieler</span>
@@ -53,6 +54,7 @@
                             <h2>
                                 <span th:text="${request.kind() == 'ITEM' ? request.itemName() : request.material().name()}">Material</span>
                                 <span th:if="${request.kind() == 'ITEM'}" class="mb-kind-tag" th:text="#{materialboerse.kind.item}">Item</span>
+                                <span th:if="${request.gameItem() != null}" class="mb-item-chips" data-testid="mb-item-chips" th:insert="~{kernel/fragments/item-chips :: itemChips(${request.gameItem()})}"></span>
                             </h2>
                             <p class="mb-dp-owner">
                                 <span th:text="#{materialgesuch.detail.from}">gesucht von</span>

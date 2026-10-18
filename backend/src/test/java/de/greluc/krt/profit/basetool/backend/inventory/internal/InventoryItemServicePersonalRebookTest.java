@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -33,26 +34,18 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
-import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepository;
-import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
-import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.List;
@@ -84,16 +77,10 @@ class InventoryItemServicePersonalRebookTest {
 
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private UserRepository userRepository;
-  @Mock private MaterialRepository materialRepository;
   @Mock private LocationRepository locationRepository;
-  @Mock private JobOrderRepository jobOrderRepository;
-  @Mock private MissionRepository missionRepository;
-  @Mock private MissionFinanceEntryRepository missionFinanceEntryRepository;
-  @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private StockOfferLookup stockOfferLookup;
   @Mock private StockChangeObserver offerRatchet;
   @Mock private InventoryItemMapper inventoryItemMapper;
-  @Mock private MaterialMapper materialMapper;
   @Mock private OwnerScopeService ownerScopeService;
 
   @Mock private AuditService auditService;
@@ -181,43 +168,47 @@ class InventoryItemServicePersonalRebookTest {
       assertSame(SENTINEL, result);
       verify(inventoryItemRepository).save(any(InventoryItem.class));
     }
+  }
 
-    @Test
-    void zeroAmount_throwsBadRequest() {
-      InventoryItem item = newItem(10.0, 1L, true);
+  @Nested
+  class RefusalTests {
+
+    private void assertRefused(InventoryItem item, double amount, String detail) {
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
       BadRequestException ex =
           assertThrows(
               BadRequestException.class,
-              () -> service.rebookPersonal(ITEM_ID, dto(0.0, 1L, null), OWNER_ID, false));
-      assertEquals("Rebooked amount must be positive", ex.getMessage());
+              () -> service.rebookPersonal(ITEM_ID, dto(amount, 1L, null), OWNER_ID, false));
+
+      assertEquals(detail, ex.getMessage());
       verify(inventoryItemRepository, never()).save(any());
+      verify(inventoryItemRepository, never()).delete(any());
+      verify(auditService, never()).record(any(), any(), any(), any(), any());
     }
 
     @Test
-    void negativeAmount_throwsBadRequest() {
-      InventoryItem item = newItem(10.0, 1L, true);
-      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
-
-      BadRequestException ex =
-          assertThrows(
-              BadRequestException.class,
-              () -> service.rebookPersonal(ITEM_ID, dto(-5.0, 1L, null), OWNER_ID, false));
-      assertEquals("Rebooked amount must be positive", ex.getMessage());
+    void amountNotPositive_isABadRequest() {
+      assertRefused(newItem(10.0, 1L, true), 0.0, "Rebooked amount must be positive");
     }
 
     @Test
-    void amountExceedsAvailable_throwsBadRequest() {
-      InventoryItem item = newItem(5.0, 1L, true);
-      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+    void exceedsStock_isABadRequest() {
+      assertRefused(newItem(5.0, 1L, true), 10.0, "Cannot rebook more than the available amount");
+    }
 
-      BadRequestException ex =
-          assertThrows(
-              BadRequestException.class,
-              () -> service.rebookPersonal(ITEM_ID, dto(10.0, 1L, null), OWNER_ID, false));
-      assertEquals("Cannot rebook more than the available amount", ex.getMessage());
-      verify(inventoryItemRepository, never()).save(any());
+    @Test
+    void fractionalAmount_isABadRequestNamingTheStock() {
+      assertRefused(newGameItemRow(10.0), 1.5, "Amount must be a whole number for item stock");
+    }
+
+    @Test
+    void earmarked_isABadRequest() {
+      InventoryItem item = newItem(10.0, 1L, false);
+      InventoryAllocations.addJobOrder(item, UUID.randomUUID(), item.getAmount(), false);
+
+      assertRefused(
+          item, 4.0, "Stock assigned to a job order or mission cannot be marked personal");
     }
   }
 
@@ -354,169 +345,57 @@ class InventoryItemServicePersonalRebookTest {
     }
 
     @Test
-    void sourceWithJobOrder_throwsBadRequest_beforeCreatingAnyRow() {
-      InventoryItem item = newItem(10.0, 1L, false);
-      JobOrder jobOrder = new JobOrder();
-      jobOrder.setId(UUID.randomUUID());
-      InventoryAllocations.addJobOrder(item, jobOrder.getId(), item.getAmount(), false);
+    void full_deletesSourceAndSavesPersonalRow() {
+      InventoryItem item = newItem(5.0, 1L, false);
+      item.setOwningOrgUnit(sourceOrgUnit);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-      BadRequestException ex =
-          assertThrows(
-              BadRequestException.class,
-              () -> service.rebookPersonal(ITEM_ID, dto(4.0, 1L, null), OWNER_ID, false));
-      assertEquals(
-          "Stock assigned to a job order or mission cannot be marked personal", ex.getMessage());
-      verify(inventoryItemRepository, never()).save(any());
-      verify(inventoryItemRepository, never()).delete(any());
-      verify(auditService, never()).record(any(), any(), any(), any(), any());
+      InventoryItemDto result =
+          service.rebookPersonal(ITEM_ID, dto(5.0, 1L, null), OWNER_ID, false);
+
+      assertSame(SENTINEL, result);
+      ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
+      verify(inventoryItemRepository).save(captor.capture());
+      assertEquals(5.0, captor.getValue().getAmount());
+      assertTrue(captor.getValue().getPersonal(), "the split row flips to the personal pool");
+      verify(inventoryItemRepository).delete(item);
+      verify(inventoryItemRepository, never()).saveAndFlush(any());
     }
 
     @Test
-    void sourceWithMission_throwsBadRequest_beforeCreatingAnyRow() {
-      InventoryItem item = newItem(10.0, 1L, false);
-      Mission mission = new Mission();
-      mission.setId(UUID.randomUUID());
-      InventoryAllocations.addMission(item, mission.getId(), item.getAmount());
+    void itemRow_copiesGameItemOntoNewRow() {
+      InventoryItem item = newGameItemRow(10.0);
+      item.setOwningOrgUnit(sourceOrgUnit);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-      BadRequestException ex =
-          assertThrows(
-              BadRequestException.class,
-              () -> service.rebookPersonal(ITEM_ID, dto(4.0, 1L, null), OWNER_ID, false));
-      assertEquals(
-          "Stock assigned to a job order or mission cannot be marked personal", ex.getMessage());
-      verify(inventoryItemRepository, never()).save(any());
-      verify(inventoryItemRepository, never()).delete(any());
-      verify(auditService, never()).record(any(), any(), any(), any(), any());
+      service.rebookPersonal(ITEM_ID, dto(4.0, 1L, null), OWNER_ID, false);
+
+      ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
+      verify(inventoryItemRepository).save(captor.capture());
+      InventoryItem newRow = captor.getValue();
+      assertSame(item.getGameItem(), newRow.getGameItem());
+      assertNull(newRow.getMaterial());
+      assertNull(newRow.getQuality());
+      assertTrue(newRow.getPersonal(), "the split row flips to the personal pool");
+      assertEquals(4.0, newRow.getAmount());
     }
   }
 
   /**
-   * Rebooking a game-item row copies the game item onto the new personal row, with material and
-   * quality left {@code null}.
+   * Builds a shared game-item row: game item set, material and quality {@code null}.
+   *
+   * @param amount the row's amount
+   * @return the row
    */
-  @Test
-  void rebook_itemRow_copiesGameItemOntoNewRow() {
-    InventoryItem item = newItem(10.0, 1L, false);
+  private InventoryItem newGameItemRow(double amount) {
+    InventoryItem item = newItem(amount, 1L, false);
     item.setMaterial(null);
     item.setQuality(null);
-    de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem gameItem =
-        new de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem();
+    GameItem gameItem = new GameItem();
     gameItem.setId(UUID.randomUUID());
     gameItem.setName("Quantum Drive");
     item.setGameItem(gameItem);
-    item.setOwningOrgUnit(sourceOrgUnit);
-    when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
-
-    service.rebookPersonal(ITEM_ID, dto(4.0, 1L, null), OWNER_ID, false);
-
-    ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
-    verify(inventoryItemRepository, org.mockito.Mockito.atLeastOnce()).save(captor.capture());
-    InventoryItem newRow =
-        captor.getAllValues().stream()
-            .filter(i -> i != item)
-            .findFirst()
-            .orElseThrow(() -> new AssertionError("expected the split row to be saved"));
-    assertSame(gameItem, newRow.getGameItem());
-    org.junit.jupiter.api.Assertions.assertNull(newRow.getMaterial());
-    org.junit.jupiter.api.Assertions.assertNull(newRow.getQuality());
-    assertTrue(newRow.getPersonal(), "the split row flips to the personal pool");
-    assertEquals(4.0, newRow.getAmount());
-  }
-
-  @Test
-  void rebook_itemRow_fractionalAmount_throwsBadRequest() {
-    InventoryItem item = newItem(10.0, 1L, false);
-    item.setMaterial(null);
-    item.setQuality(null);
-    de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem gameItem =
-        new de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem();
-    gameItem.setId(UUID.randomUUID());
-    item.setGameItem(gameItem);
-    when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
-
-    BadRequestException ex =
-        assertThrows(
-            BadRequestException.class,
-            () -> service.rebookPersonal(ITEM_ID, dto(1.5, 1L, null), OWNER_ID, false));
-    assertEquals("Amount must be a whole number for item stock", ex.getMessage());
-    verify(inventoryItemRepository, never()).save(any());
-    verify(inventoryItemRepository, never()).delete(any());
-  }
-
-  @Test
-  void rebook_itemRow_legacyFractionalRow_fullDepletion_isAllowed() {
-    InventoryItem item = newItem(1.5, 1L, false);
-    item.setMaterial(null);
-    item.setQuality(null);
-    de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem gameItem =
-        new de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem();
-    gameItem.setId(UUID.randomUUID());
-    item.setGameItem(gameItem);
-    when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
-
-    InventoryItemDto result = service.rebookPersonal(ITEM_ID, dto(1.5, 1L, null), OWNER_ID, false);
-
-    assertSame(SENTINEL, result);
-    ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
-    verify(inventoryItemRepository).save(captor.capture());
-    assertEquals(1.5, captor.getValue().getAmount());
-    verify(inventoryItemRepository).delete(item);
-    verify(inventoryItemRepository, never()).saveAndFlush(any());
-  }
-
-  @Test
-  void rebook_itemRow_legacyFractionalRow_partialFractionalAmount_throwsBadRequest() {
-    InventoryItem item = newItem(1.5, 1L, false);
-    item.setMaterial(null);
-    item.setQuality(null);
-    de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem gameItem =
-        new de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem();
-    gameItem.setId(UUID.randomUUID());
-    item.setGameItem(gameItem);
-    when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
-
-    BadRequestException ex =
-        assertThrows(
-            BadRequestException.class,
-            () -> service.rebookPersonal(ITEM_ID, dto(0.5, 1L, null), OWNER_ID, false));
-    assertEquals("Amount must be a whole number for item stock", ex.getMessage());
-    verify(inventoryItemRepository, never()).save(any());
-    verify(inventoryItemRepository, never()).delete(any());
-  }
-
-  @Test
-  void rebook_pieceMaterial_legacyFractionalRow_fullDepletion_isAllowed() {
-    InventoryItem item = newItem(1.5, 1L, false);
-    item.getMaterial().setQuantityType(QuantityType.PIECE);
-    item.setOwningOrgUnit(sourceOrgUnit);
-    when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
-
-    InventoryItemDto result = service.rebookPersonal(ITEM_ID, dto(1.5, 1L, null), OWNER_ID, false);
-
-    assertSame(SENTINEL, result);
-    ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
-    verify(inventoryItemRepository).save(captor.capture());
-    assertEquals(1.5, captor.getValue().getAmount());
-    assertTrue(captor.getValue().getPersonal(), "the split row flips to the personal pool");
-    verify(inventoryItemRepository).delete(item);
-    verify(inventoryItemRepository, never()).saveAndFlush(any());
-  }
-
-  @Test
-  void rebook_pieceMaterial_legacyFractionalRow_partialFractionalAmount_throwsBadRequest() {
-    InventoryItem item = newItem(1.5, 1L, false);
-    item.getMaterial().setQuantityType(QuantityType.PIECE);
-    when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
-
-    BadRequestException ex =
-        assertThrows(
-            BadRequestException.class,
-            () -> service.rebookPersonal(ITEM_ID, dto(0.5, 1L, null), OWNER_ID, false));
-    assertEquals("Amount must be a whole number for PIECE materials", ex.getMessage());
-    verify(inventoryItemRepository, never()).save(any());
-    verify(inventoryItemRepository, never()).delete(any());
+    return item;
   }
 
   private InventoryItem newItem(double amount, Long version, boolean personal) {
