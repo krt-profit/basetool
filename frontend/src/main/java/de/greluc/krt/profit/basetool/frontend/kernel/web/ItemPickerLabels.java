@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.kernel.web;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.model.ComponentItemReference;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.ItemPickerOption;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
@@ -85,7 +86,7 @@ public class ItemPickerLabels {
    * @param item the game-item reference
    * @return the label, the plain name for a non-component
    */
-  public String label(@NotNull InventoryGameItemReferenceDto item) {
+  public String label(@NotNull ComponentItemReference item) {
     if (item.componentType() == null) {
       return item.name();
     }
@@ -108,7 +109,7 @@ public class ItemPickerLabels {
   }
 
   @Nullable
-  private String sizeGrade(InventoryGameItemReferenceDto item, Locale locale) {
+  private String sizeGrade(ComponentItemReference item, Locale locale) {
     if (item.size() != null && item.grade() != null) {
       return messageSource.getMessage(
           "inventory.items.sizeGrade", new Object[] {item.size(), item.grade()}, locale);

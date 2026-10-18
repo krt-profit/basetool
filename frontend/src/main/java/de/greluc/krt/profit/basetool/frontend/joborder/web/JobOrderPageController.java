@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
-import de.greluc.krt.profit.basetool.frontend.catalogue.model.ItemDerivationDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
@@ -32,7 +31,6 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverIte
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemForm;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverForm;
-import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemMaterialDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderSettingsDto;
@@ -51,7 +49,6 @@ import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -106,6 +103,7 @@ public class JobOrderPageController {
   private final RoleHierarchy roleHierarchy;
   private final ParallelPageLoader parallelPageLoader;
   private final QualityTierCatalog qualityTierCatalog;
+  private final JobOrderItemLines jobOrderItemLines;
 
   private static final List<String> VALID_STATUSES =
       List.of("OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED");
@@ -587,54 +585,15 @@ public class JobOrderPageController {
       model.addAttribute("jobOrderItemForm", itemForm);
     }
     model.addAttribute("editOrderId", id);
-    model.addAttribute("editItems", buildEditItems(order));
+    model.addAttribute(
+        "editItems",
+        jobOrderItemLines.editPrefill(order.items() != null ? order.items() : List.of()));
     model.addAttribute("materials", fetchMaterials());
     model.addAttribute("hasOrderableItems", hasOrderableItems());
     model.addAttribute("squadrons", fetchSquadrons());
     model.addAttribute("qualityTiers", qualityTierCatalog.all());
     addOwnerPickerOptions(model);
     return "joborder/orders-create";
-  }
-
-  /**
-   * Builds the {@code window.EDIT_ITEMS} prefill: one entry per item line with its id, booked
-   * production, item, blueprint, amount, parent index and material-quality map.
-   *
-   * <p>The list index serves as the client line id.
-   *
-   * @param order the item order being edited
-   * @return the JS-serializable prefill list
-   */
-  @NotNull
-  private List<Map<String, Object>> buildEditItems(@NotNull JobOrderDto order) {
-    List<JobOrderItemDto> items = order.items() != null ? order.items() : List.of();
-    Map<UUID, Integer> idToIndex = new HashMap<>();
-    for (int i = 0; i < items.size(); i++) {
-      idToIndex.put(items.get(i).id(), i);
-    }
-    List<Map<String, Object>> result = new ArrayList<>();
-    for (JobOrderItemDto line : items) {
-      Map<String, String> qualities = new LinkedHashMap<>();
-      if (line.materials() != null) {
-        for (JobOrderItemMaterialDto m : line.materials()) {
-          if (m.material() != null && m.material().id() != null) {
-            qualities.put(m.material().id().toString(), m.qualityRequirement());
-          }
-        }
-      }
-      Map<String, Object> entry = new LinkedHashMap<>();
-      entry.put("id", line.id() != null ? line.id().toString() : null);
-      entry.put("manufactured", line.manufacturedAmount() != null ? line.manufacturedAmount() : 0);
-      entry.put("gameItemId", line.gameItem() != null ? line.gameItem().id().toString() : null);
-      entry.put("gameItemName", line.gameItem() != null ? line.gameItem().name() : null);
-      entry.put("blueprintId", line.blueprint() != null ? line.blueprint().id().toString() : null);
-      entry.put("amount", line.amount() != null ? line.amount() : 1);
-      entry.put(
-          "parentId", line.parentItemId() != null ? idToIndex.get(line.parentItemId()) : null);
-      entry.put("qualities", qualities);
-      result.add(entry);
-    }
-    return result;
   }
 
   /**
@@ -654,27 +613,6 @@ public class JobOrderPageController {
             () -> jobOrderClient.itemBlueprints(gameItemId),
             null);
     return result != null ? result : List.of();
-  }
-
-  /**
-   * JSON proxy for the create form's material-derivation preview: returns the resolved materials,
-   * sub-assembly suggestions and unresolved-ingredient names for a blueprint at the given amount.
-   *
-   * @param blueprintId the chosen blueprint
-   * @param amount the whole-unit amount to scale by (defaults to 1)
-   * @return the derivation preview, or {@code null} on failure
-   */
-  @Nullable
-  @GetMapping("/item-derivation/{blueprintId}")
-  @ResponseBody
-  public ItemDerivationDto itemDerivation(
-      @PathVariable UUID blueprintId,
-      @RequestParam(required = false, defaultValue = "1") int amount) {
-    return SectionFallback.load(
-        log,
-        "job-order-item-derivation",
-        () -> jobOrderClient.itemDerivation(blueprintId, amount),
-        null);
   }
 
   /**

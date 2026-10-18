@@ -55,7 +55,8 @@ class JobOrderPageControllerReauthMvcTest {
                 client,
                 mock(RoleHierarchy.class),
                 mock(ParallelPageLoader.class),
-                mock(QualityTierCatalog.class)));
+                mock(QualityTierCatalog.class),
+                mock(JobOrderItemLines.class)));
     ReauthPageMvc.signInMember();
   }
 
