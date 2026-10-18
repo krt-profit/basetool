@@ -28,8 +28,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Tells the member's open pages that an exchange write changed their data (REQ-XCH-013): the frame
@@ -85,32 +83,12 @@ public class ExchangeLiveSync {
   }
 
   /**
-   * Publishes once the current transaction has committed, or at once outside a transaction.
+   * Announces one section of a room after the commit.
    *
    * @param topic the room
    * @param section the section
    */
   private void afterCommit(@NotNull LiveSyncTopic topic, @NotNull String section) {
-    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-      publish(topic, section);
-      return;
-    }
-    TransactionSynchronizationManager.registerSynchronization(
-        new TransactionSynchronization() {
-          @Override
-          public void afterCommit() {
-            publish(topic, section);
-          }
-        });
-  }
-
-  /**
-   * Publishes one frame.
-   *
-   * @param topic the room
-   * @param section the section
-   */
-  private void publish(@NotNull LiveSyncTopic topic, @NotNull String section) {
-    publisher.publish(topic, List.of(section));
+    publisher.publishAfterCommit(topic, List.of(section));
   }
 }

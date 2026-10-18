@@ -21,17 +21,25 @@ package de.greluc.krt.profit.basetool.backend.livesync.api;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Announces a committed backend write to the frontend's live-sync rooms (ADR-0274, REQ-FE-010).
  *
  * <p>Unbounded by design: the write that raises a frame is itself bounded. Never throws, so a
- * caller needs no guard of its own.
+ * caller needs no guard of its own. A write announces through {@link #publishAfterCommit}, which
+ * waits for the commit (ADR-0288).
  */
 @Slf4j
 @Service
@@ -65,5 +73,43 @@ public class LiveSyncPublisher {
             MetricNames.TAG_TOPIC_CLASS,
             topic.topicClass().metricLabel())
         .increment();
+  }
+
+  /**
+   * Publishes once the current transaction has committed, or at once outside a transaction. Calls
+   * for one room within a transaction are coalesced into one frame carrying the union of their
+   * sections; a rolled-back transaction publishes nothing.
+   *
+   * @param topic the room
+   * @param sections the sections that changed, as the caller names them
+   */
+  public void publishAfterCommit(@NotNull LiveSyncTopic topic, @NotNull List<String> sections) {
+    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+      publish(topic, sections);
+      return;
+    }
+    Flush flush = (Flush) TransactionSynchronizationManager.getResource(this);
+    if (flush == null) {
+      flush = new Flush();
+      TransactionSynchronizationManager.bindResource(this, flush);
+      TransactionSynchronizationManager.registerSynchronization(flush);
+    }
+    flush.pending.computeIfAbsent(topic, _ -> new LinkedHashSet<>()).addAll(sections);
+  }
+
+  /** The frames one transaction collected, published after its commit and released either way. */
+  private final class Flush implements TransactionSynchronization {
+
+    private final Map<LiveSyncTopic, Set<String>> pending = new LinkedHashMap<>();
+
+    @Override
+    public void afterCommit() {
+      pending.forEach((topic, sections) -> publish(topic, new ArrayList<>(sections)));
+    }
+
+    @Override
+    public void afterCompletion(int status) {
+      TransactionSynchronizationManager.unbindResourceIfPossible(LiveSyncPublisher.this);
+    }
   }
 }
