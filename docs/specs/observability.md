@@ -1598,6 +1598,13 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   **not** instrumented; three of them go through the static `ScWikiOrphanSweep` helper, which would
   need a skip callback threaded in from each caller. So the new alert covers one catalogue, and
   `ScWikiCensusIncompleteStreak`'s fetch-error proxy is still what covers the other four.
+- `basetool_catalogue_item_class_unknown_total` counter (untagged, `ScWikiItemSyncService`), bumped
+  once per SC Wiki item whose `class` value is no `ShipComponentClass` (REQ-DATA-024, ADR-0283).
+  The item is still written, with no class, so without the meter a new in-game class would only
+  show as components missing their chip. The value itself is unbounded upstream text and goes to
+  the WARN log once per value, never into a label. Registered at zero by every enabled item sync, so
+  the first increment is visible to `increase()`. Backs `ScWikiItemClassUnknown` (> 0 in 24h for
+  1h, warning).
 - `basetool_redis_fanout_subscribed{fanout}` gauge (`LiveSyncRedisConfig`,
   `NotificationRedisConfig`), 1 while the cross-instance pub/sub container is listening and 0 while
   it is not; `fanout` is the two-valued literal `livesync` / `notifications`. Exists because the

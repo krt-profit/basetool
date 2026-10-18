@@ -25,10 +25,12 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiItemDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiItemManufacturerDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiResponseDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
+import de.greluc.krt.profit.basetool.logging.LogSafe;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.HashMap;
@@ -39,6 +41,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Contract;
@@ -71,6 +74,15 @@ public class ScWikiItemSyncService {
   private static final ParameterizedTypeReference<ScWikiResponseDto<ScWikiItemDto>> ITEM_PAGE_TYPE =
       new ParameterizedTypeReference<ScWikiResponseDto<ScWikiItemDto>>() {};
 
+  /** Longest unknown class value written to the log. */
+  private static final int MAX_ITEM_CLASS_LOG_LENGTH = 64;
+
+  /** Distinct unknown class values remembered for the once-per-value warning. */
+  private static final int MAX_LOGGED_UNKNOWN_ITEM_CLASSES = 32;
+
+  /** Unknown class values already warned about since this instance started. */
+  private final Set<String> unknownItemClassesLogged = ConcurrentHashMap.newKeySet();
+
   private final ScWikiClient scWikiClient;
   private final ScWikiProperties properties;
   private final GameItemRepository gameItemRepository;
@@ -91,6 +103,8 @@ public class ScWikiItemSyncService {
    * Entry point invoked by {@link ScWikiScheduler}: a no-op when {@code item-sync-enabled} is off,
    * otherwise runs Mode B or Mode A depending on {@code sync-all-items}.
    *
+   * <p>An enabled run registers the unknown-class counter at zero before it writes.
+   *
    * @return the number of {@code game_item} rows written this run; {@code 0} when disabled
    */
   public int syncItems() {
@@ -100,6 +114,7 @@ public class ScWikiItemSyncService {
               + " skipping.");
       return 0;
     }
+    meterRegistry.counter(MetricNames.CATALOGUE_ITEM_CLASS_UNKNOWN);
     if (Boolean.TRUE.equals(properties.syncAllItems())) {
       return syncItemsBackfill();
     }
@@ -627,6 +642,9 @@ public class ScWikiItemSyncService {
    * Writes the Wiki-owned descriptive columns onto a game item; the UEX {@code name} and, on
    * existing rows, {@code manufacturer} are never touched.
    *
+   * <p>A payload without {@code size}, {@code grade} or {@code class} keeps the stored value
+   * (REQ-DATA-024).
+   *
    * @param item the game item to update
    * @param dto the Wiki item payload
    * @param now timestamp for {@code scwiki_synced_at}
@@ -640,8 +658,15 @@ public class ScWikiItemSyncService {
     item.setWikiTypeLabel(dto.typeLabel());
     item.setWikiSubType(dto.subType());
     item.setWikiSubTypeLabel(dto.subTypeLabel());
-    item.setSizeClass(parseSize(dto.size()));
-    item.setGrade(dto.grade());
+    if (StringUtils.hasText(dto.size())) {
+      item.setSizeClass(parseSize(dto.size()));
+    }
+    if (StringUtils.hasText(dto.grade())) {
+      item.setGrade(dto.grade());
+    }
+    if (StringUtils.hasText(dto.itemClass())) {
+      item.setItemClass(resolveItemClass(dto.itemClass()));
+    }
     item.setRarity(dto.rarity());
     item.setMass(dto.mass());
     if (dto.dimension() != null) {
@@ -658,6 +683,29 @@ public class ScWikiItemSyncService {
     item.setScwikiGameVersionSeen(dto.version());
     item.setScwikiSyncedAt(now);
     item.setScwikiDeletedAt(null);
+  }
+
+  /**
+   * Maps a present Wiki {@code class} value; an unknown one is counted, logged once per value and
+   * resolves to no class (REQ-DATA-024).
+   *
+   * @param wikiClass the non-blank payload value
+   * @return the class, or {@code null} when the value is unknown
+   */
+  @Nullable
+  private ShipComponentClass resolveItemClass(@NotNull String wikiClass) {
+    ShipComponentClass resolved = ShipComponentClass.fromWikiClass(wikiClass);
+    if (resolved == null) {
+      meterRegistry.counter(MetricNames.CATALOGUE_ITEM_CLASS_UNKNOWN).increment();
+      String value = LogSafe.text(wikiClass.strip(), MAX_ITEM_CLASS_LOG_LENGTH);
+      if (unknownItemClassesLogged.size() < MAX_LOGGED_UNKNOWN_ITEM_CLASSES
+          && unknownItemClassesLogged.add(value.toLowerCase(Locale.ROOT))) {
+        log.warn(
+            "Unknown SC Wiki item class '{}' — storing no class; add it to ShipComponentClass.",
+            value);
+      }
+    }
+    return resolved;
   }
 
   /**

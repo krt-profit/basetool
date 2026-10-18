@@ -311,25 +311,9 @@
                 </div>
 
                 <div class="tree-group" th:each="group : ${groupedItems}">
-                    <div class="tree-row tree-row--group" data-trigger="inv-my-toggle-group" th:data-game-item-id="${group.gameItem.id}">
-                        <div class="tree-cell tree-name">
-                            <span class="tree-chevron toggle-icon">▶</span>
-                            <span class="tree-label" th:text="${group.gameItem.name}">Item</span>
-                            <span class="chip chip--muted" th:if="${group.gameItem.kind != null}"
-                                  th:with="kindKey=|inventory.items.kind.${group.gameItem.kind}|"
-                                  th:text="${#messages.msgOrNull(kindKey)} ?: ${group.gameItem.kind}">Art</span>
-                        </div>
-                        <div class="tree-cell lager-cell-muted">
-                            <span th:if="${group.gameItem.manufacturer != null}" th:text="|${group.gameItem.manufacturer} · |">Hersteller · </span>
-                            <span th:text="${#lists.size(group.stacks) == 1} ? #{inventory.tree.stackCount.one} : #{inventory.tree.stackCount.many(${#lists.size(group.stacks)})}">5 Stacks</span>
-                        </div>
-                        <div class="tree-cell tree-cell--num tree-amount">
-                            <span><span th:text="${group.totalAmount != null ? #numbers.formatInteger(group.totalAmount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">St&uuml;ck</span></span>
-                        </div>
-                        <div class="tree-cell lager-cell-select">
-                            <input type="checkbox" class="item-checkbox group-select-all" th:data-game-item-id="${group.gameItem.id}" th:title="#{inventory.bulk.checkout.select.all}" th:aria-label="#{inventory.bulk.checkout.select.all}" data-trigger="inv-my-toggle-group-cb">
-                        </div>
-                    </div>
+                    <div th:replace="~{inventory/fragments/inventory-item-group :: itemGroupRow(group=${group}, toggleTrigger='inv-my-toggle-group',
+                        contextText=${#lists.size(group.stacks) == 1} ? #{inventory.tree.stackCount.one} : #{inventory.tree.stackCount.many(${#lists.size(group.stacks)})},
+                        selectTrigger='inv-my-toggle-group-cb')}"></div>
 
                     <div class="tree-group-items">
                         <div th:each="stack : ${group.stacks}">

@@ -71,6 +71,12 @@ class InventoryLagerPatternRenderTest {
 
   private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-0000000000c4");
 
+  private static final UUID SHIELD_ID = UUID.fromString("00000000-0000-0000-0000-0000000000d1");
+
+  private static final UUID PAINT_ID = UUID.fromString("00000000-0000-0000-0000-0000000000d2");
+
+  private static final UUID COOLER_ID = UUID.fromString("00000000-0000-0000-0000-0000000000d3");
+
   @Autowired private WebApplicationContext context;
 
   @MockitoBean private BackendApiClient backendApiClient;
@@ -249,6 +255,113 @@ class InventoryLagerPatternRenderTest {
         .contains("data-chip-family=\"gameItemCheck\"")
         .contains("Du hast noch keine Items eingelagert.")
         .doesNotContain("id=\"minQuality\"");
+  }
+
+  /**
+   * "Mein Lager" items view: a component shows its type and size/grade chips, a paint keeps its
+   * category chip, a component without size and grade shows no data chip, and only a labelled class
+   * gets a class chip (REQ-INV-061, REQ-INV-062).
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void myLagerItemsViewShowsComponentChipsOnlyForComponents() throws Exception {
+    String main =
+        main(render("/inventory/my?view=items", "/inventory/my-inventory/grouped", itemGroups()));
+
+    assertThat(main)
+        .contains("class=\"tree-cell tree-name lager-item-name\"")
+        .contains("data-trigger=\"inv-my-toggle-group\"")
+        .contains("data-trigger=\"inv-my-toggle-group-cb\"");
+    assertThat(groupRow(main, SHIELD_ID))
+        .containsPattern("data-testid=\"item-component-type\"[^>]*>Schild<")
+        .containsPattern("data-testid=\"item-size-grade\"[^>]*>S1 · A<")
+        .containsPattern(
+            "data-testid=\"item-class\"[^>]*class=\"chip chip--item-class-military\"[^>]*>Militär<")
+        .doesNotContain("data-testid=\"item-kind\"");
+    assertThat(groupRow(main, PAINT_ID))
+        .containsPattern("data-testid=\"item-kind\"[^>]*>Schiffskomponente<")
+        .doesNotContain("data-testid=\"item-component-type\"")
+        .doesNotContain("chip--data")
+        .doesNotContain("item-class");
+    assertThat(groupRow(main, COOLER_ID))
+        .containsPattern("data-testid=\"item-component-type\"[^>]*>Kühler<")
+        .doesNotContain("chip--data")
+        .doesNotContain("item-class")
+        .doesNotContain("PROTOTYPE");
+  }
+
+  /**
+   * The Globales Lager items view renders the same group row with the chips (REQ-INV-061,
+   * REQ-INV-062).
+   */
+  @Test
+  @WithMockUser(roles = "LOGISTICIAN")
+  void globalLagerItemsViewShowsComponentChips() throws Exception {
+    String main = main(render("/inventory/all?view=items", "/inventory/all/grouped", itemGroups()));
+
+    assertThat(main)
+        .contains("class=\"tree-cell tree-name lager-item-name\"")
+        .contains("data-trigger=\"inv-admin-toggle-group\"")
+        .doesNotContain("group-select-all");
+    assertThat(groupRow(main, SHIELD_ID))
+        .containsPattern("data-testid=\"item-component-type\"[^>]*>Schild<")
+        .containsPattern("data-testid=\"item-size-grade\"[^>]*>S1 · A<")
+        .containsPattern("data-testid=\"item-class\"[^>]*>Militär<");
+  }
+
+  /**
+   * Three item groups: a size-1 grade-A military shield, a paint carrying a meaningless grade, and
+   * a cooler without size and grade whose class has no label.
+   *
+   * @return the grouped list
+   */
+  private static @NotNull List<GroupedInventoryDto> itemGroups() {
+    return List.of(
+        itemGroup(
+            new InventoryGameItemReferenceDto(
+                SHIELD_ID, "FR-66", "Gorgon", "VEHICLE_ITEM", "SHIELD", 1, "A", "MILITARY")),
+        itemGroup(
+            new InventoryGameItemReferenceDto(PAINT_ID, "Aurora Paint", null, "VEHICLE_ITEM")),
+        itemGroup(
+            new InventoryGameItemReferenceDto(
+                COOLER_ID, "Bracer", null, "VEHICLE_ITEM", "COOLER", null, null, "PROTOTYPE")));
+  }
+
+  /**
+   * One item group holding one stack at one place.
+   *
+   * @param gameItem the group's game item
+   * @return the group
+   */
+  private static @NotNull GroupedInventoryDto itemGroup(
+      @NotNull InventoryGameItemReferenceDto gameItem) {
+    InventoryStackDto stack =
+        new InventoryStackDto(
+            new UserReferenceDto(USER_ID, "owner", "Owner", "Lager Owner", null),
+            new LocationReferenceDto(LOCATION_ID, "ARC-L1"),
+            null,
+            false,
+            false,
+            null,
+            2.0,
+            null,
+            null,
+            1);
+    return new GroupedInventoryDto(null, gameItem, 2.0, null, null, List.of(stack));
+  }
+
+  /**
+   * The group row of one game item, up to the next group row.
+   *
+   * @param main the rendered {@code <main>}
+   * @param gameItemId the group's game item
+   * @return the row's markup
+   */
+  private static @NotNull String groupRow(@NotNull String main, @NotNull UUID gameItemId) {
+    int start = main.indexOf("data-game-item-id=\"" + gameItemId + "\"");
+    assertThat(start).isNotNegative();
+    int end = main.indexOf("tree-group-items", start);
+    return main.substring(start, end);
   }
 
   /**

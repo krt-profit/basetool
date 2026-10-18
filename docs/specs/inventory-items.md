@@ -158,6 +158,75 @@ member's ledger, another Staffel's and a private pool included.
 `JobOrderItemProductionService`, `JobOrderItemProductionCreateDto`,
 `InventoryStockCommands#requireBookIn`, `BookInRule` · **Issues:** —
 
+### REQ-INV-061 — Component type, size and grade beside an item's name
+
+In **Mein Lager**, the **Globales Lager** and the aggregated Lager items table (`/inventory`,
+`view=items`), a ship component shows its component type and its size and grade next to its name,
+e.g. `FR-66 [SCHILD] [S1 · A]`.
+
+- A **ship component** is a `GameItem` whose SC Wiki type is one of `ShipComponentType` (shield,
+  cooler, power plant, quantum and jump drive, radar, ship gun, mining laser, missile and bomb with
+  their racks, turret, EMP, quantum interdiction generator, tractor and towing beam, salvage head,
+  life support). Paints, flair and every other wiki type are no component: they carry a default
+  grade "A" that means nothing, so they show neither chip.
+- The **component type chip** replaces the category chip (`GameItemKind`, e.g.
+  "Schiffskomponente") for a component; any other item keeps its category chip. The type label
+  comes from the DE/EN bundles (`inventory.items.componentType.*`); a type without a label falls
+  back to the category chip, never to raw upstream text.
+- The **size/grade chip** is a neutral `.chip.chip--data` reading `S{size} · {grade}`; a missing
+  value is left out, and with neither there is no chip.
+- `InventoryGameItemReferenceDto` carries `componentType`, `size` and `grade`, set only for a
+  component. They are columns of the `game_item` row the read already loads, so the read path adds
+  no query per row.
+- The Mein Lager and Globales Lager item group rows render from one shared fragment
+  (`inventory/fragments/inventory-item-group :: itemGroupRow`), and all three surfaces render the
+  chips from `itemChips`.
+- Up to tablet width (≤ 1024 px), where the tree takes its content width, the chips move to a
+  second line under the name, so they do not widen the name column; the aggregated table stacks
+  its cells on a phone as before.
+
+**Acceptance**
+
+- [x] A shield with size 1 and grade A shows a "Schild" chip and an `S1 · A` chip in Mein Lager,
+  the Globales Lager and the aggregated items table.
+- [x] A paint or flair item shows neither chip and keeps its category chip.
+- [x] A component without size and grade shows no data chip.
+- [x] Every `ShipComponentType` has a label in all three bundles.
+
+**Enforced by:** `ShipComponentTypeTest`, `InventoryItemMapperTest` reference cases,
+`InventoryLagerPatternRenderTest` / `InventoryIndexListPatternRenderTest` chip cases,
+`ShipComponentTypeMessageCoverageTest` · **Code:** `ShipComponentType`,
+`InventoryItemMapper#gameItemToReferenceDto`, `inventory-item-group.html` · **Issues:** #2719
+
+### REQ-INV-062 — Component class as a coloured chip
+
+On the same three surfaces as REQ-INV-061, a ship component with a known class shows a class chip
+after its size/grade chip, e.g. `FR-66 [SCHILD] [S1 · A] [MILITÄR]`.
+
+- The class comes from the SC Wiki (REQ-DATA-024). `InventoryGameItemReferenceDto` carries it as
+  `itemClass`, the `ShipComponentClass` name, set only for a component — the same rule as size and
+  grade.
+- The chip shows the translated class name (`inventory.items.itemClass.*`: Militär, Zivil,
+  Industrie, Stealth, Wettkampf). A class without a label, an absent class and every non-component
+  get no class chip, never raw upstream text.
+- The chip is `.chip.chip--item-class-<class>` from the design system. Its colours are the ten
+  `--krt-item-class-*` tokens declared in `styles.css`: the hue is the border and, mixed to 15 %,
+  the fill; the `-text` tint is the label. The colour is a second cue beside the label, never the
+  only one, and the label keeps WCAG AA on its fill over the card surfaces.
+
+**Acceptance**
+
+- [x] A military shield shows a "Militär" chip after `S1 · A` in Mein Lager, the Globales Lager and
+  the aggregated items table.
+- [x] A component whose class has no label, and every paint or flair item, shows no class chip.
+- [x] Every `ShipComponentClass` has a label in all three bundles.
+- [x] Each chip variant uses the design-system tokens, and its label reaches 4.5:1 on its fill.
+
+**Enforced by:** `InventoryItemMapperTest` class cases, `InventoryLagerPatternRenderTest` /
+`InventoryIndexListPatternRenderTest` class cases, `ShipComponentTypeMessageCoverageTest`,
+`ItemClassChipContrastTest` · **Code:** `InventoryItemMapper#gameItemToReferenceDto`,
+`inventory-item-group.html`, `styles.css` · **Issues:** #2720
+
 ## Out of scope
 
 Non-blueprint items and the "Mein Inventar" boundary (design §11). Materialbörse stock-backed

@@ -23,6 +23,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentType;
 import de.greluc.krt.profit.basetool.backend.inventory.api.DonationAllocationDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.DonationEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryGameItemReferenceDto;
@@ -33,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.MissionAllocationDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
+import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import de.greluc.krt.profit.basetool.backend.platform.api.CentralMapperConfig;
@@ -180,7 +183,8 @@ public abstract class InventoryItemMapper {
 
   /**
    * Projects a {@link GameItem} into the slim Lager reference DTO: id, display name, manufacturer
-   * name and kind name (REQ-INV-029).
+   * name, kind name and, for a ship component, its type, size, grade and class (REQ-INV-029,
+   * REQ-INV-061, REQ-INV-062).
    *
    * <p>Dereferences the lazy {@code manufacturer} association, so it must be fetched or the session
    * still open.
@@ -193,11 +197,24 @@ public abstract class InventoryItemMapper {
     if (gameItem == null) {
       return null;
     }
+    String manufacturer =
+        gameItem.getManufacturer() != null ? gameItem.getManufacturer().getName() : null;
+    String kind = gameItem.getKind() != null ? gameItem.getKind().name() : null;
+    ShipComponentType componentType = ShipComponentType.fromWikiType(gameItem.getWikiType());
+    if (componentType == null) {
+      return new InventoryGameItemReferenceDto(
+          gameItem.getId(), gameItem.getName(), manufacturer, kind);
+    }
+    ShipComponentClass itemClass = gameItem.getItemClass();
     return new InventoryGameItemReferenceDto(
         gameItem.getId(),
         gameItem.getName(),
-        gameItem.getManufacturer() != null ? gameItem.getManufacturer().getName() : null,
-        gameItem.getKind() != null ? gameItem.getKind().name() : null);
+        manufacturer,
+        kind,
+        componentType.name(),
+        gameItem.getSizeClass(),
+        StringNormalization.trimToNull(gameItem.getGrade()),
+        itemClass != null ? itemClass.name() : null);
   }
 
   /**

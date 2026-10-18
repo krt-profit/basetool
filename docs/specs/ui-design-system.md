@@ -1556,21 +1556,36 @@ built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a deskto
   control; on `/admin/**` pages and on any page whose link lives in an admin group the drawer opens
   in that mode.
 - **The menu filter** searches every group the member has, the personal links and — for
-  administrators — the admin groups. A link matches when its label or its group's label contains
-  the text (case-insensitive); only matching groups show, all open, and the top entries hide. With
+  administrators — the admin groups. A link matches when its label, its search terms or its group's
+  label contains the text; only matching groups show, all open, and the top entries hide. With
   no match it says „Kein Menüeintrag gefunden."; with any text it offers „Im Schnellzugriff suchen",
   which closes the drawer and opens the quick access with the text.
 - **The quick access** (`Strg`/`⌘` + `K` from anywhere, inputs included; the header trigger; the
-  phone's search button) is a dialog of the one dialog shape (REQ-UI-013, `#nav-palette`). Empty, it
-  offers up to four recently visited pages (`localStorage` `krt.recent`, recorded on every page whose
-  link is in the menu) and the actions „Neuen Auftrag anlegen", „Org-Einheit wechseln" (only with a
-  switcher) and „Abmelden". With text it lists up to eight pages, label hits before breadcrumb hits,
-  then the matching actions, with the hit marked; „Keine Treffer. Signal verloren." when nothing
-  matches. ↑/↓ move the selection, Enter opens, Escape and the scrim close.
-- **Rights stay on the server.** The quick access builds its index from the links the server
-  rendered into the drawer (`data-nav-group` / `data-nav-icon` on each group), so it offers exactly
-  the pages this member may see and needs no endpoint. A recently visited page that is no longer in
-  the menu is not offered.
+  phone's search button) is a dialog of the one dialog shape (REQ-UI-013, `#nav-palette`). Its pages
+  are the menu's links, the legal links, and sub-pages the menu reaches only as tabs: „Mein Lager",
+  „Globales Lager", „Hangar der Org-Einheit", for administrators the two sync-report tabs, and —
+  loaded on the first opening — „Eingehende Spenden" and „Spenden-Statistik" (REQ-SUP) and
+  „Ankauf-Partner", „Handelsbeauftragte" and „Ankauf-Bericht" (REQ-PUR) for exactly the members
+  whose tab bar shows them. Empty, it offers up to four recently visited pages (`localStorage`
+  `krt.recent`, recorded on every page it offers by its exact path, otherwise by the current menu
+  link, and when a page is opened from it) and the actions: „Neuen Auftrag anlegen", „Neue Mission
+  anlegen", „Neuen Raffinerieauftrag anlegen", „In mein Lager einbuchen", „Ins globale Lager
+  einbuchen" (logisticians only), „Org-Einheit wechseln" (only with a switcher), „Administration
+  öffnen" (administrators only; opens the drawer in administration mode), „Handbuch öffnen" (the
+  wiki, in a new tab), the switch to the other language, and „Abmelden". With text it lists up to
+  eight pages, label hits before breadcrumb and search-term hits, then the matching actions, with
+  the hit marked; „Keine Treffer. Signal verloren." when nothing matches. ↑/↓ move the selection,
+  Enter opens, Escape and the scrim close.
+- **Tolerant matching.** The menu filter and the quick access compare folded text: case is
+  ignored, diacritics are dropped, `ß` matches `ss`, and `ä`/`ö`/`ü` match `ae`/`oe`/`ue` in either
+  direction. Menu links, the quick access's own pages and its actions carry localized search terms
+  (`data-nav-keywords`, `palette.keywords.*`) that match like the label.
+- **Rights stay on the server.** The quick access builds its index from links the server rendered
+  for this member — the drawer's (`data-nav-group` / `data-nav-icon` on each group) and its own
+  hidden source lists, each under the same condition as the button or tab it mirrors. Sub-pages
+  whose condition needs a backend read come from `GET /quick-access/entries`, which asks each
+  domain's `QuickAccessContributor` and fails closed (ADR-0282). A recently visited page that is no
+  longer offered is not shown.
 - **Phones (≤ 768 px).** The header is 56 px: logo, title, search. A fixed tab bar (64 px plus the
   safe area) holds Einsätze · Lager · Aufträge · Meldungen (with the unread count) · Menü; the current
   area is marked. „Menü" opens the same drawer as a sheet above the tab bar — its groups an
@@ -1587,17 +1602,23 @@ built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a deskto
   `aria-expanded`; the quick access is a combobox over a listbox with `aria-activedescendant`.
   Motion is limited to colour transitions and the 0.4 s drawer slide, and `prefers-reduced-motion`
   removes both.
-- **No data, nothing mutates.** The org-unit switch and logout keep their existing forms, so no
-  live-update wiring, audit event or metric changes.
+- **No data, nothing mutates.** Every action navigates or opens the drawer; the org-unit switch
+  and logout keep their existing forms, so no live-update wiring, audit event or metric changes.
 
 **Enforced by:** `NavigationRenderMvcTest` (header, drawer zones and groups, admin mode only for
-administrators, the quick-access metadata, no „Rechtliches" group, nothing of it for a signed-out
-visitor) · `NavigationE2eTest` (filter and hand-over, `Ctrl+K`, admin mode, the phone tab bar and
-sheet) · `DialogA11yE2eTest` (the quick access follows the dialog contract) ·
+administrators, the quick-access metadata, search terms on menu links, the quick access's own pages
+and actions per role, no „Rechtliches" group, nothing of it for a signed-out visitor) ·
+`QuickAccessControllerTest`, `SupplyQuickAccessContributorTest`,
+`PurchasingQuickAccessContributorTest` (the on-demand sub-pages follow the tabs and fail closed) ·
+`:frontend:testSearchJs` (folding and hit ranges) · `NavigationE2eTest` (filter and hand-over,
+`Ctrl+K`, tolerant and search-term matching, the create-mission and administration actions, admin
+mode, the phone tab bar and sheet) · `DialogA11yE2eTest` (the quick access follows the dialog contract) ·
 `TouchClassLayoutE2eTest` (`main` reserves the tab bar; header, footer and tab bar within the
 chrome budget) · **Code:** `kernel/fragments/header.html`, `kernel/fragments/sidebar.html`,
 `kernel/fragments/palette.html`, `kernel/fragments/mobile-nav.html`, `static/js/kernel/sidebar.js`,
-`static/js/kernel/krt-palette.js` · **Related:** REQ-UI-009, REQ-UI-013, REQ-UI-019
+`static/js/kernel/krt-palette.js`, `static/js/kernel/krt-search.js`, `shell/web/QuickAccessController.java`,
+`kernel/layout/QuickAccessContributor.java` · **Related:** REQ-UI-009, REQ-UI-013, REQ-UI-019,
+ADR-0282
 
 ### REQ-UI-027 — Work pages follow three page patterns built from shared fragments
 
