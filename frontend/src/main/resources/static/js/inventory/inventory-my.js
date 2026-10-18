@@ -958,6 +958,10 @@ const inventoryMy = krtPageSections.create({
 
 inventoryHooks.notifyChanged = () => inventoryMy.notify('stock');
 
+document.addEventListener('krt:inventory-changed', () => {
+    filterMyInventory();
+});
+
 krtPageSections.create({
     sections: {
         demand: { container: '#myInventoryTableContainer' },
