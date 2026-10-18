@@ -98,7 +98,7 @@
                             </a>
                         </td>
                         <td>
-                            <span class="lager-item-chips" th:insert="~{inventory/fragments/inventory-item-group :: itemChips(${item.gameItem})}"></span>
+                            <span class="lager-item-chips" th:insert="~{kernel/fragments/item-chips :: itemChips(${item.gameItem})}"></span>
                         </td>
                         <td class="num" th:text="|${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'} #{material.quantity.piece}|">10 Stück</td>
                         <td class="cell-actions"><svg class="row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg></td>

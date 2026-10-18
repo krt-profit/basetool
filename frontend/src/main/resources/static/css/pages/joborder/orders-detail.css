@@ -126,6 +126,13 @@
         color: var(--color-white);
         font-weight: var(--fw-bold);
     }
+    .od-item-chips {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: var(--space-1);
+        align-items: center;
+        vertical-align: middle;
+    }
     .od-item-stock-table {
         margin-top: var(--space-2);
     }

@@ -141,8 +141,15 @@ class ItemCollectionRenderTest {
         .doesNotContain("hud-box")
         .doesNotContain("btn--cta");
     assertThat(html)
-        .as("game-item name in the group row")
-        .containsPattern("class=\"collection-group__title\">Cirrus Optic Scope<");
+        .as("game-item name in the group row, followed by its category chip")
+        .containsPattern(
+            "class=\"collection-group__title\">Cirrus Optic Scope</span>\\s*"
+                + "<span class=\"collection-group__chips\">\\s*"
+                + "<span class=\"chip chip--muted\" data-testid=\"item-kind\">[^<]+</span>");
+    assertThat(html)
+        .as("no component chips on a non-component")
+        .doesNotContain("data-testid=\"item-component-type\"")
+        .doesNotContain("data-testid=\"item-size-grade\"");
     assertThat(html)
         .as("collection progress over all groups and per group")
         .contains("data-collection-progress=\"total\"")
@@ -157,6 +164,66 @@ class ItemCollectionRenderTest {
     assertThat(html)
         .as("row keyed by the entry id")
         .contains("data-inventory-id=\"" + entryId + "\"");
+  }
+
+  @Test
+  void itemCollection_componentGroup_rendersTypeSizeGradeAndClassChips() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    JobOrderItemStockGroupDto group =
+        new JobOrderItemStockGroupDto(
+            new InventoryGameItemReferenceDto(
+                UUID.randomUUID(),
+                "FR-66",
+                "Gorgon Defender",
+                "VEHICLE_ITEM",
+                "SHIELD",
+                1,
+                "A",
+                "MILITARY"),
+            1,
+            0,
+            1L,
+            List.of(
+                new JobOrderItemStockEntryDto(
+                    UUID.randomUUID(),
+                    1L,
+                    "Alice",
+                    UUID.randomUUID(),
+                    "Lorville",
+                    locationId,
+                    1L,
+                    1L,
+                    false)));
+    when(backendApiClient.get(contains("/item-stock"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(List.of(group));
+    when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
+        .thenReturn(List.of(new LocationReferenceDto(locationId, "Lorville")));
+
+    String html =
+        mockMvc
+            .perform(
+                get("/orders/" + orderId + "/item-collection")
+                    .header("Accept-Language", "de")
+                    .with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .as("the group title shows the name followed by type, size/grade and class chips")
+        .containsPattern(
+            "class=\"collection-group__title\">FR-66</span>\\s*<span"
+                + " class=\"collection-group__chips\">\\s*<span class=\"chip chip--muted\""
+                + " data-testid=\"item-component-type\">Schild</span>\\s*<span class=\"chip"
+                + " chip--data\" data-testid=\"item-size-grade\"[^>]*>S1 · A</span>\\s*<span"
+                + " data-testid=\"item-class\"[^>]*class=\"chip chip--item-class-military\""
+                + "[^>]*>Militär</span>");
+    assertThat(html)
+        .as("a component shows no category chip")
+        .doesNotContain("data-testid=\"item-kind\"");
   }
 
   @Test
