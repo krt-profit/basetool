@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
@@ -217,20 +216,13 @@ public class InventoryCheckoutService {
       throw new AccessDeniedException("You are not allowed to book out this inventory item");
     }
 
-    if (dto.amount() > item.getAmount()) {
-      throw new BadRequestException("Cannot book out more than the available amount");
-    }
-
-    if (item.countsWholeUnits()
-        && dto.amount() % 1 != 0
-        && Double.compare(dto.amount(), item.getAmount()) != 0) {
-      throw new BadRequestException(item.wholeUnitAmountDetail());
-    }
-
-    if (item.getGameItem() != null
-        && dto.missionReductions() != null
-        && !dto.missionReductions().isEmpty()) {
-      throw new BadRequestException("Game-item stock carries no mission earmarks");
+    InventoryStockDecisions.BookOutRefusal refusal =
+        InventoryStockDecisions.bookOut(
+            item,
+            dto.amount(),
+            dto.missionReductions() != null && !dto.missionReductions().isEmpty());
+    if (refusal != null) {
+      throw bookOutProblem(item, refusal);
     }
 
     CheckoutType checkoutType = dto.type();
@@ -334,6 +326,23 @@ public class InventoryCheckoutService {
       announceBookedOutByOther(checkoutType, sourceId, sourceOwnerId, currentUserId, bookedOutLot);
       return new BookOut(inventoryItemMapper.toDto(saved), new StockChangeEffects(reduced, 0));
     }
+  }
+
+  /**
+   * Maps a book-out refusal to the web's problem.
+   *
+   * @param item the row the book-out was refused on
+   * @param refusal the refusal
+   * @return the 400 problem to throw
+   */
+  private static @NotNull BadRequestException bookOutProblem(
+      @NotNull InventoryItem item, @NotNull InventoryStockDecisions.BookOutRefusal refusal) {
+    return new BadRequestException(
+        switch (refusal) {
+          case EXCEEDS_STOCK -> "Cannot book out more than the available amount";
+          case FRACTIONAL_AMOUNT -> item.wholeUnitAmountDetail();
+          case MISSION_EARMARK_ON_ITEM_STOCK -> "Game-item stock carries no mission earmarks";
+        });
   }
 
   /**
@@ -656,26 +665,19 @@ public class InventoryCheckoutService {
       throw new AccessDeniedException("You are not allowed to rebook this inventory item");
     }
 
-    if (dto.amount() == null || dto.amount() <= 0) {
-      throw new BadRequestException("Rebooked amount must be positive");
-    }
-    if (dto.amount() > item.getAmount()) {
-      throw new BadRequestException("Cannot rebook more than the available amount");
-    }
-    if (item.countsWholeUnits()
-        && dto.amount() % 1 != 0
-        && Double.compare(dto.amount(), item.getAmount()) != 0) {
-      throw new BadRequestException(item.wholeUnitAmountDetail());
-    }
-
-    final boolean sourcePersonal = Boolean.TRUE.equals(item.getPersonal());
-    final boolean targetPersonal = !sourcePersonal;
-
-    if (targetPersonal
-        && (!item.getJobOrderAllocations().isEmpty() || !item.getMissionAllocations().isEmpty())) {
+    InventoryStockDecisions.PersonalRebookRefusal refusal =
+        InventoryStockDecisions.rebookPersonal(item, dto.amount());
+    if (refusal != null) {
       throw new BadRequestException(
-          "Stock assigned to a job order or mission cannot be marked personal");
+          switch (refusal) {
+            case AMOUNT_NOT_POSITIVE -> "Rebooked amount must be positive";
+            case EXCEEDS_STOCK -> "Cannot rebook more than the available amount";
+            case FRACTIONAL_AMOUNT -> item.wholeUnitAmountDetail();
+            case EARMARKED -> "Stock assigned to a job order or mission cannot be marked personal";
+          });
     }
+
+    final boolean targetPersonal = !Boolean.TRUE.equals(item.getPersonal());
 
     final OrgUnit targetOwningOrgUnit =
         targetPersonal
@@ -778,9 +780,7 @@ public class InventoryCheckoutService {
     if (material == null && !gameItemRow) {
       return row;
     }
-    final boolean autoMerge =
-        gameItemRow || Objects.requireNonNull(material).getQuantityType() == QuantityType.PIECE;
-    if (!autoMerge && !clientRequestedMerge) {
+    if (!row.countsWholeUnits() && !clientRequestedMerge) {
       return row;
     }
     if (stockOfferLookup.isOffered(row.getId())) {
@@ -838,7 +838,7 @@ public class InventoryCheckoutService {
         AuditDetails.of("merged", victims.size())
             .with("total", row.getAmount())
             .with("q", row.getQuality())
-            .with("trigger", autoMerge ? "auto" : "manual"));
+            .with("trigger", row.countsWholeUnits() ? "auto" : "manual"));
     return row;
   }
 

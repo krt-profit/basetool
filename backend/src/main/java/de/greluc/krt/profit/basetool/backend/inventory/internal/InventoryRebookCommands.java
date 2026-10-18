@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
-import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.inventory.api.RebookCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
@@ -39,7 +38,6 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,9 +51,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class InventoryRebookCommands implements RebookCommands {
-
-  /** The tolerance of an amount comparison, which only absorbs floating-point noise. */
-  private static final double EPSILON = AllocationReductions.REDUCTION_EPSILON;
 
   private final InventoryItemRepository inventoryRepository;
   private final InventoryCheckoutService checkoutService;
@@ -95,131 +90,27 @@ public class InventoryRebookCommands implements RebookCommands {
     for (InventoryItem source : sources) {
       offered.put(source.getId(), stockOfferLookup.activeOfferedAmount(source.getId()));
     }
-    RebookRefusal refusal = check(sources, offered, amount, toPool, wholeUnits);
-    if (refusal != null) {
-      return RebookOutcome.refused(refusal);
+    InventoryStockDecisions.LotRebook decision =
+        InventoryStockDecisions.rebookLot(sources, offered, amount, toPool, wholeUnits);
+    if (decision.refusal() != null) {
+      return RebookOutcome.refused(decision.refusal());
     }
     if (dryRun) {
       return RebookOutcome.checked();
     }
     Map<UUID, RebookRowState> before = states(lotRows);
-    double left = amount;
-    for (InventoryItem source : sources) {
-      if (left <= EPSILON) {
-        break;
-      }
-      double take =
-          Math.min(
-              left, movable(source, offered.getOrDefault(source.getId(), 0.0), toPool, wholeUnits));
-      if (take <= EPSILON) {
-        continue;
-      }
+    for (InventoryStockDecisions.Take take : decision.takes()) {
+      InventoryItem source = take.row();
       if (toPool && !Boolean.TRUE.equals(source.getPersonal())) {
-        poolChangeService.moveUnitlessRowIntoPool(source, take, Objects.requireNonNull(pool));
+        poolChangeService.moveUnitlessRowIntoPool(
+            source, take.amount(), Objects.requireNonNull(pool));
       } else {
         checkoutService.rebookRow(
-            source, take, !toPool, toPool ? pool : source.getOwningOrgUnit(), false);
+            source, take.amount(), !toPool, toPool ? pool : source.getOwningOrgUnit(), false);
       }
-      left = ScuAmounts.roundToScuScale(left - take);
     }
     Map<UUID, RebookRowState> after = states(lockLotRows(rebook.member(), lot));
     return RebookOutcome.applied(changes(before, after));
-  }
-
-  /**
-   * Decides a rebooking before anything is written: enough stock at the source, then enough of it
-   * free of earmarks, then enough left above the Materialbörse offers.
-   *
-   * @param sources the rows the rebooking may take from
-   * @param offered the amount each source offers on the Materialbörse, by row
-   * @param amount the amount to move
-   * @param toPool whether the stock moves into the pool
-   * @param wholeUnits whether the lot counts whole units
-   * @return the refusal, or {@code null} when the rebooking may happen
-   */
-  private static @Nullable RebookRefusal check(
-      @NotNull List<InventoryItem> sources,
-      @NotNull Map<UUID, Double> offered,
-      double amount,
-      boolean toPool,
-      boolean wholeUnits) {
-    double held = 0.0;
-    double unreserved = 0.0;
-    double movable = 0.0;
-    for (InventoryItem source : sources) {
-      held += amountOf(source);
-      unreserved += unreserved(source, toPool, wholeUnits);
-      movable += movable(source, offered.getOrDefault(source.getId(), 0.0), toPool, wholeUnits);
-    }
-    if (amount > held + EPSILON) {
-      return RebookRefusal.INSUFFICIENT_STOCK;
-    }
-    if (amount > unreserved + EPSILON) {
-      return RebookRefusal.STOCK_EARMARKED;
-    }
-    if (amount > movable + EPSILON) {
-      return RebookRefusal.STOCK_OFFERED;
-    }
-    return null;
-  }
-
-  /**
-   * Returns the part of a row no earmark holds. A shared row earmarked to a job order or mission
-   * cannot become personal at all, as in the web.
-   *
-   * @param row the row
-   * @param toPool whether the stock moves into the pool
-   * @param wholeUnits whether the lot counts whole units
-   * @return the unreserved amount, never negative
-   */
-  private static double unreserved(@NotNull InventoryItem row, boolean toPool, boolean wholeUnits) {
-    double reserved;
-    if (toPool) {
-      reserved =
-          Math.max(Math.max(row.jobOrderReserved(), row.missionReserved()), row.donationReserved());
-    } else if (!row.getJobOrderAllocations().isEmpty() || !row.getMissionAllocations().isEmpty()) {
-      return 0.0;
-    } else {
-      reserved = row.donationReserved();
-    }
-    return free(amountOf(row), reserved, wholeUnits);
-  }
-
-  /**
-   * Returns the part of a row a rebooking may take: unreserved and above its Materialbörse offer.
-   *
-   * @param row the row
-   * @param offered the amount the row offers on the Materialbörse
-   * @param toPool whether the stock moves into the pool
-   * @param wholeUnits whether the lot counts whole units
-   * @return the movable amount, never negative
-   */
-  private static double movable(
-      @NotNull InventoryItem row, double offered, boolean toPool, boolean wholeUnits) {
-    return Math.min(unreserved(row, toPool, wholeUnits), free(amountOf(row), offered, wholeUnits));
-  }
-
-  /**
-   * Returns what is left of an amount above a held part, in whole units where the lot counts them.
-   *
-   * @param amount the row's amount
-   * @param held the part that must stay
-   * @param wholeUnits whether the lot counts whole units
-   * @return the free amount, never negative
-   */
-  private static double free(double amount, double held, boolean wholeUnits) {
-    double free = Math.max(0.0, ScuAmounts.roundToScuScale(amount - held));
-    return wholeUnits ? Math.floor(free + EPSILON) : free;
-  }
-
-  /**
-   * Returns a row's amount.
-   *
-   * @param row the row
-   * @return the amount, {@code 0} when unset
-   */
-  private static double amountOf(@NotNull InventoryItem row) {
-    return row.getAmount() == null ? 0.0 : row.getAmount();
   }
 
   /**
@@ -318,8 +209,7 @@ public class InventoryRebookCommands implements RebookCommands {
    * @return whether only whole amounts may move
    */
   private static boolean countsWholeUnits(@NotNull StockLot lot) {
-    return lot.gameItem() != null
-        || (lot.material() != null && lot.material().getQuantityType() == QuantityType.PIECE);
+    return InventoryItem.countsWholeUnits(lot.material(), lot.gameItem());
   }
 
   /**
@@ -338,7 +228,7 @@ public class InventoryRebookCommands implements RebookCommands {
               row.getId(),
               Boolean.TRUE.equals(row.getPersonal()),
               unit == null ? null : unit.getId(),
-              amountOf(row),
+              InventoryStockDecisions.amountOf(row),
               row.getVersion() == null ? 0L : row.getVersion(),
               InventoryAllocations.jobOrderEarmarks(row),
               InventoryAllocations.missionEarmarks(row)));
