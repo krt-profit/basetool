@@ -22,41 +22,22 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
-import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprint;
-import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintCommands;
-import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintCreateRequest;
-import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
-import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
-import de.greluc.krt.profit.basetool.backend.hangar.api.ShipCommands;
-import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
-import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
-import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands;
-import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
-import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.EnumSet;
-import java.util.IdentityHashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
-import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -65,8 +46,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.function.SingletonSupplier;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * Undoes a client's writes since a point in time (REQ-XCH-022, REQ-XCH-046) — to the member's own
@@ -91,26 +70,18 @@ public class ExchangeUndoService {
   private static final String SKIPPED = "skipped";
 
   private final ExchangeJournalRepository journalRepository;
-  private final ExchangeChangeRepository changeRepository;
   private final ExchangeClientRepository clientRepository;
-  private final PersonalBlueprintRepository blueprintRepository;
-  private final PersonalBlueprintCommands blueprintService;
-  private final ExchangeStockWriteService stockWriteService;
-  private final StockCommands stockCommands;
-  private final PoolEntryCommands poolEntryCommands;
+  private final ExchangeBlueprintJournal blueprintJournal;
+  private final ExchangeStockJournal stockJournal;
+  private final ExchangeShipJournal shipJournal;
+  private final ExchangeOrgStockJournal orgStockJournal;
   private final ExchangeOrgUnitService orgUnitService;
-  private final ShipRepository shipRepository;
-  private final ShipTypeRepository shipTypeRepository;
-  private final LocationRepository locationRepository;
-  private final ShipCommands shipCommands;
   private final OrgUnitMembershipQueryService membershipQueryService;
-  private final ExchangeShipLinkRepository linkRepository;
   private final AuditRecorder auditRecorder;
   private final ExchangeLiveSync liveSync;
   private final ExchangeEntryLabels entryLabels;
   private final ExchangeChangeRetentionProperties retention;
   private final MeterRegistry meterRegistry;
-  private final ObjectMapper objectMapper;
   private final Clock clock = Clock.systemUTC();
 
   /**
@@ -225,27 +196,26 @@ public class ExchangeUndoService {
         groups.values().stream()
             .filter(group -> group.getFirst().getResource() == ExchangeResource.ORG_STOCK)
             .toList();
-    Map<List<ExchangeJournalEntry>, String> orgStock;
-    if (orgGroups.isEmpty()) {
-      stockCommands.lockLots(member, lots);
-      orgStock = Map.of();
-    } else {
-      orgStock = restoreOrgStock(member, lots, orgGroups, pools);
-    }
+    Map<List<ExchangeJournalEntry>, String> orgStock =
+        orgStockJournal.lockAndRestore(member, lots, orgGroups, pools);
     int restored = 0;
     List<ExchangeJournalEntry> skippedEntries = new ArrayList<>();
     List<Skipped> skipped = new ArrayList<>();
     Set<ExchangeResource> touched = EnumSet.noneOf(ExchangeResource.class);
     List<UUID> undone = new ArrayList<>();
-    Supplier<Set<UUID>> memberships =
-        SingletonSupplier.of(() -> membershipQueryService.findDirectMembershipOrgUnitIds(member));
+    ExchangeEntryRestorer.UndoScope scope =
+        new ExchangeEntryRestorer.UndoScope(
+            member,
+            clientId,
+            SingletonSupplier.of(
+                () -> membershipQueryService.findDirectMembershipOrgUnitIds(member)));
     for (List<ExchangeJournalEntry> group : groups.values()) {
       ExchangeJournalEntry newest = group.getFirst();
       ExchangeResource entryResource = newest.getResource();
       String reason =
           entryResource == ExchangeResource.ORG_STOCK
               ? orgStock.get(group)
-              : restore(member, clientId, group, memberships);
+              : restorer(entryResource).restore(scope, group);
       if (reason != null) {
         skippedEntries.add(newest);
         skipped.add(new Skipped(newest.getId(), entryResource, reason));
@@ -265,346 +235,19 @@ public class ExchangeUndoService {
   }
 
   /**
-   * Restores one entry to its state before the client's first write in the span; an entry whose
-   * latest change-log entry is missing counts as changed afterwards, because nothing proves it was
-   * not.
+   * Returns the restorer of a resource whose entries are set back one by one.
    *
-   * @param member the member
-   * @param clientId the client
-   * @param group the client's writes to the entry, newest first
-   * @param memberships the member's direct org-unit memberships, loaded on first use
-   * @return {@code null} when restored, else the reason it was left alone
+   * @param resource the resource
+   * @return its restorer
+   * @throws IllegalStateException for the org stock, whose entries are restored together
    */
-  private @Nullable String restore(
-      @NotNull UUID member,
-      @NotNull String clientId,
-      @NotNull List<ExchangeJournalEntry> group,
-      @NotNull Supplier<Set<UUID>> memberships) {
-    List<ExchangeJournalEntry> data =
-        group.stream().filter(e -> e.getAction() != ExchangeJournalAction.SHIP_LINK).toList();
-    List<ExchangeJournalEntry> links =
-        group.stream().filter(e -> e.getAction() == ExchangeJournalAction.SHIP_LINK).toList();
-    if (!data.isEmpty()) {
-      ExchangeJournalEntry newest = data.getFirst();
-      ExchangeResource resource = newest.getResource();
-      String feedKey =
-          resource == ExchangeResource.BLUEPRINT
-              ? ExchangeBlueprintFeedService.keyOf(newest.getEntityKey())
-              : newest.getEntityKey();
-      Optional<ExchangeChange> latest =
-          changeRepository.findLatestForKey(member, resource.name(), feedKey);
-      if (latest.isEmpty() || latest.get().getTx() != newest.getTx()) {
-        return CHANGED_AFTERWARDS;
-      }
-      JsonNode before = parse(data.getLast().getBeforeState());
-      boolean done =
-          switch (resource) {
-            case BLUEPRINT -> restoreBlueprint(member, newest.getEntityKey(), before);
-            case STOCK -> restoreLot(member, newest.getEntityKey(), before, data);
-            case SHIP -> restoreShip(member, newest.getEntityKey(), before, memberships);
-            case ORG_STOCK ->
-                throw new IllegalStateException("Org-stock entries are restored together");
-          };
-      if (!done) {
-        return GONE;
-      }
-    }
-    unlink(member, clientId, links);
-    return null;
-  }
-
-  /**
-   * Sets every org-stock entry in scope back to its state before the client's first write in the
-   * span, in one call that first locks them all together with the member's own lots the undo sets
-   * back afterwards; an entry of a pool the member may no longer write is left alone as {@code
-   * GONE}.
-   *
-   * @param member the member whose writes are undone
-   * @param lots the member's own lots the undo sets back afterwards
-   * @param groups the client's writes to each entry, newest first
-   * @param pools the units the member is a Logistician and direct member of now, or {@code null}
-   *     when every pool may be set back
-   * @return the reason each group was left alone, or {@code null} for a restored one, by group
-   */
-  private @NotNull Map<List<ExchangeJournalEntry>, String> restoreOrgStock(
-      @NotNull UUID member,
-      @NotNull List<String> lots,
-      @NotNull List<List<ExchangeJournalEntry>> groups,
-      @Nullable Set<UUID> pools) {
-    IdentityHashMap<List<ExchangeJournalEntry>, String> reasons = new IdentityHashMap<>();
-    List<PoolEntryCommands.PoolRestore> restores = new ArrayList<>();
-    List<List<ExchangeJournalEntry>> restoring = new ArrayList<>();
-    for (List<ExchangeJournalEntry> group : groups) {
-      IdentityHashMap<ExchangeJournalEntry, WriteOrder> places = new IdentityHashMap<>();
-      group.forEach(entry -> places.put(entry, writeOrder(entry)));
-      List<ExchangeJournalEntry> ordered =
-          group.stream().sorted(Comparator.comparing(places::get)).toList();
-      PoolEntryCommands.PoolEntryState target = poolState(ordered.getFirst().getBeforeState());
-      PoolEntryCommands.PoolEntryState expected = poolState(ordered.getLast().getAfterState());
-      if (pools != null && !(inPools(target, pools) && inPools(expected, pools))) {
-        reasons.put(group, GONE);
-        continue;
-      }
-      restores.add(
-          new PoolEntryCommands.PoolRestore(
-              UUID.fromString(group.getFirst().getEntityKey()), expected, target));
-      restoring.add(group);
-    }
-    List<PoolEntryCommands.PoolRestoreResult> results =
-        poolEntryCommands.restore(Map.of(member, lots), restores);
-    for (int i = 0; i < results.size(); i++) {
-      reasons.put(
-          restoring.get(i),
-          switch (results.get(i)) {
-            case RESTORED -> null;
-            case CHANGED_AFTERWARDS -> CHANGED_AFTERWARDS;
-            case GONE -> GONE;
-          });
-    }
-    return reasons;
-  }
-
-  /**
-   * Orders an entry's journaled writes: by transaction, and within one by the version the entry had
-   * before the write, since a change set's rows share their recording time.
-   *
-   * @param entry a journaled write
-   * @return its place, the earliest first
-   */
-  private @NotNull WriteOrder writeOrder(@NotNull ExchangeJournalEntry entry) {
-    PoolEntryCommands.PoolEntryState before = poolState(entry.getBeforeState());
-    return new WriteOrder(entry.getTx(), before == null ? Long.MIN_VALUE : before.version());
-  }
-
-  /**
-   * Whether a journaled state lies in one of the given pools.
-   *
-   * @param state the state, or {@code null} for an absent entry
-   * @param pools the pools
-   * @return {@code true} for an absent entry or one in those pools
-   */
-  private static boolean inPools(
-      @Nullable PoolEntryCommands.PoolEntryState state, @NotNull Set<UUID> pools) {
-    return state == null || pools.contains(state.poolUnitId());
-  }
-
-  /**
-   * Reads a journaled org-stock state.
-   *
-   * @param json the state, or {@code null}
-   * @return the state, or {@code null} for none
-   */
-  private @Nullable PoolEntryCommands.PoolEntryState poolState(@Nullable String json) {
-    return json == null
-        ? null
-        : objectMapper.readValue(json, PoolEntryCommands.PoolEntryState.class);
-  }
-
-  /**
-   * Adds or removes a blueprint to match its earlier state.
-   *
-   * @param member the member
-   * @param productKey the product
-   * @param before the state before the client's first write, or {@code null} when it was absent
-   * @return always {@code true}
-   */
-  private boolean restoreBlueprint(
-      @NotNull UUID member, @NotNull String productKey, @Nullable JsonNode before) {
-    Optional<PersonalBlueprint> owned =
-        blueprintRepository.findByOwnerUserIdAndProductKey(member, productKey);
-    if (before == null) {
-      owned.ifPresent(blueprint -> blueprintService.delete(member, blueprint.getId()));
-    } else if (owned.isEmpty()) {
-      String acquiredAt = text(before, "acquiredAt");
-      blueprintService.add(
-          member,
-          new PersonalBlueprintCreateRequest(
-              productKey,
-              acquiredAt == null ? null : Instant.parse(acquiredAt),
-              text(before, "note")));
-    }
-    return true;
-  }
-
-  /**
-   * Sets the lot's pools back by the net amount the client's shares and unshares moved into each,
-   * then sets the lot back to its earlier quantity.
-   *
-   * @param member the member
-   * @param lotKey the lot
-   * @param before the state before the client's first write
-   * @param writes the client's writes to the lot, newest first
-   * @return whether the lot could be restored; {@code false} when a pool no longer holds what was
-   *     shared into it, or stock cannot go back into a pool the member has left
-   */
-  private boolean restoreLot(
-      @NotNull UUID member,
-      @NotNull String lotKey,
-      @Nullable JsonNode before,
-      @NotNull List<ExchangeJournalEntry> writes) {
-    String unit = text(before, "unit");
-    if (before == null || before.get("quantity") == null || unit == null) {
-      return false;
-    }
-    Map<UUID, BigDecimal> moved = new TreeMap<>();
-    for (ExchangeJournalEntry write : writes) {
-      boolean share = write.getAction() == ExchangeJournalAction.STOCK_SHARE;
-      if (share || write.getAction() == ExchangeJournalAction.STOCK_UNSHARE) {
-        JsonNode after = parse(write.getAfterState());
-        String pool = text(after, "orgUnit");
-        JsonNode amount = after == null ? null : after.get(share ? "shared" : "unshared");
-        if (pool == null || amount == null) {
-          return false;
-        }
-        moved.merge(
-            UUID.fromString(pool),
-            share ? amount.decimalValue() : amount.decimalValue().negate(),
-            BigDecimal::add);
-      }
-    }
-    if (!moved.isEmpty() && !stockWriteService.restorePools(member, lotKey, unit, moved)) {
-      return false;
-    }
-    BigDecimal quantity = before.get("quantity").decimalValue();
-    return stockWriteService.restoreLot(member, lotKey, quantity, unit);
-  }
-
-  /**
-   * Removes, updates or recreates a ship to match its earlier state, including its earlier org unit
-   * while the member still directly belongs to it; a recreated ship gets a new id and does not
-   * rejoin mission units, and one whose unit is not restored is stamped like a client's create.
-   *
-   * @param member the member
-   * @param rawId the ship's id
-   * @param before the state before the client's first write, or {@code null} when it was absent
-   * @param memberships the member's direct org-unit memberships, loaded on first use
-   * @return whether the ship could be restored
-   */
-  private boolean restoreShip(
-      @NotNull UUID member,
-      @NotNull String rawId,
-      @Nullable JsonNode before,
-      @NotNull Supplier<Set<UUID>> memberships) {
-    UUID shipId = UUID.fromString(rawId);
-    Optional<Ship> ship = shipRepository.lockOwnedById(shipId, member);
-    if (ship.isEmpty() && shipRepository.existsById(shipId)) {
-      return false;
-    }
-    if (before == null) {
-      if (ship.isPresent()) {
-        shipCommands.deleteShip(member, shipId);
-      }
-      return true;
-    }
-    UUID shipType = UUID.fromString(text(before, "shipType"));
-    String location = text(before, "location");
-    UUID locationId = location == null ? null : UUID.fromString(location);
-    if (!shipTypeRepository.existsById(shipType)
-        || (locationId != null && !locationRepository.existsById(locationId))) {
-      return false;
-    }
-    JsonNode fitted = before.get("fitted");
-    ShipRequestDto dto =
-        new ShipRequestDto(
-            text(before, "name"),
-            shipType,
-            Objects.requireNonNull(text(before, "insurance")),
-            locationId,
-            fitted != null && fitted.asBoolean(),
-            ship.map(Ship::getVersion).orElse(null),
-            null);
-    EarlierUnit unit = earlierUnit(before, memberships);
-    if (ship.isEmpty()) {
-      if (unit == null) {
-        shipCommands.addShipForClient(member, dto);
-      } else {
-        shipCommands.addShipForClientInOrgUnit(member, dto, unit.orgUnitId());
-      }
-      return true;
-    }
-    Ship current = ship.get();
-    UUID currentUnit =
-        current.getOwningOrgUnit() == null ? null : current.getOwningOrgUnit().getId();
-    long unitVersion = current.getOwningOrgUnitVersion();
-    shipCommands.updateShip(member, shipId, dto);
-    if (unit != null && !Objects.equals(unit.orgUnitId(), currentUnit)) {
-      shipCommands.changeShipOrgUnit(member, shipId, unit.orgUnitId(), unitVersion);
-    }
-    return true;
-  }
-
-  /**
-   * Reads the org unit a ship had before the client's first write, when it may be restored.
-   *
-   * @param before the ship's earlier state
-   * @param memberships the member's direct org-unit memberships, loaded on first use
-   * @return the earlier unit, whose id is {@code null} when the ship had none; {@code null} when
-   *     the state has no {@code orgUnit} key, names no valid unit id, or names a unit the member no
-   *     longer directly belongs to
-   */
-  private static @Nullable EarlierUnit earlierUnit(
-      @NotNull JsonNode before, @NotNull Supplier<Set<UUID>> memberships) {
-    if (!before.has("orgUnit")) {
-      return null;
-    }
-    String raw = text(before, "orgUnit");
-    if (raw == null) {
-      return new EarlierUnit(null);
-    }
-    UUID orgUnitId;
-    try {
-      orgUnitId = UUID.fromString(raw);
-    } catch (IllegalArgumentException _) {
-      return null;
-    }
-    return memberships.get().contains(orgUnitId) ? new EarlierUnit(orgUnitId) : null;
-  }
-
-  /**
-   * Takes back the links the client made in the span and puts back what they replaced, the latter
-   * only while the ship is still the member's.
-   *
-   * @param member the member
-   * @param clientId the client
-   * @param links the client's link writes to one ship, newest first
-   */
-  private void unlink(
-      @NotNull UUID member, @NotNull String clientId, @NotNull List<ExchangeJournalEntry> links) {
-    Map<String, List<ExchangeJournalEntry>> byInstallation = new LinkedHashMap<>();
-    links.forEach(
-        entry ->
-            byInstallation
-                .computeIfAbsent(entry.getInstallationKey(), _ -> new ArrayList<>())
-                .add(entry));
-    byInstallation.forEach(
-        (installation, entries) -> {
-          UUID shipId = UUID.fromString(entries.getFirst().getEntityKey());
-          String made = text(parse(entries.getFirst().getAfterState()), "externalId");
-          String replaced = text(parse(entries.getLast().getBeforeState()), "externalId");
-          linkRepository
-              .findByUserIdAndClientIdAndInstallationKeyAndShipId(
-                  member, clientId, installation, shipId)
-              .filter(link -> link.getExternalId().equals(made))
-              .ifPresent(linkRepository::delete);
-          linkRepository.flush();
-          if (replaced != null
-              && shipRepository.existsByIdAndOwnerId(shipId, member)
-              && linkRepository
-                  .findByUserIdAndClientIdAndInstallationKeyAndExternalId(
-                      member, clientId, installation, replaced)
-                  .isEmpty()) {
-            linkRepository.save(
-                ExchangeShipLink.builder()
-                    .id(UUID.randomUUID())
-                    .userId(member)
-                    .clientId(clientId)
-                    .installationKey(installation)
-                    .externalId(replaced)
-                    .shipId(shipId)
-                    .createdAt(clock.instant())
-                    .build());
-          }
-        });
+  private @NotNull ExchangeEntryRestorer restorer(@NotNull ExchangeResource resource) {
+    return switch (resource) {
+      case BLUEPRINT -> blueprintJournal;
+      case STOCK -> stockJournal;
+      case SHIP -> shipJournal;
+      case ORG_STOCK -> throw new IllegalStateException("Org-stock entries are restored together");
+    };
   }
 
   /**
@@ -620,31 +263,6 @@ public class ExchangeUndoService {
       case SHIP -> liveSync.hangarChanged(member);
       case null -> throw new NullPointerException("resource");
     }
-  }
-
-  /**
-   * Reads a journaled state.
-   *
-   * @param json the state, or {@code null}
-   * @return the state, or {@code null} for none
-   */
-  private @Nullable JsonNode parse(@Nullable String json) {
-    return json == null ? null : objectMapper.readTree(json);
-  }
-
-  /**
-   * Reads a text field of a state.
-   *
-   * @param state the state, or {@code null}
-   * @param field the field
-   * @return its text, or {@code null} when absent or null
-   */
-  private static @Nullable String text(@Nullable JsonNode state, @NotNull String field) {
-    if (state == null) {
-      return null;
-    }
-    JsonNode value = state.get(field);
-    return value == null || value.isNull() ? null : value.asString();
   }
 
   /**
@@ -688,26 +306,4 @@ public class ExchangeUndoService {
    */
   public record Skipped(
       @NotNull UUID journalEntryId, @NotNull ExchangeResource resource, @NotNull String reason) {}
-
-  /**
-   * The org unit an undo puts a ship back in.
-   *
-   * @param orgUnitId the unit, or {@code null} for none
-   */
-  private record EarlierUnit(@Nullable UUID orgUnitId) {}
-
-  /**
-   * The place of a journaled org-stock write among the writes to the same entry.
-   *
-   * @param tx the writing transaction
-   * @param versionBefore the entry's version before the write, the lowest for a creation
-   */
-  private record WriteOrder(long tx, long versionBefore) implements Comparable<WriteOrder> {
-
-    @Override
-    public int compareTo(@NotNull WriteOrder other) {
-      int byTx = Long.compare(tx, other.tx);
-      return byTx != 0 ? byTx : Long.compare(versionBefore, other.versionBefore);
-    }
-  }
 }

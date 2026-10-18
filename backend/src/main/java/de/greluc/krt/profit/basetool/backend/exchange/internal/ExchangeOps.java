@@ -24,7 +24,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import org.jetbrains.annotations.NotNull;
 
-/** The results a stock write op ends with and the rounding of its amounts (REQ-XCH-016). */
+/**
+ * The results an exchange write op ends with and the rounding of stock amounts (REQ-XCH-015,
+ * REQ-XCH-016).
+ */
 final class ExchangeOps {
 
   /** The result of an op that found the state it asked for. */
@@ -35,6 +38,15 @@ final class ExchangeOps {
 
   /** The result of an op that changed something. */
   static final String APPLIED = "applied";
+
+  /** The result of an op whose reference matched no catalogue entry or no entry of the member. */
+  static final String UNMATCHED = "unmatched";
+
+  /** The result of an op whose reference matched several catalogue entries. */
+  static final String AMBIGUOUS = "ambiguous";
+
+  /** The write counter's outcome of a change set the mass-change guard held back. */
+  static final String HELD = "held";
 
   /** Not instantiable. */
   private ExchangeOps() {}

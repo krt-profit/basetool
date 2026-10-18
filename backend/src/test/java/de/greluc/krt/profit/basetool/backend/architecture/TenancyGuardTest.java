@@ -30,7 +30,6 @@ import de.greluc.krt.profit.basetool.backend.architecture.TenancyGuardRules.Hand
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccount;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankTransaction;
-import de.greluc.krt.profit.basetool.backend.exchange.web.ConnectedAppsController;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.hangar.web.HangarController;
@@ -267,14 +266,7 @@ class TenancyGuardTest {
               "the service method carries @missionSecurityService.canEditFinanceEntry"));
 
   /** Selected write handlers that write no tenant data, each with the reason. */
-  private static final Map<HandlerKey, String> NOT_TENANT_WRITES =
-      Map.of(
-          new HandlerKey(ConnectedAppsController.class, "markSeen"),
-          "marks one of the caller's own installations seen; the controller is selected only"
-              + " through the undo, which restores the caller's own stock through StockCommands",
-          new HandlerKey(ConnectedAppsController.class, "disconnectInstallation"),
-          "revokes one of the caller's own installations; the controller is selected only through"
-              + " the undo, which restores the caller's own stock through StockCommands");
+  private static final Map<HandlerKey, String> NOT_TENANT_WRITES = Map.of();
 
   /** The controllers the replaced simple-name whitelist covered; the marker rule must keep them. */
   private static final Set<Class<?>> LEGACY_WHITELIST =
