@@ -175,6 +175,7 @@ input.pf-v5-c-form-control {
     border-bottom: 2px solid var(--color-primary) !important;
     color: var(--color-gray-1) !important;
     font-family: var(--font-body) !important;
+    font-size: max(1rem, 16px) !important;
     outline: none !important;
     transition: border-color 0.3s ease;
     box-sizing: border-box;

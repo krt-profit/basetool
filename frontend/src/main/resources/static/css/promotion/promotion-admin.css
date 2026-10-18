@@ -69,7 +69,7 @@
         line-height: 1;
     }
 
-    @media (width <= 1024px) {
+    @media (width <= 1024px), (pointer: coarse) {
         .pa-sort-controls .pa-sort-btn {
             min-height: var(--touch-target-dense);
             height: var(--touch-target-dense);

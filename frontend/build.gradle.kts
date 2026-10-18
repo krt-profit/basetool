@@ -761,6 +761,23 @@ val testKrtFetchReadJs =
     outputs.upToDateWhen { false }
   }
 
+val testPageSectionsJs =
+  tasks.register<NodeTask>("testPageSectionsJs") {
+    group = "verification"
+    description =
+      "Regression tests for the page-section module: write, version, re-render, broadcast and peer frame (ADR-0289)."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(layout.projectDirectory.file("scripts/krt-page-sections.test.mjs").asFile)
+    ignoreExitValue.set(false)
+    inputs.file(layout.projectDirectory.file("scripts/krt-page-sections.test.mjs"))
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-fetch.js"))
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-page-sections.js"),
+    )
+    outputs.upToDateWhen { false }
+  }
+
 val testTrustedTypesJs =
   tasks.register<NodeTask>("testTrustedTypesJs") {
     group = "verification"
@@ -953,6 +970,7 @@ tasks.named("check").configure {
   dependsOn("checkExchangeDocs")
   dependsOn(
     testKrtFetchReadJs,
+    testPageSectionsJs,
     testTrustedTypesJs,
     testClientErrorCspJs,
     testSafeUrl,

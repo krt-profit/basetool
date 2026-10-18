@@ -877,7 +877,7 @@ function filterMyInventory() {
     } catch {}
 
     krtFetch
-        .get(url.toString())
+        .get(url.toString(), { key: 'inventory-my-table' })
         .then((response) => {
             if (!response || !response.ok) {
                 throw new Error(`Inventory fragment refused (${response ? response.status : 0})`);
@@ -889,6 +889,7 @@ function filterMyInventory() {
             myLager.restoreExpandedTree();
         })
         .catch((error) => {
+            if (error instanceof DOMException && error.name === 'AbortError') return;
             console.error('Error fetching filtered personal inventory:', error);
             container.style.opacity = '1.0';
             container.style.pointerEvents = 'auto';

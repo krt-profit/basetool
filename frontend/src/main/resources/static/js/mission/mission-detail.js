@@ -20,30 +20,9 @@
 /* global missionId */
 
 import { showKrtConfirm } from '/js/kernel/toast.js';
-import { krtFetch } from '/js/kernel/krt-fetch.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { missionHooks } from '/js/mission/mission-hooks.js';
-
-const MISSION_SECTIONS = {
-    crew: { container: '#crew-board-results', fragmentValue: 'crew-board' },
-    finance: { container: '#finance-results', fragmentValue: 'finance' },
-    mgmt: { container: '#mission-mgmt-results', fragmentValue: 'mgmt' },
-    overview: { container: '#overview-results', fragmentValue: 'overview' },
-    steps: { container: '#mission-steps-results', fragmentValue: 'steps-editor' },
-    objectives: {
-        container: '#mission-objectives-results',
-        fragmentValue: 'objectives-editor',
-    },
-    frequencies: {
-        container: '#mission-frequencies-results',
-        fragmentValue: 'frequencies-editor',
-    },
-    organisation: {
-        container: '#mission-organisation-results',
-        fragmentValue: 'organisation',
-    },
-};
 
 /**
  * Tells the parent operation's room that this mission's overview or finance section changed.
@@ -52,7 +31,7 @@ const MISSION_SECTIONS = {
  */
 function crossPublishToParentOperation(keys) {
     const operationId = window.missionOperationId;
-    if (!operationId || typeof krtLiveSync.sendChanged !== 'function') {
+    if (!operationId) {
         return;
     }
     const changed = Array.isArray(keys) ? keys : [keys];
@@ -64,11 +43,11 @@ function crossPublishToParentOperation(keys) {
         operationSections.push('finance');
     }
     if (operationSections.length) {
-        krtLiveSync.sendChanged(`operation:${operationId}`, operationSections);
+        krtPageSections.publish(`operation:${operationId}`, operationSections);
     }
 }
 
-const missionSeam = krtFetch.sectionWrite({
+const missionSeam = krtPageSections.create({
     dictName: 'MISSION_SUBRES_I18N',
     dict() {
         return window.MISSION_SUBRES_I18N || {};
@@ -85,7 +64,25 @@ const missionSeam = krtFetch.sectionWrite({
         reloadDetailKey: 'mission.conflict.toast.detail',
         refreshErrorKey: 'mission.section.refresh.error',
     },
-    sections: MISSION_SECTIONS,
+    sections: {
+        crew: { container: '#crew-board-results', fragmentValue: 'crew-board' },
+        finance: { container: '#finance-results', fragmentValue: 'finance' },
+        mgmt: { container: '#mission-mgmt-results', fragmentValue: 'mgmt' },
+        overview: { container: '#overview-results', fragmentValue: 'overview' },
+        steps: { container: '#mission-steps-results', fragmentValue: 'steps-editor' },
+        objectives: {
+            container: '#mission-objectives-results',
+            fragmentValue: 'objectives-editor',
+        },
+        frequencies: {
+            container: '#mission-frequencies-results',
+            fragmentValue: 'frequencies-editor',
+        },
+        organisation: {
+            container: '#mission-organisation-results',
+            fragmentValue: 'organisation',
+        },
+    },
     pageUrl() {
         return window.missionId ? `/missions/${window.missionId}` : null;
     },
@@ -94,6 +91,19 @@ const missionSeam = krtFetch.sectionWrite({
             missionHooks.presence.sendChanged(keys);
         }
         crossPublishToParentOperation(keys);
+    },
+    receiver: {
+        events: { changed: 'krt:mission-changed', resync: 'krt:mission-resync' },
+        pill: {
+            id: 'mission-livesync-pill',
+            label() {
+                const dict = window.MISSION_LIVESYNC_I18N || {};
+                return krtI18nText(
+                    dict['mission.livesync.updates_available'],
+                    'MISSION_LIVESYNC_I18N[mission.livesync.updates_available]',
+                );
+            },
+        },
     },
 });
 missionHooks.write = missionSeam.write;
@@ -202,27 +212,6 @@ document.addEventListener('krt:swapped', (ev) => {
     }
 });
 
-krtLiveSync.createReceiver({
-    sections: MISSION_SECTIONS,
-    events: { changed: 'krt:mission-changed', resync: 'krt:mission-resync' },
-    /** @param {string[] | string} keys the changed section keys */
-    refresh(keys) {
-        if (missionHooks.refresh) {
-            missionHooks.refresh(keys, { broadcast: false });
-        }
-    },
-    pill: {
-        id: 'mission-livesync-pill',
-        label() {
-            const dict = window.MISSION_LIVESYNC_I18N || {};
-            return krtI18nText(
-                dict['mission.livesync.updates_available'],
-                'MISSION_LIVESYNC_I18N[mission.livesync.updates_available]',
-            );
-        },
-    },
-});
-
 function mid() {
     return window.missionId || (typeof missionId !== 'undefined' ? missionId : null);
 }
@@ -230,12 +219,6 @@ function stepsVersion() {
     const holder = document.querySelector('[data-steps-version]');
     const v = holder ? Number(holder.getAttribute('data-steps-version')) : null;
     return v === null || Number.isNaN(v) ? null : v;
-}
-function refreshSteps() {
-    if (missionHooks.refresh) {
-        return missionHooks.refresh(['steps', 'overview']);
-    }
-    return Promise.resolve();
 }
 /**
  * Writes to the steps section.
@@ -245,7 +228,7 @@ function refreshSteps() {
  */
 function writeStep(opts) {
     return missionHooks.write(
-        Object.assign({ sectionKey: 'steps', onSuccess: refreshSteps }, opts),
+        Object.assign({ sectionKey: 'steps', refresh: ['steps', 'overview'] }, opts),
     );
 }
 
@@ -520,12 +503,6 @@ function initMissionDetail() {
         const v = holder ? Number(holder.getAttribute('data-objectives-version')) : null;
         return v === null || Number.isNaN(v) ? null : v;
     }
-    function refreshObjectives() {
-        if (missionHooks.refresh) {
-            return missionHooks.refresh(['objectives', 'overview']);
-        }
-        return Promise.resolve();
-    }
     /**
      * Writes to the objectives section.
      *
@@ -534,7 +511,7 @@ function initMissionDetail() {
      */
     function writeObjective(opts) {
         return missionHooks.write(
-            Object.assign({ sectionKey: 'objectives', onSuccess: refreshObjectives }, opts),
+            Object.assign({ sectionKey: 'objectives', refresh: ['objectives', 'overview'] }, opts),
         );
     }
     /**

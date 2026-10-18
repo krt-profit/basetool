@@ -37,6 +37,9 @@
         margin: 0;
         cursor: pointer;
     }
+    .admin-materials-table select {
+        min-width: 8.5rem;
+    }
     .admin-materials-category-form {
         margin-bottom: var(--space-3);
     }

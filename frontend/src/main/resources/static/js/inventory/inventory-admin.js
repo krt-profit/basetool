@@ -320,7 +320,7 @@ function filterInventory() {
     } catch {}
 
     krtFetch
-        .get(url.toString())
+        .get(url.toString(), { key: 'inventory-admin-table' })
         .then((response) => {
             if (!response || !response.ok) {
                 throw new Error(`Inventory fragment refused (${response ? response.status : 0})`);
@@ -332,6 +332,7 @@ function filterInventory() {
             adminLager.restoreExpandedTree();
         })
         .catch((error) => {
+            if (error instanceof DOMException && error.name === 'AbortError') return;
             console.error('Error fetching filtered inventory:', error);
             container.style.opacity = '1.0';
             container.style.pointerEvents = 'auto';

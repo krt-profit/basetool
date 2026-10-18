@@ -290,18 +290,22 @@
                 th:with="mfg=${item.manufacturedAmount != null ? item.manufacturedAmount : 0},dlv=${item.deliveredAmount != null ? item.deliveredAmount : 0},amt=${item.amount != null ? item.amount : 0},complete=${(item.amount != null ? item.amount : 0) > 0 and (item.manufacturedAmount != null ? item.manufacturedAmount : 0) >= (item.amount != null ? item.amount : 0)},hasDemand=${item.materials != null and !item.materials.isEmpty()},demandId='od-prod-demand-' + ${item.id},stockGroup=${(item.gameItem != null and itemStockByGameItem != null) ? itemStockByGameItem.get(item.gameItem.id()) : null},stockEntries=${stockGroup != null ? stockGroup.entries : null},hasStock=${stockEntries != null and !stockEntries.isEmpty()},canExpand=${(isLogistician and hasDemand) or hasStock}">
             <tr>
                 <td class="od-item-cell">
+                    <div class="od-item-head">
                     <button th:if="${!requesterView and canExpand}" type="button" class="od-prod-toggle"
                             data-trigger="od-toggle-demand" aria-expanded="false"
                             th:attr="aria-controls=${demandId}"
                             th:aria-label="#{orders.detail.item.expand}">
                         <svg class="krt-icon od-prod-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
                     </button>
+                    <span class="od-item-main">
                     <span class="od-item-name" th:text="${item.gameItem != null ? item.gameItem.name() : '-'}"></span>
                     <span th:if="${item.gameItem != null}" class="od-item-chips" th:insert="~{kernel/fragments/item-chips :: itemChips(${item.gameItem})}"></span>
                     <span th:if="${item.parentItemId != null}" class="subassembly-tag" th:text="#{orders.detail.item.subassembly}" th:title="#{orders.detail.item.subassembly}">Unterbaugruppe</span>
                     <span th:if="${item.blueprintStale}" class="chip chip--warning"
                           th:text="#{orders.detail.item.blueprintStale}"
                           th:title="#{orders.detail.item.blueprintStale.hint}">Rezept veraltet</span>
+                    </span>
+                    </div>
                     <ul th:if="${isLogistician}" class="od-production-demand" hidden aria-hidden="true">
                         <li th:each="m : ${item.materials}"
                             th:data-material-id="${m.material != null ? m.material.id() : ''}"

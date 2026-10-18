@@ -26,6 +26,11 @@
         min-width: 0;
     }
 
+    .lager-filter-field .multi-select-options {
+        position: static;
+        box-shadow: none;
+    }
+
     .lager-filter-select {
         width: 100%;
         min-height: var(--touch-target);
@@ -179,6 +184,10 @@
     }
 
     @media (width <= 1024px) {
+        .lager-material-tree {
+            --tree-cols: minmax(160px, 1.4fr) minmax(160px, 1.7fr) 132px 124px 168px;
+        }
+
         .lager-item-name {
             display: grid;
             grid-template-columns: auto minmax(0, 1fr);

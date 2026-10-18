@@ -1089,105 +1089,6 @@ function bindSwap(opts) {
     bindSwapAnchorInterception(container, opts);
 }
 
-/**
- * Builds a page's section-write seam: the { write, refresh, notify } trio for pages whose
- * aggregate is saved and re-rendered as independent sections. The dict, pageUrl and broadcast
- * callbacks are re-evaluated on every call.
- *
- * config:
- *  - dict()               getter for the page's localized i18n dictionary
- *  - dictName             the dictionary's global name, used in the key a missing string is
- *                         reported as (`NAME[key]`)
- *  - keys                 dictionary keys: saveSectionPrefix, conflictSectionPrefix, successKey,
- *                         errorKey, conflictTitleKey, reloadLabelKey, dismissLabelKey,
- *                         reloadQuestionKey, reloadDetailKey, refreshErrorKey; an omitted key
- *                         leaves write()'s krtFetchI18n default in place
- *  - sections             sectionKey -> { container, fragmentValue } map for refresh()
- *  - pageUrl()            getter for the page's base URL; null makes refresh() resolve false
- *  - broadcast(keys)      optional peer notification (REQ-FE-010); called by refresh() unless
- *                         opts.broadcast === false, and always by notify()
- *
- * Returns:
- *  - write(opts)          {@link write} with the localized strings derived from opts.sectionKey
- *  - refresh(sectionKeys, opts)  re-renders one or more sections via {@link swap}; resolves when
- *                         all swaps complete
- *  - notify(sectionKeys)  broadcasts without re-rendering
- *
- * @param {KrtSectionWriteConfig} config the page's section configuration
- * @returns {KrtSectionWriter} the section-write seam
- */
-function sectionWrite(config) {
-    return {
-        write(opts) {
-            /** @type {KrtI18nDict} */
-            const dict = config.dict() || {};
-            /**
-             * The page dictionary's string for `key`, visibly reported when missing; undefined
-             * for a key the config does not name, so write() applies its own default.
-             *
-             * @param {string | undefined} key the dictionary key
-             * @returns {string | undefined} the localized string
-             */
-            function t(key) {
-                if (!key) return undefined;
-                return krtI18nText(dict[key], `${config.dictName || 'dict'}[${key}]`);
-            }
-            const key = opts.sectionKey || '';
-            const k = config.keys;
-            return write(
-                Object.assign({}, opts, {
-                    serialize: opts.serialize || (key ? `section:${key}` : undefined),
-                    sectionLabel: k.saveSectionPrefix ? t(k.saveSectionPrefix + key) : undefined,
-                    conflictSectionLabel: k.conflictSectionPrefix
-                        ? t(k.conflictSectionPrefix + key)
-                        : undefined,
-                    successMessage: t(k.successKey),
-                    errorMessage: t(k.errorKey),
-                    conflict: {
-                        title: t(k.conflictTitleKey),
-                        reloadLabel: t(k.reloadLabelKey),
-                        dismissLabel: t(k.dismissLabelKey),
-                        reloadQuestion: t(k.reloadQuestionKey),
-                        reloadDetailFallback: t(k.reloadDetailKey),
-                    },
-                }),
-            );
-        },
-        refresh(sectionKeys, opts) {
-            const list = Array.isArray(sectionKeys) ? sectionKeys : [sectionKeys];
-            if ((!opts || opts.broadcast !== false) && typeof config.broadcast === 'function') {
-                config.broadcast(list);
-            }
-            return Promise.all(
-                list.map((sectionKey) => {
-                    const cfg = config.sections[sectionKey];
-                    const url = cfg ? config.pageUrl() : null;
-                    if (!cfg || !url || !document.querySelector(cfg.container)) {
-                        return Promise.resolve(false);
-                    }
-                    return swap({
-                        url,
-                        container: cfg.container,
-                        fragmentValue: cfg.fragmentValue,
-                        history: false,
-                        preserveScroll: true,
-                        errorMessage:
-                            /** @type {KrtI18nDict} */ (config.dict() || {})[
-                                config.keys.refreshErrorKey
-                            ] || '',
-                    });
-                }),
-            );
-        },
-        notify(sectionKeys) {
-            const list = Array.isArray(sectionKeys) ? sectionKeys : [sectionKeys];
-            if (typeof config.broadcast === 'function') {
-                config.broadcast(list);
-            }
-        },
-    };
-}
-
 /** @type {KrtFetchApi} */
 export const krtFetch = {
     get,
@@ -1204,7 +1105,6 @@ export const krtFetch = {
     ownerOrgUnitRequiredMessage,
     maybeReauthenticate,
     reauthRedirect,
-    sectionWrite,
     serialize: runSerialized,
     csrf: krtCsrf,
 };
