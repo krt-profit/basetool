@@ -198,6 +198,35 @@ e.g. `FR-66 [SCHILD] [S1 · A]`.
 `ShipComponentTypeMessageCoverageTest` · **Code:** `ShipComponentType`,
 `InventoryItemMapper#gameItemToReferenceDto`, `inventory-item-group.html` · **Issues:** #2719
 
+### REQ-INV-062 — Component class as a coloured chip
+
+On the same three surfaces as REQ-INV-061, a ship component with a known class shows a class chip
+after its size/grade chip, e.g. `FR-66 [SCHILD] [S1 · A] [MILITÄR]`.
+
+- The class comes from the SC Wiki (REQ-DATA-024). `InventoryGameItemReferenceDto` carries it as
+  `itemClass`, the `ShipComponentClass` name, set only for a component — the same rule as size and
+  grade.
+- The chip shows the translated class name (`inventory.items.itemClass.*`: Militär, Zivil,
+  Industrie, Stealth, Wettkampf). A class without a label, an absent class and every non-component
+  get no class chip, never raw upstream text.
+- The chip is `.chip.chip--item-class-<class>` from the design system. Its colours are the ten
+  `--krt-item-class-*` tokens declared in `styles.css`: the hue is the border and, mixed to 15 %,
+  the fill; the `-text` tint is the label. The colour is a second cue beside the label, never the
+  only one, and the label keeps WCAG AA on its fill over the card surfaces.
+
+**Acceptance**
+
+- [x] A military shield shows a "Militär" chip after `S1 · A` in Mein Lager, the Globales Lager and
+  the aggregated items table.
+- [x] A component whose class has no label, and every paint or flair item, shows no class chip.
+- [x] Every `ShipComponentClass` has a label in all three bundles.
+- [x] Each chip variant uses the design-system tokens, and its label reaches 4.5:1 on its fill.
+
+**Enforced by:** `InventoryItemMapperTest` class cases, `InventoryLagerPatternRenderTest` /
+`InventoryIndexListPatternRenderTest` class cases, `ShipComponentTypeMessageCoverageTest`,
+`ItemClassChipContrastTest` · **Code:** `InventoryItemMapper#gameItemToReferenceDto`,
+`inventory-item-group.html`, `styles.css` · **Issues:** #2720
+
 ## Out of scope
 
 Non-blueprint items and the "Mein Inventar" boundary (design §11). Materialbörse stock-backed

@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentType;
 import de.greluc.krt.profit.basetool.backend.inventory.api.DonationAllocationDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.DonationEarmark;
@@ -182,7 +183,8 @@ public abstract class InventoryItemMapper {
 
   /**
    * Projects a {@link GameItem} into the slim Lager reference DTO: id, display name, manufacturer
-   * name, kind name and, for a ship component, its type, size and grade (REQ-INV-029, REQ-INV-061).
+   * name, kind name and, for a ship component, its type, size, grade and class (REQ-INV-029,
+   * REQ-INV-061, REQ-INV-062).
    *
    * <p>Dereferences the lazy {@code manufacturer} association, so it must be fetched or the session
    * still open.
@@ -203,6 +205,7 @@ public abstract class InventoryItemMapper {
       return new InventoryGameItemReferenceDto(
           gameItem.getId(), gameItem.getName(), manufacturer, kind);
     }
+    ShipComponentClass itemClass = gameItem.getItemClass();
     return new InventoryGameItemReferenceDto(
         gameItem.getId(),
         gameItem.getName(),
@@ -210,7 +213,8 @@ public abstract class InventoryItemMapper {
         kind,
         componentType.name(),
         gameItem.getSizeClass(),
-        StringNormalization.trimToNull(gameItem.getGrade()));
+        StringNormalization.trimToNull(gameItem.getGrade()),
+        itemClass != null ? itemClass.name() : null);
   }
 
   /**

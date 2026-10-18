@@ -647,6 +647,7 @@ class ScWikiItemSyncServiceBackfillTest {
         "subTypeLabel",
         "1",
         "A",
+        null,
         "common",
         1.0,
         null,

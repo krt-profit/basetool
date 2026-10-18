@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.inventory.api.DonationEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryGameItemReferenceDto;
@@ -299,6 +300,28 @@ class InventoryItemMapperTest {
     assertEquals("SHIELD", dto.componentType());
     assertEquals(1, dto.size());
     assertEquals("A", dto.grade());
+  }
+
+  @Test
+  void gameItemToReferenceDto_component_carriesItsClass() {
+    GameItem shield = gameItem("FR-66", GameItemKind.VEHICLE_ITEM, "Shield", 1, "A");
+    shield.setItemClass(ShipComponentClass.MILITARY);
+
+    InventoryGameItemReferenceDto dto = mapper.gameItemToReferenceDto(shield);
+
+    assertNotNull(dto);
+    assertEquals("MILITARY", dto.itemClass());
+  }
+
+  @Test
+  void gameItemToReferenceDto_nonComponent_dropsItsClass() {
+    GameItem paint = gameItem("Aurora Paint", GameItemKind.VEHICLE_ITEM, "Paints", 1, "A");
+    paint.setItemClass(ShipComponentClass.CIVILIAN);
+
+    InventoryGameItemReferenceDto dto = mapper.gameItemToReferenceDto(paint);
+
+    assertNotNull(dto);
+    assertNull(dto.itemClass());
   }
 
   @Test

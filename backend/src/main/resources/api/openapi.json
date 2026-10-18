@@ -81747,6 +81747,9 @@
             "type" : "string",
             "format" : "uuid"
           },
+          "itemClass" : {
+            "type" : "string"
+          },
           "kind" : {
             "type" : "string"
           },

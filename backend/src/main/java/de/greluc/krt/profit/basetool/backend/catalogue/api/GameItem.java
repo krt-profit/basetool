@@ -130,6 +130,12 @@ public class GameItem extends AbstractEntity<UUID> {
   @Column(name = "grade")
   private String grade;
 
+  /** In-game component class from the SC Wiki, or {@code null} when absent or unknown. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "item_class", length = 16)
+  @Nullable
+  private ShipComponentClass itemClass;
+
   /** Item rarity tier. R4. */
   @Column(name = "rarity")
   private String rarity;

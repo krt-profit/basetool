@@ -24,9 +24,10 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Slim {@code GameItem} reference for the Lager item-stock surfaces and the item-catalog picker
- * (REQ-INV-029, REQ-INV-061).
+ * (REQ-INV-029, REQ-INV-061, REQ-INV-062).
  *
- * <p>Size and grade are only set for a ship component, i.e. when {@code componentType} is set.
+ * <p>Size, grade and class are only set for a ship component, i.e. when {@code componentType} is
+ * set.
  *
  * @param id the game item's primary key
  * @param name the item's display name
@@ -35,6 +36,8 @@ import org.jetbrains.annotations.Nullable;
  * @param componentType the {@code ShipComponentType} name, or {@code null} for a non-component
  * @param size the component size, or {@code null} when unknown or no component
  * @param grade the component grade, or {@code null} when unknown or no component
+ * @param itemClass the {@code ShipComponentClass} name, or {@code null} when unknown or no
+ *     component
  */
 public record InventoryGameItemReferenceDto(
     UUID id,
@@ -43,7 +46,8 @@ public record InventoryGameItemReferenceDto(
     @Nullable String kind,
     @Nullable String componentType,
     @Nullable Integer size,
-    @Nullable String grade) {
+    @Nullable String grade,
+    @Nullable String itemClass) {
 
   /**
    * Builds a reference without component data, for items that are no ship component.
@@ -55,6 +59,6 @@ public record InventoryGameItemReferenceDto(
    */
   public InventoryGameItemReferenceDto(
       UUID id, String name, @Nullable String manufacturer, @Nullable String kind) {
-    this(id, name, manufacturer, kind, null, null, null);
+    this(id, name, manufacturer, kind, null, null, null, null);
   }
 }

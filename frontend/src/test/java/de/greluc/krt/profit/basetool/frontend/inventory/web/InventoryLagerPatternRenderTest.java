@@ -259,7 +259,8 @@ class InventoryLagerPatternRenderTest {
 
   /**
    * "Mein Lager" items view: a component shows its type and size/grade chips, a paint keeps its
-   * category chip, a component without size and grade shows no data chip (REQ-INV-061).
+   * category chip, a component without size and grade shows no data chip, and only a labelled class
+   * gets a class chip (REQ-INV-061, REQ-INV-062).
    */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
@@ -274,17 +275,25 @@ class InventoryLagerPatternRenderTest {
     assertThat(groupRow(main, SHIELD_ID))
         .containsPattern("data-testid=\"item-component-type\"[^>]*>Schild<")
         .containsPattern("data-testid=\"item-size-grade\"[^>]*>S1 · A<")
+        .containsPattern(
+            "data-testid=\"item-class\"[^>]*class=\"chip chip--item-class-military\"[^>]*>Militär<")
         .doesNotContain("data-testid=\"item-kind\"");
     assertThat(groupRow(main, PAINT_ID))
         .containsPattern("data-testid=\"item-kind\"[^>]*>Schiffskomponente<")
         .doesNotContain("data-testid=\"item-component-type\"")
-        .doesNotContain("chip--data");
+        .doesNotContain("chip--data")
+        .doesNotContain("item-class");
     assertThat(groupRow(main, COOLER_ID))
         .containsPattern("data-testid=\"item-component-type\"[^>]*>Kühler<")
-        .doesNotContain("chip--data");
+        .doesNotContain("chip--data")
+        .doesNotContain("item-class")
+        .doesNotContain("PROTOTYPE");
   }
 
-  /** The Globales Lager items view renders the same group row with the chips (REQ-INV-061). */
+  /**
+   * The Globales Lager items view renders the same group row with the chips (REQ-INV-061,
+   * REQ-INV-062).
+   */
   @Test
   @WithMockUser(roles = "LOGISTICIAN")
   void globalLagerItemsViewShowsComponentChips() throws Exception {
@@ -296,12 +305,13 @@ class InventoryLagerPatternRenderTest {
         .doesNotContain("group-select-all");
     assertThat(groupRow(main, SHIELD_ID))
         .containsPattern("data-testid=\"item-component-type\"[^>]*>Schild<")
-        .containsPattern("data-testid=\"item-size-grade\"[^>]*>S1 · A<");
+        .containsPattern("data-testid=\"item-size-grade\"[^>]*>S1 · A<")
+        .containsPattern("data-testid=\"item-class\"[^>]*>Militär<");
   }
 
   /**
-   * Three item groups: a size-1 grade-A shield, a paint carrying a meaningless grade, and a cooler
-   * without size and grade.
+   * Three item groups: a size-1 grade-A military shield, a paint carrying a meaningless grade, and
+   * a cooler without size and grade whose class has no label.
    *
    * @return the grouped list
    */
@@ -309,12 +319,12 @@ class InventoryLagerPatternRenderTest {
     return List.of(
         itemGroup(
             new InventoryGameItemReferenceDto(
-                SHIELD_ID, "FR-66", "Gorgon", "VEHICLE_ITEM", "SHIELD", 1, "A")),
+                SHIELD_ID, "FR-66", "Gorgon", "VEHICLE_ITEM", "SHIELD", 1, "A", "MILITARY")),
         itemGroup(
             new InventoryGameItemReferenceDto(PAINT_ID, "Aurora Paint", null, "VEHICLE_ITEM")),
         itemGroup(
             new InventoryGameItemReferenceDto(
-                COOLER_ID, "Bracer", null, "VEHICLE_ITEM", "COOLER", null, null)));
+                COOLER_ID, "Bracer", null, "VEHICLE_ITEM", "COOLER", null, null, "PROTOTYPE")));
   }
 
   /**

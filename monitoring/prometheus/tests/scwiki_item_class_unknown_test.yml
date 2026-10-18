@@ -1,0 +1,40 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: silent - counter registered at zero and never rising
+    interval: 1m
+    input_series:
+      - series: 'basetool_catalogue_item_class_unknown_total{job="basetool-backend"}'
+        values: "0x180"
+    alert_rule_test:
+      - eval_time: 150m
+        alertname: ScWikiItemClassUnknown
+        exp_alerts: []
+
+  - name: fires - a sync stored items with an unknown class
+    interval: 1m
+    input_series:
+      - series: 'basetool_catalogue_item_class_unknown_total{job="basetool-backend"}'
+        values: "0x30 4+0x150"
+    alert_rule_test:
+      - eval_time: 150m
+        alertname: ScWikiItemClassUnknown
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "SC-Wiki serves an item class the basetool does not know"
+              description: "The SC-Wiki item sync stored at least one ship component without a class in the last 24h because its class value is not one of Military, Civilian, Industrial, Stealth or Competition (REQ-DATA-024, ADR-0283). The sync itself succeeded; those components just show no class chip in the Lager. Grep the backend log for 'Unknown SC Wiki item class' to read the value, then add it to ShipComponentClass with its DE/EN labels, a design-system colour and a migration widening ck_game_item_item_class."
+
+  - name: silent - the series is absent (sync disabled)
+    interval: 1m
+    input_series:
+      - series: 'basetool_catalogue_orphan_sweep_skipped_total{reason="not_modified"}'
+        values: "0+1x180"
+    alert_rule_test:
+      - eval_time: 150m
+        alertname: ScWikiItemClassUnknown
+        exp_alerts: []

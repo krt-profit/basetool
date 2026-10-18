@@ -34,20 +34,22 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
- * Tests that every {@code ShipComponentType} the backend can send has an {@code
- * inventory.items.componentType.*} label in all three bundles (REQ-INV-061).
+ * Tests that every {@code ShipComponentType} and {@code ShipComponentClass} the backend can send
+ * has an {@code inventory.items.componentType.*} / {@code inventory.items.itemClass.*} label in all
+ * three bundles (REQ-INV-061, REQ-INV-062).
  *
- * <p>The enum is read from the backend's source file, since the frontend holds no backend classes.
+ * <p>The enums are read from the backend's source files, since the frontend holds no backend
+ * classes.
  */
 class ShipComponentTypeMessageCoverageTest {
 
-  /** The enum whose constants must each have a label. */
-  private static final Path SHIP_COMPONENT_TYPE =
-      resolveModuleRelative(
-          "../backend/src/main/java/de/greluc/krt/profit/basetool/backend/catalogue/api/ShipComponentType.java");
+  /** The backend package holding both enums. */
+  private static final String CATALOGUE_API =
+      "../backend/src/main/java/de/greluc/krt/profit/basetool/backend/catalogue/api/";
 
   /** The three bundles, by the name a failure should name. */
   private static final Map<String, Path> BUNDLES =
@@ -63,19 +65,21 @@ class ShipComponentTypeMessageCoverageTest {
   private static final Pattern CONSTANT =
       Pattern.compile("^\\s{2}([A-Z][A-Z0-9_]*)\\(", Pattern.MULTILINE);
 
-  @Test
-  void everyShipComponentTypeHasALabelInEveryBundle() throws IOException {
-    Set<String> constants = shipComponentTypes();
-    assertThat(constants)
-        .as("parsed ShipComponentType constants from " + SHIP_COMPONENT_TYPE.toAbsolutePath())
-        .hasSizeGreaterThan(5);
+  @ParameterizedTest
+  @CsvSource({
+    "ShipComponentType, inventory.items.componentType.",
+    "ShipComponentClass, inventory.items.itemClass."
+  })
+  void everyConstantHasALabelInEveryBundle(String enumName, String keyPrefix) throws IOException {
+    Set<String> constants = constantsOf(enumName);
+    assertThat(constants).as("parsed %s constants", enumName).hasSizeGreaterThanOrEqualTo(5);
 
     Map<String, List<String>> missingByBundle = new LinkedHashMap<>();
     for (Map.Entry<String, Path> bundle : BUNDLES.entrySet()) {
       String content = Files.readString(bundle.getValue(), StandardCharsets.UTF_8);
       List<String> missing = new ArrayList<>();
       for (String constant : constants) {
-        if (!content.contains("inventory.items.componentType." + constant + "=")) {
+        if (!content.contains(keyPrefix + constant + "=")) {
           missing.add(constant);
         }
       }
@@ -86,24 +90,28 @@ class ShipComponentTypeMessageCoverageTest {
 
     assertThat(missingByBundle)
         .as(
-            "A component type without a label falls back to the category chip in the Lager. Add"
-                + " inventory.items.componentType.<TYPE> to the bundle named here -- umlauts as"
-                + " \\\\uXXXX in the .properties files.")
+            "A component type without a label falls back to the category chip, a class without one"
+                + " shows no class chip. Add "
+                + keyPrefix
+                + "<CONSTANT> to the bundle named here -- umlauts as \\\\uXXXX in the .properties"
+                + " files.")
         .isEmpty();
   }
 
   /**
-   * The enum's constants, read from the backend source.
+   * An enum's constants, read from the backend source.
    *
+   * @param enumName the simple name of an enum in the catalogue API package
    * @return the constant names in declaration order
    * @throws IOException when the source file cannot be read
    */
-  private static Set<String> shipComponentTypes() throws IOException {
-    assertThat(Files.isRegularFile(SHIP_COMPONENT_TYPE))
-        .as("ShipComponentType.java not found at " + SHIP_COMPONENT_TYPE.toAbsolutePath())
+  private static Set<String> constantsOf(String enumName) throws IOException {
+    Path file = resolveModuleRelative(CATALOGUE_API + enumName + ".java");
+    assertThat(Files.isRegularFile(file))
+        .as(enumName + ".java not found at " + file.toAbsolutePath())
         .isTrue();
-    String source = Files.readString(SHIP_COMPONENT_TYPE, StandardCharsets.UTF_8);
-    int body = source.indexOf("public enum ShipComponentType");
+    String source = Files.readString(file, StandardCharsets.UTF_8);
+    int body = source.indexOf("public enum " + enumName);
     assertThat(body).as("the enum declaration").isGreaterThan(0);
 
     Set<String> out = new LinkedHashSet<>();
