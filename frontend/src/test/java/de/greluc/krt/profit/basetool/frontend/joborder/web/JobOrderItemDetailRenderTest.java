@@ -528,11 +528,14 @@ class JobOrderItemDetailRenderTest {
     UUID userId = UUID.randomUUID();
     UUID lineId = UUID.randomUUID();
     UUID handoverId = UUID.randomUUID();
+    GameItemReferenceDto shield =
+        new GameItemReferenceDto(
+            UUID.randomUUID(), "FR-66", "VEHICLE_ITEM", "SHIELD", 1, "A", "MILITARY");
 
     JobOrderItemDto line =
         new JobOrderItemDto(
             lineId,
-            new GameItemReferenceDto(UUID.randomUUID(), "A03 Sniper Rifle", "WEAPON"),
+            shield,
             new BlueprintReferenceDto(UUID.randomUUID(), "A03 Sniper Rifle", "wiki-a03"),
             3,
             3,
@@ -556,12 +559,7 @@ class JobOrderItemDetailRenderTest {
             "Recipient",
             null,
             null,
-            List.of(
-                new JobOrderItemHandoverEntryDto(
-                    UUID.randomUUID(),
-                    lineId,
-                    new GameItemReferenceDto(UUID.randomUUID(), "A03 Sniper Rifle", "WEAPON"),
-                    1)),
+            List.of(new JobOrderItemHandoverEntryDto(UUID.randomUUID(), lineId, shield, 1)),
             1L);
 
     JobOrderDto order =
@@ -600,7 +598,10 @@ class JobOrderItemDetailRenderTest {
 
     MvcResult result =
         mockMvc
-            .perform(get("/orders/" + orderId).with(authentication(logisticianToken(userId))))
+            .perform(
+                get("/orders/" + orderId)
+                    .header("Accept-Language", "de")
+                    .with(authentication(logisticianToken(userId))))
             .andExpect(status().isOk())
             .andReturn();
 
@@ -619,6 +620,21 @@ class JobOrderItemDetailRenderTest {
     assertThat(html).as("item-handover history row").contains("data-testid=\"item-handover-row\"");
     assertThat(html).as("PDF download trigger").contains("od-download-item-report");
     assertThat(html).as("recipient handle in history").contains("Recipient");
+    assertThat(html)
+        .as("the handover dialog labels a component line with its chips")
+        .containsPattern(
+            "class=\"form-label-sm\">FR-66</label>\\s*<span class=\"od-item-chips\">\\s*<span"
+                + " class=\"chip chip--muted\""
+                + " data-testid=\"item-component-type\">Schild</span>\\s*<span class=\"chip"
+                + " chip--data\" data-testid=\"item-size-grade\"[^>]*>S1 · A</span>\\s*<span"
+                + " data-testid=\"item-class\"[^>]*>Militär</span>");
+    assertThat(html)
+        .as("the handover history labels a component entry with its chips")
+        .containsPattern(
+            "<li>\\s*<span>FR-66</span>\\s*<span class=\"od-item-chips\">\\s*<span class=\"chip"
+                + " chip--muted\" data-testid=\"item-component-type\">Schild</span>\\s*<span"
+                + " class=\"chip chip--data\" data-testid=\"item-size-grade\"[^>]*>S1 ·"
+                + " A</span>\\s*<span data-testid=\"item-class\"[^>]*>Militär</span>\\s*</span>:");
   }
 
   @Test
@@ -824,10 +840,15 @@ class JobOrderItemDetailRenderTest {
   }
 
   private JobOrderDto oneLineItemOrder(UUID orderId, UUID gameItemId) {
+    return oneLineItemOrder(
+        orderId, new GameItemReferenceDto(gameItemId, "A03 Sniper Rifle", "WEAPON"));
+  }
+
+  private JobOrderDto oneLineItemOrder(UUID orderId, GameItemReferenceDto gameItem) {
     JobOrderItemDto line =
         new JobOrderItemDto(
             UUID.randomUUID(),
-            new GameItemReferenceDto(gameItemId, "A03 Sniper Rifle", "WEAPON"),
+            gameItem,
             new BlueprintReferenceDto(UUID.randomUUID(), "A03 Sniper Rifle", "wiki-a03"),
             3,
             0,
@@ -1250,6 +1271,77 @@ class JobOrderItemDetailRenderTest {
     assertThat(html)
         .as("a fragment swap returns the section alone, not the whole page")
         .doesNotContain("<html");
+  }
+
+  @Test
+  void itemOrder_componentLine_rendersTypeSizeGradeAndClassChips() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    GameItemReferenceDto shield =
+        new GameItemReferenceDto(
+            UUID.randomUUID(), "FR-66", "VEHICLE_ITEM", "SHIELD", 1, "A", "MILITARY");
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
+        .thenReturn(oneLineItemOrder(orderId, shield));
+    when(backendApiClient.get(eq("/api/v1/orders/{id}/item-stock"), anyTypeRef(), eq(orderId)))
+        .thenReturn(List.of());
+
+    String html =
+        mockMvc
+            .perform(
+                get("/orders/" + orderId)
+                    .param("fragment", "items")
+                    .header("Accept-Language", "de")
+                    .with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .as("the item row shows the name followed by type, size/grade and class chips")
+        .containsPattern(
+            "class=\"od-item-name\">FR-66</span>\\s*<span class=\"od-item-chips\">\\s*<span"
+                + " class=\"chip chip--muted\""
+                + " data-testid=\"item-component-type\">Schild</span>\\s*<span class=\"chip"
+                + " chip--data\" data-testid=\"item-size-grade\"[^>]*>S1 · A</span>\\s*<span"
+                + " data-testid=\"item-class\"[^>]*class=\"chip chip--item-class-military\""
+                + "[^>]*>Militär</span>");
+    assertThat(html)
+        .as("a component shows no category chip")
+        .doesNotContain("data-testid=\"item-kind\"");
+  }
+
+  @Test
+  void itemOrder_nonComponentLine_rendersNameAndCategoryOnly() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
+        .thenReturn(oneLineItemOrder(orderId, UUID.randomUUID()));
+    when(backendApiClient.get(eq("/api/v1/orders/{id}/item-stock"), anyTypeRef(), eq(orderId)))
+        .thenReturn(List.of());
+
+    String html =
+        mockMvc
+            .perform(
+                get("/orders/" + orderId)
+                    .param("fragment", "items")
+                    .header("Accept-Language", "de")
+                    .with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .as("a non-component shows its name and its category chip")
+        .containsPattern(
+            "class=\"od-item-name\">A03 Sniper Rifle</span>\\s*<span class=\"od-item-chips\">\\s*"
+                + "<span class=\"chip chip--muted\" data-testid=\"item-kind\">Handwaffe</span>");
+    assertThat(html)
+        .as("no component chips on a non-component")
+        .doesNotContain("data-testid=\"item-component-type\"")
+        .doesNotContain("data-testid=\"item-size-grade\"")
+        .doesNotContain("data-testid=\"item-class\"");
   }
 
   @Test

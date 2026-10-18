@@ -28,7 +28,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInRule;
@@ -509,8 +508,7 @@ public class InventoryItemService {
         && (!jobAllocations.isEmpty() || !missionAllocations.isEmpty())) {
       throw new BadRequestException("Personal items cannot be assigned to a mission or job order");
     }
-    boolean wholeUnits =
-        gameItem != null || (material != null && material.getQuantityType() == QuantityType.PIECE);
+    boolean wholeUnits = InventoryItem.countsWholeUnits(material, gameItem);
     Set<UUID> seenOrders = new HashSet<>();
     for (InventoryAllocationInput allocation : jobAllocations) {
       if (!seenOrders.add(allocation.targetId())) {
@@ -946,14 +944,9 @@ public class InventoryItemService {
     if (raw <= 0) {
       throw new BadRequestException("An allocation amount must be positive");
     }
-    boolean itemRow = item.getGameItem() != null;
-    boolean wholeUnits =
-        itemRow
-            || (item.getMaterial() != null
-                && item.getMaterial().getQuantityType() == QuantityType.PIECE);
-    if (wholeUnits && raw % 1 != 0) {
+    if (item.countsWholeUnits() && raw % 1 != 0) {
       throw new BadRequestException(
-          itemRow
+          item.getGameItem() != null
               ? "An item allocation amount must be a whole number"
               : "A PIECE allocation amount must be a whole number");
     }

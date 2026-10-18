@@ -785,6 +785,35 @@ foreign-order handover rejected) · **Code:** `JobOrderController.downloadItemHa
 `JobOrderItemHandoverReportService`, `JobOrderHandoverReportProxyController`, `orders-detail.js`
 (item-handover download) · **Issues:** —
 
+### REQ-ORDERS-045 — Job orders show a component's type, size, grade and class
+
+An `ITEM` order shows the Lager chips beside an item's name wherever it lists a game item — the
+ordered-items table, the item-handover dialog and history of the detail, and each item group of the
+Itemsammelübersicht (REQ-ORDERS-031) — so a logistician sees which variant an order asks for, e.g.
+`FR-66 [SCHILD] [S1 · A] [MILITÄR]`.
+
+- The chips follow the Lager rules (REQ-INV-061, REQ-INV-062): only a ship component gets the
+  type, size/grade and class chips; every other item shows its category chip. The earmarked stock
+  in the item expand row (REQ-ORDERS-028) sits under the labelled item row.
+- All Lager and job-order surfaces render the chips from one fragment,
+  `kernel/fragments/item-chips :: itemChips`.
+- The `GameItemReferenceDto` of order lines and handover entries (`GameItemReferenceDto.of`,
+  REQ-INV-064) and the item stock's `InventoryGameItemReferenceDto` carry the attributes from the `game_item` row the reads already
+  load, so neither read adds a query per row.
+
+**Acceptance**
+
+- [x] An order for FR-66 shows `[SCHILD] [S1 · A] [MILITÄR]` beside the item in the detail and in
+  the Itemsammelübersicht.
+- [x] An item handover of FR-66 shows the same chips in the handover dialog and the history.
+- [x] A non-component item shows its name and its category chip.
+
+**Enforced by:** `JobOrderItemDetailRenderTest` chip and handover cases, `ItemCollectionRenderTest`
+chip cases, `JobOrderItemHandoverMapperTest`,
+`JobOrderItemServiceTest#toItemDtosCarryAComponentsTypeSizeGradeAndClass`, `InventoryItemMapperTest`
+reference cases · **Code:** `kernel/fragments/item-chips.html`, `joborder/orders-detail.html`,
+`joborder/item-collection.html`, `JobOrderItemHandoverMapper` · **Issues:** #2724
+
 ## Out of scope
 
 - Editing the ordered recipe / blueprint from the production modal — the recipe is the line's

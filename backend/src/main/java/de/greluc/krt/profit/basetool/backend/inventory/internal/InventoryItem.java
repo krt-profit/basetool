@@ -235,8 +235,20 @@ public class InventoryItem extends AbstractEntity<UUID> implements StockRow {
    * @return {@code true} iff amounts on this row must be whole numbers
    */
   boolean countsWholeUnits() {
-    return getGameItem() != null
-        || (getMaterial() != null && getMaterial().getQuantityType() == QuantityType.PIECE);
+    return countsWholeUnits(getMaterial(), getGameItem());
+  }
+
+  /**
+   * Tells whether stock of a catalogue entry counts whole units: a game item or a {@code PIECE}
+   * material.
+   *
+   * @param material the material, or {@code null} for item stock
+   * @param gameItem the game item, or {@code null} for material stock
+   * @return {@code true} iff amounts of such stock must be whole numbers
+   */
+  static boolean countsWholeUnits(@Nullable Material material, @Nullable GameItem gameItem) {
+    return gameItem != null
+        || (material != null && material.getQuantityType() == QuantityType.PIECE);
   }
 
   /**

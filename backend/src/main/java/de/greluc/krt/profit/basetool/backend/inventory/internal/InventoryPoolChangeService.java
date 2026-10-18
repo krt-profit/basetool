@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
@@ -212,7 +211,7 @@ public class InventoryPoolChangeService {
               new TransferredLot(
                   catalogName(item),
                   moved,
-                  requiresWholeUnits(item),
+                  item.countsWholeUnits(),
                   item.getQuality(),
                   item.getLocation() != null ? item.getLocation().getName() : null)));
     }
@@ -311,19 +310,11 @@ public class InventoryPoolChangeService {
    */
   private @NotNull InventoryItem splitOff(
       @NotNull InventoryItem item, double amount, @NotNull OrgUnit target) {
-    double held = item.getAmount() != null ? item.getAmount() : 0.0;
-    if (amount <= 0) {
-      throw new BadRequestException("error.inventory.poolChange.amountPositive");
-    }
-    if (amount > held) {
-      throw new BadRequestException("error.inventory.poolChange.amountTooLarge");
-    }
-    if (requiresWholeUnits(item) && amount % 1 != 0) {
-      throw new BadRequestException("error.inventory.poolChange.wholeUnits");
-    }
-    double remaining = ScuAmounts.roundToScuScale(held - amount);
-    if (remaining + QUANTITY_EPSILON < stockOfferLookup.activeOfferedAmount(item.getId())) {
-      throw new BusinessConflictException("error.inventory.poolChange.belowOffer");
+    InventoryStockDecisions.SplitRefusal refusal =
+        InventoryStockDecisions.split(
+            item, amount, stockOfferLookup.activeOfferedAmount(item.getId()));
+    if (refusal != null) {
+      throw splitProblem(refusal);
     }
     InventoryItem part = new InventoryItem();
     part.setUser(item.getUser());
@@ -336,12 +327,27 @@ public class InventoryPoolChangeService {
     part.setPersonal(false);
     part.setStolen(item.getStolen());
     final InventoryItem savedPart = inventoryItemRepository.save(part);
-    item.setAmount(remaining);
-    if (!InventoryAllocations.fits(item)) {
-      throw new OverAllocationException();
-    }
+    item.setAmount(ScuAmounts.roundToScuScale(amountOf(item) - amount));
     inventoryItemRepository.saveAndFlush(item);
     return savedPart;
+  }
+
+  /**
+   * Maps a split refusal to the web's problem for a pool change.
+   *
+   * @param refusal the refusal
+   * @return the problem to throw
+   */
+  static @NotNull RuntimeException splitProblem(
+      @NotNull InventoryStockDecisions.SplitRefusal refusal) {
+    return switch (refusal) {
+      case AMOUNT_NOT_POSITIVE ->
+          new BadRequestException("error.inventory.poolChange.amountPositive");
+      case EXCEEDS_STOCK -> new BadRequestException("error.inventory.poolChange.amountTooLarge");
+      case FRACTIONAL_AMOUNT -> new BadRequestException("error.inventory.poolChange.wholeUnits");
+      case BELOW_OFFER -> new BusinessConflictException("error.inventory.poolChange.belowOffer");
+      case EARMARKS_EXCEED_REST -> new OverAllocationException();
+    };
   }
 
   /**
@@ -402,17 +408,5 @@ public class InventoryPoolChangeService {
       return item.getMaterial().getName();
     }
     return item.getGameItem() != null ? item.getGameItem().getName() : UNKNOWN_NAME;
-  }
-
-  /**
-   * Whether amounts on this row must be whole numbers: game-item rows and {@code PIECE} materials.
-   *
-   * @param item the row
-   * @return {@code true} for whole-unit stock
-   */
-  private static boolean requiresWholeUnits(@NotNull InventoryItem item) {
-    return item.getGameItem() != null
-        || (item.getMaterial() != null
-            && item.getMaterial().getQuantityType() == QuantityType.PIECE);
   }
 }

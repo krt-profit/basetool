@@ -7,7 +7,7 @@
     <div class="tree-cell tree-name lager-item-name">
         <span class="tree-chevron toggle-icon">▶</span>
         <span class="tree-label" th:text="${group.gameItem.name}">Item</span>
-        <span class="lager-item-chips" th:insert="~{inventory/fragments/inventory-item-group :: itemChips(${group.gameItem})}"></span>
+        <span class="lager-item-chips" th:insert="~{kernel/fragments/item-chips :: itemChips(${group.gameItem})}"></span>
     </div>
     <div class="tree-cell lager-cell-muted">
         <span th:if="${group.gameItem.manufacturer != null}" th:text="|${group.gameItem.manufacturer} · |">Hersteller · </span>
@@ -21,22 +21,6 @@
     </div>
     <div class="tree-cell" th:if="${selectTrigger == null}"></div>
 </div>
-
-<th:block th:fragment="itemChips(gameItem)"
-          th:with="typeLabel=${gameItem.componentType != null} ? ${#messages.msgOrNull('inventory.items.componentType.' + gameItem.componentType)} : null,
-                   classLabel=${gameItem.componentType != null and gameItem.itemClass != null} ? ${#messages.msgOrNull('inventory.items.itemClass.' + gameItem.itemClass)} : null">
-    <span th:if="${typeLabel != null}" class="chip chip--muted" data-testid="item-component-type" th:text="${typeLabel}">Schild</span>
-    <span th:if="${typeLabel == null and gameItem.kind != null}" class="chip chip--muted" data-testid="item-kind"
-          th:with="kindKey=|inventory.items.kind.${gameItem.kind}|"
-          th:text="${#messages.msgOrNull(kindKey)} ?: ${gameItem.kind}">Art</span>
-    <span th:if="${typeLabel != null and (gameItem.size != null or gameItem.grade != null)}" class="chip chip--data" data-testid="item-size-grade"
-          th:title="#{inventory.items.sizeGrade.title}"
-          th:text="${gameItem.size != null and gameItem.grade != null} ? #{inventory.items.sizeGrade(${gameItem.size}, ${gameItem.grade})} : (${gameItem.size != null} ? #{inventory.items.size(${gameItem.size})} : #{inventory.items.grade(${gameItem.grade})})">S1 · A</span>
-    <span th:if="${typeLabel != null and classLabel != null}" data-testid="item-class"
-          th:class="|chip chip--item-class-${#strings.toLowerCase(gameItem.itemClass)}|"
-          th:title="#{inventory.items.itemClass.title}"
-          th:text="${classLabel}">Milit&auml;r</span>
-</th:block>
 
 </body>
 </html>

@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
@@ -208,22 +207,12 @@ public class InventoryStolenMarkService {
    */
   private @NotNull InventoryItem markPart(
       @NotNull InventoryItem item, double amount, boolean target, @NotNull UUID callerId) {
-    double rowAmount = item.getAmount() != null ? item.getAmount() : 0.0;
-    if (amount <= 0) {
-      throw new BadRequestException("error.inventory.stolen.amountPositive");
+    InventoryStockDecisions.SplitRefusal refusal =
+        InventoryStockDecisions.split(
+            item, amount, stockOfferLookup.activeOfferedAmount(item.getId()));
+    if (refusal != null) {
+      throw splitProblem(refusal);
     }
-    if (amount > rowAmount) {
-      throw new BadRequestException("error.inventory.stolen.amountTooLarge");
-    }
-    if (requiresWholeUnits(item) && amount % 1 != 0) {
-      throw new BadRequestException("error.inventory.stolen.wholeUnits");
-    }
-    double remaining = ScuAmounts.roundToScuScale(rowAmount - amount);
-    double offered = stockOfferLookup.activeOfferedAmount(item.getId());
-    if (remaining + QUANTITY_EPSILON < offered) {
-      throw new BusinessConflictException("error.inventory.stolen.belowOffer");
-    }
-
     InventoryItem part = new InventoryItem();
     part.setUser(item.getUser());
     part.setOwningOrgUnit(item.getOwningOrgUnit());
@@ -236,10 +225,7 @@ public class InventoryStolenMarkService {
     part.setStolen(target);
     final InventoryItem savedPart = inventoryItemRepository.save(part);
 
-    item.setAmount(remaining);
-    if (!InventoryAllocations.fits(item)) {
-      throw new OverAllocationException();
-    }
+    item.setAmount(ScuAmounts.roundToScuScale(InventoryStockDecisions.amountOf(item) - amount));
     inventoryItemRepository.saveAndFlush(item);
 
     auditRecorder.record(
@@ -252,15 +238,20 @@ public class InventoryStolenMarkService {
   }
 
   /**
-   * Whether amounts on this row must be whole numbers: game-item rows and {@code PIECE} materials.
+   * Maps a split refusal to the web's problem for a stolen marking.
    *
-   * @param item the row
-   * @return {@code true} for whole-unit stock
+   * @param refusal the refusal
+   * @return the problem to throw
    */
-  private static boolean requiresWholeUnits(@NotNull InventoryItem item) {
-    return item.getGameItem() != null
-        || (item.getMaterial() != null
-            && item.getMaterial().getQuantityType() == QuantityType.PIECE);
+  static @NotNull RuntimeException splitProblem(
+      @NotNull InventoryStockDecisions.SplitRefusal refusal) {
+    return switch (refusal) {
+      case AMOUNT_NOT_POSITIVE -> new BadRequestException("error.inventory.stolen.amountPositive");
+      case EXCEEDS_STOCK -> new BadRequestException("error.inventory.stolen.amountTooLarge");
+      case FRACTIONAL_AMOUNT -> new BadRequestException("error.inventory.stolen.wholeUnits");
+      case BELOW_OFFER -> new BusinessConflictException("error.inventory.stolen.belowOffer");
+      case EARMARKS_EXCEED_REST -> new OverAllocationException();
+    };
   }
 
   /**
