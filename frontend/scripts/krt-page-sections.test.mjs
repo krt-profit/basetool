@@ -343,6 +343,18 @@ await test('a receiver driven by events needs no topic', async () => {
     assert.equal(h.live.receivers.length, 1);
 });
 
+await test('a page that declares neither dict nor keys still refreshes and receives', async () => {
+    const h = harness();
+    const sections = h.krtPageSections.create(
+        declaration({ dict: undefined, keys: undefined, receiver: {} }),
+    );
+    sections.receiver.apply(['b']);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(h.elements['#b'].innerHTML, 'fresh frag-b');
+    await sections.refresh(['a']);
+    assert.equal(h.elements['#a'].innerHTML, 'fresh frag-a');
+});
+
 await test('publish is a no-op without a topic', async () => {
     const h = harness();
     h.krtPageSections.publish(null, ['a']);

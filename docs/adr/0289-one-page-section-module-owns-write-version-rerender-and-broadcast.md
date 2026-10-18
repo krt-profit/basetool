@@ -36,3 +36,9 @@ Its seam is covered by a node test over a fake DOM running the real `krt-fetch.j
   declaration. Rendering the allowed keys and versions into `data-*` attributes from the server, so
   no JS copy remains, is a possible next step and not part of this decision.
 - Pages not yet migrated keep working unchanged and move with the next change that touches them.
+
+## Amendment: remaining pages (#2757)
+
+Migrating the remaining pages widens the declaration without changing the decision:
+
+- `dict` and `keys` are optional, for a page that only receives or needs no localized section strings.

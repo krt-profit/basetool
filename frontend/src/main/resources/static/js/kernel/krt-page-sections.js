@@ -90,14 +90,14 @@ function create(config) {
                 if (!cfg || !url || !document.querySelector(cfg.container)) {
                     return Promise.resolve(false);
                 }
-                const dict = /** @type {KrtI18nDict} */ (config.dict() || {});
+                const dict = /** @type {KrtI18nDict} */ ((config.dict && config.dict()) || {});
                 return krtFetch.swap({
                     url,
                     container: cfg.container,
                     fragmentValue: cfg.fragmentValue,
                     history: false,
                     preserveScroll: true,
-                    errorMessage: dict[config.keys.refreshErrorKey] || '',
+                    errorMessage: dict[(config.keys || {}).refreshErrorKey] || '',
                 });
             }),
         );
@@ -123,7 +123,7 @@ function create(config) {
      */
     function write(opts) {
         /** @type {KrtI18nDict} */
-        const dict = config.dict() || {};
+        const dict = (config.dict && config.dict()) || {};
 
         /**
          * @param {string | undefined} key the dictionary key
@@ -134,7 +134,7 @@ function create(config) {
             return krtI18nText(dict[key], `${config.dictName || 'dict'}[${key}]`);
         }
         const key = opts.sectionKey || '';
-        const k = config.keys;
+        const k = config.keys || {};
         const own = sections[key];
         const refreshKeys = opts.refresh ? asList(opts.refresh) : null;
         const userSuccess = opts.onSuccess;
