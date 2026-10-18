@@ -37,6 +37,12 @@ owns the whole choreography and returns `{write, refresh, notify, receiver, sect
   `dataset.version =` or `syncVersion` write on a page that patches the DOM without a re-render; a
   section re-rendered after the write gets its version from the fragment. `refresh: [keys]` re-renders and
   broadcasts those sections once after a 2xx, before the caller's `onSuccess`.
+- `write` takes `onConflict(body, response)` for a page with its own answer to a 409 (a toast and a
+  re-pull instead of the reload confirm): it runs instead of `onError`, which never sees a 409,
+  and replaces the conflict confirm unless it returns `false`. `submitForm` is the same
+  decoration over `krtFetch.submitForm`. `sections` and `pageUrl` are optional for a page that
+  only writes, and `receiver.refresh(keys, run)` wraps a peer re-render for a page that restores
+  state around the swap.
 - `refresh` re-renders sections in place via `krtFetch.swap` and broadcasts to the topic first
   (`alsoBroadcast` keys are appended) unless it applies a peer signal, `{broadcast: false}`.
 - `notify` is the broadcast-only sibling for handlers that patch their own DOM.

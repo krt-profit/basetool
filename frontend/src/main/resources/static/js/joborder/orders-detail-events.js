@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* global ORDER_CONFLICT, I18N_ADDED, I18N_REMOVED, I18N_NOTE_SAVED, I18N_NOTE_DELETED, I18N_ADD_ERROR, I18N_REMOVE_ERROR, I18N_NOTE_ERROR, I18N_NOTE_CONFLICT, I18N_NOTE_FORBIDDEN, I18N_NOTE_FOR */
+/* global I18N_ADDED, I18N_REMOVED, I18N_NOTE_SAVED, I18N_NOTE_DELETED, I18N_ADD_ERROR, I18N_REMOVE_ERROR, I18N_NOTE_ERROR, I18N_NOTE_FORBIDDEN, I18N_NOTE_FOR */
 
 import {
     _toggleBlueprintCounting,
@@ -135,14 +135,6 @@ function oaOrderId() {
     return sec ? sec.getAttribute('data-order-id') : null;
 }
 
-const OA_CONFLICT = {
-    title: ORDER_CONFLICT.title,
-    reloadLabel: ORDER_CONFLICT.reload,
-    reloadQuestion: ORDER_CONFLICT.reloadQuestion,
-    dismissLabel: ORDER_CONFLICT.dismiss,
-    reloadDetailFallback: I18N_NOTE_CONFLICT,
-};
-
 /**
  * Sends one assignee mutation through krtFetch (REQ-FE-002) and swaps the returned
  * #assignees-section fragment in place.
@@ -179,17 +171,19 @@ async function oaSend(method, url, opts) {
                 joborderHooks.notifyOrderChanged(['assignees']);
             }
         },
-        conflict: OA_CONFLICT,
         onError(status) {
-            if (status === 409) return false;
             showFrontendErrorToast(status === 403 ? I18N_NOTE_FORBIDDEN : errorMsg);
             return true;
         },
     };
     const result =
         opts.form !== undefined
-            ? await krtFetch.submitForm(Object.assign(common, { formData: opts.form }))
-            : await krtFetch.write(Object.assign(common, { payload: opts.json }));
+            ? await /** @type {NonNullable<typeof joborderHooks.submitOrderForm>} */ (
+                  joborderHooks.submitOrderForm
+              )(Object.assign(common, { formData: opts.form }))
+            : await /** @type {NonNullable<typeof joborderHooks.writeOrder>} */ (
+                  joborderHooks.writeOrder
+              )(Object.assign(common, { payload: opts.json }));
     return result.ok;
 }
 

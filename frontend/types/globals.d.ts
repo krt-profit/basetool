@@ -200,6 +200,11 @@ interface KrtWriteOpts extends KrtSendOpts {
     propagateVersion?: boolean;
     /** After a 2xx, re-renders these sections and broadcasts once, before `onSuccess`. */
     refresh?: string | string[];
+    /**
+     * With a `krtPageSections` write: runs on a 409 instead of `onError`. Unless it returns
+     * `false`, it replaces the conflict confirm.
+     */
+    onConflict?: (body: any, response: Response) => unknown;
 }
 
 /** Options for {@linkcode KrtFetchApi.submitForm}. */
@@ -219,6 +224,12 @@ interface KrtSubmitFormOpts extends KrtSendOpts {
     serialize?: string;
     /** Section key resolved against the dictionary by a `krtPageSections` write. */
     sectionKey?: string;
+    /** With `sectionKey`: writes the response version to every `[data-version]` of the section. */
+    propagateVersion?: boolean;
+    /** After a 2xx, re-renders these sections and broadcasts once, before `onSuccess`. */
+    refresh?: string | string[];
+    /** With a `krtPageSections` submit: runs on a 409 instead of `onError`. */
+    onConflict?: (body: any, response: Response) => unknown;
 }
 
 /** Options for {@linkcode KrtFetchApi.get} and {@linkcode KrtFetchApi.getJson}. */
@@ -282,12 +293,12 @@ interface KrtPageSectionsConfig {
     /** Message-key prefixes used to derive the per-section localized strings. */
     keys?: Record<string, string>;
     /** Maps a section key to its swap container and Thymeleaf fragment value. */
-    sections: Record<string, { container: string; fragmentValue?: string }>;
+    sections?: Record<string, { container: string; fragmentValue?: string }>;
     /**
      * Late-bound accessor for the URL the section fragments are fetched from. Null while the
      * entity has no id; `refresh()` then resolves false instead of fetching.
      */
-    pageUrl(): string | null;
+    pageUrl?(): string | null;
     /** The live-sync topic room, or a thunk for it; null while the page has no entity id. */
     topic?: string | null | (() => string | null);
     /** Section keys added to every broadcast of this page, such as a dependent chart. */
@@ -335,6 +346,8 @@ interface KrtSectionRefreshOpts {
 interface KrtPageSections {
     /** {@linkcode KrtFetchApi.write} with the section's localized strings applied. */
     write(opts: KrtWriteOpts): Promise<KrtWriteResult>;
+    /** {@linkcode KrtFetchApi.submitForm} with the same decoration as `write`. */
+    submitForm(opts: KrtSubmitFormOpts): Promise<KrtWriteResult>;
     /**
      * Re-renders one or more sections in place and broadcasts the change to peers. Resolves with
      * one success flag per section, in the order given.
@@ -375,6 +388,8 @@ interface KrtFetchApi {
     getJson(url: string, opts?: KrtReadOpts): Promise<any>;
     /** Sends a JSON write and handles the response, returning the parsed outcome. */
     write(opts: KrtWriteOpts): Promise<KrtWriteResult>;
+    /** {@linkcode KrtFetchApi.submitForm} with the same decoration as `write`. */
+    submitForm(opts: KrtSubmitFormOpts): Promise<KrtWriteResult>;
     /** Submits a form as multipart/form-encoded data through the same pipeline. */
     submitForm(opts: KrtSubmitFormOpts): Promise<KrtWriteResult>;
     /**

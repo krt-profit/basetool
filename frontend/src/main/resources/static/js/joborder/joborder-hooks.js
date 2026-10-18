@@ -21,6 +21,7 @@
  * @typedef {object} JoborderHooks
  * @property {((...args: any[]) => any) | undefined} [refreshOrderSection] re-renders order sections (orders-detail.js)
  * @property {((opts: KrtWriteOpts) => Promise<KrtWriteResult>) | undefined} [writeOrder] writes to the order through the section seam (orders-detail.js)
+ * @property {((opts: KrtSubmitFormOpts) => Promise<KrtWriteResult>) | undefined} [submitOrderForm] submits an order form through the section seam (orders-detail.js)
  * @property {((...args: any[]) => any) | undefined} [notifyOrderChanged] tells peers that order sections changed (orders-detail.js)
  * @property {(() => void) | undefined} [confirmRemoveMaterial] removes the material row awaiting confirmation (orders-detail-edit.js)
  * @property {((...args: any[]) => any) | undefined} [refreshOrdersQueue] re-renders the order queue (orders-index.js)

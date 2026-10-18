@@ -106,6 +106,7 @@ function initOrdersDetail() {
     joborderHooks.refreshOrderSection = order.refresh;
     joborderHooks.notifyOrderChanged = order.notify;
     joborderHooks.writeOrder = order.write;
+    joborderHooks.submitOrderForm = order.submitForm;
 }
 
 initOrdersDetail();

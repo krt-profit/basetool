@@ -400,6 +400,46 @@ await test('a receiver refresh hook wraps the re-render of a peer change', async
     assert.equal(h.live.sent.length, 0);
 });
 
+await test('onConflict replaces the conflict confirm and keeps a 409 away from onError', async () => {
+    const h = harness([
+        new Response('{"code":"OPTIMISTIC_LOCK"}', { status: 409, headers: PROBLEM_TYPE }),
+    ]);
+    const sections = h.krtPageSections.create(declaration());
+    const seen = [];
+    const result = await sections.write({
+        method: 'PATCH',
+        url: '/api/x',
+        payload: {},
+        onConflict: (body) => seen.push(`conflict:${body.code}`),
+        onError: (status) => seen.push(`error:${status}`),
+    });
+    assert.equal(result.status, 409);
+    assert.deepEqual(plain(seen), ['conflict:OPTIMISTIC_LOCK']);
+    assert.deepEqual(h.ui.confirms, []);
+});
+
+await test('onConflict returning false still shows the conflict confirm', async () => {
+    const h = harness([
+        new Response('{"code":"OPTIMISTIC_LOCK"}', { status: 409, headers: PROBLEM_TYPE }),
+    ]);
+    const sections = h.krtPageSections.create(declaration());
+    await sections.write({ method: 'PATCH', url: '/api/x', payload: {}, onConflict: () => false });
+    assert.deepEqual(h.ui.confirms, ['Conflict']);
+});
+
+await test('onError sees a non-409 failure and a page without sections can write', async () => {
+    const h = harness([new Response('{}', { status: 500, headers: PROBLEM_TYPE })]);
+    const sections = h.krtPageSections.create({ dict: undefined, keys: undefined });
+    const seen = [];
+    await sections.write({
+        method: 'PATCH',
+        url: '/api/x',
+        payload: {},
+        onError: (status) => seen.push(status),
+    });
+    assert.deepEqual(plain(seen), [500]);
+});
+
 await test('publish is a no-op without a topic', async () => {
     const h = harness();
     h.krtPageSections.publish(null, ['a']);

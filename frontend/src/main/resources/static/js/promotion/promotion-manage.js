@@ -25,9 +25,23 @@ import {
     showKrtConfirm,
 } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
 import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
+
+const promotion = krtPageSections.create({
+    dict() {
+        return { 'promotion.refresh.failed': MSG_REFRESH_FAILED };
+    },
+    keys: { refreshErrorKey: 'promotion.refresh.failed' },
+    sections: {
+        matrix: { container: '#pm-matrix-results', fragmentValue: 'matrixBody' },
+    },
+    pageUrl() {
+        return '/promotion/manage';
+    },
+});
 
 /**
  * @typedef {object} PmSaveJob
@@ -47,21 +61,20 @@ function pmPutEvaluation(url, payload) {
     function toastError(message) {
         showFrontendErrorToast(message);
     }
-    return krtFetch
+    return promotion
         .write({
             method: 'PUT',
             url,
             payload,
             toast: false,
-            onError(status) {
-                if (status === 409) {
-                    toastError(MSG_CONFLICT);
-                    pmSaveQueue = [];
-                    pmEligibilityDirty.clear();
-                    pmRefreshMatrix();
-                } else {
-                    toastError(MSG_ERROR);
-                }
+            onConflict() {
+                toastError(MSG_CONFLICT);
+                pmSaveQueue = [];
+                pmEligibilityDirty.clear();
+                promotion.refresh('matrix');
+            },
+            onError() {
+                toastError(MSG_ERROR);
                 return true;
             },
             onNetworkError() {
@@ -76,15 +89,6 @@ function pmPutEvaluation(url, payload) {
 
 /** @type {Set<string>} */
 const pmEligibilityDirty = new Set();
-
-function pmRefreshMatrix() {
-    return krtFetch.swap({
-        url: '/promotion/manage',
-        container: '#pm-matrix-results',
-        fragmentValue: 'matrixBody',
-        errorMessage: MSG_REFRESH_FAILED,
-    });
-}
 
 /**
  * Re-renders the eligibility cell of one member row.

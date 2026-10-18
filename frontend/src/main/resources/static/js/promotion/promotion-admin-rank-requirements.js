@@ -25,7 +25,7 @@ import {
     showKrtConfirm,
 } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
-import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 
 /**
@@ -72,14 +72,18 @@ function openModal(id) {
     krtModal.open(id);
 }
 
-function arRefresh() {
-    return krtFetch.swap({
-        url: '/promotion/admin/rank-requirements',
-        container: '#ar-results',
-        fragmentValue: 'ranksResults',
-        errorMessage: MSG_REFRESH_FAILED,
-    });
-}
+const rankRequirements = krtPageSections.create({
+    dict() {
+        return { 'promotion.refresh.failed': MSG_REFRESH_FAILED };
+    },
+    keys: { refreshErrorKey: 'promotion.refresh.failed' },
+    sections: {
+        ranks: { container: '#ar-results', fragmentValue: 'ranksResults' },
+    },
+    pageUrl() {
+        return '/promotion/admin/rank-requirements';
+    },
+});
 
 /**
  * Sets the "to" rank of a dialog to one below its "from" rank.
@@ -144,19 +148,18 @@ function isValidSingleStep(fromVal, toVal) {
  * @returns {Promise<any>} the parsed body, `{}` for an empty one, null when the write failed
  */
 function apiCall(url, method, body) {
-    return krtFetch
+    return rankRequirements
         .write({
             method,
             url,
             payload: body || undefined,
             toast: false,
-            onError(status) {
-                if (status === 409) {
-                    toastError(MSG_CONFLICT);
-                    arRefresh();
-                } else {
-                    toastError(MSG_ERROR);
-                }
+            onConflict() {
+                toastError(MSG_CONFLICT);
+                rankRequirements.refresh('ranks');
+            },
+            onError() {
+                toastError(MSG_ERROR);
                 return true;
             },
             onNetworkError() {
@@ -266,7 +269,7 @@ function submitCreate() {
         if (!data) return;
         toastSuccess(MSG_SAVED);
         closeModal('modal-create');
-        arRefresh();
+        rankRequirements.refresh('ranks');
     });
 }
 
@@ -292,7 +295,7 @@ function submitEdit() {
         if (!data) return;
         toastSuccess(MSG_SAVED);
         closeModal('modal-edit');
-        arRefresh();
+        rankRequirements.refresh('ranks');
     });
 }
 
@@ -320,7 +323,7 @@ function confirmAndDelete(id) {
         deleteRequirement(id).then((data) => {
             if (!data) return;
             toastSuccess(MSG_DELETED);
-            arRefresh();
+            rankRequirements.refresh('ranks');
         });
     });
 }
@@ -359,7 +362,7 @@ function confirmAndDeleteGroup(fromRank, toRank) {
         });
         chain.then(() => {
             toastSuccess(MSG_GROUP_DELETED);
-            arRefresh();
+            rankRequirements.refresh('ranks');
         });
     });
 }

@@ -21,7 +21,7 @@
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
-import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 
 function initAdminQualityTiers() {
     const PAGE_URL = '/admin/quality-tiers';
@@ -172,22 +172,39 @@ function initAdminQualityTiers() {
         krtModal.open(deleteModal);
     }
 
-    /** @returns {Promise<boolean>} */
-    function refreshTable() {
-        return krtFetch.swap({ url: PAGE_URL, container: '#qt-results', history: false });
-    }
+    const tiers = krtPageSections.create({
+        dict() {
+            return {
+                'conflict.title': QT_CONFLICT.title,
+                'conflict.detail': QT_CONFLICT.reloadDetailFallback,
+                'conflict.reload': QT_CONFLICT.reloadLabel,
+                'conflict.dismiss': QT_CONFLICT.dismissLabel,
+                'conflict.question': QT_CONFLICT.reloadQuestion,
+            };
+        },
+        keys: {
+            conflictTitleKey: 'conflict.title',
+            reloadDetailKey: 'conflict.detail',
+            reloadLabelKey: 'conflict.reload',
+            dismissLabelKey: 'conflict.dismiss',
+            reloadQuestionKey: 'conflict.question',
+        },
+        sections: {
+            tiers: { container: '#qt-results' },
+        },
+        pageUrl() {
+            return PAGE_URL;
+        },
+    });
 
     /**
      * Maps a relayed backend refusal to its own toast; an optimistic-lock conflict falls through to
      * the shared conflict dialog.
      * @param {boolean} deleting
-     * @returns {(status: number, body: any) => boolean}
+     * @returns {(body: any) => boolean}
      */
     function refusalHandler(deleting) {
-        return function (status, body) {
-            if (status !== 409) {
-                return false;
-            }
+        return function (body) {
             const code = body && typeof body.code === 'string' ? body.code : '';
             if (code === 'ENTITY_IN_USE') {
                 errorToast(QT_MSG.inUse);
@@ -225,18 +242,17 @@ function initAdminQualityTiers() {
             return;
         }
         const id = idInput.value;
-        krtFetch.write({
+        tiers.write({
             method: 'POST',
             url: id ? `${PAGE_URL}/${encodeURIComponent(id)}` : PAGE_URL,
             payload: payload(),
             submitter: submitBtn,
             successMessage: id ? QT_MSG.updated : QT_MSG.created,
             errorMessage: QT_MSG.error,
-            conflict: QT_CONFLICT,
-            onError: refusalHandler(false),
+            onConflict: refusalHandler(false),
+            refresh: ['tiers'],
             onSuccess() {
                 krtModal.close(modal);
-                return refreshTable();
             },
         });
     });
@@ -247,18 +263,17 @@ function initAdminQualityTiers() {
                 return;
             }
             const id = pendingDeleteId;
-            krtFetch.write({
+            tiers.write({
                 method: 'POST',
                 url: `${PAGE_URL}/${encodeURIComponent(id)}/delete`,
                 submitter: deleteConfirm,
                 successMessage: QT_MSG.deleted,
                 errorMessage: QT_MSG.deleteError,
-                conflict: QT_CONFLICT,
-                onError: refusalHandler(true),
+                onConflict: refusalHandler(true),
+                refresh: ['tiers'],
                 onSuccess() {
                     pendingDeleteId = null;
                     krtModal.close(deleteModal);
-                    return refreshTable();
                 },
             });
         });

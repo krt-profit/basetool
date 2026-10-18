@@ -45,7 +45,7 @@ function publish(topic, keys) {
  * @returns {KrtPageSections} the page's section seam
  */
 function create(config) {
-    const sections = config.sections;
+    const sections = config.sections || {};
     const alsoBroadcast = config.alsoBroadcast || [];
 
     /** @returns {string | null} the topic room, or null while the page has no entity id */
@@ -89,7 +89,7 @@ function create(config) {
         return Promise.all(
             list.map((sectionKey) => {
                 const cfg = sections[sectionKey];
-                const url = cfg ? config.pageUrl() : null;
+                const url = cfg && config.pageUrl ? config.pageUrl() : null;
                 if (!cfg || !url || !document.querySelector(cfg.container)) {
                     return Promise.resolve(false);
                 }
@@ -123,15 +123,17 @@ function create(config) {
     }
 
     /**
-     * Writes through {@link KrtFetchApi.write} with the localized strings derived from the section
-     * key. A 409 shows the conflict confirm and neither re-renders nor broadcasts.
+     * Decorates write options with the localized strings derived from the section key, the 409
+     * routing and the post-write re-render.
      *
-     * @param {KrtWriteOpts} opts the write options; `propagateVersion` writes the response version
-     *     to every `[data-version]` of the section, `refresh` re-renders and broadcasts those
-     *     sections after a 2xx and before `onSuccess`
-     * @returns {Promise<KrtWriteResult>} the outcome
+     * @template {KrtWriteOpts | KrtSubmitFormOpts} T
+     * @param {T} opts the write options; `onConflict` runs instead of `onError` on a 409 and
+     *     replaces the conflict confirm unless it returns false; `propagateVersion` writes the
+     *     response version to every `[data-version]` of the section, `refresh` re-renders and
+     *     broadcasts those sections after a 2xx and before `onSuccess`
+     * @returns {T} the options for the transport
      */
-    function write(opts) {
+    function decorate(opts) {
         /** @type {KrtI18nDict} */
         const dict = (config.dict && config.dict()) || {};
 
@@ -148,7 +150,9 @@ function create(config) {
         const own = sections[key];
         const refreshKeys = opts.refresh ? asList(opts.refresh) : null;
         const userSuccess = opts.onSuccess;
-        return krtFetch.write(
+        const userError = opts.onError;
+        const onConflict = opts.onConflict;
+        return /** @type {T} */ (
             Object.assign({}, opts, {
                 serialize: opts.serialize || (key ? `section:${key}` : undefined),
                 containerSelector:
@@ -167,6 +171,22 @@ function create(config) {
                     reloadQuestion: t(k.reloadQuestionKey),
                     reloadDetailFallback: t(k.reloadDetailKey),
                 },
+                /**
+                 * @param {number} status the HTTP status
+                 * @param {any} body the parsed body
+                 * @param {Response} response the response
+                 * @returns {unknown} truthy when the failure was handled
+                 */
+                onError(status, body, response) {
+                    if (status === 409) {
+                        return typeof onConflict === 'function'
+                            ? onConflict(body, response) !== false
+                            : false;
+                    }
+                    return typeof userError === 'function'
+                        ? userError(status, body, response)
+                        : false;
+                },
                 onSuccess: refreshKeys
                     ? async (/** @type {any} */ body) => {
                           await refresh(refreshKeys);
@@ -175,8 +195,29 @@ function create(config) {
                           }
                       }
                     : userSuccess,
-            }),
+            })
         );
+    }
+
+    /**
+     * Writes through {@link KrtFetchApi.write}. A 409 shows the conflict confirm and neither
+     * re-renders nor broadcasts.
+     *
+     * @param {KrtWriteOpts} opts the write options, see {@link decorate}
+     * @returns {Promise<KrtWriteResult>} the outcome
+     */
+    function write(opts) {
+        return krtFetch.write(decorate(opts));
+    }
+
+    /**
+     * Submits a form through {@link KrtFetchApi.submitForm} with the same decoration as a write.
+     *
+     * @param {KrtSubmitFormOpts} opts the submit options, see {@link decorate}
+     * @returns {Promise<KrtWriteResult>} the outcome
+     */
+    function submitForm(opts) {
+        return krtFetch.submitForm(decorate(opts));
     }
 
     /** @type {KrtReceiver | null} */
@@ -210,7 +251,7 @@ function create(config) {
         });
     }
 
-    return { write, refresh, notify, receiver, sections };
+    return { write, submitForm, refresh, notify, receiver, sections };
 }
 
 /** @type {KrtPageSectionsApi} */
