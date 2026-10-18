@@ -41,7 +41,11 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeComponentDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeDemandItemDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeDemandMaterialDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeDemandOrderItemDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeDemandUnitDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgDemandDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow;
@@ -219,6 +223,33 @@ class ExchangeDemandServiceTest {
     assertThat(demand.items().get(0).craftableByMe()).isFalse();
     assertThat(demand.items().get(1).item().bt()).isEqualTo(helmet.getId().toString());
     assertThat(demand.items().get(1).craftableByMe()).isTrue();
+  }
+
+  @Test
+  void anItemLineOfAShipComponentCarriesItsComponentAndOtherItemsNone() {
+    JobOrder order = order(JobOrderType.ITEM);
+    order.setResponsibleOrgUnit(squadron(UNIT, "Alpha"));
+    GameItem shield = gameItem("FR-66");
+    shield.setWikiType("Shield");
+    shield.setSizeClass(1);
+    shield.setGrade("A");
+    shield.setItemClass(ShipComponentClass.MILITARY);
+    GameItem helmet = gameItem("ORC-mkX Helmet");
+    order.getItems().add(line(shield, "FR-66", 2, 0));
+    order.getItems().add(line(helmet, "ORC-mkX Helmet", 1, 0));
+    givenOrders(order);
+    when(orgUnitService.logisticianUnits(MEMBER)).thenReturn(Set.of(UNIT));
+    when(requirementResolver.requirementsOf(any())).thenReturn(List.of());
+
+    ExchangeOrgDemandDto demand = service.demand(MEMBER, true);
+
+    ExchangeComponentDto fr66 = new ExchangeComponentDto("SHIELD", 1, "A", "MILITARY");
+    assertThat(demand.items())
+        .extracting(ExchangeDemandItemDto::component)
+        .containsExactly(fr66, null);
+    assertThat(demand.orders().getFirst().items())
+        .extracting(ExchangeDemandOrderItemDto::component)
+        .containsExactly(fr66, null);
   }
 
   @Test

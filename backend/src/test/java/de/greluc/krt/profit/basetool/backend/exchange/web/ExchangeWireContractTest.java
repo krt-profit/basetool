@@ -177,6 +177,7 @@ class ExchangeWireContractTest {
   private boolean wasEnabled;
   private final List<UUID> blueprints = new ArrayList<>();
   private final List<UUID> materials = new ArrayList<>();
+  private final List<UUID> gameItems = new ArrayList<>();
   private final List<UUID> locations = new ArrayList<>();
   private final List<UUID> cities = new ArrayList<>();
   private final List<UUID> shipTypes = new ArrayList<>();
@@ -226,6 +227,7 @@ class ExchangeWireContractTest {
     missions.forEach(id -> jdbc.update("DELETE FROM mission WHERE id = ?", id));
     blueprints.forEach(id -> jdbc.update("DELETE FROM blueprint WHERE id = ?", id));
     materials.forEach(id -> jdbc.update("DELETE FROM material WHERE id = ?", id));
+    gameItems.forEach(id -> jdbc.update("DELETE FROM game_item WHERE id = ?", id));
     shipTypes.forEach(id -> jdbc.update("DELETE FROM ship_type WHERE id = ?", id));
     locations.forEach(id -> jdbc.update("DELETE FROM location WHERE id = ?", id));
     cities.forEach(id -> jdbc.update("DELETE FROM city WHERE id = ?", id));
@@ -404,7 +406,8 @@ class ExchangeWireContractTest {
 
   /**
    * Seeds one owned blueprint, one stock lot at a UEX city, one Logistician membership of a
-   * Staffel, one shared lot in that Staffel's pool and one ship in that Staffel for the member.
+   * Staffel, one shared material and one shared ship component lot in that Staffel's pool and one
+   * ship in that Staffel for the member.
    */
   private void seed() {
     Blueprint blueprint = new Blueprint();
@@ -452,6 +455,14 @@ class ExchangeWireContractTest {
         location,
         Timestamp.from(Instant.now().minusSeconds(10)));
 
+    UUID shield = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO game_item (id, name, kind, source_systems, wiki_type, size_class, grade,"
+            + " item_class) VALUES (?, ?, 'GENERIC', 'UEX_ONLY', 'Shield', 1, 'A', 'MILITARY')",
+        shield,
+        "Wire shield " + shield);
+    gameItems.add(shield);
+
     UUID orgUnit = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO org_unit (id, kind, name, shorthand, active, is_promotion_enabled,"
@@ -496,6 +507,16 @@ class ExchangeWireContractTest {
         UUID.randomUUID(),
         member,
         material,
+        location,
+        orgUnit,
+        Timestamp.from(Instant.now().minusSeconds(10)));
+    jdbc.update(
+        "INSERT INTO inventory_item (id, user_id, game_item_id, location_id, amount, personal,"
+            + " stolen, owning_org_unit_id, created_at, version)"
+            + " VALUES (?, ?, ?, ?, 1, false, false, ?, ?, 0)",
+        UUID.randomUUID(),
+        member,
+        shield,
         location,
         orgUnit,
         Timestamp.from(Instant.now().minusSeconds(10)));

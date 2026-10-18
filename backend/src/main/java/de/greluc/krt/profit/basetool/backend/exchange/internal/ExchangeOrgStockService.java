@@ -257,6 +257,7 @@ public class ExchangeOrgStockService {
         new ExchangeOrgStockUnitDto(unit.id(), unit.name()),
         base.material(),
         base.materialKind(),
+        base.component(),
         base.location(),
         base.quality(),
         base.stolen(),

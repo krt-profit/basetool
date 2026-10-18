@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
-import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.APPLIED;
 import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.REJECTED;
 import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.UNCHANGED;
 import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.round;
@@ -51,16 +50,12 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.Poo
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
-import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.MeterRegistry;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -86,11 +81,13 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>An op on a pool whose unit the writer is not a Logistician and direct member of is refused
  * {@code NOT_PERMITTED}, and so is a {@code move-holder} into such a pool and an op on an entry
  * that is personal or lies in another pool. Every holder lot the batch touches is locked before any
- * op runs (ADR-0229).
+ * op runs (ADR-0229). The {@link ExchangeChangeSetRunner} runs the change set (ADR-0285).
  */
 @Service
 @RequiredArgsConstructor
-public class ExchangeOrgStockWriteService {
+public class ExchangeOrgStockWriteService
+    implements ExchangeChangeSetAdapter<
+        ExchangeOrgStockChangeSet, ExchangeOrgStockWriteService.PoolWrite> {
 
   /** The refusal of an op on a pool or entry the writer may not write. */
   static final String NOT_PERMITTED = "NOT_PERMITTED";
@@ -104,9 +101,6 @@ public class ExchangeOrgStockWriteService {
   /** The refusal of a quantity whose unit is not the material's. */
   static final String UNIT_MISMATCH = "UNIT_MISMATCH";
 
-  /** The outcome counted for a batch the mass-change guard holds back. */
-  private static final String HELD = "held";
-
   private final ExchangeOrgUnitService orgUnitService;
   private final ExchangeOrgStockRoster roster;
   private final ExchangeOrgStockTargets targets;
@@ -117,7 +111,7 @@ public class ExchangeOrgStockWriteService {
   private final ExchangeMassChangeGuard guard;
   private final StockReads stockReads;
   private final ExchangeLiveSync liveSync;
-  private final MeterRegistry meterRegistry;
+  private final ExchangeChangeSetRunner runner;
 
   /**
    * Applies one change set in one transaction, op by op in its order, unless it takes so much out
@@ -134,7 +128,7 @@ public class ExchangeOrgStockWriteService {
   @Transactional
   public @NotNull ExchangeChangeResultDto apply(
       @NotNull ExchangeCaller caller, @NotNull ExchangeOrgStockChangeSet changeSet) {
-    return run(caller, changeSet, true);
+    return runner.run(caller, this, changeSet, true);
   }
 
   /**
@@ -150,27 +144,41 @@ public class ExchangeOrgStockWriteService {
   @Transactional
   public @NotNull ExchangeChangeResultDto applyConfirmed(
       @NotNull ExchangeCaller caller, @NotNull ExchangeOrgStockChangeSet changeSet) {
-    return run(caller, changeSet, false);
+    return runner.run(caller, this, changeSet, false);
+  }
+
+  @Override
+  public @NotNull ExchangeResource resource() {
+    return ExchangeResource.ORG_STOCK;
+  }
+
+  @Override
+  public boolean dryRun(@NotNull ExchangeOrgStockChangeSet changeSet) {
+    return changeSet.dryRun();
+  }
+
+  @Override
+  public @Nullable String opId(@NotNull ExchangeOrgStockChangeSet changeSet, int index) {
+    return changeSet.ops().get(index).opId();
   }
 
   /**
-   * Plans a change set, asks the guard when told to, and applies it op by op.
+   * Decides every op on its own, before anything is locked.
    *
    * @param caller the client, installation and writer
    * @param changeSet the writes
-   * @param guarded whether the mass-change guard decides
-   * @return the result
+   * @return one plan per op
+   * @throws BadRequestException when an op lacks a field its kind needs
    */
-  private @NotNull ExchangeChangeResultDto run(
-      @NotNull ExchangeCaller caller,
-      @NotNull ExchangeOrgStockChangeSet changeSet,
-      boolean guarded) {
+  @Override
+  public @NotNull List<Planned<PoolWrite>> plan(
+      @NotNull ExchangeCaller caller, @NotNull ExchangeOrgStockChangeSet changeSet) {
     List<ExchangeOrgStockChangeSet.Op> ops = changeSet.ops();
     ops.forEach(ExchangeOrgStockWriteService::requireFields);
     Set<UUID> pools = orgUnitService.logisticianUnits(caller.member());
     Map<Integer, ExchangeLotCatalogue.Entry> catalogue = resolveBookIns(ops);
     Map<UUID, Map<String, UUID>> rosters = new HashMap<>();
-    List<Planned> plan = new ArrayList<>(ops.size());
+    List<Planned<PoolWrite>> plan = new ArrayList<>(ops.size());
     for (int i = 0; i < ops.size(); i++) {
       ExchangeOrgStockChangeSet.Op op = ops.get(i);
       plan.add(
@@ -194,62 +202,57 @@ public class ExchangeOrgStockWriteService {
             default -> throw new BadRequestException("Unknown org-stock op");
           });
     }
-    if (guarded && !changeSet.dryRun() && holdsBack(caller, ops, plan)) {
-      count(caller, HELD, false);
-      throw ExchangeProblemException.massChangeConfirmationRequired();
-    }
+    return plan;
+  }
+
+  /**
+   * Locks every holder lot and entry the plan touches, then hands each op to the Lager, journals
+   * what it changed and refreshes the Lager pages afterwards.
+   *
+   * @param caller the client, installation and writer
+   * @param batch the change set's id
+   * @param plan the plan
+   * @param dryRun whether the Lager only checks the ops
+   * @return the execution
+   */
+  @Override
+  public @NotNull Execution<PoolWrite> start(
+      @NotNull ExchangeCaller caller,
+      @NotNull UUID batch,
+      @NotNull List<Planned<PoolWrite>> plan,
+      boolean dryRun) {
     lock(plan);
-    boolean dryRun = changeSet.dryRun();
-    UUID batch = UUID.randomUUID();
-    int applied = 0;
-    int unchanged = 0;
-    int reduced = 0;
-    int removed = 0;
-    List<ExchangeChangeResultDto.OpResult> results = new ArrayList<>();
-    for (int i = 0; i < plan.size(); i++) {
-      String opId = ops.get(i).opId();
-      switch (plan.get(i)) {
-        case Skip skip -> {
-          if (UNCHANGED.equals(skip.result())) {
-            unchanged++;
-          }
-          count(caller, skip.result(), dryRun);
-          results.add(new ExchangeChangeResultDto.OpResult(i, opId, skip.result(), skip.reason()));
+    return new Execution<>() {
+      private int reduced;
+      private int removed;
+
+      @Override
+      public @NotNull Outcome run(@NotNull PoolWrite write) {
+        PoolOutcome outcome = write.run(poolEntryCommands, dryRun);
+        if (outcome.refusal() != null) {
+          return Outcome.rejected(outcome.refusal().name());
         }
-        case Write write -> {
-          PoolOutcome outcome = write.run(poolEntryCommands, dryRun);
-          if (outcome.refusal() != null) {
-            count(caller, REJECTED, dryRun);
-            results.add(
-                new ExchangeChangeResultDto.OpResult(i, opId, REJECTED, outcome.refusal().name()));
-          } else if (outcome.unchanged()) {
-            unchanged++;
-            count(caller, UNCHANGED, dryRun);
-            results.add(new ExchangeChangeResultDto.OpResult(i, opId, UNCHANGED, null));
-          } else {
-            applied++;
-            count(caller, APPLIED, dryRun);
-            reduced += outcome.offers().reduced();
-            removed += outcome.offers().removed();
-            if (!dryRun) {
-              journal(caller, batch, write, outcome);
-            }
-          }
+        if (outcome.unchanged()) {
+          return Outcome.UNCHANGED;
         }
+        reduced += outcome.offers().reduced();
+        removed += outcome.offers().removed();
+        if (!dryRun) {
+          journal(caller, batch, write, outcome);
+        }
+        return Outcome.APPLIED;
       }
-    }
-    if (!dryRun && applied > 0) {
-      liveSync.stockChanged(reduced + removed > 0);
-    }
-    return new ExchangeChangeResultDto(
-        dryRun,
-        applied,
-        unchanged,
-        plan.size() - applied - unchanged,
-        List.copyOf(results),
-        reduced,
-        removed,
-        null);
+
+      @Override
+      public @NotNull Effects effects() {
+        return new Effects(reduced, removed, null);
+      }
+
+      @Override
+      public void announce() {
+        liveSync.stockChanged(reduced + removed > 0);
+      }
+    };
   }
 
   /**
@@ -257,18 +260,19 @@ public class ExchangeOrgStockWriteService {
    * mass-change guard's threshold for the writer.
    *
    * @param caller the client and writer
-   * @param ops the ops
+   * @param changeSet the writes
    * @param plan what each op will do
    * @return {@code true} when the writer must confirm the batch
    */
-  private boolean holdsBack(
+  @Override
+  public boolean holdsBack(
       @NotNull ExchangeCaller caller,
-      @NotNull List<ExchangeOrgStockChangeSet.Op> ops,
-      @NotNull List<Planned> plan) {
+      @NotNull ExchangeOrgStockChangeSet changeSet,
+      @NotNull List<Planned<PoolWrite>> plan) {
     Map<UUID, Long> removals = new TreeMap<>();
     for (int i = 0; i < plan.size(); i++) {
-      if (plan.get(i) instanceof Write write && write.removedFrom() != null) {
-        removals.merge(ops.get(i).unit(), 1L, Long::sum);
+      if (plan.get(i) instanceof Write<PoolWrite>(PoolWrite write) && write.removedFrom() != null) {
+        removals.merge(changeSet.ops().get(i).unit(), 1L, Long::sum);
       }
     }
     for (Map.Entry<UUID, Long> pool : removals.entrySet()) {
@@ -428,34 +432,34 @@ public class ExchangeOrgStockWriteService {
    * @param rosters each unit's roster read so far, ref to member
    * @return the plan
    */
-  private @NotNull Planned planBookIn(
+  private @NotNull Planned<PoolWrite> planBookIn(
       @NotNull ExchangeCaller caller,
       @NotNull ExchangeOrgStockChangeSet.Op op,
       @NotNull Set<UUID> pools,
       @NotNull ExchangeLotCatalogue.Entry entry,
       @NotNull Map<UUID, Map<String, UUID>> rosters) {
     if (!pools.contains(op.unit())) {
-      return new Skip(REJECTED, NOT_PERMITTED);
+      return ExchangeChangeSetAdapter.skip(REJECTED, NOT_PERMITTED);
     }
     UUID holder = holderOf(caller, op.unit(), Objects.requireNonNull(op.holder()), rosters);
     if (holder == null) {
-      return new Skip(REJECTED, HOLDER_UNKNOWN);
+      return ExchangeChangeSetAdapter.skip(REJECTED, HOLDER_UNKNOWN);
     }
     if (entry.result() != null) {
-      return new Skip(entry.result(), entry.reason());
+      return ExchangeChangeSetAdapter.skip(entry.result(), entry.reason());
     }
     Optional<Location> location = locationResolver.resolve(Objects.requireNonNull(op.location()));
     if (location.isEmpty()) {
-      return new Skip(REJECTED, LOCATION_UNKNOWN);
+      return ExchangeChangeSetAdapter.skip(REJECTED, LOCATION_UNKNOWN);
     }
     String unit = entry.unit();
     ExchangeStockChangeSet.Quantity quantity = Objects.requireNonNull(op.quantity());
     if (!sameUnit(unit, quantity, op.jobOrders(), op.missions())) {
-      return new Skip(REJECTED, UNIT_MISMATCH);
+      return ExchangeChangeSetAdapter.skip(REJECTED, UNIT_MISMATCH);
     }
     BigDecimal amount = round(quantity.amount(), unit);
     if (amount.signum() == 0) {
-      return new Skip(UNCHANGED, null);
+      return ExchangeChangeSetAdapter.skip(UNCHANGED, null);
     }
     StockLot lot =
         new StockLot(
@@ -464,16 +468,17 @@ public class ExchangeOrgStockWriteService {
             location.get(),
             entry.material() == null ? null : op.quality(),
             Boolean.TRUE.equals(op.stolen()));
-    return new BookIn(
-        new PoolBookIn(
-            holder,
-            op.unit(),
-            lot,
-            amount.doubleValue(),
-            op.note(),
-            Boolean.TRUE.equals(op.mergeScu()),
-            jobOrderEarmarks(op.jobOrders(), unit),
-            missionEarmarks(op.missions(), unit)));
+    return ExchangeChangeSetAdapter.write(
+        new BookIn(
+            new PoolBookIn(
+                holder,
+                op.unit(),
+                lot,
+                amount.doubleValue(),
+                op.note(),
+                Boolean.TRUE.equals(op.mergeScu()),
+                jobOrderEarmarks(op.jobOrders(), unit),
+                missionEarmarks(op.missions(), unit))));
   }
 
   /**
@@ -484,12 +489,12 @@ public class ExchangeOrgStockWriteService {
    * @param pools the units the writer is a Logistician and direct member of
    * @return the plan
    */
-  private static @NotNull Planned planBookOut(
+  private static @NotNull Planned<PoolWrite> planBookOut(
       @NotNull ExchangeCaller caller,
       @NotNull ExchangeOrgStockChangeSet.Op op,
       @NotNull Set<UUID> pools) {
-    Skip skip = checkTake(op, pools);
-    return skip != null ? skip : new BookOut(takeOf(caller, op));
+    Planned<PoolWrite> skip = checkTake(op, pools);
+    return skip != null ? skip : ExchangeChangeSetAdapter.write(new BookOut(takeOf(caller, op)));
   }
 
   /**
@@ -500,18 +505,19 @@ public class ExchangeOrgStockWriteService {
    * @param pools the units the writer is a Logistician and direct member of
    * @return the plan
    */
-  private static @NotNull Planned planSell(
+  private static @NotNull Planned<PoolWrite> planSell(
       @NotNull ExchangeCaller caller,
       @NotNull ExchangeOrgStockChangeSet.Op op,
       @NotNull Set<UUID> pools) {
-    Skip skip = checkTake(op, pools);
+    Planned<PoolWrite> skip = checkTake(op, pools);
     return skip != null
         ? skip
-        : new Sell(
-            new PoolSale(
-                takeOf(caller, op),
-                Objects.requireNonNull(op.terminal()).trim(),
-                Objects.requireNonNull(op.proceeds())));
+        : ExchangeChangeSetAdapter.write(
+            new Sell(
+                new PoolSale(
+                    takeOf(caller, op),
+                    Objects.requireNonNull(op.terminal()).trim(),
+                    Objects.requireNonNull(op.proceeds()))));
   }
 
   /**
@@ -522,26 +528,27 @@ public class ExchangeOrgStockWriteService {
    * @param pools the units the writer is a Logistician and direct member of
    * @return the plan
    */
-  private @NotNull Planned planMoveLocation(
+  private @NotNull Planned<PoolWrite> planMoveLocation(
       @NotNull ExchangeCaller caller,
       @NotNull ExchangeOrgStockChangeSet.Op op,
       @NotNull Set<UUID> pools) {
-    Skip skip = checkTake(op, pools);
+    Planned<PoolWrite> skip = checkTake(op, pools);
     if (skip != null) {
       return skip;
     }
     Optional<Location> location = locationResolver.resolve(Objects.requireNonNull(op.location()));
     if (location.isEmpty()) {
-      return new Skip(REJECTED, LOCATION_UNKNOWN);
+      return ExchangeChangeSetAdapter.skip(REJECTED, LOCATION_UNKNOWN);
     }
-    return new Move(
-        new PoolMove(
-            takeOf(caller, op),
-            null,
-            location.get(),
-            op.unit(),
-            Boolean.TRUE.equals(op.mergeScu())),
-        ExchangeJournalAction.ORG_STOCK_MOVE_LOCATION);
+    return ExchangeChangeSetAdapter.write(
+        new Move(
+            new PoolMove(
+                takeOf(caller, op),
+                null,
+                location.get(),
+                op.unit(),
+                Boolean.TRUE.equals(op.mergeScu())),
+            ExchangeJournalAction.ORG_STOCK_MOVE_LOCATION));
   }
 
   /**
@@ -553,26 +560,28 @@ public class ExchangeOrgStockWriteService {
    * @param rosters each unit's roster read so far, ref to member
    * @return the plan
    */
-  private @NotNull Planned planMoveHolder(
+  private @NotNull Planned<PoolWrite> planMoveHolder(
       @NotNull ExchangeCaller caller,
       @NotNull ExchangeOrgStockChangeSet.Op op,
       @NotNull Set<UUID> pools,
       @NotNull Map<UUID, Map<String, UUID>> rosters) {
     UUID toUnit = Objects.requireNonNull(op.toUnit());
     if (!pools.contains(toUnit)) {
-      return new Skip(REJECTED, NOT_PERMITTED);
+      return ExchangeChangeSetAdapter.skip(REJECTED, NOT_PERMITTED);
     }
-    Skip skip = checkTake(op, pools);
+    Planned<PoolWrite> skip = checkTake(op, pools);
     if (skip != null) {
       return skip;
     }
     UUID holder = holderOf(caller, toUnit, Objects.requireNonNull(op.holder()), rosters);
     if (holder == null) {
-      return new Skip(REJECTED, HOLDER_UNKNOWN);
+      return ExchangeChangeSetAdapter.skip(REJECTED, HOLDER_UNKNOWN);
     }
-    return new Move(
-        new PoolMove(takeOf(caller, op), holder, null, toUnit, Boolean.TRUE.equals(op.mergeScu())),
-        ExchangeJournalAction.ORG_STOCK_MOVE_HOLDER);
+    return ExchangeChangeSetAdapter.write(
+        new Move(
+            new PoolMove(
+                takeOf(caller, op), holder, null, toUnit, Boolean.TRUE.equals(op.mergeScu())),
+            ExchangeJournalAction.ORG_STOCK_MOVE_HOLDER));
   }
 
   /**
@@ -583,33 +592,34 @@ public class ExchangeOrgStockWriteService {
    * @param pools the units the writer is a Logistician and direct member of
    * @return the plan
    */
-  private static @NotNull Planned planMovePool(
+  private static @NotNull Planned<PoolWrite> planMovePool(
       @NotNull ExchangeCaller caller,
       @NotNull ExchangeOrgStockChangeSet.Op op,
       @NotNull Set<UUID> pools) {
     UUID toUnit = Objects.requireNonNull(op.toUnit());
     if (!pools.contains(op.unit()) || !pools.contains(toUnit)) {
-      return new Skip(REJECTED, NOT_PERMITTED);
+      return ExchangeChangeSetAdapter.skip(REJECTED, NOT_PERMITTED);
     }
     ExchangeStockChangeSet.Quantity quantity = op.quantity();
     Double amount = null;
     if (quantity != null) {
       BigDecimal rounded = round(quantity.amount(), quantity.unit());
       if (rounded.signum() == 0) {
-        return new Skip(UNCHANGED, null);
+        return ExchangeChangeSetAdapter.skip(UNCHANGED, null);
       }
       amount = rounded.doubleValue();
     }
-    return new MovePool(
-        new PoolChange(
-            caller.member(),
-            Objects.requireNonNull(op.entry()),
-            op.unit(),
-            Objects.requireNonNull(op.version()),
-            toUnit,
-            amount,
-            quantity == null ? null : quantity.unit(),
-            Boolean.TRUE.equals(op.mergeScu())));
+    return ExchangeChangeSetAdapter.write(
+        new MovePool(
+            new PoolChange(
+                caller.member(),
+                Objects.requireNonNull(op.entry()),
+                op.unit(),
+                Objects.requireNonNull(op.version()),
+                toUnit,
+                amount,
+                quantity == null ? null : quantity.unit(),
+                Boolean.TRUE.equals(op.mergeScu()))));
   }
 
   /**
@@ -620,20 +630,21 @@ public class ExchangeOrgStockWriteService {
    * @param pools the units the writer is a Logistician and direct member of
    * @return the plan
    */
-  private static @NotNull Planned planNote(
+  private static @NotNull Planned<PoolWrite> planNote(
       @NotNull ExchangeCaller caller,
       @NotNull ExchangeOrgStockChangeSet.Op op,
       @NotNull Set<UUID> pools) {
     if (!pools.contains(op.unit())) {
-      return new Skip(REJECTED, NOT_PERMITTED);
+      return ExchangeChangeSetAdapter.skip(REJECTED, NOT_PERMITTED);
     }
-    return new Note(
-        new PoolNote(
-            caller.member(),
-            Objects.requireNonNull(op.entry()),
-            op.unit(),
-            Objects.requireNonNull(op.version()),
-            op.note()));
+    return ExchangeChangeSetAdapter.write(
+        new Note(
+            new PoolNote(
+                caller.member(),
+                Objects.requireNonNull(op.entry()),
+                op.unit(),
+                Objects.requireNonNull(op.version()),
+                op.note())));
   }
 
   /**
@@ -644,31 +655,32 @@ public class ExchangeOrgStockWriteService {
    * @param pools the units the writer is a Logistician and direct member of
    * @return the plan
    */
-  private static @NotNull Planned planStolen(
+  private static @NotNull Planned<PoolWrite> planStolen(
       @NotNull ExchangeCaller caller,
       @NotNull ExchangeOrgStockChangeSet.Op op,
       @NotNull Set<UUID> pools) {
     if (!pools.contains(op.unit())) {
-      return new Skip(REJECTED, NOT_PERMITTED);
+      return ExchangeChangeSetAdapter.skip(REJECTED, NOT_PERMITTED);
     }
     ExchangeStockChangeSet.Quantity quantity = op.quantity();
     Double amount = null;
     if (quantity != null) {
       BigDecimal rounded = round(quantity.amount(), quantity.unit());
       if (rounded.signum() == 0) {
-        return new Skip(UNCHANGED, null);
+        return ExchangeChangeSetAdapter.skip(UNCHANGED, null);
       }
       amount = rounded.doubleValue();
     }
-    return new Stolen(
-        new PoolStolen(
-            caller.member(),
-            Objects.requireNonNull(op.entry()),
-            op.unit(),
-            Objects.requireNonNull(op.version()),
-            Boolean.TRUE.equals(op.stolen()),
-            amount,
-            quantity == null ? null : quantity.unit()));
+    return ExchangeChangeSetAdapter.write(
+        new Stolen(
+            new PoolStolen(
+                caller.member(),
+                Objects.requireNonNull(op.entry()),
+                op.unit(),
+                Objects.requireNonNull(op.version()),
+                Boolean.TRUE.equals(op.stolen()),
+                amount,
+                quantity == null ? null : quantity.unit())));
   }
 
   /**
@@ -679,33 +691,34 @@ public class ExchangeOrgStockWriteService {
    * @param change whether the earmark is added, changed or removed
    * @return the plan
    */
-  private static @NotNull Planned planAllocation(
+  private static @NotNull Planned<PoolWrite> planAllocation(
       @NotNull ExchangeOrgStockChangeSet.Op op,
       @NotNull Set<UUID> pools,
       @NotNull EarmarkChange change) {
     if (!pools.contains(op.unit())) {
-      return new Skip(REJECTED, NOT_PERMITTED);
+      return ExchangeChangeSetAdapter.skip(REJECTED, NOT_PERMITTED);
     }
     ExchangeStockChangeSet.Quantity quantity = op.quantity();
     Double amount = null;
     if (change != EarmarkChange.REMOVE) {
       BigDecimal rounded = round(Objects.requireNonNull(quantity).amount(), quantity.unit());
       if (rounded.signum() == 0) {
-        return new Skip(UNCHANGED, null);
+        return ExchangeChangeSetAdapter.skip(UNCHANGED, null);
       }
       amount = rounded.doubleValue();
     }
     UUID jobOrder = op.jobOrder();
-    return new Allocate(
-        new PoolAllocation(
-            Objects.requireNonNull(op.entry()),
-            op.unit(),
-            Objects.requireNonNull(op.version()),
-            change,
-            jobOrder != null ? EarmarkDimension.JOB_ORDER : EarmarkDimension.MISSION,
-            jobOrder != null ? jobOrder : Objects.requireNonNull(op.mission()),
-            amount,
-            change == EarmarkChange.REMOVE ? null : Objects.requireNonNull(quantity).unit()));
+    return ExchangeChangeSetAdapter.write(
+        new Allocate(
+            new PoolAllocation(
+                Objects.requireNonNull(op.entry()),
+                op.unit(),
+                Objects.requireNonNull(op.version()),
+                change,
+                jobOrder != null ? EarmarkDimension.JOB_ORDER : EarmarkDimension.MISSION,
+                jobOrder != null ? jobOrder : Objects.requireNonNull(op.mission()),
+                amount,
+                change == EarmarkChange.REMOVE ? null : Objects.requireNonNull(quantity).unit())));
   }
 
   /**
@@ -716,18 +729,18 @@ public class ExchangeOrgStockWriteService {
    * @param pools the units the writer is a Logistician and direct member of
    * @return the result that ends the op, or {@code null} when the Lager decides it
    */
-  private static @Nullable Skip checkTake(
+  private static @Nullable Planned<PoolWrite> checkTake(
       @NotNull ExchangeOrgStockChangeSet.Op op, @NotNull Set<UUID> pools) {
     if (!pools.contains(op.unit())) {
-      return new Skip(REJECTED, NOT_PERMITTED);
+      return ExchangeChangeSetAdapter.skip(REJECTED, NOT_PERMITTED);
     }
     ExchangeStockChangeSet.Quantity quantity = Objects.requireNonNull(op.quantity());
     String unit = quantity.unit();
     if (!sameUnit(unit, quantity, op.fromJobOrders(), op.fromMissions())) {
-      return new Skip(REJECTED, UNIT_MISMATCH);
+      return ExchangeChangeSetAdapter.skip(REJECTED, UNIT_MISMATCH);
     }
     if (round(quantity.amount(), unit).signum() == 0) {
-      return new Skip(UNCHANGED, null);
+      return ExchangeChangeSetAdapter.skip(UNCHANGED, null);
     }
     return null;
   }
@@ -794,10 +807,10 @@ public class ExchangeOrgStockWriteService {
    *
    * @param plan the plan
    */
-  private void lock(@NotNull List<Planned> plan) {
+  private void lock(@NotNull List<Planned<PoolWrite>> plan) {
     Locks locks = new Locks(new HashMap<>(), new HashSet<>(), new ArrayList<>());
-    for (Planned planned : plan) {
-      if (planned instanceof Write write) {
+    for (Planned<PoolWrite> planned : plan) {
+      if (planned instanceof Write<PoolWrite>(PoolWrite write)) {
         write.lockInto(locks);
       }
     }
@@ -821,7 +834,7 @@ public class ExchangeOrgStockWriteService {
   private void journal(
       @NotNull ExchangeCaller caller,
       @NotNull UUID batch,
-      @NotNull Write write,
+      @NotNull PoolWrite write,
       @NotNull PoolOutcome outcome) {
     ExchangeJournalAction action = write.action();
     UUID removedFrom = write.removedFrom();
@@ -921,43 +934,8 @@ public class ExchangeOrgStockWriteService {
     return List.copyOf(earmarks);
   }
 
-  /**
-   * Counts one op's outcome for the caller's client, unless nothing is written.
-   *
-   * @param caller the caller, whose client the relay bounded by the registry
-   * @param outcome the outcome
-   * @param dryRun whether the change set only plans
-   */
-  private void count(@NotNull ExchangeCaller caller, @NotNull String outcome, boolean dryRun) {
-    if (dryRun) {
-      return;
-    }
-    Counter counter =
-        meterRegistry.counter(
-            MetricNames.EXCHANGE_WRITES,
-            MetricNames.TAG_CLIENT_ID,
-            caller.clientId(),
-            MetricNames.TAG_RESOURCE,
-            ExchangeResource.ORG_STOCK.name().toLowerCase(Locale.ROOT),
-            MetricNames.TAG_OUTCOME,
-            outcome);
-    counter.increment();
-  }
-
-  /** What one op of a change set will do. */
-  private sealed interface Planned permits Skip, Write {}
-
-  /**
-   * An op that is decided without the Lager.
-   *
-   * @param result its result
-   * @param reason its refusal code, or {@code null}
-   */
-  private record Skip(@NotNull String result, @Nullable String reason) implements Planned {}
-
   /** An op the Lager decides: what it locks, runs and journals. */
-  private sealed interface Write extends Planned
-      permits BookIn, BookOut, Sell, Move, MovePool, Note, Stolen, Allocate {
+  sealed interface PoolWrite permits BookIn, BookOut, Sell, Move, MovePool, Note, Stolen, Allocate {
 
     /**
      * Adds the lots and entries this op touches to the batch's locks.
@@ -1001,7 +979,7 @@ public class ExchangeOrgStockWriteService {
    * @param entries the entries the ops write
    * @param relocations the lots moves and markings land in
    */
-  private record Locks(
+  record Locks(
       @NotNull Map<UUID, List<StockLot>> holderLots,
       @NotNull Set<UUID> entries,
       @NotNull List<PoolRelocation> relocations) {}
@@ -1011,7 +989,7 @@ public class ExchangeOrgStockWriteService {
    *
    * @param request the book-in
    */
-  private record BookIn(@NotNull PoolBookIn request) implements Write {
+  private record BookIn(@NotNull PoolBookIn request) implements PoolWrite {
 
     @Override
     public void lockInto(@NotNull Locks locks) {
@@ -1042,7 +1020,7 @@ public class ExchangeOrgStockWriteService {
    *
    * @param request the book-out
    */
-  private record BookOut(@NotNull PoolBookOut request) implements Write {
+  private record BookOut(@NotNull PoolBookOut request) implements PoolWrite {
 
     @Override
     public void lockInto(@NotNull Locks locks) {
@@ -1070,7 +1048,7 @@ public class ExchangeOrgStockWriteService {
    *
    * @param request the sale
    */
-  private record Sell(@NotNull PoolSale request) implements Write {
+  private record Sell(@NotNull PoolSale request) implements PoolWrite {
 
     @Override
     public void lockInto(@NotNull Locks locks) {
@@ -1100,7 +1078,7 @@ public class ExchangeOrgStockWriteService {
    * @param action {@code ORG_STOCK_MOVE_LOCATION} or {@code ORG_STOCK_MOVE_HOLDER}
    */
   private record Move(@NotNull PoolMove request, @NotNull ExchangeJournalAction action)
-      implements Write {
+      implements PoolWrite {
 
     @Override
     public void lockInto(@NotNull Locks locks) {
@@ -1132,7 +1110,7 @@ public class ExchangeOrgStockWriteService {
    *
    * @param request the note edit
    */
-  private record Note(@NotNull PoolNote request) implements Write {
+  private record Note(@NotNull PoolNote request) implements PoolWrite {
 
     @Override
     public void lockInto(@NotNull Locks locks) {
@@ -1160,7 +1138,7 @@ public class ExchangeOrgStockWriteService {
    *
    * @param request the pool change
    */
-  private record MovePool(@NotNull PoolChange request) implements Write {
+  private record MovePool(@NotNull PoolChange request) implements PoolWrite {
 
     @Override
     public void lockInto(@NotNull Locks locks) {
@@ -1188,7 +1166,7 @@ public class ExchangeOrgStockWriteService {
    *
    * @param request the marking
    */
-  private record Stolen(@NotNull PoolStolen request) implements Write {
+  private record Stolen(@NotNull PoolStolen request) implements PoolWrite {
 
     @Override
     public void lockInto(@NotNull Locks locks) {
@@ -1216,7 +1194,7 @@ public class ExchangeOrgStockWriteService {
    *
    * @param request the earmark write
    */
-  private record Allocate(@NotNull PoolAllocation request) implements Write {
+  private record Allocate(@NotNull PoolAllocation request) implements PoolWrite {
 
     @Override
     public void lockInto(@NotNull Locks locks) {

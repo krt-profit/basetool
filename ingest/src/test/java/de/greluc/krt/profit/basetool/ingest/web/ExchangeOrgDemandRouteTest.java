@@ -201,7 +201,7 @@ class ExchangeOrgDemandRouteTest {
     assertThat(names(schema.at("/properties/materials/items/properties")))
         .containsExactly("material", "minQuality", "openQuantity", "rawRefs", "source");
     assertThat(names(schema.at("/properties/items/items/properties")))
-        .containsExactly("craftableByMe", "item", "openQuantity");
+        .containsExactly("component", "craftableByMe", "item", "openQuantity");
     assertThat(names(schema.at("/$defs/order/properties")))
         .containsExactly(
             "comment",
@@ -218,8 +218,12 @@ class ExchangeOrgDemandRouteTest {
     assertThat(names(schema.at("/$defs/order/properties/materials/items/properties")))
         .containsExactly("material", "minQuality", "openQuantity");
     assertThat(names(schema.at("/$defs/order/properties/items/items/properties")))
-        .containsExactly("item", "openQuantity");
+        .containsExactly("component", "item", "openQuantity");
     assertThat(names(schema.at("/$defs/unit/properties"))).containsExactly("id", "name");
+    JsonNode component =
+        MAPPER.readTree(Files.readString(SCHEMAS.resolve("component.schema.json")));
+    assertThat(names(component.at("/properties")))
+        .containsExactly("componentType", "grade", "itemClass", "size");
   }
 
   /**
