@@ -234,7 +234,9 @@ mark), `InventoryAccessPolicy` (also the `BookInPolicy`), `InventoryStockCommand
 implementation), `InventoryStockReads` (the `StockReads` implementation), `InventoryEarmarkTargetCache`,
 `StockViewerAccessService`, `InventoryStockDecisions` (each stock rule of a book-out, an Umbuchung, a
 split and a lot rebooking as a pure function returning a refusal value, which the web services and the
-published commands both adapt; REQ-INV-065, ADR-0284),
+published commands both adapt; REQ-INV-065, ADR-0284), `LotRows` (the one primitive that splits a
+part off a row and lowers or deletes the source, keeping the earmarks, donations and the
+Materialbörse observer in step; REQ-MARKET-013),
 `InventoryCraftableStock` (the blueprint's `CraftableStockSource`),
 `InventoryOrgUnitReconciler` (the org-unit module's `FirstMembershipObserver`), its GDPR participants, the
 three repositories, `InventoryItemMapper`, `InventoryItemCatalogService` (the `StockItemCatalogue`) and the
