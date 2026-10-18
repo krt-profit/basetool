@@ -291,16 +291,26 @@ look-alike variants apart, e.g. `FR-66 · S1 · A · Militär`.
 - The frontend proxies `GET /inventory/item-search` and `GET /orders/item-search` return
   `{id, name, label}` per match, the label built in the request's locale by `ItemPickerLabels`.
   Both pickers show `label`.
+- The job-order form labels every item it shows the same way: an existing line when an item order
+  is edited, and each adoptable sub-assembly of the derivation preview with the line it adds. The
+  backend `GameItemReferenceDto` of order lines and sub-assemblies carries `componentType`,
+  `size`, `grade` and `itemClass`, set only for a component (`GameItemReferenceDto.of`); the
+  frontend relay `GET /orders/item-derivation/{blueprintId}` adds a `label` to each
+  sub-assembly.
 
 **Acceptance**
 
 - [x] Searching „FR-66" while booking in shows `FR-66 · S1 · A · Militär` as the option label.
 - [x] The job-order item search shows the same label.
 - [x] A non-component item shows its plain name.
+- [x] Editing an item order shows an existing FR-66 line as `FR-66 · S1 · A · Militär`.
+- [x] A sub-assembly suggestion and the line it adopts show the same label.
 
 **Enforced by:** `ItemPickerLabelsTest`, `InventoryPageControllerMvcTest` item-search cases,
-`JobOrderItemSearchControllerMvcTest` · **Code:** `ItemPickerLabels`, `ItemPickerOption`,
-`InventoryPageController#itemSearch`, `JobOrderItemSearchController`,
+`JobOrderItemPickerControllerMvcTest`, `JobOrderItemLinesTest`,
+`JobOrderItemServiceTest#toItemDtosCarryAComponentsTypeSizeGradeAndClass` · **Code:**
+`ItemPickerLabels`, `ItemPickerOption`, `InventoryPageController#itemSearch`,
+`JobOrderItemPickerController`, `JobOrderItemLines`, `GameItemReferenceDto`,
 `krt-catalog-search.js`, `orders-create.js` · **Issues:** #2723
 
 ## Out of scope

@@ -46,7 +46,8 @@ public record InventoryGameItemReferenceDto(
     String componentType,
     Integer size,
     String grade,
-    String itemClass) {
+    String itemClass)
+    implements ComponentItemReference {
 
   /**
    * Builds a reference without component data, for items that are no ship component.

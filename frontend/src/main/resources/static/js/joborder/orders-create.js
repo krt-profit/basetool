@@ -30,6 +30,11 @@ import { toGameItemOption } from '/js/kernel/krt-catalog-search.js';
 
 /** @typedef {ApiDto<'MaterialDto'> & {id: string}} OrderMaterial */
 /** @typedef {ApiDto<'BlueprintReferenceDto'> & {id: string}} OrderBlueprint */
+/**
+ * The derivation preview of `/orders/item-derivation`, each sub-assembly with its picker label.
+ *
+ * @typedef {Omit<ApiDto<'ItemDerivationDto'>, 'subAssemblies'> & {subAssemblies?: (ApiDto<'SubAssemblySuggestionDto'> & {label?: string})[]}} ItemDerivationView
+ */
 
 /**
  * Prefill values of an item line, from the edit bootstrap or an adopted sub-assembly.
@@ -39,7 +44,7 @@ import { toGameItemOption } from '/js/kernel/krt-catalog-search.js';
  * @property {number | string} [manufactured] the amount already produced
  * @property {string} [parentId] the client line id of the parent line
  * @property {string} [gameItemId] the ordered item
- * @property {string} [gameItemName] the ordered item's name
+ * @property {string} [gameItemName] the ordered item's picker label
  * @property {number | string} [amount] the ordered amount
  * @property {string} [blueprintId] the stored blueprint
  * @property {Record<string, string>} [qualities] the stored quality code per material id
@@ -700,7 +705,7 @@ function loadDerivation(row, qualities) {
     const subs = /** @type {HTMLElement} */ (row.querySelector('[data-role="subassemblies"]'));
     krtFetch
         .getJson(`/orders/item-derivation/${encodeURIComponent(blueprintId)}?amount=${amount}`)
-        .then((/** @type {ApiDto<'ItemDerivationDto'> | null} */ d) => {
+        .then((/** @type {ItemDerivationView | null} */ d) => {
             if (!d) {
                 clearDerived(row);
                 return;
@@ -748,9 +753,10 @@ function loadDerivation(row, qualities) {
             if ((d.subAssemblies || []).length) {
                 const subLines = (d.subAssemblies ?? []).map((sa) => {
                     const gi = sa.gameItem || {};
+                    const itemLabel = sa.label || gi.name || '';
                     return krtHtml`<div class="oc-material-line">
-                        <span class="flex-2">${gi.name || ''} &times; ${sa.quantity}</span>
-                        <button type="button" class="btn btn-ghost mb-0" data-trigger="orders-adopt-sub" data-game-item-id="${gi.id}" data-game-item-name="${gi.name || ''}" data-amount="${sa.quantity}" data-parent="${idx}">${ITEM_I18N.subAdopt}</button>
+                        <span class="flex-2">${itemLabel} &times; ${sa.quantity}</span>
+                        <button type="button" class="btn btn-ghost mb-0" data-trigger="orders-adopt-sub" data-game-item-id="${gi.id}" data-game-item-name="${itemLabel}" data-amount="${sa.quantity}" data-parent="${idx}">${ITEM_I18N.subAdopt}</button>
                     </div>`;
                 });
                 krtHtml.set(

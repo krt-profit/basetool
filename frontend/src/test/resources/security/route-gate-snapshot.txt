@@ -447,8 +447,8 @@
 /orders/create POST -> JobOrderWriteController#createOrder gate=class:isAuthenticated() layout=yes
 /orders/create POST headers=[X-Requested-With=XMLHttpRequest] -> JobOrderWriteController#createOrderAjax gate=class:isAuthenticated() layout=yes
 /orders/item-blueprints/{gameItemId} GET -> JobOrderPageController#itemBlueprints gate=class:isAuthenticated() layout=yes
-/orders/item-derivation/{blueprintId} GET -> JobOrderPageController#itemDerivation gate=class:isAuthenticated() layout=yes
-/orders/item-search GET -> JobOrderItemSearchController#itemSearch gate=class:isAuthenticated() layout=no
+/orders/item-derivation/{blueprintId} GET -> JobOrderItemPickerController#itemDerivation gate=class:isAuthenticated() layout=no
+/orders/item-search GET -> JobOrderItemPickerController#itemSearch gate=class:isAuthenticated() layout=no
 /orders/items POST -> JobOrderWriteController#createItemOrder gate=class:isAuthenticated() layout=yes
 /orders/items POST headers=[X-Requested-With=XMLHttpRequest] -> JobOrderWriteController#createItemOrderAjax gate=class:isAuthenticated() layout=yes
 /orders/material-demand GET -> JobOrderMaterialDemandPageController#viewMaterialDemand gate=method:isAuthenticated() layout=yes

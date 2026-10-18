@@ -213,7 +213,7 @@ class ArchitectureTest {
    * The maximum number of body-writing handlers inside {@code @UsesLayoutModel} controllers; lower
    * it when handlers move out, never raise it.
    */
-  private static final long BODY_HANDLERS_IN_LAYOUT_CONTROLLERS = 214L;
+  private static final long BODY_HANDLERS_IN_LAYOUT_CONTROLLERS = 213L;
 
   /**
    * Whether a handler method writes its response body directly, mirroring the shapes {@code
