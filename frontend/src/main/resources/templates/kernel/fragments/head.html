@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta th:if="${csrfTokenValue != null}" name="_csrf" th:content="${csrfTokenValue}"/>
     <meta th:if="${csrfHeaderName != null}" name="_csrf_header" th:content="${csrfHeaderName}"/>
+    <meta th:each="sectionKeys : ${@liveSyncSectionKeys.byTopicClass()}" name="krt-live-sync-sections"
+          th:attr="data-topic-class=${sectionKeys.key}" th:content="${sectionKeys.value}"/>
     <link rel="icon" type="image/svg+xml" th:href="@{/logos/basetool-favicon.svg}">
     <link rel="icon" type="image/png" sizes="32x32" th:href="@{/logos/basetool-favicon-32.png}">
     <link rel="icon" type="image/png" sizes="16x16" th:href="@{/logos/basetool-favicon-16.png}">

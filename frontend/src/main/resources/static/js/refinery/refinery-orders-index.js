@@ -71,6 +71,7 @@ function initRefineryOrdersIndex() {
 
     if (results) {
         krtPageSections.create({
+            topicClass: 'REFINERY',
             sections: {
                 queue: { container: '#refinery-orders-results', fragmentValue: 'results' },
             },

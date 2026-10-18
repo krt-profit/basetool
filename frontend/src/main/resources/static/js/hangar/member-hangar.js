@@ -167,6 +167,7 @@ function initMemberHangar() {
     const memberTopic = resultsEl ? resultsEl.dataset.liveSyncTopic || '' : '';
 
     const memberSections = krtPageSections.create({
+        topicClass: 'HANGAR_OWN',
         sections: { ships: { container: RESULTS } },
         pageUrl() {
             const query = new URLSearchParams(window.location.search).toString();

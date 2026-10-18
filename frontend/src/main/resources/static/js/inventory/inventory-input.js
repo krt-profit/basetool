@@ -111,6 +111,7 @@ function startOrderNeedsLiveSync() {
         return;
     }
     krtPageSections.create({
+        topicClass: 'ORDERS_QUEUE',
         sections: {
             demand: { container: '#jobOrderAllocGroup', fragmentValue: 'demand' },
         },

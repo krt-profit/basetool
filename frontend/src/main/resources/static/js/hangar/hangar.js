@@ -61,6 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const hangarTopic = hangarResults ? hangarResults.dataset.liveSyncTopic || '' : '';
 
     const hangarSections = krtPageSections.create({
+        topicClass: 'HANGAR_OWN',
         sections: { ships: { container: '#hangar-results' } },
         pageUrl: currentListUrl,
         topic: hangarTopic,

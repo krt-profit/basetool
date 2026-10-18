@@ -41,6 +41,7 @@ function initMissions() {
     }
 
     krtPageSections.create({
+        topicClass: 'MISSIONS_LIST',
         sections: {
             list: { container: '#missions-results', fragmentValue: 'results' },
         },

@@ -61,6 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
         containerSelector: '#supply-incoming-results',
         listUrl: '/supply/donations/incoming',
         section: 'donations',
+        topicClass: 'SUPPLY_DONATIONS',
     });
 
     bindFilterForm({

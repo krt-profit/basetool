@@ -121,6 +121,7 @@ export function bindResults(cfg) {
     const fragment = cfg.fragment || 'results';
 
     const seam = krtPageSections.create({
+        topicClass: 'PURCHASING_DEALS',
         sections: { [cfg.section]: { container: cfg.containerSelector, fragmentValue: fragment } },
         pageUrl() {
             return `${cfg.listUrl}${window.location.search}`;

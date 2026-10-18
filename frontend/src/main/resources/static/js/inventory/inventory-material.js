@@ -23,6 +23,7 @@ import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 document.addEventListener('DOMContentLoaded', () => {
     krtFetch.bindSwap({ container: '#inventory-material-results', history: true });
     krtPageSections.create({
+        topicClass: 'INVENTORY_ALL',
         sections: {
             stock: { container: '#inventory-material-results', fragmentValue: 'results' },
         },

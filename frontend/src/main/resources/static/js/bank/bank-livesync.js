@@ -47,7 +47,7 @@ function bankAccountId() {
 /**
  * Declares one bank room's sections, topic and receiver.
  *
- * @param {{ topic: string, coalesceMs?: number, sections: Record<string, { container: string, fragmentValue: string }> }} room
+ * @param {{ topicClass: string, topic: string, coalesceMs?: number, sections: Record<string, { container: string, fragmentValue: string }> }} room
  *     the room's topic, receiver coalescing delay and section map
  * @returns {KrtPageSections} the room's section seam
  */
@@ -57,6 +57,7 @@ function bankRoom(room) {
             return { 'bank.refresh.error': bankRefreshError() };
         },
         keys: { refreshErrorKey: 'bank.refresh.error' },
+        topicClass: room.topicClass,
         sections: room.sections,
         pageUrl() {
             return window.location.pathname + window.location.search;
@@ -81,6 +82,7 @@ export function initLiveSyncReceivers() {
         document.querySelector('#bank-grants-results');
     if (hasStaffRoom) {
         bankRoom({
+            topicClass: 'BANK_STAFF',
             topic: 'bank',
             coalesceMs: 1500,
             sections: {
@@ -100,6 +102,7 @@ export function initLiveSyncReceivers() {
         document.querySelector('#org-unit-bank-settings-results');
     if (hasOrgUnitRoom) {
         bankRoom({
+            topicClass: 'ORGUNIT_BANK',
             topic: 'orgunit-bank',
             coalesceMs: 1500,
             sections: {
@@ -118,6 +121,7 @@ export function initLiveSyncReceivers() {
     const accountId = bankAccountId();
     if (accountId && document.querySelector('#bank-account-results')) {
         bankRoom({
+            topicClass: 'BANK_ACCOUNT',
             topic: `bank:${accountId}`,
             sections: {
                 account: { container: '#bank-account-results', fragmentValue: 'accountBody' },
@@ -127,6 +131,7 @@ export function initLiveSyncReceivers() {
         });
     } else if (accountId) {
         bankRoom({
+            topicClass: 'BANK_ACCOUNT',
             topic: `bank:${accountId}`,
             sections: {
                 account: {

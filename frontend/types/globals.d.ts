@@ -292,7 +292,15 @@ interface KrtPageSectionsConfig {
     dictName?: string;
     /** Message-key prefixes used to derive the per-section localized strings. */
     keys?: Record<string, string>;
-    /** Maps a section key to its swap container and Thymeleaf fragment value. */
+    /**
+     * The `LiveSyncTopicClass` whose server-rendered section keys (the head's
+     * `meta[name="krt-live-sync-sections"]`) bound this page's `sections`.
+     */
+    topicClass?: string;
+    /**
+     * Maps a section key to its swap container and Thymeleaf fragment value; a key the server did
+     * not render for `topicClass` is reported and dropped.
+     */
     sections?: Record<string, { container: string; fragmentValue?: string }>;
     /**
      * Late-bound accessor for the URL the section fragments are fetched from. Null while the
@@ -357,8 +365,10 @@ interface KrtPageSections {
     notify(sectionKeys: string | string[]): void;
     /** The receiver of a peer's change, or null when the page declared none or has no topic. */
     receiver: KrtReceiver | null;
-    /** The declared sections. */
+    /** The declared sections, without any key the server did not allow. */
     sections: Record<string, { container: string; fragmentValue?: string }>;
+    /** The section keys the server allows for `topicClass`, or null without a topic class. */
+    allowedKeys: string[] | null;
 }
 
 /** The page-section module installed by `kernel/krt-page-sections.js` (ADR-0289). */

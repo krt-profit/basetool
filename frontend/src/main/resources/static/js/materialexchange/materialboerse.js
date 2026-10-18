@@ -898,6 +898,7 @@ function initMaterialboerse() {
     }
 
     const boardSections = krtPageSections.create({
+        topicClass: 'MATERIALBOARD',
         sections: {
             board: { container: '#mb-listwrap', fragmentValue: 'list' },
             requests: { container: '#mg-listwrap', fragmentValue: 'list' },

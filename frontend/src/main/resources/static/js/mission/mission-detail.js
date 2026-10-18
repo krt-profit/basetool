@@ -64,6 +64,7 @@ const missionSeam = krtPageSections.create({
         reloadDetailKey: 'mission.conflict.toast.detail',
         refreshErrorKey: 'mission.section.refresh.error',
     },
+    topicClass: 'MISSION',
     sections: {
         crew: { container: '#crew-board-results', fragmentValue: 'crew-board' },
         finance: { container: '#finance-results', fragmentValue: 'finance' },

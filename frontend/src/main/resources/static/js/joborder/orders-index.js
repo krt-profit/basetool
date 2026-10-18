@@ -38,6 +38,7 @@ function initOrdersIndex() {
             };
         },
         keys: { refreshErrorKey: 'orders.section.refresh.error' },
+        topicClass: 'ORDERS_QUEUE',
         sections: {
             queue: { container: '#orders-results', fragmentValue: 'results' },
         },

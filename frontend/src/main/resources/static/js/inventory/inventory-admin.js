@@ -340,6 +340,7 @@ function filterInventory() {
 }
 
 const inventoryAll = krtPageSections.create({
+    topicClass: 'INVENTORY_ALL',
     sections: {
         stock: { container: '#tableContainer', fragmentValue: 'stock' },
     },
@@ -357,6 +358,7 @@ const inventoryAll = krtPageSections.create({
 inventoryHooks.notifyChanged = () => inventoryAll.notify('stock');
 
 krtPageSections.create({
+    topicClass: 'ORDERS_QUEUE',
     sections: {
         demand: { container: '#tableContainer' },
     },

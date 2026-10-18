@@ -228,6 +228,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!window.orderId) return;
     const orderId = window.orderId;
     collectionSections = krtPageSections.create({
+        topicClass: 'ORDER',
         sections: {
             materials: { container: '#material-collection-results', fragmentValue: 'results' },
         },

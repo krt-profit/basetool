@@ -583,6 +583,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
             },
             keys: { refreshErrorKey: 'demand.section.refresh.error' },
+            topicClass: 'ORDERS_QUEUE',
             sections: {
                 demand: { container: '#orders-material-demand-results', fragmentValue: 'results' },
             },

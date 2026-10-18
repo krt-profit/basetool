@@ -36,6 +36,7 @@ function initAdminExchangeClients() {
             return { 'xc.refresh.error': (holder && holder.dataset.error) || '' };
         },
         keys: { refreshErrorKey: 'xc.refresh.error' },
+        topicClass: 'EXCHANGE_CLIENTS',
         sections: {
             registry: { container: '#xc-registry-host', fragmentValue: 'registry' },
             undoRuns: { container: '#xc-undo-runs-host', fragmentValue: 'undoRuns' },

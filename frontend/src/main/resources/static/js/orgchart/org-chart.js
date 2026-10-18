@@ -43,6 +43,7 @@ const orgChart = krtPageSections.create({
         return { 'orgchart.refresh.failed': OC_I18N.refreshFailed };
     },
     keys: { refreshErrorKey: 'orgchart.refresh.failed' },
+    topicClass: 'ORG_STRUCTURE',
     sections: {
         chart: { container: '#oc-chart', fragmentValue: 'chartBody' },
     },

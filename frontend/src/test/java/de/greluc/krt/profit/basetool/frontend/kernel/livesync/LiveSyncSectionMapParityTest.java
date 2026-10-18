@@ -558,6 +558,42 @@ class LiveSyncSectionMapParityTest {
         .isPositive();
   }
 
+  private static final Pattern JOINS_ROOM = Pattern.compile("(?m)^\\s+topic(?::|\\(\\))");
+
+  @Test
+  void everyDeclaredTopicClassNamesAnExistingClassAndEveryLiveSeamDeclaresOne() throws IOException {
+    Set<String> classes = new LinkedHashSet<>();
+    for (LiveSyncTopicClass topicClass : LiveSyncTopicClass.values()) {
+      classes.add(topicClass.name());
+    }
+    Set<String> declaredClasses = new LinkedHashSet<>();
+    Set<String> seamsWithoutTopicClass = new LinkedHashSet<>();
+    Pattern declaration = Pattern.compile("\\btopicClass:\\s*'([A-Z_]+)'");
+    Path scripts = ClasspathAssets.scripts();
+    try (Stream<Path> files = Files.walk(scripts)) {
+      for (Path file : files.filter(path -> path.toString().endsWith(".js")).toList()) {
+        String js = Files.readString(file, StandardCharsets.UTF_8);
+        if (!js.contains("krtPageSections.create(")) {
+          continue;
+        }
+        Matcher matcher = declaration.matcher(js);
+        while (matcher.find()) {
+          declaredClasses.add(matcher.group(1));
+        }
+        if (!js.contains("topicClass:") && JOINS_ROOM.matcher(js).find()) {
+          seamsWithoutTopicClass.add(scripts.relativize(file).toString().replace('\\', '/'));
+        }
+      }
+    }
+
+    assertThat(classes)
+        .as("every declared topicClass names a LiveSyncTopicClass")
+        .containsAll(declaredClasses);
+    assertThat(seamsWithoutTopicClass)
+        .as("a page module that joins a live-sync room declares its topicClass")
+        .isEmpty();
+  }
+
   /**
    * Resolves a {@code data-livesync} topic token to its {@link LiveSyncTopicClass} by prefix and
    * whether it carries an id segment, e.g. {@code bank:@account} to {@link

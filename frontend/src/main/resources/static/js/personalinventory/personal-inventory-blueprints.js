@@ -335,6 +335,7 @@ function blueprintPageUrl() {
 }
 
 const memberBlueprints = krtPageSections.create({
+    topicClass: 'BLUEPRINTS_OWN',
     sections: { list: { container: '#krt-bp-list', fragmentValue: 'list' } },
     pageUrl: blueprintPageUrl,
     topic() {
