@@ -783,7 +783,9 @@ function restoreMyInventoryFilters() {
         return false;
     }
     if (
-        [...myLager.lagerFilterParams(), ...myLager.itemAttributeParams()].some((p) => params.has(p))
+        [...myLager.lagerFilterParams(), ...myLager.itemAttributeParams()].some((p) =>
+            params.has(p),
+        )
     ) {
         persistMyInventoryFilters();
         return false;

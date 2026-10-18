@@ -18859,11 +18859,92 @@
           }
         }, {
           "in" : "query",
+          "name" : "personalOnly",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean"
+          }
+        }, {
+          "in" : "query",
+          "name" : "nonPersonalOnly",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean"
+          }
+        }, {
+          "in" : "query",
+          "name" : "stolenOnly",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean"
+          }
+        }, {
+          "in" : "query",
+          "name" : "nonStolenOnly",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean"
+          }
+        }, {
+          "in" : "query",
+          "name" : "kinds",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "GENERIC", "VEHICLE_ITEM", "VEHICLE_WEAPON", "WEAPON", "WEAPON_ATTACHMENT", "ARMOR", "CLOTHING", "FOOD" ]
+            }
+          }
+        }, {
+          "in" : "query",
+          "name" : "componentTypes",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "SHIELD", "COOLER", "POWER_PLANT", "QUANTUM_DRIVE", "JUMP_DRIVE", "RADAR", "WEAPON_GUN", "WEAPON_MINING", "MISSILE_LAUNCHER", "MISSILE", "BOMB_LAUNCHER", "BOMB", "TURRET", "EMP", "QUANTUM_INTERDICTION_GENERATOR", "TRACTOR_BEAM", "TOWING_BEAM", "SALVAGE_HEAD", "LIFE_SUPPORT_GENERATOR" ]
+            }
+          }
+        }, {
+          "in" : "query",
+          "name" : "sizes",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "integer",
+              "format" : "int32"
+            }
+          }
+        }, {
+          "in" : "query",
+          "name" : "grades",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }, {
+          "in" : "query",
+          "name" : "itemClasses",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "MILITARY", "CIVILIAN", "INDUSTRIAL", "STEALTH", "COMPETITION" ]
+            }
+          }
+        }, {
+          "in" : "query",
           "name" : "catalog",
           "required" : false,
           "schema" : {
             "type" : "string",
-            "default" : "MATERIAL",
             "enum" : [ "MATERIAL", "ITEM" ]
           }
         }, {
@@ -19066,19 +19147,31 @@
           }
         }, {
           "in" : "query",
+          "name" : "personalOnly",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean"
+          }
+        }, {
+          "in" : "query",
+          "name" : "nonPersonalOnly",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean"
+          }
+        }, {
+          "in" : "query",
           "name" : "stolenOnly",
           "required" : false,
           "schema" : {
-            "type" : "boolean",
-            "default" : false
+            "type" : "boolean"
           }
         }, {
           "in" : "query",
           "name" : "nonStolenOnly",
           "required" : false,
           "schema" : {
-            "type" : "boolean",
-            "default" : false
+            "type" : "boolean"
           }
         }, {
           "in" : "query",
@@ -19140,7 +19233,6 @@
           "required" : false,
           "schema" : {
             "type" : "string",
-            "default" : "MATERIAL",
             "enum" : [ "MATERIAL", "ITEM" ]
           }
         } ],
@@ -20697,32 +20789,28 @@
           "name" : "personalOnly",
           "required" : false,
           "schema" : {
-            "type" : "boolean",
-            "default" : false
+            "type" : "boolean"
           }
         }, {
           "in" : "query",
           "name" : "nonPersonalOnly",
           "required" : false,
           "schema" : {
-            "type" : "boolean",
-            "default" : false
+            "type" : "boolean"
           }
         }, {
           "in" : "query",
           "name" : "stolenOnly",
           "required" : false,
           "schema" : {
-            "type" : "boolean",
-            "default" : false
+            "type" : "boolean"
           }
         }, {
           "in" : "query",
           "name" : "nonStolenOnly",
           "required" : false,
           "schema" : {
-            "type" : "boolean",
-            "default" : false
+            "type" : "boolean"
           }
         }, {
           "in" : "query",
@@ -20784,7 +20872,6 @@
           "required" : false,
           "schema" : {
             "type" : "string",
-            "default" : "MATERIAL",
             "enum" : [ "MATERIAL", "ITEM" ]
           }
         } ],
@@ -20971,32 +21058,28 @@
           "name" : "personalOnly",
           "required" : false,
           "schema" : {
-            "type" : "boolean",
-            "default" : false
+            "type" : "boolean"
           }
         }, {
           "in" : "query",
           "name" : "nonPersonalOnly",
           "required" : false,
           "schema" : {
-            "type" : "boolean",
-            "default" : false
+            "type" : "boolean"
           }
         }, {
           "in" : "query",
           "name" : "stolenOnly",
           "required" : false,
           "schema" : {
-            "type" : "boolean",
-            "default" : false
+            "type" : "boolean"
           }
         }, {
           "in" : "query",
           "name" : "nonStolenOnly",
           "required" : false,
           "schema" : {
-            "type" : "boolean",
-            "default" : false
+            "type" : "boolean"
           }
         }, {
           "in" : "query",
@@ -21058,7 +21141,6 @@
           "required" : false,
           "schema" : {
             "type" : "string",
-            "default" : "MATERIAL",
             "enum" : [ "MATERIAL", "ITEM" ]
           }
         } ],

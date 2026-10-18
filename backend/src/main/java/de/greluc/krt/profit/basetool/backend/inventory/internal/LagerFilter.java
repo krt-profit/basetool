@@ -38,7 +38,7 @@ import org.jetbrains.annotations.Unmodifiable;
  * <p>The record owns the defaults (no list narrows, {@code catalog} falls back to {@code
  * MATERIAL}), the contradictory flag pairs and the filters the requested catalog cannot honour. A
  * read applies the dimensions that belong to it and ignores the others: the squadron-wide reads
- * ignore the personal flags, the flat lists ignore the stolen flags and the attribute lists.
+ * ignore the personal flags and the flat lists ignore the stolen flags.
  *
  * @param materialIds the materials to narrow to ({@code MATERIAL} only)
  * @param gameItemIds the game items to narrow to ({@code ITEM} only)

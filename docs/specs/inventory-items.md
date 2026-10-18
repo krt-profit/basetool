@@ -325,7 +325,7 @@ parameters (ADR-0290).
   filters the catalog cannot honour with 400 (REQ-INV-029, REQ-INV-031, REQ-INV-063) and answers
   empty for the contradictory pairs `personalOnly` + `nonPersonalOnly` and `stolenOnly` +
   `nonStolenOnly` without reading the database. The squadron-wide reads ignore the personal flags;
-  the flat list ignores the „Gestohlen" flags and the attribute lists.
+  the flat list ignores the „Gestohlen" flags.
 - The frontend binds `LagerQuery` on `/inventory/my`, `/inventory/my/entry-ids` and
   `/inventory/all`. It owns the parsing, the emptiness test, the backend parameters and the page
   URL parameters from one set of names; `InventoryBackendClient` takes it, and a failed write

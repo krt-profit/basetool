@@ -47,6 +47,15 @@ class LagerQueryTest {
   }
 
   @Test
+  void emptyItemsIsTheItemViewWithoutNarrowing() {
+    LagerQuery query = LagerQuery.emptyItems();
+
+    assertThat(query.itemsView()).isTrue();
+    assertThat(query.anyActive()).isFalse();
+    assertThat(query.backendParams().keySet()).containsExactly("catalog");
+  }
+
+  @Test
   void bindsTheUnchangedUrlParameterNames() {
     MockHttpServletRequest request = new MockHttpServletRequest();
     request.addParameter("view", "items");

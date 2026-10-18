@@ -159,8 +159,6 @@ public record LagerQuery(
       @Nullable List<Integer> sizes,
       @Nullable List<String> grades,
       @Nullable List<String> itemClasses) {
-    ItemAttributeFilter attributes =
-        new ItemAttributeFilter(kinds, componentTypes, sizes, grades, itemClasses);
     this.view = view != null && VIEW_ITEMS.equalsIgnoreCase(view.trim()) ? VIEW_ITEMS : null;
     this.materialIds = distinctIds(materialIds);
     this.minQuality = minQuality;
@@ -172,6 +170,8 @@ public record LagerQuery(
     this.nonPersonalOnly = Boolean.TRUE.equals(nonPersonalOnly);
     this.stolenOnly = Boolean.TRUE.equals(stolenOnly);
     this.nonStolenOnly = Boolean.TRUE.equals(nonStolenOnly);
+    ItemAttributeFilter attributes =
+        new ItemAttributeFilter(kinds, componentTypes, sizes, grades, itemClasses);
     this.kinds = attributes.kinds();
     this.componentTypes = attributes.componentTypes();
     this.sizes = attributes.sizes();

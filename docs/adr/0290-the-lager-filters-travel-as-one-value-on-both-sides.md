@@ -33,8 +33,7 @@ script. Each new filter touched thirty to forty files.
    `data-attribute-filters`; the page scripts read them instead of repeating them.
 4. **URL and REST parameter names are unchanged**, so bookmarks and the end-to-end tests keep
    working. The squadron-wide reads ignore the personal flags and the flat lists ignore the stolen
-   flags and the attribute lists, as before; `openapi.json` now lists the shared filter set on
-   those endpoints.
+   flags, as before; `openapi.json` lists the shared filter set on those endpoints.
 
 ## Consequences
 

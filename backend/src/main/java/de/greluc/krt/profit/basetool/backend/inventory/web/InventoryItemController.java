@@ -61,6 +61,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -294,7 +295,7 @@ public class InventoryItemController {
   @GetMapping("/my-inventory/grouped")
   @Transactional(readOnly = true)
   public List<GroupedInventoryDto> getMyGroupedInventory(
-      @AuthenticationPrincipal Jwt jwt, @ModelAttribute LagerFilter filter) {
+      @AuthenticationPrincipal Jwt jwt, @ParameterObject @ModelAttribute LagerFilter filter) {
     filter.requireMatchingCatalog();
     UUID userId = userService.getUserIdFromJwt(jwt);
     if (filter.catalog() == InventoryCatalog.ITEM) {
@@ -315,7 +316,7 @@ public class InventoryItemController {
   @GetMapping("/my-inventory/entry-ids")
   @Transactional(readOnly = true)
   public List<UUID> getMyEntryIds(
-      @AuthenticationPrincipal Jwt jwt, @ModelAttribute LagerFilter filter) {
+      @AuthenticationPrincipal Jwt jwt, @ParameterObject @ModelAttribute LagerFilter filter) {
     filter.requireMatchingCatalog();
     UUID userId = userService.getUserIdFromJwt(jwt);
     if (filter.catalog() == InventoryCatalog.ITEM) {
@@ -326,8 +327,8 @@ public class InventoryItemController {
 
   /**
    * Squadron-wide flat inventory list (admin/logistician view). A filter that does not match the
-   * catalog is rejected with 400 (REQ-INV-029/031); the personal and stolen flags and the item
-   * attribute filters do not apply to this list.
+   * catalog (including an item attribute filter on the material catalog) is rejected with 400
+   * (REQ-INV-029/031); the personal and stolen flags do not apply to this list.
    *
    * @param filter the Lager filters bound from the query string
    * @param page zero-based page index
@@ -339,7 +340,7 @@ public class InventoryItemController {
   @PreAuthorize(INVENTORY_ACCESS)
   @Transactional(readOnly = true)
   public PageResponse<InventoryItemDto> getAllInventory(
-      @ModelAttribute LagerFilter filter,
+      @ParameterObject @ModelAttribute LagerFilter filter,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort) {
@@ -388,7 +389,8 @@ public class InventoryItemController {
   @GetMapping("/all/grouped")
   @PreAuthorize(INVENTORY_ACCESS)
   @Transactional(readOnly = true)
-  public List<GroupedInventoryDto> getAllGroupedInventory(@ModelAttribute LagerFilter filter) {
+  public List<GroupedInventoryDto> getAllGroupedInventory(
+      @ParameterObject @ModelAttribute LagerFilter filter) {
     filter.requireMatchingCatalog();
     if (filter.catalog() == InventoryCatalog.ITEM) {
       return inventoryAggregationService.getAllAggregatedItemInventory(filter);
