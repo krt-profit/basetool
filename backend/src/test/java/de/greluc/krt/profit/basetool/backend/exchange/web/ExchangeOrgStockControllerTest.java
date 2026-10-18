@@ -86,6 +86,7 @@ class ExchangeOrgStockControllerTest {
   private final List<UUID> users = new ArrayList<>();
   private final List<UUID> orgUnits = new ArrayList<>();
   private final List<UUID> materials = new ArrayList<>();
+  private final List<UUID> gameItems = new ArrayList<>();
   private final List<UUID> locations = new ArrayList<>();
   private final List<UUID> missions = new ArrayList<>();
   private final List<UUID> jobOrders = new ArrayList<>();
@@ -132,6 +133,7 @@ class ExchangeOrgStockControllerTest {
     users.forEach(id -> jdbc.update("DELETE FROM app_user WHERE id = ?", id));
     orgUnits.reversed().forEach(id -> jdbc.update("DELETE FROM org_unit WHERE id = ?", id));
     materials.forEach(id -> jdbc.update("DELETE FROM material WHERE id = ?", id));
+    gameItems.forEach(id -> jdbc.update("DELETE FROM game_item WHERE id = ?", id));
     locations.forEach(id -> jdbc.update("DELETE FROM location WHERE id = ?", id));
     ExchangeSettings settings =
         settingsRepository.findById(ExchangeSettings.SINGLETON_ID).orElseThrow();
@@ -181,6 +183,26 @@ class ExchangeOrgStockControllerTest {
         .andExpect(jsonPath("$.units.length()").value(1))
         .andExpect(jsonPath("$.units[0].id").value(staffel.toString()))
         .andExpect(jsonPath("$.units[0].kind").value("SQUADRON"));
+  }
+
+  @Test
+  void aShipComponentLotCarriesItsComponentAndAMaterialLotNone() throws Exception {
+    UUID staffel = orgUnit("SQUADRON", null);
+    joins(member, staffel, "MEMBER");
+    UUID shield = component();
+    UUID titanium = material();
+    UUID area18 = location();
+    stockItem(other, shield, area18, 2, staffel);
+    stock(other, titanium, area18, 500, 3, false, staffel);
+
+    read(relayed(get(PATH)))
+        .andExpect(jsonPath("$.items.length()").value(2))
+        .andExpect(jsonPath("$.items[?(@.quality == 0)].material.bt").value(shield.toString()))
+        .andExpect(jsonPath("$.items[?(@.quality == 0)].component.componentType").value("SHIELD"))
+        .andExpect(jsonPath("$.items[?(@.quality == 0)].component.size").value(1))
+        .andExpect(jsonPath("$.items[?(@.quality == 0)].component.grade").value("A"))
+        .andExpect(jsonPath("$.items[?(@.quality == 0)].component.itemClass").value("MILITARY"))
+        .andExpect(jsonPath("$.items[?(@.quality == 500)].component").isEmpty());
   }
 
   @Test
@@ -545,6 +567,54 @@ class ExchangeOrgStockControllerTest {
         amount,
         personal,
         pool);
+    return id;
+  }
+
+  /**
+   * Inserts and commits a shared item stock row.
+   *
+   * @param owner the holder
+   * @param item the game item
+   * @param location the location
+   * @param amount the pieces
+   * @param pool the owning org unit
+   */
+  private void stockItem(
+      @NotNull UUID owner,
+      @NotNull UUID item,
+      @NotNull UUID location,
+      double amount,
+      @NotNull UUID pool) {
+    jdbc.update(
+        """
+        INSERT INTO inventory_item (id, user_id, game_item_id, location_id, amount, personal,
+                                    stolen, owning_org_unit_id, version)
+        VALUES (?, ?, ?, ?, ?, false, false, ?, 0)
+        """,
+        UUID.randomUUID(),
+        owner,
+        item,
+        location,
+        amount,
+        pool);
+  }
+
+  /**
+   * Seeds an S1 grade A military shield generator.
+   *
+   * @return its id
+   */
+  private @NotNull UUID component() {
+    UUID id = UUID.randomUUID();
+    jdbc.update(
+        """
+        INSERT INTO game_item (id, name, kind, source_systems, wiki_type, size_class, grade,
+                               item_class)
+        VALUES (?, ?, 'GENERIC', 'UEX_ONLY', 'Shield', 1, 'A', 'MILITARY')
+        """,
+        id,
+        "FR-66 " + id);
+    gameItems.add(id);
     return id;
   }
 

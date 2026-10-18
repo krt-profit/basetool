@@ -19,16 +19,21 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * One open item line of the org demand (REQ-XCH-018).
+ * One open item line of the org demand (REQ-XCH-018); absent optional fields are left out.
  *
  * @param item the game item, with its id as {@code bt}
+ * @param component the item's ship component data, or {@code null} for another item
  * @param openQuantity the pieces still needed
  * @param craftableByMe whether the member holds a blueprint that produces it
  */
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record ExchangeDemandItemDto(
     @NotNull ExchangeItemRefDto item,
+    @Nullable ExchangeComponentDto component,
     @NotNull ExchangeQuantityDto openQuantity,
     boolean craftableByMe) {}
