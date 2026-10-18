@@ -21,18 +21,14 @@
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
 import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { joborderHooks } from '/js/joborder/joborder-hooks.js';
 
-const ORDERS_SECTIONS = {
-    queue: { container: '#orders-results', fragmentValue: 'results' },
-};
-
 function initOrdersIndex() {
-    const ordersQueueSeam = krtFetch.sectionWrite({
+    const ordersQueue = krtPageSections.create({
         dict() {
             return {
                 'orders.section.refresh.error':
@@ -42,39 +38,28 @@ function initOrdersIndex() {
             };
         },
         keys: { refreshErrorKey: 'orders.section.refresh.error' },
-        sections: ORDERS_SECTIONS,
+        sections: {
+            queue: { container: '#orders-results', fragmentValue: 'results' },
+        },
         pageUrl() {
             return window.location.pathname + window.location.search;
         },
-        broadcast(keys) {
-            if (typeof krtLiveSync.sendChanged === 'function') {
-                krtLiveSync.sendChanged('orders', keys);
-            }
-        },
-    });
-    joborderHooks.refreshOrdersQueue = ordersQueueSeam.refresh;
-
-    krtLiveSync.createReceiver({
         topic: 'orders',
-        sections: ORDERS_SECTIONS,
-        coalesceMs: 1500,
-        /** @param {string[]} keys the section keys a peer changed */
-        refresh(keys) {
-            if (joborderHooks.refreshOrdersQueue) {
-                joborderHooks.refreshOrdersQueue(keys, { broadcast: false });
-            }
-        },
-        busyTest() {
-            return joborderHooks.ordersDragging === true;
-        },
-        pill: {
-            label() {
-                return typeof KRT_ORDERS_LIVESYNC_UPDATES !== 'undefined'
-                    ? KRT_ORDERS_LIVESYNC_UPDATES
-                    : undefined;
+        receiver: {
+            coalesceMs: 1500,
+            busyTest() {
+                return joborderHooks.ordersDragging === true;
+            },
+            pill: {
+                label() {
+                    return typeof KRT_ORDERS_LIVESYNC_UPDATES !== 'undefined'
+                        ? KRT_ORDERS_LIVESYNC_UPDATES
+                        : undefined;
+                },
             },
         },
     });
+    joborderHooks.refreshOrdersQueue = ordersQueue.refresh;
 }
 
 initOrdersIndex();

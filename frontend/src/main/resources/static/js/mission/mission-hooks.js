@@ -19,9 +19,9 @@
 
 /**
  * @typedef {object} MissionHooks
- * @property {KrtSectionWriter['write']} write sends one section write (mission-detail.js)
- * @property {KrtSectionWriter['refresh']} refresh re-renders sections (mission-detail.js)
- * @property {KrtSectionWriter['notify']} notify tells peers that sections changed (mission-detail.js)
+ * @property {KrtPageSections['write']} write sends one section write (mission-detail.js)
+ * @property {KrtPageSections['refresh']} refresh re-renders sections (mission-detail.js)
+ * @property {KrtPageSections['notify']} notify tells peers that sections changed (mission-detail.js)
  * @property {(overlay: Element | null) => void} modalOpen opens a dialog (mission-detail-modals.js)
  * @property {(overlay: Element | null) => void} modalClose closes a dialog (mission-detail-modals.js)
  * @property {(targetId: string, value: string) => void} segSet sets a segmented control (mission-detail-modals.js)
