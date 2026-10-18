@@ -18,12 +18,8 @@
  */
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
-
-const REFINERY_SECTIONS = {
-    queue: { container: '#refinery-orders-results', fragmentValue: 'results' },
-};
 
 function initRefineryOrdersIndex() {
     const FILTER_PREF_KEY = 'refinery_orders_filter';
@@ -74,13 +70,16 @@ function initRefineryOrdersIndex() {
     }
 
     if (results) {
-        krtLiveSync.createReceiver({
-            topic: 'refinery',
-            sections: REFINERY_SECTIONS,
-            coalesceMs: 1500,
-            refresh() {
-                load(false);
+        krtPageSections.create({
+            sections: {
+                queue: { container: '#refinery-orders-results', fragmentValue: 'results' },
             },
+            pageUrl() {
+                const query = queryString();
+                return `/refinery-orders${query ? `?${query}` : ''}`;
+            },
+            topic: 'refinery',
+            receiver: { coalesceMs: 1500 },
         });
     }
 

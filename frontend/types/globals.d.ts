@@ -276,11 +276,11 @@ interface KrtSwapOpts {
 /** Configuration for {@linkcode KrtPageSectionsApi.create}. */
 interface KrtPageSectionsConfig {
     /** Late-bound accessor for the page's i18n dictionary. */
-    dict(): KrtI18nDict | null | undefined;
+    dict?(): KrtI18nDict | null | undefined;
     /** The dictionary's global name, used to report a missing string as `NAME[key]`. */
     dictName?: string;
     /** Message-key prefixes used to derive the per-section localized strings. */
-    keys: Record<string, string>;
+    keys?: Record<string, string>;
     /** Maps a section key to its swap container and Thymeleaf fragment value. */
     sections: Record<string, { container: string; fragmentValue: string }>;
     /**

@@ -26,8 +26,8 @@ replacement for native dialogs (see [`ui-design-system.md`](ui-design-system.md)
 ([`kernel/krt-page-sections.js`](../../frontend/src/main/resources/static/js/kernel/krt-page-sections.js),
 ADR-0289, which replaces `krtFetch.sectionWrite` of ADR-0069): a page declares its sections
 once (key to `{container, fragmentValue}`), the live-sync `topic` (a string or a thunk that is
-null while the page has no entity id), the page-URL getter, the late-bound i18n dict and keys,
-and optionally a `receiver` (`coalesceMs`, `busyTest`, `pill`, `events`, `expand`). The module
+null while the page has no entity id), the page-URL getter, the late-bound i18n dict and keys (both optional for a page that only
+receives), and optionally a `receiver` (`coalesceMs`, `busyTest`, `pill`, `events`, `expand`). The module
 owns the whole choreography and returns `{write, refresh, notify, receiver, sections}`:
 
 - `write` decorates `krtFetch.write` with the section's localized success/error/conflict

@@ -1,10 +1,6 @@
 import { krtFetch } from '/js/kernel/krt-fetch.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
-
-const MISSIONS_SECTIONS = {
-    list: { container: '#missions-results', fragmentValue: 'results' },
-};
 
 function initMissions() {
     const form = /** @type {HTMLFormElement | null} */ (
@@ -44,13 +40,16 @@ function initMissions() {
         });
     }
 
-    krtLiveSync.createReceiver({
-        topic: 'missions',
-        sections: MISSIONS_SECTIONS,
-        coalesceMs: 1500,
-        refresh() {
-            loadResults(false);
+    krtPageSections.create({
+        sections: {
+            list: { container: '#missions-results', fragmentValue: 'results' },
         },
+        pageUrl() {
+            const query = buildQueryString();
+            return `/missions${query ? `?${query}` : ''}`;
+        },
+        topic: 'missions',
+        receiver: { coalesceMs: 1500 },
     });
 
     if (!form) return;
