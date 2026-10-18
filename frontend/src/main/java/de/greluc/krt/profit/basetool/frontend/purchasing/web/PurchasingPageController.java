@@ -120,8 +120,7 @@ public class PurchasingPageController {
   @ModelAttribute("purchasingTabs")
   public @NotNull PurchasingTabs purchasingTabs(
       @ModelAttribute("purchasingState") @NotNull PurchasingStateDto state) {
-    return new PurchasingTabs(
-        state.delegate() || state.governing(), state.governing(), state.canReadReport());
+    return PurchasingTabs.of(state);
   }
 
   /**
@@ -131,7 +130,20 @@ public class PurchasingPageController {
    * @param delegates whether the „Handelsbeauftragte" tab is shown
    * @param report whether the „Bericht" tab is shown
    */
-  public record PurchasingTabs(boolean partners, boolean delegates, boolean report) {}
+  public record PurchasingTabs(boolean partners, boolean delegates, boolean report) {
+
+    /**
+     * Derives the tabs from what the caller may do.
+     *
+     * @param state the caller's capabilities
+     * @return the partners for a delegate or a governing member, the delegates for a governing
+     *     member, the report for a caller who may read it
+     */
+    public static @NotNull PurchasingTabs of(@NotNull PurchasingStateDto state) {
+      return new PurchasingTabs(
+          state.delegate() || state.governing(), state.governing(), state.canReadReport());
+    }
+  }
 
   private static final PurchasingStateDto NO_STATE =
       new PurchasingStateDto(false, false, false, false, false, false, false);

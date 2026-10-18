@@ -96,12 +96,7 @@ public class SupplyPageController {
     return SectionFallback.load(
         log,
         "supply-tabs",
-        () -> {
-          List<SupplyUnitDto> units = orEmpty(supplyClient.units());
-          boolean incoming = units.stream().anyMatch(u -> u.canManage() && u.acceptsDonations());
-          boolean managesAny = units.stream().anyMatch(SupplyUnitDto::canManage);
-          return new SupplyTabs(incoming, incoming || managesAny || authHelper.isAdmin());
-        },
+        () -> SupplyTabs.of(orEmpty(supplyClient.units()), authHelper.isAdmin()),
         new SupplyTabs(false, false));
   }
 
@@ -111,7 +106,22 @@ public class SupplyPageController {
    * @param incoming whether the „Eingehende Spenden" tab is shown
    * @param stats whether the „Statistik" tab is shown
    */
-  public record SupplyTabs(boolean incoming, boolean stats) {}
+  public record SupplyTabs(boolean incoming, boolean stats) {
+
+    /**
+     * Derives the tabs from the units the caller can see.
+     *
+     * @param units the supply units as the backend answers them for the caller
+     * @param admin whether the caller is an administrator, who always sees the statistics
+     * @return the incoming tab for a manager of a receiving unit, the statistics for any manager
+     *     and for an administrator
+     */
+    public static @NotNull SupplyTabs of(@NotNull List<SupplyUnitDto> units, boolean admin) {
+      boolean incoming = units.stream().anyMatch(u -> u.canManage() && u.acceptsDonations());
+      boolean managesAny = units.stream().anyMatch(SupplyUnitDto::canManage);
+      return new SupplyTabs(incoming, incoming || managesAny || admin);
+    }
+  }
 
   /**
    * Renders the needs page: every open need, and for a unit's managers the unit's other states too

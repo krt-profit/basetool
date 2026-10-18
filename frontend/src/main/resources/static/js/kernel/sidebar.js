@@ -18,6 +18,7 @@
  */
 
 import { krtChrome } from '/js/kernel/krt-chrome.js';
+import { krtSearchFold } from '/js/kernel/krt-search.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const phone = window.matchMedia('(max-width: 768px)');
@@ -198,12 +199,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderGroup(group, !!groupOpen.get(group));
                 return;
             }
-            const groupHit = textOf(group.querySelector('.nav-group-label'))
-                .toLowerCase()
-                .includes(query);
+            const groupHit = krtSearchFold(
+                textOf(group.querySelector('.nav-group-label')),
+            ).includes(query);
             let hits = 0;
             links.forEach((link) => {
-                const hit = groupHit || textOf(link).toLowerCase().includes(query);
+                const terms = `${textOf(link)} ${link.getAttribute('data-nav-keywords') || ''}`;
+                const hit = groupHit || krtSearchFold(terms).includes(query);
                 if (link instanceof HTMLElement) link.hidden = !hit;
                 if (hit) hits++;
             });
@@ -327,6 +329,12 @@ document.addEventListener('DOMContentLoaded', () => {
         close() {
             closeSidebar(false);
         },
+        openAdmin() {
+            setAdminMode(true);
+            const list = document.getElementById('nav-list');
+            if (list) list.scrollTop = 0;
+            openSidebar(null);
+        },
     };
 
     if (sidebarEl && adminModeEl) {
@@ -388,7 +396,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (filterEl) {
         filterEl.addEventListener('input', () => {
-            query = filterEl.value.trim().toLowerCase();
+            query = krtSearchFold(filterEl.value.trim());
             renderList();
         });
         filterEl.addEventListener('keydown', (e) => {

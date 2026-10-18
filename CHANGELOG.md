@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Schnellzugriff: mehr Seiten, mehr Aktionen, tolerantere Suche.** `Strg`/`⌘` + `K` findet jetzt auch Reiter-Seiten wie „Mein Lager“, „Globales Lager“, „Hangar der Org-Einheit“ sowie – wenn du sie sehen darfst – die Reiter von „Bedarf & Spenden“ und „Ankauf“, und bietet die Aktionen „Neue Mission anlegen“, „Neuen Raffinerieauftrag anlegen“, „In mein Lager einbuchen“, „Ins globale Lager einbuchen“ (Logistiker), „Handbuch öffnen“, Sprachwechsel und „Administration öffnen“ (Admins). Menüfilter und Schnellzugriff finden „ü“ auch als „ue“ und hören auf Suchbegriffe („Schiffe“ → Hangar); besuchte Rechtsseiten erscheinen unter „Zuletzt besucht“ (neuer Endpunkt `GET /quick-access/entries`, ADR-0282, REQ-UI-026).
+
 ### Fixed
 
 - **Exchange: Bestätigungslink bleibt bei erneut gesendeter Massenänderung gültig.** Sendet eine verbundene Anwendung einen zur Bestätigung zurückgehaltenen Änderungssatz unverändert erneut, solange er noch wartet, antwortet das Gateway mit demselben `confirmationUrl`, statt ihn neu abzulegen und den Link ungültig zu machen, den das Mitglied gerade bekommen hat. Solche Wiederholungen zählen in der neuen Metrik `basetool_ingest_exchange_mass_changes_repeated_total` mit Alarm `ExchangeHeldBatchResent`, `ExchangeGuardStorm` zählt nur noch verschiedene zurückgehaltene Änderungssätze (Ingest, ADR-0281, REQ-XCH-021).
