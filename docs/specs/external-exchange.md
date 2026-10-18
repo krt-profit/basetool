@@ -1384,6 +1384,12 @@ counts per client, writer and pool instead, with its own removals (REQ-XCH-046).
   client's or an extractor draft. *`HandoffStagingServiceTest`, `ExchangeChangeRouteTest`.* The
   confirmation page keeps consumed batches by handoff id and the backend confirms each on its own,
   so neither needed a change.
+- [x] While a held batch waits unopened, a byte-identical resend of it by the same installation to the
+  same resource gets the same `confirmationUrl`, is neither relayed nor staged again, and counts as a
+  repeat, not as a held batch (ADR-0280).
+  *`ExchangeChangeRouteTest.aResentHeldMassChangeGetsTheStagedLinkWithoutBeingRelayedOrStagedAgain`,
+  `HandoffStagingServiceTest.shouldFindTheLiveMassChangeOfARecordedDigestUntilItIsConsumed`,
+  `RedisAclIngestIntegrationTest.theMassChangeDigestRunsUnderTheIngestUser`.*
 
 The counting rule is `ExchangeMassChangeGuard`: over the journal's live removals of the client,
 member and resource in the last 24 hours plus the batch's, a batch trips above 25, or when that total
@@ -1411,6 +1417,18 @@ client's (owner decision 2026-09-27) — at most `app.exchange.store.max-mass-ch
 `/connected-apps/confirm?handoff=<id>`. A change set too large to hold — measured, like a draft, as
 the staged value with its wrapper — is `413 BATCH_TOO_LARGE`, checked before staging and never
 cached.
+
+A client that resends a held batch must not evict the link the member was just shown (ADR-0280).
+Beside the staged batch the gateway records `ingest:handoff-digest:mass:<client>:<sub>` for the
+handoff's lifetime: the SHA-256 of the installation's key thumbprint, the resource and the change set
+as the gateway serializes it, with the handoff id and the guard's `detail`. Before relaying a change
+set that is not a dry run, after the quota count, the gateway compares its digest; when it matches and
+the handoff is still staged (not yet opened by the member), the answer is the same `409` with the same
+`confirmationUrl` and `detail`, nothing is relayed or staged, the answer is not cached, and the resend
+counts `basetool_ingest_exchange_mass_changes_repeated_total{client_id}` instead of the backend's
+`outcome="held"`. Any other change set, the same one from another installation, or one sent after the
+member opened the link or it expired, is relayed as before. The digest is read and written with `GET`
+and `SET` only; a failure makes the gateway relay as if nothing were staged.
 
 The confirmation link opens `/connected-apps/confirm?handoff=…`. As ADR-0110 requires, loading the
 page consumes nothing: its script strips the id from the address bar and consumes the staged batch
@@ -1824,8 +1842,8 @@ tombstones and journal reports task metrics.
   `http_401`; `BlackboxProbeFailed` covers it).
 - [x] Per-client write metrics with the WP 3.3 journal, and the tombstone and journal purge task
   metrics. *The writes, undo, confirmation, removal and installation counters carry `client_id`;
-  `ExchangeRemoveSpike`, `ExchangeGuardStorm`, `ExchangeInstallationSurge` and `ExchangeUnknownClient`
-  alert on them (`exchange_write_alerts_test.yml`); `exchange_change_retention` purges feed and
+  `ExchangeRemoveSpike`, `ExchangeGuardStorm`, `ExchangeHeldBatchResent`, `ExchangeInstallationSurge`
+  and `ExchangeUnknownClient` alert on them (`exchange_write_alerts_test.yml`); `exchange_change_retention` purges feed and
   journal under `ScheduledJobStale`.*
 - [x] Every gateway log line of an exchange request carries the registry-bounded client label and
   the route template (`exchangeClientId`, `exchangeRoute`; Loki structured metadata `client_id`,

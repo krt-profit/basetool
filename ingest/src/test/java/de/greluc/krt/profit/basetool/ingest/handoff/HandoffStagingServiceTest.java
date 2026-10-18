@@ -39,6 +39,7 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -261,6 +262,73 @@ class HandoffStagingServiceTest {
                 .opsForList()
                 .size(HandoffStagingService.MASS_CHANGE_INDEX_PREFIX + "versekit:user-two"))
         .isEqualTo(1L);
+  }
+
+  /** A recorded digest finds its staged mass change while the member has not opened it. */
+  @Test
+  void shouldFindTheLiveMassChangeOfARecordedDigestUntilItIsConsumed() {
+    HandoffStagingService.Staged staged =
+        service.stageMassChange("versekit", "user-repeat", "{\"resource\":\"stock\"}", 4096);
+    service.rememberMassChange(
+        "versekit",
+        "user-repeat",
+        new HandoffStagingService.HeldMassChange("digest-1", staged.handoffId(), "12 removals."));
+
+    HandoffStagingService.HeldMassChange held =
+        service.liveMassChange("versekit", "user-repeat", "digest-1");
+
+    assertThat(held).isNotNull();
+    assertThat(held.handoffId()).isEqualTo(staged.handoffId());
+    assertThat(held.detail()).isEqualTo("12 removals.");
+    assertThat(service.liveMassChange("versekit", "user-repeat", "digest-2")).isNull();
+    assertThat(service.liveMassChange("other-app", "user-repeat", "digest-1")).isNull();
+    assertThat(service.liveMassChange("versekit", "someone-else", "digest-1")).isNull();
+    assertThat(
+            redisTemplate.getExpire(
+                HandoffStagingService.MASS_CHANGE_DIGEST_PREFIX + "versekit:user-repeat"))
+        .isPositive();
+
+    assertThat(consume("user-repeat", staged.handoffId())).isPresent();
+    assertThat(service.liveMassChange("versekit", "user-repeat", "digest-1")).isNull();
+  }
+
+  /** A digest whose staged mass change was replaced by a newer one finds nothing. */
+  @Test
+  void shouldNotFindAMassChangeTheNextHeldBatchEvicted() {
+    HandoffStagingService.Staged first =
+        service.stageMassChange("versekit", "user-evict", "{\"resource\":\"stock\"}", 4096);
+    service.rememberMassChange(
+        "versekit",
+        "user-evict",
+        new HandoffStagingService.HeldMassChange("digest-1", first.handoffId(), null));
+    service.stageMassChange("versekit", "user-evict", "{\"resource\":\"ships\"}", 4096);
+
+    assertThat(service.liveMassChange("versekit", "user-evict", "digest-1")).isNull();
+  }
+
+  /** An unreadable digest entry is treated as absent, so the change set is relayed. */
+  @Test
+  void shouldTreatAnUnreadableDigestEntryAsAbsent() {
+    redisTemplate
+        .opsForValue()
+        .set(HandoffStagingService.MASS_CHANGE_DIGEST_PREFIX + "versekit:user-bad", "not json");
+
+    assertThat(service.liveMassChange("versekit", "user-bad", "digest-1")).isNull();
+  }
+
+  /** The digest tells installations, resources and change sets apart and ignores nothing else. */
+  @Test
+  void shouldDigestTheInstallationTheResourceAndTheChangeSet() {
+    JsonNode ops = objectMapper.readTree("{\"ops\":[{\"op\":\"remove\"}]}");
+    JsonNode other = objectMapper.readTree("{\"ops\":[{\"op\":\"remove\",\"key\":\"k\"}]}");
+    String digest = service.massChangeDigest("key-a", "stock", ops);
+
+    assertThat(service.massChangeDigest("key-a", "stock", objectMapper.readTree(ops.toString())))
+        .isEqualTo(digest)
+        .hasSize(64);
+    assertThat(service.massChangeDigest("key-b", "stock", ops)).isNotEqualTo(digest);
+    assertThat(service.massChangeDigest("key-a", "ships", ops)).isNotEqualTo(digest);
+    assertThat(service.massChangeDigest("key-a", "stock", other)).isNotEqualTo(digest);
   }
 
   /** A staged mass change above its own cap is refused. */

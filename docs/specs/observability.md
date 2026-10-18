@@ -1816,6 +1816,12 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   `basetool_ingest_exchange_mass_changes_staged_total{client_id}` counts change sets the
   mass-change guard held back and the gateway staged for the member's confirmation (REQ-XCH-021;
   panel 74 of the operations dashboard).
+  `basetool_ingest_exchange_mass_changes_repeated_total{client_id}` counts byte-identical resends of
+  a held batch that still waited for the member, which the gateway answered with the same link and
+  never relayed, so the backend's `outcome="held"` counts distinct held batches; registered at zero,
+  and `ExchangeHeldBatchResent` (warning, 5 m) fires above 10 of one client in an hour
+  (REQ-XCH-021, ADR-0280; `exchange_write_alerts_test.yml`; the Exchange dashboard's mass-change
+  panel).
   `basetool_ingest_exchange_idempotent_replays_total` counts writes answered from the idempotency
   cache; `basetool_ingest_exchange_budget_used_ratio` is the total byte budget's use at the last
   measurement, and `ExchangeBudgetHigh` (warning, 10 m) fires above 0.8 (REQ-XCH-020, REQ-XCH-023).
@@ -1891,7 +1897,8 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   `rejected`), plus `held` per change set the mass-change guard held back, an org-stock set once however
   many of its pools are over the threshold; shown per day on panel 80 of the operations dashboard
   (REQ-XCH-015…-017, REQ-XCH-021, REQ-XCH-045, REQ-XCH-046). `ExchangeGuardStorm`
-  fires when one client's batches are held more than 10 times an hour, `ExchangeOrgStockRejectionSpike`
+  fires when more than 10 distinct batches of one client are held in an hour (a resend of a batch
+  that still waits for the member never reaches the backend, ADR-0280), `ExchangeOrgStockRejectionSpike`
   when more than 50 of one client's org-stock ops are rejected in an hour.
 - `basetool_exchange_org_stock_pages_total{client_id}` counter — org-stock snapshot and feed pages
   the backend served, by registered client; shown per hour on the „Exchange" dashboard beside the

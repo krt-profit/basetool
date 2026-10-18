@@ -461,8 +461,8 @@
         "y": 34
       },
       "type": "timeseries",
-      "title": "Mass changes/day: staged and confirmed",
-      "description": "Change sets the mass-change guard held back and the gateway staged for the member's confirmation, per client, beside the ones members confirmed, per client and resource (REQ-XCH-021).",
+      "title": "Mass changes/day: staged, resent and confirmed",
+      "description": "Change sets the mass-change guard held back and the gateway staged for the member's confirmation, per client, the resends of a still-waiting held batch the gateway answered with the same link (ADR-0280; ExchangeHeldBatchResent), and the ones members confirmed, per client and resource (REQ-XCH-021).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -503,6 +503,15 @@
           "expr": "sum by (client_id, resource) (increase(basetool_exchange_mass_changes_confirmed_total{client_id=~\"$client_id\"}[1d]))",
           "refId": "B",
           "legendFormat": "confirmed {{client_id}} {{resource}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "sum by (client_id) (increase(basetool_ingest_exchange_mass_changes_repeated_total{client_id=~\"$client_id\", client_id!=\"none\"}[1d]))",
+          "refId": "C",
+          "legendFormat": "resent {{client_id}}",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"

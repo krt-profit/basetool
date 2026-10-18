@@ -46,7 +46,7 @@ tests:
               client_id: versekit
             exp_annotations:
               summary: "The mass-change guard keeps holding one client's batches"
-              description: "The mass-change guard held back more than 10 change sets of one registered client (client_id) in the last hour. Members will see many confirmation links; a client that deletes by mistake, or a release that sends removals where it should not, looks like this. Check the client's recent writes and consider suspending it (REQ-XCH-021)."
+              description: "The mass-change guard held back more than 10 distinct change sets of one registered client (client_id) in the last hour; a resend of a batch that still waits for the member is not counted here but by ExchangeHeldBatchResent. Members will see many confirmation links; a client that deletes by mistake, or a release that sends removals where it should not, looks like this. Check the client's recent writes and consider suspending it (REQ-XCH-021)."
 
   - name: fires - the guard holds a client's org-stock batches again and again
     interval: 1m
@@ -62,7 +62,7 @@ tests:
               client_id: versekit
             exp_annotations:
               summary: "The mass-change guard keeps holding one client's batches"
-              description: "The mass-change guard held back more than 10 change sets of one registered client (client_id) in the last hour. Members will see many confirmation links; a client that deletes by mistake, or a release that sends removals where it should not, looks like this. Check the client's recent writes and consider suspending it (REQ-XCH-021)."
+              description: "The mass-change guard held back more than 10 distinct change sets of one registered client (client_id) in the last hour; a resend of a batch that still waits for the member is not counted here but by ExchangeHeldBatchResent. Members will see many confirmation links; a client that deletes by mistake, or a release that sends removals where it should not, looks like this. Check the client's recent writes and consider suspending it (REQ-XCH-021)."
 
   - name: silent - many applied writes and a few held batches
     interval: 1m
@@ -74,6 +74,44 @@ tests:
     alert_rule_test:
       - eval_time: 60m
         alertname: ExchangeGuardStorm
+        exp_alerts: []
+
+  - name: silent - one held batch resent every few minutes is no guard storm
+    interval: 1m
+    input_series:
+      - series: 'basetool_exchange_writes_total{job="basetool-backend", instance="backend:11261", client_id="versekit", resource="stock", outcome="held"}'
+        values: "0x10 1x60"
+      - series: 'basetool_ingest_exchange_mass_changes_repeated_total{job="basetool-ingest", instance="ingest:11262", client_id="versekit"}'
+        values: "0x10 0+0.2x60"
+    alert_rule_test:
+      - eval_time: 60m
+        alertname: ExchangeGuardStorm
+        exp_alerts: []
+
+  - name: fires - a client keeps resending a held batch
+    interval: 1m
+    input_series:
+      - series: 'basetool_ingest_exchange_mass_changes_repeated_total{job="basetool-ingest", instance="ingest:11262", client_id="versekit"}'
+        values: "0+0.25x70"
+    alert_rule_test:
+      - eval_time: 60m
+        alertname: ExchangeHeldBatchResent
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              client_id: versekit
+            exp_annotations:
+              summary: "An exchange client keeps resending a held batch"
+              description: "One registered client (client_id) resent a change set more than 10 times in the last hour while the mass-change guard's held batch still waited for the member. The gateway answers each resend with the same confirmation link and relays nothing, so members are not harmed, but the client ignores the contract's 'do not retry the batch' and burns its members' write quota. Tell the client's author (REQ-XCH-021, ADR-0280)."
+
+  - name: silent - a few resends of a held batch
+    interval: 1m
+    input_series:
+      - series: 'basetool_ingest_exchange_mass_changes_repeated_total{job="basetool-ingest", instance="ingest:11262", client_id="versekit"}'
+        values: "0x30 5x40"
+    alert_rule_test:
+      - eval_time: 60m
+        alertname: ExchangeHeldBatchResent
         exp_alerts: []
 
   - name: fires - a client keeps sending refused org-stock writes

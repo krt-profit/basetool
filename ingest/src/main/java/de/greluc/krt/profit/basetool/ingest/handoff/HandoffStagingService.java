@@ -22,13 +22,18 @@ package de.greluc.krt.profit.basetool.ingest.handoff;
 import de.greluc.krt.profit.basetool.ingest.config.IngestProperties;
 import de.greluc.krt.profit.basetool.ingest.problem.BadRequestException;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.HexFormat;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -59,6 +64,14 @@ public class HandoffStagingService {
    * ingest:handoff-index:drafts:<client>:<sub>}, apart from other clients' drafts.
    */
   static final String DRAFT_INDEX_PREFIX = "ingest:handoff-index:drafts:";
+
+  /**
+   * Prefix of the digest of a client's staged mass change, {@code
+   * ingest:handoff-digest:mass:<client>:<sub>}, which names the staged batch's handoff id so a
+   * byte-identical resend gets the same confirmation link (REQ-XCH-021, ADR-0280); not under {@link
+   * #KEY_PREFIX}.
+   */
+  static final String MASS_CHANGE_DIGEST_PREFIX = "ingest:handoff-digest:mass:";
 
   private static final SecureRandom RANDOM = new SecureRandom();
   private static final Base64.Encoder URL_ENCODER = Base64.getUrlEncoder().withoutPadding();
@@ -117,6 +130,94 @@ public class HandoffStagingService {
         maxBytes,
         MASS_CHANGE_INDEX_PREFIX + clientId + ":" + sub,
         1);
+  }
+
+  /**
+   * Computes the digest that identifies a held change set: the SHA-256 of the installation, the
+   * resource and the change set as the gateway serializes it, so only a byte-identical resend of
+   * the same installation to the same resource matches.
+   *
+   * @param installationKey the installation's key thumbprint
+   * @param resource the resource's path segment
+   * @param changeSet the change set as received
+   * @return the lower-case hex digest
+   */
+  public @NotNull String massChangeDigest(
+      @NotNull String installationKey, @NotNull String resource, @NotNull JsonNode changeSet) {
+    MessageDigest sha256;
+    try {
+      sha256 = MessageDigest.getInstance("SHA-256");
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException("SHA-256 is unavailable", e);
+    }
+    sha256.update(installationKey.getBytes(StandardCharsets.UTF_8));
+    sha256.update((byte) '\n');
+    sha256.update(resource.getBytes(StandardCharsets.UTF_8));
+    sha256.update((byte) '\n');
+    sha256.update(objectMapper.writeValueAsBytes(changeSet));
+    return HexFormat.of().formatHex(sha256.digest());
+  }
+
+  /**
+   * Finds the client's staged mass change for the member when it carries the given digest and the
+   * member has not opened it yet (REQ-XCH-021, ADR-0280).
+   *
+   * <p>Best-effort: a Redis failure or an unreadable entry yields {@code null}, so the change set
+   * is relayed as if nothing were staged.
+   *
+   * @param clientId the registry client
+   * @param sub the member's subject
+   * @param digest the change set's {@link #massChangeDigest digest}
+   * @return the live staged batch, or {@code null} when none with this digest is waiting
+   */
+  public @Nullable HeldMassChange liveMassChange(
+      @NotNull String clientId, @NotNull String sub, @NotNull String digest) {
+    try {
+      String raw =
+          redisTemplate.opsForValue().get(MASS_CHANGE_DIGEST_PREFIX + clientId + ":" + sub);
+      if (raw == null) {
+        return null;
+      }
+      HeldMassChange held = objectMapper.readValue(raw, HeldMassChange.class);
+      if (!digest.equals(held.digest())
+          || redisTemplate.opsForValue().get(key(sub, held.handoffId())) == null) {
+        return null;
+      }
+      return held;
+    } catch (RuntimeException redisProblem) {
+      log.warn(
+          "Could not read the staged mass change's digest (sub=u-{}): {}",
+          mask(sub),
+          redisProblem.toString());
+      return null;
+    }
+  }
+
+  /**
+   * Records which handoff holds the change set of a digest, for as long as the handoff lives, so
+   * {@link #liveMassChange} can find it; the client's next held batch overwrites it.
+   *
+   * <p>Best-effort: a failure is logged and swallowed, and a resend is then staged anew.
+   *
+   * @param clientId the registry client
+   * @param sub the member's subject
+   * @param held the digest, the handoff id and the guard's detail
+   */
+  public void rememberMassChange(
+      @NotNull String clientId, @NotNull String sub, @NotNull HeldMassChange held) {
+    try {
+      redisTemplate
+          .opsForValue()
+          .set(
+              MASS_CHANGE_DIGEST_PREFIX + clientId + ":" + sub,
+              objectMapper.writeValueAsString(held),
+              ingestProperties.handoffTtl());
+    } catch (RuntimeException redisProblem) {
+      log.warn(
+          "Could not record the staged mass change's digest (sub=u-{}): {}",
+          mask(sub),
+          redisProblem.toString());
+    }
   }
 
   /**
@@ -260,4 +361,14 @@ public class HandoffStagingService {
    * @param bytes the size of the stored value
    */
   public record Staged(@NotNull String handoffId, @NotNull String key, long bytes) {}
+
+  /**
+   * A staged mass change as its digest entry names it.
+   *
+   * @param digest the change set's {@link #massChangeDigest digest}
+   * @param handoffId the handoff that holds it
+   * @param detail the guard's explanation the first answer carried
+   */
+  public record HeldMassChange(
+      @NotNull String digest, @NotNull String handoffId, @Nullable String detail) {}
 }

@@ -260,7 +260,16 @@ groups:
           severity: warning
         annotations:
           summary: "The mass-change guard keeps holding one client's batches"
-          description: "The mass-change guard held back more than 10 change sets of one registered client (client_id) in the last hour. Members will see many confirmation links; a client that deletes by mistake, or a release that sends removals where it should not, looks like this. Check the client's recent writes and consider suspending it (REQ-XCH-021)."
+          description: "The mass-change guard held back more than 10 distinct change sets of one registered client (client_id) in the last hour; a resend of a batch that still waits for the member is not counted here but by ExchangeHeldBatchResent. Members will see many confirmation links; a client that deletes by mistake, or a release that sends removals where it should not, looks like this. Check the client's recent writes and consider suspending it (REQ-XCH-021)."
+
+      - alert: ExchangeHeldBatchResent
+        expr: sum by (client_id) (increase(basetool_ingest_exchange_mass_changes_repeated_total[1h])) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "An exchange client keeps resending a held batch"
+          description: "One registered client (client_id) resent a change set more than 10 times in the last hour while the mass-change guard's held batch still waited for the member. The gateway answers each resend with the same confirmation link and relays nothing, so members are not harmed, but the client ignores the contract's 'do not retry the batch' and burns its members' write quota. Tell the client's author (REQ-XCH-021, ADR-0280)."
 
       - alert: ExchangeOrgStockRejectionSpike
         expr: sum by (client_id) (increase(basetool_exchange_writes_total{resource="org_stock",outcome="rejected"}[1h])) > 50

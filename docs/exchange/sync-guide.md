@@ -172,6 +172,13 @@ not applied once the member disconnected your client or installation, or your cl
 suspended, after it was held back. A confirmed batch is applied as your installation's own write,
 and your next pull shows it. `dryRun` does not ask the guard.
 
+If you resend the identical batch anyway — the same bytes, from the same installation, to the same
+resource — while it still waits for the member, the server answers the same `409` with the same
+`confirmationUrl`, and neither evaluates nor stores the batch again. The link you already showed
+stays valid. Each resend still counts against your daily write quota, and the operators see it as a
+client that ignores this rule. Any other batch, or the same one after the member opened the link or
+its 30 minutes ran out, is evaluated again and, if it is held, gets a new link.
+
 ## Several installations
 
 A member may run your client on several devices. Each is its own installation with its own

@@ -148,6 +148,14 @@ public final class MetricNames {
       "basetool.ingest.exchange.mass.changes.staged";
 
   /**
+   * Counter {@code basetool_ingest_exchange_mass_changes_repeated_total{client_id}}: change sets a
+   * client resent byte-identical while its held batch still waited for the member, answered with
+   * the same confirmation link and never relayed, by registry client (REQ-XCH-021, ADR-0280).
+   */
+  public static final String EXCHANGE_MASS_CHANGES_REPEATED =
+      "basetool.ingest.exchange.mass.changes.repeated";
+
+  /**
    * {@link #TAG_CLIENT_ID} value on the exchange counters before a token names a client, and on the
    * zero registrations.
    */
