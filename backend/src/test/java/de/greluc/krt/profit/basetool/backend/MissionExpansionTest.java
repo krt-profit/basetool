@@ -35,7 +35,9 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionCrew;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionUnit;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionStructureService;
 import de.greluc.krt.profit.basetool.backend.model.*;
 import de.greluc.krt.profit.basetool.backend.repository.*;
 import java.util.Set;
@@ -50,6 +52,10 @@ import org.springframework.transaction.annotation.Transactional;
 class MissionExpansionTest {
 
   @Autowired private MissionService missionService;
+
+  @Autowired private MissionParticipantService missionParticipantService;
+
+  @Autowired private MissionStructureService missionStructureService;
 
   @Autowired private MissionRepository missionRepository;
 
@@ -97,7 +103,7 @@ class MissionExpansionTest {
                 null));
 
     mission =
-        missionService.addParticipant(
+        missionParticipantService.addParticipant(
             mission.getId(), savedUser.getId(), null, null, null, null, null);
     MissionParticipant participant =
         mission.getParticipants().stream()
@@ -106,7 +112,7 @@ class MissionExpansionTest {
             .orElseThrow();
 
     mission =
-        missionService.addUnitToMission(
+        missionStructureService.addUnitToMission(
             mission.getId(),
             "Expansion Unit",
             fighter.getId(),
@@ -133,7 +139,7 @@ class MissionExpansionTest {
 
     Set<UUID> jobTypeIds = Set.of(pilot.getId(), engineer.getId());
     mission =
-        missionService.addCrewToShip(
+        missionStructureService.addCrewToShip(
             mission.getId(), missionShip.getId(), participant.getId(), jobTypeIds);
 
     Mission updatedMission = missionRepository.findById(mission.getId()).orElseThrow();

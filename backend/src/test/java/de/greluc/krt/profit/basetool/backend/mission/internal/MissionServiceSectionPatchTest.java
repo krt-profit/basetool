@@ -55,7 +55,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -86,11 +85,6 @@ class MissionServiceSectionPatchTest {
 
   @Mock private AuditService auditService;
 
-  @Mock private MissionNotificationPublisher notificationPublisher;
-  @InjectMocks private MissionParticipantService missionParticipantService;
-
-  @InjectMocks private MissionStructureService missionStructureService;
-
   private MissionService missionService;
 
   private UUID missionId;
@@ -113,8 +107,6 @@ class MissionServiceSectionPatchTest {
             null,
             auditService,
             null,
-            missionParticipantService,
-            missionStructureService,
             mock(MissionNotificationPublisher.class));
     missionId = UUID.randomUUID();
     existing = new Mission();
@@ -310,35 +302,6 @@ class MissionServiceSectionPatchTest {
   }
 
   @Test
-  void removeMissionUnit_shouldNotCallMissionRepositorySave() {
-    de.greluc.krt.profit.basetool.backend.mission.api.MissionUnit unit =
-        new de.greluc.krt.profit.basetool.backend.mission.api.MissionUnit();
-    UUID unitId = UUID.randomUUID();
-    unit.setId(unitId);
-    existing.getAssignedUnits().add(unit);
-    when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
-
-    Mission result = missionService.removeMissionUnit(missionId, unitId);
-
-    assertSame(existing, result);
-    verify(missionRepository, never()).save(any(Mission.class));
-  }
-
-  @Test
-  void removeManager_shouldNotCallMissionRepositorySave() {
-    UUID userId = UUID.randomUUID();
-    User manager = new User();
-    manager.setId(userId);
-    existing.getManagers().add(manager);
-    when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
-
-    Mission result = missionService.removeManager(missionId, userId);
-
-    assertSame(existing, result);
-    verify(missionRepository, never()).save(any(Mission.class));
-  }
-
-  @Test
   void updateMissionOwner_shouldSucceed_whenOwnershipVersionMatches() {
     UUID newOwnerId = UUID.randomUUID();
     User newOwner = new User();
@@ -522,88 +485,5 @@ class MissionServiceSectionPatchTest {
     assertThrows(
         NotFoundException.class,
         () -> missionService.updateOwningOrgUnit(missionId, UUID.randomUUID(), 0L));
-  }
-
-  @Test
-  void setPartyLead_shouldLinkRegisteredUser_whenUserIdProvided() {
-    UUID userId = UUID.randomUUID();
-    User user = new User();
-    user.setId(userId);
-    existing.setPartyLeadGuestName("Old Guest Lead");
-    when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
-    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
-    when(missionRepository.save(any(Mission.class))).thenAnswer(inv -> inv.getArgument(0));
-
-    Mission result = missionService.setPartyLead(missionId, userId, null, 0L);
-
-    assertSame(user, result.getPartyLeadUser());
-    assertNull(result.getPartyLeadGuestName());
-    assertEquals(1L, result.getPartyLeadVersion());
-  }
-
-  @Test
-  void setPartyLead_shouldStoreGuestName_whenOnlyGuestNameProvided() {
-    User previous = new User();
-    previous.setId(UUID.randomUUID());
-    existing.setPartyLeadUser(previous);
-    when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
-    when(missionRepository.save(any(Mission.class))).thenAnswer(inv -> inv.getArgument(0));
-
-    Mission result = missionService.setPartyLead(missionId, null, "  Ghost Pilot  ", 0L);
-
-    assertNull(result.getPartyLeadUser());
-    assertEquals("Ghost Pilot", result.getPartyLeadGuestName());
-    assertEquals(1L, result.getPartyLeadVersion());
-  }
-
-  @Test
-  void setPartyLead_shouldClearPartyLead_whenNeitherUserNorGuestNameProvided() {
-    existing.setPartyLeadGuestName("Someone");
-    when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
-    when(missionRepository.save(any(Mission.class))).thenAnswer(inv -> inv.getArgument(0));
-
-    Mission result = missionService.setPartyLead(missionId, null, "   ", 0L);
-
-    assertNull(result.getPartyLeadUser());
-    assertNull(result.getPartyLeadGuestName());
-    assertEquals(1L, result.getPartyLeadVersion());
-  }
-
-  @Test
-  void setPartyLead_shouldBumpOnlyPartyLeadVersion_andNotCallParentVersion() {
-    UUID userId = UUID.randomUUID();
-    User user = new User();
-    user.setId(userId);
-    when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
-    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
-    when(missionRepository.save(any(Mission.class))).thenAnswer(inv -> inv.getArgument(0));
-
-    Mission result = missionService.setPartyLead(missionId, userId, null, 0L);
-
-    assertEquals(1L, result.getPartyLeadVersion());
-    assertEquals(4L, result.getCoreVersion());
-    assertEquals(5L, result.getScheduleVersion());
-    assertEquals(6L, result.getFlagsVersion());
-    assertEquals(7L, result.getVersion());
-  }
-
-  @Test
-  void setPartyLead_shouldThrow409_whenPartyLeadVersionMismatch() {
-    when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
-
-    when(missionRepository.bumpPartyLeadVersionIfMatches(missionId, 5L)).thenReturn(0);
-    assertThrows(
-        ObjectOptimisticLockingFailureException.class,
-        () -> missionService.setPartyLead(missionId, null, "Whoever", 5L));
-  }
-
-  @Test
-  void setPartyLead_shouldThrow404_whenReferencedUserUnknown() {
-    UUID userId = UUID.randomUUID();
-    when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
-    when(userRepository.findPlainById(userId)).thenReturn(Optional.empty());
-
-    assertThrows(
-        NotFoundException.class, () -> missionService.setPartyLead(missionId, userId, null, 0L));
   }
 }

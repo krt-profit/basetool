@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateParticipantRequest;
 import java.time.Instant;
@@ -64,6 +65,8 @@ class MissionTimeTest {
 
   @Autowired private MissionService missionService;
 
+  @Autowired private MissionParticipantService missionParticipantService;
+
   private final JsonMapper objectMapper = JsonMapper.builder().findAndAddModules().build();
 
   private User officerUser;
@@ -89,7 +92,7 @@ class MissionTimeTest {
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
 
-    missionService.addParticipant(
+    missionParticipantService.addParticipant(
         mission.getId(), memberUser.getId(), null, null, null, null, null);
   }
 

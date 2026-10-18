@@ -1,6 +1,6 @@
 # ADR-0061 — Split `MissionService` into focused services behind a delegating orchestration facade
 
-- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-07-02 (`bc38d9f2f`: `MissionTimelineService`, `MissionParticipantService`, `MissionStructureService`, `support.MissionSectionVersions`).
+- **Status:** Superseded by [ADR-0286](0286-the-mission-controller-calls-the-mission-section-services-directly.md) (2026-10-18) — the section split stands, the delegating facade is gone: `MissionController` calls the section services directly. Before that: Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-07-02 (`bc38d9f2f`: `MissionTimelineService`, `MissionParticipantService`, `MissionStructureService`, `support.MissionSectionVersions`).
 - **Date:** 2026-07-02
 - **Deciders:** Repository owner (@greluc)
 - **Related:** issue #920 (L1, epic #905) · ADR-0057 (`objectivesVersion`) · ADR-0050 (`owningOrgUnitVersion`) · spec [`org-unit-tenancy.md`](../specs/org-unit-tenancy.md) `REQ-ORG-018` · the CLAUDE.md optimistic-lock rules

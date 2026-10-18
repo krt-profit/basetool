@@ -1667,8 +1667,8 @@ class ArchitectureTest {
   @Test
   void missionServiceAddParticipantMustNotSaveMission() {
     DescribedPredicate<JavaMethod> selection =
-        addParticipantMethods(Set.of(MissionParticipantService.class, MissionService.class));
-    assertMethodFloor("missionServiceAddParticipantMustNotSaveMission", selection, 4);
+        addParticipantMethods(Set.of(MissionParticipantService.class));
+    assertMethodFloor("missionServiceAddParticipantMustNotSaveMission", selection, 2);
     addParticipantMustNotSaveRule(selection, MissionRepository.class).check(CLASSES);
   }
 
@@ -1686,7 +1686,7 @@ class ArchitectureTest {
         .that(selection)
         .should(notCallSaveOn(missionRepository))
         .because(
-            "MissionParticipantService.addParticipant (and the MissionService facade delegation)"
+            "MissionParticipantService.addParticipant, which MissionController calls directly,"
                 + " must not bump Mission.version under concurrent signups — calling"
                 + " missionRepository.save(mission) inside the flow would dirty the parent row and"
                 + " re-open 409s on parallel \"Anmelden\" clicks. Persist the new participant via"
