@@ -188,7 +188,7 @@ class LiveSyncSectionMapParityTest {
           .as(
               "%s must poke the cross-order demand overview after an order-linked stock write",
               module)
-          .contains("sendChanged('orders', ['demand'])");
+          .contains("publish('orders', ['demand'])");
     }
   }
 
@@ -218,7 +218,9 @@ class LiveSyncSectionMapParityTest {
     assertThat(js)
         .as("the refinery detail page must not duplicate the server-side inventory/queue publishes")
         .doesNotContain("sendChanged('inventory'")
-        .doesNotContain("sendChanged('refinery'");
+        .doesNotContain("sendChanged('refinery'")
+        .doesNotContain("publish('inventory'")
+        .doesNotContain("publish('refinery'");
   }
 
   /**
@@ -275,76 +277,61 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void inventoryInputOrderSeamMap_isASubsetOfTheOrdersQueueWhitelist() throws IOException {
-    Set<String> jsKeys =
-        seamMapKeys("/static/js/inventory/inventory-input.js", "INVENTORY_INPUT_ORDER_SECTIONS");
+    Set<String> jsKeys = seamMapKeys("/static/js/inventory/inventory-input.js", "sections");
     assertThat(jsKeys)
-        .as(
-            "INVENTORY_INPUT_ORDER_SECTIONS keys in inventory-input.js vs the ORDERS_QUEUE"
-                + " whitelist")
+        .as("sections keys in inventory-input.js vs the ORDERS_QUEUE" + " whitelist")
         .isSubsetOf(LiveSyncTopicClass.ORDERS_QUEUE.allowedSections());
   }
 
   @Test
   void inventoryPageOrderSeamMaps_areASubsetOfTheOrdersQueueWhitelist() throws IOException {
-    assertThat(
-            seamMapKeys("/static/js/inventory/inventory-admin.js", "INVENTORY_ALL_ORDER_SECTIONS"))
-        .as("INVENTORY_ALL_ORDER_SECTIONS keys in inventory-admin.js vs the ORDERS_QUEUE whitelist")
+    assertThat(seamMapKeys("/static/js/inventory/inventory-admin.js", "sections", 1))
+        .as("sections keys in inventory-admin.js vs the ORDERS_QUEUE whitelist")
         .isSubsetOf(LiveSyncTopicClass.ORDERS_QUEUE.allowedSections());
-    assertThat(seamMapKeys("/static/js/inventory/inventory-my.js", "INVENTORY_MY_ORDER_SECTIONS"))
-        .as("INVENTORY_MY_ORDER_SECTIONS keys in inventory-my.js vs the ORDERS_QUEUE whitelist")
+    assertThat(seamMapKeys("/static/js/inventory/inventory-my.js", "sections", 1))
+        .as("sections keys in inventory-my.js vs the ORDERS_QUEUE whitelist")
         .isSubsetOf(LiveSyncTopicClass.ORDERS_QUEUE.allowedSections());
   }
 
   @Test
   void inventoryAllSeamMap_matchesTheInventoryAllTopicWhitelist() throws IOException {
-    Set<String> jsKeys =
-        seamMapKeys("/static/js/inventory/inventory-admin.js", "INVENTORY_ALL_SECTIONS");
+    Set<String> jsKeys = seamMapKeys("/static/js/inventory/inventory-admin.js", "sections", 0);
     assertThat(jsKeys)
         .as(
-            "INVENTORY_ALL_SECTIONS keys in inventory-admin.js vs LiveSyncTopicClass.INVENTORY_ALL"
+            "sections keys in inventory-admin.js vs LiveSyncTopicClass.INVENTORY_ALL"
                 + " whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.INVENTORY_ALL.allowedSections());
   }
 
   @Test
   void inventoryMySeamMap_matchesTheInventoryAllTopicWhitelist() throws IOException {
-    Set<String> jsKeys =
-        seamMapKeys("/static/js/inventory/inventory-my.js", "INVENTORY_MY_SECTIONS");
+    Set<String> jsKeys = seamMapKeys("/static/js/inventory/inventory-my.js", "sections", 0);
     assertThat(jsKeys)
-        .as("INVENTORY_MY_SECTIONS keys in inventory-my.js vs LiveSyncTopicClass.INVENTORY_ALL")
+        .as("sections keys in inventory-my.js vs LiveSyncTopicClass.INVENTORY_ALL")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.INVENTORY_ALL.allowedSections());
   }
 
   @Test
   void inventoryIndexSeamMap_matchesTheInventoryAllTopicWhitelist() throws IOException {
-    Set<String> jsKeys =
-        seamMapKeys("/static/js/inventory/inventory-index.js", "INVENTORY_INDEX_SECTIONS");
+    Set<String> jsKeys = seamMapKeys("/static/js/inventory/inventory-index.js", "sections");
     assertThat(jsKeys)
-        .as(
-            "INVENTORY_INDEX_SECTIONS keys in inventory-index.js vs"
-                + " LiveSyncTopicClass.INVENTORY_ALL")
+        .as("sections keys in inventory-index.js vs" + " LiveSyncTopicClass.INVENTORY_ALL")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.INVENTORY_ALL.allowedSections());
   }
 
   @Test
   void inventoryMaterialSeamMap_matchesTheInventoryAllTopicWhitelist() throws IOException {
-    Set<String> jsKeys =
-        seamMapKeys("/static/js/inventory/inventory-material.js", "INVENTORY_MATERIAL_SECTIONS");
+    Set<String> jsKeys = seamMapKeys("/static/js/inventory/inventory-material.js", "sections");
     assertThat(jsKeys)
-        .as(
-            "INVENTORY_MATERIAL_SECTIONS keys in inventory-material.js vs"
-                + " LiveSyncTopicClass.INVENTORY_ALL")
+        .as("sections keys in inventory-material.js vs" + " LiveSyncTopicClass.INVENTORY_ALL")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.INVENTORY_ALL.allowedSections());
   }
 
   @Test
   void inventoryGameItemSeamMap_matchesTheInventoryAllTopicWhitelist() throws IOException {
-    Set<String> jsKeys =
-        seamMapKeys("/static/js/inventory/inventory-game-item.js", "INVENTORY_GAME_ITEM_SECTIONS");
+    Set<String> jsKeys = seamMapKeys("/static/js/inventory/inventory-game-item.js", "sections");
     assertThat(jsKeys)
-        .as(
-            "INVENTORY_GAME_ITEM_SECTIONS keys in inventory-game-item.js vs"
-                + " LiveSyncTopicClass.INVENTORY_ALL")
+        .as("sections keys in inventory-game-item.js vs" + " LiveSyncTopicClass.INVENTORY_ALL")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.INVENTORY_ALL.allowedSections());
   }
 

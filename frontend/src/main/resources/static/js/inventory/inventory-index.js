@@ -18,27 +18,18 @@
  */
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
-
-const INVENTORY_INDEX_SECTIONS = {
-    stock: { container: '#inventory-results', fragmentValue: 'results' },
-};
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     krtFetch.bindSwap({ container: '#inventory-results', history: true });
-    if (document.getElementById('inventory-results')) {
-        krtLiveSync.createReceiver({
-            topic: 'inventory',
-            sections: INVENTORY_INDEX_SECTIONS,
-            coalesceMs: 1500,
-            refresh() {
-                krtFetch.swap({
-                    url: window.location.pathname + window.location.search,
-                    container: '#inventory-results',
-                    fragmentValue: INVENTORY_INDEX_SECTIONS.stock.fragmentValue,
-                    history: false,
-                });
-            },
-        });
-    }
+    krtPageSections.create({
+        sections: {
+            stock: { container: '#inventory-results', fragmentValue: 'results' },
+        },
+        pageUrl() {
+            return window.location.pathname + window.location.search;
+        },
+        topic: 'inventory',
+        receiver: document.getElementById('inventory-results') ? { coalesceMs: 1500 } : undefined,
+    });
 });

@@ -26,6 +26,7 @@ import {
 } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { inventoryHooks } from '/js/inventory/inventory-hooks.js';
 
 /** @type {HTMLElement | null} */
@@ -97,6 +98,8 @@ export function removeNote() {
     });
 }
 
+const noteSeam = krtPageSections.create({});
+
 /**
  * Sends the note of the active button, queued behind earlier writes of the same entry.
  *
@@ -128,7 +131,7 @@ function runNoteUpdate(btn, id, noteValue) {
         typeof inventoryConflictI18n !== 'undefined'
             ? Object.assign({}, inventoryConflictI18n, { reloadDetailFallback: noteI18n.conflict })
             : { reloadDetailFallback: noteI18n.conflict };
-    return krtFetch.write({
+    return noteSeam.write({
         method: 'PUT',
         url: `/inventory/${encodeURIComponent(id)}/note`,
         payload: {
@@ -179,9 +182,6 @@ function runNoteUpdate(btn, id, noteValue) {
             }
         },
         onError(status) {
-            if (status === 409) {
-                return false;
-            }
             if (status === 403) {
                 showInventoryToast('error', noteI18n.forbidden);
             } else if (status === 400 || status === 422) {

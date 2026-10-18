@@ -42,8 +42,11 @@ owns the whole choreography and returns `{write, refresh, notify, receiver, sect
   and replaces the conflict confirm unless it returns `false`. `submitForm` is the same
   decoration over `krtFetch.submitForm`. `sections` and `pageUrl` are optional for a page that
   only writes, and `receiver.refresh(keys, run)` wraps a peer re-render for a page that restores
-  state around the swap.
-- `refresh` re-renders sections in place via `krtFetch.swap` and broadcasts to the topic first
+  state around the swap. A `conflict` object passed to a write wins, field by field, over the
+  strings derived from the dictionary. `receiver.retargetable` builds the receiver before the topic
+  is known, for a list that switches rooms in place through `receiver.retarget`.
+- `refresh` re-renders sections in place via `krtFetch.swap`; sections that share a container and
+  fragment are fetched once and broadcasts to the topic first
   (`alsoBroadcast` keys are appended) unless it applies a peer signal, `{broadcast: false}`.
 - `notify` is the broadcast-only sibling for handlers that patch their own DOM.
 - `receiver` is the `krtLiveSync` receiver of the page, built from the same declaration: a peer

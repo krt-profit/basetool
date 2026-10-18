@@ -32,7 +32,7 @@ import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
 import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
 import { krtInventory } from '/js/inventory/inventory-common.js';
@@ -49,7 +49,7 @@ const adminLager = /** @type {KrtInventoryApi} */ (krtInventory).createLager({
         filterInventory();
     },
     notifyInventoryChanged() {
-        broadcastInventoryAllChanged();
+        inventoryAll.notify('stock');
     },
 });
 
@@ -339,43 +339,37 @@ function filterInventory() {
         });
 }
 
-const INVENTORY_ALL_SECTIONS = {
-    stock: { container: '#tableContainer', fragmentValue: 'stock' },
-};
+const inventoryAll = krtPageSections.create({
+    sections: {
+        stock: { container: '#tableContainer', fragmentValue: 'stock' },
+    },
+    topic: 'inventory',
+    receiver: document.getElementById('tableContainer')
+        ? {
+              coalesceMs: 1500,
+              refresh() {
+                  filterInventory();
+              },
+          }
+        : undefined,
+});
 
-/** Tells peers viewing the global Lager that the stock changed. */
-function broadcastInventoryAllChanged() {
-    if (typeof krtLiveSync.sendChanged === 'function') {
-        krtLiveSync.sendChanged('inventory', Object.keys(INVENTORY_ALL_SECTIONS));
-    }
-}
-inventoryHooks.notifyChanged = broadcastInventoryAllChanged;
+inventoryHooks.notifyChanged = () => inventoryAll.notify('stock');
 
-if (document.getElementById('tableContainer')) {
-    krtLiveSync.createReceiver({
-        topic: 'inventory',
-        sections: INVENTORY_ALL_SECTIONS,
-        coalesceMs: 1500,
-        refresh() {
-            filterInventory();
-        },
-    });
-}
-
-const INVENTORY_ALL_ORDER_SECTIONS = {
-    demand: { container: '#tableContainer' },
-};
-
-if (document.getElementById('tableContainer')) {
-    krtLiveSync.createReceiver({
-        topic: 'orders',
-        sections: INVENTORY_ALL_ORDER_SECTIONS,
-        coalesceMs: 1500,
-        refresh() {
-            filterInventory();
-        },
-    });
-}
+krtPageSections.create({
+    sections: {
+        demand: { container: '#tableContainer' },
+    },
+    topic: 'orders',
+    receiver: document.getElementById('tableContainer')
+        ? {
+              coalesceMs: 1500,
+              refresh() {
+                  filterInventory();
+              },
+          }
+        : undefined,
+});
 
 /** Clears every filter and re-pulls the table. */
 function resetInventoryFilter() {
@@ -686,7 +680,7 @@ function submitUmbuchen(event) {
             onSuccess() {
                 adminLager.closeUmbuchenModal();
                 filterInventory();
-                broadcastInventoryAllChanged();
+                inventoryAll.notify('stock');
                 adminLager.broadcastOrdersChanged(affectedOrderIds);
                 adminLager.broadcastBoardChanged();
             },
@@ -742,7 +736,7 @@ function initInventoryAdmin() {
                         /** @type {string} */ (deleteBtn.getAttribute('data-success')),
                     );
                     filterInventory();
-                    broadcastInventoryAllChanged();
+                    inventoryAll.notify('stock');
                     adminLager.broadcastBoardChanged();
                 },
             });
@@ -806,7 +800,7 @@ if (adminUmbuchenFormEl) {
 
 initPoolChange(() => {
     filterInventory();
-    broadcastInventoryAllChanged();
+    inventoryAll.notify('stock');
     adminLager.broadcastBoardChanged();
 });
 

@@ -26,7 +26,7 @@ import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { krtHerkunft } from '/js/inventory/inventory-herkunft.js';
@@ -759,12 +759,11 @@ function createLager(cfg) {
      * @param {Array<string | null | undefined> | null | undefined} orderIds the affected orders
      */
     function broadcastOrdersChanged(orderIds) {
-        if (typeof krtLiveSync.sendChanged !== 'function') return;
         let touchedAnyOrder = false;
         (orderIds || []).forEach((orderId) => {
             if (orderId) {
                 touchedAnyOrder = true;
-                krtLiveSync.sendChanged(`order:${orderId}`, [
+                krtPageSections.publish(`order:${orderId}`, [
                     'materials',
                     'aggregated',
                     'item-stock',
@@ -772,7 +771,7 @@ function createLager(cfg) {
             }
         });
         if (touchedAnyOrder) {
-            krtLiveSync.sendChanged('orders', ['demand']);
+            krtPageSections.publish('orders', ['demand']);
         }
     }
 
@@ -780,9 +779,7 @@ function createLager(cfg) {
      * Tells the Materialbörse to re-pull its board after a stock-reducing write.
      */
     function broadcastBoardChanged() {
-        if (typeof krtLiveSync.sendChanged === 'function') {
-            krtLiveSync.sendChanged('materialboard', ['board']);
-        }
+        krtPageSections.publish('materialboard', ['board']);
     }
 
     /**

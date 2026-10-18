@@ -31,7 +31,7 @@ import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toa
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
 import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
 import { krtInventory } from '/js/inventory/inventory-common.js';
@@ -47,7 +47,7 @@ const myLager = /** @type {KrtInventoryApi} */ (krtInventory).createLager({
         filterMyInventory();
     },
     notifyInventoryChanged() {
-        broadcastInventoryChanged();
+        inventoryMy.notify('stock');
     },
     onStackEntriesLoaded(content) {
         applyBulkSelectionToLoaded(content);
@@ -332,7 +332,7 @@ async function executeBulkCheckout() {
         onSuccess() {
             showFrontendSuccessToast(bulkI18n.success.replace('{0}', String(ids.length)));
             filterMyInventory();
-            broadcastInventoryChanged();
+            inventoryMy.notify('stock');
             myLager.broadcastOrdersChanged(affectedOrderIds);
             myLager.broadcastBoardChanged();
         },
@@ -552,7 +552,7 @@ function submitBulkRebook(event) {
                 closeBulkRebookModal();
                 reportBulkRebookOutcome(body);
                 filterMyInventory();
-                broadcastInventoryChanged();
+                inventoryMy.notify('stock');
                 myLager.broadcastOrdersChanged(affectedOrderIds);
                 myLager.broadcastBoardChanged();
             },
@@ -941,47 +941,37 @@ function resetMyInventoryFilter() {
     filterMyInventory();
 }
 
-const INVENTORY_MY_SECTIONS = {
-    stock: { container: '#myInventoryTableContainer', fragmentValue: 'stock' },
-};
-
-/** Tells peers viewing the personal Lager that the stock changed. */
-function broadcastInventoryChanged() {
-    if (typeof krtLiveSync.sendChanged === 'function') {
-        krtLiveSync.sendChanged('inventory', Object.keys(INVENTORY_MY_SECTIONS));
-    }
-}
-inventoryHooks.notifyChanged = broadcastInventoryChanged;
-
-document.addEventListener('krt:inventory-changed', () => {
-    filterMyInventory();
+const inventoryMy = krtPageSections.create({
+    sections: {
+        stock: { container: '#myInventoryTableContainer', fragmentValue: 'stock' },
+    },
+    topic: 'inventory',
+    receiver: document.getElementById('myInventoryTableContainer')
+        ? {
+              coalesceMs: 1500,
+              refresh() {
+                  filterMyInventory();
+              },
+          }
+        : undefined,
 });
 
-if (document.getElementById('myInventoryTableContainer')) {
-    krtLiveSync.createReceiver({
-        topic: 'inventory',
-        sections: INVENTORY_MY_SECTIONS,
-        coalesceMs: 1500,
-        refresh() {
-            filterMyInventory();
-        },
-    });
-}
+inventoryHooks.notifyChanged = () => inventoryMy.notify('stock');
 
-const INVENTORY_MY_ORDER_SECTIONS = {
-    demand: { container: '#myInventoryTableContainer' },
-};
-
-if (document.getElementById('myInventoryTableContainer')) {
-    krtLiveSync.createReceiver({
-        topic: 'orders',
-        sections: INVENTORY_MY_ORDER_SECTIONS,
-        coalesceMs: 1500,
-        refresh() {
-            filterMyInventory();
-        },
-    });
-}
+krtPageSections.create({
+    sections: {
+        demand: { container: '#myInventoryTableContainer' },
+    },
+    topic: 'orders',
+    receiver: document.getElementById('myInventoryTableContainer')
+        ? {
+              coalesceMs: 1500,
+              refresh() {
+                  filterMyInventory();
+              },
+          }
+        : undefined,
+});
 
 document.addEventListener('DOMContentLoaded', () => {
     const filtersRestored = restoreMyInventoryFilters();
@@ -1316,7 +1306,7 @@ function submitUmbuchen(event) {
             onSuccess() {
                 myLager.closeUmbuchenModal();
                 filterMyInventory();
-                broadcastInventoryChanged();
+                inventoryMy.notify('stock');
                 myLager.broadcastOrdersChanged(affectedOrderIds);
                 myLager.broadcastBoardChanged();
             },
@@ -1488,7 +1478,7 @@ function submitOrgUnitChange(event) {
                 closeOrgUnitChangeModal();
                 if (bulk) reportBulkOrgUnitOutcome(body);
                 filterMyInventory();
-                broadcastInventoryChanged();
+                inventoryMy.notify('stock');
                 myLager.broadcastBoardChanged();
             },
         })
@@ -1528,7 +1518,7 @@ function submitBulkStolenMark(el) {
                 reportBulkStolenOutcome(body);
                 clearBulkSelection();
                 filterMyInventory();
-                broadcastInventoryChanged();
+                inventoryMy.notify('stock');
                 myLager.broadcastBoardChanged();
             },
         })
