@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,8 @@ import org.springframework.transaction.annotation.Transactional;
 class MissionManagerIntegrationTest {
 
   @Autowired private MissionService missionService;
+
+  @Autowired private MissionParticipantService missionParticipantService;
 
   @Autowired private MissionRepository missionRepository;
 
@@ -60,7 +63,7 @@ class MissionManagerIntegrationTest {
     UUID missionId = mission.getId();
     UUID userId = user.getId();
 
-    Mission updatedMission = missionService.addManager(missionId, userId);
+    Mission updatedMission = missionParticipantService.addManager(missionId, userId);
 
     assertNotNull(updatedMission);
     assertEquals(1, updatedMission.getManagers().size());

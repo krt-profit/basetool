@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
@@ -55,8 +56,8 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
  *
  * <p>Guards the {@code @OptimisticLock(excluded = true)} on {@link
  * de.greluc.krt.profit.basetool.backend.mission.api.Mission#getParticipants()} and the absence of a
- * mission save in {@link MissionService#addParticipant}. Not {@code @Transactional}, so each worker
- * runs in its own session.
+ * mission save in {@link MissionParticipantService#addParticipant}. Not {@code @Transactional}, so
+ * each worker runs in its own session.
  */
 @SpringBootTest
 class MissionParticipantConcurrencyTest {
@@ -70,6 +71,7 @@ class MissionParticipantConcurrencyTest {
   @Autowired private MissionParticipantRepository missionParticipantRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private MissionService missionService;
+  @Autowired private MissionParticipantService missionParticipantService;
 
   private UUID seedMissionId;
   private final List<UUID> seedUserIds = new ArrayList<>();
@@ -140,7 +142,8 @@ class MissionParticipantConcurrencyTest {
                       otherErrorCount.incrementAndGet();
                       return;
                     }
-                    missionService.addParticipant(missionId, userId, null, null, null, null, null);
+                    missionParticipantService.addParticipant(
+                        missionId, userId, null, null, null, null, null);
                     successCount.incrementAndGet();
                   } catch (ObjectOptimisticLockingFailureException unexpected) {
                     conflictCount.incrementAndGet();
@@ -239,7 +242,8 @@ class MissionParticipantConcurrencyTest {
                       otherErrorCount.incrementAndGet();
                       return;
                     }
-                    missionService.addParticipant(missionId, userId, null, null, null, null, null);
+                    missionParticipantService.addParticipant(
+                        missionId, userId, null, null, null, null, null);
                     successCount.incrementAndGet();
                   } catch (DuplicateEntityException expected) {
                     rejectedByInMemoryCheck.incrementAndGet();

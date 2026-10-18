@@ -39,7 +39,9 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionUnit;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionStructureService;
 import de.greluc.krt.profit.basetool.backend.model.*;
 import de.greluc.krt.profit.basetool.backend.repository.*;
 import java.util.UUID;
@@ -67,6 +69,8 @@ class MissionUnitManagementTest {
   @Autowired private ShipRepository shipRepository;
   @Autowired private ShipTypeRepository shipTypeRepository;
   @Autowired private MissionService missionService;
+  @Autowired private MissionParticipantService missionParticipantService;
+  @Autowired private MissionStructureService missionStructureService;
 
   private User officerUser;
   private Mission mission;
@@ -109,11 +113,11 @@ class MissionUnitManagementTest {
                 null,
                 null));
 
-    missionService.addParticipant(
+    missionParticipantService.addParticipant(
         mission.getId(), officerUser.getId(), null, null, null, null, null);
 
     mission =
-        missionService.addUnitToMission(
+        missionStructureService.addUnitToMission(
             mission.getId(), "Initial Unit", st.getId(), ship.getId(), false, 123.45, null, null);
     unit = mission.getAssignedUnits().iterator().next();
   }
@@ -178,7 +182,7 @@ class MissionUnitManagementTest {
     assertThrows(
         IllegalArgumentException.class,
         () ->
-            missionService.addUnitToMission(
+            missionStructureService.addUnitToMission(
                 mission.getId(),
                 "Outsider Unit",
                 outsiderShip.getShipType().getId(),
@@ -192,7 +196,7 @@ class MissionUnitManagementTest {
   @Test
   void testAddUnit_ShipOwnerIsParticipant_Allowed() {
     Mission updated =
-        missionService.addUnitToMission(
+        missionStructureService.addUnitToMission(
             mission.getId(),
             "Participant Unit",
             ship.getShipType().getId(),
@@ -218,7 +222,7 @@ class MissionUnitManagementTest {
     assertThrows(
         IllegalArgumentException.class,
         () ->
-            missionService.updateMissionUnit(
+            missionStructureService.updateMissionUnit(
                 mission.getId(),
                 unit.getId(),
                 null,
@@ -239,9 +243,9 @@ class MissionUnitManagementTest {
             .findFirst()
             .orElseThrow()
             .getId();
-    missionService.removeParticipant(mission.getId(), participantId);
+    missionParticipantService.removeParticipant(mission.getId(), participantId);
 
-    missionService.updateMissionUnit(
+    missionStructureService.updateMissionUnit(
         mission.getId(),
         unit.getId(),
         null,
@@ -267,7 +271,7 @@ class MissionUnitManagementTest {
   @Test
   void testAddUnit_BlankName_DerivesNameFromShip() {
     Mission updated =
-        missionService.addUnitToMission(
+        missionStructureService.addUnitToMission(
             mission.getId(),
             "  ",
             ship.getShipType().getId(),
@@ -292,7 +296,7 @@ class MissionUnitManagementTest {
   @Test
   void testAddUnit_BlankName_DerivesNameFromShipType() {
     Mission updated =
-        missionService.addUnitToMission(
+        missionStructureService.addUnitToMission(
             mission.getId(), null, ship.getShipType().getId(), null, false, null, null, null);
 
     MissionUnit created =
@@ -312,7 +316,7 @@ class MissionUnitManagementTest {
     assertThrows(
         IllegalArgumentException.class,
         () ->
-            missionService.addUnitToMission(
+            missionStructureService.addUnitToMission(
                 mission.getId(), " ", null, null, false, null, null, null));
   }
 
@@ -320,7 +324,7 @@ class MissionUnitManagementTest {
   @Test
   void testAddUnit_ResponsibleAndNote_Persisted() {
     Mission updated =
-        missionService.addUnitToMission(
+        missionStructureService.addUnitToMission(
             mission.getId(),
             "Responsible Unit",
             null,
@@ -340,7 +344,7 @@ class MissionUnitManagementTest {
     assertEquals("Eskorte, Gruppe 1", created.getNote(), "note must be trimmed");
 
     Mission cleared =
-        missionService.updateMissionUnit(
+        missionStructureService.updateMissionUnit(
             mission.getId(),
             created.getId(),
             null,

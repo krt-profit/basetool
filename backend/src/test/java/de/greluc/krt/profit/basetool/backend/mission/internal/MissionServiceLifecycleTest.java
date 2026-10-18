@@ -35,23 +35,16 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeRepository;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeRepository;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
-import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
-import de.greluc.krt.profit.basetool.backend.mission.api.MissionCrew;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionDeletionObserver;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFrequency;
-import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.mission.api.MissionUnit;
 import de.greluc.krt.profit.basetool.backend.mission.api.OperationSummaryProvider;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
@@ -64,27 +57,19 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * Tests the lifecycle and ownership methods of {@link MissionService}: {@code deleteMission},
- * {@code removeParticipant}, {@code updateMissionOwner}, {@code removeMissionFrequency} and {@code
- * findAllActiveReference}.
+ * {@code updateMissionOwner}, {@code removeMissionFrequency} and {@code findAllActiveReference}.
  */
 @ExtendWith(MockitoExtension.class)
 class MissionServiceLifecycleTest {
 
   @Mock private MissionRepository missionRepository;
   @Mock private UserRepository userRepository;
-  @Mock private ShipRepository shipRepository;
-  @Mock private ShipTypeRepository shipTypeRepository;
-  @Mock private JobTypeRepository jobTypeRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
-  @Mock private MissionUnitRepository missionUnitRepository;
-  @Mock private MissionCrewRepository missionCrewRepository;
-  @Mock private SquadronRepository squadronRepository;
   @Mock private FrequencyTypeRepository frequencyTypeRepository;
   @Mock private MissionFrequencyRepository missionFrequencyRepository;
   @Mock private MissionOwnershipRepository missionOwnershipRepository;
@@ -96,8 +81,6 @@ class MissionServiceLifecycleTest {
 
   @Mock private AuditService auditService;
 
-  @Mock private MissionNotificationPublisher notificationPublisher;
-  @InjectMocks private MissionParticipantService missionParticipantService;
   private MissionService service;
 
   @BeforeEach
@@ -116,8 +99,6 @@ class MissionServiceLifecycleTest {
             ownerScopeService,
             authHelperService,
             auditService,
-            null,
-            missionParticipantService,
             null,
             mock(MissionNotificationPublisher.class));
   }
@@ -209,96 +190,6 @@ class MissionServiceLifecycleTest {
       service.deleteMission(MISSION_ID);
 
       verify(missionRepository).delete(mission);
-    }
-  }
-
-  @Nested
-  class RemoveParticipantTests {
-
-    @Test
-    void throwsNotFound_whenMissionDoesNotExist() {
-      when(missionRepository.findById(MISSION_ID)).thenReturn(Optional.empty());
-
-      assertThrows(
-          NotFoundException.class, () -> service.removeParticipant(MISSION_ID, UUID.randomUUID()));
-    }
-
-    @Test
-    void throwsNotFound_whenParticipantNotOnMission() {
-      Mission mission = newMission();
-      when(missionRepository.findById(MISSION_ID)).thenReturn(Optional.of(mission));
-
-      NotFoundException ex =
-          assertThrows(
-              NotFoundException.class,
-              () -> service.removeParticipant(MISSION_ID, UUID.randomUUID()));
-      assertTrue(ex.getMessage().toLowerCase().contains("participant"));
-    }
-
-    @Test
-    void happyPath_removesParticipantAndAnyCrewReferences() {
-      UUID participantId = UUID.randomUUID();
-      Mission mission = newMission();
-      MissionParticipant participant = newParticipant(participantId);
-      mission.getParticipants().add(participant);
-
-      MissionUnit unitA = new MissionUnit();
-      unitA.setId(UUID.randomUUID());
-      MissionCrew crewA = new MissionCrew();
-      crewA.setParticipant(participant);
-      unitA.getCrew().add(crewA);
-      MissionCrew foreignCrew = new MissionCrew();
-      MissionParticipant foreignParticipant = newParticipant(UUID.randomUUID());
-      foreignCrew.setParticipant(foreignParticipant);
-      unitA.getCrew().add(foreignCrew);
-
-      MissionUnit unitB = new MissionUnit();
-      unitB.setId(UUID.randomUUID());
-      MissionCrew crewB = new MissionCrew();
-      crewB.setParticipant(participant);
-      unitB.getCrew().add(crewB);
-
-      mission.getAssignedUnits().add(unitA);
-      mission.getAssignedUnits().add(unitB);
-
-      when(missionRepository.findById(MISSION_ID)).thenReturn(Optional.of(mission));
-
-      Mission result = service.removeParticipant(MISSION_ID, participantId);
-
-      assertSame(mission, result);
-      assertTrue(
-          mission.getParticipants().isEmpty(),
-          "participant must be removed from the participants set");
-      assertEquals(
-          1,
-          unitA.getCrew().size(),
-          "crew in unit A: only the participant's crew is gone, foreign crew kept");
-      assertSame(foreignCrew, unitA.getCrew().iterator().next());
-      assertTrue(
-          unitB.getCrew().isEmpty(), "crew in unit B must also have the participant's row removed");
-    }
-
-    @Test
-    void crewWithNullParticipant_isNotTouched() {
-      UUID participantId = UUID.randomUUID();
-      Mission mission = newMission();
-      MissionParticipant participant = newParticipant(participantId);
-      mission.getParticipants().add(participant);
-
-      MissionUnit unit = new MissionUnit();
-      MissionCrew nullPartCrew = new MissionCrew();
-      nullPartCrew.setParticipant(null);
-      unit.getCrew().add(nullPartCrew);
-      mission.getAssignedUnits().add(unit);
-
-      when(missionRepository.findById(MISSION_ID)).thenReturn(Optional.of(mission));
-
-      service.removeParticipant(MISSION_ID, participantId);
-
-      assertEquals(
-          1,
-          unit.getCrew().size(),
-          "crew with null participant must survive (would NPE otherwise)");
     }
   }
 
@@ -504,12 +395,6 @@ class MissionServiceLifecycleTest {
     m.setFrequencies(new HashSet<>());
     m.setManagers(new HashSet<>());
     return m;
-  }
-
-  private MissionParticipant newParticipant(UUID id) {
-    MissionParticipant p = new MissionParticipant();
-    p.setId(id);
-    return p;
   }
 
   private User newUser(UUID id) {

@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,6 +66,8 @@ class MissionUnitAttributeTest {
 
   @Autowired private MissionService missionService;
 
+  @Autowired private MissionParticipantService missionParticipantService;
+
   private final JsonMapper objectMapper = JsonMapper.builder().build();
 
   private User officerUser;
@@ -96,7 +99,7 @@ class MissionUnitAttributeTest {
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
 
-    missionService.addParticipant(
+    missionParticipantService.addParticipant(
         mission.getId(), officerUser.getId(), null, null, null, null, null);
   }
 

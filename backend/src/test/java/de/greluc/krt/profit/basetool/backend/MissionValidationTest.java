@@ -39,7 +39,9 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionUnit;
 import de.greluc.krt.profit.basetool.backend.mission.internal.AddCrewRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.AddExternalParticipantRequest;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionStructureService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateParticipantRequest;
 import de.greluc.krt.profit.basetool.backend.model.*;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
@@ -81,6 +83,10 @@ class MissionValidationTest {
   @Autowired private ShipTypeRepository shipTypeRepository;
 
   @Autowired private MissionService missionService;
+
+  @Autowired private MissionParticipantService missionParticipantService;
+
+  @Autowired private MissionStructureService missionStructureService;
 
   @Autowired private JobTypeRepository jobTypeRepository;
 
@@ -135,9 +141,9 @@ class MissionValidationTest {
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
 
-    missionService.addParticipant(
+    missionParticipantService.addParticipant(
         mission.getId(), officerUser.getId(), null, null, null, null, null);
-    missionService.addUnitToMission(
+    missionStructureService.addUnitToMission(
         mission.getId(), "Test Unit", st.getId(), ship.getId(), false, null, null, null);
     mission = missionRepository.findById(mission.getId()).orElseThrow();
     missionShip = mission.getAssignedUnits().iterator().next();
