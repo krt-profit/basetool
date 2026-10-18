@@ -170,7 +170,7 @@ function initMemberHangar() {
         sections: { ships: { container: RESULTS } },
         pageUrl() {
             const query = new URLSearchParams(window.location.search).toString();
-            return `${query ? `?${query}` : ''}`;
+            return `${baseUrl}${query ? `?${query}` : ''}`;
         },
         topic: memberTopic,
         receiver: { coalesceMs: 1500 },
