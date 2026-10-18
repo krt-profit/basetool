@@ -42,3 +42,13 @@ Its seam is covered by a node test over a fake DOM running the real `krt-fetch.j
 Migrating the remaining pages widens the declaration without changing the decision:
 
 - `dict` and `keys` are optional, for a page that only receives or needs no localized section strings.
+- `sections` and `pageUrl` are optional, for a page that only writes.
+- A write may carry `onConflict(body, response)`, which runs instead of `onError` on a 409 and
+  replaces the conflict confirm unless it returns `false`; `onError` never sees a 409. A
+  `conflict` object passed to the write wins over the derived strings.
+- `submitForm` applies the same decoration to `krtFetch.submitForm`.
+- `receiver.retargetable` builds the receiver before the topic is known, and `receiver.refresh`
+  wraps the re-render of a peer change for a page that restores state around the swap.
+- `refresh` fetches sections that share a container and fragment once.
+
+These widen the declaration and do not change who owns the choreography.

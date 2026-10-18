@@ -22,7 +22,7 @@ import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import {
     createShipSelection,
     formatMessage,
@@ -31,8 +31,6 @@ import {
 } from '/js/hangar/ship-unit-change.js';
 
 const RESULTS = '#member-hangar-results';
-
-const MEMBER_HANGAR_SECTIONS = { ships: { container: RESULTS } };
 
 /**
  * Wires the admin member hangar: the add, edit and delete dialogs (REQ-HANGAR-011) and the unit
@@ -165,41 +163,25 @@ function initMemberHangar() {
         krtModal.close(shipModal);
     }
 
-    /**
-     * Re-reads the ship list in place and copies its total into the page head.
-     */
-    function refreshList() {
-        const query = new URLSearchParams(window.location.search).toString();
-        krtFetch.swap({
-            url: `${baseUrl}${query ? `?${query}` : ''}`,
-            container: RESULTS,
-            history: false,
-        });
-    }
-
     const resultsEl = document.getElementById('member-hangar-results');
     const memberTopic = resultsEl ? resultsEl.dataset.liveSyncTopic || '' : '';
+
+    const memberSections = krtPageSections.create({
+        sections: { ships: { container: RESULTS } },
+        pageUrl() {
+            const query = new URLSearchParams(window.location.search).toString();
+            return `${baseUrl}${query ? `?${query}` : ''}`;
+        },
+        topic: memberTopic,
+        receiver: { coalesceMs: 1500 },
+    });
 
     /**
      * Re-reads the list after one of this page's writes and tells the member's other open hangar
      * pages.
      */
     function afterWrite() {
-        refreshList();
-        if (memberTopic) {
-            krtLiveSync.sendChanged(memberTopic, Object.keys(MEMBER_HANGAR_SECTIONS));
-        }
-    }
-
-    if (memberTopic) {
-        krtLiveSync.createReceiver({
-            topic: memberTopic,
-            sections: MEMBER_HANGAR_SECTIONS,
-            coalesceMs: 1500,
-            refresh() {
-                refreshList();
-            },
-        });
+        memberSections.refresh('ships');
     }
 
     document.addEventListener('krt:swapped', (e) => {

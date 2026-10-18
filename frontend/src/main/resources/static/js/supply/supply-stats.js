@@ -17,8 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { krtFetch } from '/js/kernel/krt-fetch.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { bindFilterForm } from '/js/supply/supply-common.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -28,16 +27,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     if (!document.querySelector('#supply-stats-results')) return;
-    krtLiveSync.createReceiver({
-        topic: 'supply-needs',
+    krtPageSections.create({
         sections: { stats: { container: '#supply-stats-results' } },
-        coalesceMs: 1500,
-        refresh() {
-            krtFetch.swap({
-                url: `${window.location.pathname}${window.location.search}`,
-                container: '#supply-stats-results',
-                history: false,
-            });
+        pageUrl() {
+            return `${window.location.pathname}${window.location.search}`;
         },
+        topic: 'supply-needs',
+        receiver: { coalesceMs: 1500 },
     });
 });

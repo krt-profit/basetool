@@ -20,7 +20,26 @@
 /* global MSG_ENABLED, MSG_DISABLED, MSG_ERROR, MSG_SAVED, MSG_PROFIT_ENABLED, MSG_PROFIT_DISABLED, MSG_PROFIT_ERROR, MSG_PROFIT_SAVED, SAVE_SUCCESS, SAVE_ERROR, SAVE_CONFLICT */
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
-import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
+
+const settings = krtPageSections.create({
+    dict() {
+        return {
+            'conflict.title': SAVE_CONFLICT.title,
+            'conflict.detail': SAVE_CONFLICT.reloadDetailFallback,
+            'conflict.reload': SAVE_CONFLICT.reloadLabel,
+            'conflict.dismiss': SAVE_CONFLICT.dismissLabel,
+            'conflict.question': SAVE_CONFLICT.reloadQuestion,
+        };
+    },
+    keys: {
+        conflictTitleKey: 'conflict.title',
+        reloadDetailKey: 'conflict.detail',
+        reloadLabelKey: 'conflict.reload',
+        dismissLabelKey: 'conflict.dismiss',
+        reloadQuestionKey: 'conflict.question',
+    },
+});
 
 /**
  * Wires one family of optimistic boolean toggles: each change flips the label at once and PATCHes
@@ -51,19 +70,19 @@ function wireToggle(selector, idAttribute, urlFor, bodyFor, labels) {
                         labelSpan.textContent = !checked ? labels.on : labels.off;
                     }
                 }
-                krtFetch.write({
+                settings.write({
                     method: 'PATCH',
                     url: urlFor(id),
                     payload: bodyFor(checked),
                     submitter: checkbox,
                     successMessage: labels.saved,
                     errorMessage: labels.error,
-                    conflict: SAVE_CONFLICT,
-                    onError(status) {
+                    onConflict() {
                         revert();
-                        if (status === 409) {
-                            return false;
-                        }
+                        return false;
+                    },
+                    onError() {
+                        revert();
                         showFrontendErrorToast(labels.error);
                         return true;
                     },
@@ -148,14 +167,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (submitBtn) {
             submitBtn.disabled = true;
         }
-        krtFetch
+        settings
             .write({
                 method: 'POST',
                 url: settingsForm.getAttribute('action') || '',
                 payload,
                 successMessage: SAVE_SUCCESS,
                 errorMessage: SAVE_ERROR,
-                conflict: SAVE_CONFLICT,
                 onSuccess(body) {
                     if (!body) {
                         return;

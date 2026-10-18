@@ -23,7 +23,7 @@ import { krtOrderWrite } from '/js/joborder/orders-detail-edit.js';
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { joborderHooks } from '/js/joborder/joborder-hooks.js';
 
@@ -956,9 +956,7 @@ export function bookProduction() {
                     'item-handover-lines',
                 ]);
             }
-            if (typeof krtLiveSync.sendChanged === 'function') {
-                krtLiveSync.sendChanged('inventory', ['stock']);
-            }
+            krtPageSections.publish('inventory', ['stock']);
         },
     });
 }

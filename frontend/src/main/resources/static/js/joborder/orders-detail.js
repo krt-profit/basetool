@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* global labelPiece, labelScu, scuHintText, labelMenge, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_HANDOVER_MISSION_HERKUNFT, MSG_HANDOVER_MISSION_REST, MSG_HANDOVER_MISSION_MIN, MSG_STOLEN, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR, ORDER_HANDOVER_I18N */
+/* global labelPiece, labelScu, scuHintText, labelMenge, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_HANDOVER_MISSION_HERKUNFT, MSG_HANDOVER_MISSION_REST, MSG_HANDOVER_MISSION_MIN, MSG_STOLEN, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR, ORDER_CONFLICT, ORDER_HANDOVER_I18N */
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
@@ -50,9 +50,21 @@ function initOrdersDetail() {
                     typeof KRT_ORDER_SECTION_REFRESH_ERROR !== 'undefined'
                         ? KRT_ORDER_SECTION_REFRESH_ERROR
                         : '',
+                'orders.conflict.title': ORDER_CONFLICT.title,
+                'orders.conflict.reload': ORDER_CONFLICT.reload,
+                'orders.conflict.reload.question': ORDER_CONFLICT.reloadQuestion,
+                'orders.conflict.dismiss': ORDER_CONFLICT.dismiss,
+                'orders.conflict.detail': ORDER_CONFLICT.detail,
             };
         },
-        keys: { refreshErrorKey: 'orders.section.refresh.error' },
+        keys: {
+            refreshErrorKey: 'orders.section.refresh.error',
+            conflictTitleKey: 'orders.conflict.title',
+            reloadLabelKey: 'orders.conflict.reload',
+            dismissLabelKey: 'orders.conflict.dismiss',
+            reloadQuestionKey: 'orders.conflict.reload.question',
+            reloadDetailKey: 'orders.conflict.detail',
+        },
         sections: {
             header: { container: '#order-header-results', fragmentValue: 'header' },
             kpi: { container: '#order-kpi-results', fragmentValue: 'kpi' },
@@ -93,6 +105,8 @@ function initOrdersDetail() {
     });
     joborderHooks.refreshOrderSection = order.refresh;
     joborderHooks.notifyOrderChanged = order.notify;
+    joborderHooks.writeOrder = order.write;
+    joborderHooks.submitOrderForm = order.submitForm;
 }
 
 initOrdersDetail();

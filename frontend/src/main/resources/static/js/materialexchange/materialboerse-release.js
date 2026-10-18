@@ -14,7 +14,7 @@
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { krtHooks } from '/js/kernel/krt-hooks.js';
@@ -784,7 +784,7 @@ function initMaterialboerseRelease() {
     }
 
     function notifyPeers() {
-        krtLiveSync.sendChanged(MATERIALBOARD_TOPIC, ['board']);
+        krtPageSections.publish(MATERIALBOARD_TOPIC, ['board']);
     }
 
     document.addEventListener('click', (e) => {

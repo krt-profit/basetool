@@ -25,7 +25,7 @@ import {
     showKrtConfirm,
 } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
-import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 
 /**
@@ -81,14 +81,16 @@ function paTopicsUrl() {
     }`;
 }
 
-function paRefreshTopics() {
-    return krtFetch.swap({
-        url: paTopicsUrl(),
-        container: '#pa-topics-results',
-        fragmentValue: 'topicsResults',
-        errorMessage: MSG_REFRESH_FAILED,
-    });
-}
+const topics = krtPageSections.create({
+    dict() {
+        return { 'promotion.refresh.failed': MSG_REFRESH_FAILED };
+    },
+    keys: { refreshErrorKey: 'promotion.refresh.failed' },
+    sections: {
+        topics: { container: '#pa-topics-results', fragmentValue: 'topicsResults' },
+    },
+    pageUrl: paTopicsUrl,
+});
 
 /**
  * Shows the detail pane of one topic, marks its master row as selected and records the choice in
@@ -170,19 +172,18 @@ function paOnTopicListKeydown(e) {
  * @returns {Promise<any>} the parsed body (an empty object for a body-less success), or null
  */
 function apiCall(url, method, body) {
-    return krtFetch
+    return topics
         .write({
             method,
             url,
             payload: body || undefined,
             toast: false,
-            onError(status) {
-                if (status === 409) {
-                    toastError(MSG_CONFLICT);
-                    paRefreshTopics();
-                } else {
-                    toastError(MSG_ERROR);
-                }
+            onConflict() {
+                toastError(MSG_CONFLICT);
+                topics.refresh('topics');
+            },
+            onError() {
+                toastError(MSG_ERROR);
                 return true;
             },
             onNetworkError() {
@@ -228,7 +229,7 @@ function createTopic() {
         if (data.id) paSelectedTopicId = String(data.id);
         toastSuccess(MSG_SAVED);
         closeModal('modal-create-topic');
-        paRefreshTopics();
+        topics.refresh('topics');
     });
 }
 function updateTopic() {
@@ -243,7 +244,7 @@ function updateTopic() {
         if (!data) return;
         toastSuccess(MSG_SAVED);
         closeModal('modal-edit-topic');
-        paRefreshTopics();
+        topics.refresh('topics');
     });
 }
 /**
@@ -267,7 +268,7 @@ function deleteTopic(btn) {
             if (!data) return;
             if (paSelectedTopicId === id) paSelectedTopicId = null;
             toastSuccess(MSG_DELETED);
-            paRefreshTopics();
+            topics.refresh('topics');
         });
     });
 }
@@ -309,7 +310,7 @@ function createCategory() {
         if (!data) return;
         toastSuccess(MSG_SAVED);
         closeModal('modal-create-category');
-        paRefreshTopics();
+        topics.refresh('topics');
     });
 }
 function updateCategory() {
@@ -325,7 +326,7 @@ function updateCategory() {
         if (!data) return;
         toastSuccess(MSG_SAVED);
         closeModal('modal-edit-category');
-        paRefreshTopics();
+        topics.refresh('topics');
     });
 }
 /**
@@ -348,7 +349,7 @@ function deleteCategory(btn) {
         apiCall(`/api/proxy/promotion/categories/${id}`, 'DELETE', null).then((data) => {
             if (!data) return;
             toastSuccess(MSG_DELETED);
-            paRefreshTopics();
+            topics.refresh('topics');
         });
     });
 }
@@ -451,7 +452,7 @@ function moveTopic(btn, direction) {
     swapSort(card, other, '/api/proxy/promotion/topics', 'topic').then((r) => {
         if (r === null) return;
         toastSuccess(MSG_SAVED);
-        paRefreshTopics();
+        topics.refresh('topics');
     });
 }
 /**
@@ -467,7 +468,7 @@ function moveCategory(btn, direction) {
     swapSort(card, other, '/api/proxy/promotion/categories', 'category').then((r) => {
         if (r === null) return;
         toastSuccess(MSG_SAVED);
-        paRefreshTopics();
+        topics.refresh('topics');
     });
 }
 

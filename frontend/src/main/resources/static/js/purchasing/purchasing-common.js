@@ -20,7 +20,7 @@
 /* global purchasingConflict */
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 
 /**
  * Looks up an element by id and returns it as an input; the purchasing templates always render
@@ -118,31 +118,16 @@ export function sendWrite(opts) {
 export function bindResults(cfg) {
     const container = document.querySelector(cfg.containerSelector);
     const topic = container ? container.getAttribute('data-live-sync-topic') || '' : '';
-    const sections = { [cfg.section]: { container: cfg.containerSelector } };
     const fragment = cfg.fragment || 'results';
 
-    /** Re-renders the container from the server. */
-    function reswap() {
-        const query = new URLSearchParams(window.location.search);
-        query.set('fragment', fragment);
-        krtFetch.swap({
-            url: `${cfg.listUrl}?${query.toString()}`,
-            container: cfg.containerSelector,
-            fragmentValue: fragment,
-            history: false,
-        });
-    }
-
-    if (topic) {
-        krtLiveSync.createReceiver({
-            topic,
-            sections,
-            coalesceMs: 1500,
-            refresh() {
-                reswap();
-            },
-        });
-    }
+    const seam = krtPageSections.create({
+        sections: { [cfg.section]: { container: cfg.containerSelector, fragmentValue: fragment } },
+        pageUrl() {
+            return `${cfg.listUrl}${window.location.search}`;
+        },
+        topic: topic || null,
+        receiver: { coalesceMs: 1500 },
+    });
     krtFetch.bindSwap({
         container: cfg.containerSelector,
         fragmentValue: fragment,
@@ -150,10 +135,7 @@ export function bindResults(cfg) {
     });
 
     return function afterWrite() {
-        reswap();
-        if (topic && typeof krtLiveSync.sendChanged === 'function') {
-            krtLiveSync.sendChanged(topic, Object.keys(sections));
-        }
+        seam.refresh(cfg.section);
     };
 }
 

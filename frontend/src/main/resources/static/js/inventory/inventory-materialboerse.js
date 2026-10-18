@@ -13,7 +13,7 @@
 import { showKrtConfirm } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtHooks } from '/js/kernel/krt-hooks.js';
 
 function initInventoryMaterialboerse() {
@@ -83,7 +83,7 @@ function initInventoryMaterialboerse() {
                 serialize: 'materialboerse',
                 onSuccess() {
                     setStatus(itemId, false);
-                    krtLiveSync.sendChanged('materialboard', ['board']);
+                    krtPageSections.publish('materialboard', ['board']);
                 },
                 onError() {
                     el.checked = true;

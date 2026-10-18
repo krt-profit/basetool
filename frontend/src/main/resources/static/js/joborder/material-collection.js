@@ -21,7 +21,7 @@
 
 import { showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 
 /**
  * Finds the collection row of an inventory entry.
@@ -110,10 +110,11 @@ function updateCollectionProgress() {
     );
 }
 
+/** @type {KrtPageSections | null} */
+let collectionSections = null;
+
 function broadcastCollectionChanged() {
-    if (window.orderId && typeof krtLiveSync.sendChanged === 'function') {
-        krtLiveSync.sendChanged(`order:${window.orderId}`, ['materials', 'aggregated']);
-    }
+    if (collectionSections) collectionSections.notify('materials');
 }
 
 /**
@@ -223,24 +224,20 @@ async function onDeliveredToggle(cb) {
     updateCollectionProgress();
 }
 
-const MATERIAL_COLLECTION_SECTIONS = {
-    materials: { container: '#material-collection-results', fragmentValue: 'results' },
-};
-
 document.addEventListener('DOMContentLoaded', () => {
-    if (window.orderId && document.getElementById('material-collection-results')) {
-        krtLiveSync.createReceiver({
-            topic: `order:${window.orderId}`,
-            sections: MATERIAL_COLLECTION_SECTIONS,
-            coalesceMs: 1500,
-            refresh() {
-                krtFetch.swap({
-                    url: `/orders/${window.orderId}/material-collection`,
-                    container: '#material-collection-results',
-                    fragmentValue: MATERIAL_COLLECTION_SECTIONS.materials.fragmentValue,
-                    history: false,
-                });
-            },
-        });
-    }
+    if (!window.orderId) return;
+    const orderId = window.orderId;
+    collectionSections = krtPageSections.create({
+        sections: {
+            materials: { container: '#material-collection-results', fragmentValue: 'results' },
+        },
+        alsoBroadcast: ['aggregated'],
+        pageUrl() {
+            return `/orders/${orderId}/material-collection`;
+        },
+        topic: `order:${orderId}`,
+        receiver: document.querySelector('#material-collection-results')
+            ? { coalesceMs: 1500 }
+            : undefined,
+    });
 });

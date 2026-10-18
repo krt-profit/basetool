@@ -3,7 +3,7 @@ import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
@@ -65,7 +65,6 @@ function init() {
     deleteAllModal = $('krt-bp-delete-all-modal');
     deleteAllForm = /** @type {HTMLFormElement | null} */ ($('krt-bp-delete-all-form'));
     deleteAllBtn = /** @type {HTMLButtonElement | null} */ ($('krt-bp-delete-all-open'));
-    wireLiveSync();
 
     if (searchInput) {
         searchInput.addEventListener('input', onSearchInput);
@@ -326,53 +325,37 @@ function conflictObj() {
     };
 }
 
-function reswapList() {
-    if (!document.getElementById('krt-bp-list') && document.getElementById('bp-results')) {
-        krtFetch.swap({
-            url: window.location.pathname + window.location.search,
-            container: '#bp-results',
-            history: false,
-        });
-        return;
-    }
-    krtFetch.swap({
-        url: window.location.pathname + window.location.search,
-        container: '#krt-bp-list',
-        fragmentValue: 'list',
-        history: false,
-    });
-}
-
-const BLUEPRINT_SECTIONS = { list: { container: '#krt-bp-list', fragmentValue: 'list' } };
-
 function blueprintTopic() {
     const list = document.getElementById('krt-bp-list');
     return list ? list.dataset.liveSyncTopic || '' : '';
 }
 
+function blueprintPageUrl() {
+    return window.location.pathname + window.location.search;
+}
+
+const memberBlueprints = krtPageSections.create({
+    sections: { list: { container: '#krt-bp-list', fragmentValue: 'list' } },
+    pageUrl: blueprintPageUrl,
+    topic() {
+        return blueprintTopic() || null;
+    },
+    receiver: blueprintTopic() ? { coalesceMs: 1500 } : undefined,
+});
+
+const adminBlueprints = krtPageSections.create({
+    sections: { list: { container: '#bp-results' } },
+    pageUrl: blueprintPageUrl,
+});
+
+/** @returns {KrtPageSections} the seam of the blueprint list the page renders */
+function blueprintSeam() {
+    return document.getElementById('krt-bp-list') ? memberBlueprints : adminBlueprints;
+}
+
 function afterListWrite() {
-    reswapList();
-    const topic = blueprintTopic();
-    if (topic && typeof krtLiveSync.sendChanged === 'function') {
-        krtLiveSync.sendChanged(topic, Object.keys(BLUEPRINT_SECTIONS));
-    }
+    blueprintSeam().refresh('list');
 }
-
-function wireLiveSync() {
-    const topic = blueprintTopic();
-    if (!topic) {
-        return;
-    }
-    krtLiveSync.createReceiver({
-        topic,
-        sections: BLUEPRINT_SECTIONS,
-        coalesceMs: 1500,
-        refresh() {
-            reswapList();
-        },
-    });
-}
-
 function recountAndSync() {
     const rows = document.querySelectorAll('#krt-bp-master-rows .master-row');
     const total = rows.length;
@@ -581,7 +564,7 @@ function patchBlueprintRow(dto) {
         return;
     }
     if (!document.getElementById('krt-bp-list') && document.getElementById('bp-results')) {
-        reswapList();
+        adminBlueprints.refresh('list');
         return;
     }
     const newNote = dto.note == null ? '' : dto.note;

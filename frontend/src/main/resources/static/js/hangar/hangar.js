@@ -25,7 +25,7 @@ import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import {
     createShipSelection,
     formatMessage,
@@ -57,34 +57,18 @@ document.addEventListener('DOMContentLoaded', () => {
         return `/hangar${query ? `?${query}` : ''}`;
     }
 
-    function reswapHangar() {
-        krtFetch.swap({
-            url: currentListUrl(),
-            container: '#hangar-results',
-            history: false,
-        });
-    }
-
-    const HANGAR_SECTIONS = { ships: { container: '#hangar-results' } };
     const hangarResults = document.getElementById('hangar-results');
     const hangarTopic = hangarResults ? hangarResults.dataset.liveSyncTopic || '' : '';
 
-    function afterHangarWrite() {
-        reswapHangar();
-        if (hangarTopic && typeof krtLiveSync.sendChanged === 'function') {
-            krtLiveSync.sendChanged(hangarTopic, Object.keys(HANGAR_SECTIONS));
-        }
-    }
+    const hangarSections = krtPageSections.create({
+        sections: { ships: { container: '#hangar-results' } },
+        pageUrl: currentListUrl,
+        topic: hangarTopic,
+        receiver: { coalesceMs: 1500 },
+    });
 
-    if (hangarTopic) {
-        krtLiveSync.createReceiver({
-            topic: hangarTopic,
-            sections: HANGAR_SECTIONS,
-            coalesceMs: 1500,
-            refresh() {
-                reswapHangar();
-            },
-        });
+    function afterHangarWrite() {
+        hangarSections.refresh('ships');
     }
 
     /**

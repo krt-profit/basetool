@@ -21,7 +21,7 @@
 
 import { showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 
 /**
  * Finds the collection row of an inventory entry.
@@ -110,10 +110,11 @@ function updateCollectionProgress() {
     );
 }
 
+/** @type {KrtPageSections | null} */
+let collectionSections = null;
+
 function broadcastCollectionChanged() {
-    if (window.orderId && typeof krtLiveSync.sendChanged === 'function') {
-        krtLiveSync.sendChanged(`order:${window.orderId}`, ['items']);
-    }
+    if (collectionSections) collectionSections.notify('items');
 }
 
 /**
@@ -223,24 +224,19 @@ async function onDeliveredToggle(cb) {
     updateCollectionProgress();
 }
 
-const ITEM_COLLECTION_SECTIONS = {
-    items: { container: '#item-collection-results', fragmentValue: 'results' },
-};
-
 document.addEventListener('DOMContentLoaded', () => {
-    if (window.orderId && document.getElementById('item-collection-results')) {
-        krtLiveSync.createReceiver({
-            topic: `order:${window.orderId}`,
-            sections: ITEM_COLLECTION_SECTIONS,
-            coalesceMs: 1500,
-            refresh() {
-                krtFetch.swap({
-                    url: `/orders/${window.orderId}/item-collection`,
-                    container: '#item-collection-results',
-                    fragmentValue: ITEM_COLLECTION_SECTIONS.items.fragmentValue,
-                    history: false,
-                });
-            },
-        });
-    }
+    if (!window.orderId) return;
+    const orderId = window.orderId;
+    collectionSections = krtPageSections.create({
+        sections: {
+            items: { container: '#item-collection-results', fragmentValue: 'results' },
+        },
+        pageUrl() {
+            return `/orders/${orderId}/item-collection`;
+        },
+        topic: `order:${orderId}`,
+        receiver: document.querySelector('#item-collection-results')
+            ? { coalesceMs: 1500 }
+            : undefined,
+    });
 });

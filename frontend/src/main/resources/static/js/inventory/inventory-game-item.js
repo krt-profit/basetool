@@ -18,27 +18,20 @@
  */
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
-
-const INVENTORY_GAME_ITEM_SECTIONS = {
-    stock: { container: '#inventory-game-item-results', fragmentValue: 'results' },
-};
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     krtFetch.bindSwap({ container: '#inventory-game-item-results', history: true });
-    if (document.getElementById('inventory-game-item-results')) {
-        krtLiveSync.createReceiver({
-            topic: 'inventory',
-            sections: INVENTORY_GAME_ITEM_SECTIONS,
-            coalesceMs: 1500,
-            refresh() {
-                krtFetch.swap({
-                    url: window.location.pathname + window.location.search,
-                    container: '#inventory-game-item-results',
-                    fragmentValue: INVENTORY_GAME_ITEM_SECTIONS.stock.fragmentValue,
-                    history: false,
-                });
-            },
-        });
-    }
+    krtPageSections.create({
+        sections: {
+            stock: { container: '#inventory-game-item-results', fragmentValue: 'results' },
+        },
+        pageUrl() {
+            return window.location.pathname + window.location.search;
+        },
+        topic: 'inventory',
+        receiver: document.getElementById('inventory-game-item-results')
+            ? { coalesceMs: 1500 }
+            : undefined,
+    });
 });

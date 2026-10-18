@@ -22,7 +22,7 @@
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const matSelect = /** @type {HTMLSelectElement | null} */ (
@@ -106,22 +106,21 @@ document.addEventListener('DOMContentLoaded', () => {
  * @typedef {ApiDto<'OrgUnitMembershipOptionDto'> & {orgUnitId: string}} InventoryInputOwnerOption
  */
 
-const INVENTORY_INPUT_ORDER_SECTIONS = {
-    demand: { container: '#jobOrderAllocGroup', fragmentValue: 'demand' },
-};
-
 function startOrderNeedsLiveSync() {
     if (!document.getElementById('jobOrderAllocGroup')) {
         return;
     }
-    krtLiveSync.createReceiver({
+    krtPageSections.create({
+        sections: {
+            demand: { container: '#jobOrderAllocGroup', fragmentValue: 'demand' },
+        },
         topic: 'orders',
-        sections: INVENTORY_INPUT_ORDER_SECTIONS,
-        coalesceMs: 1500,
-        refresh: refreshOrderNeeds,
+        receiver: {
+            coalesceMs: 1500,
+            refresh: refreshOrderNeeds,
+        },
     });
 }
-
 function refreshOrderNeeds() {
     krtFetch
         .getJson('/inventory/order-needs')
