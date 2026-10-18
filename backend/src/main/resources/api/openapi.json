@@ -81737,6 +81737,12 @@
       "InventoryGameItemReferenceDto" : {
         "type" : "object",
         "properties" : {
+          "componentType" : {
+            "type" : "string"
+          },
+          "grade" : {
+            "type" : "string"
+          },
           "id" : {
             "type" : "string",
             "format" : "uuid"
@@ -81749,6 +81755,10 @@
           },
           "name" : {
             "type" : "string"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         }
       },

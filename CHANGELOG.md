@@ -4,6 +4,8 @@
 
 ### Added
 
+- **Lager: Komponententyp, Größe und Grad am Item.** In „Mein Lager", im Globalen Lager und in der Item-Übersicht zeigt eine Schiffskomponente ihren Typ („Schild", „Kühler", „Quantenantrieb", …) statt „Schiffskomponente" und daneben Größe und Grad, z. B. `S1 · A`. Lackierungen und Flair zeigen weiterhin nur ihre Kategorie; `InventoryGameItemReferenceDto` liefert dafür `componentType`, `size` und `grade` (REQ-INV-061).
+
 - **Schnellzugriff: mehr Seiten, mehr Aktionen, tolerantere Suche.** `Strg`/`⌘` + `K` findet jetzt auch Reiter-Seiten wie „Mein Lager“, „Globales Lager“, „Hangar der Org-Einheit“ sowie – wenn du sie sehen darfst – die Reiter von „Bedarf & Spenden“ und „Ankauf“, und bietet die Aktionen „Neue Mission anlegen“, „Neuen Raffinerieauftrag anlegen“, „In mein Lager einbuchen“, „Ins globale Lager einbuchen“ (Logistiker), „Handbuch öffnen“, Sprachwechsel und „Administration öffnen“ (Admins). Menüfilter und Schnellzugriff finden „ü“ auch als „ue“ und hören auf Suchbegriffe („Schiffe“ → Hangar); besuchte Rechtsseiten erscheinen unter „Zuletzt besucht“ (neuer Endpunkt `GET /quick-access/entries`, ADR-0282, REQ-UI-026).
 
 ### Fixed

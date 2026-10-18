@@ -316,23 +316,9 @@
                 </div>
 
                 <div class="tree-group" th:each="group : ${groupedItems}">
-                    <div class="tree-row tree-row--group" data-trigger="inv-admin-toggle-group" th:data-game-item-id="${group.gameItem.id}">
-                        <div class="tree-cell tree-name">
-                            <span class="tree-chevron toggle-icon">▶</span>
-                            <span class="tree-label" th:text="${group.gameItem.name}">Item</span>
-                            <span class="chip chip--muted" th:if="${group.gameItem.kind != null}"
-                                  th:with="kindKey=|inventory.items.kind.${group.gameItem.kind}|"
-                                  th:text="${#messages.msgOrNull(kindKey)} ?: ${group.gameItem.kind}">Art</span>
-                        </div>
-                        <div class="tree-cell lager-cell-muted">
-                            <span th:if="${group.gameItem.manufacturer != null}" th:text="|${group.gameItem.manufacturer} · |">Hersteller · </span>
-                            <span th:text="#{inventory.tree.groupContext(${group.userCount()}, ${#lists.size(group.stacks)})}">3 Nutzer · 5 Stacks</span>
-                        </div>
-                        <div class="tree-cell tree-cell--num tree-amount">
-                            <span><span th:text="${group.totalAmount != null ? #numbers.formatInteger(group.totalAmount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">St&uuml;ck</span></span>
-                        </div>
-                        <div class="tree-cell"></div>
-                    </div>
+                    <div th:replace="~{inventory/fragments/inventory-item-group :: itemGroupRow(group=${group}, toggleTrigger='inv-admin-toggle-group',
+                        contextText=#{inventory.tree.groupContext(${group.userCount()}, ${#lists.size(group.stacks)})},
+                        selectTrigger=null)}"></div>
 
                     <div class="tree-group-items">
                         <div th:each="stack : ${group.stacks}">

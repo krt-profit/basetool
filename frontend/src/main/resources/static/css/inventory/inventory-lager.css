@@ -52,6 +52,13 @@
         grid-column: 1 / 3;
     }
 
+    .lager-item-chips {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: var(--space-1);
+        align-items: center;
+    }
+
     .tree-table--empty {
         width: auto;
     }
@@ -169,6 +176,18 @@
     .lager-push-end {
         min-height: var(--touch-target);
         margin-left: auto;
+    }
+
+    @media (width <= 1024px) {
+        .lager-item-name {
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr);
+            row-gap: var(--space-1);
+        }
+
+        .lager-item-name .lager-item-chips {
+            grid-column: 2;
+        }
     }
 
     @media (width <= 768px) {
