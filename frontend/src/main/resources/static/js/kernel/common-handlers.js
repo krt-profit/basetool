@@ -241,6 +241,119 @@ function initCommonHandlers() {
     });
 
     revealActiveTabs();
+    trackStackLineEnds();
+}
+
+/** The width up to which a `.data-table--stack` table stacks its rows into cards. */
+const STACK_QUERY = window.matchMedia('(width <= 768px)');
+
+/**
+ * The client rectangle of the first visible character inside an element, or null when it holds no
+ * visible text.
+ *
+ * @param {Element} el the element to search
+ * @returns {DOMRect | null} the rectangle of that character
+ */
+function firstCharRect(el) {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const text = node.textContent ?? '';
+        const index = text.search(/\S/);
+        if (index < 0) continue;
+        const range = document.createRange();
+        range.setStart(node, index);
+        range.setEnd(node, index + 1);
+        const rect = range.getBoundingClientRect();
+        if (rect.height > 0) return rect;
+    }
+    return null;
+}
+
+/**
+ * Marks every `.cell-sub` of a stacked secondary cell whose separator dot would begin a line or
+ * stand alone at the end of one with `stack-sub-break`, so the dot is not drawn.
+ *
+ * @param {boolean} stacked whether the stacked layout applies
+ */
+function markStackSubBreaks(stacked) {
+    const subs = document.querySelectorAll(
+        '.data-table--stack > tbody > tr > td:not(:first-child, .cell-status, .cell-actions) .cell-sub',
+    );
+    subs.forEach((sub) => sub.classList.remove('stack-sub-break'));
+    if (!stacked) return;
+    /** @type {Element[]} */
+    const breaks = [];
+    subs.forEach((sub) => {
+        const prev = sub.previousElementSibling;
+        const rects = sub.getClientRects();
+        if (!prev || rects.length === 0) return;
+        const prevRects = prev.getClientRects();
+        const prevLast = prevRects[prevRects.length - 1];
+        const startsLine = prevLast !== undefined && rects[0].top >= prevLast.bottom - 1;
+        const text = firstCharRect(sub);
+        const dotAlone = text !== null && text.top >= rects[0].bottom - 1;
+        if (startsLine || dotAlone) breaks.push(sub);
+    });
+    breaks.forEach((sub) => sub.classList.add('stack-sub-break'));
+}
+
+/**
+ * Marks every secondary cell of a stacked table row whose following cell starts a new line with
+ * `stack-line-end`, so its separator dot is not drawn at the end of a line.
+ */
+function markStackLineEnds() {
+    const rows = document.querySelectorAll('.data-table--stack > tbody > tr');
+    const stacked = STACK_QUERY.matches;
+    markStackSubBreaks(stacked);
+    for (const row of rows) {
+        if (!(row instanceof HTMLTableRowElement)) continue;
+        /** @type {HTMLTableCellElement[]} */
+        const cells = [];
+        for (const cell of row.cells) {
+            if (
+                cell === row.cells[0] ||
+                cell.classList.contains('cell-status') ||
+                cell.classList.contains('cell-actions') ||
+                cell.getClientRects().length === 0
+            ) {
+                continue;
+            }
+            cells.push(cell);
+        }
+        cells.forEach((cell, index) => {
+            const next = cells[index + 1];
+            const lineEnd =
+                stacked &&
+                next !== undefined &&
+                next.getBoundingClientRect().top >= cell.getBoundingClientRect().bottom - 1;
+            cell.classList.toggle('stack-line-end', lineEnd);
+        });
+    }
+}
+
+/**
+ * Keeps the `stack-line-end` marks current across resizes, orientation changes and DOM updates
+ * such as fragment swaps, measuring at most once per animation frame.
+ */
+function trackStackLineEnds() {
+    let pending = false;
+    const schedule = () => {
+        if (pending) return;
+        pending = true;
+        requestAnimationFrame(() => {
+            pending = false;
+            markStackLineEnds();
+        });
+    };
+    schedule();
+    window.addEventListener('resize', schedule);
+    STACK_QUERY.addEventListener('change', schedule);
+    document.fonts.ready.then(schedule, () => {});
+    new MutationObserver(schedule).observe(document.body, {
+        childList: true,
+        characterData: true,
+        subtree: true,
+    });
 }
 
 /**

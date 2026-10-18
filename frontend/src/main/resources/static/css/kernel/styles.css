@@ -7416,12 +7416,15 @@
                 .cell-status,
                 .cell-actions,
                 .cell-block,
+                .stack-line-end,
                 :has(> :is(div, p, ul, ol, table, form, .meter, [role='progressbar']))
             ):has(~ td:not(.cell-status, .cell-actions, .cell-block, :empty))::after {
             content: '\00b7';
             position: absolute;
+            top: 50%;
             right: -0.5rem;
-            bottom: 0;
+            line-height: 1;
+            transform: translateY(-50%);
         }
         .data-table--stack td[data-label]:not(:first-child, .cell-status)::before {
             content: attr(data-label) ': ';
@@ -8128,7 +8131,7 @@
         .data-table--stack
             td:not(:first-child, .cell-status, .cell-actions)
             :not(div, .meter)
-            + .cell-sub::before {
+            + .cell-sub:not(.stack-sub-break)::before {
             content: '\00a0\00b7\00a0';
         }
 

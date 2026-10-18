@@ -583,6 +583,8 @@ class TouchClassLayoutE2eTest {
     }
     measured.add(path);
     boolean touch = touchApplies(page, deviceLabel, width);
+    page.evaluate(
+        "() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))");
 
     @SuppressWarnings("unchecked")
     Map<String, Object> probe =
@@ -738,6 +740,9 @@ class TouchClassLayoutE2eTest {
     }
     for (Object offender : list(probe.get("nestedHudBoxes"))) {
       findings.add(where + ": nested .hud-box — " + offender);
+    }
+    for (Object offender : list(probe.get("lineEndDots"))) {
+      findings.add(where + ": stacked-row separator dot at the end of a line — " + offender);
     }
     List<Object> gray = list(probe.get("retiredGrayTexts"));
     for (Object offender : gray) {
@@ -1242,6 +1247,44 @@ class TouchClassLayoutE2eTest {
           label(el) + (shown(el) ? '' : ' (hidden)') + ' inside '
             + label(el.parentElement.closest('.hud-box')));
 
+        const lineEndDots = [];
+        for (const row of document.querySelectorAll('.data-table--stack > tbody > tr')) {
+          const cells = Array.from(row.cells).filter((c, i) => i > 0
+            && !c.classList.contains('cell-status') && !c.classList.contains('cell-actions')
+            && c.getClientRects().length > 0);
+          cells.forEach((cell, i) => {
+            const next = cells[i + 1];
+            if (!next || !getComputedStyle(cell, '::after').content.includes('\\u00b7')) return;
+            if (next.getBoundingClientRect().top < cell.getBoundingClientRect().bottom - 1) return;
+            if (lineEndDots.length < maxListed) lineEndDots.push(label(cell));
+          });
+          for (const cell of cells) {
+            for (const sub of cell.querySelectorAll('.cell-sub')) {
+              const prev = sub.previousElementSibling;
+              const rects = sub.getClientRects();
+              if (!prev || rects.length === 0
+                  || !getComputedStyle(sub, '::before').content.includes('\\u00b7')) continue;
+              const prevRects = prev.getClientRects();
+              const prevLast = prevRects[prevRects.length - 1];
+              const walker = document.createTreeWalker(sub, NodeFilter.SHOW_TEXT);
+              let textTop = null;
+              for (let n = walker.nextNode(); n && textTop === null; n = walker.nextNode()) {
+                const at = n.textContent.search(/\\S/);
+                if (at < 0) continue;
+                const range = document.createRange();
+                range.setStart(n, at);
+                range.setEnd(n, at + 1);
+                textTop = range.getBoundingClientRect().top;
+              }
+              const startsLine = prevLast && rects[0].top >= prevLast.bottom - 1;
+              const alone = textTop !== null && textTop >= rects[0].bottom - 1;
+              if ((startsLine || alone) && lineEndDots.length < maxListed) {
+                lineEndDots.push(label(sub) + (startsLine ? ' (dot starts a line)' : ''));
+              }
+            }
+          }
+        }
+
         const retiredGrayTexts = [];
         let retiredGrayCount = 0;
         for (const el of document.body.querySelectorAll('*')) {
@@ -1268,7 +1311,7 @@ class TouchClassLayoutE2eTest {
                  cutOff, unscrollableTables, badControls, smallTextEntries, modalIssues, overlaps,
                  cardOverflows, cardOverflowCount, primaryAction, primaryIssue,
                  ctaCrowds, ctaCrowdCount, nestedHudBoxes, nestedHudCount: nested.length,
-                 retiredGrayTexts, retiredGrayCount,
+                 retiredGrayTexts, retiredGrayCount, lineEndDots,
                  modalCount: document.querySelectorAll('%s').length };
       }
       """

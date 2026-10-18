@@ -26,6 +26,11 @@
         min-width: 0;
     }
 
+    .lager-filter-field .multi-select-options {
+        position: static;
+        box-shadow: none;
+    }
+
     .lager-filter-select {
         width: 100%;
         min-height: var(--touch-target);
