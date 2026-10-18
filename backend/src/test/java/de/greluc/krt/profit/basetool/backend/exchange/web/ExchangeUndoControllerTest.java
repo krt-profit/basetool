@@ -474,6 +474,41 @@ class ExchangeUndoControllerTest {
   }
 
   @Test
+  void aShareThatTookSharedStockWithoutAUnitIsTakenBackToPersonal() throws Exception {
+    UUID laranite = material("Laranite");
+    UUID place = location();
+    UUID squadron = orgUnit("SQUADRON");
+    joins(squadron);
+    personalRow(laranite, place, 4);
+    sharedRow(laranite, place, 3, squadron);
+    jdbc.update(
+        "INSERT INTO inventory_item (id, user_id, material_id, location_id, quality, amount,"
+            + " personal, stolen, created_at, version) VALUES (?, ?, ?, ?, 500, 3, false, false,"
+            + " now(), 0)",
+        UUID.randomUUID(),
+        member,
+        laranite,
+        place);
+    write("stock", "{\"ops\":[" + share(laranite, locationName(place), squadron, "6", "7") + "]}")
+        .andExpect(jsonPath("$.applied").value(1));
+    assertThat(pooled(squadron)).isEqualTo(9.0);
+
+    undo(Instant.now().minus(1, ChronoUnit.HOURS))
+        .andExpect(jsonPath("$.restored").value(1))
+        .andExpect(jsonPath("$.skipped.length()").value(0));
+
+    assertThat(total(laranite)).isEqualTo(10.0);
+    assertThat(pooled(squadron)).isEqualTo(3.0);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COALESCE(SUM(amount), 0) FROM inventory_item WHERE user_id = ?"
+                    + " AND (personal OR owning_org_unit_id IS NULL)",
+                Double.class,
+                member))
+        .isEqualTo(7.0);
+  }
+
+  @Test
   void aShareWhosePoolStockTheClientBookedOutIsSkippedAsGone() throws Exception {
     UUID laranite = material("Laranite");
     UUID place = location();

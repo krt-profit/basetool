@@ -84,7 +84,8 @@ web, naming its client (REQ-AUDIT-005):
   nothing, REQ-INV-052) /
   a shared row's pool change by a Logistician of both units (`INVENTORY_POOL_CHANGED`, from / to as
   `kind:id`, the amount and whether it split; naming the row's own pool records nothing,
-  REQ-INV-059) /
+  REQ-INV-059; also a lot rebooking's move of a shared row without a unit into a pool, from `none`,
+  REQ-INV-060) /
   the „gestohlen“ marker (`INVENTORY_STOLEN_MARKED` / `INVENTORY_STOLEN_UNMARKED` per row or split,
   with the amount and whether it split; a selection writes one `INVENTORY_BULK_STOLEN_CHANGED`
   summary; an unchanged row records nothing, REQ-INV-053) /

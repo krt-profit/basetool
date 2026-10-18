@@ -1623,9 +1623,12 @@ amount of the member's own stock of one lot between personal and one named org u
 direction. It joins the caller's transaction, after the caller has taken the member's lot lock
 (ADR-0229).
 
-- **Into the pool** the rows are taken in this order: the member's personal rows stamped with the
-  target unit, then the personal rows without a unit, then the other personal rows, each group oldest
-  first. A row is split where only part of it is needed.
+- **Into the pool** the rows are taken from the lot's personal part, which the Lager defines once as
+  `StockRow.countsAsPersonal` (personal rows and shared rows outside any pool); the exchange's ledger
+  reads it, and its `split` query counts the same rows (REQ-XCH-016). The order: the member's personal rows stamped with the
+  target unit, then the personal rows without a unit, then the other personal rows, then the
+  member's shared rows without a unit, each group oldest first. Shared rows already in a unit's pool
+  are never a source. A row is split where only part of it is needed.
 - **Back to personal** only the member's own shared rows of that pool move, oldest first. The member
   need not belong to the unit any more.
 - **Every moved row** goes through the web's row rebooking: the member stays the holder, the
@@ -1641,9 +1644,10 @@ direction. It joins the caller's transaction, after the caller has taken the mem
     back to personal, a shared row with a job-order or mission earmark does not move at all, as in the
     web;
   - `STOCK_OFFERED` — the move would leave a row below what it offers on the Materialbörse.
-- **Audit.** Each moved row records `INVENTORY_ITEM_DEPERSONALIZED` or `INVENTORY_ITEM_PERSONALIZED`
-  (REQ-AUDIT-001), with the client of the request's authentication (REQ-AUDIT-005) and no free text
-  or personal data in the details.
+- **Audit.** Each moved personal row records `INVENTORY_ITEM_DEPERSONALIZED` or
+  `INVENTORY_ITEM_PERSONALIZED`, and each moved shared row without a unit `INVENTORY_POOL_CHANGED`
+  (from `none` into the named pool) (REQ-AUDIT-001), with the client of the request's
+  authentication (REQ-AUDIT-005) and no free text or personal data in the details.
 - **Report.** The call returns every row of the lot it created, changed, removed or merged away, with
   its state before and after (personal marker, unit, amount, version, job-order and mission
   earmarks), so a caller can journal the change for undo. A dry run decides and writes nothing.
@@ -1662,6 +1666,10 @@ direction. It joins the caller's transaction, after the caller has taken the mem
 - [x] Each refusal is answered and changes nothing.
 - [x] A dry run writes nothing; each direction is audited under the calling client; the report
   carries the states before and after.
+- [x] A share of more than the personal rows takes the shared rows without a unit second, oldest
+  first, into the named pool with the lot total unchanged; above both it is `INSUFFICIENT_STOCK`;
+  an earmark or offer on such a row limits it with the usual refusals; its part is audited as
+  `INVENTORY_POOL_CHANGED` under the client. *`RebookCommandsTest`.*
 
 **Enforced by:** `RebookCommandsTest`, `InventoryItemServicePersonalRebookTest`,
 `InventoryModuleContractTest`, `ModularityTest` · **Code:** `inventory/api/RebookCommands`,

@@ -222,6 +222,56 @@ class ExchangeStockShareControllerTest {
   }
 
   @Test
+  void theWholeReportedPersonalPartCanBeSharedIncludingSharedStockWithoutAUnit() throws Exception {
+    UUID laranite = material("SCU");
+    UUID area18 = location();
+    UUID squadron = orgUnit("SQUADRON", null);
+    joins(squadron, false);
+    UUID loose = row(laranite, area18, 500, 4, null);
+    sharedRow(laranite, area18, 500, 3, squadron);
+    UUID unitless = insert(laranite, area18, 500, 3, false, null, 600);
+    String place = locationName(area18);
+
+    change("{\"dryRun\":true,\"ops\":[" + share(laranite, place, squadron, "8", "7") + "]}")
+        .andExpect(jsonPath("$.results[0].reason").value("QUANTITY_ABOVE_EXPECTED"));
+    change("{\"dryRun\":true,\"ops\":[" + share(laranite, place, squadron, "7", "7") + "]}")
+        .andExpect(jsonPath("$.applied").value(1))
+        .andExpect(jsonPath("$.notApplied").value(0));
+    assertThat(amount(loose)).isEqualTo(4.0);
+    assertThat(amount(unitless)).isEqualTo(3.0);
+
+    change(share(laranite, area18, 500, squadron, "6", "7", "SCU"))
+        .andExpect(jsonPath("$.applied").value(1));
+
+    assertThat(exists(loose)).isFalse();
+    assertThat(amount(unitless)).isEqualTo(1.0);
+    assertThat(pooled(squadron)).isEqualTo(9.0);
+    assertThat(total(laranite)).isEqualTo(10.0);
+    read(get(PATH))
+        .andExpect(jsonPath("$.items[0].quantity.amount").value(10))
+        .andExpect(jsonPath("$.items[0].split.personal.amount").value(1))
+        .andExpect(pool(squadron).value(9));
+    assertThat(
+            jdbc.queryForList(
+                "SELECT event_type || ':' || client_id FROM audit_event WHERE subject_id IN (?, ?)"
+                    + " AND event_type IN ('INVENTORY_ITEM_DEPERSONALIZED',"
+                    + " 'INVENTORY_POOL_CHANGED')",
+                String.class,
+                loose,
+                unitless))
+        .containsExactlyInAnyOrder(
+            "INVENTORY_ITEM_DEPERSONALIZED:" + client, "INVENTORY_POOL_CHANGED:" + client);
+
+    change(share(laranite, area18, 500, squadron, "2", "1", "SCU"))
+        .andExpect(jsonPath("$.results[0].reason").value("QUANTITY_ABOVE_EXPECTED"));
+    change(share(laranite, area18, 500, squadron, "1", "1", "SCU"))
+        .andExpect(jsonPath("$.applied").value(1));
+    assertThat(amount(unitless)).isEqualTo(1.0);
+    assertThat(pooled(squadron)).isEqualTo(10.0);
+    assertThat(total(laranite)).isEqualTo(10.0);
+  }
+
+  @Test
   void aUnitTheMemberIsNotADirectMemberOfIsRefusedEvenForAnAdminOrAnAreaLeader() throws Exception {
     UUID laranite = material("SCU");
     UUID area18 = location();

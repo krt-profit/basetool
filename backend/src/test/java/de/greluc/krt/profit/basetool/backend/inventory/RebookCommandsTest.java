@@ -173,6 +173,90 @@ class RebookCommandsTest {
   }
 
   @Test
+  void aShareBeyondThePersonalRowsTakesTheSharedRowsWithoutAUnitSecond() {
+    UUID personal = row(member, 4.0, true, otherUnit, 100);
+    UUID pooled = row(member, 3.0, false, target, 300);
+    UUID unitless = row(member, 3.0, false, null, 200);
+    UUID newerUnitless = row(member, 2.0, false, null, 50);
+
+    RebookOutcome outcome = rebook(RebookDirection.TO_POOL, 6.0, false);
+
+    assertThat(outcome.refusal()).isNull();
+    assertThat(amountOf(personal)).isNull();
+    assertThat(amountOf(unitless)).isEqualTo(1.0);
+    assertThat(amountOf(newerUnitless)).isEqualTo(2.0);
+    assertThat(amountOf(pooled)).isEqualTo(3.0);
+    assertThat(poolAmounts(member, target)).containsExactlyInAnyOrder(3.0, 4.0, 2.0);
+    assertThat(lotTotal()).isEqualTo(12.0);
+    assertThat(outcome.changes())
+        .filteredOn(change -> change.before() == null)
+        .extracting(RebookedRow::after)
+        .allSatisfy(
+            after -> {
+              assertThat(Objects.requireNonNull(after).personal()).isFalse();
+              assertThat(after.orgUnitId()).isEqualTo(target);
+            });
+  }
+
+  @Test
+  void aShareAbovePersonalAndUnitlessSharedStockIsRefused() {
+    row(member, 4.0, true, null, 100);
+    row(member, 3.0, false, target, 100);
+    row(member, 3.0, false, null, 100);
+
+    assertThat(rebook(RebookDirection.TO_POOL, 7.5, false).refusal())
+        .isEqualTo(RebookRefusal.INSUFFICIENT_STOCK);
+    assertThat(rebook(RebookDirection.TO_POOL, 7.0, true).refusal()).isNull();
+    assertThat(lotTotal()).isEqualTo(10.0);
+    assertThat(poolAmounts(member, target)).containsExactly(3.0);
+  }
+
+  @Test
+  void anEarmarkOrAnOfferOnAUnitlessSharedRowLimitsWhatAShareTakesFromIt() {
+    row(member, 1.0, true, null, 100);
+    UUID earmarked = row(member, 3.0, false, null, 100);
+    reserveForMission(earmarked, 2.0);
+
+    assertThat(rebook(RebookDirection.TO_POOL, 3.0, false).refusal())
+        .isEqualTo(RebookRefusal.STOCK_EARMARKED);
+    assertThat(rebook(RebookDirection.TO_POOL, 2.0, false).refusal()).isNull();
+    assertThat(amountOf(earmarked)).isEqualTo(2.0);
+
+    UUID offered = row(member, 3.0, false, null, 50);
+    offer(offered, 2.0);
+
+    assertThat(rebook(RebookDirection.TO_POOL, 2.0, false).refusal())
+        .isEqualTo(RebookRefusal.STOCK_OFFERED);
+    assertThat(rebook(RebookDirection.TO_POOL, 1.0, false).refusal()).isNull();
+    assertThat(amountOf(offered)).isEqualTo(2.0);
+  }
+
+  @Test
+  void theUnitlessPartOfAShareIsAuditedAsAPoolChangeUnderTheCallingClient() {
+    row(member, 2.0, true, null, 100);
+    UUID unitless = row(member, 3.0, false, null, 100);
+
+    rebook(RebookDirection.TO_POOL, 4.0, false);
+
+    assertThat(auditEvents())
+        .containsExactlyInAnyOrder(
+            "INVENTORY_ITEM_DEPERSONALIZED:" + client, "INVENTORY_POOL_CHANGED:" + client);
+    assertThat(
+            jdbc.queryForList(
+                "SELECT details FROM audit_event WHERE subject_id = ?"
+                    + " AND event_type = 'INVENTORY_POOL_CHANGED'",
+                String.class,
+                unitless))
+        .singleElement()
+        .satisfies(
+            details ->
+                assertThat(details)
+                    .contains("fromOrgUnit")
+                    .contains(target.toString())
+                    .doesNotContain("rebook-member-"));
+  }
+
+  @Test
   void aWholeShareMovesEveryPersonalRowAndKeepsHolderQualityAndStolenMarker() {
     UUID material = material("SCU");
     UUID first = row(member, material, 4.0, true, null, 600, true, 300);
@@ -521,10 +605,21 @@ class RebookCommandsTest {
     return ((Number) sum.get("total")).doubleValue();
   }
 
+  private double lotTotal() {
+    Map<String, Object> sum =
+        jdbc.queryForMap(
+            "SELECT COALESCE(SUM(amount), 0) AS total FROM inventory_item"
+                + " WHERE user_id = ? AND material_id = ?",
+            member,
+            material);
+    return ((Number) sum.get("total")).doubleValue();
+  }
+
   private @NotNull List<String> auditEvents() {
     return jdbc.queryForList(
         "SELECT event_type || ':' || client_id FROM audit_event WHERE target_user_id = ?"
-            + " AND event_type IN ('INVENTORY_ITEM_DEPERSONALIZED', 'INVENTORY_ITEM_PERSONALIZED')",
+            + " AND event_type IN ('INVENTORY_ITEM_DEPERSONALIZED', 'INVENTORY_ITEM_PERSONALIZED',"
+            + " 'INVENTORY_POOL_CHANGED')",
         String.class,
         member);
   }
