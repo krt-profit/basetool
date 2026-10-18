@@ -36,7 +36,9 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionUnit;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionStructureService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
@@ -55,7 +57,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 /**
  * Verifies the {@code GET /api/v1/missions/{id}/unit-ship-options} endpoint and the backing {@link
- * MissionService#getSelectableUnitShips} logic: a unit's ship picker offers ships of every
+ * MissionStructureService#getSelectableUnitShips} logic: a unit's ship picker offers ships of every
  * registered participant regardless of OrgUnit, excludes non-participants, and retains ships
  * already pinned to a unit even when their owner has left the roster.
  */
@@ -73,6 +75,8 @@ class MissionUnitShipOptionsTest {
   @Autowired private ShipTypeRepository shipTypeRepository;
   @Autowired private SquadronRepository squadronRepository;
   @Autowired private MissionService missionService;
+  @Autowired private MissionParticipantService missionParticipantService;
+  @Autowired private MissionStructureService missionStructureService;
 
   private ShipType shipType;
   private Mission mission;
@@ -108,16 +112,18 @@ class MissionUnitShipOptionsTest {
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
 
-    missionService.addParticipant(
+    missionParticipantService.addParticipant(
         mission.getId(), participantA.getId(), null, null, null, null, null);
-    missionService.addParticipant(
+    missionParticipantService.addParticipant(
         mission.getId(), participantB.getId(), null, null, null, null, null);
   }
 
   @Test
   void getSelectableUnitShips_includesParticipantShipsAcrossOrgUnits_excludesNonParticipants() {
     List<UUID> shipIds =
-        missionService.getSelectableUnitShips(mission.getId()).stream().map(Ship::getId).toList();
+        missionStructureService.getSelectableUnitShips(mission.getId()).stream()
+            .map(Ship::getId)
+            .toList();
 
     assertTrue(
         shipIds.contains(participantShipSameOrgUnit.getId()),
@@ -134,11 +140,13 @@ class MissionUnitShipOptionsTest {
   void getSelectableUnitShips_includesParticipantShipWithoutAnyOrgUnit() {
     User orgUnitlessParticipant = saveUser("ship_opts_no_orgunit");
     Ship orgUnitlessShip = saveShip("E-Ship", orgUnitlessParticipant, null);
-    missionService.addParticipant(
+    missionParticipantService.addParticipant(
         mission.getId(), orgUnitlessParticipant.getId(), null, null, null, null, null);
 
     List<UUID> shipIds =
-        missionService.getSelectableUnitShips(mission.getId()).stream().map(Ship::getId).toList();
+        missionStructureService.getSelectableUnitShips(mission.getId()).stream()
+            .map(Ship::getId)
+            .toList();
 
     assertTrue(
         shipIds.contains(orgUnitlessShip.getId()),
@@ -159,7 +167,9 @@ class MissionUnitShipOptionsTest {
     mission = missionRepository.save(mission);
 
     List<UUID> shipIds =
-        missionService.getSelectableUnitShips(mission.getId()).stream().map(Ship::getId).toList();
+        missionStructureService.getSelectableUnitShips(mission.getId()).stream()
+            .map(Ship::getId)
+            .toList();
 
     assertTrue(
         shipIds.contains(assignedShip.getId()),

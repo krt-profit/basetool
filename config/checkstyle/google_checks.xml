@@ -127,7 +127,7 @@
   <module name="FileLength">
     <property name="id" value="fileLengthMissionController"/>
     <property name="fileExtensions" value="java"/>
-    <property name="max" value="1418"/>
+    <property name="max" value="1405"/>
   </module>
   <module name="SuppressionSingleFilter">
     <property name="id" value="fileLength"/>
@@ -162,19 +162,6 @@
   <module name="SuppressionSingleFilter">
     <property name="id" value="fileLengthInventoryItemService"/>
     <property name="files" value="^(?!.*basetool.backend.inventory.internal.InventoryItemService\.java$)"/>
-  </module>
-  <module name="FileLength">
-    <property name="id" value="fileLengthMissionService"/>
-    <property name="fileExtensions" value="java"/>
-    <property name="max" value="1301"/>
-  </module>
-  <module name="SuppressionSingleFilter">
-    <property name="id" value="fileLength"/>
-    <property name="files" value="basetool.backend.mission.internal.MissionService\.java$"/>
-  </module>
-  <module name="SuppressionSingleFilter">
-    <property name="id" value="fileLengthMissionService"/>
-    <property name="files" value="^(?!.*basetool.backend.mission.internal.MissionService\.java$)"/>
   </module>
   <module name="FileLength">
     <property name="id" value="fileLengthExchangeController"/>

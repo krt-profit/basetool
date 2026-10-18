@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
@@ -55,6 +56,8 @@ import org.springframework.transaction.annotation.Transactional;
 class MissionParticipantOrgUnitTest {
 
   @Autowired private MissionService missionService;
+
+  @Autowired private MissionParticipantService missionParticipantService;
   @Autowired private MissionRepository missionRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private SquadronRepository squadronRepository;
@@ -110,7 +113,8 @@ class MissionParticipantOrgUnitTest {
     User user = newUser("nomember");
 
     Mission updated =
-        missionService.addParticipant(mission.getId(), user.getId(), null, null, null, null, null);
+        missionParticipantService.addParticipant(
+            mission.getId(), user.getId(), null, null, null, null, null);
 
     assertTrue(
         onlyParticipant(updated).getOrgUnits().isEmpty(),
@@ -123,7 +127,8 @@ class MissionParticipantOrgUnitTest {
     addMembership(user, testStaffel, OrgUnitKind.SQUADRON);
 
     Mission updated =
-        missionService.addParticipant(mission.getId(), user.getId(), null, null, null, null, null);
+        missionParticipantService.addParticipant(
+            mission.getId(), user.getId(), null, null, null, null, null);
 
     List<UUID> ids = onlyParticipant(updated).getOrgUnits().stream().map(OrgUnit::getId).toList();
     assertEquals(List.of(testStaffel.getId()), ids);
@@ -135,7 +140,8 @@ class MissionParticipantOrgUnitTest {
     addMembership(user, testSk, OrgUnitKind.SPECIAL_COMMAND);
 
     Mission updated =
-        missionService.addParticipant(mission.getId(), user.getId(), null, null, null, null, null);
+        missionParticipantService.addParticipant(
+            mission.getId(), user.getId(), null, null, null, null, null);
 
     List<UUID> ids = onlyParticipant(updated).getOrgUnits().stream().map(OrgUnit::getId).toList();
     assertEquals(List.of(testSk.getId()), ids);
@@ -148,7 +154,8 @@ class MissionParticipantOrgUnitTest {
     addMembership(user, testSk, OrgUnitKind.SPECIAL_COMMAND);
 
     Mission updated =
-        missionService.addParticipant(mission.getId(), user.getId(), null, null, null, null, null);
+        missionParticipantService.addParticipant(
+            mission.getId(), user.getId(), null, null, null, null, null);
 
     List<UUID> ids = onlyParticipant(updated).getOrgUnits().stream().map(OrgUnit::getId).toList();
     assertTrue(ids.contains(testStaffel.getId()), "Staffel affiliation must be present");
@@ -159,7 +166,7 @@ class MissionParticipantOrgUnitTest {
   @Test
   void guest_anonymousCaller_submittedOrgUnitsAreHonored() {
     Mission updated =
-        missionService.addParticipant(
+        missionParticipantService.addParticipant(
             mission.getId(),
             null,
             "Guest",

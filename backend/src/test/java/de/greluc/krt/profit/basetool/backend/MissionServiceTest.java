@@ -20,11 +20,9 @@
 package de.greluc.krt.profit.basetool.backend;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -35,22 +33,16 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
-import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.mission.api.MemberPayoutSettings;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
-import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantCount;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionNotificationPublisher;
-import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
-import de.greluc.krt.profit.basetool.backend.mission.internal.ParticipantTargetResolver;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -62,7 +54,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -75,9 +66,6 @@ class MissionServiceTest {
   @Mock private MissionRepository missionRepository;
 
   @Mock private UserRepository userRepository;
-  @Mock private MemberPayoutSettings memberPayoutSettings;
-
-  @Mock private SquadronRepository squadronRepository;
 
   @Mock private MissionParticipantRepository missionParticipantRepository;
 
@@ -88,31 +76,12 @@ class MissionServiceTest {
   @Mock
   private de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService authHelperService;
 
-  @Mock
-  private de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService
-      orgUnitMembershipQueryService;
-
   @Mock private AuditService auditService;
 
-  /**
-   * The name resolution is its own unit ({@code ParticipantTargetResolverTest}); here it passes
-   * every submission through unresolved by default, and the one case about name matching stubs the
-   * match it needs.
-   */
-  @Mock private ParticipantTargetResolver participantTargetResolver;
-
-  @Mock private MissionNotificationPublisher notificationPublisher;
-  @InjectMocks private MissionParticipantService missionParticipantService;
   private MissionService missionService;
 
   @BeforeEach
-  void wireExtractedParticipantService() {
-    org.mockito.Mockito.lenient()
-        .when(participantTargetResolver.resolve(any(), any(), any()))
-        .thenAnswer(
-            inv ->
-                new ParticipantTargetResolver.ParticipantTarget(
-                    inv.getArgument(0), inv.getArgument(1)));
+  void buildService() {
     missionService =
         new MissionService(
             missionRepository,
@@ -127,8 +96,6 @@ class MissionServiceTest {
             ownerScopeService,
             authHelperService,
             auditService,
-            null,
-            missionParticipantService,
             null,
             mock(MissionNotificationPublisher.class));
   }
@@ -232,110 +199,6 @@ class MissionServiceTest {
 
     assertEquals(Optional.empty(), result);
     verify(missionRepository, never()).findById(any());
-  }
-
-  @Test
-  void addParticipant_ShouldMatchGuestNameToExistingUserCaseInsensitive() {
-    UUID missionId = UUID.randomUUID();
-    Mission mission = new Mission();
-    mission.setId(missionId);
-
-    UUID userId = UUID.randomUUID();
-    User existingUser = new User();
-    existingUser.setId(userId);
-    existingUser.setUsername("testuser");
-
-    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
-    when(participantTargetResolver.resolve(null, "TestUser", "Participant name is ambiguous."))
-        .thenReturn(new ParticipantTargetResolver.ParticipantTarget(userId, null));
-    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(existingUser));
-    when(orgUnitMembershipQueryService.findAllMembershipsForUser(userId)).thenReturn(List.of());
-
-    Mission result = missionService.addParticipant(missionId, null, "TestUser", null, "No comment");
-
-    assertEquals(1, result.getParticipants().size());
-    MissionParticipant participant = result.getParticipants().iterator().next();
-    assertNotNull(participant.getUser(), "User should be mapped from guest name");
-    assertEquals(userId, participant.getUser().getId());
-    assertNull(participant.getGuestName(), "Guest name should be nullified since user was found");
-    assertTrue(
-        participant.getOrgUnits().isEmpty(),
-        "a user with no membership must get no org-unit affiliation (no IRIDIUM fallback)");
-  }
-
-  @Test
-  void addParticipant_ShouldPreFillPayoutPreferenceFromUserDefault() {
-    UUID missionId = UUID.randomUUID();
-    Mission mission = new Mission();
-    mission.setId(missionId);
-
-    UUID userId = UUID.randomUUID();
-    User user = new User();
-    user.setId(userId);
-    user.setUsername("donator");
-
-    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
-    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
-    when(memberPayoutSettings.defaultFor(userId)).thenReturn(Optional.of(PayoutPreference.DONATE));
-    when(orgUnitMembershipQueryService.findAllMembershipsForUser(userId)).thenReturn(List.of());
-
-    Mission result = missionService.addParticipant(missionId, userId, null, null, "No comment");
-
-    MissionParticipant participant = result.getParticipants().iterator().next();
-    assertEquals(
-        PayoutPreference.DONATE,
-        participant.getPayoutPreference(),
-        "participant payout preference must be seeded from the signing-up user's profile default");
-  }
-
-  @Test
-  void addParticipant_ShouldKeepPayoutDefault_WhenUserHasNoDefault() {
-    UUID missionId = UUID.randomUUID();
-    Mission mission = new Mission();
-    mission.setId(missionId);
-
-    UUID userId = UUID.randomUUID();
-    User user = new User();
-    user.setId(userId);
-    user.setUsername("nopref");
-
-    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
-    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
-    when(orgUnitMembershipQueryService.findAllMembershipsForUser(userId)).thenReturn(List.of());
-
-    Mission result = missionService.addParticipant(missionId, userId, null, null, "No comment");
-
-    MissionParticipant participant = result.getParticipants().iterator().next();
-    assertEquals(
-        PayoutPreference.PAYOUT,
-        participant.getPayoutPreference(),
-        "a user with no profile default keeps the PAYOUT entity default");
-  }
-
-  @Test
-  void addParticipant_ExplicitPayoutChoice_WinsOverProfileDefault() {
-    UUID missionId = UUID.randomUUID();
-    Mission mission = new Mission();
-    mission.setId(missionId);
-
-    UUID userId = UUID.randomUUID();
-    User user = new User();
-    user.setId(userId);
-    user.setUsername("explicit-chooser");
-
-    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
-    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
-    when(orgUnitMembershipQueryService.findAllMembershipsForUser(userId)).thenReturn(List.of());
-
-    Mission result =
-        missionService.addParticipant(
-            missionId, userId, null, null, "No comment", null, PayoutPreference.PAYOUT);
-
-    MissionParticipant participant = result.getParticipants().iterator().next();
-    assertEquals(
-        PayoutPreference.PAYOUT,
-        participant.getPayoutPreference(),
-        "an explicit sign-up payout choice must override the profile default");
   }
 
   @Test

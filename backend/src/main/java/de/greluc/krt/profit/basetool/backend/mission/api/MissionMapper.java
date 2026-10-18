@@ -281,7 +281,7 @@ public abstract class MissionMapper {
   /**
    * Counts participants that have been checked in. A participant is considered checked in as soon
    * as {@code startTime} is set (see {@link
-   * de.greluc.krt.profit.basetool.backend.mission.internal.MissionService#checkIn}).
+   * de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService#checkIn}).
    */
   public int resolveCheckedInParticipants(Mission mission) {
     if (mission == null || mission.getParticipants() == null) {

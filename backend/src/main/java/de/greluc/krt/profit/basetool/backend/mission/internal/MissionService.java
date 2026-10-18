@@ -26,8 +26,6 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeRepository;
-import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
-import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
@@ -38,8 +36,6 @@ import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionCommands;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionDeletionObserver;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFrequency;
-import de.greluc.krt.profit.basetool.backend.mission.api.MissionObjectiveKind;
-import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantCount;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionReferenceDto;
@@ -69,18 +65,18 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Manages the {@code mission} aggregate: roster, units and crews, schedule, frequencies, goals and
- * steps, managers and owner.
+ * Manages the {@code mission} aggregate's core, schedule, flags, owning org unit, frequencies,
+ * owner, sub-missions and search; the timeline, participant and structure sections live in {@link
+ * MissionTimelineService}, {@link MissionParticipantService} and {@link MissionStructureService}
+ * (ADR-0286).
  *
- * <p>Writes are guarded by the mission's {@code @Version} or a dedicated section counter;
- * participant, unit and crew writes use dirty-checking on the managed aggregate, and ownership is
- * versioned separately in {@code mission_ownership}.
+ * <p>Writes are guarded by the mission's {@code @Version} or a dedicated section counter, and
+ * ownership is versioned separately in {@code mission_ownership}.
  */
 @Service
 @Slf4j
@@ -88,7 +84,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class MissionService implements MissionCommands {
 
-  /** Hard cap on participants per mission — see {@link #addParticipant} for the rationale. */
+  /** Hard cap on participants per mission, enforced by {@link MissionParticipantService}. */
   public static final int MAX_PARTICIPANTS_PER_MISSION = 500;
 
   private final MissionRepository missionRepository;
@@ -104,9 +100,6 @@ public class MissionService implements MissionCommands {
   private final AuthHelperService authHelperService;
   private final AuditRecorder auditRecorder;
   private final MissionTimelineService missionTimelineService;
-  private final MissionParticipantService missionParticipantService;
-
-  private final MissionStructureService missionStructureService;
 
   /** Publishes the mission notifications (REQ-MISSION-021…029). */
   private final MissionNotificationPublisher notificationPublisher;
@@ -569,400 +562,6 @@ public class MissionService implements MissionCommands {
   }
 
   /**
-   * Adds a participant with a user reference or guest name, an optional desired job type and
-   * comment; delegates to the full overload without org units or payout choice.
-   */
-  @Transactional
-  public Mission addParticipant(
-      @NotNull UUID missionId,
-      @Nullable UUID userId,
-      @Nullable String guestName,
-      @Nullable UUID desiredJobTypeId,
-      @Nullable String comment) {
-    return missionParticipantService.addParticipant(
-        missionId, userId, guestName, desiredJobTypeId, comment);
-  }
-
-  /**
-   * Adds a participant, resolving the user from {@code userId} or by case-insensitive {@code
-   * guestName} match.
-   *
-   * <p>A registered user's org-unit affiliations are derived from their memberships; an external
-   * participant keeps the submitted {@code orgUnitIds}. A non-null {@code payoutPreference}
-   * overrides the profile default (REQ-MISSION-002).
-   *
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when any referenced id
-   *     is unknown
-   */
-  @Transactional
-  public Mission addParticipant(
-      @NotNull UUID missionId,
-      @Nullable UUID userId,
-      @Nullable String guestName,
-      @Nullable UUID desiredJobTypeId,
-      @Nullable String comment,
-      @Nullable List<UUID> orgUnitIds,
-      @Nullable PayoutPreference payoutPreference) {
-    return missionParticipantService.addParticipant(
-        missionId, userId, guestName, desiredJobTypeId, comment, orgUnitIds, payoutPreference);
-  }
-
-  /**
-   * Returns a participant of the given mission; a participant of another mission counts as not
-   * found.
-   *
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the participant
-   *     does not exist on this mission
-   */
-  public MissionParticipant getParticipant(@NotNull UUID missionId, @NotNull UUID participantId) {
-    return missionParticipantService.getParticipant(missionId, participantId);
-  }
-
-  /**
-   * Returns the participants of a mission not yet assigned to any unit or crew.
-   *
-   * @param missionId mission id
-   * @return list of unassigned participants
-   */
-  public List<MissionParticipant> getUnassignedParticipants(@NotNull UUID missionId) {
-    return missionParticipantService.getUnassignedParticipants(missionId);
-  }
-
-  /**
-   * Removes a participant from a mission and the participant's linked finance entries. The
-   * participant row itself is deleted (not soft-deleted); finance entries with FK to the
-   * participant cascade-delete to keep the FK constraint happy.
-   */
-  @Transactional
-  public Mission removeParticipant(@NotNull UUID missionId, @NotNull UUID participantId) {
-    return missionParticipantService.removeParticipant(missionId, participantId);
-  }
-
-  /**
-   * Updates a participant's per-mission attributes, guarded by the participant's own version; the
-   * mission's version is not bumped.
-   *
-   * @param authentication the caller; a caller who may not manage the mission can neither set the
-   *     planned job type nor rename the row onto a member or another guest
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the participant or
-   *     any referenced id is unknown
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when stale
-   */
-  @Transactional
-  public Mission updateParticipantAttributes(
-      @NotNull UUID missionId,
-      @NotNull UUID participantId,
-      UUID desiredMissionJobTypeId,
-      UUID plannedMissionJobTypeId,
-      String comment,
-      Instant startTime,
-      Instant endTime,
-      List<UUID> orgUnitIds,
-      PayoutPreference payoutPreference,
-      String guestName,
-      Long version,
-      Authentication authentication) {
-    return missionParticipantService.updateParticipantAttributes(
-        missionId,
-        participantId,
-        desiredMissionJobTypeId,
-        plannedMissionJobTypeId,
-        comment,
-        startTime,
-        endTime,
-        orgUnitIds,
-        payoutPreference,
-        guestName,
-        version,
-        authentication);
-  }
-
-  /**
-   * Marks a participant as checked in. Sets {@code startTime} to {@code now()} only if the
-   * participant has not been checked in before — repeated check-in is a no-op so the original
-   * arrival time is preserved.
-   */
-  @Transactional
-  public Mission checkIn(UUID missionId, UUID participantId) {
-    return missionParticipantService.checkIn(missionId, participantId);
-  }
-
-  /**
-   * Marks a participant as checked out. Sets {@code endTime} to {@code now()}. Unlike check-in, a
-   * repeated check-out overrides the previous timestamp — late check-out corrections.
-   */
-  @Transactional
-  public Mission checkOut(UUID missionId, UUID participantId) {
-    return missionParticipantService.checkOut(missionId, participantId);
-  }
-
-  /**
-   * Updates a participant's payout preference (PAYOUT or DONATE). Guests can change their own
-   * preference even without authentication — the security gate on the participant row keeps other
-   * users' preferences locked.
-   */
-  @Transactional
-  public Mission updatePayoutPreference(
-      UUID missionId, UUID participantId, PayoutPreference preference) {
-    return missionParticipantService.updatePayoutPreference(missionId, participantId, preference);
-  }
-
-  /**
-   * Adds a unit to a mission. A blank {@code name} is derived from the ship or ship type; at least
-   * one of name, ship and ship type is required.
-   */
-  @Transactional
-  public Mission addUnitToMission(
-      @NotNull UUID missionId,
-      String name,
-      UUID shipTypeId,
-      UUID shipId,
-      boolean highValueUnit,
-      Double frequency,
-      UUID responsibleUserId,
-      String note) {
-    return missionStructureService.addUnitToMission(
-        missionId, name, shipTypeId, shipId, highValueUnit, frequency, responsibleUserId, note);
-  }
-
-  /** Updates a unit's name and assigned ship, guarded by the unit's {@code expectedVersion}. */
-  @Transactional
-  public Mission updateMissionUnit(
-      @NotNull UUID missionId,
-      @NotNull UUID unitId,
-      Long expectedVersion,
-      String name,
-      UUID shipTypeId,
-      UUID shipId,
-      boolean highValueUnit,
-      Double frequency,
-      UUID responsibleUserId,
-      String note) {
-    return missionStructureService.updateMissionUnit(
-        missionId,
-        unitId,
-        expectedVersion,
-        name,
-        shipTypeId,
-        shipId,
-        highValueUnit,
-        frequency,
-        responsibleUserId,
-        note);
-  }
-
-  /**
-   * Collects the ships selectable for this mission's units: ships of registered participants,
-   * regardless of org unit, plus ships already assigned to a unit; deduplicated, participant ships
-   * first.
-   *
-   * @param missionId the mission whose selectable unit ships are collected, never {@code null}
-   * @return the candidate ships for this mission's unit ship pickers
-   * @throws NotFoundException when the mission id does not resolve
-   */
-  @Transactional(readOnly = true)
-  public List<Ship> getSelectableUnitShips(@NotNull UUID missionId) {
-    return missionStructureService.getSelectableUnitShips(missionId);
-  }
-
-  /** Removes a unit; its participants stay on the mission with unit and crew cleared. */
-  @Transactional
-  public Mission removeMissionUnit(@NotNull UUID missionId, @NotNull UUID unitId) {
-    return missionStructureService.removeMissionUnit(missionId, unitId);
-  }
-
-  /**
-   * Appends a not-done step to the mission's Ablauf, guarded by {@code stepsVersion}.
-   *
-   * @param missionId the mission id
-   * @param title the required step title
-   * @param meta the optional free-text time/place hint
-   * @param expectedStepsVersion the steps-section version the caller last saw
-   * @return the managed mission
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the mission is
-   *     unknown
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
-   *     expectedStepsVersion} is stale
-   */
-  @Transactional
-  public Mission addStep(
-      @NotNull UUID missionId,
-      String title,
-      @Nullable String meta,
-      @NotNull Long expectedStepsVersion) {
-    return missionTimelineService.addStep(missionId, title, meta, expectedStepsVersion);
-  }
-
-  /**
-   * Edits an existing Ablauf step's title and time/place hint. Mutates the managed child via
-   * dirty-checking (no explicit child save) and bumps {@code stepsVersion}.
-   *
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
-   *     expectedStepsVersion} is stale
-   */
-  @Transactional
-  public Mission updateStep(
-      @NotNull UUID missionId,
-      @NotNull UUID stepId,
-      String title,
-      @Nullable String meta,
-      @NotNull Long expectedStepsVersion) {
-    return missionTimelineService.updateStep(missionId, stepId, title, meta, expectedStepsVersion);
-  }
-
-  /**
-   * Removes an Ablauf step and re-packs the remaining steps' {@code orderIndex} to 0..n-1 so the
-   * timeline stays contiguous. Bumps {@code stepsVersion}.
-   *
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the step is not a
-   *     child of the mission
-   */
-  @Transactional
-  public Mission deleteStep(
-      @NotNull UUID missionId, @NotNull UUID stepId, @NotNull Long expectedStepsVersion) {
-    return missionTimelineService.deleteStep(missionId, stepId, expectedStepsVersion);
-  }
-
-  /**
-   * Reorders the mission's steps; {@code orderedStepIds} must be exactly its step ids. Guarded by
-   * {@code stepsVersion}.
-   *
-   * @throws IllegalArgumentException when the id set does not match the mission's steps exactly
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
-   *     expectedStepsVersion} is stale
-   */
-  @Transactional
-  public Mission reorderSteps(
-      @NotNull UUID missionId,
-      @NotNull List<UUID> orderedStepIds,
-      @NotNull Long expectedStepsVersion) {
-    return missionTimelineService.reorderSteps(missionId, orderedStepIds, expectedStepsVersion);
-  }
-
-  /**
-   * Sets a step's {@code done} flag and bumps {@code stepsVersion}.
-   *
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the step is not a
-   *     child of the mission
-   */
-  @Transactional
-  public Mission toggleStepDone(
-      @NotNull UUID missionId,
-      @NotNull UUID stepId,
-      boolean done,
-      @NotNull Long expectedStepsVersion) {
-    return missionTimelineService.toggleStepDone(missionId, stepId, done, expectedStepsVersion);
-  }
-
-  /**
-   * Appends a goal to the mission, guarded by {@code objectivesVersion}; the audit event carries no
-   * title.
-   *
-   * @param missionId the mission id
-   * @param title the required goal text
-   * @param kind the classification (primary / secondary / non-goal)
-   * @param expectedObjectivesVersion the goals-section version the caller last saw
-   * @return the managed mission
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the mission is
-   *     unknown
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
-   *     expectedObjectivesVersion} is stale
-   */
-  @Transactional
-  public Mission addObjective(
-      @NotNull UUID missionId,
-      String title,
-      @NotNull MissionObjectiveKind kind,
-      @NotNull Long expectedObjectivesVersion) {
-    return missionTimelineService.addObjective(missionId, title, kind, expectedObjectivesVersion);
-  }
-
-  /**
-   * Edits an existing goal's text and classification. Mutates the managed child via dirty-checking
-   * (no explicit child save) and bumps {@code objectivesVersion}.
-   *
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
-   *     expectedObjectivesVersion} is stale
-   */
-  @Transactional
-  public Mission updateObjective(
-      @NotNull UUID missionId,
-      @NotNull UUID objectiveId,
-      String title,
-      @NotNull MissionObjectiveKind kind,
-      @NotNull Long expectedObjectivesVersion) {
-    return missionTimelineService.updateObjective(
-        missionId, objectiveId, title, kind, expectedObjectivesVersion);
-  }
-
-  /**
-   * Removes a goal and re-packs the remaining goals' {@code orderIndex} to 0..n-1 so the list stays
-   * contiguous. Bumps {@code objectivesVersion}.
-   *
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the goal is not a
-   *     child of the mission
-   */
-  @Transactional
-  public Mission deleteObjective(
-      @NotNull UUID missionId, @NotNull UUID objectiveId, @NotNull Long expectedObjectivesVersion) {
-    return missionTimelineService.deleteObjective(
-        missionId, objectiveId, expectedObjectivesVersion);
-  }
-
-  /**
-   * Reorders the mission's goals; {@code orderedObjectiveIds} must be exactly its goal ids. Guarded
-   * by {@code objectivesVersion}.
-   *
-   * @throws IllegalArgumentException when the id set does not match the mission's goals exactly
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
-   *     expectedObjectivesVersion} is stale
-   */
-  @Transactional
-  public Mission reorderObjectives(
-      @NotNull UUID missionId,
-      @NotNull List<UUID> orderedObjectiveIds,
-      @NotNull Long expectedObjectivesVersion) {
-    return missionTimelineService.reorderObjectives(
-        missionId, orderedObjectiveIds, expectedObjectivesVersion);
-  }
-
-  /**
-   * Adds a crew (ship-level grouping) under a unit. Crews are the second level of the participant
-   * hierarchy and pin participants to a specific ship's role.
-   */
-  @Transactional
-  public Mission addCrewToShip(
-      @NotNull UUID missionId,
-      @NotNull UUID missionUnitId,
-      @NotNull UUID participantId,
-      @NotNull Set<UUID> jobTypeIds) {
-    return missionStructureService.addCrewToShip(
-        missionId, missionUnitId, participantId, jobTypeIds);
-  }
-
-  /** Updates a crew's assigned job types, guarded by the crew's {@code expectedVersion}. */
-  @Transactional
-  public Mission updateCrewInShip(
-      @NotNull UUID missionId,
-      @NotNull UUID missionUnitId,
-      @NotNull UUID crewId,
-      Long expectedVersion,
-      @NotNull Set<UUID> jobTypeIds) {
-    return missionStructureService.updateCrewInShip(
-        missionId, missionUnitId, crewId, expectedVersion, jobTypeIds);
-  }
-
-  /**
-   * Removes a crew. Participants assigned to the crew fall back to the parent unit's unassigned
-   * slot.
-   */
-  @Transactional
-  public Mission removeCrewFromShip(
-      @NotNull UUID missionId, @NotNull UUID missionUnitId, @NotNull UUID crewId) {
-    return missionStructureService.removeCrewFromShip(missionId, missionUnitId, crewId);
-  }
-
-  /**
    * Creates a sub-mission under a parent mission; {@code parent} and the owning squadron come from
    * the parent.
    *
@@ -1239,49 +838,6 @@ public class MissionService implements MissionCommands {
   @NotNull
   private static String formatOrgUnitRef(@Nullable OrgUnit orgUnit) {
     return orgUnit == null ? "none" : orgUnit.getKind() + ":" + orgUnit.getId();
-  }
-
-  /**
-   * Sets or clears a mission's party lead: a non-null {@code userId} links a user, otherwise a
-   * non-blank {@code guestName} is stored, otherwise the lead is cleared. Guarded by {@code
-   * partyLeadVersion} only.
-   *
-   * @param missionId mission to update
-   * @param userId registered party-lead reference, or {@code null}
-   * @param guestName free-text party-lead handle, or {@code null}
-   * @param expectedPartyLeadVersion expected value of {@code Mission.partyLeadVersion}
-   * @return the managed mission with the party lead applied
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the mission or the
-   *     referenced user is unknown
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
-   *     expectedPartyLeadVersion} is stale
-   */
-  @Transactional
-  public Mission setPartyLead(
-      @NotNull UUID missionId,
-      @Nullable UUID userId,
-      @Nullable String guestName,
-      @NotNull Long expectedPartyLeadVersion) {
-    return missionParticipantService.setPartyLead(
-        missionId, userId, guestName, expectedPartyLeadVersion);
-  }
-
-  /**
-   * Adds a co-manager. Co-managers can edit the mission with the same privileges as the owner
-   * (except they cannot transfer ownership — see {@link MissionSecurityService#canChangeOwner}).
-   */
-  @Transactional
-  public Mission addManager(@NotNull UUID missionId, @NotNull UUID userId) {
-    return missionParticipantService.addManager(missionId, userId);
-  }
-
-  /**
-   * Removes a co-manager. The owner cannot be removed via this method — use {@link
-   * #updateMissionOwner} to transfer ownership first.
-   */
-  @Transactional
-  public Mission removeManager(@NotNull UUID missionId, @NotNull UUID userId) {
-    return missionParticipantService.removeManager(missionId, userId);
   }
 
   /**
