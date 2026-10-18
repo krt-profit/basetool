@@ -84,6 +84,8 @@ class JobOrderPageControllerNoReloadMvcTest {
 
   @MockitoBean private BackendApiClient backendApiClient;
 
+  @MockitoBean private JobOrderPageReader reader;
+
   @MockitoBean
   private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
       clientRegistrationRepository;
@@ -683,8 +685,11 @@ class JobOrderPageControllerNoReloadMvcTest {
   void viewOrderDetail_AssigneesFragment_RendersTheAssigneesSection() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
-        .thenReturn(materialOrder(orderId, 1L));
+    when(reader.readOrderDetail(eq(orderId), any(), any()))
+        .thenReturn(
+            JobOrderPageStubs.detail(materialOrder(orderId, 1L))
+                .assigning(List.of(), List.of(), List.of())
+                .build());
 
     var result =
         mockMvc
@@ -704,7 +709,7 @@ class JobOrderPageControllerNoReloadMvcTest {
   void viewOrderDetail_FragmentBackendError_ReturnsNonRedirectErrorFragment() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
+    when(reader.readOrderDetail(eq(orderId), any(), any()))
         .thenThrow(new RuntimeException("backend unavailable"));
 
     var result =

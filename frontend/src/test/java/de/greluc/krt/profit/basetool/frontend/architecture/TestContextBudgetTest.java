@@ -34,7 +34,7 @@ import org.springframework.test.context.MergedContextConfiguration;
  */
 class TestContextBudgetTest {
 
-  private static final int BUDGET = 22;
+  private static final int BUDGET = 23;
 
   private static final int SPRING_TEST_CLASS_FLOOR = 163;
 

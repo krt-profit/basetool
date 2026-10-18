@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -51,17 +52,13 @@ import org.springframework.web.context.WebApplicationContext;
 @SpringBootTest
 class JobOrderPageStatusFilterTest {
 
-  private static final String ONE_STATUS_URI =
-      "/api/v1/orders?page={page}&size={size}&sort=priority,asc&status={status}";
-
-  private static final String TWO_STATUSES_URI =
-      "/api/v1/orders?page={page}&size={size}&sort=priority,asc&status={status},{status}";
-
   @Autowired private WebApplicationContext context;
 
   private MockMvc mockMvc;
 
   @MockitoBean private BackendApiClient backendApiClient;
+
+  @MockitoBean private JobOrderPageReader reader;
 
   @MockitoBean
   private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
@@ -72,64 +69,57 @@ class JobOrderPageStatusFilterTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
         .thenReturn(LayoutResponses.capabilities(true, true, true));
+    when(reader.readOrderList(any()))
+        .thenReturn(JobOrderPageStubs.list(new PageResponse<>(List.of(), 0, 0, 0L, 0, List.of())));
+  }
+
+  private List<String> requestedStatuses() {
+    ArgumentCaptor<JobOrderPageReader.OrderListQuery> query =
+        ArgumentCaptor.forClass(JobOrderPageReader.OrderListQuery.class);
+    verify(reader).readOrderList(query.capture());
+    assertThat(query.getValue().page()).isZero();
+    assertThat(query.getValue().size()).isEqualTo(100);
+    return query.getValue().statuses();
   }
 
   @Test
   @WithMockUser
   void viewOrders_withoutStatusParam_usesDefaultAndSetsNoCookie() throws Exception {
-    when(backendApiClient.get(
-            eq(TWO_STATUSES_URI), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("IN_PROGRESS")))
-        .thenReturn(new PageResponse<>(List.of(), 0, 0, 0L, 0, List.of()));
-
     mockMvc
         .perform(get("/orders"))
         .andExpect(status().isOk())
         .andExpect(cookie().doesNotExist("orders_filter_status"));
 
-    verify(backendApiClient)
-        .get(eq(TWO_STATUSES_URI), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("IN_PROGRESS"));
+    assertThat(requestedStatuses()).containsExactly("OPEN", "IN_PROGRESS");
   }
 
   @Test
   @WithMockUser
   void viewOrders_withStatusParam_usesItAndSetsNoCookie() throws Exception {
-    when(backendApiClient.get(eq(ONE_STATUS_URI), anyTypeRef(), eq(0), eq(100), eq("COMPLETED")))
-        .thenReturn(new PageResponse<>(List.of(), 0, 0, 0L, 0, List.of()));
-
     mockMvc
         .perform(get("/orders").param("status", "COMPLETED"))
         .andExpect(status().isOk())
         .andExpect(cookie().doesNotExist("orders_filter_status"));
 
-    verify(backendApiClient).get(eq(ONE_STATUS_URI), anyTypeRef(), eq(0), eq(100), eq("COMPLETED"));
+    assertThat(requestedStatuses()).containsExactly("COMPLETED");
   }
 
   @Test
   @WithMockUser
   void viewOrders_withInvalidStatusParam_fallsBackToDefault() throws Exception {
-    when(backendApiClient.get(
-            eq(TWO_STATUSES_URI), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("IN_PROGRESS")))
-        .thenReturn(new PageResponse<>(List.of(), 0, 0, 0L, 0, List.of()));
-
     mockMvc
         .perform(get("/orders").param("status", "BOGUS"))
         .andExpect(status().isOk())
         .andExpect(cookie().doesNotExist("orders_filter_status"));
 
-    verify(backendApiClient)
-        .get(eq(TWO_STATUSES_URI), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("IN_PROGRESS"));
+    assertThat(requestedStatuses()).containsExactly("OPEN", "IN_PROGRESS");
   }
 
   @Test
   @WithMockUser
   void viewOrders_withMultipleValidStatusParams_passesThemThrough() throws Exception {
-    when(backendApiClient.get(
-            eq(TWO_STATUSES_URI), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("COMPLETED")))
-        .thenReturn(new PageResponse<>(List.of(), 0, 0, 0L, 0, List.of()));
-
     mockMvc.perform(get("/orders").param("status", "OPEN", "COMPLETED")).andExpect(status().isOk());
 
-    verify(backendApiClient)
-        .get(eq(TWO_STATUSES_URI), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("COMPLETED"));
+    assertThat(requestedStatuses()).containsExactly("OPEN", "COMPLETED");
   }
 }

@@ -22,7 +22,9 @@ package de.greluc.krt.profit.basetool.frontend.joborder.web;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
@@ -126,7 +128,8 @@ class JobOrderPageControllerReaderTest {
         .containsEntry("error", "error.joborder.load")
         .containsEntry("orders", List.of())
         .containsEntry("ageYellowDays", 30)
-        .containsEntry("ageRedDays", 90);
+        .containsEntry("ageRedDays", 90)
+        .containsEntry("ordersPage", null);
   }
 
   @Test
@@ -142,12 +145,12 @@ class JobOrderPageControllerReaderTest {
                 Optional.of(List.of()),
                 Optional.of(List.of()),
                 Optional.of(options),
-                Optional.empty(),
+                JobOrderPageReader.Part.of(null),
                 5,
                 6,
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty()));
+                JobOrderPageReader.Part.absent(),
+                JobOrderPageReader.Part.absent(),
+                JobOrderPageReader.Part.of(null)));
     Model model = new ExtendedModelMap();
 
     assertThat(controller.viewOrderDetail(ID, true, false, model, null, null))
@@ -160,8 +163,34 @@ class JobOrderPageControllerReaderTest {
         .containsEntry("ageYellowDays", 5)
         .containsEntry("requestingOptions", options)
         .containsKeys("materials", "squadrons", "jobOrderForm", "kpi")
-        .doesNotContainKeys("actingUser", "itemBlueprintOwners", "orphanedInventory");
+        .containsEntry("actingUser", null)
+        .containsEntry("orphanedInventory", null)
+        .doesNotContainKeys("itemBlueprintOwners", "itemStockByGameItem");
     assertThat((List<?>) model.asMap().get("responsibleOptions")).hasSize(1);
+  }
+
+  @Test
+  void theRequestedFragmentIsPassedToTheReader() {
+    when(reader.readOrderDetail(any(), any(), any()))
+        .thenReturn(
+            new JobOrderPageReader.OrderDetailPage(
+                order("ITEM", false),
+                false,
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                JobOrderPageReader.Part.absent(),
+                5,
+                6,
+                JobOrderPageReader.Part.absent(),
+                JobOrderPageReader.Part.absent(),
+                JobOrderPageReader.Part.absent()));
+
+    assertThat(controller.viewOrderDetail(ID, true, false, new ExtendedModelMap(), null, "items"))
+        .isEqualTo("joborder/orders-detail :: itemsSection");
+
+    verify(reader).readOrderDetail(eq(ID), any(), eq("items"));
   }
 
   @Test
@@ -193,6 +222,22 @@ class JobOrderPageControllerReaderTest {
         .containsEntry("hasOrderableItems", false)
         .containsEntry("requestingOptions", options)
         .containsKeys("materials", "squadrons", "qualityTiers", "jobOrderForm");
+  }
+
+  @Test
+  void aCreateFormWithDefaultedCatalogsStillCarriesEveryAttribute() {
+    when(reader.readOrderCreate())
+        .thenReturn(new JobOrderPageReader.OrderCreatePage(List.of(), true, List.of(), List.of()));
+    Model model = new ExtendedModelMap();
+
+    controller.viewCreateForm(null, null, model);
+
+    assertThat(model.asMap())
+        .containsEntry("materials", List.of())
+        .containsEntry("squadrons", List.of())
+        .containsEntry("hasOrderableItems", true)
+        .containsEntry("requestingOptions", List.of())
+        .containsEntry("responsibleOptions", List.of());
   }
 
   @Test

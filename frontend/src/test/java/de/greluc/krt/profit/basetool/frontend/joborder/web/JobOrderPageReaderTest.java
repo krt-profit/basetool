@@ -25,6 +25,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -281,13 +283,13 @@ class JobOrderPageReaderTest {
     assertThat(detail.materials()).hasValueSatisfying(m -> assertThat(m).hasSize(1));
     assertThat(detail.squadrons()).hasValueSatisfying(s -> assertThat(s).hasSize(1));
     assertThat(detail.requestingOptions()).hasValueSatisfying(r -> assertThat(r).hasSize(1));
-    assertThat(detail.actingUser()).isPresent();
+    assertThat(detail.actingUser().present()).isTrue();
+    assertThat(detail.actingUser().value()).isNotNull();
     assertThat(detail.ageYellowDays()).isEqualTo(5);
     assertThat(detail.ageRedDays()).isEqualTo(6);
-    assertThat(detail.blueprintOwners()).containsSame(owners);
-    assertThat(detail.itemStockByGameItem())
-        .hasValueSatisfying(m -> assertThat(m).containsEntry(gameItemId, group));
-    assertThat(detail.orphanedInventory()).hasValue(List.of());
+    assertThat(detail.blueprintOwners().value()).isSameAs(owners);
+    assertThat(detail.itemStockByGameItem().value()).containsEntry(gameItemId, group);
+    assertThat(detail.orphanedInventory().value()).isEmpty();
     assertThat(appender.list).isEmpty();
   }
 
@@ -304,9 +306,9 @@ class JobOrderPageReaderTest {
     assertThat(detail.materials()).isPresent();
     assertThat(detail.squadrons()).isEmpty();
     assertThat(detail.requestingOptions()).isEmpty();
-    assertThat(detail.actingUser()).isEmpty();
-    assertThat(detail.blueprintOwners()).isEmpty();
-    assertThat(detail.itemStockByGameItem()).isEmpty();
+    assertThat(detail.actingUser().present()).isFalse();
+    assertThat(detail.blueprintOwners().present()).isFalse();
+    assertThat(detail.itemStockByGameItem().present()).isFalse();
   }
 
   @Test
@@ -322,10 +324,44 @@ class JobOrderPageReaderTest {
     JobOrderPageReader.OrderDetailPage detail =
         reader.readOrderDetail(ID, logistician(), "blueprint-owners");
 
-    assertThat(detail.blueprintOwners()).isPresent();
-    assertThat(detail.actingUser()).isEmpty();
-    assertThat(detail.itemStockByGameItem()).isEmpty();
-    assertThat(detail.orphanedInventory()).isEmpty();
+    assertThat(detail.blueprintOwners().present()).isTrue();
+    assertThat(detail.actingUser().present()).isFalse();
+    assertThat(detail.itemStockByGameItem().present()).isFalse();
+    assertThat(detail.orphanedInventory().present()).isFalse();
+  }
+
+  @Test
+  void aLogisticianDetailFetchesEachLookupExactlyOnce() {
+    when(client.order(ID)).thenReturn(order("ITEM", false, List.of()));
+    when(client.jobOrderMaterials()).thenReturn(List.of());
+    when(client.squadrons()).thenReturn(page(List.of()));
+    when(client.activeOrgUnitsAllKinds()).thenReturn(List.of(option(true)));
+
+    reader.readOrderDetail(ID, logistician(), null);
+
+    verify(client, times(1)).jobOrderMaterials();
+    verify(client, times(1)).squadrons();
+    verify(client, times(1)).activeOrgUnitsAllKinds();
+    verify(client, never()).activeOrgUnits();
+  }
+
+  @Test
+  void anItemsFragmentReadDoesNotFetchTheBlueprintCoverage() {
+    when(client.order(ID)).thenReturn(order("ITEM", false, List.of()));
+
+    reader.readOrderDetail(ID, logistician(), "items");
+
+    verify(client, never()).itemBlueprintOwners(ID);
+  }
+
+  @Test
+  void aMaterialOrderDetailDoesNotFetchTheItemStock() {
+    when(client.order(ID)).thenReturn(order("MATERIAL", false, List.of()));
+
+    reader.readOrderDetail(ID, logistician(), null);
+
+    verify(client, never()).itemStock(ID);
+    verify(client, never()).itemBlueprintOwners(ID);
   }
 
   @Test
@@ -348,12 +384,13 @@ class JobOrderPageReaderTest {
     assertThat(detail.materials()).hasValue(List.of());
     assertThat(detail.squadrons()).hasValue(List.of());
     assertThat(detail.requestingOptions()).hasValue(List.of());
-    assertThat(detail.actingUser()).isEmpty();
+    assertThat(detail.actingUser().present()).isTrue();
+    assertThat(detail.actingUser().value()).isNull();
     assertThat(detail.ageYellowDays()).isEqualTo(JobOrderPageReader.DEFAULT_AGE_YELLOW_DAYS);
     assertThat(detail.ageRedDays()).isEqualTo(JobOrderPageReader.DEFAULT_AGE_RED_DAYS);
-    assertThat(detail.blueprintOwners()).isEmpty();
-    assertThat(detail.itemStockByGameItem()).isEmpty();
-    assertThat(detail.orphanedInventory()).isEmpty();
+    assertThat(detail.blueprintOwners().present()).isFalse();
+    assertThat(detail.itemStockByGameItem().present()).isFalse();
+    assertThat(detail.orphanedInventory().present()).isFalse();
     assertThat(appender.list)
         .extracting(ILoggingEvent::getFormattedMessage)
         .containsExactlyInAnyOrder(
@@ -422,6 +459,7 @@ class JobOrderPageReaderTest {
     assertThat(create.squadrons()).hasSize(1);
     assertThat(create.requestingOptions()).hasSize(1);
     assertThat(appender.list).isEmpty();
+    verify(client, never()).activeOrgUnits();
   }
 
   @Test

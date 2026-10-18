@@ -79,6 +79,39 @@ public class JobOrderPageReader {
   private final ParallelPageLoader parallelPageLoader;
 
   /**
+   * One optional part of a page. A part that is not {@linkplain #present() present} was not read
+   * for this request or its read failed, so its model attribute is left out; a present part keeps
+   * its attribute, with the value the backend answered or the part's default.
+   *
+   * @param present whether the part carries an attribute
+   * @param value the part's value, which may be {@code null} when the backend answered none
+   * @param <T> the part's value type
+   */
+  public record Part<T>(boolean present, @Nullable T value) {
+
+    /**
+     * Creates a part that carries an attribute.
+     *
+     * @param value the attribute value, possibly {@code null}
+     * @param <T> the value type
+     * @return the present part
+     */
+    public static <T> Part<T> of(@Nullable T value) {
+      return new Part<>(true, value);
+    }
+
+    /**
+     * Creates a part without an attribute.
+     *
+     * @param <T> the value type
+     * @return the absent part
+     */
+    public static <T> Part<T> absent() {
+      return new Part<>(false, null);
+    }
+  }
+
+  /**
    * What the order list needs to ask for.
    *
    * @param ownScope whether the requester-redacted own-orders list is read
@@ -145,8 +178,8 @@ public class JobOrderPageReader {
       boolean authenticated, @Nullable UUID tokenUserId, boolean logistician) {}
 
   /**
-   * Everything the order detail page renders. An empty {@link Optional} means the part is not shown
-   * for this caller, order type or fragment, or that its read failed; the page renders both alike.
+   * Everything the order detail page renders. An empty {@link Optional} or an absent {@link Part}
+   * means the part is not read for this caller, order type or fragment, or that its read failed.
    *
    * @param order the order
    * @param canAssign whether the caller may assign and administer the order
@@ -154,7 +187,8 @@ public class JobOrderPageReader {
    * @param materials the material catalog, read for a requester or an assigning caller
    * @param squadrons the squadron catalog, read for an assigning caller
    * @param requestingOptions the requesting org-unit options, read for an assigning caller
-   * @param actingUser the production modal's acting user, read for an item order's full page
+   * @param actingUser the production modal's acting user, present for an item order's full page;
+   *     its value is {@code null} when the lookup failed
    * @param ageYellowDays the yellow aging threshold, the default when the settings are unavailable
    * @param ageRedDays the red aging threshold, the default when the settings are unavailable
    * @param blueprintOwners the blueprint owners of an item order
@@ -168,12 +202,12 @@ public class JobOrderPageReader {
       @NotNull Optional<List<MaterialDto>> materials,
       @NotNull Optional<List<SquadronDto>> squadrons,
       @NotNull Optional<List<OrgUnitMembershipOptionDto>> requestingOptions,
-      @NotNull Optional<UserDto> actingUser,
+      @NotNull Part<UserDto> actingUser,
       int ageYellowDays,
       int ageRedDays,
-      @NotNull Optional<JobOrderItemBlueprintOwnersDto> blueprintOwners,
-      @NotNull Optional<Map<UUID, JobOrderItemStockGroupDto>> itemStockByGameItem,
-      @NotNull Optional<List<InventoryItemDto>> orphanedInventory) {}
+      @NotNull Part<JobOrderItemBlueprintOwnersDto> blueprintOwners,
+      @NotNull Part<Map<UUID, JobOrderItemStockGroupDto>> itemStockByGameItem,
+      @NotNull Part<List<InventoryItemDto>> orphanedInventory) {}
 
   /**
    * Everything the create form renders.
@@ -271,8 +305,8 @@ public class JobOrderPageReader {
     boolean itemOrder = TYPE_ITEM.equals(order.type());
     Optional<UUID> currentUserId = currentUserId(caller);
     DetailCatalogs catalogs = detailCatalogs(requesterView, canAssign);
-    Optional<UserDto> actingUser =
-        canAssign && itemOrder && fragment == null ? actingUser() : Optional.empty();
+    Part<UserDto> actingUser =
+        canAssign && itemOrder && fragment == null ? actingUser() : Part.absent();
     JobOrderSettingsDto settings = settings();
     return new OrderDetailPage(
         order,
@@ -286,11 +320,11 @@ public class JobOrderPageReader {
         settings != null ? settings.ageRedDays() : DEFAULT_AGE_RED_DAYS,
         itemOrder && (fragment == null || "blueprint-owners".equalsIgnoreCase(fragment))
             ? blueprintOwners(id)
-            : Optional.empty(),
+            : Part.absent(),
         itemOrder && !requesterView && (fragment == null || "items".equalsIgnoreCase(fragment))
             ? itemStock(id)
-            : Optional.empty(),
-        fragment == null ? orphanedInventory(id) : Optional.empty());
+            : Part.absent(),
+        fragment == null ? orphanedInventory(id) : Part.absent());
   }
 
   private DetailCatalogs detailCatalogs(boolean requesterView, boolean canAssign) {
@@ -313,26 +347,30 @@ public class JobOrderPageReader {
         Optional.empty());
   }
 
-  private Optional<UserDto> actingUser() {
-    return Optional.ofNullable(
+  private Part<UserDto> actingUser() {
+    return Part.of(
         SectionFallback.load(log, "job-order-acting-user", jobOrderClient::currentUser, null));
   }
 
-  private Optional<JobOrderItemBlueprintOwnersDto> blueprintOwners(@NotNull UUID id) {
-    return Optional.ofNullable(
-        SectionFallback.load(
-            log, "job-order-blueprint-owners", () -> jobOrderClient.itemBlueprintOwners(id), null));
+  private Part<JobOrderItemBlueprintOwnersDto> blueprintOwners(@NotNull UUID id) {
+    return SectionFallback.load(
+        log,
+        "job-order-blueprint-owners",
+        () -> Part.of(jobOrderClient.itemBlueprintOwners(id)),
+        Part.absent());
   }
 
-  private Optional<Map<UUID, JobOrderItemStockGroupDto>> itemStock(@NotNull UUID id) {
-    return Optional.ofNullable(
-        SectionFallback.load(log, "job-order-item-stock", () -> stockByGameItem(id), null));
+  private Part<Map<UUID, JobOrderItemStockGroupDto>> itemStock(@NotNull UUID id) {
+    return SectionFallback.load(
+        log, "job-order-item-stock", () -> Part.of(stockByGameItem(id)), Part.absent());
   }
 
-  private Optional<List<InventoryItemDto>> orphanedInventory(@NotNull UUID id) {
-    return Optional.ofNullable(
-        SectionFallback.load(
-            log, "job-order-orphaned-inventory", () -> jobOrderClient.orphanedInventory(id), null));
+  private Part<List<InventoryItemDto>> orphanedInventory(@NotNull UUID id) {
+    return SectionFallback.load(
+        log,
+        "job-order-orphaned-inventory",
+        () -> Part.of(jobOrderClient.orphanedInventory(id)),
+        Part.absent());
   }
 
   /**

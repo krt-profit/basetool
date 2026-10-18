@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -76,6 +76,8 @@ class JobOrderStolenChipRenderTest {
 
   @MockitoBean private BackendApiClient backendApiClient;
 
+  @MockitoBean private JobOrderPageReader reader;
+
   @MockitoBean
   private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
       clientRegistrationRepository;
@@ -90,10 +92,9 @@ class JobOrderStolenChipRenderTest {
   @Test
   void orderDetail_orphanedInventory_marksOnlyTheStolenRow() throws Exception {
     UUID orderId = UUID.randomUUID();
-    stubOrder(materialOrder(orderId, List.of()));
-    when(backendApiClient.get(
-            eq("/api/v1/orders/{id}/allocations/orphaned"), anyTypeRef(), eq(orderId)))
-        .thenReturn(List.of(inventory("Titanium", false), inventory("Quantanium", true)));
+    stubOrder(
+        materialOrder(orderId, List.of()),
+        List.of(inventory("Titanium", false), inventory("Quantanium", true)));
 
     String html = render(orderId);
 
@@ -138,10 +139,8 @@ class JobOrderStolenChipRenderTest {
     stubOrder(
         materialOrder(
             orderId,
-            List.of(handover(orderId, List.of(handoverItem(material("Titanium"), false))))));
-    when(backendApiClient.get(
-            eq("/api/v1/orders/{id}/allocations/orphaned"), anyTypeRef(), eq(orderId)))
-        .thenReturn(List.of(inventory("Laranite", false)));
+            List.of(handover(orderId, List.of(handoverItem(material("Titanium"), false))))),
+        List.of(inventory("Laranite", false)));
 
     String html = render(orderId);
 
@@ -151,13 +150,27 @@ class JobOrderStolenChipRenderTest {
   }
 
   /**
-   * Stubs the order read the detail page issues first.
+   * Stubs the reader's detail page of a logistician with no orphaned inventory.
    *
-   * @param order the order the backend returns.
+   * @param order the order the reader returns.
    */
   private void stubOrder(@NotNull JobOrderDto order) {
-    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(order.id())))
-        .thenReturn(order);
+    stubOrder(order, List.of());
+  }
+
+  /**
+   * Stubs the reader's detail page of a logistician.
+   *
+   * @param order the order the reader returns.
+   * @param orphaned the orphaned inventory rows the reader returns.
+   */
+  private void stubOrder(@NotNull JobOrderDto order, @NotNull List<InventoryItemDto> orphaned) {
+    when(reader.readOrderDetail(eq(order.id()), any(), any()))
+        .thenReturn(
+            JobOrderPageStubs.detail(order)
+                .assigning(List.of(), List.of(), List.of())
+                .orphanedInventory(orphaned)
+                .build());
   }
 
   /**

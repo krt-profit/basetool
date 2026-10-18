@@ -352,7 +352,7 @@ public class JobOrderPageController {
       }
       model.addAttribute("jobOrderForm", form);
     }
-    detail.actingUser().ifPresent(user -> model.addAttribute("actingUser", user));
+    addPart(model, "actingUser", detail.actingUser());
     model.addAttribute("ageYellowDays", detail.ageYellowDays());
     model.addAttribute("ageRedDays", detail.ageRedDays());
 
@@ -369,13 +369,24 @@ public class JobOrderPageController {
     model.addAttribute("hasOutstandingItemLines", hasOutstandingItemLines(order));
     model.addAttribute("isFullyDelivered", isFullyDelivered(order));
     model.addAttribute("kpi", computeKpi(order));
-    detail.blueprintOwners().ifPresent(owners -> model.addAttribute("itemBlueprintOwners", owners));
-    detail
-        .itemStockByGameItem()
-        .ifPresent(stock -> model.addAttribute("itemStockByGameItem", stock));
-    detail
-        .orphanedInventory()
-        .ifPresent(orphaned -> model.addAttribute("orphanedInventory", orphaned));
+    addPart(model, "itemBlueprintOwners", detail.blueprintOwners());
+    addPart(model, "itemStockByGameItem", detail.itemStockByGameItem());
+    addPart(model, "orphanedInventory", detail.orphanedInventory());
+  }
+
+  /**
+   * Adds an optional part under its attribute name, keeping a {@code null} value, and leaves the
+   * attribute out when the part is absent.
+   *
+   * @param model the model
+   * @param name the attribute name
+   * @param part the part
+   */
+  private static void addPart(
+      @NotNull Model model, @NotNull String name, @NotNull JobOrderPageReader.Part<?> part) {
+    if (part.present()) {
+      model.addAttribute(name, part.value());
+    }
   }
 
   /**

@@ -19,9 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -65,6 +64,8 @@ class JobOrderListRenderTest {
   private MockMvc mockMvc;
 
   @MockitoBean private BackendApiClient backendApiClient;
+
+  @MockitoBean private JobOrderPageReader reader;
 
   @MockitoBean
   private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
@@ -146,16 +147,9 @@ class JobOrderListRenderTest {
             null,
             false);
 
-    when(backendApiClient.get(
-            eq(
-                "/api/v1/orders?page={page}&size={size}&sort=priority,asc"
-                    + "&status={status},{status}"),
-            anyTypeRef(),
-            eq(0),
-            eq(100),
-            eq("OPEN"),
-            eq("IN_PROGRESS")))
-        .thenReturn(new PageResponse<>(List.of(order), 0, 1000, 1L, 1, List.of()));
+    when(reader.readOrderList(any()))
+        .thenReturn(
+            JobOrderPageStubs.list(new PageResponse<>(List.of(order), 0, 1000, 1L, 1, List.of())));
 
     MvcResult result = mockMvc.perform(get("/orders")).andExpect(status().isOk()).andReturn();
 
@@ -193,16 +187,9 @@ class JobOrderListRenderTest {
             null,
             false);
 
-    when(backendApiClient.get(
-            eq(
-                "/api/v1/orders?page={page}&size={size}&sort=priority,asc"
-                    + "&status={status},{status}"),
-            anyTypeRef(),
-            eq(0),
-            eq(100),
-            eq("OPEN"),
-            eq("IN_PROGRESS")))
-        .thenReturn(new PageResponse<>(List.of(order), 0, 1000, 1L, 1, List.of()));
+    when(reader.readOrderList(any()))
+        .thenReturn(
+            JobOrderPageStubs.list(new PageResponse<>(List.of(order), 0, 1000, 1L, 1, List.of())));
 
     MvcResult result = mockMvc.perform(get("/orders")).andExpect(status().isOk()).andReturn();
 

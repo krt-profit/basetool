@@ -19,11 +19,6 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -33,9 +28,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
-import java.util.Collections;
+import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import java.util.List;
 import java.util.UUID;
 import org.hamcrest.Matchers;
@@ -67,6 +61,8 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
 
   @MockitoBean private BackendApiClient backendApiClient;
 
+  @MockitoBean private JobOrderPageReader reader;
+
   @MockitoBean
   private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
       clientRegistrationRepository;
@@ -83,14 +79,10 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void viewCreateForm_materialPickerCarriesComboboxMarker() throws Exception {
-    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
-        .thenReturn(Collections.emptyList());
-    when(backendApiClient.getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef()))
-        .thenReturn(Collections.emptyList());
     MaterialDto agricium = jobOrderMaterial("Agricium");
     MaterialDto quantainium = jobOrderMaterial("Quantainium-Distinct");
-    when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef()))
-        .thenReturn(List.of(agricium, quantainium));
+    when(reader.readOrderCreate())
+        .thenReturn(JobOrderPageStubs.create(List.of(agricium, quantainium), List.of()));
 
     mockMvc
         .perform(get("/orders/create"))
@@ -147,10 +139,9 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
         new OrgUnitMembershipOptionDto(
             UUID.randomUUID(), "Kartellleitung XYZ", "OL", "ORGANISATIONSLEITUNG", false);
 
-    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
-        .thenReturn(Collections.emptyList());
-    when(backendApiClient.getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef()))
-        .thenReturn(List.of(profitStaffel, profitSk, bereich, ol));
+    when(reader.readOrderCreate())
+        .thenReturn(
+            JobOrderPageStubs.create(List.of(), List.of(profitStaffel, profitSk, bereich, ol)));
 
     mockMvc
         .perform(get("/orders/create"))
@@ -159,9 +150,38 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
         .andExpect(content().string(Matchers.containsString("Profit Spezialkommando")))
         .andExpect(content().string(Matchers.containsString("Bereich Profit XYZ")))
         .andExpect(content().string(Matchers.containsString("Kartellleitung XYZ")));
+  }
 
-    verify(backendApiClient).getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef());
-    verify(backendApiClient, never()).getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE), anyTypeRef());
-    verify(backendApiClient, never()).getCached(eq(CachedCatalog.SPECIAL_COMMANDS), anyTypeRef());
+  @Test
+  @WithMockUser
+  void viewCreateForm_populatesBothPickersFromTheReadersOptions() throws Exception {
+    OrgUnitMembershipOptionDto profitStaffel =
+        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Profit Staffel", "PS", "SQUADRON", true);
+    OrgUnitMembershipOptionDto nonProfitSk =
+        new OrgUnitMembershipOptionDto(
+            UUID.randomUUID(), "Combat SK", "CSK", "SPECIAL_COMMAND", false);
+    when(reader.readOrderCreate())
+        .thenReturn(JobOrderPageStubs.create(List.of(), List.of(profitStaffel, nonProfitSk)));
+
+    mockMvc
+        .perform(get("/orders/create"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("joborder/orders-create"))
+        .andExpect(content().string(Matchers.containsString("Combat SK")))
+        .andExpect(content().string(Matchers.containsString("Profit Staffel")));
+  }
+
+  @Test
+  @WithMockUser
+  void viewCreateForm_blanketInputRuleExcludesRadioAndCheckboxControls() throws Exception {
+    when(reader.readOrderCreate()).thenReturn(JobOrderPageStubs.create(List.of(), List.of()));
+
+    mockMvc
+        .perform(get("/orders/create"))
+        .andExpect(status().isOk())
+        .andExpect(
+            PageStylesheets.content(
+                Matchers.containsString(
+                    ".form-group input:where(:not([type='checkbox'], [type='radio']))")));
   }
 }
