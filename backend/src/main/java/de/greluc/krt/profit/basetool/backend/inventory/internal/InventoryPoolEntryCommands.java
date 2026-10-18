@@ -46,6 +46,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -364,17 +365,13 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
     }
     Double part = move.amount();
     if (part != null) {
-      double held = held(row);
       if (!unitOf(row).equals(move.unit())) {
         return PoolOutcome.refused(PoolRefusal.UNIT_MISMATCH);
       }
-      if (part > held + EPSILON) {
-        return PoolOutcome.refused(PoolRefusal.INSUFFICIENT_STOCK);
-      }
-      if (Math.abs(part - held) <= EPSILON) {
+      if (Math.abs(part - held(row)) <= EPSILON) {
         part = null;
       } else {
-        refusal = checkSplit(row, ScuAmounts.roundToScuScale(held - part));
+        refusal = checkSplit(row, part, InventoryPoolChangeService::splitProblem);
         if (refusal != null) {
           return PoolOutcome.refused(refusal);
         }
@@ -453,17 +450,13 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
     }
     Double part = stolen.amount();
     if (part != null) {
-      double held = held(row);
       if (!unitOf(row).equals(stolen.unit())) {
         return PoolOutcome.refused(PoolRefusal.UNIT_MISMATCH);
       }
-      if (part > held + EPSILON) {
-        return PoolOutcome.refused(PoolRefusal.INSUFFICIENT_STOCK);
-      }
-      if (Math.abs(part - held) <= EPSILON) {
+      if (Math.abs(part - held(row)) <= EPSILON) {
         part = null;
       } else {
-        refusal = checkSplit(row, ScuAmounts.roundToScuScale(held - part));
+        refusal = checkSplit(row, part, InventoryStolenMarkService::splitProblem);
         if (refusal != null) {
           return PoolOutcome.refused(refusal);
         }
@@ -658,13 +651,16 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
       return PoolRefusal.UNIT_MISMATCH;
     }
     double amount = take.amount();
+    InventoryStockDecisions.BookOutRefusal bookOut =
+        InventoryStockDecisions.bookOut(row, amount, !take.fromMissions().isEmpty());
+    if (bookOut != null) {
+      return switch (bookOut) {
+        case EXCEEDS_STOCK -> PoolRefusal.INSUFFICIENT_STOCK;
+        case MISSION_EARMARK_ON_ITEM_STOCK -> PoolRefusal.EARMARK_TARGET_INVALID;
+        case FRACTIONAL_AMOUNT -> PoolRefusal.UNIT_MISMATCH;
+      };
+    }
     double held = held(row);
-    if (amount > held + EPSILON) {
-      return PoolRefusal.INSUFFICIENT_STOCK;
-    }
-    if (row.getGameItem() != null && !take.fromMissions().isEmpty()) {
-      return PoolRefusal.EARMARK_TARGET_INVALID;
-    }
     PoolRefusal plan = checkPlan(row, take.fromJobOrders(), amount, true);
     if (plan == null) {
       plan = checkPlan(row, take.fromMissions(), amount, false);
@@ -679,23 +675,30 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   }
 
   /**
-   * Checks what a partial stolen marking leaves on the entry, as the Lager's marking does: no less
-   * than it offers on the Materialbörse, and no less than any of its earmarks and pledges.
+   * Checks a part split off an entry by the Lager's split decision; a fraction of piece or item
+   * stock is {@code UNIT_MISMATCH}, and a part that is not positive is thrown as the web's problem.
    *
    * @param row the locked entry
-   * @param remaining the amount the entry keeps
+   * @param part the part split off, not the whole entry
+   * @param problem the web's problem for a refusal the commands do not answer
    * @return the refusal, or {@code null} when the split may happen
    */
-  private @Nullable PoolRefusal checkSplit(@NotNull InventoryItem row, double remaining) {
-    if (remaining + EPSILON < stockOfferLookup.activeOfferedAmount(row.getId())) {
-      return PoolRefusal.STOCK_OFFERED;
+  private @Nullable PoolRefusal checkSplit(
+      @NotNull InventoryItem row,
+      double part,
+      @NotNull Function<InventoryStockDecisions.SplitRefusal, RuntimeException> problem) {
+    InventoryStockDecisions.SplitRefusal refusal =
+        InventoryStockDecisions.split(row, part, stockOfferLookup.activeOfferedAmount(row.getId()));
+    if (refusal == null) {
+      return null;
     }
-    if (InventoryAllocations.sumJobOrder(row) > remaining + EPSILON
-        || InventoryAllocations.sumMission(row) > remaining + EPSILON
-        || InventoryAllocations.sumDonation(row) > remaining + EPSILON) {
-      return PoolRefusal.STOCK_EARMARKED;
-    }
-    return null;
+    return switch (refusal) {
+      case EXCEEDS_STOCK -> PoolRefusal.INSUFFICIENT_STOCK;
+      case FRACTIONAL_AMOUNT -> PoolRefusal.UNIT_MISMATCH;
+      case BELOW_OFFER -> PoolRefusal.STOCK_OFFERED;
+      case EARMARKS_EXCEED_REST -> PoolRefusal.STOCK_EARMARKED;
+      case AMOUNT_NOT_POSITIVE -> throw problem.apply(refusal);
+    };
   }
 
   /**
@@ -921,11 +924,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
    * @return {@code PIECE} for items and piece-counted materials, {@code SCU} otherwise
    */
   private static @NotNull String unitOf(@NotNull InventoryItem row) {
-    boolean pieces =
-        row.getGameItem() != null
-            || (row.getMaterial() != null
-                && row.getMaterial().getQuantityType() == QuantityType.PIECE);
-    return (pieces ? QuantityType.PIECE : QuantityType.SCU).name();
+    return (row.countsWholeUnits() ? QuantityType.PIECE : QuantityType.SCU).name();
   }
 
   /**

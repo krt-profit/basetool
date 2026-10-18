@@ -232,7 +232,10 @@ The inventory (the Lager) moved since P4-1: `InventoryItemController` sits in `i
 `inventory.internal` holds the Lager services (item, aggregation, checkout, org-unit change, stolen
 mark), `InventoryAccessPolicy` (also the `BookInPolicy`), `InventoryStockCommands` (the `StockCommands`
 implementation), `InventoryStockReads` (the `StockReads` implementation), `InventoryEarmarkTargetCache`,
-`StockViewerAccessService`, `InventoryCraftableStock` (the blueprint's `CraftableStockSource`),
+`StockViewerAccessService`, `InventoryStockDecisions` (each stock rule of a book-out, an Umbuchung, a
+split and a lot rebooking as a pure function returning a refusal value, which the web services and the
+published commands both adapt; REQ-INV-065, ADR-0284),
+`InventoryCraftableStock` (the blueprint's `CraftableStockSource`),
 `InventoryOrgUnitReconciler` (the org-unit module's `FirstMembershipObserver`), its GDPR participants, the
 three repositories, `InventoryItemMapper`, `InventoryItemCatalogService` (the `StockItemCatalogue`) and the
 request and read DTOs. `inventory.api` publishes what other modules use: `StockCommands`,
