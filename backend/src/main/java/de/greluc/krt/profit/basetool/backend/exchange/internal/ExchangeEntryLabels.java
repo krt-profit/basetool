@@ -72,7 +72,8 @@ public class ExchangeEntryLabels {
       JsonNode state = after != null ? after : parse(entry.getBeforeState());
       switch (entry.getResource()) {
         case BLUEPRINT -> {
-          String name = text(state, "productName");
+          String name =
+              state == null ? null : ExchangeBlueprintJournal.State.read(state).productName();
           if (name != null) {
             labels.put(entry.getId(), name);
           }
@@ -93,7 +94,7 @@ public class ExchangeEntryLabels {
           }
         }
         case SHIP -> {
-          UUID type = uuid(text(state, "shipType"));
+          UUID type = state == null ? null : ExchangeShipJournal.State.read(state).shipType();
           if (type != null) {
             shipTypeOf.put(entry.getId(), type);
           } else {
