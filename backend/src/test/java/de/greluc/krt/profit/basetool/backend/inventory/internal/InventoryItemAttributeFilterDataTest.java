@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
@@ -82,6 +83,9 @@ class InventoryItemAttributeFilterDataTest {
     shieldS2A = gameItem(GameItemKind.VEHICLE_ITEM, "Shield", 2, "A");
     paintGradeA = gameItem(GameItemKind.VEHICLE_ITEM, "Paints", 2, "A");
     rifle = gameItem(GameItemKind.WEAPON, "WeaponPersonal", null, null);
+    quantumDriveS2A.setItemClass(ShipComponentClass.MILITARY);
+    shieldS2A.setItemClass(ShipComponentClass.CIVILIAN);
+    paintGradeA.setItemClass(ShipComponentClass.MILITARY);
     for (GameItem gameItem :
         List.of(quantumDriveS2A, quantumDriveS1C, shieldS2A, paintGradeA, rifle)) {
       InventoryItem row = new InventoryItem();
@@ -104,7 +108,9 @@ class InventoryItemAttributeFilterDataTest {
 
   @Test
   void kind_narrowsToTheCategory() {
-    assertThat(userStacks(new ItemAttributeFilter(List.of(GameItemKind.WEAPON), null, null, null)))
+    assertThat(
+            userStacks(
+                new ItemAttributeFilter(List.of(GameItemKind.WEAPON), null, null, null, null)))
         .containsExactly(rifle);
   }
 
@@ -113,27 +119,50 @@ class InventoryItemAttributeFilterDataTest {
     assertThat(
             userStacks(
                 new ItemAttributeFilter(
-                    null, List.of(ShipComponentType.QUANTUM_DRIVE), List.of(2), null)))
+                    null, List.of(ShipComponentType.QUANTUM_DRIVE), List.of(2), null, null)))
         .containsExactly(quantumDriveS2A);
   }
 
   @Test
   void gradeAlone_skipsNonComponentsCarryingTheGrade() {
-    assertThat(userStacks(new ItemAttributeFilter(null, null, null, List.of("A"))))
+    assertThat(userStacks(new ItemAttributeFilter(null, null, null, List.of("A"), null)))
         .as("a paint carries grade A but is no component, so the grade filter skips it")
         .containsExactlyInAnyOrder(quantumDriveS2A, shieldS2A);
   }
 
   @Test
   void grade_matchesAStoredGradeWithSurroundingWhitespace() {
-    assertThat(userStacks(new ItemAttributeFilter(null, null, null, List.of("C"))))
+    assertThat(userStacks(new ItemAttributeFilter(null, null, null, List.of("C"), null)))
         .containsExactly(quantumDriveS1C);
+  }
+
+  @Test
+  void itemClass_narrowsToComponentsOfTheClass() {
+    assertThat(
+            userStacks(
+                new ItemAttributeFilter(
+                    null, null, null, null, List.of(ShipComponentClass.MILITARY))))
+        .as("an item without a class and a non-component carrying the class are both skipped")
+        .containsExactly(quantumDriveS2A);
+  }
+
+  @Test
+  void itemClass_combinesWithComponentTypeAndSize() {
+    assertThat(
+            userStacks(
+                new ItemAttributeFilter(
+                    null,
+                    List.of(ShipComponentType.QUANTUM_DRIVE, ShipComponentType.SHIELD),
+                    List.of(2),
+                    null,
+                    List.of(ShipComponentClass.CIVILIAN))))
+        .containsExactly(shieldS2A);
   }
 
   @Test
   void globalStacks_applyTheSameClauses() {
     ItemAttributeFilter filter =
-        new ItemAttributeFilter(null, List.of(ShipComponentType.SHIELD), null, null);
+        new ItemAttributeFilter(null, List.of(ShipComponentType.SHIELD), null, null, null);
 
     List<GameItem> items =
         inventoryItemViewRepository
@@ -156,7 +185,9 @@ class InventoryItemAttributeFilterDataTest {
                 filter.hasSizes(),
                 filter.sizesOrNull(),
                 filter.hasGrades(),
-                filter.gradesOrNull())
+                filter.gradesOrNull(),
+                filter.hasItemClasses(),
+                filter.itemClassesOrNull())
             .stream()
             .map(InventoryItemStackAggregate::gameItem)
             .filter(this::isFixture)
@@ -167,7 +198,7 @@ class InventoryItemAttributeFilterDataTest {
 
   @Test
   void entryIds_applyTheSameClauses() {
-    ItemAttributeFilter filter = new ItemAttributeFilter(null, null, List.of(1), null);
+    ItemAttributeFilter filter = new ItemAttributeFilter(null, null, List.of(1), null, null);
 
     List<UUID> ids =
         inventoryItemViewRepository.findUserItemEntryIds(
@@ -189,7 +220,9 @@ class InventoryItemAttributeFilterDataTest {
             filter.hasSizes(),
             filter.sizesOrNull(),
             filter.hasGrades(),
-            filter.gradesOrNull());
+            filter.gradesOrNull(),
+            filter.hasItemClasses(),
+            filter.itemClassesOrNull());
 
     assertThat(ids).hasSize(1);
     assertThat(inventoryItemRepository.findById(ids.get(0)).orElseThrow().getGameItem())
@@ -217,7 +250,9 @@ class InventoryItemAttributeFilterDataTest {
             filter.hasSizes(),
             filter.sizesOrNull(),
             filter.hasGrades(),
-            filter.gradesOrNull())
+            filter.gradesOrNull(),
+            filter.hasItemClasses(),
+            filter.itemClassesOrNull())
         .stream()
         .map(InventoryItemStackAggregate::gameItem)
         .toList();

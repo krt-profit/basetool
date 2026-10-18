@@ -333,7 +333,7 @@ class InventoryPageControllerTest {
     String view =
         controller.viewMyInventory(
             null, null, null, null, null, null, null, false, false, false, false, null, null, null,
-            null, false, model);
+            null, null, false, model);
 
     assertEquals("inventory/inventory-my", view);
     assertTrue(model.containsAttribute("items"));
@@ -362,6 +362,7 @@ class InventoryPageControllerTest {
             false,
             false,
             false,
+            null,
             null,
             null,
             null,
@@ -397,7 +398,7 @@ class InventoryPageControllerTest {
     String view =
         controller.viewMyInventory(
             null, null, null, null, null, null, null, true, false, false, false, null, null, null,
-            null, false, model);
+            null, null, false, model);
 
     assertEquals("inventory/inventory-my", view);
     assertEquals(true, model.getAttribute("selectedPersonalOnly"));
@@ -422,7 +423,7 @@ class InventoryPageControllerTest {
     String view =
         controller.viewMyInventory(
             null, null, null, null, null, null, null, false, true, false, false, null, null, null,
-            null, false, model);
+            null, null, false, model);
 
     assertEquals("inventory/inventory-my", view);
     assertEquals(true, model.getAttribute("selectedNonPersonalOnly"));
@@ -450,7 +451,7 @@ class InventoryPageControllerTest {
     String view =
         controller.viewMyInventory(
             null, null, null, null, null, null, null, false, false, false, false, null, null, null,
-            null, true, model);
+            null, null, true, model);
 
     assertEquals("inventory/inventory-my :: inventoryTableFragment", view);
   }
@@ -476,6 +477,7 @@ class InventoryPageControllerTest {
             false,
             false,
             false,
+            null,
             null,
             null,
             null,
@@ -517,6 +519,7 @@ class InventoryPageControllerTest {
             null,
             null,
             null,
+            null,
             null);
 
     assertEquals(List.of(entry), ids);
@@ -537,7 +540,7 @@ class InventoryPageControllerTest {
         List.of(),
         controller.myEntryIds(
             null, null, null, null, null, null, null, false, false, false, false, null, null, null,
-            null));
+            null, null));
   }
 
   @Test
@@ -558,6 +561,7 @@ class InventoryPageControllerTest {
             null,
             false,
             false,
+            null,
             null,
             null,
             null,
@@ -1146,6 +1150,7 @@ class InventoryPageControllerTest {
             null,
             null,
             null,
+            null,
             false,
             model);
 
@@ -1221,6 +1226,7 @@ class InventoryPageControllerTest {
         null,
         null,
         null,
+        null,
         false,
         model);
 
@@ -1236,10 +1242,10 @@ class InventoryPageControllerTest {
     Model model = new ConcurrentModel();
     InventoryGameItemReferenceDto drive =
         new InventoryGameItemReferenceDto(
-            UUID.randomUUID(), "FR-66", null, "VEHICLE_ITEM", "QUANTUM_DRIVE", 2, "A", null);
+            UUID.randomUUID(), "FR-66", null, "VEHICLE_ITEM", "QUANTUM_DRIVE", 2, "A", "MILITARY");
     InventoryGameItemReferenceDto shield =
         new InventoryGameItemReferenceDto(
-            UUID.randomUUID(), "Rampart", null, "VEHICLE_ITEM", "SHIELD", 1, "C", "MILITARY");
+            UUID.randomUUID(), "Rampart", null, "VEHICLE_ITEM", "SHIELD", 1, "C", "CIVILIAN");
     InventoryGameItemReferenceDto rifle =
         new InventoryGameItemReferenceDto(UUID.randomUUID(), "P4-AR", null, "WEAPON");
     GroupedInventoryDto driveGroup =
@@ -1253,7 +1259,7 @@ class InventoryPageControllerTest {
             invocation -> {
               String url = invocation.getArgument(0);
               if (url.contains("/api/v1/inventory/my-inventory/grouped")) {
-                return url.contains("sizes=")
+                return url.contains("itemClasses=")
                     ? List.of(driveGroup)
                     : List.of(driveGroup, shieldGroup, rifleGroup);
               }
@@ -1276,6 +1282,7 @@ class InventoryPageControllerTest {
         List.of("QUANTUM_DRIVE"),
         List.of(2),
         null,
+        List.of("MILITARY"),
         false,
         model);
 
@@ -1285,11 +1292,13 @@ class InventoryPageControllerTest {
             List.of("VEHICLE_ITEM", "WEAPON"),
             List.of("QUANTUM_DRIVE", "SHIELD"),
             List.of(1, 2),
-            List.of("A", "C")),
+            List.of("A", "C"),
+            List.of("CIVILIAN", "MILITARY")),
         model.getAttribute("itemAttributeOptions"));
     assertEquals(List.of(drive, shield, rifle), model.getAttribute("gameItems"));
     assertEquals(
-        new ItemAttributeFilter(null, List.of("QUANTUM_DRIVE"), List.of(2), null),
+        new ItemAttributeFilter(
+            null, List.of("QUANTUM_DRIVE"), List.of(2), null, List.of("MILITARY")),
         model.getAttribute("selectedItemAttributes"));
     org.mockito.ArgumentCaptor<String> urlCaptor =
         org.mockito.ArgumentCaptor.forClass(String.class);
@@ -1301,7 +1310,8 @@ class InventoryPageControllerTest {
                 u ->
                     u.contains("/api/v1/inventory/my-inventory/grouped")
                         && u.contains("componentTypes=QUANTUM_DRIVE")
-                        && u.contains("sizes=2")),
+                        && u.contains("sizes=2")
+                        && u.contains("itemClasses=MILITARY")),
         "the attribute filters must be forwarded");
   }
 
@@ -1325,13 +1335,15 @@ class InventoryPageControllerTest {
         List.of("WEAPON"),
         null,
         null,
-        List.of("B"));
+        List.of("B"),
+        List.of("STEALTH"));
 
     org.mockito.ArgumentCaptor<String> urlCaptor =
         org.mockito.ArgumentCaptor.forClass(String.class);
     org.mockito.Mockito.verify(backendApiClient).get(urlCaptor.capture(), anyTypeRef());
     assertTrue(urlCaptor.getValue().contains("kinds=WEAPON"));
     assertTrue(urlCaptor.getValue().contains("grades=B"));
+    assertTrue(urlCaptor.getValue().contains("itemClasses=STEALTH"));
   }
 
   /** REQ-INV-040: the shared "Globales Lager" relays the same filter. */
@@ -1352,6 +1364,7 @@ class InventoryPageControllerTest {
             List.of(locationId),
             false,
             false,
+            null,
             null,
             null,
             null,
@@ -1398,6 +1411,7 @@ class InventoryPageControllerTest {
         null,
         null,
         null,
+        null,
         null);
     controller.myEntryIds(
         "items",
@@ -1411,6 +1425,7 @@ class InventoryPageControllerTest {
         false,
         false,
         false,
+        null,
         null,
         null,
         null,

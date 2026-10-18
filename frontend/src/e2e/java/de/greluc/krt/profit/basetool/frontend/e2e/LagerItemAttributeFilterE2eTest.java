@@ -38,10 +38,10 @@ import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * E2E flow for the Lager item-attribute filters (REQ-INV-063): picking component type
- * "Quantenantrieb" and size S2 narrows the items view to the S2 quantum drive in place, on both
- * Mein Lager and Globales Lager, shows two chips and counts them on the toggle, survives a revisit
- * through the stored selection, feeds "Alle markieren", and "Alle zurücksetzen" brings the other
- * items back.
+ * "Quantenantrieb" and size S2, or class "Militär" and size S2, narrows the items view to the S2
+ * quantum drive in place, on both Mein Lager and Globales Lager, shows two chips and counts them on
+ * the toggle, survives a revisit through the stored selection, feeds "Alle markieren", and "Alle
+ * zurücksetzen" brings the other items back.
  */
 @Tag("e2e")
 class LagerItemAttributeFilterE2eTest {
@@ -62,8 +62,9 @@ class LagerItemAttributeFilterE2eTest {
   private static String shieldS2Id;
 
   /**
-   * Launches the browser and seeds three components in stock: an S2 and an S1 quantum drive and an
-   * S2 shield, so neither the type nor the size alone isolates the S2 drive.
+   * Launches the browser and seeds three components in stock: a military S2 and S1 quantum drive
+   * and a civilian S2 shield, so neither the type, the class nor the size alone isolates the S2
+   * drive.
    */
   @BeforeAll
   static void setUp() {
@@ -81,6 +82,9 @@ class LagerItemAttributeFilterE2eTest {
       seeder.makeShipComponent(driveS2Id, "QuantumDrive", 2, "A");
       seeder.makeShipComponent(driveS1Id, "QuantumDrive", 1, "C");
       seeder.makeShipComponent(shieldS2Id, "Shield", 2, "B");
+      seeder.setItemClass(driveS2Id, "MILITARY");
+      seeder.setItemClass(driveS1Id, "MILITARY");
+      seeder.setItemClass(shieldS2Id, "CIVILIAN");
       seeder.createItemInventoryEntry(USERNAME, PASSWORD, driveS2Id, hub, 1);
       seeder.createItemInventoryEntry(USERNAME, PASSWORD, driveS1Id, hub, 1);
       seeder.createItemInventoryEntry(USERNAME, PASSWORD, shieldS2Id, hub, 1);
@@ -181,6 +185,91 @@ class LagerItemAttributeFilterE2eTest {
         assertThat(group(page, driveS1Id)).hasCount(1);
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "lager-item-attribute-filter");
+        throw failure;
+      }
+    }
+  }
+
+  /**
+   * Ticks "Militär" and S2 and asserts the items view keeps only the military S2 drive, counts both
+   * filters on the toggle, restores them on a revisit, feeds "Alle markieren", never reloads, and
+   * lists every item again after "Alle zurücksetzen".
+   *
+   * @param path the Lager page
+   * @param panelId the page's filter popover
+   */
+  @ParameterizedTest
+  @CsvSource({
+    "/inventory/my?view=items, myFilterPanel",
+    "/inventory/all?view=items, globalFilterPanel"
+  })
+  void itemClassAndSizeNarrowTheItemsViewInPlace(String path, String panelId) {
+    String baseUrl = STACK.baseUrl();
+    Path storageState = E2eSupport.authenticatedStorageState(browser, baseUrl, USERNAME, PASSWORD);
+    try (BrowserContext context =
+        browser.newContext(
+            new Browser.NewContextOptions()
+                .setIgnoreHTTPSErrors(true)
+                .setStorageStatePath(storageState))) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.navigate(page, baseUrl + path);
+        page.waitForLoadState();
+
+        assertThat(group(page, shieldS2Id))
+            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(RENDER_TIMEOUT_MS));
+
+        if (page.locator("#" + panelId).isHidden()) {
+          page.locator("[data-testid='lager-filter-toggle']").click();
+        }
+        assertThat(page.locator("#" + panelId)).isVisible();
+        page.evaluate("() => { window.__e2eNoReloadMarker = 'kept'; }");
+
+        page.locator("#itemClassHeader").click();
+        page.locator("#itemClassOptions input.itemClassCheck[value='MILITARY']").check();
+        assertThat(group(page, shieldS2Id))
+            .hasCount(0, new LocatorAssertions.HasCountOptions().setTimeout(RENDER_TIMEOUT_MS));
+        assertThat(group(page, driveS1Id)).hasCount(1);
+        assertThat(group(page, driveS2Id)).hasCount(1);
+
+        page.locator("#sizeHeader").click();
+        page.locator("#sizeOptions input.sizeCheck[value='2']").check();
+        assertThat(group(page, driveS1Id))
+            .hasCount(0, new LocatorAssertions.HasCountOptions().setTimeout(RENDER_TIMEOUT_MS));
+        assertThat(group(page, driveS2Id)).hasCount(1);
+        assertThat(page.locator(".filter-toggle [data-filter-count-value]")).hasText("2");
+        assertThat(page.locator("[data-testid='filter-chip-itemClassFilter']")).isVisible();
+
+        Assertions.assertEquals(
+            "kept",
+            page.evaluate("() => window.__e2eNoReloadMarker"),
+            "a filter change must swap the table in place, never reload the page");
+
+        E2eSupport.navigate(page, baseUrl + path);
+        page.waitForLoadState();
+        assertThat(group(page, driveS1Id))
+            .hasCount(0, new LocatorAssertions.HasCountOptions().setTimeout(RENDER_TIMEOUT_MS));
+        assertThat(group(page, driveS2Id))
+            .hasCount(1, new LocatorAssertions.HasCountOptions().setTimeout(RENDER_TIMEOUT_MS));
+        assertThat(page.locator(".filter-toggle [data-filter-count-value]")).hasText("2");
+
+        if (page.locator("#bulkSelectAllBtn").count() > 0) {
+          page.waitForRequest(
+              request ->
+                  request.url().contains("/inventory/my/entry-ids")
+                      && request.url().contains("itemClasses=MILITARY")
+                      && request.url().contains("sizes=2"),
+              () -> page.locator("#bulkSelectAllBtn").click());
+          assertThat(page.locator("#bulkSelectAllBtn")).hasAttribute("data-state", "on");
+          page.locator("#bulkSelectAllBtn").click();
+        }
+
+        page.locator("[data-filter-chips-reset]").click();
+        assertThat(group(page, shieldS2Id))
+            .hasCount(1, new LocatorAssertions.HasCountOptions().setTimeout(RENDER_TIMEOUT_MS));
+        assertThat(group(page, driveS1Id)).hasCount(1);
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "lager-item-class-filter");
         throw failure;
       }
     }

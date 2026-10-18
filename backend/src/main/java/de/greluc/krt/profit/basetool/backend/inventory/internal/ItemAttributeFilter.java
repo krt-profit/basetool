@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentType;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import java.util.Arrays;
@@ -30,25 +31,28 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * The category, component-type, size and grade filters of the Lager item view (REQ-INV-063).
+ * The category, component-type, size, grade and class filters of the Lager item view (REQ-INV-063).
  *
  * <p>Every list is distinct, free of {@code null} and blank values, and empty when it narrows
- * nothing. A size or grade filter narrows to ship components, the only items whose size and grade
- * the Lager shows (REQ-INV-061).
+ * nothing. A size, grade or class filter narrows to ship components, the only items whose size,
+ * grade and class the Lager shows (REQ-INV-061, REQ-INV-062).
  *
  * @param kinds the item categories to narrow to
  * @param componentTypes the ship component types to narrow to
  * @param sizes the component sizes to narrow to
  * @param grades the component grades to narrow to, trimmed
+ * @param itemClasses the component classes to narrow to
  */
 public record ItemAttributeFilter(
     @NotNull @Unmodifiable List<GameItemKind> kinds,
     @NotNull @Unmodifiable List<ShipComponentType> componentTypes,
     @NotNull @Unmodifiable List<Integer> sizes,
-    @NotNull @Unmodifiable List<String> grades) {
+    @NotNull @Unmodifiable List<String> grades,
+    @NotNull @Unmodifiable List<ShipComponentClass> itemClasses) {
 
   /** Narrows nothing. */
-  public static final ItemAttributeFilter NONE = new ItemAttributeFilter(null, null, null, null);
+  public static final ItemAttributeFilter NONE =
+      new ItemAttributeFilter(null, null, null, null, null);
 
   private static final List<String> COMPONENT_WIKI_TYPES =
       Arrays.stream(ShipComponentType.values()).map(ShipComponentType::getWikiType).toList();
@@ -61,12 +65,14 @@ public record ItemAttributeFilter(
    * @param componentTypes the ship component types, may be {@code null}
    * @param sizes the component sizes, may be {@code null}
    * @param grades the component grades, may be {@code null}
+   * @param itemClasses the component classes, may be {@code null}
    */
   public ItemAttributeFilter(
       @Nullable List<GameItemKind> kinds,
       @Nullable List<ShipComponentType> componentTypes,
       @Nullable List<Integer> sizes,
-      @Nullable List<String> grades) {
+      @Nullable List<String> grades,
+      @Nullable List<ShipComponentClass> itemClasses) {
     this.kinds = distinctNonNull(kinds);
     this.componentTypes = distinctNonNull(componentTypes);
     this.sizes = distinctNonNull(sizes);
@@ -78,6 +84,7 @@ public record ItemAttributeFilter(
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
+    this.itemClasses = distinctNonNull(itemClasses);
   }
 
   /**
@@ -86,7 +93,11 @@ public record ItemAttributeFilter(
    * @return {@code true} when every list is empty
    */
   public boolean isEmpty() {
-    return kinds.isEmpty() && componentTypes.isEmpty() && sizes.isEmpty() && grades.isEmpty();
+    return kinds.isEmpty()
+        && componentTypes.isEmpty()
+        && sizes.isEmpty()
+        && grades.isEmpty()
+        && itemClasses.isEmpty();
   }
 
   /**
@@ -108,17 +119,20 @@ public record ItemAttributeFilter(
   }
 
   /**
-   * Gates the wiki-type clause, which a component-type, size or grade filter sets.
+   * Gates the wiki-type clause, which a component-type, size, grade or class filter sets.
    *
    * @return whether the result narrows to some wiki types
    */
   public boolean hasWikiTypes() {
-    return !componentTypes.isEmpty() || !sizes.isEmpty() || !grades.isEmpty();
+    return !componentTypes.isEmpty()
+        || !sizes.isEmpty()
+        || !grades.isEmpty()
+        || !itemClasses.isEmpty();
   }
 
   /**
    * The wiki-type query parameter: the chosen component types, or every component type when only a
-   * size or grade narrows the result.
+   * size, grade or class narrows the result.
    *
    * @return the wiki types, or {@code null} when none narrows the result
    */
@@ -163,6 +177,24 @@ public record ItemAttributeFilter(
    */
   public @Nullable List<String> gradesOrNull() {
     return hasGrades() ? grades : null;
+  }
+
+  /**
+   * Gates the class clause.
+   *
+   * @return whether a component class narrows the result
+   */
+  public boolean hasItemClasses() {
+    return !itemClasses.isEmpty();
+  }
+
+  /**
+   * The class query parameter.
+   *
+   * @return the component classes, or {@code null} when none narrows the result
+   */
+  public @Nullable List<ShipComponentClass> itemClassesOrNull() {
+    return hasItemClasses() ? itemClasses : null;
   }
 
   private static <T> @NotNull @Unmodifiable List<T> distinctNonNull(@Nullable List<T> values) {

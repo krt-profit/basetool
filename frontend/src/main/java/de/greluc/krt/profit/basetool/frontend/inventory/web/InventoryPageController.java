@@ -450,6 +450,7 @@ public class InventoryPageController {
    * @param componentTypes optional ship-component-type filter (multi; items view only)
    * @param sizes optional component-size filter (multi; items view only)
    * @param grades optional component-grade filter (multi; items view only)
+   * @param itemClasses optional component-class filter (multi; items view only)
    * @param fragment when true, return the {@code inventoryTableFragment} fragment
    * @param model model populated with grouped items, filter catalogs and auth-derived UX flags
    * @return either the full {@code inventory-my} view or its table fragment
@@ -472,6 +473,7 @@ public class InventoryPageController {
       @RequestParam(required = false) List<String> componentTypes,
       @RequestParam(required = false) List<Integer> sizes,
       @RequestParam(required = false) List<String> grades,
+      @RequestParam(required = false) List<String> itemClasses,
       @RequestParam(required = false, defaultValue = "false") boolean fragment,
       Model model) {
     if (!model.containsAttribute("inventoryForm")) {
@@ -498,7 +500,7 @@ public class InventoryPageController {
               nonPersonalOnly,
               stolen.stolenOnly(),
               stolen.nonStolenOnly(),
-              new ItemAttributeFilter(kinds, componentTypes, sizes, grades)),
+              new ItemAttributeFilter(kinds, componentTypes, sizes, grades, itemClasses)),
           fragment);
       model.addAttribute("users", fetchUsers());
       model.addAttribute("selectedPersonalOnly", personalOnly);
@@ -596,6 +598,7 @@ public class InventoryPageController {
    * @param componentTypes optional ship-component-type filter (multi; items view only)
    * @param sizes optional component-size filter (multi; items view only)
    * @param grades optional component-grade filter (multi; items view only)
+   * @param itemClasses optional component-class filter (multi; items view only)
    * @return the ids of every matching entry, in creation order; never {@code null}
    */
   @GetMapping("/my/entry-ids")
@@ -615,7 +618,8 @@ public class InventoryPageController {
       @RequestParam(required = false) List<String> kinds,
       @RequestParam(required = false) List<String> componentTypes,
       @RequestParam(required = false) List<Integer> sizes,
-      @RequestParam(required = false) List<String> grades) {
+      @RequestParam(required = false) List<String> grades,
+      @RequestParam(required = false) List<String> itemClasses) {
     List<UUID> ids =
         isItemsView(view)
             ? inventoryClient.myItemEntryIds(
@@ -627,7 +631,7 @@ public class InventoryPageController {
                     nonPersonalOnly,
                     stolenOnly,
                     nonStolenOnly,
-                    new ItemAttributeFilter(kinds, componentTypes, sizes, grades)))
+                    new ItemAttributeFilter(kinds, componentTypes, sizes, grades, itemClasses)))
             : inventoryClient.myMaterialEntryIds(
                 new InventoryBackendClient.MaterialFilter(
                     materialIds,
@@ -838,6 +842,7 @@ public class InventoryPageController {
    * @param componentTypes optional ship-component-type filter (multi; items view only)
    * @param sizes optional component-size filter (multi; items view only)
    * @param grades optional component-grade filter (multi; items view only)
+   * @param itemClasses optional component-class filter (multi; items view only)
    * @param fragment when true, return the table fragment
    * @return either the full {@code inventory-admin} view or its fragment
    */
@@ -857,6 +862,7 @@ public class InventoryPageController {
       @RequestParam(required = false) List<String> componentTypes,
       @RequestParam(required = false) List<Integer> sizes,
       @RequestParam(required = false) List<String> grades,
+      @RequestParam(required = false) List<String> itemClasses,
       @RequestParam(required = false, defaultValue = "false") boolean fragment,
       Model model) {
     if (!model.containsAttribute("inventoryForm")) {
@@ -883,7 +889,7 @@ public class InventoryPageController {
               false,
               stolen.stolenOnly(),
               stolen.nonStolenOnly(),
-              new ItemAttributeFilter(kinds, componentTypes, sizes, grades)),
+              new ItemAttributeFilter(kinds, componentTypes, sizes, grades, itemClasses)),
           fragment);
       model.addAttribute("authUserId", currentAuthName());
       model.addAttribute("canEditForeignNotes", hasLogisticianOrAbove());

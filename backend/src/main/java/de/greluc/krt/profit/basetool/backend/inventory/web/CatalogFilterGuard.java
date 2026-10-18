@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
-/** Rejects a Lager filter that does not match the requested stock catalog with 400. */
+/** Rejects a Lager filter or stack key that does not match the requested stock catalog with 400. */
 final class CatalogFilterGuard {
 
   private CatalogFilterGuard() {}
@@ -66,7 +66,39 @@ final class CatalogFilterGuard {
     }
     if (!attributes.isEmpty()) {
       throw new BadRequestException(
-          "kinds, componentTypes, sizes and grades are not supported for catalog=MATERIAL");
+          "kinds, componentTypes, sizes, grades and itemClasses are not supported for"
+              + " catalog=MATERIAL");
+    }
+  }
+
+  /**
+   * Validates the stack address of a {@code catalog=ITEM} stack-entries drill-down (REQ-INV-005/
+   * 029): the stack is keyed by {@code gameItemId}, and a {@code quality} parameter is rejected
+   * because item stacks carry no quality dimension.
+   *
+   * @param gameItemId the item stack key; must be present
+   * @param quality the material-only quality key; must be absent
+   * @throws BadRequestException when the item key is missing or a quality key is supplied
+   */
+  static void requireItemStackKey(UUID gameItemId, Integer quality) {
+    if (gameItemId == null) {
+      throw new BadRequestException("gameItemId is required for catalog=ITEM");
+    }
+    if (quality != null) {
+      throw new BadRequestException("quality is not supported for catalog=ITEM");
+    }
+  }
+
+  /**
+   * Validates that a {@code catalog=MATERIAL} stack-entries drill-down names its {@code materialId}
+   * stack key.
+   *
+   * @param materialId the material stack key; must be present
+   * @throws BadRequestException when the material key is missing
+   */
+  static void requireMaterialStackKey(UUID materialId) {
+    if (materialId == null) {
+      throw new BadRequestException("materialId is required for catalog=MATERIAL");
     }
   }
 }

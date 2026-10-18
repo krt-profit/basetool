@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryScope;
 import java.util.Collection;
 import java.util.List;
@@ -43,7 +44,8 @@ public interface InventoryItemViewRepository extends Repository<InventoryItem, U
       " AND (:hasKinds = false OR gi.kind IN :kinds)"
           + " AND (:hasWikiTypes = false OR gi.wikiType IN :wikiTypes)"
           + " AND (:hasSizes = false OR gi.sizeClass IN :sizes)"
-          + " AND (:hasGrades = false OR TRIM(gi.grade) IN :grades)";
+          + " AND (:hasGrades = false OR TRIM(gi.grade) IN :grades)"
+          + " AND (:hasItemClasses = false OR gi.itemClass IN :itemClasses)";
 
   /**
    * Aggregates the scoped, filtered non-personal game-item stock into one {@link
@@ -71,6 +73,9 @@ public interface InventoryItemViewRepository extends Repository<InventoryItem, U
    * @param sizes the component sizes to narrow to; ignored when {@code hasSizes} is false.
    * @param hasGrades gates the {@code grades} clause.
    * @param grades the trimmed grades to narrow to; ignored when {@code hasGrades} is false.
+   * @param hasItemClasses gates the {@code itemClasses} clause.
+   * @param itemClasses the component classes to narrow to; ignored when {@code hasItemClasses} is
+   *     false.
    * @return one aggregate per item stack in scope; never {@code null}.
    */
   @Query(
@@ -109,7 +114,9 @@ public interface InventoryItemViewRepository extends Repository<InventoryItem, U
       @Param("hasSizes") boolean hasSizes,
       @Param("sizes") @Nullable List<Integer> sizes,
       @Param("hasGrades") boolean hasGrades,
-      @Param("grades") @Nullable List<String> grades);
+      @Param("grades") @Nullable List<String> grades,
+      @Param("hasItemClasses") boolean hasItemClasses,
+      @Param("itemClasses") @Nullable List<ShipComponentClass> itemClasses);
 
   /**
    * Aggregates the user's filtered game-item stock into one {@link InventoryItemStackAggregate} per
@@ -137,6 +144,9 @@ public interface InventoryItemViewRepository extends Repository<InventoryItem, U
    * @param sizes the component sizes to narrow to; ignored when {@code hasSizes} is false.
    * @param hasGrades gates the {@code grades} clause.
    * @param grades the trimmed grades to narrow to; ignored when {@code hasGrades} is false.
+   * @param hasItemClasses gates the {@code itemClasses} clause.
+   * @param itemClasses the component classes to narrow to; ignored when {@code hasItemClasses} is
+   *     false.
    * @return one aggregate per item stack the user owns; never {@code null}.
    */
   @Query(
@@ -176,7 +186,9 @@ public interface InventoryItemViewRepository extends Repository<InventoryItem, U
       @Param("hasSizes") boolean hasSizes,
       @Param("sizes") @Nullable List<Integer> sizes,
       @Param("hasGrades") boolean hasGrades,
-      @Param("grades") @Nullable List<String> grades);
+      @Param("grades") @Nullable List<String> grades,
+      @Param("hasItemClasses") boolean hasItemClasses,
+      @Param("itemClasses") @Nullable List<ShipComponentClass> itemClasses);
 
   /**
    * Returns the ids of every game-item entry the user owns that matches the {@link
@@ -203,6 +215,9 @@ public interface InventoryItemViewRepository extends Repository<InventoryItem, U
    * @param sizes the component sizes to narrow to; ignored when {@code hasSizes} is false.
    * @param hasGrades gates the {@code grades} clause.
    * @param grades the trimmed grades to narrow to; ignored when {@code hasGrades} is false.
+   * @param hasItemClasses gates the {@code itemClasses} clause.
+   * @param itemClasses the component classes to narrow to; ignored when {@code hasItemClasses} is
+   *     false.
    * @return the ids of every matching game-item entry the user owns; never {@code null}.
    */
   @Query(
@@ -240,5 +255,7 @@ public interface InventoryItemViewRepository extends Repository<InventoryItem, U
       @Param("hasSizes") boolean hasSizes,
       @Param("sizes") @Nullable List<Integer> sizes,
       @Param("hasGrades") boolean hasGrades,
-      @Param("grades") @Nullable List<String> grades);
+      @Param("grades") @Nullable List<String> grades,
+      @Param("hasItemClasses") boolean hasItemClasses,
+      @Param("itemClasses") @Nullable List<ShipComponentClass> itemClasses);
 }

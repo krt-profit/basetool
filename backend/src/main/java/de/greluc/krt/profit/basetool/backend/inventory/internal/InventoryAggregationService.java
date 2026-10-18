@@ -376,7 +376,7 @@ public class InventoryAggregationService {
    * @param nonPersonalOnly when {@code true}, narrows to the caller's shared stock rows
    * @param stolenOnly when {@code true}, narrows to stock marked „gestohlen" (REQ-INV-053)
    * @param nonStolenOnly when {@code true}, narrows to stock not marked „gestohlen"
-   * @param attributes the category, component-type, size and grade filters (REQ-INV-063)
+   * @param attributes the category, component-type, size, grade and class filters (REQ-INV-063)
    * @return item groups, each carrying its sorted stacks and item-wide total
    * @throws NotFoundException when the user id is unknown
    */
@@ -414,7 +414,9 @@ public class InventoryAggregationService {
             attributes.hasSizes(),
             attributes.sizesOrNull(),
             attributes.hasGrades(),
-            attributes.gradesOrNull());
+            attributes.gradesOrNull(),
+            attributes.hasItemClasses(),
+            attributes.itemClassesOrNull());
     return buildGroupedFromItemStacks(stacks);
   }
 
@@ -481,7 +483,7 @@ public class InventoryAggregationService {
    * @param nonPersonalOnly when {@code true}, narrows to the caller's shared stock rows
    * @param stolenOnly when {@code true}, narrows to stock marked „gestohlen" (REQ-INV-053)
    * @param nonStolenOnly when {@code true}, narrows to stock not marked „gestohlen"
-   * @param attributes the category, component-type, size and grade filters (REQ-INV-063)
+   * @param attributes the category, component-type, size, grade and class filters (REQ-INV-063)
    * @return the ids of every matching game-item entry, in creation order; never {@code null}
    * @throws NotFoundException when the user id is unknown
    */
@@ -518,7 +520,9 @@ public class InventoryAggregationService {
         attributes.hasSizes(),
         attributes.sizesOrNull(),
         attributes.hasGrades(),
-        attributes.gradesOrNull());
+        attributes.gradesOrNull(),
+        attributes.hasItemClasses(),
+        attributes.itemClassesOrNull());
   }
 
   /**
@@ -531,7 +535,7 @@ public class InventoryAggregationService {
    * @param jobOrderIds optional job-order filter
    * @param stolenOnly when {@code true}, narrows to stock marked „gestohlen" (REQ-INV-053)
    * @param nonStolenOnly when {@code true}, narrows to stock not marked „gestohlen"
-   * @param attributes the category, component-type, size and grade filters (REQ-INV-063)
+   * @param attributes the category, component-type, size, grade and class filters (REQ-INV-063)
    * @return item groups, each carrying its sorted stacks and item-wide total
    */
   public List<GroupedInventoryDto> getAllAggregatedItemInventory(
@@ -565,7 +569,9 @@ public class InventoryAggregationService {
             attributes.hasSizes(),
             attributes.sizesOrNull(),
             attributes.hasGrades(),
-            attributes.gradesOrNull());
+            attributes.gradesOrNull(),
+            attributes.hasItemClasses(),
+            attributes.itemClassesOrNull());
     return buildGroupedFromItemStacks(stacks);
   }
 

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentType;
 import java.util.Arrays;
 import java.util.List;
@@ -43,12 +44,48 @@ class ItemAttributeFilterTest {
     assertThat(filter.sizesOrNull()).isNull();
     assertThat(filter.hasGrades()).isFalse();
     assertThat(filter.gradesOrNull()).isNull();
+    assertThat(filter.hasItemClasses()).isFalse();
+    assertThat(filter.itemClassesOrNull()).isNull();
+  }
+
+  @Test
+  void itemClassAlone_isDistinctAndNarrowsToComponents() {
+    ItemAttributeFilter filter =
+        new ItemAttributeFilter(
+            null,
+            null,
+            null,
+            null,
+            Arrays.asList(ShipComponentClass.MILITARY, null, ShipComponentClass.MILITARY));
+
+    assertThat(filter.isEmpty()).isFalse();
+    assertThat(filter.hasItemClasses()).isTrue();
+    assertThat(filter.itemClassesOrNull()).containsExactly(ShipComponentClass.MILITARY);
+    assertThat(filter.hasWikiTypes()).isTrue();
+    assertThat(filter.wikiTypesOrNull())
+        .containsExactlyElementsOf(
+            Arrays.stream(ShipComponentType.values()).map(ShipComponentType::getWikiType).toList());
+  }
+
+  @Test
+  void itemClassWithComponentType_keepsTheChosenTypesOnly() {
+    ItemAttributeFilter filter =
+        new ItemAttributeFilter(
+            null,
+            List.of(ShipComponentType.QUANTUM_DRIVE),
+            List.of(2),
+            null,
+            List.of(ShipComponentClass.MILITARY));
+
+    assertThat(filter.wikiTypesOrNull()).containsExactly("QuantumDrive");
+    assertThat(filter.itemClassesOrNull()).containsExactly(ShipComponentClass.MILITARY);
   }
 
   @Test
   void nullAndEmptyLists_narrowNothing() {
     ItemAttributeFilter filter =
-        new ItemAttributeFilter(List.of(), null, Arrays.asList((Integer) null), List.of(" "));
+        new ItemAttributeFilter(
+            List.of(), null, Arrays.asList((Integer) null), List.of(" "), List.of());
 
     assertThat(filter.isEmpty()).isTrue();
   }
@@ -58,6 +95,7 @@ class ItemAttributeFilterTest {
     ItemAttributeFilter filter =
         new ItemAttributeFilter(
             List.of(GameItemKind.WEAPON, GameItemKind.ARMOR, GameItemKind.WEAPON),
+            null,
             null,
             null,
             null);
@@ -71,7 +109,11 @@ class ItemAttributeFilterTest {
   void componentTypes_resolveToTheirWikiTypes() {
     ItemAttributeFilter filter =
         new ItemAttributeFilter(
-            null, List.of(ShipComponentType.QUANTUM_DRIVE, ShipComponentType.SHIELD), null, null);
+            null,
+            List.of(ShipComponentType.QUANTUM_DRIVE, ShipComponentType.SHIELD),
+            null,
+            null,
+            null);
 
     assertThat(filter.hasWikiTypes()).isTrue();
     assertThat(filter.wikiTypesOrNull()).containsExactly("QuantumDrive", "Shield");
@@ -79,7 +121,7 @@ class ItemAttributeFilterTest {
 
   @Test
   void sizeAlone_narrowsToEveryComponentWikiType() {
-    ItemAttributeFilter filter = new ItemAttributeFilter(null, null, List.of(2, 2, 1), null);
+    ItemAttributeFilter filter = new ItemAttributeFilter(null, null, List.of(2, 2, 1), null, null);
 
     assertThat(filter.sizesOrNull()).containsExactly(2, 1);
     assertThat(filter.hasWikiTypes()).isTrue();
@@ -91,7 +133,7 @@ class ItemAttributeFilterTest {
   @Test
   void gradeAlone_isTrimmedAndNarrowsToComponents() {
     ItemAttributeFilter filter =
-        new ItemAttributeFilter(null, null, null, List.of(" A", "B ", "A"));
+        new ItemAttributeFilter(null, null, null, List.of(" A", "B ", "A"), null);
 
     assertThat(filter.gradesOrNull()).containsExactly("A", "B");
     assertThat(filter.hasWikiTypes()).isTrue();
@@ -100,7 +142,8 @@ class ItemAttributeFilterTest {
   @Test
   void componentTypeWithSize_keepsTheChosenTypesOnly() {
     ItemAttributeFilter filter =
-        new ItemAttributeFilter(null, List.of(ShipComponentType.QUANTUM_DRIVE), List.of(2), null);
+        new ItemAttributeFilter(
+            null, List.of(ShipComponentType.QUANTUM_DRIVE), List.of(2), null, null);
 
     assertThat(filter.wikiTypesOrNull()).containsExactly("QuantumDrive");
     assertThat(filter.sizesOrNull()).containsExactly(2);

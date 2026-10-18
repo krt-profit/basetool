@@ -7,6 +7,7 @@
     <th:block th:replace="~{inventory/fragments/inventory-item-attribute-filters :: attributeFilter(${triggerPrefix}, 'componentType', 'componentTypes', 'inventory.items.filter.componentType', ${itemAttributeOptions.componentTypes}, ${selectedItemAttributes.componentTypes}, 'message', 'inventory.items.componentType.')}"></th:block>
     <th:block th:replace="~{inventory/fragments/inventory-item-attribute-filters :: attributeFilter(${triggerPrefix}, 'size', 'sizes', 'inventory.items.filter.size', ${itemAttributeOptions.sizes}, ${selectedItemAttributes.sizes}, 'size', null)}"></th:block>
     <th:block th:replace="~{inventory/fragments/inventory-item-attribute-filters :: attributeFilter(${triggerPrefix}, 'grade', 'grades', 'inventory.items.filter.grade', ${itemAttributeOptions.grades}, ${selectedItemAttributes.grades}, 'raw', null)}"></th:block>
+    <th:block th:replace="~{inventory/fragments/inventory-item-attribute-filters :: attributeFilter(${triggerPrefix}, 'itemClass', 'itemClasses', 'inventory.items.filter.itemClass', ${itemAttributeOptions.itemClasses}, ${selectedItemAttributes.itemClasses}, 'message', 'inventory.items.itemClass.')}"></th:block>
 </th:block>
 
 <div th:fragment="attributeFilter(triggerPrefix, family, paramName, titleKey, options, selected, labelMode, labelPrefix)"

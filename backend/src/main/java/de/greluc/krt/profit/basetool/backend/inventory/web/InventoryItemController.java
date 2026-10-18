@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.inventory.web;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentType;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
@@ -49,7 +50,6 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryPoolCha
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStolenMarkService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.ItemAttributeFilter;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.UpdateDeliveredRequest;
-import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitReferenceDto;
@@ -296,6 +296,7 @@ public class InventoryItemController {
    * @param componentTypes optional component-type filter ({@code catalog=ITEM} only)
    * @param sizes optional component-size filter ({@code catalog=ITEM} only)
    * @param grades optional component-grade filter ({@code catalog=ITEM} only)
+   * @param itemClasses optional component-class filter ({@code catalog=ITEM} only)
    * @param catalog which stock catalog to group; defaults to {@code MATERIAL}; a filter that does
    *     not match the catalog is rejected with 400 (REQ-INV-029/031)
    * @param gameItemIds optional game-item filter ({@code catalog=ITEM} only; 400 otherwise)
@@ -320,8 +321,10 @@ public class InventoryItemController {
       @RequestParam(required = false) List<ShipComponentType> componentTypes,
       @RequestParam(required = false) List<Integer> sizes,
       @RequestParam(required = false) List<String> grades,
+      @RequestParam(required = false) List<ShipComponentClass> itemClasses,
       @RequestParam(required = false, defaultValue = "MATERIAL") InventoryCatalog catalog) {
-    ItemAttributeFilter attributes = new ItemAttributeFilter(kinds, componentTypes, sizes, grades);
+    ItemAttributeFilter attributes =
+        new ItemAttributeFilter(kinds, componentTypes, sizes, grades, itemClasses);
     if (catalog == InventoryCatalog.ITEM) {
       CatalogFilterGuard.rejectMaterialOnlyFilters(minQuality, missionIds, materialIds);
       return inventoryAggregationService.getMyAggregatedItemInventory(
@@ -371,6 +374,7 @@ public class InventoryItemController {
    * @param componentTypes optional component-type filter ({@code catalog=ITEM} only)
    * @param sizes optional component-size filter ({@code catalog=ITEM} only)
    * @param grades optional component-grade filter ({@code catalog=ITEM} only)
+   * @param itemClasses optional component-class filter ({@code catalog=ITEM} only)
    * @param catalog which stock catalog to select from; defaults to {@code MATERIAL}
    * @return the ids of every matching entry, in creation order
    */
@@ -392,8 +396,10 @@ public class InventoryItemController {
       @RequestParam(required = false) List<ShipComponentType> componentTypes,
       @RequestParam(required = false) List<Integer> sizes,
       @RequestParam(required = false) List<String> grades,
+      @RequestParam(required = false) List<ShipComponentClass> itemClasses,
       @RequestParam(required = false, defaultValue = "MATERIAL") InventoryCatalog catalog) {
-    ItemAttributeFilter attributes = new ItemAttributeFilter(kinds, componentTypes, sizes, grades);
+    ItemAttributeFilter attributes =
+        new ItemAttributeFilter(kinds, componentTypes, sizes, grades, itemClasses);
     if (catalog == InventoryCatalog.ITEM) {
       CatalogFilterGuard.rejectMaterialOnlyFilters(minQuality, missionIds, materialIds);
       return inventoryAggregationService.getMyItemEntryIds(
@@ -509,6 +515,7 @@ public class InventoryItemController {
    * @param componentTypes optional component-type filter ({@code catalog=ITEM} only)
    * @param sizes optional component-size filter ({@code catalog=ITEM} only)
    * @param grades optional component-grade filter ({@code catalog=ITEM} only)
+   * @param itemClasses optional component-class filter ({@code catalog=ITEM} only)
    * @param catalog which stock catalog to group; defaults to {@code MATERIAL}
    * @return grouped DTOs
    */
@@ -528,8 +535,10 @@ public class InventoryItemController {
       @RequestParam(required = false) List<ShipComponentType> componentTypes,
       @RequestParam(required = false) List<Integer> sizes,
       @RequestParam(required = false) List<String> grades,
+      @RequestParam(required = false) List<ShipComponentClass> itemClasses,
       @RequestParam(required = false, defaultValue = "MATERIAL") InventoryCatalog catalog) {
-    ItemAttributeFilter attributes = new ItemAttributeFilter(kinds, componentTypes, sizes, grades);
+    ItemAttributeFilter attributes =
+        new ItemAttributeFilter(kinds, componentTypes, sizes, grades, itemClasses);
     if (catalog == InventoryCatalog.ITEM) {
       CatalogFilterGuard.rejectMaterialOnlyFilters(minQuality, missionIds, materialIds);
       return inventoryAggregationService.getAllAggregatedItemInventory(
@@ -565,7 +574,7 @@ public class InventoryItemController {
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size) {
     if (catalog == InventoryCatalog.ITEM) {
-      requireItemStackKey(gameItemId, quality);
+      CatalogFilterGuard.requireItemStackKey(gameItemId, quality);
       return PageResponse.of(
           inventoryAggregationService.getMyItemStackEntries(
               userService.getUserIdFromJwt(jwt),
@@ -576,7 +585,7 @@ public class InventoryItemController {
               owningOrgUnitId,
               stackEntriesPageRequest(page, size)));
     }
-    requireMaterialStackKey(materialId);
+    CatalogFilterGuard.requireMaterialStackKey(materialId);
     Page<InventoryItemDto> p =
         inventoryItemService.getMyStackEntries(
             userService.getUserIdFromJwt(jwt),
@@ -611,7 +620,7 @@ public class InventoryItemController {
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size) {
     if (catalog == InventoryCatalog.ITEM) {
-      requireItemStackKey(gameItemId, quality);
+      CatalogFilterGuard.requireItemStackKey(gameItemId, quality);
       return PageResponse.of(
           inventoryAggregationService.getAllItemStackEntries(
               gameItemId,
@@ -621,7 +630,7 @@ public class InventoryItemController {
               owningOrgUnitId,
               stackEntriesPageRequest(page, size)));
     }
-    requireMaterialStackKey(materialId);
+    CatalogFilterGuard.requireMaterialStackKey(materialId);
     Page<InventoryItemDto> p =
         inventoryItemService.getAllStackEntries(
             materialId,
@@ -649,37 +658,6 @@ public class InventoryItemController {
             ? Math.min(size, STACK_ENTRIES_MAX_SIZE)
             : STACK_ENTRIES_DEFAULT_SIZE;
     return PageRequest.of(resolvedPage, resolvedSize);
-  }
-
-  /**
-   * Validates the stack address of a {@code catalog=ITEM} stack-entries drill-down (REQ-INV-005/
-   * 029): the stack is keyed by {@code gameItemId}, and a {@code quality} parameter is rejected
-   * because item stacks carry no quality dimension.
-   *
-   * @param gameItemId the item stack key; must be present
-   * @param quality the material-only quality key; must be absent
-   * @throws BadRequestException when the item key is missing or a quality key is supplied
-   */
-  private static void requireItemStackKey(UUID gameItemId, Integer quality) {
-    if (gameItemId == null) {
-      throw new BadRequestException("gameItemId is required for catalog=ITEM");
-    }
-    if (quality != null) {
-      throw new BadRequestException("quality is not supported for catalog=ITEM");
-    }
-  }
-
-  /**
-   * Validates that a {@code catalog=MATERIAL} stack-entries drill-down names its {@code materialId}
-   * stack key.
-   *
-   * @param materialId the material stack key; must be present
-   * @throws BadRequestException when the material key is missing
-   */
-  private static void requireMaterialStackKey(UUID materialId) {
-    if (materialId == null) {
-      throw new BadRequestException("materialId is required for catalog=MATERIAL");
-    }
   }
 
   /**

@@ -45,6 +45,7 @@ const ITEM_ATTRIBUTE_FILTERS = [
     { param: 'componentTypes', family: 'componentType' },
     { param: 'sizes', family: 'size' },
     { param: 'grades', family: 'grade' },
+    { param: 'itemClasses', family: 'itemClass' },
 ];
 
 /**

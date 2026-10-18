@@ -172,14 +172,15 @@ class InventoryBackendClientTest {
                 List.of("VEHICLE_ITEM"),
                 List.of("QUANTUM_DRIVE", "SHIELD"),
                 List.of(2),
-                List.of(" A", "B", "")));
+                List.of(" A", "B", ""),
+                List.of("MILITARY", " ", "STEALTH")));
 
     client.groupedItems(InventoryBackendClient.Listing.ALL, filter);
     client.myItemEntryIds(filter);
 
     String attributes =
         "&kinds=VEHICLE_ITEM&componentTypes=QUANTUM_DRIVE&componentTypes=SHIELD&sizes=2"
-            + "&grades=A&grades=B";
+            + "&grades=A&grades=B&itemClasses=MILITARY&itemClasses=STEALTH";
     backend.expect("GET", "/api/v1/inventory/all/grouped?catalog=ITEM" + attributes);
     backend.expect("GET", "/api/v1/inventory/my-inventory/entry-ids?catalog=ITEM" + attributes);
   }
