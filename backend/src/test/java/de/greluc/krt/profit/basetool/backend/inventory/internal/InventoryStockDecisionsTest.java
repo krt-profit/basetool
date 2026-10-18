@@ -103,6 +103,14 @@ class InventoryStockDecisionsTest {
       assertThat(scuRow(1, false).countsWholeUnits()).isFalse();
       assertThat(InventoryItem.countsWholeUnits(null, null)).isFalse();
     }
+
+    @Test
+    void theFractionalDetailNamesTheKindOfStock() {
+      assertThat(itemRow(1).wholeUnitAmountDetail())
+          .isEqualTo("Amount must be a whole number for item stock");
+      assertThat(pieceRow(1).wholeUnitAmountDetail())
+          .isEqualTo("Amount must be a whole number for PIECE materials");
+    }
   }
 
   @Nested
@@ -126,8 +134,23 @@ class InventoryStockDecisionsTest {
     }
 
     @Test
+    void aFractionalPartOfItemStockIsRefused() {
+      assertThat(InventoryStockDecisions.bookOut(itemRow(10), 1.5, false))
+          .isEqualTo(BookOutRefusal.FRACTIONAL_AMOUNT);
+    }
+
+    @Test
     void aFractionalWholeRowOfWholeUnitStockIsAllowed() {
       assertThat(InventoryStockDecisions.bookOut(pieceRow(2.5), 2.5, false)).isNull();
+      assertThat(InventoryStockDecisions.bookOut(itemRow(1.5), 1.5, false)).isNull();
+    }
+
+    @Test
+    void aFractionalPartOfAFractionalWholeUnitRowIsRefused() {
+      assertThat(InventoryStockDecisions.bookOut(pieceRow(1.5), 0.5, false))
+          .isEqualTo(BookOutRefusal.FRACTIONAL_AMOUNT);
+      assertThat(InventoryStockDecisions.bookOut(itemRow(1.5), 0.5, false))
+          .isEqualTo(BookOutRefusal.FRACTIONAL_AMOUNT);
     }
 
     @Test
@@ -147,6 +170,8 @@ class InventoryStockDecisionsTest {
           .isEqualTo(PersonalRebookRefusal.AMOUNT_NOT_POSITIVE);
       assertThat(InventoryStockDecisions.rebookPersonal(row, 0.0))
           .isEqualTo(PersonalRebookRefusal.AMOUNT_NOT_POSITIVE);
+      assertThat(InventoryStockDecisions.rebookPersonal(row, -5.0))
+          .isEqualTo(PersonalRebookRefusal.AMOUNT_NOT_POSITIVE);
     }
 
     @Test
@@ -159,6 +184,16 @@ class InventoryStockDecisionsTest {
     void aFractionalPartOfWholeUnitStockIsRefused() {
       assertThat(InventoryStockDecisions.rebookPersonal(itemRow(4), 0.5))
           .isEqualTo(PersonalRebookRefusal.FRACTIONAL_AMOUNT);
+      assertThat(InventoryStockDecisions.rebookPersonal(itemRow(1.5), 0.5))
+          .isEqualTo(PersonalRebookRefusal.FRACTIONAL_AMOUNT);
+      assertThat(InventoryStockDecisions.rebookPersonal(pieceRow(1.5), 0.5))
+          .isEqualTo(PersonalRebookRefusal.FRACTIONAL_AMOUNT);
+    }
+
+    @Test
+    void aFractionalWholeRowOfWholeUnitStockMayMove() {
+      assertThat(InventoryStockDecisions.rebookPersonal(itemRow(1.5), 1.5)).isNull();
+      assertThat(InventoryStockDecisions.rebookPersonal(pieceRow(1.5), 1.5)).isNull();
     }
 
     @Test
