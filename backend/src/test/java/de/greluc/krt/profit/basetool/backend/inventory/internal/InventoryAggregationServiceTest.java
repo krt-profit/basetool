@@ -100,8 +100,7 @@ class InventoryAggregationServiceTest {
       stubUser(userId);
       stubUserItemStacks();
 
-      service.getMyAggregatedItemInventory(
-          userId, null, null, null, false, false, false, false, ItemAttributeFilter.NONE);
+      service.getMyAggregatedItemInventory(userId, LagerFilter.NONE);
 
       verify(inventoryItemViewRepository)
           .findUserItemStacks(
@@ -135,7 +134,7 @@ class InventoryAggregationServiceTest {
       stubUserItemStacks();
 
       service.getMyAggregatedItemInventory(
-          userId, List.of(), null, List.of(), false, false, false, false, ItemAttributeFilter.NONE);
+          userId, LagerFilter.builder().gameItemIds(List.of()).jobOrderIds(List.of()).build());
 
       verify(inventoryItemViewRepository)
           .findUserItemStacks(
@@ -172,14 +171,11 @@ class InventoryAggregationServiceTest {
 
       service.getMyAggregatedItemInventory(
           userId,
-          List.of(gameItemId),
-          null,
-          List.of(jobOrderId),
-          true,
-          false,
-          false,
-          false,
-          ItemAttributeFilter.NONE);
+          LagerFilter.builder()
+              .gameItemIds(List.of(gameItemId))
+              .jobOrderIds(List.of(jobOrderId))
+              .personalOnly(true)
+              .build());
 
       verify(inventoryItemViewRepository)
           .findUserItemStacks(
@@ -214,19 +210,13 @@ class InventoryAggregationServiceTest {
 
       service.getMyAggregatedItemInventory(
           userId,
-          null,
-          null,
-          null,
-          false,
-          false,
-          false,
-          false,
-          new ItemAttributeFilter(
-              List.of(GameItemKind.VEHICLE_ITEM),
-              List.of(ShipComponentType.QUANTUM_DRIVE),
-              List.of(2),
-              List.of("A"),
-              List.of(ShipComponentClass.MILITARY)));
+          LagerFilter.builder()
+              .kinds(List.of(GameItemKind.VEHICLE_ITEM))
+              .componentTypes(List.of(ShipComponentType.QUANTUM_DRIVE))
+              .sizes(List.of(2))
+              .grades(List.of("A"))
+              .itemClasses(List.of(ShipComponentClass.MILITARY))
+              .build());
 
       verify(inventoryItemViewRepository)
           .findUserItemStacks(
@@ -281,13 +271,7 @@ class InventoryAggregationServiceTest {
               any()))
           .thenReturn(List.of());
 
-      service.getAllAggregatedItemInventory(
-          null,
-          null,
-          null,
-          false,
-          false,
-          new ItemAttributeFilter(null, null, null, List.of("C"), null));
+      service.getAllAggregatedItemInventory(LagerFilter.builder().grades(List.of("C")).build());
 
       verify(inventoryItemViewRepository)
           .findGlobalItemStacks(
@@ -324,9 +308,7 @@ class InventoryAggregationServiceTest {
 
       assertThrows(
           NotFoundException.class,
-          () ->
-              service.getMyAggregatedItemInventory(
-                  userId, null, null, null, false, false, false, false, ItemAttributeFilter.NONE));
+          () -> service.getMyAggregatedItemInventory(userId, LagerFilter.NONE));
 
       verifyNoInteractions(inventoryItemRepository);
     }
@@ -361,8 +343,7 @@ class InventoryAggregationServiceTest {
               any()))
           .thenReturn(List.of());
 
-      service.getAllAggregatedItemInventory(
-          null, null, null, false, false, ItemAttributeFilter.NONE);
+      service.getAllAggregatedItemInventory(LagerFilter.NONE);
 
       verify(inventoryItemViewRepository)
           .findGlobalItemStacks(
@@ -411,7 +392,12 @@ class InventoryAggregationServiceTest {
           .thenReturn(List.of());
 
       service.getMyEntryIds(
-          userId, List.of(), null, null, List.of(), List.of(), false, false, false, false);
+          userId,
+          LagerFilter.builder()
+              .materialIds(List.of())
+              .jobOrderIds(List.of())
+              .missionIds(List.of())
+              .build());
 
       verify(inventoryItemRepository)
           .findUserEntryIds(
@@ -459,15 +445,13 @@ class InventoryAggregationServiceTest {
       List<UUID> ids =
           service.getMyEntryIds(
               userId,
-              List.of(materialId),
-              null,
-              700,
-              List.of(jobOrderId),
-              List.of(missionId),
-              true,
-              false,
-              false,
-              false);
+              LagerFilter.builder()
+                  .materialIds(List.of(materialId))
+                  .minQuality(700)
+                  .jobOrderIds(List.of(jobOrderId))
+                  .missionIds(List.of(missionId))
+                  .personalOnly(true)
+                  .build());
 
       assertEquals(List.of(entry), ids);
       verify(inventoryItemRepository)
@@ -493,11 +477,7 @@ class InventoryAggregationServiceTest {
       UUID userId = UUID.randomUUID();
       when(userRepository.findPlainById(userId)).thenReturn(Optional.empty());
 
-      assertThrows(
-          NotFoundException.class,
-          () ->
-              service.getMyEntryIds(
-                  userId, null, null, null, null, null, false, false, false, false));
+      assertThrows(NotFoundException.class, () -> service.getMyEntryIds(userId, LagerFilter.NONE));
 
       verifyNoInteractions(inventoryItemRepository);
     }
@@ -536,14 +516,11 @@ class InventoryAggregationServiceTest {
       List<UUID> ids =
           service.getMyItemEntryIds(
               userId,
-              List.of(gameItemId),
-              null,
-              List.of(jobOrderId),
-              true,
-              false,
-              false,
-              false,
-              ItemAttributeFilter.NONE);
+              LagerFilter.builder()
+                  .gameItemIds(List.of(gameItemId))
+                  .jobOrderIds(List.of(jobOrderId))
+                  .personalOnly(true)
+                  .build());
 
       assertEquals(List.of(entry), ids);
       verify(inventoryItemViewRepository)
@@ -582,9 +559,7 @@ class InventoryAggregationServiceTest {
           agg(coupling, location("ARC-L1"), 2.0, 2L), agg(coupling, location("ARC-L2"), 3.0, 1L));
       stubItemRefMapper();
 
-      List<GroupedInventoryDto> result =
-          service.getAllAggregatedItemInventory(
-              null, null, null, false, false, ItemAttributeFilter.NONE);
+      List<GroupedInventoryDto> result = service.getAllAggregatedItemInventory(LagerFilter.NONE);
 
       assertEquals(1, result.size());
       GroupedInventoryDto group = result.get(0);
@@ -606,9 +581,7 @@ class InventoryAggregationServiceTest {
           agg(shield, location("L"), 7.0, 1L), agg(coupling, location("L"), 5.0, 1L));
       stubItemRefMapper();
 
-      List<GroupedInventoryDto> result =
-          service.getAllAggregatedItemInventory(
-              null, null, null, false, false, ItemAttributeFilter.NONE);
+      List<GroupedInventoryDto> result = service.getAllAggregatedItemInventory(LagerFilter.NONE);
 
       assertEquals(
           List.of("Coupling", "Shield"), result.stream().map(g -> g.gameItem().name()).toList());
@@ -626,11 +599,7 @@ class InventoryAggregationServiceTest {
       stubItemRefMapper();
 
       List<InventoryStackDto> stacks =
-          service
-              .getAllAggregatedItemInventory(
-                  null, null, null, false, false, ItemAttributeFilter.NONE)
-              .get(0)
-              .stacks();
+          service.getAllAggregatedItemInventory(LagerFilter.NONE).get(0).stacks();
 
       assertEquals("A", stacks.get(0).location().name());
       assertEquals(20.0, stacks.get(0).totalAmount(), "location A, larger amount first");
@@ -647,11 +616,7 @@ class InventoryAggregationServiceTest {
       stubGlobalItemStacks(agg(coupling, location("A"), null, null));
       stubItemRefMapper();
 
-      GroupedInventoryDto group =
-          service
-              .getAllAggregatedItemInventory(
-                  null, null, null, false, false, ItemAttributeFilter.NONE)
-              .get(0);
+      GroupedInventoryDto group = service.getAllAggregatedItemInventory(LagerFilter.NONE).get(0);
 
       assertEquals(0.0, group.totalAmount(), "a null SUM coalesces to 0.0");
       assertEquals(0.0, group.stacks().get(0).totalAmount());
@@ -662,11 +627,7 @@ class InventoryAggregationServiceTest {
     void noStacks_yieldEmptyGroupList() {
       stubGlobalItemStacks();
 
-      assertTrue(
-          service
-              .getAllAggregatedItemInventory(
-                  null, null, null, false, false, ItemAttributeFilter.NONE)
-              .isEmpty());
+      assertTrue(service.getAllAggregatedItemInventory(LagerFilter.NONE).isEmpty());
     }
 
     @Test
@@ -700,8 +661,7 @@ class InventoryAggregationServiceTest {
       stubItemRefMapper();
 
       List<GroupedInventoryDto> result =
-          service.getMyAggregatedItemInventory(
-              userId, null, null, null, false, false, false, false, ItemAttributeFilter.NONE);
+          service.getMyAggregatedItemInventory(userId, LagerFilter.NONE);
 
       assertEquals(1, result.size());
       assertEquals("Coupling", result.get(0).gameItem().name());
@@ -813,7 +773,9 @@ class InventoryAggregationServiceTest {
       when(inventoryItemMapper.toDto(row)).thenReturn(dto);
 
       Page<InventoryItemDto> page =
-          service.getAllItemInventory(List.of(gameItemId), null, null, PageRequest.of(0, 20));
+          service.getAllItemInventory(
+              LagerFilter.builder().gameItemIds(List.of(gameItemId)).build(),
+              PageRequest.of(0, 20));
 
       assertEquals(List.of(dto), page.getContent());
       verify(inventoryItemRepository)

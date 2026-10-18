@@ -34,7 +34,7 @@ import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemNoteU
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemOrgUnitChangeDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemPersonalRebookDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemStolenMarkDto;
-import de.greluc.krt.profit.basetool.frontend.inventory.model.ItemAttributeFilter;
+import de.greluc.krt.profit.basetool.frontend.inventory.model.LagerQuery;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
 import java.util.List;
@@ -104,32 +104,46 @@ class InventoryBackendClientTest {
       backend.answerJson("[]");
     }
 
-    client.groupedItems(
+    client.grouped(
         InventoryBackendClient.Listing.MY,
-        new InventoryBackendClient.ItemFilter(
+        new LagerQuery(
+            "items",
+            null,
+            null,
+            List.of(JOB_ORDER),
+            null,
             List.of(GAME_ITEM),
             List.of(LOCATION),
-            List.of(JOB_ORDER),
             true,
             false,
             true,
             false,
-            ItemAttributeFilter.NONE));
-    client.groupedItems(InventoryBackendClient.Listing.ALL, InventoryBackendClient.ItemFilter.NONE);
-    client.groupedMaterials(
+            null,
+            null,
+            null,
+            null,
+            null));
+    client.grouped(InventoryBackendClient.Listing.ALL, LagerQuery.emptyItems());
+    client.grouped(
         InventoryBackendClient.Listing.ALL,
-        new InventoryBackendClient.MaterialFilter(
+        new LagerQuery(
+            null,
             List.of(MATERIAL),
-            List.of(LOCATION),
             3,
             List.of(JOB_ORDER),
             List.of(MISSION),
+            null,
+            List.of(LOCATION),
             false,
             true,
             false,
-            true));
-    client.groupedMaterials(
-        InventoryBackendClient.Listing.MY, InventoryBackendClient.MaterialFilter.NONE);
+            true,
+            null,
+            null,
+            null,
+            null,
+            null));
+    client.grouped(InventoryBackendClient.Listing.MY, LagerQuery.empty());
 
     backend.expect(
         "GET",
@@ -159,8 +173,12 @@ class InventoryBackendClientTest {
   void itemListingsCarryTheAttributeFilters() {
     backend.answerJson("[]");
     backend.answerJson("[]");
-    InventoryBackendClient.ItemFilter filter =
-        new InventoryBackendClient.ItemFilter(
+    LagerQuery query =
+        new LagerQuery(
+            "items",
+            null,
+            null,
+            null,
             null,
             null,
             null,
@@ -168,15 +186,14 @@ class InventoryBackendClientTest {
             false,
             false,
             false,
-            new ItemAttributeFilter(
-                List.of("VEHICLE_ITEM"),
-                List.of("QUANTUM_DRIVE", "SHIELD"),
-                List.of(2),
-                List.of(" A", "B", ""),
-                List.of("MILITARY", " ", "STEALTH")));
+            List.of("VEHICLE_ITEM"),
+            List.of("QUANTUM_DRIVE", "SHIELD"),
+            List.of(2),
+            List.of(" A", "B", ""),
+            List.of("MILITARY", " ", "STEALTH"));
 
-    client.groupedItems(InventoryBackendClient.Listing.ALL, filter);
-    client.myItemEntryIds(filter);
+    client.grouped(InventoryBackendClient.Listing.ALL, query);
+    client.myEntryIds(query);
 
     String attributes =
         "&kinds=VEHICLE_ITEM&componentTypes=QUANTUM_DRIVE&componentTypes=SHIELD&sizes=2"
@@ -186,55 +203,70 @@ class InventoryBackendClientTest {
   }
 
   @Test
-  void entryIdsKeepTheirOwnParameterOrder() {
+  void entryIdsUseTheCanonicalParameterOrder() {
     backend.answerJson("[]");
     backend.answerJson("[]");
 
     assertThat(
-            client.myItemEntryIds(
-                new InventoryBackendClient.ItemFilter(
+            client.myEntryIds(
+                new LagerQuery(
+                    "items",
+                    null,
+                    null,
+                    List.of(JOB_ORDER),
+                    null,
                     List.of(GAME_ITEM),
                     List.of(LOCATION),
-                    List.of(JOB_ORDER),
                     false,
                     true,
                     false,
                     true,
-                    ItemAttributeFilter.NONE)))
+                    null,
+                    null,
+                    null,
+                    null,
+                    null)))
         .isEmpty();
     assertThat(
-            client.myMaterialEntryIds(
-                new InventoryBackendClient.MaterialFilter(
+            client.myEntryIds(
+                new LagerQuery(
+                    null,
                     List.of(MATERIAL),
-                    List.of(LOCATION),
                     2,
                     List.of(JOB_ORDER),
                     List.of(MISSION),
+                    null,
+                    List.of(LOCATION),
                     true,
                     false,
                     true,
-                    false)))
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null)))
         .isEmpty();
 
     backend.expect(
         "GET",
         "/api/v1/inventory/my-inventory/entry-ids?catalog=ITEM&gameItemIds="
             + GAME_ITEM
-            + "&jobOrderIds="
-            + JOB_ORDER
             + "&locationIds="
             + LOCATION
+            + "&jobOrderIds="
+            + JOB_ORDER
             + "&nonPersonalOnly=true&nonStolenOnly=true");
     backend.expect(
         "GET",
         "/api/v1/inventory/my-inventory/entry-ids?materialIds="
             + MATERIAL
+            + "&locationIds="
+            + LOCATION
             + "&minQuality=2&jobOrderIds="
             + JOB_ORDER
             + "&missionIds="
             + MISSION
-            + "&locationIds="
-            + LOCATION
             + "&personalOnly=true&stolenOnly=true");
   }
 

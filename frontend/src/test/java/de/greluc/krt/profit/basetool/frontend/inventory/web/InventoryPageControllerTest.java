@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemNoteU
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemPersonalRebookDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryStackDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.ItemAttributeFilter;
+import de.greluc.krt.profit.basetool.frontend.inventory.model.LagerQuery;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
@@ -335,8 +336,11 @@ class InventoryPageControllerTest {
 
     String view =
         controller.viewMyInventory(
-            null, null, null, null, null, null, null, false, false, false, false, null, null, null,
-            null, null, false, model);
+            new LagerQuery(
+                null, null, null, null, null, null, null, false, false, false, false, null, null,
+                null, null, null),
+            false,
+            model);
 
     assertEquals("inventory/inventory-my", view);
     assertTrue(model.containsAttribute("items"));
@@ -354,22 +358,23 @@ class InventoryPageControllerTest {
 
     String view =
         controller.viewMyInventory(
-            null,
-            List.of(materialId),
-            500,
-            List.of(jobOrderId),
-            null,
-            null,
-            null,
-            false,
-            false,
-            false,
-            false,
-            null,
-            null,
-            null,
-            null,
-            null,
+            new LagerQuery(
+                null,
+                List.of(materialId),
+                500,
+                List.of(jobOrderId),
+                null,
+                null,
+                null,
+                false,
+                false,
+                false,
+                false,
+                null,
+                null,
+                null,
+                null,
+                null),
             false,
             model);
 
@@ -400,8 +405,11 @@ class InventoryPageControllerTest {
 
     String view =
         controller.viewMyInventory(
-            null, null, null, null, null, null, null, true, false, false, false, null, null, null,
-            null, null, false, model);
+            new LagerQuery(
+                null, null, null, null, null, null, null, true, false, false, false, null, null,
+                null, null, null),
+            false,
+            model);
 
     assertEquals("inventory/inventory-my", view);
     assertEquals(true, model.getAttribute("selectedPersonalOnly"));
@@ -425,8 +433,11 @@ class InventoryPageControllerTest {
 
     String view =
         controller.viewMyInventory(
-            null, null, null, null, null, null, null, false, true, false, false, null, null, null,
-            null, null, false, model);
+            new LagerQuery(
+                null, null, null, null, null, null, null, false, true, false, false, null, null,
+                null, null, null),
+            false,
+            model);
 
     assertEquals("inventory/inventory-my", view);
     assertEquals(true, model.getAttribute("selectedNonPersonalOnly"));
@@ -453,8 +464,11 @@ class InventoryPageControllerTest {
 
     String view =
         controller.viewMyInventory(
-            null, null, null, null, null, null, null, false, false, false, false, null, null, null,
-            null, null, true, model);
+            new LagerQuery(
+                null, null, null, null, null, null, null, false, false, false, false, null, null,
+                null, null, null),
+            true,
+            model);
 
     assertEquals("inventory/inventory-my :: inventoryTableFragment", view);
   }
@@ -469,22 +483,23 @@ class InventoryPageControllerTest {
 
     List<UUID> ids =
         controller.myEntryIds(
-            null,
-            List.of(materialId),
-            500,
-            List.of(jobOrderId),
-            null,
-            null,
-            null,
-            false,
-            false,
-            false,
-            false,
-            null,
-            null,
-            null,
-            null,
-            null);
+            new LagerQuery(
+                null,
+                List.of(materialId),
+                500,
+                List.of(jobOrderId),
+                null,
+                null,
+                null,
+                false,
+                false,
+                false,
+                false,
+                null,
+                null,
+                null,
+                null,
+                null));
 
     assertEquals(List.of(entryA, entryB), ids);
     org.mockito.ArgumentCaptor<String> urlCaptor =
@@ -508,22 +523,23 @@ class InventoryPageControllerTest {
 
     List<UUID> ids =
         controller.myEntryIds(
-            "items",
-            null,
-            null,
-            null,
-            null,
-            List.of(gameItemId),
-            null,
-            true,
-            false,
-            false,
-            false,
-            null,
-            null,
-            null,
-            null,
-            null);
+            new LagerQuery(
+                "items",
+                null,
+                null,
+                null,
+                null,
+                List.of(gameItemId),
+                null,
+                true,
+                false,
+                false,
+                false,
+                null,
+                null,
+                null,
+                null,
+                null));
 
     assertEquals(List.of(entry), ids);
     org.mockito.ArgumentCaptor<String> urlCaptor =
@@ -542,8 +558,9 @@ class InventoryPageControllerTest {
     assertEquals(
         List.of(),
         controller.myEntryIds(
-            null, null, null, null, null, null, null, false, false, false, false, null, null, null,
-            null, null));
+            new LagerQuery(
+                null, null, null, null, null, null, null, false, false, false, false, null, null,
+                null, null, null)));
   }
 
   @Test
@@ -555,20 +572,23 @@ class InventoryPageControllerTest {
 
     String view =
         controller.viewAllInventory(
-            null,
-            List.of(UUID.randomUUID()),
-            100,
-            null,
-            null,
-            null,
-            null,
-            false,
-            false,
-            null,
-            null,
-            null,
-            null,
-            null,
+            new LagerQuery(
+                null,
+                List.of(UUID.randomUUID()),
+                100,
+                null,
+                null,
+                null,
+                null,
+                false,
+                false,
+                false,
+                false,
+                null,
+                null,
+                null,
+                null,
+                null),
             false,
             model);
 
@@ -1138,22 +1158,23 @@ class InventoryPageControllerTest {
 
     String view =
         controller.viewMyInventory(
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            List.of(locationId),
-            false,
-            false,
-            false,
-            false,
-            null,
-            null,
-            null,
-            null,
-            null,
+            new LagerQuery(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of(locationId),
+                false,
+                false,
+                false,
+                false,
+                null,
+                null,
+                null,
+                null,
+                null),
             false,
             model);
 
@@ -1214,22 +1235,23 @@ class InventoryPageControllerTest {
             });
 
     controller.viewMyInventory(
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        List.of(pickedId),
-        false,
-        false,
-        false,
-        false,
-        null,
-        null,
-        null,
-        null,
-        null,
+        new LagerQuery(
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            List.of(pickedId),
+            false,
+            false,
+            false,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null),
         false,
         model);
 
@@ -1270,22 +1292,23 @@ class InventoryPageControllerTest {
             });
 
     controller.viewMyInventory(
-        "items",
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        false,
-        false,
-        false,
-        false,
-        null,
-        List.of("QUANTUM_DRIVE"),
-        List.of(2),
-        null,
-        List.of("MILITARY"),
+        new LagerQuery(
+            "items",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            false,
+            false,
+            false,
+            null,
+            List.of("QUANTUM_DRIVE"),
+            List.of(2),
+            null,
+            List.of("MILITARY")),
         false,
         model);
 
@@ -1324,22 +1347,23 @@ class InventoryPageControllerTest {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of());
 
     controller.myEntryIds(
-        "items",
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        false,
-        false,
-        false,
-        false,
-        List.of("WEAPON"),
-        null,
-        null,
-        List.of("B"),
-        List.of("STEALTH"));
+        new LagerQuery(
+            "items",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            false,
+            false,
+            false,
+            List.of("WEAPON"),
+            null,
+            null,
+            List.of("B"),
+            List.of("STEALTH")));
 
     org.mockito.ArgumentCaptor<String> urlCaptor =
         org.mockito.ArgumentCaptor.forClass(String.class);
@@ -1358,20 +1382,23 @@ class InventoryPageControllerTest {
 
     String view =
         controller.viewAllInventory(
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            List.of(locationId),
-            false,
-            false,
-            null,
-            null,
-            null,
-            null,
-            null,
+            new LagerQuery(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of(locationId),
+                false,
+                false,
+                false,
+                false,
+                null,
+                null,
+                null,
+                null,
+                null),
             false,
             model);
 
@@ -1400,39 +1427,41 @@ class InventoryPageControllerTest {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of());
 
     controller.myEntryIds(
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        List.of(locationId),
-        false,
-        false,
-        false,
-        false,
-        null,
-        null,
-        null,
-        null,
-        null);
+        new LagerQuery(
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            List.of(locationId),
+            false,
+            false,
+            false,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null));
     controller.myEntryIds(
-        "items",
-        null,
-        null,
-        null,
-        null,
-        null,
-        List.of(locationId),
-        false,
-        false,
-        false,
-        false,
-        null,
-        null,
-        null,
-        null,
-        null);
+        new LagerQuery(
+            "items",
+            null,
+            null,
+            null,
+            null,
+            null,
+            List.of(locationId),
+            false,
+            false,
+            false,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null));
 
     org.mockito.ArgumentCaptor<String> urlCaptor =
         org.mockito.ArgumentCaptor.forClass(String.class);

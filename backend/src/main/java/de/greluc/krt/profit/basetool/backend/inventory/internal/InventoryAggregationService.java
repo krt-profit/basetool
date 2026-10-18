@@ -203,14 +203,13 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Unfiltered convenience overload for {@link #getMyAggregatedInventory(UUID, List, Integer, List,
-   * List)}.
+   * Unfiltered convenience overload for {@link #getMyAggregatedInventory(UUID, LagerFilter)}.
    *
    * @param userId owner id
    * @return aggregated items grouped by material
    */
   public List<GroupedInventoryDto> getMyAggregatedInventory(UUID userId) {
-    return getMyAggregatedInventory(userId, null, null, null, null);
+    return getMyAggregatedInventory(userId, LagerFilter.NONE);
   }
 
   /**
@@ -223,12 +222,12 @@ public class InventoryAggregationService {
    */
   public List<GroupedInventoryDto> getMyAggregatedInventory(
       UUID userId, @Nullable List<UUID> jobOrderIds, @Nullable List<UUID> missionIds) {
-    return getMyAggregatedInventory(userId, null, null, jobOrderIds, missionIds);
+    return getMyAggregatedInventory(
+        userId, LagerFilter.builder().jobOrderIds(jobOrderIds).missionIds(missionIds).build());
   }
 
   /**
-   * Overload of {@link #getMyAggregatedInventory(UUID, List, List, Integer, List, List, boolean,
-   * boolean, boolean, boolean)} without location filter and without personal/shared narrowing.
+   * Aggregates the user's inventory filtered by material, quality, job order and mission only.
    *
    * @param userId owner id
    * @param materialIds optional material filter
@@ -245,67 +244,54 @@ public class InventoryAggregationService {
       @Nullable List<UUID> jobOrderIds,
       @Nullable List<UUID> missionIds) {
     return getMyAggregatedInventory(
-        userId, materialIds, null, minQuality, jobOrderIds, missionIds, false, false, false, false);
+        userId,
+        LagerFilter.builder()
+            .materialIds(materialIds)
+            .minQuality(minQuality)
+            .jobOrderIds(jobOrderIds)
+            .missionIds(missionIds)
+            .build());
   }
 
   /**
    * Aggregates the user's material stock into the Material to Stack shape of the {@code /grouped}
-   * view, applying all filters.
+   * view, applying the material, location, quality, job-order, mission, personal and stolen filters
+   * of {@code filter} (REQ-INV-040, REQ-INV-053).
    *
    * @param userId owner id
-   * @param materialIds optional material filter
-   * @param locationIds optional storage-location filter; empty or {@code null} means every location
-   *     (REQ-INV-040)
-   * @param minQuality optional min-quality filter
-   * @param jobOrderIds optional job order filter
-   * @param missionIds optional mission filter
-   * @param personalOnly {@code true} to return only personal rows
-   * @param nonPersonalOnly {@code true} to return only shared rows; mutually exclusive with {@code
-   *     personalOnly}, both {@code false} returns both
-   * @param stolenOnly when {@code true}, narrows to stock marked „gestohlen" (REQ-INV-053)
-   * @param nonStolenOnly when {@code true}, narrows to stock not marked „gestohlen"
+   * @param filter the Lager filters; a contradictory flag pair answers empty
    * @return aggregated items
    * @throws NotFoundException when the user id is unknown
    */
   public List<GroupedInventoryDto> getMyAggregatedInventory(
-      UUID userId,
-      @Nullable List<UUID> materialIds,
-      @Nullable List<UUID> locationIds,
-      @Nullable Integer minQuality,
-      @Nullable List<UUID> jobOrderIds,
-      @Nullable List<UUID> missionIds,
-      boolean personalOnly,
-      boolean nonPersonalOnly,
-      boolean stolenOnly,
-      boolean nonStolenOnly) {
+      UUID userId, @NotNull LagerFilter filter) {
     User user = Entities.require(userRepository.findPlainById(userId), "User not found");
-    boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
-    boolean hasLocations = locationIds != null && !locationIds.isEmpty();
-    boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
-    boolean hasMissions = missionIds != null && !missionIds.isEmpty();
+    if (filter.contradictory()) {
+      return List.of();
+    }
     List<InventoryStackAggregate> stacks =
         inventoryItemRepository.findUserStacks(
             user.getId(),
-            hasMaterials,
-            hasMaterials ? materialIds : null,
-            hasLocations,
-            hasLocations ? locationIds : null,
-            minQuality,
-            hasJobOrders,
-            hasJobOrders ? jobOrderIds : null,
-            hasMissions,
-            hasMissions ? missionIds : null,
-            personalOnly,
-            nonPersonalOnly,
-            stolenOnly,
-            nonStolenOnly);
+            filter.hasMaterials(),
+            filter.materialIdsOrNull(),
+            filter.hasLocations(),
+            filter.locationIdsOrNull(),
+            filter.minQuality(),
+            filter.hasJobOrders(),
+            filter.jobOrderIdsOrNull(),
+            filter.hasMissions(),
+            filter.missionIdsOrNull(),
+            filter.personalOnly(),
+            filter.nonPersonalOnly(),
+            filter.stolenOnly(),
+            filter.nonStolenOnly());
 
     return buildGroupedFromStacks(stacks);
   }
 
   /**
-   * Overload of {@link #getAllAggregatedInventory(List, List, Integer, List, List, boolean,
-   * boolean)} without location, job-order and mission filters.
+   * Overload of {@link #getAllAggregatedInventory(LagerFilter)} filtered by material and minimum
+   * quality only.
    *
    * @param materialIds optional material filter
    * @param minQuality optional min-quality filter
@@ -313,100 +299,73 @@ public class InventoryAggregationService {
    */
   public List<GroupedInventoryDto> getAllAggregatedInventory(
       @Nullable List<UUID> materialIds, @Nullable Integer minQuality) {
-    return getAllAggregatedInventory(materialIds, null, minQuality, null, null, false, false);
+    return getAllAggregatedInventory(
+        LagerFilter.builder().materialIds(materialIds).minQuality(minQuality).build());
   }
 
   /**
    * Aggregates the material stock of all users in the caller's scope into the {@code /grouped}
-   * shape.
+   * shape, applying the material, location, quality, job-order, mission and stolen filters of
+   * {@code filter}; the personal flags do not apply squadron-wide.
    *
-   * @param materialIds optional material filter
-   * @param locationIds optional storage-location filter; empty or {@code null} means every location
-   *     (REQ-INV-040)
-   * @param minQuality optional min-quality filter
-   * @param jobOrderIds optional job order filter
-   * @param missionIds optional mission filter
-   * @param stolenOnly when {@code true}, narrows to stock marked „gestohlen" (REQ-INV-053)
-   * @param nonStolenOnly when {@code true}, narrows to stock not marked „gestohlen"
+   * @param filter the Lager filters; a contradictory stolen pair answers empty
    * @return aggregated items grouped by material
    */
-  public List<GroupedInventoryDto> getAllAggregatedInventory(
-      @Nullable List<UUID> materialIds,
-      @Nullable List<UUID> locationIds,
-      @Nullable Integer minQuality,
-      @Nullable List<UUID> jobOrderIds,
-      @Nullable List<UUID> missionIds,
-      boolean stolenOnly,
-      boolean nonStolenOnly) {
-    boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
-    boolean hasLocations = locationIds != null && !locationIds.isEmpty();
-    boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
-    boolean hasMissions = missionIds != null && !missionIds.isEmpty();
+  public List<GroupedInventoryDto> getAllAggregatedInventory(@NotNull LagerFilter filter) {
+    if (filter.stolenContradiction()) {
+      return List.of();
+    }
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     List<InventoryStackAggregate> stacks =
         inventoryItemRepository.findGlobalStacks(
-            hasMaterials,
-            hasMaterials ? materialIds : null,
-            hasLocations,
-            hasLocations ? locationIds : null,
-            minQuality,
-            hasJobOrders,
-            hasJobOrders ? jobOrderIds : null,
-            hasMissions,
-            hasMissions ? missionIds : null,
+            filter.hasMaterials(),
+            filter.materialIdsOrNull(),
+            filter.hasLocations(),
+            filter.locationIdsOrNull(),
+            filter.minQuality(),
+            filter.hasJobOrders(),
+            filter.jobOrderIdsOrNull(),
+            filter.hasMissions(),
+            filter.missionIdsOrNull(),
             scope.adminAllScope(),
             scope.activeOrgUnitId(),
             scope.memberOrgUnitIds(),
-            stolenOnly,
-            nonStolenOnly);
+            filter.stolenOnly(),
+            filter.nonStolenOnly());
 
     return buildGroupedFromStacks(stacks);
   }
 
   /**
-   * Game-item sibling of {@link #getMyAggregatedInventory(UUID, List, List, Integer, List, List,
-   * boolean, boolean, boolean, boolean)}: the user's game-item stock grouped by item and stack.
-   * Items have no quality or mission filter (REQ-INV-031).
+   * Game-item sibling of {@link #getMyAggregatedInventory(UUID, LagerFilter)}: the user's game-item
+   * stock grouped by item and stack. Items have no quality or mission filter (REQ-INV-031); the
+   * category, component-type, size, grade and class filters apply (REQ-INV-063).
    *
    * @param userId owner id
-   * @param gameItemIds optional game-item filter
-   * @param locationIds optional storage-location filter (REQ-INV-040)
-   * @param jobOrderIds optional job-order filter
-   * @param personalOnly when {@code true}, narrows to the caller's private stock rows
-   * @param nonPersonalOnly when {@code true}, narrows to the caller's shared stock rows
-   * @param stolenOnly when {@code true}, narrows to stock marked „gestohlen" (REQ-INV-053)
-   * @param nonStolenOnly when {@code true}, narrows to stock not marked „gestohlen"
-   * @param attributes the category, component-type, size, grade and class filters (REQ-INV-063)
+   * @param filter the Lager filters; a contradictory flag pair answers empty
    * @return item groups, each carrying its sorted stacks and item-wide total
    * @throws NotFoundException when the user id is unknown
    */
   public List<GroupedInventoryDto> getMyAggregatedItemInventory(
-      UUID userId,
-      List<UUID> gameItemIds,
-      List<UUID> locationIds,
-      List<UUID> jobOrderIds,
-      boolean personalOnly,
-      boolean nonPersonalOnly,
-      boolean stolenOnly,
-      boolean nonStolenOnly,
-      @NotNull ItemAttributeFilter attributes) {
+      UUID userId, @NotNull LagerFilter filter) {
     User user = Entities.require(userRepository.findPlainById(userId), "User not found");
-    boolean hasGameItems = gameItemIds != null && !gameItemIds.isEmpty();
-    boolean hasLocations = locationIds != null && !locationIds.isEmpty();
-    boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
+    if (filter.contradictory()) {
+      return List.of();
+    }
+    ItemAttributeFilter attributes = filter.attributes();
     List<InventoryItemStackAggregate> stacks =
         inventoryItemViewRepository.findUserItemStacks(
             user.getId(),
-            hasGameItems,
-            hasGameItems ? gameItemIds : null,
-            hasLocations,
-            hasLocations ? locationIds : null,
-            hasJobOrders,
-            hasJobOrders ? jobOrderIds : null,
-            personalOnly,
-            nonPersonalOnly,
-            stolenOnly,
-            nonStolenOnly,
+            filter.hasGameItems(),
+            filter.gameItemIdsOrNull(),
+            filter.hasLocations(),
+            filter.locationIdsOrNull(),
+            filter.hasJobOrders(),
+            filter.jobOrderIdsOrNull(),
+            filter.personalOnly(),
+            filter.nonPersonalOnly(),
+            filter.stolenOnly(),
+            filter.nonStolenOnly(),
             attributes.hasKinds(),
             attributes.kindsOrNull(),
             attributes.hasWikiTypes(),
@@ -426,49 +385,30 @@ public class InventoryAggregationService {
    * view.
    *
    * @param userId owner id
-   * @param materialIds optional material filter
-   * @param locationIds optional storage-location filter (REQ-INV-040)
-   * @param minQuality optional min-quality filter
-   * @param jobOrderIds optional job order filter
-   * @param missionIds optional mission filter
-   * @param personalOnly when {@code true}, narrows to the caller's private stock rows
-   * @param nonPersonalOnly when {@code true}, narrows to the caller's shared stock rows
-   * @param stolenOnly when {@code true}, narrows to stock marked „gestohlen" (REQ-INV-053)
-   * @param nonStolenOnly when {@code true}, narrows to stock not marked „gestohlen"
+   * @param filter the Lager filters; a contradictory flag pair answers empty
    * @return the ids of every matching material entry, in creation order; never {@code null}
    * @throws NotFoundException when the user id is unknown
    */
-  public List<UUID> getMyEntryIds(
-      UUID userId,
-      List<UUID> materialIds,
-      List<UUID> locationIds,
-      Integer minQuality,
-      List<UUID> jobOrderIds,
-      List<UUID> missionIds,
-      boolean personalOnly,
-      boolean nonPersonalOnly,
-      boolean stolenOnly,
-      boolean nonStolenOnly) {
+  public List<UUID> getMyEntryIds(UUID userId, @NotNull LagerFilter filter) {
     User user = Entities.require(userRepository.findPlainById(userId), "User not found");
-    boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
-    boolean hasLocations = locationIds != null && !locationIds.isEmpty();
-    boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
-    boolean hasMissions = missionIds != null && !missionIds.isEmpty();
+    if (filter.contradictory()) {
+      return List.of();
+    }
     return inventoryItemRepository.findUserEntryIds(
         user.getId(),
-        hasMaterials,
-        hasMaterials ? materialIds : null,
-        hasLocations,
-        hasLocations ? locationIds : null,
-        minQuality,
-        hasJobOrders,
-        hasJobOrders ? jobOrderIds : null,
-        hasMissions,
-        hasMissions ? missionIds : null,
-        personalOnly,
-        nonPersonalOnly,
-        stolenOnly,
-        nonStolenOnly);
+        filter.hasMaterials(),
+        filter.materialIdsOrNull(),
+        filter.hasLocations(),
+        filter.locationIdsOrNull(),
+        filter.minQuality(),
+        filter.hasJobOrders(),
+        filter.jobOrderIdsOrNull(),
+        filter.hasMissions(),
+        filter.missionIdsOrNull(),
+        filter.personalOnly(),
+        filter.nonPersonalOnly(),
+        filter.stolenOnly(),
+        filter.nonStolenOnly());
   }
 
   /**
@@ -476,43 +416,28 @@ public class InventoryAggregationService {
    * that matches the item filters (REQ-INV-034).
    *
    * @param userId owner id
-   * @param gameItemIds optional game-item filter
-   * @param locationIds optional storage-location filter (REQ-INV-040)
-   * @param jobOrderIds optional job-order filter
-   * @param personalOnly when {@code true}, narrows to the caller's private stock rows
-   * @param nonPersonalOnly when {@code true}, narrows to the caller's shared stock rows
-   * @param stolenOnly when {@code true}, narrows to stock marked „gestohlen" (REQ-INV-053)
-   * @param nonStolenOnly when {@code true}, narrows to stock not marked „gestohlen"
-   * @param attributes the category, component-type, size, grade and class filters (REQ-INV-063)
+   * @param filter the Lager filters; a contradictory flag pair answers empty
    * @return the ids of every matching game-item entry, in creation order; never {@code null}
    * @throws NotFoundException when the user id is unknown
    */
-  public List<UUID> getMyItemEntryIds(
-      UUID userId,
-      List<UUID> gameItemIds,
-      List<UUID> locationIds,
-      List<UUID> jobOrderIds,
-      boolean personalOnly,
-      boolean nonPersonalOnly,
-      boolean stolenOnly,
-      boolean nonStolenOnly,
-      @NotNull ItemAttributeFilter attributes) {
+  public List<UUID> getMyItemEntryIds(UUID userId, @NotNull LagerFilter filter) {
     User user = Entities.require(userRepository.findPlainById(userId), "User not found");
-    boolean hasGameItems = gameItemIds != null && !gameItemIds.isEmpty();
-    boolean hasLocations = locationIds != null && !locationIds.isEmpty();
-    boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
+    if (filter.contradictory()) {
+      return List.of();
+    }
+    ItemAttributeFilter attributes = filter.attributes();
     return inventoryItemViewRepository.findUserItemEntryIds(
         user.getId(),
-        hasGameItems,
-        hasGameItems ? gameItemIds : null,
-        hasLocations,
-        hasLocations ? locationIds : null,
-        hasJobOrders,
-        hasJobOrders ? jobOrderIds : null,
-        personalOnly,
-        nonPersonalOnly,
-        stolenOnly,
-        nonStolenOnly,
+        filter.hasGameItems(),
+        filter.gameItemIdsOrNull(),
+        filter.hasLocations(),
+        filter.locationIdsOrNull(),
+        filter.hasJobOrders(),
+        filter.jobOrderIdsOrNull(),
+        filter.personalOnly(),
+        filter.nonPersonalOnly(),
+        filter.stolenOnly(),
+        filter.nonStolenOnly(),
         attributes.hasKinds(),
         attributes.kindsOrNull(),
         attributes.hasWikiTypes(),
@@ -526,42 +451,32 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Game-item sibling of {@link #getAllAggregatedInventory(List, List, Integer, List, List,
-   * boolean, boolean)}: the scoped game-item stock grouped by item and stack. No quality or mission
-   * filter (REQ-INV-031).
+   * Game-item sibling of {@link #getAllAggregatedInventory(LagerFilter)}: the scoped game-item
+   * stock grouped by item and stack. No quality or mission filter (REQ-INV-031); the personal flags
+   * do not apply squadron-wide.
    *
-   * @param gameItemIds optional game-item filter
-   * @param locationIds optional storage-location filter (REQ-INV-040)
-   * @param jobOrderIds optional job-order filter
-   * @param stolenOnly when {@code true}, narrows to stock marked „gestohlen" (REQ-INV-053)
-   * @param nonStolenOnly when {@code true}, narrows to stock not marked „gestohlen"
-   * @param attributes the category, component-type, size, grade and class filters (REQ-INV-063)
+   * @param filter the Lager filters; a contradictory stolen pair answers empty
    * @return item groups, each carrying its sorted stacks and item-wide total
    */
-  public List<GroupedInventoryDto> getAllAggregatedItemInventory(
-      List<UUID> gameItemIds,
-      List<UUID> locationIds,
-      List<UUID> jobOrderIds,
-      boolean stolenOnly,
-      boolean nonStolenOnly,
-      @NotNull ItemAttributeFilter attributes) {
-    boolean hasGameItems = gameItemIds != null && !gameItemIds.isEmpty();
-    boolean hasLocations = locationIds != null && !locationIds.isEmpty();
-    boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
+  public List<GroupedInventoryDto> getAllAggregatedItemInventory(@NotNull LagerFilter filter) {
+    if (filter.stolenContradiction()) {
+      return List.of();
+    }
+    ItemAttributeFilter attributes = filter.attributes();
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     List<InventoryItemStackAggregate> stacks =
         inventoryItemViewRepository.findGlobalItemStacks(
-            hasGameItems,
-            hasGameItems ? gameItemIds : null,
-            hasLocations,
-            hasLocations ? locationIds : null,
-            hasJobOrders,
-            hasJobOrders ? jobOrderIds : null,
+            filter.hasGameItems(),
+            filter.gameItemIdsOrNull(),
+            filter.hasLocations(),
+            filter.locationIdsOrNull(),
+            filter.hasJobOrders(),
+            filter.jobOrderIdsOrNull(),
             scope.adminAllScope(),
             scope.activeOrgUnitId(),
             scope.memberOrgUnitIds(),
-            stolenOnly,
-            nonStolenOnly,
+            filter.stolenOnly(),
+            filter.nonStolenOnly(),
             attributes.hasKinds(),
             attributes.kindsOrNull(),
             attributes.hasWikiTypes(),
@@ -897,43 +812,32 @@ public class InventoryAggregationService {
    */
   public Page<InventoryItemDto> getAllInventory(
       @Nullable List<UUID> materialIds, @Nullable Integer minQuality, Pageable pageable) {
-    return getAllInventory(materialIds, null, minQuality, null, null, pageable);
+    return getAllInventory(
+        LagerFilter.builder().materialIds(materialIds).minQuality(minQuality).build(), pageable);
   }
 
   /**
-   * Flat paged inventory list in the caller's scope, one row per {@code InventoryItem}.
+   * Flat paged inventory list in the caller's scope, one row per {@code InventoryItem}, filtered by
+   * the material, location, quality, job-order and mission filters of {@code filter}.
    *
-   * @param materialIds optional material filter
-   * @param locationIds optional storage-location filter (REQ-INV-040)
-   * @param minQuality optional min-quality filter
-   * @param jobOrderIds optional job order filter
-   * @param missionIds optional mission filter
+   * @param filter the Lager filters
    * @param pageable page request
    * @return paged inventory items
    */
   public Page<InventoryItemDto> getAllInventory(
-      @Nullable List<UUID> materialIds,
-      @Nullable List<UUID> locationIds,
-      @Nullable Integer minQuality,
-      @Nullable List<UUID> jobOrderIds,
-      @Nullable List<UUID> missionIds,
-      Pageable pageable) {
-    boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
-    boolean hasLocations = locationIds != null && !locationIds.isEmpty();
-    boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
-    boolean hasMissions = missionIds != null && !missionIds.isEmpty();
+      @NotNull LagerFilter filter, @NotNull Pageable pageable) {
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     return inventoryItemRepository
         .findGlobalByFilters(
-            hasMaterials,
-            hasMaterials ? materialIds : null,
-            hasLocations,
-            hasLocations ? locationIds : null,
-            minQuality,
-            hasJobOrders,
-            hasJobOrders ? jobOrderIds : null,
-            hasMissions,
-            hasMissions ? missionIds : null,
+            filter.hasMaterials(),
+            filter.materialIdsOrNull(),
+            filter.hasLocations(),
+            filter.locationIdsOrNull(),
+            filter.minQuality(),
+            filter.hasJobOrders(),
+            filter.jobOrderIdsOrNull(),
+            filter.hasMissions(),
+            filter.missionIdsOrNull(),
             scope.adminAllScope(),
             scope.activeOrgUnitId(),
             scope.memberOrgUnitIds(),
@@ -942,29 +846,24 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Game-item sibling of {@link #getAllInventory(List, List, Integer, List, List, Pageable)}: the
-   * flat scoped list of game-item rows. No quality or mission filter (REQ-INV-031).
+   * Game-item sibling of {@link #getAllInventory(LagerFilter, Pageable)}: the flat scoped list of
+   * game-item rows. No quality or mission filter (REQ-INV-031).
    *
-   * @param gameItemIds optional game-item filter
-   * @param locationIds optional storage-location filter (REQ-INV-040)
-   * @param jobOrderIds optional job-order filter
+   * @param filter the Lager filters; the game-item, location and job-order filters apply
    * @param pageable page request (whitelisted {@code gameItem.name} / {@code amount} sort)
    * @return paged game-item inventory rows
    */
   public Page<InventoryItemDto> getAllItemInventory(
-      List<UUID> gameItemIds, List<UUID> locationIds, List<UUID> jobOrderIds, Pageable pageable) {
-    boolean hasGameItems = gameItemIds != null && !gameItemIds.isEmpty();
-    boolean hasLocations = locationIds != null && !locationIds.isEmpty();
-    boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
+      @NotNull LagerFilter filter, @NotNull Pageable pageable) {
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     return inventoryItemRepository
         .findGlobalItemsByFilters(
-            hasGameItems,
-            hasGameItems ? gameItemIds : null,
-            hasLocations,
-            hasLocations ? locationIds : null,
-            hasJobOrders,
-            hasJobOrders ? jobOrderIds : null,
+            filter.hasGameItems(),
+            filter.gameItemIdsOrNull(),
+            filter.hasLocations(),
+            filter.locationIdsOrNull(),
+            filter.hasJobOrders(),
+            filter.jobOrderIdsOrNull(),
             scope.adminAllScope(),
             scope.activeOrgUnitId(),
             scope.memberOrgUnitIds(),

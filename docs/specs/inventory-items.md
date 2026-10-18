@@ -253,9 +253,9 @@ more multi-selects beside item, location, Auftrag and „Gestohlen": **Kategorie
 - The selection updates the table in place, is mirrored into the address, persisted per page and
   view (REQ-UI-017), counted by the toggle's badge, shown as filter chips, cleared by „Alle
   zurücksetzen", and applied by „Alle markieren" (REQ-INV-034).
-- The two Lager scripts share the dimension list (`ITEM_ATTRIBUTE_FILTERS` in
-  `inventory-common.js`) and the markup (`inventory-item-attribute-filters.html`). A further
-  dimension is one entry in each plus its backend parameter.
+- The two Lager scripts share the markup (`inventory-item-attribute-filters.html`) and read the
+  dimension list from the server-rendered `data-attribute-filters` of the Lager tree (REQ-INV-066).
+  A further dimension is one entry in the query records plus its markup and backend parameter.
 
 **Acceptance**
 
@@ -273,7 +273,7 @@ more multi-selects beside item, location, Auftrag and „Gestohlen": **Kategorie
 `InventoryBackendClientTest#itemListingsCarryTheAttributeFilters`, `InventoryPageControllerTest`
 attribute cases, `InventoryLagerPatternRenderTest#lagerItemsViewsRenderTheAttributeFiltersFromTheStock`,
 `LagerItemAttributeFilterE2eTest` · **Code:** `ItemAttributeFilter`,
-`InventoryItemViewRepository`, `InventoryItemController`, `CatalogFilterGuard`,
+`InventoryItemViewRepository`, `InventoryItemController`, `LagerFilter`,
 the frontend `ItemAttributeFilter`, `InventoryPageController#addItemViewModel`,
 `ItemAttributeOptions`, `inventory-item-attribute-filters.html`, `inventory-common.js` · **Issues:**
 #2721, #2722
@@ -312,6 +312,38 @@ look-alike variants apart, e.g. `FR-66 · S1 · A · Militär`.
 `ItemPickerLabels`, `ItemPickerOption`, `InventoryPageController#itemSearch`,
 `JobOrderItemPickerController`, `JobOrderItemLines`, `GameItemReferenceDto`,
 `krt-catalog-search.js`, `orders-create.js` · **Issues:** #2723
+
+### REQ-INV-066 — The Lager filters travel as one value on both sides
+
+The filters of a Lager read (material, game item, location, quality, Auftrag, mission, personal,
+shared, „Gestohlen", category, component type, size, grade, class) are one value on each side, bound
+once from the query string, and no Lager controller or service method takes them as loose
+parameters (ADR-0290).
+
+- The backend binds `LagerFilter` on `GET /my-inventory/grouped`, `/my-inventory/entry-ids`,
+  `/all` and `/all/grouped`. It normalises its lists, defaults `catalog` to `MATERIAL`, rejects the
+  filters the catalog cannot honour with 400 (REQ-INV-029, REQ-INV-031, REQ-INV-063) and answers
+  empty for the contradictory pairs `personalOnly` + `nonPersonalOnly` and `stolenOnly` +
+  `nonStolenOnly` without reading the database. The squadron-wide reads ignore the personal flags;
+  the flat list ignores the „Gestohlen" flags and the attribute lists.
+- The frontend binds `LagerQuery` on `/inventory/my`, `/inventory/my/entry-ids` and
+  `/inventory/all`. It owns the parsing, the emptiness test, the backend parameters and the page
+  URL parameters from one set of names; `InventoryBackendClient` takes it, and a failed write
+  re-renders the listing with `LagerQuery.empty()`.
+- The URL and REST parameter names are unchanged. The Lager scripts read the filter parameter
+  names and the attribute-filter families from the `data-filter-params` and
+  `data-attribute-filters` attributes the server renders on the Lager tree.
+
+**Acceptance**
+
+- [x] Parse → backend parameters → page URL round-trips every filter in both views.
+- [x] A contradictory flag pair answers empty; a catalog mismatch answers 400.
+- [x] Existing bookmarks and the end-to-end Lager tests work with the unchanged parameter names.
+
+**Enforced by:** `LagerFilterTest`, `LagerQueryTest`, `InventoryItemControllerTest`,
+`InventoryAggregationServiceTest`, `InventoryBackendClientTest`, `InventoryPageControllerTest` ·
+**Code:** `LagerFilter`, `InventoryItemController`, `LagerQuery`, `InventoryPageController`,
+`InventoryBackendClient`, `inventory-common.js` · **Issues:** #2735
 
 ## Out of scope
 

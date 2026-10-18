@@ -131,8 +131,7 @@ public class InventoryItemService {
   }
 
   /**
-   * Unfiltered convenience overload for {@link #getMyAggregatedInventory(UUID, List, Integer, List,
-   * List)}.
+   * Unfiltered convenience overload for {@link #getMyAggregatedInventory(UUID, LagerFilter)}.
    *
    * @param userId owner id
    * @return aggregated items grouped by material
@@ -155,9 +154,8 @@ public class InventoryItemService {
   }
 
   /**
-   * Aggregates the user's shared and personal stock with the given filters, without location
-   * narrowing; see {@link #getMyAggregatedInventory(UUID, List, List, Integer, List, List, boolean,
-   * boolean, boolean, boolean)}.
+   * Aggregates the user's shared and personal stock with the given material, quality, job-order and
+   * mission filters.
    *
    * @param userId owner id
    * @param materialIds optional material filter
@@ -181,87 +179,32 @@ public class InventoryItemService {
    * Aggregates the user's stock with the full filter surface into the {@code /grouped} shape.
    *
    * @param userId owner id
-   * @param materialIds optional material filter
-   * @param locationIds optional storage-location filter (REQ-INV-040)
-   * @param minQuality optional min-quality filter
-   * @param jobOrderIds optional job order filter
-   * @param missionIds optional mission filter
-   * @param personalOnly {@code true} to return only private ({@code personal = true}) stock
-   * @param nonPersonalOnly {@code true} to return only shared stock; mutually exclusive with {@code
-   *     personalOnly}, both {@code false} returns everything
-   * @param stolenOnly when {@code true}, narrows to stock marked „gestohlen" (REQ-INV-053)
-   * @param nonStolenOnly when {@code true}, narrows to stock not marked „gestohlen"
+   * @param filter the Lager filters
    * @return aggregated items
    * @throws NotFoundException when the user id is unknown
    */
   public List<GroupedInventoryDto> getMyAggregatedInventory(
-      UUID userId,
-      List<UUID> materialIds,
-      List<UUID> locationIds,
-      Integer minQuality,
-      List<UUID> jobOrderIds,
-      List<UUID> missionIds,
-      boolean personalOnly,
-      boolean nonPersonalOnly,
-      boolean stolenOnly,
-      boolean nonStolenOnly) {
-    return inventoryAggregationService.getMyAggregatedInventory(
-        userId,
-        materialIds,
-        locationIds,
-        minQuality,
-        jobOrderIds,
-        missionIds,
-        personalOnly,
-        nonPersonalOnly,
-        stolenOnly,
-        nonStolenOnly);
+      UUID userId, @NotNull LagerFilter filter) {
+    return inventoryAggregationService.getMyAggregatedInventory(userId, filter);
   }
 
   /**
    * Returns the ids of every material entry the user owns that matches the {@link
-   * #getMyAggregatedInventory} filters, unpaginated, for the "Mein Lager" select-all (REQ-INV-034).
+   * #getMyAggregatedInventory(UUID, LagerFilter)} filters, unpaginated, for the "Mein Lager"
+   * select-all (REQ-INV-034).
    *
    * @param userId owner id
-   * @param materialIds optional material filter
-   * @param locationIds optional storage-location filter (REQ-INV-040)
-   * @param minQuality optional min-quality filter
-   * @param jobOrderIds optional job order filter
-   * @param missionIds optional mission filter
-   * @param personalOnly {@code true} to match only private stock rows
-   * @param nonPersonalOnly {@code true} to match only shared stock rows
-   * @param stolenOnly when {@code true}, narrows to stock marked „gestohlen" (REQ-INV-053)
-   * @param nonStolenOnly when {@code true}, narrows to stock not marked „gestohlen"
+   * @param filter the Lager filters
    * @return the matching entry ids, in creation order
    * @throws NotFoundException when the user id is unknown
    */
-  public List<UUID> getMyEntryIds(
-      UUID userId,
-      List<UUID> materialIds,
-      List<UUID> locationIds,
-      Integer minQuality,
-      List<UUID> jobOrderIds,
-      List<UUID> missionIds,
-      boolean personalOnly,
-      boolean nonPersonalOnly,
-      boolean stolenOnly,
-      boolean nonStolenOnly) {
-    return inventoryAggregationService.getMyEntryIds(
-        userId,
-        materialIds,
-        locationIds,
-        minQuality,
-        jobOrderIds,
-        missionIds,
-        personalOnly,
-        nonPersonalOnly,
-        stolenOnly,
-        nonStolenOnly);
+  public List<UUID> getMyEntryIds(UUID userId, @NotNull LagerFilter filter) {
+    return inventoryAggregationService.getMyEntryIds(userId, filter);
   }
 
   /**
    * Aggregates squadron-wide stock by material and quality only; see {@link
-   * #getAllAggregatedInventory(List, List, Integer, List, List, boolean, boolean)}.
+   * #getAllAggregatedInventory(LagerFilter)}.
    *
    * @param materialIds optional material filter
    * @param minQuality optional min-quality filter
@@ -275,25 +218,11 @@ public class InventoryItemService {
   /**
    * Aggregates squadron-wide stock across all users with the full filter surface.
    *
-   * @param materialIds optional material filter
-   * @param locationIds optional storage-location filter (REQ-INV-040)
-   * @param minQuality optional min-quality filter
-   * @param jobOrderIds optional job order filter
-   * @param missionIds optional mission filter
-   * @param stolenOnly when {@code true}, narrows to stock marked „gestohlen" (REQ-INV-053)
-   * @param nonStolenOnly when {@code true}, narrows to stock not marked „gestohlen"
+   * @param filter the Lager filters; the personal flags do not apply
    * @return aggregated items grouped by material
    */
-  public List<GroupedInventoryDto> getAllAggregatedInventory(
-      List<UUID> materialIds,
-      List<UUID> locationIds,
-      Integer minQuality,
-      List<UUID> jobOrderIds,
-      List<UUID> missionIds,
-      boolean stolenOnly,
-      boolean nonStolenOnly) {
-    return inventoryAggregationService.getAllAggregatedInventory(
-        materialIds, locationIds, minQuality, jobOrderIds, missionIds, stolenOnly, nonStolenOnly);
+  public List<GroupedInventoryDto> getAllAggregatedInventory(@NotNull LagerFilter filter) {
+    return inventoryAggregationService.getAllAggregatedInventory(filter);
   }
 
   /**
@@ -367,23 +296,13 @@ public class InventoryItemService {
   /**
    * Pages squadron-wide inventory, one row per {@code InventoryItem}, with optional filters.
    *
-   * @param materialIds optional material filter
-   * @param locationIds optional storage-location filter (REQ-INV-040)
-   * @param minQuality optional min-quality filter
-   * @param jobOrderIds optional job order filter
-   * @param missionIds optional mission filter
+   * @param filter the Lager filters
    * @param pageable page request
    * @return paged inventory items
    */
   public Page<InventoryItemDto> getAllInventory(
-      List<UUID> materialIds,
-      List<UUID> locationIds,
-      Integer minQuality,
-      List<UUID> jobOrderIds,
-      List<UUID> missionIds,
-      Pageable pageable) {
-    return inventoryAggregationService.getAllInventory(
-        materialIds, locationIds, minQuality, jobOrderIds, missionIds, pageable);
+      @NotNull LagerFilter filter, @NotNull Pageable pageable) {
+    return inventoryAggregationService.getAllInventory(filter, pageable);
   }
 
   /**
