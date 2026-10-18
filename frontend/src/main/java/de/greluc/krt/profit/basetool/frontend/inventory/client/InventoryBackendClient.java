@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemPerso
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemPoolChangeDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemStolenMarkDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryMergeCandidatesDto;
+import de.greluc.krt.profit.basetool.frontend.inventory.model.ItemAttributeFilter;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
@@ -124,7 +125,8 @@ public class InventoryBackendClient {
   }
 
   /**
-   * The filters of the item view of a Lager listing (REQ-INV-030, REQ-INV-040, REQ-INV-053).
+   * The filters of the item view of a Lager listing (REQ-INV-030, REQ-INV-040, REQ-INV-053,
+   * REQ-INV-063).
    *
    * @param gameItemIds the game items to narrow to, or {@code null}
    * @param locationIds the storage locations to narrow to, or {@code null}
@@ -133,6 +135,7 @@ public class InventoryBackendClient {
    * @param nonPersonalOnly whether only the caller's shared entries are listed
    * @param stolenOnly whether only stock marked „gestohlen" is listed
    * @param nonStolenOnly whether stock marked „gestohlen" is hidden
+   * @param attributes the category, component-type, size and grade filters
    */
   public record ItemFilter(
       @Nullable List<UUID> gameItemIds,
@@ -141,11 +144,32 @@ public class InventoryBackendClient {
       boolean personalOnly,
       boolean nonPersonalOnly,
       boolean stolenOnly,
-      boolean nonStolenOnly) {
+      boolean nonStolenOnly,
+      @NotNull ItemAttributeFilter attributes) {
 
     /** No narrowing at all. */
     public static final ItemFilter NONE =
-        new ItemFilter(null, null, null, false, false, false, false);
+        new ItemFilter(null, null, null, false, false, false, false, ItemAttributeFilter.NONE);
+
+    /**
+     * Whether any dimension narrows the result.
+     *
+     * @return {@code true} when an id list is non-empty, a flag is set or an attribute narrows
+     */
+    public boolean anyActive() {
+      return notEmpty(gameItemIds)
+          || notEmpty(locationIds)
+          || notEmpty(jobOrderIds)
+          || personalOnly
+          || nonPersonalOnly
+          || stolenOnly
+          || nonStolenOnly
+          || !attributes.isEmpty();
+    }
+
+    private static boolean notEmpty(@Nullable List<UUID> ids) {
+      return ids != null && !ids.isEmpty();
+    }
   }
 
   /**
@@ -264,6 +288,7 @@ public class InventoryBackendClient {
         filter.nonPersonalOnly(),
         filter.stolenOnly(),
         filter.nonStolenOnly());
+    appendAttributeParams(uriBuilder, filter.attributes());
     return backendApiClient.get(uriBuilder.build().toUriString(), GROUPED_INVENTORY_LIST);
   }
 
@@ -314,6 +339,7 @@ public class InventoryBackendClient {
         filter.nonPersonalOnly(),
         filter.stolenOnly(),
         filter.nonStolenOnly());
+    appendAttributeParams(uriBuilder, filter.attributes());
     return backendApiClient.get(uriBuilder.build().toUriString(), UUID_LIST);
   }
 
@@ -888,6 +914,21 @@ public class InventoryBackendClient {
     for (UUID id : ids) {
       uriBuilder.queryParam(name, id.toString());
     }
+  }
+
+  /**
+   * Appends one repeated query parameter per category, component type, size and grade
+   * (REQ-INV-063).
+   *
+   * @param uriBuilder the builder
+   * @param attributes the item-attribute filters
+   */
+  private static void appendAttributeParams(
+      @NotNull UriComponentsBuilder uriBuilder, @NotNull ItemAttributeFilter attributes) {
+    attributes.kinds().forEach(kind -> uriBuilder.queryParam("kinds", kind));
+    attributes.componentTypes().forEach(type -> uriBuilder.queryParam("componentTypes", type));
+    attributes.sizes().forEach(size -> uriBuilder.queryParam("sizes", size));
+    attributes.grades().forEach(grade -> uriBuilder.queryParam("grades", grade));
   }
 
   /**

@@ -577,6 +577,9 @@ interface KrtInventoryLagerConfig {
     onStackEntriesLoaded?: (content: HTMLElement) => void;
 }
 
+/** The item-attribute filter selection of the Lager items view, keyed by query parameter. */
+type KrtItemAttributeSnapshot = Record<string, string[] | null>;
+
 /** One page's instance of the shared Lager behaviour, from `krtInventory.createLager`. */
 interface KrtInventoryLager {
     /** Whether the Items (game-item) view is active rather than the Material view. */
@@ -610,6 +613,20 @@ interface KrtInventoryLager {
     ): void;
     /** The values of a family's ticked checkboxes. */
     collectChecked(className: string): string[];
+    /** The query parameter names of the item-attribute filters (REQ-INV-063). */
+    itemAttributeParams(): string[];
+    /** The item-attribute selection per parameter; null where none or every box is ticked. */
+    snapshotItemAttributes(): KrtItemAttributeSnapshot;
+    /** Ticks the item-attribute boxes from a stored snapshot; true when a box was ticked. */
+    restoreItemAttributes(saved: unknown): boolean;
+    /** Appends every ticked item-attribute value to a query under its parameter name. */
+    appendItemAttributeParams(params: URLSearchParams): void;
+    /** The number of item-attribute filters a snapshot narrows by. */
+    countActiveItemAttributes(snapshot: KrtItemAttributeSnapshot | null | undefined): number;
+    /** Unticks every item-attribute box and resets the headers. */
+    resetItemAttributes(): void;
+    /** Re-syncs the select-all box and header of every rendered item-attribute filter. */
+    syncItemAttributeStates(): void;
     /** Installs the shared delegated handlers, the book-out submit and the initial tree restore. */
     bind(): void;
 }

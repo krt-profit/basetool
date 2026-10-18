@@ -55,6 +55,7 @@ import org.springframework.transaction.annotation.Transactional;
 class InventoryItemStackQueryDataTest {
 
   @Autowired private InventoryItemRepository inventoryItemRepository;
+  @Autowired private InventoryItemViewRepository inventoryItemViewRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private MaterialRepository materialRepository;
   @Autowired private GameItemRepository gameItemRepository;
@@ -348,14 +349,32 @@ class InventoryItemStackQueryDataTest {
         .allSatisfy(stack -> assertThat(stack.material()).isNotNull());
 
     List<InventoryItemStackAggregate> userItemStacks =
-        inventoryItemRepository.findUserItemStacks(
-            user.getId(), false, null, false, null, false, null, false, false, false, false);
+        inventoryItemViewRepository.findUserItemStacks(
+            user.getId(),
+            false,
+            null,
+            false,
+            null,
+            false,
+            null,
+            false,
+            false,
+            false,
+            false,
+            false,
+            null,
+            false,
+            null,
+            false,
+            null,
+            false,
+            null);
     assertThat(userItemStacks).hasSize(1);
     assertThat(userItemStacks.get(0).gameItem().getId()).isEqualTo(gameItem.getId());
     assertThat(userItemStacks.get(0).totalAmount()).isEqualTo(3.0);
 
     List<InventoryItemStackAggregate> globalItemStacks =
-        inventoryItemRepository.findGlobalItemStacks(
+        inventoryItemViewRepository.findGlobalItemStacks(
             true,
             List.of(gameItem.getId()),
             false,
@@ -366,7 +385,15 @@ class InventoryItemStackQueryDataTest {
             null,
             Set.of(),
             false,
-            false);
+            false,
+            false,
+            null,
+            false,
+            null,
+            false,
+            null,
+            false,
+            null);
     assertThat(globalItemStacks).hasSize(1);
     assertThat(globalItemStacks.get(0).gameItem().getId()).isEqualTo(gameItem.getId());
   }
@@ -705,8 +732,26 @@ class InventoryItemStackQueryDataTest {
     entityManager.flush();
 
     List<UUID> ids =
-        inventoryItemRepository.findUserItemEntryIds(
-            owner.getId(), false, null, false, null, false, null, false, false, false, false);
+        inventoryItemViewRepository.findUserItemEntryIds(
+            owner.getId(),
+            false,
+            null,
+            false,
+            null,
+            false,
+            null,
+            false,
+            false,
+            false,
+            false,
+            false,
+            null,
+            false,
+            null,
+            false,
+            null,
+            false,
+            null);
 
     assertThat(ids)
         .as("item select-all returns every own item entry id, excluding the material row")
@@ -859,7 +904,7 @@ class InventoryItemStackQueryDataTest {
     entityManager.flush();
 
     List<InventoryItemStackAggregate> filtered =
-        inventoryItemRepository.findUserItemStacks(
+        inventoryItemViewRepository.findUserItemStacks(
             user.getId(),
             false,
             null,
@@ -870,7 +915,15 @@ class InventoryItemStackQueryDataTest {
             false,
             false,
             false,
-            false);
+            false,
+            false,
+            null,
+            false,
+            null,
+            false,
+            null,
+            false,
+            null);
 
     assertThat(filtered)
         .as("item stacks narrow by location exactly like material stacks")

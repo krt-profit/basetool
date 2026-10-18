@@ -19082,6 +19082,49 @@
           }
         }, {
           "in" : "query",
+          "name" : "kinds",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "GENERIC", "VEHICLE_ITEM", "VEHICLE_WEAPON", "WEAPON", "WEAPON_ATTACHMENT", "ARMOR", "CLOTHING", "FOOD" ]
+            }
+          }
+        }, {
+          "in" : "query",
+          "name" : "componentTypes",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "SHIELD", "COOLER", "POWER_PLANT", "QUANTUM_DRIVE", "JUMP_DRIVE", "RADAR", "WEAPON_GUN", "WEAPON_MINING", "MISSILE_LAUNCHER", "MISSILE", "BOMB_LAUNCHER", "BOMB", "TURRET", "EMP", "QUANTUM_INTERDICTION_GENERATOR", "TRACTOR_BEAM", "TOWING_BEAM", "SALVAGE_HEAD", "LIFE_SUPPORT_GENERATOR" ]
+            }
+          }
+        }, {
+          "in" : "query",
+          "name" : "sizes",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "integer",
+              "format" : "int32"
+            }
+          }
+        }, {
+          "in" : "query",
+          "name" : "grades",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }, {
+          "in" : "query",
           "name" : "catalog",
           "required" : false,
           "schema" : {
@@ -20672,6 +20715,49 @@
           }
         }, {
           "in" : "query",
+          "name" : "kinds",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "GENERIC", "VEHICLE_ITEM", "VEHICLE_WEAPON", "WEAPON", "WEAPON_ATTACHMENT", "ARMOR", "CLOTHING", "FOOD" ]
+            }
+          }
+        }, {
+          "in" : "query",
+          "name" : "componentTypes",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "SHIELD", "COOLER", "POWER_PLANT", "QUANTUM_DRIVE", "JUMP_DRIVE", "RADAR", "WEAPON_GUN", "WEAPON_MINING", "MISSILE_LAUNCHER", "MISSILE", "BOMB_LAUNCHER", "BOMB", "TURRET", "EMP", "QUANTUM_INTERDICTION_GENERATOR", "TRACTOR_BEAM", "TOWING_BEAM", "SALVAGE_HEAD", "LIFE_SUPPORT_GENERATOR" ]
+            }
+          }
+        }, {
+          "in" : "query",
+          "name" : "sizes",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "integer",
+              "format" : "int32"
+            }
+          }
+        }, {
+          "in" : "query",
+          "name" : "grades",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }, {
+          "in" : "query",
           "name" : "catalog",
           "required" : false,
           "schema" : {
@@ -20889,6 +20975,49 @@
           "schema" : {
             "type" : "boolean",
             "default" : false
+          }
+        }, {
+          "in" : "query",
+          "name" : "kinds",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "GENERIC", "VEHICLE_ITEM", "VEHICLE_WEAPON", "WEAPON", "WEAPON_ATTACHMENT", "ARMOR", "CLOTHING", "FOOD" ]
+            }
+          }
+        }, {
+          "in" : "query",
+          "name" : "componentTypes",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "SHIELD", "COOLER", "POWER_PLANT", "QUANTUM_DRIVE", "JUMP_DRIVE", "RADAR", "WEAPON_GUN", "WEAPON_MINING", "MISSILE_LAUNCHER", "MISSILE", "BOMB_LAUNCHER", "BOMB", "TURRET", "EMP", "QUANTUM_INTERDICTION_GENERATOR", "TRACTOR_BEAM", "TOWING_BEAM", "SALVAGE_HEAD", "LIFE_SUPPORT_GENERATOR" ]
+            }
+          }
+        }, {
+          "in" : "query",
+          "name" : "sizes",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "integer",
+              "format" : "int32"
+            }
+          }
+        }, {
+          "in" : "query",
+          "name" : "grades",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
           }
         }, {
           "in" : "query",

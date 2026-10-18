@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemNoteU
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemOrgUnitChangeDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemPersonalRebookDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemStolenMarkDto;
+import de.greluc.krt.profit.basetool.frontend.inventory.model.ItemAttributeFilter;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
 import java.util.List;
@@ -106,7 +107,14 @@ class InventoryBackendClientTest {
     client.groupedItems(
         InventoryBackendClient.Listing.MY,
         new InventoryBackendClient.ItemFilter(
-            List.of(GAME_ITEM), List.of(LOCATION), List.of(JOB_ORDER), true, false, true, false));
+            List.of(GAME_ITEM),
+            List.of(LOCATION),
+            List.of(JOB_ORDER),
+            true,
+            false,
+            true,
+            false,
+            ItemAttributeFilter.NONE));
     client.groupedItems(InventoryBackendClient.Listing.ALL, InventoryBackendClient.ItemFilter.NONE);
     client.groupedMaterials(
         InventoryBackendClient.Listing.ALL,
@@ -148,6 +156,35 @@ class InventoryBackendClientTest {
   }
 
   @Test
+  void itemListingsCarryTheAttributeFilters() {
+    backend.answerJson("[]");
+    backend.answerJson("[]");
+    InventoryBackendClient.ItemFilter filter =
+        new InventoryBackendClient.ItemFilter(
+            null,
+            null,
+            null,
+            false,
+            false,
+            false,
+            false,
+            new ItemAttributeFilter(
+                List.of("VEHICLE_ITEM"),
+                List.of("QUANTUM_DRIVE", "SHIELD"),
+                List.of(2),
+                List.of(" A", "B", "")));
+
+    client.groupedItems(InventoryBackendClient.Listing.ALL, filter);
+    client.myItemEntryIds(filter);
+
+    String attributes =
+        "&kinds=VEHICLE_ITEM&componentTypes=QUANTUM_DRIVE&componentTypes=SHIELD&sizes=2"
+            + "&grades=A&grades=B";
+    backend.expect("GET", "/api/v1/inventory/all/grouped?catalog=ITEM" + attributes);
+    backend.expect("GET", "/api/v1/inventory/my-inventory/entry-ids?catalog=ITEM" + attributes);
+  }
+
+  @Test
   void entryIdsKeepTheirOwnParameterOrder() {
     backend.answerJson("[]");
     backend.answerJson("[]");
@@ -161,7 +198,8 @@ class InventoryBackendClientTest {
                     false,
                     true,
                     false,
-                    true)))
+                    true,
+                    ItemAttributeFilter.NONE)))
         .isEmpty();
     assertThat(
             client.myMaterialEntryIds(

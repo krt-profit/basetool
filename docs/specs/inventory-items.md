@@ -227,6 +227,51 @@ after its size/grade chip, e.g. `FR-66 [SCHILD] [S1 · A] [MILITÄR]`.
 `ItemClassChipContrastTest` · **Code:** `InventoryItemMapper#gameItemToReferenceDto`,
 `inventory-item-group.html`, `styles.css` · **Issues:** #2720
 
+### REQ-INV-063 — The Lager items view filters by category, component type, size and grade
+
+In the items view of Mein Lager and the Globales Lager, the filter popover (REQ-INV-037) offers four
+more multi-selects beside item, location, Auftrag and „Gestohlen": **Kategorie** (`GameItemKind`),
+**Komponententyp** (`ShipComponentType`), **Größe** and **Grad**. A member can ask for "only S2
+quantum drives, grade A or B".
+
+- The options are only values present in the viewer's current stock, drawn from the same
+  unfiltered read as the item and location options (REQ-INV-030, REQ-INV-040). An active filter
+  never narrows its own or another filter's options.
+- Category and component type show their translated names (`inventory.items.kind.*`,
+  `inventory.items.componentType.*`); sizes read `S0 … S10`, grades the bare letter.
+- Filtering is server-side. The backend accepts `kinds`, `componentTypes`, `sizes` and `grades` on
+  `GET /my-inventory/grouped`, `GET /my-inventory/entry-ids` and `GET /all/grouped` under
+  `catalog=ITEM`, and rejects them with 400 under `catalog=MATERIAL`, like `gameItemIds`.
+- A component type is a set of SC Wiki types. A size or grade filter narrows to ship components
+  only, the items whose size and grade the Lager shows (REQ-INV-061): a paint carrying grade A never
+  matches "Grad A". Items without the value never match.
+- None or every box of a filter ticked means no filter: nothing is sent, counted or stored.
+- The selection updates the table in place, is mirrored into the address, persisted per page and
+  view (REQ-UI-017), counted by the toggle's badge, shown as filter chips, cleared by „Alle
+  zurücksetzen", and applied by „Alle markieren" (REQ-INV-034).
+- The two Lager scripts share the dimension list (`ITEM_ATTRIBUTE_FILTERS` in
+  `inventory-common.js`) and the markup (`inventory-item-attribute-filters.html`). A further
+  dimension is one entry in each plus its backend parameter.
+
+**Acceptance**
+
+- [x] Component type „Quantenantrieb" and size S2 show only S2 quantum drives in both Lager views,
+  without a page reload.
+- [x] The options only offer values present in stock.
+- [x] Filter chips, badge count, reset, localStorage restore and „Alle markieren" honour the
+  filters.
+- [x] The backend rejects the filters for the material view.
+
+**Enforced by:** `ItemAttributeFilterTest`, `InventoryItemAttributeFilterDataTest`,
+`InventoryAggregationServiceTest` attribute cases, `InventoryItemControllerTest` attribute cases,
+`InventoryBackendClientTest#itemListingsCarryTheAttributeFilters`, `InventoryPageControllerTest`
+attribute cases, `InventoryLagerPatternRenderTest#lagerItemsViewsRenderTheAttributeFiltersFromTheStock`,
+`LagerItemAttributeFilterE2eTest` · **Code:** `ItemAttributeFilter`,
+`InventoryItemViewRepository`, `InventoryItemController`, `CatalogFilterGuard`,
+the frontend `ItemAttributeFilter`, `InventoryPageController#addItemViewModel`,
+`ItemAttributeOptions`, `inventory-item-attribute-filters.html`, `inventory-common.js` · **Issues:**
+#2721
+
 ## Out of scope
 
 Non-blueprint items and the "Mein Inventar" boundary (design §11). Materialbörse stock-backed
