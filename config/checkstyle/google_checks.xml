@@ -192,7 +192,7 @@
   <module name="FileLength">
     <property name="id" value="fileLengthExchangeOrgStockWriteService"/>
     <property name="fileExtensions" value="java"/>
-    <property name="max" value="1245"/>
+    <property name="max" value="1223"/>
   </module>
   <module name="SuppressionSingleFilter">
     <property name="id" value="fileLength"/>
@@ -344,19 +344,6 @@
   <module name="SuppressionSingleFilter">
     <property name="id" value="fileLengthInventoryPoolEntryCommands"/>
     <property name="files" value="^(?!.*basetool.backend.inventory.internal.InventoryPoolEntryCommands\.java$)"/>
-  </module>
-  <module name="FileLength">
-    <property name="id" value="fileLengthExchangeShipWriteService"/>
-    <property name="fileExtensions" value="java"/>
-    <property name="max" value="1019"/>
-  </module>
-  <module name="SuppressionSingleFilter">
-    <property name="id" value="fileLength"/>
-    <property name="files" value="basetool.backend.exchange.internal.ExchangeShipWriteService\.java$"/>
-  </module>
-  <module name="SuppressionSingleFilter">
-    <property name="id" value="fileLengthExchangeShipWriteService"/>
-    <property name="files" value="^(?!.*basetool.backend.exchange.internal.ExchangeShipWriteService\.java$)"/>
   </module>
   <module name="FileLength">
     <property name="id" value="fileLengthAdminMissionDataPageController"/>

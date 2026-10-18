@@ -919,7 +919,11 @@ plans the ops in order — an add of an owned product and a remove of a missing 
 remove of a default `rejected DEFAULT_NOT_REMOVABLE`, an add against another's tombstone `rejected
 REMOVED_ELSEWHERE` — then asks the mass-change guard, and writes through the web's own add and
 delete, so the Blueprints audit names the client; each written entry is journaled. `dryRun` plans
-only. `basetool_exchange_writes_total{resource,outcome}` counts the ops.
+only. `basetool_exchange_writes_total{resource,outcome}` counts the ops. The change sets of every
+resource — blueprints, stock, ships and the org stock — run through one runner
+(`ExchangeChangeSetRunner`, ADR-0285) with the resource's write service as its adapter: a dry run
+counts nothing, a held change set counts one `held` and writes nothing, and the result lists every
+op that was not applied, alike for every resource. *`ExchangeChangeSetRunnerTest`.*
 
 **Status:** read and write sides built in the backend, and the gateway's read route (`GET
 /exchange/v1/me/blueprints`) and write route (`POST …/changes`) — WP 4.1 (#2084); the corpus round
@@ -1491,10 +1495,16 @@ the same undo for every member of one client at once (REQ-XCH-034).
   `version`, a removed ship comes back in its earlier unit, an earlier unit the member has left is
   not restored and does not fail the undo, and an entry journaled without `orgUnit` leaves the unit
   alone. *`ExchangeUndoControllerTest`.*
+- [x] Each resource's journal state is written and read back by one class, a snapshot reads back as
+  the state it was taken from, and an entry in the shape an earlier writer journaled still undoes.
+  *`ExchangeJournalStateTest`.*
 
 The journal is `exchange_journal`: one row per written entry with the client, installation, change
 set, resource, key, action, whether it counts as a removal, the entry before and after as JSON, the
-writing transaction's id and the time. It is written in the write's own transaction, purged with the
+writing transaction's id and the time. Each resource's state is a typed record that one class per
+resource writes, reads back and restores (`ExchangeBlueprintJournal`, `ExchangeStockJournal`,
+`ExchangeShipJournal`, `ExchangeOrgStockJournal`; ADR-0285), in the same JSON keys for every version
+of the writer. It is written in the write's own transaction, purged with the
 change feed after 90 days by `exchange_change_retention`, exported under Art. 15, stays with the
 source account on a merge, and its states are searched by the Personensuche.
 
