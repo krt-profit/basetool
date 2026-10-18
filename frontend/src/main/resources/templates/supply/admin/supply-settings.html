@@ -52,10 +52,10 @@
                         <tr th:each="u : ${adminUnits}" th:data-unit-id="${u.orgUnitId()}" th:data-version="${u.version()}"
                             data-testid="supply-unit-row">
                             <td th:text="${u.name()}">ARGON</td>
-                            <td th:attr="data-label=#{supply.admin.mayRaise}"><input type="checkbox" class="supply-unit-raise" th:checked="${u.mayRaiseNeeds()}"
-                                       data-trigger="supply-unit-change" th:attr="aria-label=#{supply.admin.mayRaise}"></td>
-                            <td th:attr="data-label=#{supply.admin.accepts}"><input type="checkbox" class="supply-unit-accept" th:checked="${u.acceptsDonations()}"
-                                       data-trigger="supply-unit-change" th:attr="aria-label=#{supply.admin.accepts}"></td>
+                            <td th:attr="data-label=#{supply.admin.mayRaise}"><label class="table-check"><input type="checkbox" class="supply-unit-raise" th:checked="${u.mayRaiseNeeds()}"
+                                       data-trigger="supply-unit-change" th:attr="aria-label=#{supply.admin.mayRaise}"></label></td>
+                            <td th:attr="data-label=#{supply.admin.accepts}"><label class="table-check"><input type="checkbox" class="supply-unit-accept" th:checked="${u.acceptsDonations()}"
+                                       data-trigger="supply-unit-change" th:attr="aria-label=#{supply.admin.accepts}"></label></td>
                         </tr>
                     </tbody>
                 </table>

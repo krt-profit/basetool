@@ -86,7 +86,7 @@
         border-color: var(--color-primary);
     }
 
-    @media (width <= 1024px) {
+    @media (width <= 1024px), (pointer: coarse) {
         .ar-matrix .matrix-flag {
             width: var(--touch-target-dense);
             min-width: var(--touch-target-dense);

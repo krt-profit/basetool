@@ -284,6 +284,11 @@ Two binding rules shape every UI change:
   phones, a sectioned form with a sticky action bar. The markup lives in `fragments/page-head` and
   `fragments/components`, driven by two global scripts; breakpoints are only 768, 1024 and 1440 px,
   enforced by Stylelint (REQ-UI-027, REQ-UI-009, ADR-0242, `PagePatternFragmentsRenderTest`).
+- **Layout follows the width, touch ergonomics follow the pointer** (2026-10-17). Columns, the tab
+  bar and the drawer change at the width classes; the 44px floor, checkbox and label sizing and 16px
+  text entry apply under `(width <= 1024px), (pointer: coarse)`, so a tablet held landscape is as
+  usable as one held portrait. The phone is supported portrait (REQ-UI-009, ADR-0280,
+  `TouchClassLayoutE2eTest` with a 1180×820 touch class).
 - **Colours and stacking layers go through tokens** (2026-10-04). A colour token's value is written
   only in its declaration on `:root` — alpha variants are `color-mix()` of the token — and every
   page-level `z-index` is a step of the ascending `--z-*` scale beside it; every `var()` must name a

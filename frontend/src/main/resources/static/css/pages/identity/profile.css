@@ -57,6 +57,9 @@
     .profile-settings .form-group {
         margin: 0;
     }
+    #profile-notifications-card > .form-section {
+        margin-top: var(--space-6);
+    }
     .profile-counter {
         margin: var(--space-1) 0 0;
         color: var(--color-gray-2-text);
@@ -78,6 +81,13 @@
     }
     .profile-deletion-warning p {
         margin: 0;
+    }
+    @media (pointer: coarse) {
+        .profile-nav a {
+            display: flex;
+            align-items: center;
+            min-height: var(--touch-target);
+        }
     }
     @media (width <= 1024px) {
         .profile-layout {

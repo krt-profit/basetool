@@ -288,7 +288,7 @@
 
     .matrix-table .row-terminal th {
         top: 28px;
-        height: 44px;
+        height: 56px;
         box-sizing: border-box;
         border-bottom: 2px solid var(--color-primary);
     }
@@ -309,8 +309,13 @@
     }
 
     .mtx-term__name {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
         color: var(--color-white);
         font-size: var(--fs-xs);
+        line-height: 1.2;
+        white-space: normal;
     }
 
     .mtx-term__planet {
@@ -416,8 +421,12 @@
     }
 
     .mtx-name__text {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
         overflow: hidden;
-        text-overflow: ellipsis;
+        white-space: normal;
+        line-height: 1.25;
         color: var(--color-white);
         font-size: var(--fs-sm);
         font-weight: var(--fw-bold);
@@ -494,7 +503,7 @@
         outline-offset: -2px;
     }
 
-    @media (width <= 1024px) {
+    @media (width <= 1024px), (pointer: coarse) {
         .mtx-option,
         .mtx-kind-toggle {
             min-height: var(--touch-target);

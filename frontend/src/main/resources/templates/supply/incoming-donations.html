@@ -71,7 +71,7 @@
                                     <span th:if="${d.fromStock()}" class="chip chip--muted" th:text="#{supply.donation.fromStock}">aus dem Lager</span>
                                 </span>
                             </td>
-                            <td th:attr="data-label=#{supply.donation.donor}">
+                            <td class="supply-donor" th:attr="data-label=#{supply.donation.donor}">
                                 <span th:if="${d.donorName() != null}" th:text="${d.donorName()}">Name</span>
                                 <span th:if="${d.donorName() == null}">&ndash;</span>
                             </td>
