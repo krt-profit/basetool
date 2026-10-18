@@ -7411,16 +7411,17 @@
             color: var(--color-gray-2-text);
         }
         .data-table--stack
-            td:not(:first-child, .cell-status, .cell-actions, .cell-block):has(
-                ~ td:not(.cell-status, .cell-actions, .cell-block, :empty)
-            )::after {
+            td:not(
+                :first-child,
+                .cell-status,
+                .cell-actions,
+                .cell-block,
+                :has(> :is(div, p, ul, ol, table, form, .meter, [role='progressbar']))
+            ):has(~ td:not(.cell-status, .cell-actions, .cell-block, :empty))::after {
             content: '\00b7';
             position: absolute;
             right: -0.5rem;
             bottom: 0;
-        }
-        .data-table--stack td:has(> :is(div, p, ul, ol, table, form))::after {
-            content: none;
         }
         .data-table--stack td[data-label]:not(:first-child, .cell-status)::before {
             content: attr(data-label) ': ';

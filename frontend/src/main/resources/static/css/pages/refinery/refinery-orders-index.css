@@ -44,10 +44,24 @@
         max-width: 16rem;
     }
 
+    @media (width > 768px) {
+        .refinery-owner {
+            white-space: nowrap;
+        }
+    }
+
     @media (width <= 768px) {
         .refinery-segments > label {
             min-width: 0;
             padding-inline: var(--space-2);
+        }
+
+        .refinery-row--ready {
+            box-shadow: inset 3px 0 0 var(--color-success);
+        }
+
+        .refinery-row--ready > td:first-child {
+            box-shadow: none;
         }
 
         .refinery-table td {
