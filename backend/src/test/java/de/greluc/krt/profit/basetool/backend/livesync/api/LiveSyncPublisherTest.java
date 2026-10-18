@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
@@ -37,6 +38,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * What the publish seam guarantees its callers (ADR-0274): a frame carrying no known section is
@@ -90,6 +93,70 @@ class LiveSyncPublisherTest {
 
     verify(fanout, never()).publish(any(), anyList());
     assertThat(accepted(LiveSyncTopicClass.INVENTORY_ALL)).isZero();
+  }
+
+  @Test
+  @DisplayName("outside a transaction publishAfterCommit publishes at once")
+  void withoutATransactionTheFrameGoesOutAtOnce() {
+    publisher.publishAfterCommit(
+        LiveSyncTopic.global(LiveSyncTopicClass.INVENTORY_ALL), List.of("stock"));
+
+    verify(fanout)
+        .publish(LiveSyncTopic.global(LiveSyncTopicClass.INVENTORY_ALL), List.of("stock"));
+  }
+
+  @Test
+  @DisplayName("inside a transaction one frame per room carries the union of the sections")
+  void aTransactionCoalescesPerRoomAndPublishesAfterTheCommit() {
+    LiveSyncTopic stock = LiveSyncTopic.global(LiveSyncTopicClass.INVENTORY_ALL);
+    LiveSyncTopic board = LiveSyncTopic.global(LiveSyncTopicClass.MATERIALBOARD);
+    TransactionSynchronizationManager.initSynchronization();
+    try {
+      publisher.publishAfterCommit(stock, List.of("stock"));
+      publisher.publishAfterCommit(board, List.of("board"));
+      publisher.publishAfterCommit(stock, List.of("stock", "grid"));
+      verify(fanout, never()).publish(any(), anyList());
+
+      complete(TransactionSynchronization.STATUS_COMMITTED);
+    } finally {
+      TransactionSynchronizationManager.clear();
+    }
+
+    verify(fanout, times(1)).publish(stock, List.of("stock"));
+    verify(fanout, times(1)).publish(board, List.of("board"));
+    verify(fanout, times(2)).publish(any(), anyList());
+    assertThat(TransactionSynchronizationManager.getResource(publisher)).isNull();
+  }
+
+  @Test
+  @DisplayName("a rolled-back transaction publishes nothing and releases its collection")
+  void aRollbackPublishesNothing() {
+    TransactionSynchronizationManager.initSynchronization();
+    try {
+      publisher.publishAfterCommit(
+          LiveSyncTopic.global(LiveSyncTopicClass.INVENTORY_ALL), List.of("stock"));
+
+      complete(TransactionSynchronization.STATUS_ROLLED_BACK);
+    } finally {
+      TransactionSynchronizationManager.clear();
+    }
+
+    verify(fanout, never()).publish(any(), anyList());
+    assertThat(TransactionSynchronizationManager.getResource(publisher)).isNull();
+  }
+
+  /**
+   * Runs the registered synchronizations as a transaction manager would at the end.
+   *
+   * @param status the completion status
+   */
+  private static void complete(int status) {
+    List<TransactionSynchronization> synchronizations =
+        TransactionSynchronizationManager.getSynchronizations();
+    if (status == TransactionSynchronization.STATUS_COMMITTED) {
+      synchronizations.forEach(TransactionSynchronization::afterCommit);
+    }
+    synchronizations.forEach(s -> s.afterCompletion(status));
   }
 
   @Test

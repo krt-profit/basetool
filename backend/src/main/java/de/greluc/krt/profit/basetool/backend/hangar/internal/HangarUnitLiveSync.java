@@ -27,15 +27,12 @@ import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Tells the open unit hangar overviews that ships changed (ADR-0260): after the commit, one frame
@@ -68,67 +65,18 @@ public class HangarUnitLiveSync {
    * @param orgUnitIds the ids of the units whose overview changed
    */
   public void unitsChanged(@NotNull Collection<UUID> orgUnitIds) {
-    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-      publish(new LinkedHashSet<>(orgUnitIds));
-      return;
-    }
-    Pending pending = (Pending) TransactionSynchronizationManager.getResource(this);
-    if (pending == null) {
-      pending = new Pending(new LinkedHashSet<>());
-      TransactionSynchronizationManager.bindResource(this, pending);
-      TransactionSynchronizationManager.registerSynchronization(pending.synchronization(this));
-    }
-    pending.units().addAll(orgUnitIds);
-  }
-
-  /**
-   * Publishes one frame per unit room and one to the all-units room.
-   *
-   * @param units the distinct unit ids
-   */
-  private void publish(@NotNull Set<UUID> units) {
-    for (UUID unit : units) {
+    for (UUID unit : new LinkedHashSet<>(orgUnitIds)) {
       send(LiveSyncTopic.of(LiveSyncTopicClass.HANGAR_UNIT, unit));
     }
     send(LiveSyncTopic.global(LiveSyncTopicClass.HANGAR_UNITS));
   }
 
   /**
-   * Publishes one frame.
+   * Announces the ships section of one room after the commit.
    *
    * @param topic the room
    */
   private void send(@NotNull LiveSyncTopic topic) {
-    publisher.publish(topic, List.of(SHIPS));
-  }
-
-  /**
-   * The units one transaction has touched so far.
-   *
-   * @param units the collected unit ids
-   */
-  private record Pending(@NotNull Set<UUID> units) {
-
-    /**
-     * Builds the synchronization that publishes the collected units after the commit and releases
-     * the transaction-bound collection either way.
-     *
-     * @param owner the publisher the collection is bound under
-     * @return the synchronization
-     */
-    @NotNull
-    TransactionSynchronization synchronization(@NotNull HangarUnitLiveSync owner) {
-      return new TransactionSynchronization() {
-        @Override
-        public void afterCommit() {
-          owner.publish(units);
-        }
-
-        @Override
-        public void afterCompletion(int status) {
-          TransactionSynchronizationManager.unbindResourceIfPossible(owner);
-        }
-      };
-    }
+    publisher.publishAfterCommit(topic, List.of(SHIPS));
   }
 }
