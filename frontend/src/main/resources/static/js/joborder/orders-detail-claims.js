@@ -274,9 +274,10 @@ function _doStatusUpdate(orderId, status, selectElement) {
         },
         toast: false,
         errorMessage: MSG_STATUS_ERROR,
+        sectionKey: 'header',
+        propagateVersion: true,
         onSuccess(data) {
             if (data && data.version != null && selectElement) {
-                selectElement.dataset.version = data.version;
                 const editVer = _odEditVersionInput();
                 if (editVer) editVer.value = data.version;
             }
@@ -318,10 +319,10 @@ export function _toggleBlueprintCounting(checkbox) {
         },
         toast: false,
         errorMessage: MSG_BP_COUNTING_ERROR,
+        sectionKey: 'header',
+        propagateVersion: true,
         onSuccess(data) {
             if (data && data.version != null) {
-                const sel = document.getElementById('status-select');
-                if (sel) sel.dataset.version = data.version;
                 const editVer = _odEditVersionInput();
                 if (editVer) editVer.value = data.version;
             }

@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* global MSG_HANDOVER_SUCCESS, MSG_HANDOVER_FAILED, MSG_HANDOVER_NOITEMS, ORDER_AGE_YELLOW, ORDER_AGE_RED, MSG_UNIT_SCU, MSG_UNIT_PIECE, ORDER_CONFLICT, MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL, MSG_DELETE_ERROR, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_MATERIAL_INVALID, MSG_INVENTORY_UNLINK_SUCCESS, MSG_INVENTORY_UNLINK_ERROR, ORDER_HANDOVER_I18N */
+/* global MSG_HANDOVER_SUCCESS, MSG_HANDOVER_FAILED, MSG_HANDOVER_NOITEMS, ORDER_AGE_YELLOW, ORDER_AGE_RED, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL, MSG_DELETE_ERROR, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_MATERIAL_INVALID, MSG_INVENTORY_UNLINK_SUCCESS, MSG_INVENTORY_UNLINK_ERROR, ORDER_HANDOVER_I18N */
 
 import { validateItemHandoverForm } from '/js/joborder/orders-detail-reports.js';
 import {
@@ -37,7 +37,7 @@ import {
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';
 import { joborderHooks } from '/js/joborder/joborder-hooks.js';
 
@@ -118,9 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     _swapOrderSection(orderId, 'item-handover-lines', 'item-handover-lines');
                     _swapOrderSection(orderId, 'order-header-results', 'header');
                     _swapOrderSection(orderId, 'order-kpi-results', 'kpi');
-                    if (typeof krtLiveSync.sendChanged === 'function') {
-                        krtLiveSync.sendChanged('inventory', ['stock']);
-                    }
+                    krtPageSections.publish('inventory', ['stock']);
                     if (order && (order.status === 'COMPLETED' || order.status === 'REJECTED')) {
                         _publishOrdersQueue();
                     }
@@ -313,17 +311,8 @@ document.addEventListener('DOMContentLoaded', () => {
  * @returns {Promise<KrtWriteResult>} the outcome of the write
  */
 export function krtOrderWrite(opts) {
-    return krtFetch.write(
-        Object.assign({}, opts, {
-            serialize: opts.serialize || 'order',
-            conflict: {
-                title: ORDER_CONFLICT.title,
-                reloadLabel: ORDER_CONFLICT.reload,
-                reloadQuestion: ORDER_CONFLICT.reloadQuestion,
-                dismissLabel: ORDER_CONFLICT.dismiss,
-                reloadDetailFallback: ORDER_CONFLICT.detail,
-            },
-        }),
+    return /** @type {NonNullable<typeof joborderHooks.writeOrder>} */ (joborderHooks.writeOrder)(
+        Object.assign({}, opts, { serialize: opts.serialize || 'order' }),
     );
 }
 
@@ -501,10 +490,10 @@ export async function unlinkInventoryItem(btn) {
         url: `/orders/${orderId}/inventory/${invId}/unlink/ajax`,
         toast: false,
         errorMessage: MSG_INVENTORY_UNLINK_ERROR,
+        sectionKey: 'header',
+        propagateVersion: true,
         onSuccess(data) {
             if (data && data.version != null) {
-                const sel = document.getElementById('status-select');
-                if (sel) sel.dataset.version = data.version;
                 const editVer = _odEditVersionInput();
                 if (editVer) editVer.value = data.version;
             }

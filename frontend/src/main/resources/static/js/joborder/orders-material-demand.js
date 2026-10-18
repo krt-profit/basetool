@@ -19,14 +19,9 @@
 
 /* global KRT_DEMAND_LIVESYNC_UPDATES, KRT_DEMAND_SECTION_REFRESH_ERROR */
 
-import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
-
-const DEMAND_SECTIONS = {
-    demand: { container: '#orders-material-demand-results', fragmentValue: 'results' },
-};
 
 const DEMAND_EXPANDED_KEY = 'orders_demand_expanded';
 const DEMAND_FILTERS_KEY = 'orders_demand_filters';
@@ -578,27 +573,31 @@ document.addEventListener('DOMContentLoaded', () => {
     applyDemandView();
 
     if (document.getElementById('orders-material-demand-results')) {
-        krtLiveSync.createReceiver({
-            topic: 'orders',
-            sections: DEMAND_SECTIONS,
-            coalesceMs: 1500,
-            refresh() {
-                krtFetch.swap({
-                    url: window.location.pathname,
-                    container: '#orders-material-demand-results',
-                    fragmentValue: DEMAND_SECTIONS.demand.fragmentValue,
-                    history: false,
-                    errorMessage:
+        krtPageSections.create({
+            dict() {
+                return {
+                    'demand.section.refresh.error':
                         typeof KRT_DEMAND_SECTION_REFRESH_ERROR !== 'undefined'
                             ? KRT_DEMAND_SECTION_REFRESH_ERROR
-                            : undefined,
-                });
+                            : '',
+                };
             },
-            pill: {
-                label() {
-                    return typeof KRT_DEMAND_LIVESYNC_UPDATES !== 'undefined'
-                        ? KRT_DEMAND_LIVESYNC_UPDATES
-                        : undefined;
+            keys: { refreshErrorKey: 'demand.section.refresh.error' },
+            sections: {
+                demand: { container: '#orders-material-demand-results', fragmentValue: 'results' },
+            },
+            pageUrl() {
+                return window.location.pathname;
+            },
+            topic: 'orders',
+            receiver: {
+                coalesceMs: 1500,
+                pill: {
+                    label() {
+                        return typeof KRT_DEMAND_LIVESYNC_UPDATES !== 'undefined'
+                            ? KRT_DEMAND_LIVESYNC_UPDATES
+                            : undefined;
+                    },
                 },
             },
         });

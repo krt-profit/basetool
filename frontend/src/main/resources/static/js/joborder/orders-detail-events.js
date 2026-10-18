@@ -179,18 +179,10 @@ async function oaSend(method, url, opts) {
                 joborderHooks.notifyOrderChanged(['assignees']);
             }
         },
-        onError(status, _body, response) {
-            if (status === 409) {
-                krtFetch.handleProblem(
-                    response,
-                    { code: 'OPTIMISTIC_LOCK', detail: I18N_NOTE_CONFLICT },
-                    { conflict: OA_CONFLICT },
-                );
-            } else if (status === 403) {
-                showFrontendErrorToast(I18N_NOTE_FORBIDDEN);
-            } else {
-                showFrontendErrorToast(errorMsg);
-            }
+        conflict: OA_CONFLICT,
+        onError(status) {
+            if (status === 409) return false;
+            showFrontendErrorToast(status === 403 ? I18N_NOTE_FORBIDDEN : errorMsg);
             return true;
         },
     };

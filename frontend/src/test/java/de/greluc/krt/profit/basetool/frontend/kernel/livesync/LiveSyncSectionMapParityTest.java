@@ -158,14 +158,14 @@ class LiveSyncSectionMapParityTest {
   void ordersQueueSeamMaps_partitionTheOrdersQueueTopicWhitelist() throws IOException {
     Set<String> queueKeys = seamMapKeys("/static/js/joborder/orders-index.js", "sections");
     Set<String> demandKeys =
-        seamMapKeys("/static/js/joborder/orders-material-demand.js", "DEMAND_SECTIONS");
+        seamMapKeys("/static/js/joborder/orders-material-demand.js", "sections");
     Set<String> whitelist = LiveSyncTopicClass.ORDERS_QUEUE.allowedSections();
 
     assertThat(queueKeys)
         .as("sections keys in orders-index.js vs the ORDERS_QUEUE whitelist")
         .isSubsetOf(whitelist);
     assertThat(demandKeys)
-        .as("DEMAND_SECTIONS keys in orders-material-demand.js vs the ORDERS_QUEUE whitelist")
+        .as("sections keys in orders-material-demand.js vs the ORDERS_QUEUE whitelist")
         .isSubsetOf(whitelist);
 
     Set<String> union = new LinkedHashSet<>(queueKeys);
@@ -266,23 +266,17 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void materialCollectionSeamMap_isASubsetOfTheOrderTopicWhitelist() throws IOException {
-    Set<String> jsKeys =
-        seamMapKeys("/static/js/joborder/material-collection.js", "MATERIAL_COLLECTION_SECTIONS");
+    Set<String> jsKeys = seamMapKeys("/static/js/joborder/material-collection.js", "sections");
     assertThat(jsKeys)
-        .as(
-            "MATERIAL_COLLECTION_SECTIONS keys in material-collection.js vs"
-                + " LiveSyncTopicClass.ORDER whitelist")
+        .as("sections keys in material-collection.js vs" + " LiveSyncTopicClass.ORDER whitelist")
         .isSubsetOf(LiveSyncTopicClass.ORDER.allowedSections());
   }
 
   @Test
   void itemCollectionSeamMap_isASubsetOfTheOrderTopicWhitelist() throws IOException {
-    Set<String> jsKeys =
-        seamMapKeys("/static/js/joborder/item-collection.js", "ITEM_COLLECTION_SECTIONS");
+    Set<String> jsKeys = seamMapKeys("/static/js/joborder/item-collection.js", "sections");
     assertThat(jsKeys)
-        .as(
-            "ITEM_COLLECTION_SECTIONS keys in item-collection.js vs LiveSyncTopicClass.ORDER"
-                + " whitelist")
+        .as("sections keys in item-collection.js vs LiveSyncTopicClass.ORDER" + " whitelist")
         .isSubsetOf(LiveSyncTopicClass.ORDER.allowedSections());
   }
 
