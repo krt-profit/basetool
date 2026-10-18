@@ -5,6 +5,11 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
 
 ## 2026-10-18
 
+- **New: the member's Logistician units on the org stock.** Every unit in `units` of an org-stock
+  page carries `logistician`: whether the member is a Logistician of exactly that unit
+  ([org stock](resources/org-stock.md#the-answer)). Use it to decide where to offer writes, the
+  roster and the targets, instead of probing `/org-stock/members` per unit. No new scope;
+  `org-unit.schema.json` gains the optional `logistician`.
 - **New: ship component data.** A game item that is a ship component carries the optional
   `component`: `componentType`, `size`, `grade` and `itemClass` as stable codes. It sits beside
   `material` on the lots of `/me/stock` and `/org-stock`, and beside `item` on the item lines of

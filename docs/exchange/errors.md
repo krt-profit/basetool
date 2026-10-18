@@ -79,7 +79,7 @@ codes, whichever side refuses it.
 | `LOCATION_UNKNOWN` | The place has no warehouse location. | Offer a place from `catalog/locations`. |
 | `LINK_TARGET_TAKEN` | The server ship is already linked to another external id of this installation. | Pull and re-link. |
 | `VERSION_CONFLICT` | As above, for this op only; also an `upsert` without `shipId` for an id this installation already linked. | Pull, merge, retry this op. |
-| `NOT_PERMITTED` | An org-stock op on a pool whose unit the member is not a Logistician of, a `move-holder` into such a pool or to the entry's own holder in another pool, or an op on an entry that is unknown, personal or in another pool. | Do not retry; offer only the member's Logistician pools. |
+| `NOT_PERMITTED` | An org-stock op on a pool whose unit the member is not a Logistician of, a `move-holder` into such a pool or to the entry's own holder in another pool, or an op on an entry that is unknown, personal or in another pool. | Do not retry; offer only the units the org stock marks `logistician: true`. |
 | `HOLDER_UNKNOWN` | An org-stock `book-in` or `move-holder` names a holder who is not on the receiving unit's roster. | Read the roster again and let the member pick. |
 | `INSUFFICIENT_STOCK` | An org-stock op takes or marks more than the entry holds, a stock `share` more than the lot's personal amount, or an `unshare` more than the member's own stock in the pool. | Pull and retry with the entry's amount. |
 | `STOCK_OFFERED` | A partial org-stock `stolen` or `move-pool`, or a stock `share` or `unshare`, would leave the stock below what it offers on the Basetool's material exchange. | Take less, or ask the holder to lower the offer in the web. |
