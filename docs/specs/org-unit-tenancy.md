@@ -797,9 +797,10 @@ client renders its own localized wording from that code. Concretely for this one
   picker surfaces — book-in, hangar, mission, operation, refinery order — and one sentence localized
   once beats five copies drifting apart.
 - A page-local `onError` handler bypasses `handleProblem` entirely, so the branch is **exposed** as
-  `krtFetch.ownerOrgUnitRequiredMessage(problem)` rather than re-derived. `inventory-input.js` and
-  `mission-detail.js` are the two such handlers today; both call it before their own
-  `problem.detail` fallback.
+  `krtFetch.ownerOrgUnitRequiredMessage(problem)` rather than re-derived. `inventory-input.js`,
+  `mission-detail.js` and `refinery-orders-create.js` are the three such handlers today; each calls
+  it before its own fallback. The refinery create form shows its „Materialien ungültig" message only
+  for a `400` without a problem code, its own empty-goods check, never for a backend rejection.
 
 > [!note] What this requirement does **not** do
 > It does not make the picker a required field. The picker renders whenever the option list has more
@@ -825,6 +826,11 @@ the set the backend stamps from. Because the set is the direct one, the client m
 there: with several memberships and the active unit not among them, the picker is shown and
 required; with one it is hidden and preselected; with none it is hidden and empty. Choosing the own
 entry again restores the caller's options.
+
+On the **refinery order create form** the picker is built for the order's owner from
+`GET /api/v1/org-units/members/{id}/memberships?allKinds=true` — the owner's direct memberships of
+all four kinds, the set the backend counts. Built from Staffel and SK alone, a member of one Staffel
+and one Bereich got no picker and a refusal on every submit.
 
 **Acceptance**
 

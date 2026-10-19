@@ -280,7 +280,8 @@ public class RefineryBackendClient {
   }
 
   /**
-   * Reads a member's org-unit memberships as picker options.
+   * Reads a member's direct org-unit memberships of all four kinds as picker options, the same set
+   * the backend counts when it stamps a new order (REQ-ORG-023).
    *
    * @param userId the member
    * @return the options, or {@code null} when the backend sent no body
@@ -288,7 +289,9 @@ public class RefineryBackendClient {
   @Nullable
   public List<OrgUnitMembershipOptionDto> memberships(@NotNull UUID userId) {
     return backendApiClient.get(
-        "/api/v1/org-units/members/{id}/memberships", ORG_UNIT_MEMBERSHIP_OPTION_LIST, userId);
+        "/api/v1/org-units/members/{id}/memberships?allKinds=true",
+        ORG_UNIT_MEMBERSHIP_OPTION_LIST,
+        userId);
   }
 
   /**

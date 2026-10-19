@@ -453,18 +453,23 @@ krtEvents.on('click', 'rfc-apply-suggestion', (el) => {
 });
 
 /**
- * Picks the toast for a failed in-place create; the mission-participant problem code (REQ-SEC-042)
- * takes precedence over the generic 400 message.
+ * Picks the toast for a failed in-place create: a known problem code (REQ-SEC-042, REQ-ORG-023)
+ * names its cause, a bodiless 400 is the frontend's own material check, anything else is generic.
  *
  * @param {number} status the HTTP status of the failed response
  * @param {any} body the parsed RFC 7807 problem body, if any
  * @returns {string} the localized message to show
  */
 function _refineryCreateErrorMessage(status, body) {
-    if (body && body.code === 'MISSION_PARTICIPANT_REQUIRED') {
+    const code = body && typeof body === 'object' ? body.code : null;
+    if (code === 'MISSION_PARTICIPANT_REQUIRED') {
         return MSG_RFC_MISSION_PARTICIPANT_REQUIRED;
     }
-    return status === 400 ? MSG_RFC_MATERIAL_INVALID : MSG_RFC_CREATE_FAILED;
+    const ownerRequired = krtFetch.ownerOrgUnitRequiredMessage(body);
+    if (ownerRequired) {
+        return ownerRequired;
+    }
+    return status === 400 && !code ? MSG_RFC_MATERIAL_INVALID : MSG_RFC_CREATE_FAILED;
 }
 
 /**
