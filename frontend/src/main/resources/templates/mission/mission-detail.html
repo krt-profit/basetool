@@ -894,6 +894,9 @@
                                                     th:data-type-id="${freqType.id}"
                                                     th:data-current-value="${f != null ? f.value : ''}"
                                                     th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                                            <button th:if="${!isNew and mission.canEdit and f != null}" type="button" class="btn btn-quiet-danger btn-icon" data-trigger="typed-freq-delete"
+                                                    th:attr="data-freq-id=${f.id}"
+                                                    th:title="#{mission.frequency.typed.delete}" th:aria-label="#{mission.frequency.typed.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                                         </div>
                                     </div>
                                 </div>
@@ -1590,7 +1593,8 @@
     window.MISSION_CUSTOM_FREQ_I18N = {
         'add': /*[[#{mission.frequency.custom.add}]]*/ 'Add frequency',
         'edit': /*[[#{mission.frequency.custom.edit}]]*/ 'Edit frequency',
-        'delete_confirm': /*[[#{mission.frequency.custom.delete.confirm}]]*/ 'This frequency will be deleted.'
+        'delete_confirm': /*[[#{mission.frequency.custom.delete.confirm}]]*/ 'This frequency will be deleted.',
+        'typed_delete_confirm': /*[[#{mission.frequency.typed.delete.confirm}]]*/ 'This frequency will be removed from the mission.'
     };
     const missionId = /*[[${mission?.id?.toString()}]]*/ null;
     window.missionId = /*[[${mission?.id?.toString()}]]*/ null;

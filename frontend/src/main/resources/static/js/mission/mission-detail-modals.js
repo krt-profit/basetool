@@ -659,6 +659,47 @@ document.addEventListener('DOMContentLoaded', () => {
                 missionHooks.refresh(['frequencies', 'overview']);
             }
         }
+        /**
+         * Removes the mission's value of one frequency type after a confirmation.
+         *
+         * @param {Element} btn the delete button carrying the frequency row id
+         * @returns {Promise<void>} settles once the removal finished or was declined
+         */
+        async function delTyped(btn) {
+            const fid = btn.getAttribute('data-freq-id');
+            if (!fid) {
+                return;
+            }
+            const msg = krtI18nText(
+                dict.typed_delete_confirm,
+                'MISSION_CUSTOM_FREQ_I18N.typed_delete_confirm',
+            );
+            const ok = await showKrtConfirm?.(
+                msg,
+                msg,
+                krtI18nText(
+                    window.MISSION_SUBRES_I18N &&
+                        window.MISSION_SUBRES_I18N['mission.conflict.action.reload'],
+                    'MISSION_SUBRES_I18N[mission.conflict.action.reload]',
+                ),
+                krtI18nText(
+                    window.MISSION_SUBRES_I18N &&
+                        window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss'],
+                    'MISSION_SUBRES_I18N[mission.conflict.action.dismiss]',
+                ),
+            );
+            if (!ok) {
+                return;
+            }
+            const result = await missionHooks.write({
+                method: 'DELETE',
+                url: `/missions/${mid()}/frequencies/${fid}/ajax`,
+                sectionKey: 'frequency',
+            });
+            if (result.ok && missionHooks.refresh) {
+                missionHooks.refresh(['organisation', 'overview']);
+            }
+        }
 
         document.addEventListener('click', (e) => {
             const t = /** @type {Element} */ (e.target).closest('[data-trigger]');
@@ -681,6 +722,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (r) {
                     del(r);
                 }
+            } else if (trig === 'typed-freq-delete') {
+                e.preventDefault();
+                delTyped(t);
             }
         });
 

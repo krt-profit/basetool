@@ -94,7 +94,10 @@ or check-in change never leaves the bar stale (REQ-FE-010). The three tabs, plus
    without `canEdit`, and its one CTA „Änderungen speichern" in a `.form-actions--sticky`; the right
    column stacks four cards in the order **Ziele → Ablauf → Organisation → Verwaltungsrechte** (owner
    decision). "Organisation" holds the party lead, the typed
-   "Frequenzübersicht" (per-mission values for the global "Frequenztypen") and the custom
+   "Frequenzübersicht" (per-mission values for the global "Frequenztypen"; each type with a value
+   offers edit and delete, and a deleted value removes the type's row via the generic
+   `DELETE …/missions/{id}/frequencies/{freqId}`, after which the type shows without a value in the
+   editor and drops out of the overview "Funk" panel) and the custom
    "Weitere Frequenzen" editor (REQ-MISSION-014). "Verwaltungsrechte" carries owner & manager
    administration and the **owning-org-unit reassignment** control ("Verantwortliche Einheit" — re-homes
    the mission to a different Staffel/SK/Bereich/OL or to ownerless; REQ-ORG-018); the delete
