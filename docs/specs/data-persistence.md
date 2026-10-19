@@ -1307,6 +1307,25 @@ P4K import and the UEX sync leave them alone.
 `V307MigrationTest`, `ExternalCatalogueMappingTest` · **Code:** `ShipComponentClass`,
 `ScWikiItemSyncService#applyWikiFields`, V307 · **Issues:** #2720
 
+### REQ-DATA-025 — a P4K description is stored with real line breaks
+
+The game's localisation writes a line break inside a description as the two characters backslash
+and `n`. The P4K import decodes every such pair in the English and German description of a
+commodity, a manufacturer, an item and a ship into a real line break before it matches, fills or
+seeds anything, so `material.description`, `manufacturer.description` and the `description_en` /
+`description_de` of `game_item` and `ship_type` never hold the escaped form. V308 decoded the rows
+already stored. The material detail page shows the line breaks (`white-space: pre-line`).
+
+**Acceptance**
+
+- [x] An imported description `NDR: 08\nEffect: Toxic` (escaped) is stored with a real line break.
+- [x] V308 turns a stored escaped line break into a real one and leaves other text unchanged.
+- [x] The material detail page renders each line of the description on its own line.
+
+**Enforced by:** `P4kTextTest`, `P4kImportServiceTest#commodity_seededDescription_hasRealLineBreaks`,
+`V308MigrationTest` · **Code:** `P4kText`, the compact constructors of `P4kCommodityDto`,
+`P4kManufacturerDto`, `P4kItemDto` and `P4kShipDto`, V308, `catalogue/material-detail.css`
+
 ## Out of scope
 
 **Material-amount SCU-scale storage and rounding** (the `@PrePersist`/`@PreUpdate` HALF_UP-to-three-
