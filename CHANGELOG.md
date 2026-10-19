@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.19.0](https://github.com/krt-profit/basetool/releases/tag/v1.19.0) - 2026-10-19
+
 ### Changed
 
 - **Materialien, Orte und Schiffstypen seitenweise.** `/admin/materials`, `/admin/locations` und die Schiffstypen unter `/ship-data` zeigen 25, 50 oder 100 Einträge pro Seite mit Seitenleiste statt aller Zeilen auf einer Seite; die Suche sucht serverseitig über den ganzen Katalog, und die Zähler nennen die Gesamtzahl. Die Listen-Endpunkte für Materialien, Orte und Schiffstypen nehmen dafür den optionalen Parameter `query` an (REQ-ADMIN-004, ADR-0293).
