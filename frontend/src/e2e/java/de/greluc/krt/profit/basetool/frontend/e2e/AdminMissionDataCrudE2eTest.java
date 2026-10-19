@@ -41,7 +41,8 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * CRUD and filter coverage for {@code /admin/mission-data}: creates a squadron through the modal
  * and deletes it through the confirm dialog, both re-rendering {@code #squadrons-results} in place
  * (REQ-FE-002), and toggles each section's include-inactive filter without a page load
- * (REQ-FE-005). Cleans up after itself; runs as {@code test-admin}.
+ * (REQ-FE-005), and closes each create dialog through its cancel button (REQ-UI-013). Cleans up
+ * after itself; runs as {@code test-admin}.
  */
 @Tag("e2e")
 class AdminMissionDataCrudE2eTest {
@@ -66,6 +67,13 @@ class AdminMissionDataCrudE2eTest {
     {"includeInactiveSquadrons", "squadrons-results", "md-kind-squadrons"},
     {"includeInactiveJobTypes", "jobtypes-results", "md-kind-jobtypes"},
     {"includeInactiveFrequencyTypes", "freqtypes-results", "md-kind-freqtypes"},
+  };
+
+  /** Each master row paired with the create button its section shows and the dialog it opens. */
+  private static final String[][] DIALOGS = {
+    {"md-kind-squadrons", "add-squadron-btn", "squadron-modal"},
+    {"md-kind-jobtypes", "add-jobtype-btn", "jobtype-modal"},
+    {"md-kind-freqtypes", "add-freqtype-btn", "frequency-type-modal"},
   };
 
   private static Playwright playwright;
@@ -193,6 +201,34 @@ class AdminMissionDataCrudE2eTest {
         assertThat(page.locator(".notification-toast.error-toast")).hasCount(0);
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "admin-mission-data-filters");
+        throw failure;
+      }
+    }
+  }
+
+  /**
+   * Opens each create dialog and closes it through the cancel button in its footer, which carries
+   * the same close class as the header's close control (REQ-UI-013).
+   */
+  @Test
+  void cancelButtonClosesEachCreateDialog() {
+    String baseUrl = STACK.baseUrl();
+    try (BrowserContext context = authedContext()) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.navigate(page, baseUrl + "/admin/mission-data");
+        page.waitForLoadState(LoadState.NETWORKIDLE);
+
+        for (String[] dialog : DIALOGS) {
+          page.locator("#" + dialog[0]).click();
+          page.locator("#" + dialog[1]).click();
+          Locator modal = page.locator("#" + dialog[2]);
+          assertThat(modal).isVisible();
+          modal.locator(".krt-modal-foot .btn-ghost").click();
+          assertThat(modal).isHidden();
+        }
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "admin-mission-data-cancel");
         throw failure;
       }
     }
