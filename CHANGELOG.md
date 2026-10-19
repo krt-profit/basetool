@@ -1007,6 +1007,10 @@
 
 - **Deploy: nur ein Release auf einmal.** Die Promotion prüft alle fünf Artefakte und ihren gemeinsamen Quell-Commit, bevor sie `:stable` verschiebt; `deploy.sh` verweigert einen Satz aus verschiedenen Commits und versucht es im nächsten Tick erneut. Notausgang: `IRI_REQUIRE_ONE_RELEASE=false`.
 
+### Security
+
+- **Keycloak 26.8.1 schließt Sicherheitslücken.** Darunter CVE-2026-82968 (dauerhafte Verknüpfung mit dem falschen Konto über einen Identity Provider), CVE-2026-15943 und CVE-2026-18569 im OIDC-Broker sowie mehrere Rechte-Eskalationen in der Admin-Verwaltung. Nur der Image-Digest von `quay.io/keycloak/keycloak:26.8` und die SPI-Artefakte ziehen mit; keine Datenbankmigration. Der Tag bleibt `26.8`, daher übernimmt der Deploy den neuen Digest mit dem nächsten Release ohne Betreiberfreigabe und startet Keycloak dabei einmal neu.
+
 - **Keycloak 26.8.0.** Neues Image `quay.io/keycloak/keycloak:26.8`; Provider-JAR, Theme und Realm laufen
   unverändert. Brute-Force-Sperren bleiben jetzt über einen Neustart erhalten (Login-Fehler liegen in der
   Datenbank). Die Mindestversionen für Netty, OpenTelemetry und Jackson im SPI-Build entfallen,
