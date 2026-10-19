@@ -235,7 +235,7 @@ function renderRows(data) {
         )}\u00a0%</td><td class="num">${num(
             WHOLE,
             item.fullLoadCost,
-        )}</td><td class="num profit-max">${num(WHOLE, item.maxProfitFullLoad)}</td></tr>`;
+        )}</td><td class="num profit-max${(item.maxProfitFullLoad ?? 0) < 0 ? ' is-negative' : ''}">${num(WHOLE, item.maxProfitFullLoad)}</td></tr>`;
     });
     krtHtml.set(body, html);
     if (sorter) sorter.apply();

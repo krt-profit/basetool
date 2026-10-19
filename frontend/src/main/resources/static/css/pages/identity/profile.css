@@ -108,11 +108,16 @@
             min-height: var(--touch-target);
             margin-left: 0;
             padding: 0 var(--space-3);
-            border: var(--border-hairline);
+            background-color: var(--control-bg);
+            border: 1px solid var(--control-border);
+            border-radius: var(--radius-sm);
             font-size: var(--fs-xs);
         }
         .profile-nav a[aria-current='true'] {
-            border-color: var(--color-primary);
+            background-color: var(--control-selected-bg);
+            border-color: var(--control-selected-border);
+            box-shadow: inset 0 -3px 0 0 var(--control-selected-border);
+            color: var(--control-selected-fg);
         }
     }
 }

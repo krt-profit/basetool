@@ -13,10 +13,18 @@
     }
     .ps-count {
         margin: 0;
+        padding: var(--space-3) var(--space-4);
+        border-bottom: var(--border-hairline);
         color: var(--color-gray-2-text);
         font-size: var(--fs-sm);
     }
     .ps-results .alert {
-        margin-bottom: 0;
+        margin: var(--space-3) var(--space-4) 0;
+    }
+    .ps-results .empty-state {
+        border: 0;
+    }
+    .ps-panel:not(:has(.ps-results > *)) > form > .toolbar {
+        border-bottom: 0;
     }
 }

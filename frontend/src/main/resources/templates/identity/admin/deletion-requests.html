@@ -68,7 +68,7 @@
 </main>
 </th:block>
 <th:block th:fragment="pageTail">
-<div th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='decline-modal', titleKey='admin.deletionRequests.decline.title', variant=null, body=~{::.decline-form})}">
+<div th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='decline-modal', titleKey='admin.deletionRequests.decline.title', variant='krt-modal--danger', body=~{::.decline-form})}">
     <div class="decline-form">
         <div class="krt-modal-body">
             <p class="bank-field-hint" th:text="#{admin.deletionRequests.decline.hint}">Die Begr&uuml;ndung wird dem Mitglied mitgeteilt und gespeichert.</p>

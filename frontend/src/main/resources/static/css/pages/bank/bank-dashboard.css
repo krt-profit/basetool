@@ -4,4 +4,35 @@
     .bank-totals {
         margin-bottom: var(--space-4);
     }
+
+    .bank-list-panel .bank-acc-grid {
+        margin-top: 0;
+        padding: var(--space-4);
+    }
+
+    .bank-list-panel .table-responsive {
+        margin-top: 0;
+    }
+
+    .bank-list-panel .bank-acc-group {
+        margin-top: 0;
+        padding: var(--space-4) 0 0;
+    }
+
+    .bank-list-panel .bank-acc-group + .bank-acc-group {
+        border-top: var(--border-hairline);
+    }
+
+    .bank-list-panel .bank-acc-group-head {
+        margin: 0 var(--space-4) var(--space-2);
+    }
+
+    .bank-list-panel .bank-acc-group .bank-acc-grid {
+        padding-top: var(--space-2);
+    }
+
+    .bank-list-panel .empty-state {
+        margin: 0;
+        border: 0;
+    }
 }

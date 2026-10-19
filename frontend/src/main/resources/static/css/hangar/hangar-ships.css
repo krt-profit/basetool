@@ -67,7 +67,7 @@
         white-space: nowrap;
     }
     .hangar-fit--ready {
-        color: var(--color-success);
+        color: var(--color-success-text);
     }
     @media (width <= 768px) {
         .hangar-table tr {
@@ -159,7 +159,7 @@
         width: 100%;
         padding: 0.5rem;
         background-color: var(--control-bg);
-        border: 1px solid var(--color-gray-3);
+        border: 1px solid var(--control-border);
         color: var(--color-gray-1);
         font-family: var(--font-body);
         box-sizing: border-box;

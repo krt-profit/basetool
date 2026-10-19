@@ -35,6 +35,7 @@
            data-testid="lager-view-items" th:text="#{inventory.items.view.items}">Items</a>
     </div>
 
+    <section class="list-panel">
     <div class="toolbar lager-toolbar">
         <form th:if="${view != 'items'}" th:action="@{/inventory/my}" method="get" id="myFilterForm" class="my-inventory-filter lager-filter-form no-track">
             <th:block th:replace="~{kernel/fragments/components :: segmented(name='personalScope', labelKey='inventory.filter.scope',
@@ -355,6 +356,7 @@
             </div>
         </div>
     </div>
+    </section>
 
     <div id="bulkCheckoutBar" class="form-actions--sticky lager-selection-bar" role="region"
          th:aria-label="#{inventory.bulk.bar.label}" data-testid="lager-selection-bar" hidden>
@@ -459,11 +461,11 @@
             </div>
             </div>
             <div class="krt-modal-foot">
+                <button type="button" class="btn btn-ghost" data-trigger="inv-my-close-bookout" th:text="#{inventory.bookout.cancel}">Abbrechen</button>
                 <button type="submit" id="bookOutSubmitBtn" class="btn btn--cta"
                         th:data-text-discard="#{inventory.bookout.btn.discard}"
                         th:data-text-sell="#{inventory.bookout.btn.sell}"
                         th:text="#{inventory.bookout.submit}">Ausbuchen</button>
-                <button type="button" class="btn btn-ghost" data-trigger="inv-my-close-bookout" th:text="#{inventory.bookout.cancel}">Abbrechen</button>
             </div>
         </form>
     </th:block>
@@ -551,8 +553,8 @@
             </div>
             </div>
             <div class="krt-modal-foot">
-                <button type="submit" id="umbuchenSubmitBtn" class="btn btn--cta" th:text="#{inventory.rebook.submit}">Umbuchen</button>
                 <button type="button" class="btn btn-ghost" data-trigger="inv-my-close-umbuchen" th:text="#{inventory.rebook.cancel}">Abbrechen</button>
+                <button type="submit" id="umbuchenSubmitBtn" class="btn btn--cta" th:text="#{inventory.rebook.submit}">Umbuchen</button>
             </div>
         </form>
     </th:block>
@@ -584,10 +586,10 @@
         <p id="bulkCheckoutModalMessage" class="lager-modal-message"></p>
         </div>
         <div class="krt-modal-foot">
-            <button type="button" class="btn btn--cta" data-trigger="inv-my-execute-bulk"
-                    th:text="#{inventory.bulk.checkout.modal.confirm}">Ausbuchen</button>
             <button type="button" class="btn btn-ghost" data-trigger="inv-my-close-bulk"
                     th:text="#{inventory.bulk.checkout.modal.cancel}">Abbrechen</button>
+            <button type="button" class="btn btn--cta" data-trigger="inv-my-execute-bulk"
+                    th:text="#{inventory.bulk.checkout.modal.confirm}">Ausbuchen</button>
         </div>
     </th:block>
 </th:block>

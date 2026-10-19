@@ -20,7 +20,7 @@
         <section class="card card--flush home-upcoming" aria-labelledby="home-upcoming-title" data-testid="home-upcoming">
             <div class="home-card-head">
                 <h2 id="home-upcoming-title" class="home-card-title" th:text="#{home.upcoming.next7}">Nächste 7 Tage</h2>
-                <span class="chip chip--muted" data-testid="home-upcoming-count" th:text="${#lists.size(upcomingMissions)}">4</span>
+                <span class="count-badge count-badge--sm" data-testid="home-upcoming-count" th:text="${#lists.size(upcomingMissions)}">4</span>
                 <span class="grow"></span>
                 <a class="home-card-link" th:href="@{/missions}" th:text="#{home.upcoming.all}">Alle Einsätze →</a>
             </div>

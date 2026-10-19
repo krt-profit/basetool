@@ -34,7 +34,7 @@
         box-shadow: var(--glow-primary);
     }
     .mb-modal-kind__opt input[type='radio'] {
-        width: auto;
+        flex: none;
         margin: 0;
         accent-color: var(--color-primary);
     }

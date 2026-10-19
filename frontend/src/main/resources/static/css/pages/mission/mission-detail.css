@@ -24,7 +24,7 @@
         width: 100%;
         padding: 0.8rem;
         background-color: var(--control-bg);
-        border: 1px solid var(--color-gray-3);
+        border: 1px solid var(--control-border);
         color: var(--color-gray-1);
         font-family: var(--font-body);
         box-sizing: border-box;
@@ -550,7 +550,7 @@
         letter-spacing: 0.05em;
     }
     .fact-v.pos {
-        color: var(--color-success);
+        color: var(--color-success-text);
     }
     .fact-v.neg {
         color: var(--color-danger-text);
@@ -585,36 +585,6 @@
     }
     .chiprow--after {
         margin-top: 10px;
-    }
-
-    .seg {
-        display: inline-flex;
-        border: var(--border-hairline);
-    }
-    .seg button {
-        background: none;
-        border: none;
-        color: var(--color-gray-2-text);
-        font-family: var(--font-body);
-        font-weight: var(--fw-bold);
-        text-transform: uppercase;
-        font-size: 0.66rem;
-        letter-spacing: 0.06em;
-        padding: 8px 14px;
-        cursor: pointer;
-        min-height: var(--touch-target);
-    }
-    .seg button:focus-visible {
-        outline: 2px solid var(--color-primary);
-        outline-offset: -2px;
-    }
-    .seg button.on-pos {
-        background: var(--color-success);
-        color: var(--color-white);
-    }
-    .seg button.on-neg {
-        background: var(--color-danger);
-        color: var(--color-white);
     }
 
     .krt-modal-body input[type='text'],
@@ -865,7 +835,7 @@
         box-sizing: border-box;
         background: var(--control-bg);
         color: var(--color-white);
-        border: var(--border-hairline);
+        border: 1px solid var(--control-border);
         font-family: var(--font-body);
         font-size: 0.78rem;
         padding: 7px 9px;
@@ -881,7 +851,7 @@
         box-sizing: border-box;
         background: var(--control-bg);
         color: var(--color-white);
-        border: var(--border-hairline);
+        border: 1px solid var(--control-border);
         font-family: var(--font-body);
         font-size: 0.78rem;
         padding: 7px 9px;

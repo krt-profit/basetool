@@ -78,14 +78,16 @@ function boundsOf(menu) {
 }
 
 /**
- * Opens the panel upwards when it does not fit below its toggle and there is more room above.
+ * Opens the panel upwards when it does not fit below its toggle and there is more room above, and
+ * aligns it to the toggle's left edge when right-aligned it would leave the viewport.
  *
  * @param {HTMLElement} menu the menu being opened
  * @param {HTMLElement} toggle the menu's toggle
  * @param {HTMLElement} panel the menu's visible panel
  */
 function place(menu, toggle, panel) {
-    panel.classList.remove('overflow-menu__panel--up');
+    panel.classList.remove('overflow-menu__panel--up', 'overflow-menu__panel--start');
+    if (panel.getBoundingClientRect().left < 0) panel.classList.add('overflow-menu__panel--start');
     const { top, bottom } = boundsOf(menu);
     const anchor = toggle.getBoundingClientRect();
     const height = panel.getBoundingClientRect().height;

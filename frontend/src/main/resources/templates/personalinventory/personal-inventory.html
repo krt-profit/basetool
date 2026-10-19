@@ -31,6 +31,7 @@
         </a>
     </nav>
 
+    <section class="list-panel">
     <form id="pi-filter-form" th:action="@{/personal-inventory}" method="get" class="krt-pi-filter no-track">
         <div class="toolbar">
             <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('krt-pi-q', 'q', ${filterQuery}, 'personalInventory.filter.searchPlaceholder')}"></th:block>
@@ -98,6 +99,7 @@
         </th:block>
     </th:block>
     </div>
+    </section>
 </main>
 
 <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='krt-pi-modal', titleKey='personalInventory.modal.create.title', variant='krt-modal--wide', titleId='krt-pi-modal-title', open=${showItemModal != null}, closeTrigger='pi-close-modal', body=~{::krt-pi-modal-body})}">

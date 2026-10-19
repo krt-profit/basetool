@@ -14,6 +14,7 @@
 
     <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{${error}}">Fehler beim Laden.</div>
 
+    <section class="list-panel">
     <form id="admin-bp-filter" method="get" th:action="@{/admin/blueprints}" class="no-track">
         <div class="toolbar">
             <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('admin-bp-search', 'search', ${search}, 'admin.blueprints.search.placeholder')}"></th:block>
@@ -120,6 +121,7 @@
             </div>
         </th:block>
     </div>
+    </section>
 </main>
 
 <script type="module" th:src="@{/js/blueprint/admin-blueprints.js}" th:attr="nonce=${cspNonce}"></script>

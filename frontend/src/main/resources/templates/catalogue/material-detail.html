@@ -63,6 +63,7 @@
 
         <h2 class="md-section-title" th:text="#{materials.detail.pricesTitle}">Preise und Terminals</h2>
 
+        <section class="list-panel">
         <div class="toolbar" th:unless="${terminalRows == null || terminalRows.isEmpty()}">
             <th:block th:replace="~{kernel/fragments/components :: toolbarSearch(id='terminalFilter', name='terminal', value=null, placeholderKey='materials.detail.filterPlaceholder')}"></th:block>
         </div>
@@ -141,6 +142,7 @@
         <div id="noDataRow" class="card card--flush" th:if="${terminalRows == null || terminalRows.isEmpty()}">
             <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='materials.detail.noData', textKey='materials.detail.noData.text')}"></th:block>
         </div>
+        </section>
     </th:block>
 </main>
 

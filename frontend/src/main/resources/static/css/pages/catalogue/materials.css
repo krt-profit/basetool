@@ -65,7 +65,7 @@
         width: 100%;
         padding: 0.5rem;
         background-color: var(--control-bg);
-        border: 1px solid var(--color-gray-3);
+        border: 1px solid var(--control-border);
         color: var(--color-gray-1);
         font-family: var(--font-body);
         box-sizing: border-box;
@@ -80,6 +80,11 @@
         .material-card
     )[hidden] {
         display: none;
+    }
+
+    [id='materialsGrouped'],
+    [id='materialsFlat'] {
+        padding: var(--space-4);
     }
 
     .kind-head {

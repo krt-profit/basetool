@@ -47,7 +47,7 @@
                             <span class="cluster gap-1">
                                 <span th:if="${t.active()}" class="chip chip--success" th:text="#{admin.qualityTiers.status.active}">aktiv</span>
                                 <span th:unless="${t.active()}" class="chip chip--muted" th:text="#{admin.qualityTiers.status.inactive}">inaktiv</span>
-                                <span th:if="${t.minQuality() == 0}" class="chip chip--primary" th:text="#{admin.qualityTiers.status.base}">Grundstufe</span>
+                                <span th:if="${t.minQuality() == 0}" class="chip chip--muted" th:text="#{admin.qualityTiers.status.base}">Grundstufe</span>
                             </span>
                         </td>
                         <td class="cell-actions">
