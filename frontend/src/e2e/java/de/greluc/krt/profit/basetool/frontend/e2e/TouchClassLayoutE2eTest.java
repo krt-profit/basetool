@@ -65,10 +65,11 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *   <li>the page head's primary action lies within the first viewport;
  *   <li>a {@code .page-actions} row shows at most one {@code .btn--cta};
  *   <li>no {@code .hud-box} sits inside another;
- *   <li>no visible text is drawn in the retired gray {@value #RETIRED_GRAY}.
+ *   <li>no visible text is drawn in the retired gray {@value #RETIRED_GRAY};
+ *   <li>a horizontally scrolling {@code .tab-nav} fades exactly the edges it clips.
  * </ol>
  *
- * <p>The last five are the page-pattern rules of REQ-UI-027.
+ * <p>The five before the last are the page-pattern rules of REQ-UI-027.
  *
  * <p>Geometry is measured with bounding rectangles. All findings are collected before failing, and
  * only the Chromium run writes screenshots to {@code build/e2e-artifacts/touch-layout/}. The class
@@ -719,7 +720,8 @@ class TouchClassLayoutE2eTest {
   /**
    * Applies the page-pattern rules of REQ-UI-027: cards that are wider inside than their box on the
    * phone class, a page head's primary action below the first viewport, more than one primary
-   * action in a {@code .page-actions} row, nested {@code .hud-box}es and text in the retired gray.
+   * action in a {@code .page-actions} row, nested {@code .hud-box}es and text in the retired gray,
+   * plus the edge fade of a scrolling tab strip (REQ-UI-009).
    *
    * @param where {@code WxH /path}
    * @param probe the page-side measurement
@@ -743,6 +745,9 @@ class TouchClassLayoutE2eTest {
     }
     for (Object offender : list(probe.get("lineEndDots"))) {
       findings.add(where + ": stacked-row separator dot at the end of a line — " + offender);
+    }
+    for (Object offender : list(probe.get("uncuedTabStrips"))) {
+      findings.add(where + ": scrolling tab strip without its edge fade — " + offender);
     }
     List<Object> gray = list(probe.get("retiredGrayTexts"));
     for (Object offender : gray) {
@@ -979,13 +984,17 @@ class TouchClassLayoutE2eTest {
           }
           return Array.from(out);
         })();
-        const floorFor = (c) =>
-          DENSE_SELECTORS.some((sel) => {
+        const floorFor = (c) => {
+          const dense = %d;
+          const full = %d;
+          if (parseFloat(getComputedStyle(c).minHeight) >= full - slack) return full;
+          return DENSE_SELECTORS.some((sel) => {
             try { return c.matches(sel); } catch (e) { return false; }
-          }) ? %d : %d;
+          }) ? dense : full;
+        };
         const DENSE_SET_EMPTY = DENSE_SELECTORS.length === 0;
         const CONTROLS = 'input, select, textarea, button, a.btn, summary, [role="button"],'
-          + ' .krt-modal-close, .close-modal, .btn-close';
+          + ' .krt-modal-close, .close-modal, .btn-close, .scu-hint';
         const REPLACED = new Set(['input', 'select', 'textarea']);
         const hitBox = (c) => {
           const r = c.getBoundingClientRect();
@@ -1285,6 +1294,23 @@ class TouchClassLayoutE2eTest {
           }
         }
 
+        const uncuedTabStrips = [];
+        for (const strip of document.querySelectorAll('.tab-nav')) {
+          const max = strip.scrollWidth - strip.clientWidth;
+          if (!shown(strip) || max <= 1) continue;
+          const left = Math.abs(strip.scrollLeft);
+          const wantStart = left > 1;
+          const wantEnd = left < max - 1;
+          const masked = getComputedStyle(strip).maskImage !== 'none';
+          if (strip.classList.contains('is-clipped-start') !== wantStart
+              || strip.classList.contains('is-clipped-end') !== wantEnd
+              || (wantStart || wantEnd) !== masked) {
+            if (uncuedTabStrips.length < maxListed) {
+              uncuedTabStrips.push(label(strip) + ' clips ' + Math.round(max) + 'px, classes "'
+                + strip.className + '", mask ' + (masked ? 'on' : 'off'));
+            }
+          }
+        }
         const retiredGrayTexts = [];
         let retiredGrayCount = 0;
         for (const el of document.body.querySelectorAll('*')) {
@@ -1311,7 +1337,7 @@ class TouchClassLayoutE2eTest {
                  cutOff, unscrollableTables, badControls, smallTextEntries, modalIssues, overlaps,
                  cardOverflows, cardOverflowCount, primaryAction, primaryIssue,
                  ctaCrowds, ctaCrowdCount, nestedHudBoxes, nestedHudCount: nested.length,
-                 retiredGrayTexts, retiredGrayCount, lineEndDots,
+                 retiredGrayTexts, retiredGrayCount, lineEndDots, uncuedTabStrips,
                  modalCount: document.querySelectorAll('%s').length };
       }
       """

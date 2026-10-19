@@ -5154,6 +5154,25 @@
         .nav-context .squadron-switcher-select {
             min-height: var(--touch-target);
         }
+
+        .btn.btn-xs,
+        .btn.btn-icon {
+            min-height: var(--touch-target);
+        }
+
+        .btn.btn-icon {
+            min-width: var(--touch-target);
+        }
+
+        .scu-hint::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: var(--touch-target);
+            height: var(--touch-target);
+            transform: translate(-50%, -50%);
+        }
     }
 
     @media (width <= 768px) {
@@ -5809,6 +5828,21 @@
         background-color: var(--surface-bar);
         padding: 0 12px;
         overflow-x: auto;
+    }
+    .tab-nav.is-clipped-start {
+        mask-image: linear-gradient(to right, transparent, var(--color-white) var(--space-8));
+    }
+    .tab-nav.is-clipped-end {
+        mask-image: linear-gradient(to left, transparent, var(--color-white) var(--space-8));
+    }
+    .tab-nav.is-clipped-start.is-clipped-end {
+        mask-image: linear-gradient(
+            to right,
+            transparent,
+            var(--color-white) var(--space-8),
+            var(--color-white) calc(100% - var(--space-8)),
+            transparent
+        );
     }
     .tab-nav .tab {
         font-family: var(--font-body);

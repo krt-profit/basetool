@@ -566,8 +566,8 @@ moved to the next boundary — 460–760 → 768, 820–980 → 1024, 1600 and 1
 
 **Dense row actions are an explicit exception at 32px.** The two compact variants `.btn-xs`
 and `.btn-icon` — the *repeated* per-row actions of a dense table / tree action cluster
-(REQ-UI-022) — carry a **32px** minimum hit area on **every** device class, touch classes
-included, rather than the 44px floor above. Density in those clusters is what keeps a wide
+(REQ-UI-022) — carry a **32px** minimum hit area on the mouse classes rather than the 44px floor
+above; on the touch classes they take the full floor since 2026-10-19 (sixth round below). Density in those clusters is what keeps a wide
 Lager / bank / mission table readable, and the design system specifies exactly that: `.btn-xs`
 at 32px in `krt-components.css`, `.btn-icon` in its README as the icon-only row action that
 "saves ~50–60% of the action column in dense tables". Note the design system orders `.btn-xs`
@@ -780,12 +780,34 @@ a geometric check had no rule for:
   fourth of four and loaded off-screen; `common-handlers.js` scrolls the strip, never the page, so
   the current `.tab-nav` or `.krt-segmented` item is in view.
 
+**A sixth round, 2026-10-19: row buttons and tab strips on touch** (owner decision, after the
+design-system walk of every page on all six device classes):
+
+- **`.btn-xs` and `.btn-icon` keep their 32px density on desktop only.** On the touch classes —
+  `(width <= 1024px), (pointer: coarse)` — the touch block raises `.btn.btn-xs` and `.btn.btn-icon`
+  to `--touch-target` (an icon button also to 44px wide). The walk measured confirm/reject on bank
+  request cards, hide and home-location on `/admin/locations`, the edit and delete icons on
+  `/admin/mission-data`, the purchasing, supply and refinery row actions, the „Alles" buttons of the
+  stolen-mark and Materialbörse dialogs and the markdown toolbar at 30–34px, which is too small to
+  hit reliably with a finger. The other dense consumers (`.item-checkbox`, `.matrix-flag`,
+  `.bank-row-toggle`, `.master-row`, `.pa-sort-btn`, …) keep their exemption. The guard counts a
+  control as dense only while its computed `min-height` is below 44px, so a dense declaration that
+  the touch block overrides no longer lowers the floor.
+- **A field hint („?") has a 44px hit area on touch.** `.scu-hint` stays a 17px glyph and gains a
+  centred, transparent, positioned `::before` of `--touch-target`.
+- **A scrolling tab strip shows that it scrolls.** A `.tab-nav` whose tabs do not fit fades the edge
+  behind which tabs are hidden (`mask-image`, `--space-8` wide) and drops the fade at the scroll end.
+  `kernel/krt-tab-scroll-cue.js` sets `is-clipped-start` / `is-clipped-end` from the scroll position
+  and a `ResizeObserver`; a scroll-driven animation would need no script but is not in Safari 18.4
+  or Firefox, both inside the browser floor. The guard fails a strip whose classes or mask disagree
+  with its scroll position.
+
 **Acceptance**
 
 - [ ] Verified at all four breakpoints; interactive targets have an **effective hit area** (own box,
   a positioned `::before` / `::after` overlay, or the `<label>` that activates them) ≥ 44px on touch
-  classes, except the dense in-row controls listed above (`.btn-xs`, `.btn-icon`, `.master-row`,
-  `.item-checkbox`, `.matrix-flag`, `.bank-row-toggle`, `.pa-sort-btn`, …), which are ≥
+  classes, except the dense in-row controls listed above (`.master-row`, `.item-checkbox`,
+  `.matrix-flag`, `.bank-row-toggle`, `.pa-sort-btn`, …; `.btn-xs` and `.btn-icon` on desktop only), which are ≥
   `--touch-target-dense` (32px) on every class. That list is a reader's summary, not the mechanism: the stylesheet's
   `--touch-target-dense` consumers are the source of truth, and the guard derives the set from them.
 - [ ] **A new control needs no edit to be compliant.** The floor is a zero-specificity default, so a
