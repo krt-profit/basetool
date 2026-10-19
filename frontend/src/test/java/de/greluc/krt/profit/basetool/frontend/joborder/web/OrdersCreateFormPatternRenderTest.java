@@ -101,7 +101,7 @@ class OrdersCreateFormPatternRenderTest {
    * @return each {@code <form>} element's markup inside {@code <main>}, in document order
    */
   private static @NotNull List<String> forms(@NotNull String html) {
-    String main = html.substring(html.indexOf("<main>"), html.indexOf("</main>"));
+    String main = html.substring(html.indexOf("<main"), html.indexOf("</main>"));
     List<String> forms = new ArrayList<>();
     Matcher matcher = FORM.matcher(main);
     while (matcher.find()) {

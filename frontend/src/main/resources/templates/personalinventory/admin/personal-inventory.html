@@ -13,7 +13,7 @@
     <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{admin.personalInventory.title},
         count=${page != null ? page.totalElements() : null}, countId='pi-count', countFor='pi-results')}"></th:block>
 
-    <form th:action="@{/admin/personal-inventory}" method="get" class="krt-pi-userform no-track">
+    <form th:action="@{/admin/personal-inventory}" method="get" class="krt-pi-userform form-width no-track">
         <label for="krt-pi-user-select" th:text="#{admin.personalInventory.userSelect.label}">Mitglied</label>
         <select id="krt-pi-user-select" name="userSub" data-krt-combobox="remote-users">
             <option value="" th:text="#{admin.personalInventory.userSelect.placeholder}">-- bitte waehlen --</option>

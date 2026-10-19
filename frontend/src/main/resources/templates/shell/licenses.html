@@ -8,7 +8,7 @@
 </head>
 <body>
 <th:block th:fragment="pageContent">
-<main>
+<main class="page--narrow">
     <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.legal', titleText=#{licenses.title})}"></th:block>
     <div class="card legal-doc" data-testid="legal-doc">
         <p th:text="#{licenses.intro}">Das Profit Basetool enth&auml;lt Open-Source-Komponenten Dritter.</p>

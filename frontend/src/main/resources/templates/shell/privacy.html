@@ -8,7 +8,7 @@
 </head>
 <body>
 <th:block th:fragment="pageContent">
-<main>
+<main class="page--narrow">
     <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.legal', titleText=#{privacy.title})}"></th:block>
 
     <nav class="card legal-toc" aria-labelledby="privacy-toc-title" data-testid="privacy-toc">

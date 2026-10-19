@@ -14,7 +14,7 @@
 
     <th:block th:replace="~{kernel/fragments/components :: alert('danger', ${error}, null)}"></th:block>
 
-    <section class="card card--accent" th:if="${aliasToEdit != null}" aria-labelledby="alias-edit-title">
+    <section class="card card--accent form-width" th:if="${aliasToEdit != null}" aria-labelledby="alias-edit-title">
         <div class="card-head">
             <h2 id="alias-edit-title" class="card-title" th:text="#{admin.materialAlias.section.edit}">Alias bearbeiten</h2>
         </div>
@@ -104,7 +104,7 @@
         </div>
     </div>
 
-    <section class="card" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" aria-labelledby="alias-create-title">
+    <section class="card form-width" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" aria-labelledby="alias-create-title">
         <div class="card-head">
             <h2 id="alias-create-title" class="card-title" th:text="#{admin.materialAlias.section.add}">Neuen Alias anlegen</h2>
         </div>

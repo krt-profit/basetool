@@ -533,6 +533,28 @@ Every layout change and new component works on **four** classes:
   auto-fit card/dashboard grids) but cap long-form text at `max-width: 80ch` on `<p>`. From
   1440px `main` widens to `--content-max-data` (1600px).
 
+**Page widths follow the page type** (owner decision 2026-10-19). Every page starts at the same
+left edge — `main`'s horizontal padding is `--page-gutter` (32px, 24px up to 1024px, 16px up to
+768px), and the mission page's full-bleed head, tabs and panes inset by the same token — and the
+page head never runs wider than the content below it:
+
+- **Data pages** (tables, Lager, Bank, Materialbörse, mission and order lists, the materials matrix,
+  the profit calculation, the mission detail) use the full `main`: `--content-max` (1200px), from
+  1440px `--content-max-data` (1600px).
+- **Form and text pages** (profile, admin settings, admin announcement, `orders/create`,
+  `missions/new`, `inventory/input`, refinery create, impressum, privacy, terms, licences) mark
+  `main` with `.page--narrow`: every direct child — page head, alerts, the form or text column —
+  stops at `--content-max-form` (760px), left-aligned. A page with a fixed side column widens that
+  cap through `--page-column` (refinery create: form 760px + its side panel); the profile caps its
+  wrapper at the section nav plus 760px.
+- **A form inside a data page** (the material-alias edit and create cards, the admin member pickers
+  of personal inventory and personal blueprints, the default-blueprint search) carries `.form-width`
+  and stops at 760px too.
+- **Alerts** stop at `--measure` (80ch) on every page, so a notice never reads as one line across a
+  1600px table.
+
+`.form-layout` and `.form-width` are `border-box`, so the 760px is the outer edge of the card.
+
 **Breakpoints are only the class boundaries** (DS-11, ADR-0242, amended 2026-10-03): a media query
 uses `(width <= 768px)`, `(width <= 1024px)` or `(width >= 1440px)` — or a range between two of them —
 and nothing else. Stylelint's `media-feature-name-value-allowed-list` enforces it in both
@@ -1690,7 +1712,8 @@ krt-profit/design-system#6), and every work page follows one of three patterns.
    to four exclusive options (DS-6, REQ-UI-028), further filters behind „Filter" with a square `.filter-count`, active
    filters as `.filter-chips` with „Alle zurücksetzen". Filters apply live through `krtFetch`, never
    through a „Filtern" button; per-browser persistence (REQ-UI-017) stays.
-8. **Forms** use `.form-layout` (at most 760 px) with numbered `.form-section`s, a `.form-grid` that
+8. **Forms** use `.form-layout` (at most 760 px, left-aligned under the page head; a form page marks
+   `main` with `.page--narrow`, REQ-UI-009) with numbered `.form-section`s, a `.form-grid` that
    is two columns from tablet up, computed values as `.field-computed`, two to four exclusive options
    as `.krt-segmented--block` instead of radios, and the actions in `.form-actions--sticky` with a live
    `.form-actions__summary` (DS-9).

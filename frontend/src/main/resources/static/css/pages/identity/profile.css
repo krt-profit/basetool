@@ -2,7 +2,8 @@
 
 @layer page {
     .profile-page {
-        max-width: none;
+        max-width: calc(13rem + var(--space-8) + var(--content-max-form));
+        margin-inline: 0;
     }
     .profile-layout {
         display: grid;

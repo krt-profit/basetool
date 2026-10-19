@@ -6,6 +6,8 @@
 
 - **Neues Erscheinungsbild im Stil der Website.** Das Basetool steht nicht mehr auf Schwarz, sondern auf den Grautönen von das-kartell.org (Seite `#202020`, Panels `#35393D`, Leisten `#2A2D31`) mit 4 px Rundung, und die Hausfarbe ist `#FB8A28`. Bedienelemente haben Füllung und sichtbaren Rand, Bereichs-Tags sind gefüllt; Logos, Favicon, App-Icons, PDFs, Anmeldeseite, Wartungsseite und Exchange-Doku tragen das neue Orange (REQ-UI-002, REQ-UI-003, REQ-UI-007, ADR-0292).
 
+- **Seitenbreiten nach Seitentyp auf breiten Bildschirmen.** Tabellen- und Listenseiten nutzen weiter bis zu 1600 px, Formulare und Textseiten (Profil, Einstellungen, Ankündigung, Auftrag/Einsatz anlegen, Einbuchen, Raffinerieauftrag, Rechtsseiten) bleiben samt Seitenkopf bei 760 px und linksbündig; Hinweise sind höchstens 80 Zeichen breit. Die Einsatzseite hat denselben Seitenrand wie alle anderen Seiten (REQ-UI-009).
+
 ### Fixed
 
 - **Design-System-Abgleich aller Seiten.** Nach einer Kontrolle jeder Seite, jedes Dialogs und Menüs auf allen sechs Geräteklassen haben Eingabefelder wieder sichtbare Ränder, Auswahlen sind nie gefüllte Farbblöcke, grüne und orange Texte sind lesbar, und Listen-Seiten bündeln Suche, Filter und Liste in einem Panel. Overflow-Menüs bleiben auf dem Telefon im Bild, und die Checkbox „Ohne gestohlene“ in der Materialbörse ist wieder sichtbar (REQ-UI-006, REQ-UI-007).

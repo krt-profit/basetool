@@ -8,7 +8,7 @@
 </head>
 <body>
 <th:block th:fragment="pageContent">
-<main>
+<main class="page--narrow">
     <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='orders.create.back', eyebrowHref=@{/orders},
         titleText=(${editOrderId != null} ? #{orders.create.editTitle} : #{orders.create.title}))}"></th:block>
 

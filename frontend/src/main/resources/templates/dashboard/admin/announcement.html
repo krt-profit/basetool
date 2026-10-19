@@ -8,7 +8,7 @@
 </head>
 <body>
 <th:block th:fragment="pageContent">
-<main th:with="announcementContent=${adminAnnouncement != null and adminAnnouncement.content != null ? adminAnnouncement.content : ''}">
+<main class="page--narrow" th:with="announcementContent=${adminAnnouncement != null and adminAnnouncement.content != null ? adminAnnouncement.content : ''}">
     <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.members', titleText=#{info.edit.title}, actions=~{::announcement-actions})}">
         <th:block th:ref="announcement-actions">
             <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id='announcement-menu', items=~{::announcement-menu-items})}">
