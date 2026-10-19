@@ -54,4 +54,11 @@ public record P4kCommodityDto(
     String descKey,
     String typeGuid,
     String subtypeGuid,
-    String displayType) {}
+    String displayType) {
+
+  /** Decodes the escaped line breaks of both descriptions (REQ-DATA-025). */
+  public P4kCommodityDto {
+    desc = P4kText.decodeLineBreaks(desc);
+    descDe = P4kText.decodeLineBreaks(descDe);
+  }
+}

@@ -680,6 +680,24 @@ class P4kImportServiceTest {
   }
 
   @Test
+  void commodity_seededDescription_hasRealLineBreaks() {
+    UUID guid = UUID.randomUUID();
+    when(materialRepository.findByScwikiUuid(guid)).thenReturn(Optional.empty());
+    when(materialRepository.findByNameIgnoreCase("Sunset Berries")).thenReturn(Optional.empty());
+
+    String json =
+        "{\"commodities\":[{\"guid\":\""
+            + guid
+            + "\",\"name\":\"Sunset Berries\",\"desc\":\"NDR: 08\\\\nEffect: Toxic\"}]}";
+
+    service.applyImport(upload(json), true);
+
+    ArgumentCaptor<Material> captor = ArgumentCaptor.forClass(Material.class);
+    verify(materialRepository).save(captor.capture());
+    assertEquals("NDR: 08\nEffect: Toxic", captor.getValue().getDescription());
+  }
+
+  @Test
   void blueprint_resolvesUnresolvedItemIngredientByWikiItemUuid() {
     UUID bpGuid = UUID.randomUUID();
     UUID itemUuid = UUID.randomUUID();

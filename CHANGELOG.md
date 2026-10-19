@@ -8,6 +8,7 @@
 
 ### Fixed
 
+- **Materialbeschreibung mit Zeilenumbrüchen.** Beschreibungen aus den Spieldaten (P4K-Import) zeigten Zeilenumbrüche als `\n` im Text, etwa bei Sunset Berries. Der Import speichert sie jetzt als echte Umbrüche, Migration V308 korrigiert die vorhandenen Einträge, und die Materialseite zeigt jede Zeile für sich (REQ-DATA-025).
 - **Raffinerieauftrag anlegen bei Mitgliedschaft in Staffel und Bereich.** Das Formular zeigt jetzt die Auswahl „Zuordnen zu“, wenn der Besitzer mehreren Organisationseinheiten gleich welcher Art angehört; vorher fehlte sie, und jedes Anlegen scheiterte mit der falschen Meldung „Materialien sind ungültig oder fehlen.“ Eine fehlende Einheit wird nun auch als solche gemeldet (REQ-ORG-023).
 - **„Abbrechen“ in den Dialogen von „Einsatzdaten verwalten“.** Der Abbrechen-Button der Dialoge für Staffeln, Aufgaben und Frequenztypen schließt den Dialog wieder; bisher reagierte nur das ✕ (REQ-UI-013).
 
