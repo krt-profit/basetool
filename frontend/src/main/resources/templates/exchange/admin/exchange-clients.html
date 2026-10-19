@@ -242,7 +242,7 @@
         </form>
     </section>
 
-    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='xc-undo-modal', titleKey='admin.exchangeClients.undo.title', variant='krt-modal--wide', body=~{::xc-undo-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='xc-undo-modal', titleKey='admin.exchangeClients.undo.title', variant='krt-modal--wide krt-modal--danger', body=~{::xc-undo-modal-body})}">
         <th:block th:ref="xc-undo-modal-body">
             <form id="xc-undo-form" class="no-track" data-client-id="" novalidate>
                 <div class="krt-modal-body">

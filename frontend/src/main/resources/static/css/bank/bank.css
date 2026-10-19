@@ -111,7 +111,7 @@
     }
 
     .kpi-delta--pos {
-        color: var(--color-success);
+        color: var(--color-success-text);
     }
 
     .kpi-delta--neg {
@@ -309,7 +309,7 @@
         box-sizing: border-box;
         background: var(--control-bg);
         color: var(--color-gray-1);
-        border: var(--border-hairline);
+        border: 1px solid var(--control-border);
         padding: 7px 9px;
         font-size: 0.8rem;
         margin-top: 8px;
@@ -471,7 +471,7 @@
     }
 
     .bank-amount--pos {
-        color: var(--color-success);
+        color: var(--color-success-text);
     }
 
     .bank-amount--neg {
@@ -976,43 +976,6 @@
 
     .bank-dept--search-rescue {
         --bank-dept: var(--color-dept-search-rescue);
-    }
-
-    .bank-chart-ranges {
-        display: inline-flex;
-        flex-wrap: wrap;
-        border: 1px solid var(--color-gray-3);
-    }
-
-    .bank-chart-range-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-height: var(--touch-target-dense);
-        padding: 0 0.75rem;
-        font-size: 0.75rem;
-        color: var(--color-gray-1);
-        background-color: var(--control-bg);
-        border-right: 1px solid var(--color-gray-3);
-        text-decoration: none;
-        cursor: pointer;
-        white-space: nowrap;
-    }
-
-    .bank-chart-ranges > *:last-child {
-        border-right: 0;
-    }
-
-    .bank-chart-range-btn:hover {
-        background-color: var(--color-gray-3);
-        color: var(--color-white);
-    }
-
-    .bank-chart-range-btn.is-active {
-        background-color: var(--color-primary);
-        color: var(--color-bg-black);
-        font-weight: var(--fw-bold);
-        cursor: default;
     }
 
     .bank-chart {

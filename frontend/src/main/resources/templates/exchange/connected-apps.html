@@ -125,7 +125,7 @@
 
     <div class="alert alert-success ca-undo-result" id="ca-undo-result" hidden aria-live="polite" data-testid="ca-undo-result"></div>
 
-    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='ca-undo-modal', titleKey='connectedApps.undo.title', variant='', body=~{::ca-undo-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='ca-undo-modal', titleKey='connectedApps.undo.title', variant='krt-modal--danger', body=~{::ca-undo-modal-body})}">
         <th:block th:ref="ca-undo-modal-body">
             <form id="ca-undo-form" class="no-track">
                 <div class="krt-modal-body">

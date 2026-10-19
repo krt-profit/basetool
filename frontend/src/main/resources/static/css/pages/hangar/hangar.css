@@ -4,7 +4,6 @@
     .hangar-tabs {
         margin-bottom: var(--space-4);
         padding: 0;
-        background: transparent;
     }
     #hangar-more .overflow-menu__item:disabled {
         color: var(--color-gray-2-text);

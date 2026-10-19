@@ -1421,9 +1421,9 @@
                 <div class="form-group">
                     <label th:text="#{mission.finance.type}">Typ</label>
                     <input type="hidden" name="type" id="add-finance-type" th:value="${financeForm.type != null ? financeForm.type.name() : 'INCOME'}">
-                    <span class="seg" data-seg-target="add-finance-type">
-                        <button type="button" data-type-value="INCOME" aria-pressed="false" th:text="#{mission.finance.type.income}">Einnahme</button>
-                        <button type="button" data-type-value="EXPENSE" aria-pressed="false" th:text="#{mission.finance.type.expense}">Ausgabe</button>
+                    <span class="seg krt-segmented krt-segmented--sm" data-seg-target="add-finance-type">
+                        <button type="button" class="krt-segmented__item" data-type-value="INCOME" aria-pressed="false" th:text="#{mission.finance.type.income}">Einnahme</button>
+                        <button type="button" class="krt-segmented__item" data-type-value="EXPENSE" aria-pressed="false" th:text="#{mission.finance.type.expense}">Ausgabe</button>
                     </span>
                 </div>
 
@@ -1470,9 +1470,9 @@
                 <div class="form-group">
                     <label th:text="#{mission.finance.type}">Typ</label>
                     <input type="hidden" name="type" id="edit-finance-type" value="INCOME">
-                    <span class="seg" data-seg-target="edit-finance-type">
-                        <button type="button" data-type-value="INCOME" aria-pressed="false" th:text="#{mission.finance.type.income}">Einnahme</button>
-                        <button type="button" data-type-value="EXPENSE" aria-pressed="false" th:text="#{mission.finance.type.expense}">Ausgabe</button>
+                    <span class="seg krt-segmented krt-segmented--sm" data-seg-target="edit-finance-type">
+                        <button type="button" class="krt-segmented__item" data-type-value="INCOME" aria-pressed="false" th:text="#{mission.finance.type.income}">Einnahme</button>
+                        <button type="button" class="krt-segmented__item" data-type-value="EXPENSE" aria-pressed="false" th:text="#{mission.finance.type.expense}">Ausgabe</button>
                     </span>
                 </div>
 

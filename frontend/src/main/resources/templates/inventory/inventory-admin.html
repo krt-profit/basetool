@@ -47,6 +47,7 @@
            data-testid="lager-view-items" th:text="#{inventory.items.view.items}">Items</a>
     </div>
 
+    <section class="list-panel">
     <form th:if="${view != 'items'}" th:action="@{/inventory/all}" method="get" id="globalFilterForm" class="global-inventory-filter no-track">
         <div class="toolbar lager-toolbar">
             <th:block th:replace="~{kernel/fragments/components :: filterPopover(panelId='globalFilterPanel', panelName='inventory-all',
@@ -364,6 +365,7 @@
             </div>
         </div>
     </div>
+    </section>
 </main>
 
 <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='bookOutModal', titleKey='inventory.bookout.title', variant='krt-modal--wide', open=${showBookOutModal != null}, closeTrigger='inv-admin-close-bookout', body=~{::bookOutModal-body})}">
@@ -433,11 +435,11 @@
             </div>
             </div>
             <div class="krt-modal-foot">
+                <button type="button" class="btn btn-ghost" data-trigger="inv-admin-close-bookout" th:text="#{inventory.bookout.cancel}">Abbrechen</button>
                 <button type="submit" id="bookOutSubmitBtn" class="btn btn--cta"
                         th:data-text-discard="#{inventory.bookout.btn.discard}"
                         th:data-text-sell="#{inventory.bookout.btn.sell}"
                         th:text="#{inventory.bookout.submit}">Ausbuchen</button>
-                <button type="button" class="btn btn-ghost" data-trigger="inv-admin-close-bookout" th:text="#{inventory.bookout.cancel}">Abbrechen</button>
             </div>
         </form>
     </th:block>
@@ -504,8 +506,8 @@
             </div>
             </div>
             <div class="krt-modal-foot">
-                <button type="submit" id="umbuchenSubmitBtn" class="btn btn--cta" th:text="#{inventory.rebook.submit}">Umbuchen</button>
                 <button type="button" class="btn btn-ghost" data-trigger="inv-admin-close-umbuchen" th:text="#{inventory.rebook.cancel}">Abbrechen</button>
+                <button type="submit" id="umbuchenSubmitBtn" class="btn btn--cta" th:text="#{inventory.rebook.submit}">Umbuchen</button>
             </div>
         </form>
     </th:block>

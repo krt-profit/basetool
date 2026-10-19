@@ -68,12 +68,12 @@
         </button>
     </nav>
 
+    <section class="list-panel">
     <form id="mb-filter-form" class="no-track mb-toolbar" method="get" th:action="@{/materialboerse}">
         <div class="toolbar">
             <th:block th:replace="~{kernel/fragments/components :: segmented(name='scope', labelKey='materialboerse.scope.label', selected=${activeScope},
                 options=${ {{value: 'all', labelKey: 'filter.all', count: scopeCountAll}, {value: 'mine', labelKey: 'materialboerse.scope.mine', count: scopeCountMine}} })}"></th:block>
             <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('mb-search', 'q', ${filterQ}, 'materialgesuch.filter.search.placeholder')}"></th:block>
-            <th:block th:replace="~{kernel/fragments/components :: filterChips('mb-filter-form')}"></th:block>
             <th:block th:replace="~{kernel/fragments/components :: filterPopover(panelId='mb-filter-panel', panelName='materialboerse',
                 testid='mb-filter-toggle', body=~{::mb-filter-body})}">
                 <th:block th:ref="mb-filter-body">
@@ -107,9 +107,10 @@
                 <option value="neu" th:selected="${filterSort == 'neu'}" th:text="#{materialboerse.sort.neu}">Neueste zuerst</option>
             </select>
         </div>
+        <th:block th:replace="~{kernel/fragments/components :: filterChips('mb-filter-form')}"></th:block>
     </form>
 
-    <div id="mb-board" role="tabpanel">
+    <div id="mb-board" class="card card--flush mb-board" role="tabpanel">
         <th:block th:fragment="board">
             <div th:if="${activeMode == 'requests'}" id="mg-listwrap">
                 <th:block th:replace="~{materialexchange/fragments/materialgesuch-board :: requestList}"></th:block>
@@ -280,6 +281,7 @@
             </div>
         </th:block>
     </div>
+    </section>
 
     <th:block th:replace="~{materialexchange/fragments/materialboerse-modal :: releaseModal}"/>
     <th:block th:replace="~{materialexchange/fragments/materialgesuch-modal :: requestModal}"/>

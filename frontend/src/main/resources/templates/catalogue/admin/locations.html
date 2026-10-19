@@ -18,6 +18,7 @@
         <div th:replace="~{kernel/fragments/components :: alert('warning', 'admin.catalog.truncated', null)}"></div>
     </th:block>
 
+    <section class="list-panel">
     <div class="toolbar">
         <div class="toolbar__search">
             <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-search"/></svg>
@@ -71,6 +72,7 @@
             <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='admin.locations.empty', textKey='admin.locations.empty.text')}"></th:block>
         </th:block>
     </div>
+    </section>
 </main>
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">

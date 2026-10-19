@@ -5,6 +5,10 @@
         padding: 1.25rem;
     }
 
+    .krt-bp-search {
+        max-width: var(--content-max-form);
+    }
+
     .krt-pi-userform {
         display: flex;
         gap: 0.75rem;
@@ -16,10 +20,11 @@
     .krt-pi-userform select {
         min-height: 44px;
         background-color: var(--control-bg);
-        border: 1px solid var(--color-gray-3);
+        border: 1px solid var(--control-border);
         color: var(--color-gray-1);
         padding: 0.4rem 2rem 0.4rem 0.6rem;
         min-width: 240px;
+        max-width: var(--content-max-form);
     }
 
     .krt-pi-userform label {
@@ -83,7 +88,7 @@
         width: 100%;
         min-height: 44px;
         background-color: var(--control-bg);
-        border: 1px solid var(--color-gray-3);
+        border: 1px solid var(--control-border);
         color: var(--color-gray-1);
         font-family: Lato, sans-serif;
         padding: 0.5rem;
@@ -97,7 +102,7 @@
         width: 100%;
         min-height: 44px;
         background-color: var(--control-bg);
-        border: 1px solid var(--color-gray-3);
+        border: 1px solid var(--control-border);
         color: var(--color-gray-1);
         font-family: Lato, sans-serif;
         padding: 0.5rem 2rem 0.5rem 0.5rem;
@@ -372,7 +377,7 @@
         width: 100%;
         min-height: 44px;
         background-color: var(--control-bg);
-        border: 1px solid var(--color-gray-3);
+        border: 1px solid var(--control-border);
         color: var(--color-gray-1);
         font-family: Lato, sans-serif;
         padding: 0.5rem;
@@ -499,7 +504,7 @@
         width: 100%;
         min-height: 44px;
         background-color: var(--control-bg);
-        border: 1px solid var(--color-gray-3);
+        border: 1px solid var(--control-border);
         color: var(--color-gray-1);
         font-family: Lato, sans-serif;
         padding: 0.4rem 0.5rem;
@@ -571,6 +576,10 @@
 
     .krt-bp-toolbar.is-empty {
         display: none;
+    }
+
+    .list-panel .card--flush > .empty-state {
+        background-color: transparent;
     }
 
     .krt-bp-refinery {

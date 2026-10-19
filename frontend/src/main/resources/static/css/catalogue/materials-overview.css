@@ -93,8 +93,13 @@
         gap: var(--space-2);
     }
 
+    .mtx-active-chips:empty,
     .mtx-active-chips[hidden] {
         display: none;
+    }
+
+    .mtx-toolbar:has(+ .mtx-active-chips:is(:empty, [hidden])) {
+        border-bottom: var(--border-hairline);
     }
 
     .mtx-legend {
@@ -136,13 +141,15 @@
     }
 
     .mtx-hint {
-        margin: var(--space-2) 0 0;
+        margin: 0;
+        padding: var(--space-3) var(--space-4);
+        border-top: var(--border-hairline);
         font-size: var(--fs-xs);
         color: var(--color-gray-2-text);
     }
 
     .matrix-loading {
-        padding: var(--space-4) 0;
+        padding: var(--space-4);
         color: var(--color-gray-2-text);
         font-family: var(--font-body);
     }
@@ -511,10 +518,6 @@
     }
 
     @media (width <= 768px) {
-        .mtx-toolbar > .mtx-active-chips {
-            order: 3;
-        }
-
         .mtx-toolbar > .krt-switch {
             order: 4;
         }

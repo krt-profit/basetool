@@ -17,6 +17,7 @@
     <div th:if="${isAllSquadronsMode}" class="alert alert-info" data-testid="bp-overview-all-units"
          th:text="#{blueprintOverview.all_orgunits_notice}">Aggregation across all org units.</div>
 
+    <section class="list-panel">
     <form id="bp-overview-filter-form" class="bpo-filter-form no-track" method="get" th:action="@{/blueprint-overview}"
           th:if="${overviewPage != null and (overviewPage.totalElements() > 0 or search != null)}">
         <div class="toolbar">
@@ -73,6 +74,7 @@
         </th:block>
     </th:block>
     </div>
+    </section>
 </main>
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">

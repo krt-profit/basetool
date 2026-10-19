@@ -128,7 +128,7 @@
         </div>
     </section>
 
-    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='reject-modal', titleKey='admin.discordRegistrations.reject.modal.title', variant='krt-modal--wide', body=~{::reject-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='reject-modal', titleKey='admin.discordRegistrations.reject.modal.title', variant='krt-modal--wide krt-modal--danger', body=~{::reject-modal-body})}">
         <th:block th:ref="reject-modal-body">
             <div class="krt-modal-body">
                 <label for="reject-reason" th:text="#{admin.discordRegistrations.reject.modal.reasonLabel}">Begründung (optional)</label>

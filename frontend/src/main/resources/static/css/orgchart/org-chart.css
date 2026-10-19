@@ -240,7 +240,7 @@
         align-items: center;
         gap: 0.15rem;
         padding: 0.5rem 0.9rem;
-        background: var(--color-surface-input);
+        background: var(--surface-panel);
         border: 1px solid var(--color-gray-3);
         border-top: 3px solid var(--color-primary);
         width: var(--oc-box-w);
@@ -268,7 +268,7 @@
     }
 
     .oc-unit-box--sk .sh {
-        color: var(--color-success-text);
+        color: var(--color-gray-1);
     }
 
     .oc-tree + .oc-caption {

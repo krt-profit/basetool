@@ -234,7 +234,7 @@ now take the tints. Two `aria-hidden` glyphs kept Grau 2 as decorative exception
 2026-10-03 — the unsorted-column indicator of the material demand table and the blueprint search
 icon; DS-1 (REQ-UI-027) gave them the tint as well, so there is no exception left.
 
-**Enforced by:** `AccessibleTextTintTest` (no stylesheet sets `color` to the danger, info or Grau 2
+**Enforced by:** `AccessibleTextTintTest` (no stylesheet sets `color` to the danger, info, success or Grau 2
 hue, and no script writes one into `style.color`; its selector exemption list for decorative
 glyphs is empty) · `AccessibilitySmokeE2eTest` (axe WCAG A/AA on five pages; its report now names every
 failing node with its colours and ratio)

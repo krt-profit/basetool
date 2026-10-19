@@ -26,6 +26,7 @@
 
     <div th:if="${error}" class="alert alert-danger" th:text="#{${error}}">Fehler beim Laden.</div>
 
+    <section class="list-panel">
     <div class="toolbar" id="notifications-toolbar">
         <th:block th:replace="~{kernel/fragments/components :: segmented(name='filter', labelKey='notifications.filter.label', selected='UNREAD',
             options=${ {{value: 'UNREAD', labelKey: 'notifications.filter.unread'}, {value: 'ALL', labelKey: 'filter.all'}} })}"></th:block>
@@ -71,6 +72,7 @@
                     th:text="#{notifications.loadMore}">Mehr laden</button>
         </div>
     </div>
+    </section>
 </main>
 <script type="module" th:src="@{/js/notification/notifications-page.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>

@@ -38,17 +38,17 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Build-time check of the accessible text tints (REQ-UI-006): text colour never uses the danger
- * ({@code #A3000A}), info ({@code #355DDC}) or grey 2 ({@code #8F9399}) hues, which fail WCAG AA on
- * dark surfaces, but their {@code -text} tints. Reads the declarations directly, so unrendered
- * styles are covered too.
+ * ({@code #A3000A}), info ({@code #355DDC}), success ({@code #239E33}) or grey 2 ({@code #8F9399})
+ * hues, which fail WCAG AA on dark surfaces, but their {@code -text} tints. Reads the declarations
+ * directly, so unrendered styles are covered too.
  */
 class AccessibleTextTintTest {
 
   /** The {@code color} property (not {@code border-color} etc.) set to a failing hue. */
   private static final Pattern CSS_TEXT_COLOUR =
       Pattern.compile(
-          "(?<![-\\w])color\\s*:\\s*(var\\(--color-(?:danger|info|gray-2)\\)"
-              + "|#a3000a|#355ddc|#8f9399)(?![-\\w])",
+          "(?<![-\\w])color\\s*:\\s*(var\\(--color-(?:danger|info|success|gray-2)\\)"
+              + "|#a3000a|#355ddc|#239e33|#8f9399)(?![-\\w])",
           Pattern.CASE_INSENSITIVE);
 
   /** An innermost CSS rule block: its selector and its declarations. */
@@ -63,8 +63,8 @@ class AccessibleTextTintTest {
   /** A script writing a failing hue into {@code style.color}. */
   private static final Pattern JS_TEXT_COLOUR =
       Pattern.compile(
-          "\\.style\\.color\\s*=\\s*['\"](var\\(--color-(?:danger|info|gray-2)\\)"
-              + "|#a3000a|#355ddc|#8f9399)['\"]",
+          "\\.style\\.color\\s*=\\s*['\"](var\\(--color-(?:danger|info|success|gray-2)\\)"
+              + "|#a3000a|#355ddc|#239e33|#8f9399)['\"]",
           Pattern.CASE_INSENSITIVE);
 
   /**

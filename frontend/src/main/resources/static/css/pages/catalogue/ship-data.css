@@ -15,11 +15,6 @@
         margin: 0;
         font-size: 1.15rem;
     }
-    .sd-toolbar {
-        flex: 1 1 280px;
-        justify-content: flex-end;
-        margin-bottom: 0;
-    }
     .sd-row--hidden > td {
         opacity: 0.5;
     }

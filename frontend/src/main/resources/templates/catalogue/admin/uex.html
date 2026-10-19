@@ -41,15 +41,17 @@
 
     <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{${error}}">Fehler</div>
 
+    <section class="list-panel">
     <div class="toolbar">
         <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('filterUex', 'q', null, 'general.filter.name.placeholder')}"></th:block>
     </div>
 
-    <div th:if="${starSystems == null or starSystems.isEmpty()}" class="card card--flush">
+    <div class="card card--flush">
+    <th:block th:if="${starSystems == null or starSystems.isEmpty()}">
         <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='admin.uex.empty.title', textKey='admin.uex.empty.systems')}"></th:block>
-    </div>
+    </th:block>
 
-    <div class="uex-tree">
+    <div class="uex-tree" th:unless="${starSystems == null or starSystems.isEmpty()}">
 
         <details class="uex-system" open
                  th:each="system : ${starSystems}"
@@ -295,6 +297,8 @@
             </div>
         </details>
     </div>
+    </div>
+    </section>
 </main>
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">

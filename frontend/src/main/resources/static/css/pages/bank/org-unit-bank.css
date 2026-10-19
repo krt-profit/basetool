@@ -9,6 +9,23 @@
         margin-bottom: 0;
     }
 
+    .ou-panel.stack > .list-panel {
+        margin-bottom: 0;
+    }
+
+    .ou-list-panel .ou-acc-grid {
+        padding: var(--space-4);
+    }
+
+    .ou-list-panel .ou-list {
+        border: 0;
+        background: transparent;
+    }
+
+    .list-panel .empty-state {
+        border: 0;
+    }
+
     .ou-panel .card + .card {
         margin-top: 0;
     }

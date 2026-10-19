@@ -56,6 +56,7 @@
         </a>
     </nav>
 
+    <section class="list-panel">
     <form id="krt-bp-filter-form" class="krt-bp-toolbar-form no-track" th:action="@{/personal-inventory/blueprints}" method="get">
         <div class="toolbar krt-bp-toolbar" id="krt-bp-craft-toolbar"
              th:classappend="${#lists.isEmpty(blueprints) and #strings.isEmpty(filterQuery)} ? ' is-empty' : ''">
@@ -161,6 +162,7 @@
         </div>
     </th:block>
     </div>
+    </section>
 </main>
 
 <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='krt-bp-add-modal', titleKey='personalInventory.blueprints.add.heading', variant='krt-modal--wide', body=~{::krt-bp-add-modal-body})}">

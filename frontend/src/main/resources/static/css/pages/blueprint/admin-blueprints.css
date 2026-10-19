@@ -8,6 +8,9 @@
     table.bp-table {
         width: 100%;
         border-collapse: collapse;
+        margin-top: 0;
+        border: 0;
+        background-color: transparent;
     }
     table.bp-table th {
         height: 40px;

@@ -36,19 +36,21 @@
         <div class="split sd-section__head">
             <h2 id="sd-shiptypes-title" class="sd-section__title">
                 <span th:text="#{ship.shiptypes}">Schiffstypen</span>
-                <span class="chip chip--muted" data-testid="sd-shiptypes-count" th:text="${shipTypes != null ? #lists.size(shipTypes) : 0}">0</span>
+                <span class="count-badge count-badge--sm" data-testid="sd-shiptypes-count" th:text="${shipTypes != null ? #lists.size(shipTypes) : 0}">0</span>
             </h2>
-            <div class="toolbar sd-toolbar">
-                <div class="toolbar__search">
-                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-search"/></svg>
-                    <input type="search" id="filterShipTypes" autocomplete="off" data-testid="toolbar-search"
-                           data-trigger="filter-table" data-table-id="shipTypesTable"
-                           th:attr="placeholder=#{general.filter.name.placeholder},aria-label=#{general.filter.name.placeholder}">
-                </div>
-                <datalist id="shipTypeNames-data" hidden>
-                    <option th:each="st : ${shipTypes}" th:value="${st.name}"></option>
-                </datalist>
+        </div>
+
+        <section class="list-panel">
+        <div class="toolbar">
+            <div class="toolbar__search">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-search"/></svg>
+                <input type="search" id="filterShipTypes" autocomplete="off" data-testid="toolbar-search"
+                       data-trigger="filter-table" data-table-id="shipTypesTable"
+                       th:attr="placeholder=#{general.filter.name.placeholder},aria-label=#{general.filter.name.placeholder}">
             </div>
+            <datalist id="shipTypeNames-data" hidden>
+                <option th:each="st : ${shipTypes}" th:value="${st.name}"></option>
+            </datalist>
         </div>
 
         <div class="card card--flush">
@@ -84,25 +86,28 @@
                 <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='shipdata.shipTypes.empty', textKey='shipdata.empty.text')}"></th:block>
             </th:block>
         </div>
+        </section>
     </section>
 
     <section class="sd-section" aria-labelledby="sd-manufacturers-title">
         <div class="split sd-section__head">
             <h2 id="sd-manufacturers-title" class="sd-section__title">
                 <span th:text="#{ship.manufacturers}">Hersteller</span>
-                <span class="chip chip--muted" data-testid="sd-manufacturers-count" th:text="${manufacturers != null ? #lists.size(manufacturers) : 0}">0</span>
+                <span class="count-badge count-badge--sm" data-testid="sd-manufacturers-count" th:text="${manufacturers != null ? #lists.size(manufacturers) : 0}">0</span>
             </h2>
-            <div class="toolbar sd-toolbar">
-                <div class="toolbar__search">
-                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-search"/></svg>
-                    <input type="search" id="filterManufacturers" autocomplete="off" data-testid="toolbar-search-manufacturers"
-                           data-trigger="filter-table" data-table-id="manufacturersTable"
-                           th:attr="placeholder=#{general.filter.name.placeholder},aria-label=#{general.filter.name.placeholder}">
-                </div>
-                <datalist id="mfgNames-data" hidden>
-                    <option th:each="m : ${manufacturers}" th:value="${m.name}"></option>
-                </datalist>
+        </div>
+
+        <section class="list-panel">
+        <div class="toolbar">
+            <div class="toolbar__search">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-search"/></svg>
+                <input type="search" id="filterManufacturers" autocomplete="off" data-testid="toolbar-search-manufacturers"
+                       data-trigger="filter-table" data-table-id="manufacturersTable"
+                       th:attr="placeholder=#{general.filter.name.placeholder},aria-label=#{general.filter.name.placeholder}">
             </div>
+            <datalist id="mfgNames-data" hidden>
+                <option th:each="m : ${manufacturers}" th:value="${m.name}"></option>
+            </datalist>
         </div>
 
         <div class="card card--flush">
@@ -138,6 +143,7 @@
                 <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='shipdata.manufacturers.empty', textKey='shipdata.empty.text')}"></th:block>
             </th:block>
         </div>
+        </section>
     </section>
 </main>
 

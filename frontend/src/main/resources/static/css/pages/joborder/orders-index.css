@@ -55,8 +55,12 @@
 
     .orders-table .orders-drag-handle {
         margin-right: var(--space-2);
-        color: var(--color-primary);
+        color: var(--color-gray-2-text);
         cursor: grab;
+    }
+
+    .orders-table tr:hover .orders-drag-handle {
+        color: var(--color-primary);
     }
 
     .orders-table .orders-materials-cell > * {

@@ -68,7 +68,8 @@
         min-height: 44px;
         padding: 0 0.75rem;
         background: var(--control-bg);
-        border: var(--border-hairline);
+        border: 1px solid var(--control-border);
+        border-radius: var(--radius-sm);
         color: var(--color-white);
         font-family: var(--font-body);
         font-size: var(--fs-sm);
@@ -159,7 +160,7 @@
     }
 
     .profit-row--top .profit-rank {
-        color: var(--color-primary);
+        color: var(--color-white);
     }
 
     .profit-route {
@@ -197,6 +198,10 @@
     .profit-table td.profit-max {
         color: var(--color-success-text);
         font-weight: var(--fw-bold);
+    }
+
+    .profit-table td.profit-max.is-negative {
+        color: var(--color-danger-text);
     }
 
     .profit-state {

@@ -21,11 +21,13 @@
     .mb-tabs {
         padding: 0;
         margin-bottom: var(--space-4);
-        background: none;
     }
 
-    .mb-toolbar .filter-chips {
-        margin: 0;
+    .mb-board .empty-state {
+        border: 0;
+    }
+    .mb-board .mb-md {
+        border: 0;
     }
     .mb-sort {
         max-width: none;
@@ -41,7 +43,7 @@
         cursor: pointer;
     }
     .mb-check input[type='checkbox'] {
-        width: auto;
+        flex: none;
         margin: 0;
     }
 

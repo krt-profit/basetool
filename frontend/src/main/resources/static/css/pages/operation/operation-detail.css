@@ -18,7 +18,6 @@
     .op-tabs {
         margin: var(--space-6) 0 var(--space-4);
         padding: 0;
-        background-color: transparent;
     }
 
     .tab-pane {

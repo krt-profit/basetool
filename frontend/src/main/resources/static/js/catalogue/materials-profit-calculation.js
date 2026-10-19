@@ -131,10 +131,10 @@ function updateHullChip() {
  */
 function routeLine(cls, side, terminal, place, price) {
     const placeHtml = place
-        ? krtHtml` <span class="profit-route__place" data-testid="profit-route-place">(${place})</span>`
+        ? krtHtml` <span class="profit-route__place" data-testid="profit-route-place">(${place.replaceAll(' · ', ' ·\u00a0')})</span>`
         : '';
     const terminalHtml = terminal
-        ? krtHtml`<span class="profit-route__terminal" data-testid="profit-route-terminal">${terminal}</span>${placeHtml} · `
+        ? krtHtml`<span class="profit-route__terminal" data-testid="profit-route-terminal">${terminal}</span>${placeHtml} ·\u00a0`
         : '';
     return krtHtml`<span class="profit-route__line"><span class="${cls}">${side}</span> ${
         terminalHtml
@@ -235,7 +235,7 @@ function renderRows(data) {
         )}\u00a0%</td><td class="num">${num(
             WHOLE,
             item.fullLoadCost,
-        )}</td><td class="num profit-max">${num(WHOLE, item.maxProfitFullLoad)}</td></tr>`;
+        )}</td><td class="num profit-max${(item.maxProfitFullLoad ?? 0) < 0 ? ' is-negative' : ''}">${num(WHOLE, item.maxProfitFullLoad)}</td></tr>`;
     });
     krtHtml.set(body, html);
     if (sorter) sorter.apply();

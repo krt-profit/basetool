@@ -22,7 +22,7 @@
                     th:classappend="${mdKind == 'squadrons'} ? 'is-active' : ''"
                     th:aria-selected="${mdKind == 'squadrons'}" th:tabindex="${mdKind == 'squadrons' ? 0 : -1}">
                 <span th:text="#{admin.mission_data.squadrons}">Art</span>
-                <span class="chip chip--muted" data-list-count-for="squadrons-results"
+                <span class="count-badge count-badge--sm" data-list-count-for="squadrons-results"
                       th:text="${squadrons != null ? #lists.size(squadrons) : 0}">0</span>
             </button>
             <button type="button" class="master-row md-kind-row" role="tab" id="md-kind-jobtypes"
@@ -30,7 +30,7 @@
                     th:classappend="${mdKind == 'jobtypes'} ? 'is-active' : ''"
                     th:aria-selected="${mdKind == 'jobtypes'}" th:tabindex="${mdKind == 'jobtypes' ? 0 : -1}">
                 <span th:text="#{admin.mission_data.job_types}">Art</span>
-                <span class="chip chip--muted" data-list-count-for="jobtypes-results"
+                <span class="count-badge count-badge--sm" data-list-count-for="jobtypes-results"
                       th:text="${jobTypes != null ? #lists.size(jobTypes) : 0}">0</span>
             </button>
             <button type="button" class="master-row md-kind-row" role="tab" id="md-kind-freqtypes"
@@ -38,7 +38,7 @@
                     th:classappend="${mdKind == 'freqtypes'} ? 'is-active' : ''"
                     th:aria-selected="${mdKind == 'freqtypes'}" th:tabindex="${mdKind == 'freqtypes' ? 0 : -1}">
                 <span th:text="#{admin.mission_data.frequency_types}">Art</span>
-                <span class="chip chip--muted" data-list-count-for="freqtypes-results"
+                <span class="count-badge count-badge--sm" data-list-count-for="freqtypes-results"
                       th:text="${frequencyTypes != null ? #lists.size(frequencyTypes) : 0}">0</span>
             </button>
         </div>

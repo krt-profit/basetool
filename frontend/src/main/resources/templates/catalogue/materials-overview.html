@@ -23,6 +23,8 @@
 
     <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{__${error}__}">Fehler</div>
 
+    <div id="matrixError" class="alert alert-danger" role="alert" hidden th:text="#{error.materials.matrix.load}">Fehler</div>
+
     <div id="matrixConfig"
          th:data-data-url="@{/materials/overview/data}"
          th:data-label-material="#{materials.matrix.material}"
@@ -36,6 +38,7 @@
          th:data-label-remove="#{filter.remove}"
          hidden></div>
 
+    <section class="list-panel">
     <div class="toolbar mtx-toolbar" id="materials-overview-filters">
         <div class="filter-popover mtx-dropdown">
             <button type="button" class="mtx-dropdown__toggle" id="materialHeader" data-testid="materials-filter-materials"
@@ -83,8 +86,6 @@
             </div>
         </div>
 
-        <div class="mtx-active-chips" id="mtxActiveChips" data-testid="filter-chips"></div>
-
         <th:block th:replace="~{kernel/fragments/components :: filterPopover(panelId='materials-filter-panel',
             testid='materials-filter-toggle', panelName='materials-overview', body=~{::materials-filter-body})}">
             <th:block th:ref="materials-filter-body">
@@ -116,9 +117,10 @@
         </div>
     </div>
 
-    <div id="matrixLoading" class="matrix-loading" role="status" th:text="#{materials.matrix.loading}">Lade Matrix...</div>
+    <div class="filter-chips mtx-active-chips" id="mtxActiveChips" data-testid="filter-chips"></div>
 
-    <div id="matrixError" class="alert alert-danger" role="alert" hidden th:text="#{error.materials.matrix.load}">Fehler</div>
+    <div class="card card--flush">
+    <div id="matrixLoading" class="matrix-loading" role="status" th:text="#{materials.matrix.loading}">Lade Matrix...</div>
 
     <div id="matrixEmpty" class="card card--flush" hidden>
         <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='materials.matrix.noResults', textKey='materials.matrix.noResults.text')}"></th:block>
@@ -133,8 +135,10 @@
             </table>
         </div>
     </div>
+    </div>
 
     <p class="mtx-hint" th:text="#{materials.matrix.hint}">Obere Zahl Verkauf (+), untere Einkauf (−), aUEC je SCU.</p>
+    </section>
 </main>
 
 <script type="module" th:src="@{/js/catalogue/materials-matrix.js}" th:attr="nonce=${cspNonce}"></script>

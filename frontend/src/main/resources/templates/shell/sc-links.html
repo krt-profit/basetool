@@ -21,7 +21,7 @@
                         th:attr="aria-controls='sc-links-grid-' + ${category.key},data-category=${category.key},data-testid='sc-links-toggle-' + ${category.key}">
                     <svg class="krt-icon sc-links-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
                     <span class="sc-links-name" th:text="#{${'scLinks.category.' + category.key}}">Organisation</span>
-                    <span class="chip chip--muted" th:text="${#lists.size(category.links())}">2</span>
+                    <span class="count-badge count-badge--sm" th:text="${#lists.size(category.links())}">2</span>
                 </button>
             </h2>
             <ul class="sc-links-grid" th:id="'sc-links-grid-' + ${category.key}">

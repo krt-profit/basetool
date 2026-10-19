@@ -7,7 +7,7 @@
         min-height: 44px;
         padding: 0.4rem 0.5rem;
         background-color: var(--control-bg);
-        border: var(--border-hairline);
+        border: 1px solid var(--control-border);
         color: var(--color-gray-1);
     }
     .krt-select:focus {

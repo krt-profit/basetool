@@ -66,7 +66,7 @@
                                     <span th:if="${n.gameItem() != null}" class="supply-item-chips" data-testid="supply-item-chips" th:insert="~{kernel/fragments/item-chips :: itemChips(${n.gameItem()})}"></span>
                                     <span th:if="${n.qualityTier() != null}"
                                           th:text="${#locale.language == 'en' ? n.qualityTier().labelEn() : n.qualityTier().labelDe()}">Keine</span>
-                                    <span th:if="${n.purchasable()}" class="chip chip--primary" data-testid="supply-need-purchasable"
+                                    <span th:if="${n.purchasable()}" class="chip chip--info" data-testid="supply-need-purchasable"
                                           th:text="#{supply.need.purchasable}">Zukauf m&ouml;glich</span>
                                     <span th:if="${n.maxUnitPrice() != null}" class="chip chip--muted"
                                           th:text="#{supply.need.maxPrice(${#numbers.formatInteger(n.maxUnitPrice(), 1, 'POINT')})}">max. 1.000 aUEC</span></span></td>
