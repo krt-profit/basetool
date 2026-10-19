@@ -97,7 +97,7 @@ don't use "tests pass" as a stand-in.
 ### UI / Frontend (if affected)
 
 - [ ] Layout works on Smartphone (<=768px), Tablet (768-1024px), Desktop (1024-1600px), and Ultra-wide (1600px+); touch targets >= 44px.
-- [ ] Styleguide respected (brand orange `#E77E23`, `Lato`-only type — headlines = Lato Bold + uppercase, department colors semantically correct).
+- [ ] Styleguide respected (brand orange `#FB8A28`, `Lato`-only type — headlines = Lato Bold + uppercase, department colors semantically correct).
 - [ ] No `confirm()` / `alert()` / native browser dialogs — KRT modals/toasts instead.
 - [ ] Every user-visible string comes from `messages.properties` (de + en + fallback); umlauts in `.properties` as `\uXXXX`, in Markdown literal UTF-8.
 - [ ] Mutations update the DOM in place via `krtFetch` — no full-page reload on success — and shared surfaces propagate a peer's change (REQ-FE-001…010).

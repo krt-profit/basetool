@@ -8,7 +8,7 @@ cross-cutting rules (requirements, i18n, Git, documentation) stay in the
 
 The UI is a **binding requirement**: follow the DAS KARTELL design system. The rules —
 brand colours, Lato-only typography (headlines = Lato Bold + uppercase), the authoritative department colours, the
-square-first sci-fi HUD style, "no native browser dialogs", and the four responsive device
+sci-fi HUD style with a 4 px radius and the website palette, "no native browser dialogs", and the four responsive device
 classes — live in [`docs/specs/ui-design-system.md`](../docs/specs/ui-design-system.md). The
 visual source of truth is the design skill at
 [`.claude/skills/das-kartell-design/README.md`](../.claude/skills/das-kartell-design/README.md)
