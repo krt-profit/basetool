@@ -9,6 +9,7 @@
 ### Fixed
 
 - **Farben wie auf das-kartell.org.** Die Palette stammt jetzt aus Messungen im Browser statt aus HDR-Screenshots: dunklerer Hintergrund `#0F0F0F`, Panels `#282C30`, Kopfleiste `#1A1D21`, das Orange wieder `#E77E23`, dazu die originalen Logos und Icons (REQ-UI-002, ADR-0294).
+- **Materialbeschreibung mit Zeilenumbrüchen.** Beschreibungen aus den Spieldaten (P4K-Import) zeigten Zeilenumbrüche als `\n` im Text, etwa bei Sunset Berries. Der Import speichert sie jetzt als echte Umbrüche, Migration V308 korrigiert die vorhandenen Einträge, und die Materialseite zeigt jede Zeile für sich (REQ-DATA-025).
 - **Raffinerieauftrag anlegen bei Mitgliedschaft in Staffel und Bereich.** Das Formular zeigt jetzt die Auswahl „Zuordnen zu“, wenn der Besitzer mehreren Organisationseinheiten gleich welcher Art angehört; vorher fehlte sie, und jedes Anlegen scheiterte mit der falschen Meldung „Materialien sind ungültig oder fehlen.“ Eine fehlende Einheit wird nun auch als solche gemeldet (REQ-ORG-023).
 - **„Abbrechen“ in den Dialogen von „Einsatzdaten verwalten“.** Der Abbrechen-Button der Dialoge für Staffeln, Aufgaben und Frequenztypen schließt den Dialog wieder; bisher reagierte nur das ✕ (REQ-UI-013).
 - **Sichtbare Ränder der Material-Kacheln.** Die Kacheln der Material-Übersicht tragen jetzt den grauen Control-Rand statt der kaum sichtbaren Haarlinie und werden beim Überfahren orange (REQ-UI-028).

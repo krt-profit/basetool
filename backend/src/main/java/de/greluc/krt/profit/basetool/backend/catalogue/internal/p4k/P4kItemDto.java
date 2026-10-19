@@ -66,4 +66,11 @@ public record P4kItemDto(
     String descDe,
     String nameKey,
     String descKey,
-    String displayType) {}
+    String displayType) {
+
+  /** Decodes the escaped line breaks of both descriptions (REQ-DATA-025). */
+  public P4kItemDto {
+    desc = P4kText.decodeLineBreaks(desc);
+    descDe = P4kText.decodeLineBreaks(descDe);
+  }
+}

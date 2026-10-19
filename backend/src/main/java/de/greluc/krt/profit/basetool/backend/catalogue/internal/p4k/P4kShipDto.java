@@ -59,4 +59,11 @@ public record P4kShipDto(
     String career,
     Integer crewSize,
     String manufacturerGuid,
-    String vehicleDefinition) {}
+    String vehicleDefinition) {
+
+  /** Decodes the escaped line breaks of both descriptions (REQ-DATA-025). */
+  public P4kShipDto {
+    desc = P4kText.decodeLineBreaks(desc);
+    descDe = P4kText.decodeLineBreaks(descDe);
+  }
+}
