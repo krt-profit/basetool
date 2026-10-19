@@ -8,6 +8,8 @@
 
 ### Fixed
 
+- **Einnahme/Ausgabe im Finanzdialog eines Einsatzes auf Touch-Geräten.** Die Umschalter sind wieder 44 px hoch wie jedes andere Bedienelement (REQ-UI-009).
+
 - **Design-System-Abgleich aller Seiten.** Nach einer Kontrolle jeder Seite, jedes Dialogs und Menüs auf allen sechs Geräteklassen haben Eingabefelder wieder sichtbare Ränder, Auswahlen sind nie gefüllte Farbblöcke, grüne und orange Texte sind lesbar, und Listen-Seiten bündeln Suche, Filter und Liste in einem Panel. Overflow-Menüs bleiben auf dem Telefon im Bild, und die Checkbox „Ohne gestohlene“ in der Materialbörse ist wieder sichtbar (REQ-UI-006, REQ-UI-007).
 
 - **Benachrichtigungsregeln: verständliche Beschreibungen.** Die mitgelieferten Standardregeln unter Administration → Benachrichtigungsregeln zeigen eine kurze Beschreibung in der Sprache des Nutzers statt einer englischen Entwicklernotiz mit Anforderungs-ID; selbst angelegte oder umbeschriebene Regeln behalten ihren eigenen Text (REQ-NOTIF-007).

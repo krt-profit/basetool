@@ -7168,6 +7168,11 @@
             border-left: 0;
         }
     }
+    @media (width <= 1024px), (pointer: coarse) {
+        .krt-segmented .krt-segmented__item:not(:has(> input)) {
+            min-height: var(--touch-target);
+        }
+    }
 
     .btn.is-filtered {
         border-color: var(--color-primary);
