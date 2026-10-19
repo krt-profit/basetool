@@ -1,6 +1,6 @@
 # ADR-0292 — The app wears the website palette and a 4 px radius
 
-- **Status:** Accepted
+- **Status:** Accepted — the colour values are superseded by [ADR-0294](0294-the-app-wears-the-measured-website-palette.md)
 - **Date:** 2026-10-19
 - **Deciders:** @greluc
 - **Related:** spec [`ui-design-system.md`](../specs/ui-design-system.md) (REQ-UI-002, REQ-UI-003,

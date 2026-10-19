@@ -846,10 +846,10 @@ The UI follows the *DAS KARTELL* Corporate Design Manual strictly — see
 binding rules in [`docs/specs/ui-design-system.md`](docs/specs/ui-design-system.md)
 and [`frontend/CLAUDE.md`](frontend/CLAUDE.md). Highlights:
 
-- **Brand colour** `#FB8A28` (orange). Logo only in this orange, white,
+- **Brand colour** `#E77E23` (orange). Logo only in this orange, white,
   or black.
-- **Surfaces** canvas `#202020`, panel `#35393D`, bar `#2A2D31`, control
-  `#3F474C`, 4 px radius (dark-mode aesthetic).
+- **Surfaces** canvas `#0F0F0F`, panel `#282C30`, bar `#1A1D21`, control
+  `#373E43`, 4 px radius (dark-mode aesthetic).
 - **Type** `Lato` only (Light 300 standard, Bold 700 emphasis). Headlines are
   Lato **Bold + uppercase only** with display letter-spacing (~0.05em) — there is
   no separate display face (Audiowide/Ethnocentric retired 2026-06).
