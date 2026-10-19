@@ -182,8 +182,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const sqForm = /** @type {HTMLFormElement} */ (document.getElementById('squadron-form'));
     const sqTitle = /** @type {HTMLElement} */ (document.getElementById('squadron-modal-title'));
     const sqAddBtn = document.getElementById('add-squadron-btn');
-    const sqClose = /** @type {HTMLElement | null} */ (
-        document.querySelector('.close-squadron-modal')
+    const sqClose = /** @type {NodeListOf<HTMLElement>} */ (
+        document.querySelectorAll('.close-squadron-modal')
     );
 
     if (sqAddBtn) {
@@ -213,14 +213,16 @@ document.addEventListener('DOMContentLoaded', () => {
         krtModal.open(sqModal);
     });
 
-    if (sqClose) sqClose.onclick = () => krtModal.close(sqModal);
+    sqClose.forEach((btn) => {
+        btn.onclick = () => krtModal.close(sqModal);
+    });
 
     const jtModal = document.getElementById('jobtype-modal');
     const jtForm = /** @type {HTMLFormElement} */ (document.getElementById('jobtype-form'));
     const jtTitle = /** @type {HTMLElement} */ (document.getElementById('jobtype-modal-title'));
     const jtAddBtn = document.getElementById('add-jobtype-btn');
-    const jtClose = /** @type {HTMLElement | null} */ (
-        document.querySelector('.close-jobtype-modal')
+    const jtClose = /** @type {NodeListOf<HTMLElement>} */ (
+        document.querySelectorAll('.close-jobtype-modal')
     );
     const jtArchetypeSelect = /** @type {HTMLSelectElement | null} */ (
         document.getElementById('jt-archetype')
@@ -303,14 +305,16 @@ document.addEventListener('DOMContentLoaded', () => {
         krtModal.open(jtModal);
     });
 
-    if (jtClose) jtClose.onclick = () => krtModal.close(jtModal);
+    jtClose.forEach((btn) => {
+        btn.onclick = () => krtModal.close(jtModal);
+    });
 
     const ftModal = document.getElementById('frequency-type-modal');
     const ftForm = /** @type {HTMLFormElement} */ (document.getElementById('freqtype-form'));
     const ftTitle = /** @type {HTMLElement} */ (document.getElementById('freqtype-modal-title'));
     const ftAddBtn = document.getElementById('add-freqtype-btn');
-    const ftClose = /** @type {HTMLElement | null} */ (
-        document.querySelector('.close-freqtype-modal')
+    const ftClose = /** @type {NodeListOf<HTMLElement>} */ (
+        document.querySelectorAll('.close-freqtype-modal')
     );
 
     if (ftAddBtn) {
@@ -338,7 +342,9 @@ document.addEventListener('DOMContentLoaded', () => {
         krtModal.open(ftModal);
     });
 
-    if (ftClose) ftClose.onclick = () => krtModal.close(ftModal);
+    ftClose.forEach((btn) => {
+        btn.onclick = () => krtModal.close(ftModal);
+    });
 
     window.onclick = function (event) {
         if (event.target === sqModal) krtModal.close(sqModal);

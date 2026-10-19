@@ -5,6 +5,7 @@
 ### Fixed
 
 - **Raffinerieauftrag anlegen bei Mitgliedschaft in Staffel und Bereich.** Das Formular zeigt jetzt die Auswahl „Zuordnen zu“, wenn der Besitzer mehreren Organisationseinheiten gleich welcher Art angehört; vorher fehlte sie, und jedes Anlegen scheiterte mit der falschen Meldung „Materialien sind ungültig oder fehlen.“ Eine fehlende Einheit wird nun auch als solche gemeldet (REQ-ORG-023).
+- **„Abbrechen“ in den Dialogen von „Einsatzdaten verwalten“.** Der Abbrechen-Button der Dialoge für Staffeln, Aufgaben und Frequenztypen schließt den Dialog wieder; bisher reagierte nur das ✕ (REQ-UI-013).
 
 ## [v1.19.0](https://github.com/krt-profit/basetool/releases/tag/v1.19.0) - 2026-10-19
 

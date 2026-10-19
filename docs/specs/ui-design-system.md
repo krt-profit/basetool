@@ -392,10 +392,15 @@ hiding it — so the class always wins regardless of how the other side toggled 
 - [x] Every dialog on every page route and on a seeded mission, operation, order, refinery order and
   bank account opens modally with a title, an accessible name and a visible ✕, takes focus, and
   closes on Escape and on its ✕. A declared dialog the walk does not reach is listed with its reason.
+- [x] A page script that binds a dialog's close by `closeClass` binds **every** control carrying
+  that class (`querySelectorAll`), the ✕ in the head and a footer's „Abbrechen" alike — the wrapper
+  renders the ✕ first, so a `querySelector` binds only the ✕ and leaves the footer button dead
+  (2026-10-19, the three create dialogs of `/admin/mission-data`).
 
 **Enforced by:** `SingleModalShapeTest` (`everyOverlayIsANativeDialog`,
 `everyDialogIsRenderedByTheWrapper`), `ModalWrapperRenderTest`, `DialogA11yE2eTest`
-(`everyDialogFollowsTheContract`), `PromotionAdminDialogsRenderWithTheirScriptMvcTest`,
+(`everyDialogFollowsTheContract`), `AdminMissionDataCrudE2eTest`
+(`cancelButtonClosesEachCreateDialog`), `PromotionAdminDialogsRenderWithTheirScriptMvcTest`,
 `AdminPersonalBlueprintsPageControllerMvcTest`, `OrgChartKeyboardA11yE2eTest`,
 `TouchClassLayoutE2eTest`
 
