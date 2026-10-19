@@ -6,6 +6,10 @@
 
 - **Eingangsmenge im Raffinerieauftrag optional.** Beim Anlegen und Bearbeiten darf die Eingangsmenge eines Materials leer bleiben; sie wird als `0` gespeichert und gilt damit als „nicht eingegeben“, die Übersicht zeigt dann keine Units. Qualität und Ausgangsmenge bleiben Pflicht, alle Pflichtfelder samt Dauer und Materialspalten tragen das orange Sternchen (REQ-REFINERY-025).
 
+### Fixed
+
+- **Raffinerieauftrag anlegen bei Mitgliedschaft in Staffel und Bereich.** Das Formular zeigt jetzt die Auswahl „Zuordnen zu“, wenn der Besitzer mehreren Organisationseinheiten gleich welcher Art angehört; vorher fehlte sie, und jedes Anlegen scheiterte mit der falschen Meldung „Materialien sind ungültig oder fehlen.“ Eine fehlende Einheit wird nun auch als solche gemeldet (REQ-ORG-023).
+
 ## [v1.19.0](https://github.com/krt-profit/basetool/releases/tag/v1.19.0) - 2026-10-19
 
 ### Changed
