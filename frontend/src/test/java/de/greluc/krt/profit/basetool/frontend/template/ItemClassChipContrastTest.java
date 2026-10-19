@@ -44,7 +44,7 @@ class ItemClassChipContrastTest {
   private static final double MIN_CONTRAST = 4.5;
 
   /** The surfaces a Lager row sits on: the panel (Grau 4) and the row hover (control fill). */
-  private static final String[] SURFACES = {"#35393d", "#3f474c"};
+  private static final String[] SURFACES = {"#282c30", "#373e43"};
 
   /** The backend enum whose constants each need a chip variant. */
   private static final String SHIP_COMPONENT_CLASS =

@@ -63,7 +63,7 @@ public class WebAppManifestController {
    * <p>Mirrors {@code --color-canvas} in {@code styles.css} (REQ-UI-003). A mismatch here is
    * visible as a flash of the wrong colour while the app starts.
    */
-  private static final String BACKGROUND_COLOR = "#202020";
+  private static final String BACKGROUND_COLOR = "#0f0f0f";
 
   /**
    * Browser-UI colour: the page header, not the page background.
@@ -72,7 +72,7 @@ public class WebAppManifestController {
    * directly above that header on a phone, so matching the header — not the canvas body — is what
    * makes the seam disappear.
    */
-  private static final String THEME_COLOR = "#2a2d31";
+  private static final String THEME_COLOR = "#1a1d21";
 
   /**
    * Unversioned classpath path of the 512 px home-screen icon, as it exists under {@code
