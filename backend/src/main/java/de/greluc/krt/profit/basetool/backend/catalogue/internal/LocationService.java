@@ -76,6 +76,23 @@ public class LocationService {
   }
 
   /**
+   * Pages the locations whose name contains {@code query} case-insensitively; not cached, because
+   * the search term would make the cache key unbounded.
+   *
+   * @param query the search fragment, already stripped and non-blank
+   * @param includeHidden true to include hidden entries (admin view)
+   * @param pageable page request
+   * @return paged matching location read models
+   */
+  public Page<LocationDto> searchLocations(
+      @NotNull String query, boolean includeHidden, @NotNull Pageable pageable) {
+    return (includeHidden
+            ? locationRepository.findByNameContainingIgnoreCase(query, pageable)
+            : locationRepository.findByHiddenFalseAndNameContainingIgnoreCase(query, pageable))
+        .map(locationMapper::toDto);
+  }
+
+  /**
    * Returns all non-hidden locations as id + name reference DTOs, unbounded; payload-bounded
    * pickers use {@link #searchReference(String, Pageable)}.
    *

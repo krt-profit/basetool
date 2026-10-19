@@ -58,6 +58,9 @@ class ShipDataPageControllerMvcTest {
 
   private MockMvc mockMvc;
 
+  private static final String LIST_TEMPLATE =
+      "/api/v1/ship-types?includeHidden=true&sort=name,asc&page={page}&size={size}";
+
   @Autowired private WebApplicationContext context;
 
   @MockitoBean private BackendApiClient backendApiClient;
@@ -106,6 +109,10 @@ class ShipDataPageControllerMvcTest {
             anyTypeRef(),
             eq(0)))
         .thenReturn(shipTypesPage);
+    when(backendApiClient.get(eq(LIST_TEMPLATE), anyTypeRef(), eq(0), eq(25)))
+        .thenReturn(
+            new PageResponse<>(
+                shipTypes, 0, 25, shipTypes.size(), shipTypes.isEmpty() ? 0 : 1, List.of()));
   }
 
   /**
@@ -191,6 +198,67 @@ class ShipDataPageControllerMvcTest {
         .doesNotContain("ship-data-reset-fitted")
         .doesNotContain("js-visibility-toggle")
         .doesNotContain("reset-fitted-confirm-modal");
+  }
+
+  /**
+   * The ship types are paginated server-side: the section count shows every match, the footer the
+   * page links with the search kept, while the manufacturers stay one complete list.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void theShipTypesArePaginatedServerSide() throws Exception {
+    stubCatalogue(false);
+    ShipTypeDto cutlass = new ShipTypeDto(UUID.randomUUID(), "Cutlass Black", null, null, 3, false);
+    when(backendApiClient.get(
+            eq(LIST_TEMPLATE + "&query={query}"), anyTypeRef(), eq(0), eq(25), eq("Cut")))
+        .thenReturn(new PageResponse<>(List.of(cutlass), 0, 25, 281, 12, List.of()));
+
+    String html =
+        mockMvc
+            .perform(get("/ship-data").param("query", "Cut"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .containsPattern(
+            "data-testid=\"sd-shiptypes-count\"[^>]*data-list-count-for=\"ship-types-results\""
+                + "[^>]*>281<")
+        .contains("id=\"ship-types-filter\"")
+        .contains("id=\"ship-types-results\"")
+        .contains("data-list-total=\"281\"")
+        .contains("href=\"/ship-data?query=Cut&amp;page=1&amp;size=25\"")
+        .contains("Cutlass Black")
+        .contains("data-testid=\"toolbar-search-manufacturers\"")
+        .contains("data-testid=\"manufacturer-row\"");
+  }
+
+  /**
+   * The results fragment renders the ship-type list only and reads nothing but its page.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void theResultsFragmentRendersTheShipTypeListOnly() throws Exception {
+    stubCatalogue(false);
+
+    String html =
+        mockMvc
+            .perform(get("/ship-data").param("fragment", "results"))
+            .andExpect(status().isOk())
+            .andExpect(view().name("catalogue/ship-data :: shipTypesResults"))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("data-testid=\"ship-type-row\"")
+        .doesNotContain("manufacturer-row")
+        .doesNotContain("<html");
   }
 
   /**

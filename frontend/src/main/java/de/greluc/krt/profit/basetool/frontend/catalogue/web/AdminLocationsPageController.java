@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.catalogue.web;
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueListBackendClient;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.LocationDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CacheDomain;
@@ -29,11 +30,11 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogPages;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogPages.CompleteCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -53,9 +54,9 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 /**
  * Spring MVC controller for the admin location-management page ({@code /admin/locations}).
  *
- * <p>Renders the location list (including hidden entries — admins need to see what's hidden to
- * un-hide it) and toggles individual locations' visibility. Sort is alphabetical case-insensitive
- * because backend sort treats locale-specific casing inconsistently across PostgreSQL collations.
+ * <p>Renders one page of the location list, sorted by name and searched server-side (including
+ * hidden entries — admins need to see what's hidden to un-hide it), and toggles individual
+ * locations' visibility.
  */
 @Controller
 @UsesLayoutModel
@@ -65,42 +66,72 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminLocationsPageController {
 
+  /** The page path, also the base of the pagination links. */
+  private static final String PATH = "/admin/locations";
+
   /** Reads and writes the locations. */
   private final CatalogueBackendClient catalogueClient;
 
   /** Evicts the location catalogue after a write. */
   private final CatalogueCacheEviction cacheEviction;
 
+  /** Reads the displayed page of the paginated catalogue list. */
+  private final CatalogueListBackendClient listClient;
+
   /**
-   * Fetches all locations, including hidden ones, sorts them by name and renders the table
-   * (REQ-ADMIN-001). A backend failure sets an error key; hitting the page-walk cap sets {@code
-   * catalogTruncated} for a warning banner (REQ-ADMIN-002).
+   * Renders one page of the locations, hidden ones included, narrowed by a server-side name search,
+   * plus every location name for the search suggestions (REQ-ADMIN-001). A backend failure sets an
+   * error key; hitting the suggestions' page-walk cap sets {@code catalogTruncated} for a warning
+   * banner (REQ-ADMIN-002).
    *
-   * @param model Thymeleaf model populated with the sorted location list
-   * @return the {@code admin/locations} view name
+   * @param query name fragment to search for, may be {@code null}
+   * @param page zero-based page index, may be {@code null}
+   * @param size page size out of 25, 50 and 100, may be {@code null}
+   * @param fragment {@code results} to render only the swapped list fragment
+   * @param model Thymeleaf model populated with the location page and the suggestion names
+   * @return the {@code admin/locations} view, or its results fragment
    */
   @NotNull
   @GetMapping
-  public String listData(Model model) {
-    if (!SectionFallback.run(log, "admin-locations", () -> addLocations(model))) {
+  public String listData(
+      @RequestParam(required = false) String query,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String fragment,
+      Model model) {
+    CatalogueListPaging paging = CatalogueListPaging.of(page, size, query);
+    paging.addTo(model, "locations", paging.orEmpty(null), PATH);
+    model.addAttribute("locations", List.of());
+    if (!SectionFallback.run(log, "admin-locations", () -> addLocations(model, paging))) {
       model.addAttribute("error", "error.admin.locations.load");
     }
-    return "catalogue/admin/locations";
+    return CatalogueListPaging.wantsResults(fragment)
+        ? "catalogue/admin/locations :: locationsResults"
+        : "catalogue/admin/locations";
   }
 
   /**
-   * Adds every location sorted by name and whether the page walk hit its cap.
+   * Adds the displayed location page, every location name sorted for the suggestions and whether
+   * the suggestions' page walk hit its cap.
    *
    * @param model the admin locations model
+   * @param paging the requested page, size and search
    */
-  private void addLocations(@NotNull Model model) {
+  private void addLocations(@NotNull Model model, @NotNull CatalogueListPaging paging) {
+    PageResponse<LocationDto> locationsPage =
+        paging.orEmpty(listClient.locations(paging.query(), paging.page(), paging.size()));
+    paging.addTo(model, "locations", locationsPage, PATH);
+    model.addAttribute("locations", locationsPage.content());
+
     CompleteCatalog<LocationDto> locationsCatalog =
         CatalogPages.fetchAll(catalogueClient::locationPage);
-
-    List<LocationDto> locations = new ArrayList<>(locationsCatalog.items());
-    locations.sort(
-        Comparator.comparing(l -> l.name() == null ? "" : l.name(), String.CASE_INSENSITIVE_ORDER));
-    model.addAttribute("locations", locations);
+    model.addAttribute(
+        "locationNames",
+        locationsCatalog.items().stream()
+            .map(LocationDto::name)
+            .filter(Objects::nonNull)
+            .sorted(String.CASE_INSENSITIVE_ORDER)
+            .toList());
     model.addAttribute("catalogTruncated", locationsCatalog.truncated());
   }
 

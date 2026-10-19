@@ -27,6 +27,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueListBackendClient;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.ManufacturerDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.ShipTypeDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
@@ -53,19 +54,60 @@ class ShipDataPageControllerTest {
         .thenReturn(emptyShipTypePage);
 
     ShipDataPageController controller =
-        new ShipDataPageController(new CatalogueBackendClient(backendApiClient));
+        new ShipDataPageController(
+            new CatalogueBackendClient(backendApiClient),
+            new CatalogueListBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
 
-    String view = controller.listData(model);
+    String view = controller.listData(null, null, null, null, model);
 
     assertEquals("catalogue/ship-data", view);
+  }
+
+  @Test
+  void listData_resultsFragment_loadsTheSearchedShipTypePageOnly() {
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    ShipDataPageController controller =
+        new ShipDataPageController(
+            new CatalogueBackendClient(backendApiClient),
+            new CatalogueListBackendClient(backendApiClient));
+    Model model = new ConcurrentModel();
+    ShipTypeDto cutlass = new ShipTypeDto(null, "Cutlass Black", null, null, null, false);
+    PageResponse<ShipTypeDto> displayed =
+        new PageResponse<>(java.util.List.of(cutlass), 0, 100, 1, 1, null);
+    String template =
+        "/api/v1/ship-types?includeHidden=true&sort=name,asc&page={page}&size={size}"
+            + "&query={query}";
+    when(backendApiClient.get(
+            org.mockito.ArgumentMatchers.eq(template),
+            anyTypeRef(),
+            org.mockito.ArgumentMatchers.eq(0),
+            org.mockito.ArgumentMatchers.eq(100),
+            org.mockito.ArgumentMatchers.eq("Cut")))
+        .thenReturn(displayed);
+
+    String view = controller.listData("Cut", 0, 100, "results", model);
+
+    assertEquals("catalogue/ship-data :: shipTypesResults", view);
+    assertEquals(java.util.List.of(cutlass), model.getAttribute("shipTypes"));
+    assertEquals(displayed, model.getAttribute("shipTypesPage"));
+    verify(backendApiClient)
+        .get(
+            org.mockito.ArgumentMatchers.eq(template),
+            anyTypeRef(),
+            org.mockito.ArgumentMatchers.eq(0),
+            org.mockito.ArgumentMatchers.eq(100),
+            org.mockito.ArgumentMatchers.eq("Cut"));
+    org.mockito.Mockito.verifyNoMoreInteractions(backendApiClient);
   }
 
   @Test
   void listData_concatenatesAllShipTypePages() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     ShipDataPageController controller =
-        new ShipDataPageController(new CatalogueBackendClient(backendApiClient));
+        new ShipDataPageController(
+            new CatalogueBackendClient(backendApiClient),
+            new CatalogueListBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
 
     ManufacturerDto rsi = new ManufacturerDto(null, "RSI", "RSI", null, null, null, false);
@@ -90,14 +132,13 @@ class ShipDataPageControllerTest {
             org.mockito.ArgumentMatchers.eq(1)))
         .thenReturn(new PageResponse<>(java.util.List.of(aurora), 1, 1000, 2, 2, null));
 
-    controller.listData(model);
+    controller.listData(null, null, null, null, model);
 
-    @SuppressWarnings("unchecked")
-    java.util.List<ShipTypeDto> shipTypes =
-        (java.util.List<ShipTypeDto>) model.getAttribute("shipTypes");
-    assertEquals(2, shipTypes.size(), "the second backend page must not be dropped");
-    assertEquals("Aurora", shipTypes.get(0).name());
-    assertEquals("Zeus", shipTypes.get(1).name());
+    assertEquals(
+        java.util.List.of("Aurora", "Zeus"),
+        model.getAttribute("shipTypeNames"),
+        "the second backend page must not be dropped from the suggestions");
+    assertEquals(java.util.List.of(rsi), model.getAttribute("manufacturers"));
     assertEquals(Boolean.FALSE, model.getAttribute("catalogTruncated"));
   }
 
@@ -105,7 +146,9 @@ class ShipDataPageControllerTest {
   void testResetAllFitted_Success() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     ShipDataPageController controller =
-        new ShipDataPageController(new CatalogueBackendClient(backendApiClient));
+        new ShipDataPageController(
+            new CatalogueBackendClient(backendApiClient),
+            new CatalogueListBackendClient(backendApiClient));
     RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
 
     String view = controller.resetAllFitted(redirectAttributes);

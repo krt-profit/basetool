@@ -135,6 +135,26 @@ public interface ShipTypeRepository extends LookupTableRepository<ShipType, UUID
   Page<ShipType> findByHiddenFalse(Pageable pageable);
 
   /**
+   * Pages every ship type, hidden ones included, whose name contains {@code name}
+   * case-insensitively; LIKE wildcards in {@code name} match literally.
+   *
+   * @param name the search fragment
+   * @param pageable page request
+   * @return paged matching ship types
+   */
+  Page<ShipType> findByNameContainingIgnoreCase(String name, Pageable pageable);
+
+  /**
+   * Pages the non-hidden ship types whose name contains {@code name} case-insensitively; LIKE
+   * wildcards in {@code name} match literally.
+   *
+   * @param name the search fragment
+   * @param pageable page request
+   * @return paged matching non-hidden ship types
+   */
+  Page<ShipType> findByHiddenFalseAndNameContainingIgnoreCase(String name, Pageable pageable);
+
+  /**
    * The UEX vehicle id and local id of every ship type that carries one, in one query — the item
    * sync resolves each vehicle-bound item's ship type against the resulting map (BE-PERF-09).
    *

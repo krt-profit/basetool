@@ -27,6 +27,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueListBackendClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc;
 import org.junit.jupiter.api.AfterEach;
@@ -46,7 +47,10 @@ class AdminMaterialsPageControllerReauthMvcTest {
   void setUp() {
     mockMvc =
         ReauthPageMvc.standalone(
-            new AdminMaterialsPageController(client, mock(CatalogueCacheEviction.class)));
+            new AdminMaterialsPageController(
+                client,
+                mock(CatalogueCacheEviction.class),
+                mock(CatalogueListBackendClient.class)));
     ReauthPageMvc.signInMember("ADMIN");
   }
 

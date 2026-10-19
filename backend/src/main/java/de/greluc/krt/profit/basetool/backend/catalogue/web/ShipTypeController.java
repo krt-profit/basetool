@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ShipTypeService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import java.util.Set;
 import java.util.UUID;
@@ -58,8 +59,14 @@ public class ShipTypeController {
 
   /**
    * Paged list with whitelist-enforced sort. Uses the slim {@link ShipTypeMapper#toDto} projection
-   * to avoid exposing the heavy fields needed elsewhere.
+   * to avoid exposing the heavy fields needed elsewhere. A non-blank {@code query} narrows it to
+   * the ship types whose name contains it case-insensitively.
    *
+   * @param page zero-based page index
+   * @param size page size, clamped to the default ceiling
+   * @param sort sort terms over {@code name} and {@code id}
+   * @param includeHidden true to include ship types marked hidden
+   * @param query optional name fragment
    * @return paged ship-type DTOs
    */
   @GetMapping
@@ -67,10 +74,15 @@ public class ShipTypeController {
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort,
-      @RequestParam(required = false, defaultValue = "false") boolean includeHidden) {
+      @RequestParam(required = false, defaultValue = "false") boolean includeHidden,
+      @RequestParam(required = false) String query) {
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, sort, Set.of("name", "id"), "name");
-    return PageResponse.of(shipTypeService.getAllShipTypes(pageable, includeHidden));
+    String search = StringNormalization.trimToNull(query);
+    return PageResponse.of(
+        search == null
+            ? shipTypeService.getAllShipTypes(pageable, includeHidden)
+            : shipTypeService.searchShipTypes(search, includeHidden, pageable));
   }
 
   /**

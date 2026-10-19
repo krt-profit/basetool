@@ -64,6 +64,23 @@ public class ShipTypeService {
   }
 
   /**
+   * Pages the ship types whose name contains {@code query} case-insensitively; not cached, because
+   * the search term would make the cache key unbounded.
+   *
+   * @param query the search fragment, already stripped and non-blank
+   * @param includeHidden true to include ship types marked hidden
+   * @param pageable page request
+   * @return paged matching ship type read models
+   */
+  public Page<ShipTypeDto> searchShipTypes(
+      @NotNull String query, boolean includeHidden, @NotNull Pageable pageable) {
+    return (includeHidden
+            ? shipTypeRepository.findByNameContainingIgnoreCase(query, pageable)
+            : shipTypeRepository.findByHiddenFalseAndNameContainingIgnoreCase(query, pageable))
+        .map(shipTypeMapper::toDto);
+  }
+
+  /**
    * Returns the ship type with the given id (cached).
    *
    * @param id ship type primary key

@@ -96,6 +96,26 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
   Page<Material> findByIsVisibleTrue(Pageable pageable);
 
   /**
+   * Pages every material, hidden ones included, whose name contains {@code name}
+   * case-insensitively; LIKE wildcards in {@code name} match literally.
+   *
+   * @param name the search fragment
+   * @param pageable page request
+   * @return paged matching materials
+   */
+  Page<Material> findByNameContainingIgnoreCase(String name, Pageable pageable);
+
+  /**
+   * Pages the visible materials whose name contains {@code name} case-insensitively; LIKE wildcards
+   * in {@code name} match literally.
+   *
+   * @param name the search fragment
+   * @param pageable page request
+   * @return paged matching visible materials
+   */
+  Page<Material> findByIsVisibleTrueAndNameContainingIgnoreCase(String name, Pageable pageable);
+
+  /**
    * Returns every <b>visible</b> material flagged {@code isJobOrder=true}, ordered by name. The
    * {@code isVisible} clause keeps unreviewed wiki-only rows out of the job-order material picker.
    */

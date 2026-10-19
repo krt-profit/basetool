@@ -54,7 +54,7 @@ class ShipTypeControllerTest {
     when(service.getAllShipTypes(any(Pageable.class), eq(true)))
         .thenReturn(new PageImpl<>(List.of()));
 
-    controller.getAllShipTypes(null, null, null, true);
+    controller.getAllShipTypes(null, null, null, true, null);
 
     verify(service).getAllShipTypes(any(Pageable.class), eq(true));
   }
@@ -65,10 +65,21 @@ class ShipTypeControllerTest {
     when(service.getAllShipTypes(any(Pageable.class), eq(false)))
         .thenReturn(new PageImpl<>(List.of(dto)));
 
-    PageResponse<ShipTypeDto> resp = controller.getAllShipTypes(null, null, null, false);
+    PageResponse<ShipTypeDto> resp = controller.getAllShipTypes(null, null, null, false, null);
 
     assertEquals(1, resp.totalElements());
     assertSame(dto, resp.content().getFirst());
+  }
+
+  @Test
+  void getAll_withQuery_searchesStrippedNameAndKeepsIncludeHidden() {
+    when(service.searchShipTypes(eq("Cut"), eq(true), any(Pageable.class)))
+        .thenReturn(new PageImpl<>(List.of()));
+
+    controller.getAllShipTypes(0, 25, "name,asc", true, " Cut ");
+
+    verify(service).searchShipTypes(eq("Cut"), eq(true), any(Pageable.class));
+    verify(service, never()).getAllShipTypes(any(Pageable.class), anyBoolean());
   }
 
   @Test

@@ -23480,6 +23480,13 @@
             "type" : "boolean",
             "default" : false
           }
+        }, {
+          "in" : "query",
+          "name" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
         } ],
         "responses" : {
           "200" : {
@@ -28945,6 +28952,13 @@
         }, {
           "in" : "query",
           "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "query",
           "required" : false,
           "schema" : {
             "type" : "string"
@@ -64883,6 +64897,13 @@
           "schema" : {
             "type" : "boolean",
             "default" : false
+          }
+        }, {
+          "in" : "query",
+          "name" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
           }
         } ],
         "responses" : {

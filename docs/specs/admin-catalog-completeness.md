@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
-> **Owner area:** ADMIN · **Related ADRs:** ADR-0102, ADR-0103
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-19.
+> **Owner area:** ADMIN · **Related ADRs:** ADR-0102, ADR-0103, ADR-0293
 
 # Admin catalog pages — complete rendering, no silent truncation
 
@@ -38,9 +38,15 @@ against inconsistent backend page math. Covered surfaces: `/admin/materials` (ma
 order-processing toggles over the active squadrons, and the per-SK order-processing toggle over the
 active Spezialkommandos; the intake-SK picker was removed with the anonymous order form, ADR-0149),
 `/admin/uex-data` (cities, space stations, outposts, POIs, terminals),
-`/ship-data` (manufacturers, ship types). Any *new* admin surface of this shape falls under this
+`/ship-data` (manufacturers). Any *new* admin surface of this shape falls under this
 requirement as well, and an existing surface later found to match the shape is converted when it
 is next touched.
+
+The material list on `/admin/materials`, the location list on `/admin/locations` and the ship-type
+list on `/ship-data` paginate server-side instead (REQ-ADMIN-004, ADR-0293). What those pages still
+need complete is walked under this requirement: every material for the refined-material dropdowns
+and the create dialog, and every material, location and ship-type name for the search
+suggestions.
 
 **Acceptance**
 
@@ -127,11 +133,47 @@ appendability), `BackendApiClientHappyPathTest` (merge order, single-request com
 `frontend kernel.backend.CachedCatalog` (`Fetch` mode), `BackendApiClient.getCached` /
 `fetchCompleteCatalog` · **Issues:** —
 
+### REQ-ADMIN-004 — Long admin catalogue lists paginate server-side
+
+The material list on `/admin/materials`, the location list on `/admin/locations` and the ship-type
+list on `/ship-data` MUST render one server-side page at a time with the shared list footer
+(`kernel/fragments/components :: listFoot`, `.pagination`) and page-size picker, 25, 50 or 100
+rows per page (default 25), sorted by name. A missing or negative page becomes 0, an unsupported
+size becomes 25. The search above each list MUST search server-side: the backend list endpoints
+(`GET /api/v1/materials`, `/api/v1/locations`, `/api/v1/ship-types`) take an optional `query` that
+matches names case-insensitively as a substring, treats `%` and `_` literally, honours
+`includeHidden`, and is not cached. The search is kept in every page link.
+
+Every page, page-size and search change MUST swap the list's `?fragment=results` fragment in place
+through `krtFetch` and keep the address bar in step (REQ-FE-005); the row edits stay in-place
+writes. The page-head count (and the ship-type section count on `/ship-data`) MUST show the
+backend-reported `totalElements` and follow a swap through `data-list-total` /
+`krt-list-count.js`. The manufacturer list on `/ship-data` stays complete and client-filtered
+(REQ-ADMIN-001, ADR-0293).
+
+**Acceptance**
+
+- [x] With more rows than one page, the page shows one page, the footer range and page links, and
+  the count shows the total.
+- [x] A search reaches the backend as `query`, survives paging, and an unknown size snaps to 25.
+- [x] `?fragment=results` renders the list without the page chrome; searching swaps it in place
+  without a reload.
+- [x] A name containing `%` or `_` matches only literally; `includeHidden=false` excludes hidden
+  rows from a search.
+
+**Enforced by:** `AdminMaterialsPageControllerTest`, `AdminLocationsPageControllerTest`,
+`ShipDataPageControllerTest`, the three `…PageControllerMvcTest`s, `CatalogueListBackendClientTest`,
+`MaterialControllerTest`, `LocationControllerTest`, `ShipTypeControllerTest`,
+`LikeEscapeCatalogRepositoriesDataTest`, `CatalogueListSearchInPlaceE2eTest`,
+`AdminMaterialCreateInPlaceE2eTest` · **Code:** `frontend catalogue.web.CatalogueListPaging`, `catalogue.client.CatalogueListBackendClient`, the
+three page controllers, `static/js/catalogue/catalogue-list.js`, the backend `MaterialController`,
+`LocationController`, `ShipTypeController` · **Issues:** —
+
 ## Out of scope
 
-- Server-side pagination / search UIs for these admin pages. The pages' interaction model
-  (client-side filter over the full catalogue) is deliberate; ADR-0102 records why page-walking
-  was chosen over a pagination UI.
+- Server-side pagination for the other admin catalogue pages of REQ-ADMIN-001. Their interaction
+  model (client-side filter over the full catalogue) is deliberate; ADR-0102 records why
+  page-walking was chosen there, ADR-0293 why the three long lists of REQ-ADMIN-004 paginate.
 - Non-admin list surfaces with real pagination (hangar, refinery orders, audit log, sync
   reports, blueprints) — those are governed by their own specs.
 - The backend's `size` clamp itself (`PaginationUtil`, the kernel page policy of

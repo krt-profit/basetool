@@ -28,6 +28,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueListBackendClient;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.LocationDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CacheDomain;
@@ -53,6 +54,9 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 @ExtendWith(MockitoExtension.class)
 class AdminLocationsPageControllerTest {
 
+  private static final String LIST_TEMPLATE =
+      "/api/v1/locations?includeHidden=true&sort=name,asc&page={page}&size={size}";
+
   @Mock private BackendApiClient backendApiClient;
 
   private AdminLocationsPageController controller;
@@ -62,7 +66,8 @@ class AdminLocationsPageControllerTest {
     controller =
         new AdminLocationsPageController(
             new CatalogueBackendClient(backendApiClient),
-            new CatalogueCacheEviction(backendApiClient));
+            new CatalogueCacheEviction(backendApiClient),
+            new CatalogueListBackendClient(backendApiClient));
   }
 
   @Test
@@ -86,7 +91,7 @@ class AdminLocationsPageControllerTest {
   }
 
   @Test
-  void listData_concatenatesAllBackendPages_andSorts() {
+  void listData_rendersOnePage_andSuggestsEveryNameAcrossBackendPages() {
     LocationDto portOlisar =
         new LocationDto(UUID.randomUUID(), "Port Olisar", "Crusader station", false, false, 0L);
     LocationDto area18 =
@@ -96,17 +101,35 @@ class AdminLocationsPageControllerTest {
         .thenReturn(new PageResponse<>(List.of(portOlisar), 0, 1000, 2, 2, List.of("name,asc")));
     when(backendApiClient.get(eq(template), anyTypeRef(), eq(1)))
         .thenReturn(new PageResponse<>(List.of(area18), 1, 1000, 2, 2, List.of("name,asc")));
+    PageResponse<LocationDto> displayed =
+        new PageResponse<>(List.of(area18), 1, 50, 66, 2, List.of("name,asc"));
+    when(backendApiClient.get(eq(LIST_TEMPLATE), anyTypeRef(), eq(1), eq(50)))
+        .thenReturn(displayed);
     ConcurrentModel model = new ConcurrentModel();
 
-    String view = controller.listData(model);
+    String view = controller.listData(null, 1, 50, null, model);
 
     assertEquals("catalogue/admin/locations", view);
-    @SuppressWarnings("unchecked")
-    List<LocationDto> locations = (List<LocationDto>) model.getAttribute("locations");
-    assertEquals(2, locations.size(), "the second backend page must not be dropped");
-    assertEquals("Area18", locations.get(0).name());
-    assertEquals("Port Olisar", locations.get(1).name());
+    assertEquals(List.of(area18), model.getAttribute("locations"));
+    assertEquals(displayed, model.getAttribute("locationsPage"));
+    assertEquals(
+        List.of("Area18", "Port Olisar"),
+        model.getAttribute("locationNames"),
+        "the second backend page must not be dropped from the suggestions");
     assertEquals(Boolean.FALSE, model.getAttribute("catalogTruncated"));
+  }
+
+  @Test
+  void listData_forwardsTheSearch_andRendersTheResultsFragment() {
+    when(backendApiClient.get(
+            eq(LIST_TEMPLATE + "&query={query}"), anyTypeRef(), eq(0), eq(25), eq("Lor")))
+        .thenReturn(new PageResponse<>(List.of(), 0, 25, 0, 0, List.of()));
+    ConcurrentModel model = new ConcurrentModel();
+
+    String view = controller.listData(" Lor ", null, 7, "results", model);
+
+    assertEquals("catalogue/admin/locations :: locationsResults", view);
+    assertEquals("/admin/locations?query=Lor", model.getAttribute("paginationBaseUrl"));
   }
 
   @Test

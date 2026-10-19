@@ -77,8 +77,8 @@ class AdminMaterialCreateInPlaceE2eTest {
   }
 
   /**
-   * Double-clicks the create button and asserts one create POST, the new row in the table, and no
-   * page reload.
+   * Narrows the paginated list to the new name, double-clicks the create button and asserts one
+   * create POST, the new row in the table, and no page reload.
    */
   @Test
   void doubleClickedCreateSendsOneWriteAndRendersTheRowInPlace() {
@@ -104,6 +104,12 @@ class AdminMaterialCreateInPlaceE2eTest {
         page.waitForLoadState();
 
         page.evaluate("() => { window.__krtNoReload = true; }");
+
+        page.waitForResponse(
+            response ->
+                response.url().contains("/admin/materials?")
+                    && response.url().contains("fragment=results"),
+            () -> page.locator("#filterMaterials").fill(materialName));
 
         page.locator("[data-trigger='materials-open-create-modal']").click();
         page.locator("#cm-name").fill(materialName);

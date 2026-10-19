@@ -368,7 +368,7 @@ class CatalogueCachedReadsTest {
     reads.add(
         read(
             "ship types page",
-            () -> shipTypeController.getAllShipTypes(0, BIG_PAGE, null, true),
+            () -> shipTypeController.getAllShipTypes(0, BIG_PAGE, null, true, null),
             shipTypeId,
             Map.of(
                 "/name",
@@ -390,7 +390,7 @@ class CatalogueCachedReadsTest {
     reads.add(
         read(
             "locations page",
-            () -> locationController.getAllLocations(0, BIG_PAGE, null, true),
+            () -> locationController.getAllLocations(0, BIG_PAGE, null, true, null),
             locationId,
             Map.of(
                 "/name",
@@ -436,13 +436,13 @@ class CatalogueCachedReadsTest {
     reads.add(
         read(
             "materials page",
-            () -> materialController.getAllMaterials(false, true, 0, BIG_PAGE, null),
+            () -> materialController.getAllMaterials(false, true, 0, BIG_PAGE, null, null),
             rawMaterialId,
             materialPin()));
     reads.add(
         read(
             "visible materials page",
-            () -> materialController.getAllMaterials(false, false, 0, BIG_PAGE, null),
+            () -> materialController.getAllMaterials(false, false, 0, BIG_PAGE, null, null),
             rawMaterialId,
             materialPin()));
     reads.add(

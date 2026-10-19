@@ -27,6 +27,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueListBackendClient;
 import de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,7 +44,9 @@ class ShipDataPageControllerReauthMvcTest {
 
   @BeforeEach
   void setUp() {
-    mockMvc = ReauthPageMvc.standalone(new ShipDataPageController(client));
+    mockMvc =
+        ReauthPageMvc.standalone(
+            new ShipDataPageController(client, mock(CatalogueListBackendClient.class)));
     ReauthPageMvc.signInMember();
   }
 

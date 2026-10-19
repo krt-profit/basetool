@@ -1,6 +1,8 @@
 # ADR-0102 — Admin catalog pages page-walk the complete catalogue instead of rendering one bounded page
 
-- **Status:** Accepted
+- **Status:** Accepted; narrowed by [ADR-0293](0293-long-admin-catalogue-lists-paginate-server-side.md)
+  — the `/admin/materials` and `/admin/locations` lists and the `/ship-data` ship types paginate
+  server-side
 - **Date:** 2026-07-16
 - **Deciders:** Repository owner (@greluc)
 - **Related:** spec [`admin-catalog-completeness.md`](../specs/admin-catalog-completeness.md)

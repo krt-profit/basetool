@@ -62,6 +62,9 @@ import org.springframework.web.context.WebApplicationContext;
 @SpringBootTest
 class AdminMaterialsPageControllerMvcTest {
 
+  private static final String LIST_TEMPLATE =
+      "/api/v1/materials?includeHidden=true&sort=name,asc&page={page}&size={size}";
+
   private MockMvc mockMvc;
 
   @Autowired private WebApplicationContext context;
@@ -111,6 +114,7 @@ class AdminMaterialsPageControllerMvcTest {
             anyTypeRef(),
             eq(0)))
         .thenReturn(materialsPage);
+    stubDisplayedPage(List.of(material), 1);
     when(backendApiClient.get(eq("/api/v1/material-categories"), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
@@ -122,6 +126,19 @@ class AdminMaterialsPageControllerMvcTest {
         .andExpect(content().string(containsString("value=\"Aluminum\"")))
         .andExpect(content().string(containsString("src=\"/js/catalogue/admin-materials.js\"")))
         .andExpect(content().string(containsString("</html>")));
+  }
+
+  /**
+   * Stubs the displayed first page of 25 materials.
+   *
+   * @param content the rows of the page
+   * @param total the total number of materials
+   */
+  private void stubDisplayedPage(@NotNull List<MaterialDto> content, long total) {
+    when(backendApiClient.get(eq(LIST_TEMPLATE), anyTypeRef(), eq(0), eq(25)))
+        .thenReturn(
+            new PageResponse<>(
+                content, 0, 25, total, (int) ((total + 24) / 25), Collections.emptyList()));
   }
 
   /**
@@ -141,6 +158,7 @@ class AdminMaterialsPageControllerMvcTest {
             eq(0)))
         .thenReturn(
             new PageResponse<>(materials, 0, 1000, materials.size(), 1, Collections.emptyList()));
+    stubDisplayedPage(materials, materials.size());
     when(backendApiClient.get(eq("/api/v1/material-categories"), anyTypeRef()))
         .thenReturn(categories);
     return mockMvc
@@ -215,6 +233,78 @@ class AdminMaterialsPageControllerMvcTest {
         .containsPattern("data-category-table hidden=\"hidden\"")
         .contains("data-category-empty>");
     assertThat(main.split("data-testid=\"empty-state\"", -1)).hasSize(3);
+  }
+
+  /**
+   * More materials than one page: the head counts all of them, the footer shows the range, the page
+   * links and the size picker, and the search is a server form kept in every link.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void listMaterials_paginatesServerSide_andKeepsTheSearchInThePageLinks() throws Exception {
+    MaterialDto material =
+        new MaterialDto(
+            UUID.randomUUID(),
+            "Aluminum",
+            "RAW",
+            "SCU",
+            null,
+            null,
+            null,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            0L);
+    when(backendApiClient.get(
+            eq(LIST_TEMPLATE + "&query={query}"), anyTypeRef(), eq(0), eq(25), eq("Al")))
+        .thenReturn(new PageResponse<>(List.of(material), 0, 25, 213, 9, Collections.emptyList()));
+
+    String html =
+        mockMvc
+            .perform(get("/admin/materials").param("query", "Al").locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .containsPattern("data-testid=\"page-head-count\"[^>]*>213<")
+        .contains("id=\"materials-filter\"")
+        .containsPattern("id=\"filterMaterials\" name=\"query\" value=\"Al\"")
+        .contains("data-list-total=\"213\"")
+        .contains("class=\"pagination\"")
+        .contains("href=\"/admin/materials?query=Al&amp;page=1&amp;size=25\"")
+        .contains("href=\"/admin/materials?query=Al&amp;page=0&amp;size=100\"")
+        .doesNotContain("data-trigger=\"filter-table\"");
+  }
+
+  /** The results fragment holds the table and the footer, without the page chrome. */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void listMaterials_resultsFragment_rendersOnlyTheList() throws Exception {
+    stubDisplayedPage(List.of(), 0);
+    when(backendApiClient.get(eq("/api/v1/material-categories"), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    String html =
+        mockMvc
+            .perform(get("/admin/materials").param("fragment", "results"))
+            .andExpect(status().isOk())
+            .andExpect(view().name("catalogue/admin/materials :: materialsResults"))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("id=\"materialsTable\"")
+        .contains("data-testid=\"empty-state\"")
+        .doesNotContain("<html")
+        .doesNotContain("id=\"materials-results\"")
+        .doesNotContain("data-testid=\"page-head\"");
   }
 
   @Test
