@@ -423,7 +423,7 @@
         background-color: var(--control-bg);
         border: var(--border-hairline);
         border-radius: var(--radius-sm);
-        color: var(--color-gray-2-text);
+        color: var(--color-gray-1);
         font-family: var(--font-body);
         font-weight: var(--fw-thin);
         font-size: 0.85rem;
