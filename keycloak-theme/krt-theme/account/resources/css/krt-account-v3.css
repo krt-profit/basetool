@@ -24,21 +24,25 @@
 }
 
 :root {
-    --color-primary: #E77E23;
+    --color-primary: #FB8A28;
     --color-bg-black: #000000;
-    --color-bg-dark-gray: #141414;
+    --color-canvas: #202020;
+    --color-bg-dark-gray: #35393D;
     
     --color-accent-light: #EEB64B;
     --color-accent-dark: #C45C00;
     
-    --color-gray-1: #D2D2D2;
-    --color-gray-2: #646464;
-    --color-gray-3: #282828;
-    --color-gray-4: #141414;
-    --color-surface-input: #1C1C1C;
+    --color-gray-1: #DADBDE;
+    --color-gray-2: #8F9399;
+    --color-gray-3: #404145;
+    --color-gray-4: #35393D;
+    --color-surface-input: #2A2D31;
+    --color-control: #3F474C;
+    --color-gray-2-text: #B0B3B7;
+    --radius-sm: 4px;
 
     --color-danger: #A3000A;
-    --color-danger-text: #F2564B;
+    --color-danger-text: #FF7A70;
     --color-success: #239E33;
     --color-warning: #FFD23F;
     --color-info: #355DDC;
@@ -46,7 +50,7 @@
     --font-headline: 'Lato', sans-serif;
     --font-body: 'Lato', sans-serif;
 
-    --glow-primary: 0 0 8px rgba(231, 126, 35, 0.25);
+    --glow-primary: 0 0 8px rgba(251, 138, 40, 0.25);
     --glow-danger:  0 0 8px rgba(163, 0, 10, 0.30);
 }
 
@@ -56,16 +60,16 @@
     --pf-v5-global--primary-color--100: var(--color-primary);
     --pf-v5-global--primary-color--200: var(--color-accent-dark);
     --pf-v5-global--BackgroundColor--100: var(--color-bg-dark-gray);
-    --pf-v5-global--BackgroundColor--200: var(--color-bg-black);
-    --pf-v5-global--BackgroundColor--dark-100: var(--color-bg-black);
+    --pf-v5-global--BackgroundColor--200: var(--color-canvas);
+    --pf-v5-global--BackgroundColor--dark-100: var(--color-canvas);
     --pf-v5-global--Color--100: var(--color-gray-1);
     --pf-v5-global--Color--200: var(--color-gray-2);
 }
 
 body {
-    background-color: var(--color-bg-black);
+    background-color: var(--color-canvas);
     background-image:
-        radial-gradient(circle at 50% -10%, rgba(231, 126, 35, 0.10), transparent 55%);
+        radial-gradient(circle at 50% -10%, rgba(251, 138, 40, 0.10), transparent 55%);
     background-repeat: no-repeat;
     background-attachment: fixed;
 }
@@ -147,7 +151,7 @@ a:hover, .pf-v5-c-button--m-link:hover {
 .pf-v6-c-nav__link.pf-m-current,
 .pf-v5-c-nav__link:hover, .pf-v6-c-nav__link:hover {
     color: var(--color-primary) !important;
-    background-color: var(--color-bg-black) !important;
+    background-color: var(--color-control) !important;
     border-left: 3px solid var(--color-primary) !important;
 }
 
@@ -170,7 +174,7 @@ a:hover, .pf-v5-c-button--m-link:hover {
     border-top: 3px solid var(--color-primary) !important;
     padding: 30px !important;
     position: relative !important;
-    box-shadow: 0 0 20px rgba(231, 126, 35, 0.1) !important;
+    box-shadow: 0 0 20px rgba(251, 138, 40, 0.1) !important;
     margin-bottom: 30px !important;
 }
 
@@ -203,19 +207,19 @@ a:hover, .pf-v5-c-button--m-link:hover {
 .pf-v5-c-form-control input, .pf-v6-c-form-control input,
 .pf-v5-c-text-input, .pf-v6-c-text-input,
 input[type="text"], input[type="email"], input[type="password"], textarea, select {
-    background-color: var(--color-bg-black) !important;
+    background-color: var(--color-control) !important;
     border: 1px solid var(--color-gray-2) !important;
     border-bottom: 2px solid var(--color-primary) !important;
     color: var(--color-gray-1) !important;
     font-family: var(--font-body) !important;
     padding: 12px 15px !important;
-    border-radius: 0 !important;
+    border-radius: var(--radius-sm) !important;
 }
 
 .pf-v5-c-form-control:focus, .pf-v6-c-form-control:focus,
 input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focus, textarea:focus, select:focus {
     border-color: var(--color-primary) !important;
-    box-shadow: 0 0 8px rgba(231, 126, 35, 0.2) !important;
+    box-shadow: 0 0 8px rgba(251, 138, 40, 0.2) !important;
 }
 
 .pf-v5-c-button.pf-m-primary, .pf-v6-c-button.pf-m-primary {
@@ -224,7 +228,7 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
     font-family: var(--font-headline) !important;
     font-weight: 700 !important;
     text-transform: uppercase !important;
-    border-radius: 0 !important;
+    border-radius: var(--radius-sm) !important;
     border: none !important;
     letter-spacing: 1px !important;
     padding: 12px 25px !important;
@@ -242,22 +246,22 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
     font-family: var(--font-headline) !important;
     font-weight: 700 !important;
     text-transform: uppercase !important;
-    border-radius: 0 !important;
+    border-radius: var(--radius-sm) !important;
     letter-spacing: 1px !important;
 }
 
 .pf-v5-c-button.pf-m-secondary:hover, .pf-v6-c-button.pf-m-secondary:hover {
-    background-color: rgba(231, 126, 35, 0.1) !important;
+    background-color: rgba(251, 138, 40, 0.1) !important;
 }
 
 .pf-v5-c-card, .pf-v6-c-card {
     background-color: var(--color-bg-dark-gray) !important;
     border: 1px solid var(--color-gray-3) !important;
-    border-radius: 0 !important;
+    border-radius: var(--radius-sm) !important;
 }
 
 .pf-v5-c-page__header, .pf-v6-c-page__header {
-    background-color: var(--color-bg-dark-gray) !important;
+    background-color: var(--color-surface-input) !important;
     border-bottom: 2px solid var(--color-primary) !important;
 }
 

@@ -53,44 +53,45 @@ import org.openpdf.text.pdf.PdfWriter;
 @Slf4j
 public final class KrtPdfSupport {
 
-  /** Page background fill — pure black, matching the app's HUD canvas. */
-  public static final Color COLOR_BLACK = new Color(0x00, 0x00, 0x00);
+  /** Page background fill, the app's canvas gray ({@code --color-canvas}). */
+  public static final Color COLOR_CANVAS = new Color(0x20, 0x20, 0x20);
 
-  /** Panel background for meta rows and odd table rows. */
-  public static final Color COLOR_DARK_GRAY = new Color(0x14, 0x14, 0x14);
+  /** Panel background for meta rows and odd table rows ({@code --surface-panel}). */
+  public static final Color COLOR_DARK_GRAY = new Color(0x35, 0x39, 0x3D);
 
   /**
    * DAS KARTELL primary orange ({@code --color-primary}), used only for titles, headings, header
    * accent lines, the chart line, the top bar and the logo (REQ-UI-002).
    */
-  public static final Color COLOR_ORANGE = new Color(0xE7, 0x7E, 0x23);
+  public static final Color COLOR_ORANGE = new Color(0xFB, 0x8A, 0x28);
 
   /** Default body / data-value text on the dark background (design token {@code --data-fg}). */
   public static final Color COLOR_WHITE = new Color(0xFF, 0xFF, 0xFF);
 
-  /** Muted text — footers, empty-state hints and chart axis labels (≈ Grau 1). */
-  public static final Color COLOR_LIGHT_GRAY = new Color(0xCC, 0xCC, 0xCC);
+  /** Muted text — footers, empty-state hints and chart axis labels (Grau 1). */
+  public static final Color COLOR_LIGHT_GRAY = new Color(0xDA, 0xDB, 0xDE);
 
   /**
-   * Muted key/meta-label gray (design token Grau 2 {@code #646464}). Field labels in the meta and
-   * summary blocks are labels, not headings, so they take this neutral gray — never orange.
+   * Muted key/meta-label gray (design token {@code --color-gray-2-text} {@code #B0B3B7}). Field
+   * labels in the meta and summary blocks are labels, not headings, so they take this neutral gray
+   * — never orange.
    */
-  public static final Color COLOR_LABEL = new Color(0x64, 0x64, 0x64);
+  public static final Color COLOR_LABEL = new Color(0xB0, 0xB3, 0xB7);
 
   /**
    * Half-step surface that reads just above the {@link #COLOR_DARK_GRAY} panel, used for table-head
-   * fills (design token {@code --color-surface-input} {@code #1C1C1C}) instead of an orange fill.
+   * fills (design token {@code --surface-bar} {@code #2A2D31}) instead of an orange fill.
    */
-  public static final Color COLOR_SURFACE_INPUT = new Color(0x1C, 0x1C, 0x1C);
+  public static final Color COLOR_SURFACE_INPUT = new Color(0x2A, 0x2D, 0x31);
 
   /**
-   * Neutral hairline border / grid color (design token Grau 3 {@code #282828}). Frames every data
+   * Neutral hairline border / grid color (design token Grau 3 {@code #404145}). Frames every data
    * cell so the table grid is quiet, with orange reserved for the single header-underline accent.
    */
-  public static final Color COLOR_HAIRLINE = new Color(0x28, 0x28, 0x28);
+  public static final Color COLOR_HAIRLINE = new Color(0x40, 0x41, 0x45);
 
-  /** Alternating (even) table row background. */
-  public static final Color COLOR_TABLE_ROW_ALT = new Color(0x1E, 0x1E, 0x1E);
+  /** Alternating (even) table row background, the canvas gray. */
+  public static final Color COLOR_TABLE_ROW_ALT = new Color(0x20, 0x20, 0x20);
 
   /** Embedded Lato Regular — loaded once per JVM from the bundled TTF. */
   private static final BaseFont LATO_REGULAR = loadFont("fonts/Lato-Regular.ttf");
@@ -449,8 +450,8 @@ public final class KrtPdfSupport {
   }
 
   /**
-   * Page event painting the KRT background on every page: black fill, a thin orange top bar and the
-   * logo bottom-right.
+   * Page event painting the KRT background on every page: canvas gray fill, a thin orange top bar
+   * and the logo bottom-right.
    */
   private static class KrtPageBackground extends PdfPageEventHelper {
 
@@ -461,7 +462,7 @@ public final class KrtPdfSupport {
     public void onStartPage(PdfWriter writer, Document document) {
       PdfContentByte canvas = writer.getDirectContentUnder();
 
-      canvas.setColorFill(COLOR_BLACK);
+      canvas.setColorFill(COLOR_CANVAS);
       canvas.rectangle(0, 0, PageSize.A4.getWidth(), PageSize.A4.getHeight());
       canvas.fill();
 

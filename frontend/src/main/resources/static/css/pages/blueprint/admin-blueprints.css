@@ -14,7 +14,7 @@
         padding: 0 var(--space-4);
         text-align: left;
         white-space: nowrap;
-        background: var(--color-surface-input);
+        background: var(--surface-bar);
         border-bottom: var(--border-heading);
         color: var(--color-gray-1);
         font-size: var(--fs-2xs);

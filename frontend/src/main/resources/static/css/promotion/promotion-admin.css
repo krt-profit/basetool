@@ -3,7 +3,7 @@
 @layer page {
     .form-input {
         width: 100%;
-        background: var(--color-gray-4);
+        background: var(--control-bg);
         border: 1px solid var(--color-gray-3);
         color: var(--color-gray-1);
         padding: 0.5rem 0.75rem;
@@ -12,7 +12,7 @@
     }
 
     input.form-input:is([type='text'], [type='number']) {
-        background-color: var(--color-surface-input);
+        background-color: var(--control-bg);
         font-size: var(--fs-body);
     }
 
@@ -22,7 +22,7 @@
     }
 
     .form-input[readonly] {
-        background: var(--color-surface-input);
+        background: var(--control-bg);
         color: var(--color-gray-2-text);
         cursor: not-allowed;
     }

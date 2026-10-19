@@ -7,19 +7,15 @@
   <meta name="robots" content="noindex, nofollow">
   <title>System Maintenance &mdash; Profit Basetool</title>
   <style>
-    /* The KRT corporate font (Lato) lives inside the Spring frontend's static
-       assets. This page is served by nginx while that container is restarting,
-       so we cannot reach it. Fall back to a wide-set bold sans-serif for the
-       HUD headlines. */
     :root {
-      --color-primary: #E77E23;
+      --color-primary: #FB8A28;
       --color-accent-dark: #C45C00;
-      --color-bg: #000000;
-      --color-bg-2: #141414;
-      --color-text: #D2D2D2;
-      --color-text-muted: rgba(210, 210, 210, 0.55);
-      --color-border: rgba(231, 126, 35, 0.45);
-      --color-divider: rgba(210, 210, 210, 0.15);
+      --color-bg: #202020;
+      --color-bg-2: #35393D;
+      --color-text: #DADBDE;
+      --color-text-muted: #B0B3B7;
+      --color-border: rgba(251, 138, 40, 0.45);
+      --color-divider: rgba(218, 219, 222, 0.15);
     }
     * { box-sizing: border-box; }
     html, body {
@@ -46,9 +42,9 @@
       padding: 2.25rem 1.5rem;
       background: var(--color-bg-2);
       border: 2px solid var(--color-border);
-      box-shadow: 0 0 24px rgba(231, 126, 35, 0.18);
+      box-shadow: 0 0 24px rgba(251, 138, 40, 0.18);
+      border-radius: 4px;
     }
-    /* Technical HUD-style corner markers. */
     main.panel::before,
     main.panel::after {
       content: '';
@@ -84,6 +80,7 @@
       background: var(--color-accent-dark);
       color: #FFFFFF;
       font-weight: 700;
+      border-radius: 4px;
     }
     .pulse {
       display: inline-block;
@@ -137,20 +134,17 @@
       vertical-align: middle;
     }
 
-    /* Tablet (>= 768px). */
     @media (min-width: 768px) {
       body { padding: 2rem; }
       main.panel { padding: 3rem 2.5rem; }
       h2 { font-size: 1.2rem; }
       p  { font-size: 1rem; }
     }
-    /* Desktop (>= 1024px). */
     @media (min-width: 1024px) {
       main.panel { max-width: 760px; padding: 3.5rem 3rem; }
       h2 { font-size: 1.25rem; }
       p  { font-size: 1.05rem; }
     }
-    /* Ultra-wide (>= 1600px). */
     @media (min-width: 1600px) {
       main.panel { max-width: 820px; }
     }

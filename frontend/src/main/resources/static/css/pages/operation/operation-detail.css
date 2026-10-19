@@ -75,7 +75,7 @@
         border-bottom: 0;
     }
     .op-result-row:hover {
-        background-color: var(--color-gray-3);
+        background-color: var(--control-bg);
     }
     .op-result-row:focus-visible {
         outline: 2px solid var(--color-primary);
@@ -216,7 +216,7 @@
         color: var(--color-danger-text);
     }
     .op-fin-link {
-        color: var(--color-dept-profit);
+        color: var(--color-success-text);
         text-decoration: underline;
     }
 

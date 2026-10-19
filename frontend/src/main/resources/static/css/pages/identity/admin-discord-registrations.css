@@ -27,7 +27,7 @@
         min-height: 80px;
         padding: 0.5rem;
         box-sizing: border-box;
-        background-color: var(--color-surface-input);
+        background-color: var(--control-bg);
         border: 1px solid var(--color-gray-3);
         color: var(--color-gray-1);
         font-family: var(--font-body);

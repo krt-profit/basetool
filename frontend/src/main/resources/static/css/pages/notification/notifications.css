@@ -11,7 +11,7 @@
     }
 
     .notification-inbox .notification-item:hover {
-        background: var(--color-gray-3);
+        background: var(--control-bg);
     }
 
     .notification-inbox .notification-item:last-child {

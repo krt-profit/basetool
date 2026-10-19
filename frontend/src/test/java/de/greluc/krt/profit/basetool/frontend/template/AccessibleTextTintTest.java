@@ -38,7 +38,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Build-time check of the accessible text tints (REQ-UI-006): text colour never uses the danger
- * ({@code #A3000A}), info ({@code #355DDC}) or grey 2 ({@code #646464}) hues, which fail WCAG AA on
+ * ({@code #A3000A}), info ({@code #355DDC}) or grey 2 ({@code #8F9399}) hues, which fail WCAG AA on
  * dark surfaces, but their {@code -text} tints. Reads the declarations directly, so unrendered
  * styles are covered too.
  */
@@ -48,7 +48,7 @@ class AccessibleTextTintTest {
   private static final Pattern CSS_TEXT_COLOUR =
       Pattern.compile(
           "(?<![-\\w])color\\s*:\\s*(var\\(--color-(?:danger|info|gray-2)\\)"
-              + "|#a3000a|#355ddc|#646464)(?![-\\w])",
+              + "|#a3000a|#355ddc|#8f9399)(?![-\\w])",
           Pattern.CASE_INSENSITIVE);
 
   /** An innermost CSS rule block: its selector and its declarations. */
@@ -64,7 +64,7 @@ class AccessibleTextTintTest {
   private static final Pattern JS_TEXT_COLOUR =
       Pattern.compile(
           "\\.style\\.color\\s*=\\s*['\"](var\\(--color-(?:danger|info|gray-2)\\)"
-              + "|#a3000a|#355ddc|#646464)['\"]",
+              + "|#a3000a|#355ddc|#8f9399)['\"]",
           Pattern.CASE_INSENSITIVE);
 
   /**

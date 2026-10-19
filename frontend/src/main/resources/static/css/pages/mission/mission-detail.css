@@ -23,7 +23,7 @@
     input[type='number'] {
         width: 100%;
         padding: 0.8rem;
-        background-color: var(--color-surface-input);
+        background-color: var(--control-bg);
         border: 1px solid var(--color-gray-3);
         color: var(--color-gray-1);
         font-family: var(--font-body);
@@ -78,7 +78,7 @@
         position: sticky;
         top: 0;
         z-index: var(--z-sticky-head);
-        background-color: var(--color-bg-black);
+        background-color: var(--surface-canvas);
     }
     .mission-head-sticky > .page-head {
         margin: 0;
@@ -540,7 +540,7 @@
         flex-wrap: wrap;
     }
     .reflink {
-        color: var(--color-dept-profit);
+        color: var(--color-success-text);
         text-decoration: underline;
     }
     .auto-marker {
@@ -689,7 +689,7 @@
         height: 18px;
         margin-top: 1px;
         border: 1px solid var(--color-gray-2);
-        background: var(--color-bg-black);
+        background: var(--surface-canvas);
         box-sizing: border-box;
         display: inline-flex;
         align-items: center;
@@ -841,7 +841,7 @@
         align-items: center;
         justify-content: center;
         border: 1px solid var(--color-gray-2);
-        background: var(--color-bg-black);
+        background: var(--surface-canvas);
         color: var(--color-gray-1);
         font-family: var(--font-headline);
         font-weight: var(--fw-bold);
@@ -863,7 +863,7 @@
     .ae-fields input {
         width: 100%;
         box-sizing: border-box;
-        background: var(--color-bg-dark-gray);
+        background: var(--control-bg);
         color: var(--color-white);
         border: var(--border-hairline);
         font-family: var(--font-body);
@@ -879,7 +879,7 @@
     .ae-fields select.ae-kind {
         width: 100%;
         box-sizing: border-box;
-        background: var(--color-bg-dark-gray);
+        background: var(--control-bg);
         color: var(--color-white);
         border: var(--border-hairline);
         font-family: var(--font-body);

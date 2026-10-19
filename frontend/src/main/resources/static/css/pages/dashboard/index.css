@@ -92,7 +92,7 @@
 
     .home-mission:hover,
     .home-mission:focus-visible {
-        background: var(--color-gray-3);
+        background: var(--control-bg);
         color: inherit;
     }
 
@@ -107,7 +107,7 @@
         align-items: center;
         width: 64px;
         padding: var(--space-1) 0;
-        background: var(--color-bg-black);
+        background: var(--surface-canvas);
         border: var(--border-hairline);
         line-height: 1.15;
         text-transform: uppercase;
@@ -207,7 +207,7 @@
     }
 
     a.home-notif__main:hover {
-        background: var(--color-gray-3);
+        background: var(--control-bg);
         color: inherit;
     }
 

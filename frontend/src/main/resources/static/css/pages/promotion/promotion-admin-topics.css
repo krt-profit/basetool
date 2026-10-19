@@ -77,7 +77,7 @@
 
     .pa-category-card {
         margin-top: 0;
-        background: var(--color-bg-black);
+        background: var(--surface-canvas);
         border: var(--border-hairline);
     }
 
