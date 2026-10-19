@@ -10,6 +10,7 @@
 
 - **Raffinerieauftrag anlegen bei Mitgliedschaft in Staffel und Bereich.** Das Formular zeigt jetzt die Auswahl „Zuordnen zu“, wenn der Besitzer mehreren Organisationseinheiten gleich welcher Art angehört; vorher fehlte sie, und jedes Anlegen scheiterte mit der falschen Meldung „Materialien sind ungültig oder fehlen.“ Eine fehlende Einheit wird nun auch als solche gemeldet (REQ-ORG-023).
 - **„Abbrechen“ in den Dialogen von „Einsatzdaten verwalten“.** Der Abbrechen-Button der Dialoge für Staffeln, Aufgaben und Frequenztypen schließt den Dialog wieder; bisher reagierte nur das ✕ (REQ-UI-013).
+- **Sichtbare Ränder der Material-Kacheln.** Die Kacheln der Material-Übersicht tragen jetzt den grauen Control-Rand statt der kaum sichtbaren Haarlinie und werden beim Überfahren orange (REQ-UI-028).
 
 - **Einsatz: Frequenz eines Frequenztyps entfernen.** Unter Verwaltung → Organisation → Frequenztypen hat jede gesetzte Frequenz neben dem Stift jetzt einen Löschen-Knopf; vorher ließ sie sich nur ändern, nie entfernen. Danach steht der Typ ohne Wert da und verschwindet aus dem Funk-Panel der Übersicht.
 
