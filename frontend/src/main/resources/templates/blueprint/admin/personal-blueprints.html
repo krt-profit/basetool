@@ -52,7 +52,6 @@
                   th:data-purge-error="#{admin.personalInventory.blueprints.purge.error}">
                 <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
                 <div class="krt-modal-body stack gap-3">
-                    <p th:text="#{admin.personalInventory.blueprints.purge.text}">Entfernt unwiderruflich die Blueprints ALLER Nutzer. Standard-Blueprints bleiben erhalten.</p>
                     <p th:text="#{admin.personalInventory.blueprints.purge.modal.text}">Diese Aktion l&ouml;scht die Blueprints ALLER Nutzer unwiderruflich. Tippe LOESCHEN, um zu best&auml;tigen.</p>
                     <div class="form-group">
                         <label for="bp-purge-confirm" th:text="#{admin.personalInventory.blueprints.purge.modal.label}">Best&auml;tigung</label>

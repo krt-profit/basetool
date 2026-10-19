@@ -5,6 +5,10 @@
         padding: 1.25rem;
     }
 
+    .krt-bp-search {
+        max-width: var(--content-max-form);
+    }
+
     .krt-pi-userform {
         display: flex;
         gap: 0.75rem;
@@ -20,6 +24,7 @@
         color: var(--color-gray-1);
         padding: 0.4rem 2rem 0.4rem 0.6rem;
         min-width: 240px;
+        max-width: var(--content-max-form);
     }
 
     .krt-pi-userform label {

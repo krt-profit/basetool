@@ -8,6 +8,8 @@
 
 ### Fixed
 
+- **Design-System-Abgleich aller Seiten.** Nach einer Kontrolle jeder Seite, jedes Dialogs und Menüs auf allen sechs Geräteklassen haben Eingabefelder wieder sichtbare Ränder, Auswahlen sind nie gefüllte Farbblöcke, grüne und orange Texte sind lesbar, und Listen-Seiten bündeln Suche, Filter und Liste in einem Panel. Overflow-Menüs bleiben auf dem Telefon im Bild, und die Checkbox „Ohne gestohlene“ in der Materialbörse ist wieder sichtbar (REQ-UI-006, REQ-UI-007).
+
 - **Raffinerieauftrag: Felder überlappen nicht mehr.** Beim Anlegen und Bearbeiten verdeckt „Jetzt“ das Uhrzeitfeld nicht mehr, und Start, Dauer, Fertig am sowie die Materialzeile behalten ihren Abstand; ist das Formular zu schmal, brechen die Felder um. Die Auf-/Ab-Pfeile eines Zahlenfelds stehen app-weit mit Abstand zur Zahl (REQ-UI-028).
 
 ## [v1.18.0](https://github.com/krt-profit/basetool/releases/tag/v1.18.0) - 2026-10-18
