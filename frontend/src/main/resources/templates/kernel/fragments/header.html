@@ -17,10 +17,10 @@
         <span class="admin-mode-chip" th:aria-label="#{nav.administration}" th:text="#{nav.adminMode.chip}">ADMIN</span>
         <th:block sec:authorize="isAuthenticated()">
             <button type="button" class="palette-trigger" data-testid="palette-open" data-palette-open
-                    th:aria-label="#{palette.trigger.aria}" aria-haspopup="dialog" aria-controls="nav-palette">
+                    aria-haspopup="dialog" aria-controls="nav-palette">
                 <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-search"></use></svg>
                 <span class="palette-trigger-text" th:text="#{palette.placeholder}">Seite oder Aktion suchen …</span>
-                <span class="nav-kbd" data-palette-kbd th:text="#{palette.kbd}">STRG K</span>
+                <span class="nav-kbd" data-palette-kbd aria-hidden="true" th:text="#{palette.kbd}">STRG K</span>
             </button>
             <button type="button" class="header-search-btn" data-testid="mobile-search-open" data-palette-open
                     th:aria-label="#{mobile.search.open}" th:title="#{mobile.search.open}"
