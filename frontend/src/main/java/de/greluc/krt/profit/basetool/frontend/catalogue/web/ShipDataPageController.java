@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.catalogue.web;
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueListBackendClient;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.ManufacturerDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.ManufacturerForm;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.ShipTypeDto;
@@ -29,11 +30,13 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.ShipTypeForm;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogPages;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogPages.CompleteCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -62,24 +65,51 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @Slf4j
 public class ShipDataPageController {
 
+  /** The page path, also the base of the pagination links. */
+  private static final String PATH = "/ship-data";
+
   /** Reads and writes the manufacturer and ship-type catalogues. */
   private final CatalogueBackendClient catalogueClient;
 
+  /** Reads the displayed page of the paginated catalogue list. */
+  private final CatalogueListBackendClient listClient;
+
   /**
-   * Loads the complete manufacturer and ship-type catalogs including hidden entries
-   * (REQ-ADMIN-001), sorted case-insensitively by name, and seeds empty forms.
+   * Renders one page of the ship types, narrowed by a server-side name search, and the complete
+   * manufacturer catalogue, both including hidden entries (REQ-ADMIN-001), and seeds empty forms.
    *
    * <p>A backend failure sets an error key; a page walk that hits its safety cap sets {@code
-   * catalogTruncated} so the template warns (REQ-ADMIN-002).
+   * catalogTruncated} so the template warns (REQ-ADMIN-002). The results fragment loads the ship
+   * type page only.
    *
+   * @param query ship-type name fragment to search for, may be {@code null}
+   * @param page zero-based ship-type page index, may be {@code null}
+   * @param size ship-type page size out of 25, 50 and 100, may be {@code null}
+   * @param fragment {@code results} to render only the swapped ship-type list fragment
    * @param model Thymeleaf model populated with both forms, both lists and the optional error key
-   * @return the {@code ship-data} view name
+   * @return the {@code ship-data} view, or its ship-type results fragment
    */
   @NotNull
   @GetMapping
   @PreAuthorize("isAuthenticated()")
   @SuppressWarnings("unchecked")
-  public String listData(Model model) {
+  public String listData(
+      @RequestParam(required = false) String query,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String fragment,
+      Model model) {
+    CatalogueListPaging paging = CatalogueListPaging.of(page, size, query);
+    paging.addTo(model, "shipTypes", paging.orEmpty(null), PATH);
+    model.addAttribute("shipTypes", List.of());
+    boolean resultsOnly = CatalogueListPaging.wantsResults(fragment);
+    if (resultsOnly) {
+      if (!SectionFallback.run(log, "ship-data", () -> addShipTypePage(model, paging))) {
+        model.addAttribute("error", "error.shipdata.load");
+      }
+      return "catalogue/ship-data :: shipTypesResults";
+    }
+
     if (!model.containsAttribute("manufacturerForm")) {
       model.addAttribute("manufacturerForm", new ManufacturerForm("", "", "", "", ""));
     }
@@ -87,7 +117,7 @@ public class ShipDataPageController {
       model.addAttribute("shipTypeForm", new ShipTypeForm("", null, ""));
     }
 
-    if (!SectionFallback.run(log, "ship-data", () -> addCatalogs(model))) {
+    if (!SectionFallback.run(log, "ship-data", () -> addCatalogs(model, paging))) {
       model.addAttribute("error", "error.shipdata.load");
     }
 
@@ -95,11 +125,28 @@ public class ShipDataPageController {
   }
 
   /**
-   * Adds the name-sorted manufacturers and ship types and whether either page walk hit its cap.
+   * Adds the displayed ship-type page.
    *
    * @param model the ship-data model
+   * @param paging the requested page, size and search
    */
-  private void addCatalogs(@NotNull Model model) {
+  private void addShipTypePage(@NotNull Model model, @NotNull CatalogueListPaging paging) {
+    PageResponse<ShipTypeDto> shipTypesPage =
+        paging.orEmpty(listClient.shipTypes(paging.query(), paging.page(), paging.size()));
+    paging.addTo(model, "shipTypes", shipTypesPage, PATH);
+    model.addAttribute("shipTypes", shipTypesPage.content());
+  }
+
+  /**
+   * Adds the displayed ship-type page, every ship-type name for the search suggestions, the
+   * name-sorted manufacturers and whether either page walk hit its cap.
+   *
+   * @param model the ship-data model
+   * @param paging the requested page, size and search
+   */
+  private void addCatalogs(@NotNull Model model, @NotNull CatalogueListPaging paging) {
+    addShipTypePage(model, paging);
+
     CompleteCatalog<ManufacturerDto> manufacturersCatalog =
         CatalogPages.fetchAll(catalogueClient::manufacturerPage);
     List<ManufacturerDto> manufacturers = new ArrayList<>(manufacturersCatalog.items());
@@ -108,9 +155,13 @@ public class ShipDataPageController {
 
     CompleteCatalog<ShipTypeDto> shipTypesCatalog =
         CatalogPages.fetchAll(catalogueClient::shipTypePage);
-    List<ShipTypeDto> shipTypes = new ArrayList<>(shipTypesCatalog.items());
-    shipTypes.sort(Comparator.comparing(ShipTypeDto::name, String.CASE_INSENSITIVE_ORDER));
-    model.addAttribute("shipTypes", shipTypes);
+    model.addAttribute(
+        "shipTypeNames",
+        shipTypesCatalog.items().stream()
+            .map(ShipTypeDto::name)
+            .filter(Objects::nonNull)
+            .sorted(String.CASE_INSENSITIVE_ORDER)
+            .toList());
 
     model.addAttribute(
         "catalogTruncated", manufacturersCatalog.truncated() || shipTypesCatalog.truncated());

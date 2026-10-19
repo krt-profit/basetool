@@ -518,7 +518,9 @@ edit buttons live inside the swapped `#hangar-results` fragment they are bound t
 `data-trigger` delegation (and the live ship-type filter is a delegated document listener) so they
 survive every re-swap. **Ship-data** flips each visibility toggle in place (button label + secondary
 style + dimmed opacity, the hidden input updated so the next toggle sends the opposite value) and the
-admin reset-all-fitted toasts + closes its modal, all without navigating. **Personal-inventory**
+admin reset-all-fitted toasts + closes its modal, all without navigating; its ship-type list pages
+and searches through the `GET /ship-data?fragment=results` swap, like the admin material and
+location lists (`catalogue/catalogue-list.js`, REQ-ADMIN-004). **Personal-inventory**
 add/edit/delete go through JSON twins that re-render the existing `#pi-results` list fragment.
 **Blueprints** note-edit returns the fresh blueprint from its twin so the master row (note + version
 + note-marker badge) and the detail pane are patched in place (the selection and the loaded recipe

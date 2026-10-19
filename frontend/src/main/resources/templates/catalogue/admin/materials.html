@@ -11,7 +11,7 @@
 <th:block th:fragment="pageContent">
 <main>
     <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{admin.materials.title},
-        count=${materials != null ? materials.size() : null}, countId='materials-count', countFor='materials-results', actions=~{::materials-actions})}">
+        count=${materialsPage.totalElements()}, countId='materials-count', countFor='materials-results', actions=~{::materials-actions})}">
         <th:block th:ref="materials-actions">
             <button type="button" class="btn btn--cta" data-trigger="materials-open-create-modal" data-testid="page-head-primary"
                     th:text="#{admin.materials.create.button}">Material anlegen</button>
@@ -25,21 +25,20 @@
     </th:block>
 
     <section class="list-panel">
-    <div class="toolbar">
-        <div class="toolbar__search">
-            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-search"/></svg>
-            <input type="search" id="filterMaterials" autocomplete="off" data-testid="toolbar-search"
-                   data-trigger="filter-table" data-table-id="materialsTable"
-                   th:attr="placeholder=#{general.filter.name.placeholder},aria-label=#{general.filter.name.placeholder}">
+    <form id="materials-filter" class="no-track" role="search" method="get" th:action="@{/admin/materials}">
+        <div class="toolbar">
+            <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('filterMaterials', 'query', ${query}, 'general.filter.name.placeholder')}"></th:block>
+            <datalist id="materialNames-data" hidden>
+                <option th:each="mat : ${refinedMaterials}" th:value="${mat.name}"></option>
+            </datalist>
         </div>
-        <datalist id="materialNames-data" hidden>
-            <option th:each="mat : ${materials}" th:value="${mat.name}"></option>
-        </datalist>
-    </div>
+        <input type="hidden" name="size" th:value="${pageSize}">
+    </form>
 
     <div id="materials-results" class="card card--flush">
+        <th:block th:fragment="materialsResults">
         <div data-materials-table th:hidden="${materials == null or materials.isEmpty()}"
-             th:data-list-total="${materials != null ? materials.size() : 0}">
+             th:data-list-total="${materialsPage.totalElements()}">
             <div class="table-responsive">
                 <table id="materialsTable" class="data-table data-table--stack admin-materials-table">
                     <thead>
@@ -115,6 +114,9 @@
         </div>
         <th:block th:if="${materials == null or materials.isEmpty()}">
             <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='admin.materials.empty', textKey='admin.materials.empty.text')}"></th:block>
+        </th:block>
+        <th:block th:replace="~{kernel/fragments/components :: listFoot(pageResponse=${materialsPage}, baseUrl=${paginationBaseUrl})}"></th:block>
+        <nav th:replace="~{kernel/fragments/pagination :: pageSizePicker(pageResponse=${materialsPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
         </th:block>
     </div>
     </section>

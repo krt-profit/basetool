@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.catalogue.web;
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueListBackendClient;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialCreateAjaxRequest;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
@@ -33,10 +34,10 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogPages;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogPages.CompleteCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import jakarta.validation.Valid;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -70,56 +71,72 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminMaterialsPageController {
 
+  /** The page path, also the base of the pagination links. */
+  private static final String PATH = "/admin/materials";
+
   /** Reads and writes the materials and their categories. */
   private final CatalogueBackendClient catalogueClient;
 
   /** Evicts the material catalogue after a write. */
   private final CatalogueCacheEviction cacheEviction;
 
+  /** Reads the displayed page of the paginated catalogue list. */
+  private final CatalogueListBackendClient listClient;
+
   /**
-   * Loads the complete materials list and the category dropdown source (REQ-ADMIN-001). The refined
-   * materials dropdown lists every material, not only those flagged refined. Hitting the page-walk
-   * cap sets {@code catalogTruncated} (REQ-ADMIN-002).
+   * Renders one page of the material list, narrowed by a server-side name search, together with the
+   * complete refined-material dropdown source and the categories (REQ-ADMIN-001). Hitting the
+   * page-walk cap of the dropdown source sets {@code catalogTruncated} (REQ-ADMIN-002).
    *
-   * @param model Thymeleaf model populated with materials, refined materials and categories
-   * @return the {@code admin/materials} view name
+   * @param query name fragment to search for, may be {@code null}
+   * @param page zero-based page index, may be {@code null}
+   * @param size page size out of 25, 50 and 100, may be {@code null}
+   * @param fragment {@code results} to render only the swapped list fragment
+   * @param model Thymeleaf model populated with the material page, refined materials and categories
+   * @return the {@code admin/materials} view, or its results fragment
    */
   @NotNull
   @GetMapping
-  public String listMaterials(Model model) {
-    if (!SectionFallback.run(log, "admin-materials", () -> addMaterials(model))) {
+  public String listMaterials(
+      @RequestParam(required = false) String query,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String fragment,
+      Model model) {
+    CatalogueListPaging paging = CatalogueListPaging.of(page, size, query);
+    paging.addTo(model, "materials", paging.orEmpty(null), PATH);
+    model.addAttribute("materials", List.of());
+    if (!SectionFallback.run(log, "admin-materials", () -> addMaterials(model, paging))) {
       model.addAttribute("error", "error.admin.materials.load");
     }
-    return "catalogue/admin/materials";
+    return CatalogueListPaging.wantsResults(fragment)
+        ? "catalogue/admin/materials :: materialsResults"
+        : "catalogue/admin/materials";
   }
 
   /**
-   * Adds the name-sorted materials, the refined-material dropdown source, the categories and
-   * whether the page walk hit its cap.
+   * Adds the displayed material page, the name-sorted refined-material dropdown source, the
+   * categories and whether the dropdown's page walk hit its cap.
    *
    * @param model the admin materials model
+   * @param paging the requested page, size and search
    */
-  private void addMaterials(@NotNull Model model) {
+  private void addMaterials(@NotNull Model model, @NotNull CatalogueListPaging paging) {
+    PageResponse<MaterialDto> materialsPage =
+        paging.orEmpty(listClient.materials(paging.query(), paging.page(), paging.size()));
+    paging.addTo(model, "materials", materialsPage, PATH);
+    model.addAttribute("materials", materialsPage.content());
+
     CompleteCatalog<MaterialDto> materialsCatalog =
         CatalogPages.fetchAll(catalogueClient::materialPage);
-    List<MaterialDto> materials = new ArrayList<>(materialsCatalog.items());
     model.addAttribute("catalogTruncated", materialsCatalog.truncated());
-
     List<MaterialDto> refinedMaterials =
-        materials.stream()
+        materialsCatalog.items().stream()
             .sorted(
                 Comparator.comparing(
                     m -> m.name() == null ? "" : m.name(), String.CASE_INSENSITIVE_ORDER))
             .toList();
     model.addAttribute("refinedMaterials", refinedMaterials);
-
-    List<MaterialDto> sortedMaterials =
-        materials.stream()
-            .sorted(
-                Comparator.comparing(
-                    m -> m.name() == null ? "" : m.name(), String.CASE_INSENSITIVE_ORDER))
-            .toList();
-    model.addAttribute("materials", sortedMaterials);
 
     List<MaterialCategoryDto> categories = catalogueClient.materialCategories();
     model.addAttribute("categories", categories);

@@ -39,6 +39,7 @@
       "catalogue/admin-material-aliases.js",
       "catalogue/admin-materials.js",
       "catalogue/admin-quality-tiers.js",
+      "catalogue/catalogue-list.js",
       "catalogue/locations.js",
       "catalogue/material-detail.js",
       "catalogue/materials-matrix.js",

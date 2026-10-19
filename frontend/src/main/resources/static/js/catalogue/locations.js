@@ -21,7 +21,7 @@
 
 import { krtAutocomplete } from '/js/kernel/autocomplete.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
-import { krtHooks } from '/js/kernel/krt-hooks.js';
+import { bindCatalogueList } from '/js/catalogue/catalogue-list.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const dataList = /** @type {HTMLDataListElement | null} */ (
@@ -38,33 +38,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (inpLocations) krtAutocomplete(inpLocations, locationNames);
 });
 
-/**
- * Hides every table row whose first cell does not contain the query, case-insensitively.
- *
- * @param {string} tableId id of the table to filter
- * @param {string} query the text to look for
- */
-function filterTable(tableId, query) {
-    const filter = query.toUpperCase();
-    const table = document.getElementById(tableId);
-    if (!table) {
-        return;
-    }
-    const tr = table.getElementsByTagName('tr');
-    for (let i = 1; i < tr.length; i++) {
-        const td = tr[i].getElementsByTagName('td')[0];
-        if (td) {
-            const txtValue = td.textContent || td.innerText;
-            if (txtValue.toUpperCase().indexOf(filter) > -1) {
-                tr[i].style.display = '';
-            } else {
-                tr[i].style.display = 'none';
-            }
-        }
-    }
-}
-
-krtHooks.filterTable = filterTable;
+bindCatalogueList({
+    formSelector: '#locations-filter',
+    containerSelector: '#locations-results',
+    listUrl: '/admin/locations',
+});
 
 document.addEventListener('DOMContentLoaded', () => {
     /**

@@ -95,6 +95,26 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
   Page<Location> findByHiddenFalse(Pageable pageable);
 
   /**
+   * Pages every location, hidden ones included, whose name contains {@code name}
+   * case-insensitively; LIKE wildcards in {@code name} match literally.
+   *
+   * @param name the search fragment
+   * @param pageable page request
+   * @return paged matching locations
+   */
+  Page<Location> findByNameContainingIgnoreCase(String name, Pageable pageable);
+
+  /**
+   * Pages the non-hidden locations whose name contains {@code name} case-insensitively; LIKE
+   * wildcards in {@code name} match literally.
+   *
+   * @param name the search fragment
+   * @param pageable page request
+   * @return paged matching non-hidden locations
+   */
+  Page<Location> findByHiddenFalseAndNameContainingIgnoreCase(String name, Pageable pageable);
+
+  /**
    * Returns the curated, non-hidden home locations ordered by name descending (Z-&gt;A). Backs the
    * hangar bulk "set home location" picker via {@code GET /api/v1/locations/home-locations}; the
    * descending order is part of the contract (the picker preserves it).

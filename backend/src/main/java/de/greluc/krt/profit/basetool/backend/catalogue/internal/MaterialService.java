@@ -86,6 +86,23 @@ public class MaterialService {
   }
 
   /**
+   * Pages the materials whose name contains {@code query} case-insensitively; not cached, because
+   * the search term would make the cache key unbounded.
+   *
+   * @param query the search fragment, already stripped and non-blank
+   * @param includeHidden true to include materials with {@code is_visible = false}
+   * @param pageable page request
+   * @return paged matching material read models
+   */
+  public Page<MaterialDto> searchMaterials(
+      @NotNull String query, boolean includeHidden, @NotNull Pageable pageable) {
+    return (includeHidden
+            ? materialRepository.findByNameContainingIgnoreCase(query, pageable)
+            : materialRepository.findByIsVisibleTrueAndNameContainingIgnoreCase(query, pageable))
+        .map(materialMapper::toDto);
+  }
+
+  /**
    * Variant that eager-fetches the per-terminal price list via {@code @EntityGraph} on the
    * repository — used by views that show prices inline.
    *

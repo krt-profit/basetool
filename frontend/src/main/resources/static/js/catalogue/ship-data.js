@@ -26,6 +26,13 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtHooks } from '/js/kernel/krt-hooks.js';
+import { bindCatalogueList } from '/js/catalogue/catalogue-list.js';
+
+bindCatalogueList({
+    formSelector: '#ship-types-filter',
+    containerSelector: '#ship-types-results',
+    listUrl: '/ship-data',
+});
 
 document.addEventListener('DOMContentLoaded', () => {
     const shipTypesData = /** @type {HTMLDataListElement | null} */ (

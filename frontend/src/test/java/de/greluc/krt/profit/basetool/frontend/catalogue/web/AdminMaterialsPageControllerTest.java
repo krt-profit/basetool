@@ -27,6 +27,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueListBackendClient;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialCreateAjaxRequest;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialUpdateAjaxRequest;
@@ -46,13 +47,17 @@ import org.springframework.ui.Model;
 @SuppressWarnings("unchecked")
 class AdminMaterialsPageControllerTest {
 
+  private static final String LIST_TEMPLATE =
+      "/api/v1/materials?includeHidden=true&sort=name,asc&page={page}&size={size}";
+
   @Test
   void updateMaterialAjax_ShouldUpdateAndReturnMaterial() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     AdminMaterialsPageController controller =
         new AdminMaterialsPageController(
             new CatalogueBackendClient(backendApiClient),
-            new CatalogueCacheEviction(backendApiClient));
+            new CatalogueCacheEviction(backendApiClient),
+            new CatalogueListBackendClient(backendApiClient));
 
     UUID matId = UUID.randomUUID();
     MaterialDto currentMaterial =
@@ -84,7 +89,8 @@ class AdminMaterialsPageControllerTest {
     AdminMaterialsPageController controller =
         new AdminMaterialsPageController(
             new CatalogueBackendClient(backendApiClient),
-            new CatalogueCacheEviction(backendApiClient));
+            new CatalogueCacheEviction(backendApiClient),
+            new CatalogueListBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
 
     List<MaterialDto> materials = new ArrayList<>();
@@ -182,16 +188,19 @@ class AdminMaterialsPageControllerTest {
             anyTypeRef(),
             eq(0)))
         .thenReturn(materialsPage);
+    PageResponse<MaterialDto> displayed =
+        new PageResponse<>(materials.subList(0, 2), 0, 25, 213, 9, List.of("name,asc"));
+    when(backendApiClient.get(eq(LIST_TEMPLATE), anyTypeRef(), eq(0), eq(25)))
+        .thenReturn(displayed);
 
-    controller.listMaterials(model);
+    String view = controller.listMaterials(null, null, null, null, model);
 
-    List<MaterialDto> sortedMaterials = (List<MaterialDto>) model.getAttribute("materials");
-    assertEquals(5, sortedMaterials.size());
-    assertEquals("Alpha", sortedMaterials.get(0).name());
-    assertEquals("Bravo", sortedMaterials.get(1).name());
-    assertEquals("Charlie", sortedMaterials.get(2).name());
-    assertEquals("Delta", sortedMaterials.get(3).name());
-    assertEquals("Echo", sortedMaterials.get(4).name());
+    assertEquals("catalogue/admin/materials", view);
+    assertEquals(materials.subList(0, 2), model.getAttribute("materials"));
+    assertEquals(displayed, model.getAttribute("materialsPage"));
+    assertEquals(25, model.getAttribute("pageSize"));
+    assertEquals(List.of(25, 50, 100), model.getAttribute("pageSizes"));
+    assertEquals("/admin/materials", model.getAttribute("paginationBaseUrl"));
 
     List<MaterialDto> refinedMats = (List<MaterialDto>) model.getAttribute("refinedMaterials");
     assertEquals(5, refinedMats.size());
@@ -209,7 +218,8 @@ class AdminMaterialsPageControllerTest {
     AdminMaterialsPageController controller =
         new AdminMaterialsPageController(
             new CatalogueBackendClient(backendApiClient),
-            new CatalogueCacheEviction(backendApiClient));
+            new CatalogueCacheEviction(backendApiClient),
+            new CatalogueListBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
 
     MaterialDto first =
@@ -252,13 +262,53 @@ class AdminMaterialsPageControllerTest {
     when(backendApiClient.get(eq(template), anyTypeRef(), eq(1)))
         .thenReturn(new PageResponse<>(List.of(second), 1, 1000, 2, 2, List.of("name,asc")));
 
-    controller.listMaterials(model);
+    controller.listMaterials(null, null, null, null, model);
 
-    List<MaterialDto> sortedMaterials = (List<MaterialDto>) model.getAttribute("materials");
-    assertEquals(2, sortedMaterials.size(), "the second backend page must not be dropped");
-    assertEquals("Agricium", sortedMaterials.get(0).name());
-    assertEquals("Zeta-Prolanide", sortedMaterials.get(1).name());
+    List<MaterialDto> refined = (List<MaterialDto>) model.getAttribute("refinedMaterials");
+    assertEquals(2, refined.size(), "the second backend page must not be dropped");
+    assertEquals("Agricium", refined.get(0).name());
+    assertEquals("Zeta-Prolanide", refined.get(1).name());
     assertEquals(Boolean.FALSE, model.getAttribute("catalogTruncated"));
+  }
+
+  @Test
+  void listMaterials_forwardsSearchAndPage_snapsUnsupportedSize_andRendersTheFragment() {
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    AdminMaterialsPageController controller =
+        new AdminMaterialsPageController(
+            new CatalogueBackendClient(backendApiClient),
+            new CatalogueCacheEviction(backendApiClient),
+            new CatalogueListBackendClient(backendApiClient));
+    Model model = new ConcurrentModel();
+    when(backendApiClient.get(
+            eq(LIST_TEMPLATE + "&query={query}"), anyTypeRef(), eq(2), eq(25), eq("Alu ore")))
+        .thenReturn(new PageResponse<>(List.of(), 2, 25, 0, 0, List.of()));
+
+    String view = controller.listMaterials("  Alu ore ", 2, 30, "results", model);
+
+    assertEquals("catalogue/admin/materials :: materialsResults", view);
+    assertEquals("Alu ore", model.getAttribute("query"));
+    assertEquals(25, model.getAttribute("pageSize"));
+    assertEquals("/admin/materials?query=Alu%20ore", model.getAttribute("paginationBaseUrl"));
+  }
+
+  @Test
+  void listMaterials_withoutBackendBody_rendersAnEmptyPage() {
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    AdminMaterialsPageController controller =
+        new AdminMaterialsPageController(
+            new CatalogueBackendClient(backendApiClient),
+            new CatalogueCacheEviction(backendApiClient),
+            new CatalogueListBackendClient(backendApiClient));
+    Model model = new ConcurrentModel();
+
+    controller.listMaterials(null, -3, 100, null, model);
+
+    PageResponse<MaterialDto> page =
+        (PageResponse<MaterialDto>) model.getAttribute("materialsPage");
+    assertEquals(0, page.page());
+    assertEquals(100, page.size());
+    assertEquals(0L, page.totalElements());
   }
 
   @Test
@@ -267,7 +317,8 @@ class AdminMaterialsPageControllerTest {
     AdminMaterialsPageController controller =
         new AdminMaterialsPageController(
             new CatalogueBackendClient(backendApiClient),
-            new CatalogueCacheEviction(backendApiClient));
+            new CatalogueCacheEviction(backendApiClient),
+            new CatalogueListBackendClient(backendApiClient));
 
     MaterialCreateAjaxRequest req =
         new MaterialCreateAjaxRequest(
@@ -307,7 +358,8 @@ class AdminMaterialsPageControllerTest {
     AdminMaterialsPageController controller =
         new AdminMaterialsPageController(
             new CatalogueBackendClient(backendApiClient),
-            new CatalogueCacheEviction(backendApiClient));
+            new CatalogueCacheEviction(backendApiClient),
+            new CatalogueListBackendClient(backendApiClient));
 
     MaterialCreateAjaxRequest req =
         new MaterialCreateAjaxRequest(

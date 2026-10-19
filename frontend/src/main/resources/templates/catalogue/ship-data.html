@@ -36,24 +36,24 @@
         <div class="split sd-section__head">
             <h2 id="sd-shiptypes-title" class="sd-section__title">
                 <span th:text="#{ship.shiptypes}">Schiffstypen</span>
-                <span class="count-badge count-badge--sm" data-testid="sd-shiptypes-count" th:text="${shipTypes != null ? #lists.size(shipTypes) : 0}">0</span>
+                <span class="count-badge count-badge--sm" id="sd-shiptypes-count" data-testid="sd-shiptypes-count"
+                      data-list-count-for="ship-types-results" th:text="${shipTypesPage.totalElements()}">0</span>
             </h2>
         </div>
 
         <section class="list-panel">
-        <div class="toolbar">
-            <div class="toolbar__search">
-                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-search"/></svg>
-                <input type="search" id="filterShipTypes" autocomplete="off" data-testid="toolbar-search"
-                       data-trigger="filter-table" data-table-id="shipTypesTable"
-                       th:attr="placeholder=#{general.filter.name.placeholder},aria-label=#{general.filter.name.placeholder}">
+        <form id="ship-types-filter" class="no-track" role="search" method="get" th:action="@{/ship-data}">
+            <div class="toolbar">
+                <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('filterShipTypes', 'query', ${query}, 'general.filter.name.placeholder')}"></th:block>
+                <datalist id="shipTypeNames-data" hidden>
+                    <option th:each="name : ${shipTypeNames}" th:value="${name}"></option>
+                </datalist>
             </div>
-            <datalist id="shipTypeNames-data" hidden>
-                <option th:each="st : ${shipTypes}" th:value="${st.name}"></option>
-            </datalist>
-        </div>
+            <input type="hidden" name="size" th:value="${pageSize}">
+        </form>
 
-        <div class="card card--flush">
+        <div id="ship-types-results" class="card card--flush">
+            <th:block th:fragment="shipTypesResults">
             <div class="table-responsive" th:unless="${#lists.isEmpty(shipTypes)}">
                 <table id="shipTypesTable" class="data-table data-table--stack">
                     <thead>
@@ -84,6 +84,9 @@
             </div>
             <th:block th:if="${error == null and #lists.isEmpty(shipTypes)}">
                 <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='shipdata.shipTypes.empty', textKey='shipdata.empty.text')}"></th:block>
+            </th:block>
+            <th:block th:replace="~{kernel/fragments/components :: listFoot(pageResponse=${shipTypesPage}, baseUrl=${paginationBaseUrl})}"></th:block>
+            <nav th:replace="~{kernel/fragments/pagination :: pageSizePicker(pageResponse=${shipTypesPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
             </th:block>
         </div>
         </section>

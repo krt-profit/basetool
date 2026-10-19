@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.LocationService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -68,8 +69,14 @@ public class LocationController {
   private final LocationMapper locationMapper;
 
   /**
-   * Paged list with {@code includeHidden} for the admin view.
+   * Paged list with {@code includeHidden} for the admin view; a non-blank {@code query} narrows it
+   * to the locations whose name contains it case-insensitively.
    *
+   * @param page zero-based page index
+   * @param size page size, clamped to the default ceiling
+   * @param sort sort terms over {@code name} and {@code id}
+   * @param includeHidden true to include hidden entries
+   * @param query optional name fragment
    * @return paged location DTOs
    */
   @GetMapping
@@ -77,10 +84,15 @@ public class LocationController {
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort,
-      @RequestParam(required = false, defaultValue = "false") boolean includeHidden) {
+      @RequestParam(required = false, defaultValue = "false") boolean includeHidden,
+      @RequestParam(required = false) String query) {
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, sort, Set.of("name", "id"), "name");
-    return PageResponse.of(locationService.getAllLocations(pageable, includeHidden));
+    String search = StringNormalization.trimToNull(query);
+    return PageResponse.of(
+        search == null
+            ? locationService.getAllLocations(pageable, includeHidden)
+            : locationService.searchLocations(search, includeHidden, pageable));
   }
 
   /**

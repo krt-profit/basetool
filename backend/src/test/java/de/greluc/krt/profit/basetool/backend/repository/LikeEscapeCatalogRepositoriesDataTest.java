@@ -101,6 +101,45 @@ class LikeEscapeCatalogRepositoriesDataTest {
   }
 
   @Test
+  void adminListNameSearch_matchesLiterallyCaseInsensitivelyAndHonoursHidden() {
+    saveLocation(TAG + " Dock%A");
+    saveLocation(TAG + " DockXA");
+    Location hidden = new Location();
+    hidden.setName(TAG + " Dock_B");
+    hidden.setHidden(true);
+    locationRepository.save(hidden);
+    Material visible = saveMaterial(TAG + " Gem%A");
+    saveMaterial(TAG + " GemXA");
+    Material invisible = saveMaterial(TAG + " Gem_B");
+    invisible.setIsVisible(false);
+    materialRepository.save(invisible);
+
+    PageRequest page = PageRequest.of(0, 50);
+    assertThat(
+            locationRepository
+                .findByNameContainingIgnoreCase((TAG + " dock%a").toUpperCase(), page)
+                .map(Location::getName))
+        .containsExactly(TAG + " Dock%A");
+    assertThat(
+            locationRepository
+                .findByNameContainingIgnoreCase(TAG + " Dock_B", page)
+                .map(Location::getName))
+        .containsExactly(TAG + " Dock_B");
+    assertThat(
+            locationRepository.findByHiddenFalseAndNameContainingIgnoreCase(TAG + " Dock_B", page))
+        .isEmpty();
+    assertThat(
+            materialRepository
+                .findByNameContainingIgnoreCase(TAG + " gem%a", page)
+                .map(Material::getName))
+        .containsExactly(visible.getName());
+    assertThat(materialRepository.findByNameContainingIgnoreCase(TAG + " Gem_B", page)).hasSize(1);
+    assertThat(
+            materialRepository.findByIsVisibleTrueAndNameContainingIgnoreCase(TAG + " Gem_B", page))
+        .isEmpty();
+  }
+
+  @Test
   void missionSearch_matchesNameAndDescriptionLiterally() {
     OrgUnit owner = saveSquadron();
     saveMission(owner, TAG + " Run%A", "plain");

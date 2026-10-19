@@ -65,7 +65,7 @@ class LocationControllerTest {
     when(service.getAllLocations(any(Pageable.class), eq(true)))
         .thenReturn(new PageImpl<>(List.of()));
 
-    controller.getAllLocations(null, null, null, true);
+    controller.getAllLocations(null, null, null, true, null);
 
     verify(service).getAllLocations(any(Pageable.class), eq(true));
   }
@@ -75,7 +75,7 @@ class LocationControllerTest {
     when(service.getAllLocations(any(Pageable.class), eq(false)))
         .thenReturn(new PageImpl<>(List.of()));
 
-    controller.getAllLocations(null, null, null, false);
+    controller.getAllLocations(null, null, null, false, null);
 
     verify(service).getAllLocations(any(Pageable.class), eq(false));
   }
@@ -86,10 +86,31 @@ class LocationControllerTest {
     when(service.getAllLocations(any(Pageable.class), eq(false)))
         .thenReturn(new PageImpl<>(List.of(dto)));
 
-    PageResponse<LocationDto> resp = controller.getAllLocations(0, 50, null, false);
+    PageResponse<LocationDto> resp = controller.getAllLocations(0, 50, null, false, null);
 
     assertEquals(1, resp.totalElements());
     assertSame(dto, resp.content().getFirst());
+  }
+
+  @Test
+  void getAll_withQuery_searchesStrippedNameAndKeepsIncludeHidden() {
+    when(service.searchLocations(eq("Lor"), eq(true), any(Pageable.class)))
+        .thenReturn(new PageImpl<>(List.of()));
+
+    controller.getAllLocations(0, 25, null, true, "  Lor ");
+
+    verify(service).searchLocations(eq("Lor"), eq(true), any(Pageable.class));
+    verify(service, never()).getAllLocations(any(Pageable.class), anyBoolean());
+  }
+
+  @Test
+  void getAll_withBlankQuery_readsTheCachedList() {
+    when(service.getAllLocations(any(Pageable.class), eq(true)))
+        .thenReturn(new PageImpl<>(List.of()));
+
+    controller.getAllLocations(0, 25, null, true, "   ");
+
+    verify(service, never()).searchLocations(any(), anyBoolean(), any(Pageable.class));
   }
 
   @Test

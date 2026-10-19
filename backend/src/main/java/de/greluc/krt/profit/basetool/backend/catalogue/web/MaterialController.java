@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialSellingT
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil.PageCeiling;
 import io.swagger.v3.oas.annotations.Operation;
@@ -77,10 +78,15 @@ public class MaterialController {
    * Pages the material list, visible materials only unless {@code includeHidden} is set.
    *
    * <p>{@code hasTerminals=true} returns the price-eager projection, limited to materials with a
-   * price row.
+   * price row. A non-blank {@code query} narrows the other two variants to the materials whose name
+   * contains it case-insensitively.
    *
    * @param hasTerminals when true, return the price-eager projection
    * @param includeHidden when true (admin), also return materials with {@code is_visible = false}
+   * @param page zero-based page index
+   * @param size page size, clamped to the default ceiling
+   * @param sort sort terms over {@code name}, {@code type} and {@code id}
+   * @param query optional name fragment; ignored with {@code hasTerminals}
    * @return paged material DTOs
    */
   @GetMapping
@@ -89,12 +95,16 @@ public class MaterialController {
       @RequestParam(required = false, defaultValue = "false") Boolean includeHidden,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
-      @RequestParam(required = false) String sort) {
+      @RequestParam(required = false) String sort,
+      @RequestParam(required = false) String query) {
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, sort, Set.of("name", "type", "id"), "name");
+    String search = StringNormalization.trimToNull(query);
     Page<MaterialDto> p;
     if (Boolean.TRUE.equals(hasTerminals)) {
       p = materialService.getAllMaterialsWithPrices(pageable).map(materialMapper::toDto);
+    } else if (search != null) {
+      p = materialService.searchMaterials(search, Boolean.TRUE.equals(includeHidden), pageable);
     } else if (Boolean.TRUE.equals(includeHidden)) {
       p = materialService.getAllMaterials(pageable);
     } else {

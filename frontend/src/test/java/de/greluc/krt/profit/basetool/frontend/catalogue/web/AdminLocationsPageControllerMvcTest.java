@@ -61,6 +61,9 @@ import org.springframework.web.context.WebApplicationContext;
 @SpringBootTest
 class AdminLocationsPageControllerMvcTest {
 
+  private static final String LIST_TEMPLATE =
+      "/api/v1/locations?includeHidden=true&sort=name,asc&page={page}&size={size}";
+
   private MockMvc mockMvc;
 
   @Autowired private WebApplicationContext context;
@@ -93,6 +96,7 @@ class AdminLocationsPageControllerMvcTest {
             anyTypeRef(),
             eq(0)))
         .thenReturn(page);
+    stubDisplayedPage(List.of(location), 1);
 
     mockMvc
         .perform(get("/admin/locations"))
@@ -124,6 +128,19 @@ class AdminLocationsPageControllerMvcTest {
   }
 
   /**
+   * Stubs the displayed first page of 25 locations.
+   *
+   * @param content the rows of the page
+   * @param total the total number of locations
+   */
+  private void stubDisplayedPage(@NotNull List<LocationDto> content, long total) {
+    when(backendApiClient.get(eq(LIST_TEMPLATE), anyTypeRef(), eq(0), eq(25)))
+        .thenReturn(
+            new PageResponse<>(
+                content, 0, 25, total, (int) ((total + 24) / 25), Collections.emptyList()));
+  }
+
+  /**
    * Renders {@code /admin/locations} in German with the given locations from the backend.
    *
    * @param locations the locations the catalogue returns
@@ -137,6 +154,7 @@ class AdminLocationsPageControllerMvcTest {
             eq(0)))
         .thenReturn(
             new PageResponse<>(locations, 0, 1000, locations.size(), 1, Collections.emptyList()));
+    stubDisplayedPage(locations, locations.size());
     return mockMvc
         .perform(get("/admin/locations").locale(Locale.GERMAN))
         .andExpect(status().isOk())
@@ -165,9 +183,9 @@ class AdminLocationsPageControllerMvcTest {
     assertThat(html.split("btn--cta", -1)).hasSize(1);
     assertThat(html)
         .contains("data-testid=\"toolbar-search\"")
-        .containsPattern(
-            "id=\"filterLocations\"[^>]*data-trigger=\"filter-table\""
-                + " data-table-id=\"locationsTable\"")
+        .containsPattern("id=\"filterLocations\" name=\"query\"")
+        .contains("id=\"locations-filter\"")
+        .doesNotContain("data-trigger=\"filter-table\"")
         .contains("class=\"data-table data-table--stack\"")
         .containsPattern("class=\"cell-title\">ARC-L1<")
         .contains("class=\"btn btn-ghost btn-xs\"")
@@ -175,6 +193,60 @@ class AdminLocationsPageControllerMvcTest {
         .doesNotContain("data-testid=\"empty-state\"");
     assertThat(html.substring(html.indexOf("<main"), html.indexOf("</main>")))
         .doesNotContain("btn-secondary");
+  }
+
+  /** A second page of a searched list counts every match and links back to the first page. */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void listData_paginatesServerSide_andKeepsTheSearchInThePageLinks() throws Exception {
+    LocationDto location =
+        new LocationDto(UUID.randomUUID(), "Lorville", "Hurston", false, false, 0L);
+    when(backendApiClient.get(
+            eq(LIST_TEMPLATE + "&query={query}"), anyTypeRef(), eq(1), eq(50), eq("Lor")))
+        .thenReturn(new PageResponse<>(List.of(location), 1, 50, 66, 2, Collections.emptyList()));
+
+    String html =
+        mockMvc
+            .perform(
+                get("/admin/locations")
+                    .param("query", "Lor")
+                    .param("page", "1")
+                    .param("size", "50")
+                    .locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .containsPattern("data-testid=\"page-head-count\"[^>]*>66<")
+        .contains("data-list-total=\"66\"")
+        .contains("class=\"pagination\"")
+        .contains("href=\"/admin/locations?query=Lor&amp;page=0&amp;size=50\"")
+        .contains("<input type=\"hidden\" name=\"size\" value=\"50\"");
+  }
+
+  /** The results fragment holds the table and the footer, without the page chrome. */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void listData_resultsFragment_rendersOnlyTheList() throws Exception {
+    stubDisplayedPage(
+        List.of(new LocationDto(UUID.randomUUID(), "ARC-L1", "Arc-Corp L1", false, true, 0L)), 1);
+
+    String html =
+        mockMvc
+            .perform(get("/admin/locations").param("fragment", "results"))
+            .andExpect(status().isOk())
+            .andExpect(view().name("catalogue/admin/locations :: locationsResults"))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("data-testid=\"location-row\"")
+        .contains("data-list-total=\"1\"")
+        .doesNotContain("<html")
+        .doesNotContain("id=\"locations-results\"");
   }
 
   /** An empty catalogue renders the empty state and no table. */

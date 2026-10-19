@@ -96,7 +96,7 @@ class MaterialControllerTest {
         .thenReturn(new PageImpl<>(List.of(minimalDto(UUID.randomUUID(), "Agricium", true))));
 
     PageResponse<MaterialDto> result =
-        materialController.getAllMaterials(false, false, 0, 10, null);
+        materialController.getAllMaterials(false, false, 0, 10, null, null);
 
     assertEquals(1, result.content().size());
     verify(materialService).getVisibleMaterials(any(Pageable.class));
@@ -110,10 +110,34 @@ class MaterialControllerTest {
             new PageImpl<>(
                 List.of(minimalDto(UUID.randomUUID(), "Ace Interceptor Helmet", false))));
 
-    PageResponse<MaterialDto> result = materialController.getAllMaterials(false, true, 0, 10, null);
+    PageResponse<MaterialDto> result =
+        materialController.getAllMaterials(false, true, 0, 10, null, null);
 
     assertEquals(1, result.content().size());
     verify(materialService).getAllMaterials(any(Pageable.class));
+    verify(materialService, never()).getVisibleMaterials(any(Pageable.class));
+  }
+
+  @Test
+  void getAllMaterials_withQuery_searchesTheStrippedNameIncludingHidden() {
+    when(materialService.searchMaterials(eq("Alu"), eq(true), any(Pageable.class)))
+        .thenReturn(new PageImpl<>(List.of(minimalDto(UUID.randomUUID(), "Aluminum", false))));
+
+    PageResponse<MaterialDto> result =
+        materialController.getAllMaterials(false, true, 0, 25, "name,asc", " Alu ");
+
+    assertEquals(1, result.content().size());
+    verify(materialService, never()).getAllMaterials(any(Pageable.class));
+  }
+
+  @Test
+  void getAllMaterials_withQueryButNotHidden_searchesVisibleOnly() {
+    when(materialService.searchMaterials(eq("Alu"), eq(false), any(Pageable.class)))
+        .thenReturn(new PageImpl<>(List.of()));
+
+    materialController.getAllMaterials(false, false, 0, 25, null, "Alu");
+
+    verify(materialService).searchMaterials(eq("Alu"), eq(false), any(Pageable.class));
     verify(materialService, never()).getVisibleMaterials(any(Pageable.class));
   }
 

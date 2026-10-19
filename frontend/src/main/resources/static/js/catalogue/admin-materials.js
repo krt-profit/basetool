@@ -25,7 +25,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
-import { krtHooks } from '/js/kernel/krt-hooks.js';
+import { bindCatalogueList } from '/js/catalogue/catalogue-list.js';
 
 /** @type {string[]} */
 const materialNames = [];
@@ -218,33 +218,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-/**
- * Hides every table row whose first cell does not contain the query, case-insensitively.
- *
- * @param {string} tableId id of the table to filter
- * @param {string} query the text to look for
- */
-function filterTable(tableId, query) {
-    const filter = query.toUpperCase();
-    const table = document.getElementById(tableId);
-    if (!table) {
-        return;
-    }
-    const tr = table.getElementsByTagName('tr');
-    for (let i = 1; i < tr.length; i++) {
-        const td = tr[i].getElementsByTagName('td')[0];
-        if (td) {
-            const txtValue = td.textContent || td.innerText;
-            if (txtValue.toUpperCase().indexOf(filter) > -1) {
-                tr[i].style.display = '';
-            } else {
-                tr[i].style.display = 'none';
-            }
-        }
-    }
-}
-
-krtHooks.filterTable = filterTable;
+bindCatalogueList({
+    formSelector: '#materials-filter',
+    containerSelector: '#materials-results',
+    listUrl: '/admin/materials',
+});
 
 /**
  * Saves one inline-edited field of a material row.
@@ -426,19 +404,20 @@ function refreshMaterialsTable() {
             if (!fresh.querySelector('#materials-results #materialsTable tbody')) {
                 return false;
             }
-            replaceFromDocument(fresh, '#materials-results');
+            const currentResults = document.getElementById('materials-results');
+            const freshResults = fresh.querySelector('#materials-results');
+            if (currentResults && freshResults) {
+                currentResults.replaceChildren(
+                    ...Array.from(freshResults.childNodes, (node) =>
+                        document.importNode(node, true),
+                    ),
+                );
+            }
             replaceFromDocument(fresh, '#materialNames-data');
             replaceFromDocument(fresh, '#cm-refined');
             readMaterialNames();
-            const filterInput = /** @type {HTMLInputElement | null} */ (
-                document.getElementById('filterMaterials')
-            );
-            if (filterInput && filterInput.value) {
-                filterTable('materialsTable', filterInput.value);
-            }
-            const results = document.getElementById('materials-results');
             document.dispatchEvent(
-                new CustomEvent('krt:swapped', { detail: { container: results } }),
+                new CustomEvent('krt:swapped', { detail: { container: currentResults } }),
             );
             return true;
         })
