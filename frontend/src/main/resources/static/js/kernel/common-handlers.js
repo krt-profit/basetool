@@ -1,6 +1,7 @@
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtHooks } from '/js/kernel/krt-hooks.js';
+import { initTabScrollCues } from '/js/kernel/krt-tab-scroll-cue.js';
 
 function initCommonHandlers() {
     window.addEventListener('pageshow', (event) => {
@@ -241,6 +242,7 @@ function initCommonHandlers() {
     });
 
     revealActiveTabs();
+    initTabScrollCues();
     trackStackLineEnds();
 }
 

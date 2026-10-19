@@ -12,6 +12,8 @@
 
 - **Raffinerieauftrag: Felder überlappen nicht mehr.** Beim Anlegen und Bearbeiten verdeckt „Jetzt“ das Uhrzeitfeld nicht mehr, und Start, Dauer, Fertig am sowie die Materialzeile behalten ihren Abstand; ist das Formular zu schmal, brechen die Felder um. Die Auf-/Ab-Pfeile eines Zahlenfelds stehen app-weit mit Abstand zur Zahl (REQ-UI-028).
 
+- **Touch: größere Zeilenknöpfe und sichtbar scrollende Tab-Leisten.** Auf Telefon und Tablet sind kleine Zeilen- und Symbolknöpfe (z. B. Bestätigen/Ablehnen bei Bankanträgen, Bearbeiten/Löschen, Einlagern, Spenden) und die „?"-Hinweise mindestens 44 px groß; auf dem Desktop bleiben sie kompakt. Tab-Leisten, die nicht ganz ins Bild passen, blenden die abgeschnittene Kante aus, bis ans Ende gescrollt ist (REQ-UI-009).
+
 ## [v1.18.0](https://github.com/krt-profit/basetool/releases/tag/v1.18.0) - 2026-10-18
 
 ### Added
