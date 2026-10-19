@@ -2789,6 +2789,12 @@ class MissionPageControllerMvcTest {
 
   /** Minimal editable mission (canEdit + canManageManagers) for the fragment-render assertions. */
   private static MissionDto editableMission(UUID id) {
+    return editableMission(id, Collections.emptyList());
+  }
+
+  private static MissionDto editableMission(
+      UUID id,
+      List<de.greluc.krt.profit.basetool.frontend.mission.model.MissionFrequencyDto> frequencies) {
     return new MissionDto(
         id,
         "Frag Mission",
@@ -2803,7 +2809,7 @@ class MissionPageControllerMvcTest {
         false,
         Collections.emptySet(),
         Collections.emptyList(),
-        Collections.emptyList(),
+        frequencies,
         null,
         null,
         Collections.emptySet(),
@@ -2826,6 +2832,58 @@ class MissionPageControllerMvcTest {
         0L,
         null,
         null);
+  }
+
+  /**
+   * Verifies that the Verwaltung "Organisation" panel offers a delete control for a typed frequency
+   * that carries a value, pointing at that frequency row, and none for a type without a value.
+   */
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void missionDetail_OrganisationFragment_OffersDeleteForTypedFrequencyWithValue()
+      throws Exception {
+    UUID missionId = UUID.randomUUID();
+    UUID leadTypeId = UUID.randomUUID();
+    UUID hubTypeId = UUID.randomUUID();
+    UUID leadFrequencyId = UUID.randomUUID();
+    de.greluc.krt.profit.basetool.frontend.mission.model.MissionFrequencyDto leadFrequency =
+        new de.greluc.krt.profit.basetool.frontend.mission.model.MissionFrequencyDto(
+            leadFrequencyId,
+            new de.greluc.krt.profit.basetool.frontend.mission.model.MissionFrequencyDto
+                .FrequencyTypeRef(leadTypeId, "Einsatzleitung"),
+            null,
+            new java.math.BigDecimal("304.00"),
+            1L);
+    de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<FrequencyTypeDto>
+        freqTypesPage =
+            new de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<>(
+                List.of(
+                    new FrequencyTypeDto(leadTypeId, "Einsatzleitung", null, true, 0, 0L),
+                    new FrequencyTypeDto(hubTypeId, "Umschlagplatz", null, true, 1, 0L)),
+                0,
+                2,
+                2,
+                1,
+                Collections.emptyList());
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
+        .thenReturn(editableMission(missionId, List.of(leadFrequency)));
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(eq(CachedCatalog.FREQUENCY_TYPES_ACTIVE), anyTypeRef()))
+        .thenReturn(freqTypesPage);
+
+    String body =
+        mockMvc
+            .perform(get("/missions/" + missionId).param("fragment", "organisation"))
+            .andExpect(status().isOk())
+            .andExpect(view().name("mission/mission-detail :: organisationPanel"))
+            .andExpect(content().string(containsString("data-trigger=\"typed-freq-delete\"")))
+            .andExpect(content().string(containsString("data-freq-id=\"" + leadFrequencyId + "\"")))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    org.assertj.core.api.Assertions.assertThat(body.split("data-trigger=\"typed-freq-delete\"", -1))
+        .hasSize(2);
   }
 
   @Test
