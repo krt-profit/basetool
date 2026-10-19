@@ -10,6 +10,8 @@
 
 ### Fixed
 
+- **Einnahme/Ausgabe im Finanzdialog eines Einsatzes auf Touch-Geräten.** Die Umschalter sind wieder 44 px hoch wie jedes andere Bedienelement (REQ-UI-009).
+
 - **Design-System-Abgleich aller Seiten.** Nach einer Kontrolle jeder Seite, jedes Dialogs und Menüs auf allen sechs Geräteklassen haben Eingabefelder wieder sichtbare Ränder, Auswahlen sind nie gefüllte Farbblöcke, grüne und orange Texte sind lesbar, und Listen-Seiten bündeln Suche, Filter und Liste in einem Panel. Overflow-Menüs bleiben auf dem Telefon im Bild, und die Checkbox „Ohne gestohlene“ in der Materialbörse ist wieder sichtbar (REQ-UI-006, REQ-UI-007).
 
 - **Schnellzugriff: Screenreader lesen die sichtbare Beschriftung.** Das Suchfeld im Kopf heißt für Screenreader jetzt wie sein sichtbarer Text „Seite oder Aktion suchen …“ statt „Schnellzugriff öffnen“; die Barrierefreiheitsprüfung meldete die Abweichung auf jeder Seite.
