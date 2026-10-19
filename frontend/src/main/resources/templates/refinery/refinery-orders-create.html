@@ -109,9 +109,9 @@
                     <div class="form-group">
                         <label for="durationHours" th:text="#{refineryorder.form.duration}">Dauer</label>
                         <div class="rod-duration">
-                            <input type="number" id="durationHours" th:field="*{durationHours}" min="0" step="1" inputmode="numeric" th:placeholder="#{refineryorder.form.duration.hours}" th:aria-label="#{refineryorder.form.duration.hours}">
+                            <input type="number" id="durationHours" th:field="*{durationHours}" required min="0" step="1" inputmode="numeric" th:placeholder="#{refineryorder.form.duration.hours}" th:aria-label="#{refineryorder.form.duration.hours}">
                             <span class="rod-unit" aria-hidden="true" th:text="#{refineryorder.form.duration.hours}">h</span>
-                            <input type="number" id="durationMinutes" th:field="*{durationMinutes}" min="0" max="59" step="1" inputmode="numeric" th:placeholder="#{refineryorder.form.duration.minutes}" th:aria-label="#{refineryorder.form.duration.minutes}">
+                            <input type="number" id="durationMinutes" th:field="*{durationMinutes}" required min="0" max="59" step="1" inputmode="numeric" th:placeholder="#{refineryorder.form.duration.minutes}" th:aria-label="#{refineryorder.form.duration.minutes}">
                             <span class="rod-unit" aria-hidden="true" th:text="#{refineryorder.form.duration.minutes}">min</span>
                         </div>
                     </div>
@@ -125,12 +125,12 @@
             <fieldset class="form-section">
                 <legend class="form-section__head" th:text="|3 · #{refineryorder.form.materials.title}|">3 · Materialien</legend>
                 <div class="rod-good rod-good--head" aria-hidden="true">
-                    <span th:text="#{refineryorder.goods.input}">Eingang (Erz)</span>
-                    <span th:text="#{refineryorder.form.material.quality}">Qualität</span>
+                    <span class="rod-req" th:text="#{refineryorder.goods.input}">Eingang (Erz)</span>
+                    <span class="rod-req" th:text="#{refineryorder.form.material.quality}">Qualität</span>
                     <span class="num" th:text="#{refineryorder.goods.units}">Units</span>
                     <span></span>
                     <span th:text="#{refineryorder.goods.output}">Ausgang</span>
-                    <span class="num" th:text="#{refineryorder.goods.units}">Units</span>
+                    <span class="num rod-req" th:text="#{refineryorder.goods.units}">Units</span>
                     <span class="num" th:text="#{material.quantity.scu}">SCU</span>
                     <span></span>
                 </div>
@@ -164,11 +164,11 @@
                         </div>
                         <div class="form-group">
                             <label class="rod-good__label" th:for="'quality_' + ${stat.index}"><span class="rod-good__label-text" th:text="#{refineryorder.form.material.quality}">Qualität</span></label>
-                            <input type="number" th:id="'quality_' + ${stat.index}" th:field="*{goods[__${stat.index}__].quality}" min="0" max="1000">
+                            <input type="number" th:id="'quality_' + ${stat.index}" th:field="*{goods[__${stat.index}__].quality}" min="0" max="1000" required>
                         </div>
                         <div class="form-group">
                             <label class="rod-good__label" th:for="'inputQuantity_' + ${stat.index}"><span class="rod-good__label-text" th:text="#{refineryorder.form.material.inputQty}">Eingangsmenge (Units)</span></label>
-                            <input type="text" inputmode="numeric" class="rod-num" th:id="'inputQuantity_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputQuantity}" required>
+                            <input type="text" inputmode="numeric" class="rod-num" th:id="'inputQuantity_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputQuantity}">
                         </div>
                         <span class="rod-good__arrow" aria-hidden="true"><svg class="krt-icon"><use href="#krt-icon-arrow-right"/></svg></span>
                         <div class="form-group rod-good__out">

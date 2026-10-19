@@ -29,13 +29,15 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Refinery good of a refinery order.
  *
- * <p>{@code yieldBonusPercent} is a read-only UEX enrichment: the refinery's bonus (positive) or
- * malus (negative) for {@code inputMaterial}, or {@code null} when unknown. Ignored on write.
+ * <p>An {@code inputQuantity} of {@code 0} means the input amount was not entered
+ * (REQ-REFINERY-025). {@code yieldBonusPercent} is a read-only UEX enrichment: the refinery's bonus
+ * (positive) or malus (negative) for {@code inputMaterial}, or {@code null} when unknown. Ignored
+ * on write.
  */
 public record RefineryGoodDto(
     @Nullable UUID id,
     @SuppressWarnings("MultipleNullnessAnnotations") @Nullable @NotNull MaterialDto inputMaterial,
-    @NotNull @Min(1) Integer inputQuantity,
+    @NotNull @Min(0) Integer inputQuantity,
     @Nullable MaterialDto outputMaterial,
     @NotNull @Min(1) Integer outputQuantity,
     @QualityValue Integer quality,

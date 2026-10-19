@@ -102,9 +102,33 @@ class RefineryOrderDtoValidationTest {
 
   @Test
   void invalidGood_cascadesConstraintViolationIntoListElement() {
-    RefineryGoodDto invalidGood = new RefineryGoodDto(null, null, 0, null, 1, null, null);
+    RefineryGoodDto invalidGood = new RefineryGoodDto(null, null, -1, null, 1, null, null);
     assertTrue(
         hasViolationOn(withGood(invalidGood), "goods[0].inputQuantity"),
-        "@Valid on the list element type must cascade @Min(1) into each RefineryGoodDto");
+        "@Valid on the list element type must cascade @Min(0) into each RefineryGoodDto");
+  }
+
+  @Test
+  void zeroInputQuantity_isAcceptedAsNotEntered() {
+    RefineryGoodDto good = new RefineryGoodDto(null, null, 0, null, 1, null, null);
+    assertFalse(
+        hasViolationOn(withGood(good), "goods[0].inputQuantity"),
+        "an input amount of 0 marks it as not entered and must be accepted");
+  }
+
+  @Test
+  void nullInputQuantity_isRejected() {
+    RefineryGoodDto good = new RefineryGoodDto(null, null, null, null, 1, null, null);
+    assertTrue(
+        hasViolationOn(withGood(good), "goods[0].inputQuantity"),
+        "the API still requires the field; the web form sends 0 for an empty one");
+  }
+
+  @Test
+  void zeroOutputQuantity_isRejected() {
+    RefineryGoodDto good = new RefineryGoodDto(null, null, 0, null, 0, null, null);
+    assertTrue(
+        hasViolationOn(withGood(good), "goods[0].outputQuantity"),
+        "the output amount stays required and at least 1");
   }
 }

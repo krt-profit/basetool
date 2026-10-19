@@ -59,7 +59,7 @@ public class RefineryGood extends AbstractEntity<UUID> {
   private Material inputMaterial;
 
   @Column(nullable = false)
-  @Min(1)
+  @Min(0)
   private Integer inputQuantity;
 
   @ManyToOne(fetch = FetchType.LAZY)
