@@ -319,6 +319,85 @@ class AdminNotificationRulePageControllerMvcTest {
         .doesNotContain("krtm-");
   }
 
+  /**
+   * A seeded rule shows its description from the bundle of the viewer's language and no requirement
+   * id, while a seeded rule an admin re-described and a custom rule keep their own text.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void aSeededRuleShowsItsTranslatedDescription() throws Exception {
+    NotificationRuleDto seeded =
+        new NotificationRuleDto(
+            UUID.fromString("62200000-0000-0000-0000-000000000049"),
+            "INVENTORY_POOL_CHANGED_BY_OTHER",
+            "INVENTORY_POOL_CHANGED_BY_OTHER",
+            "Default: tell a member that somebody else moved their shared stock into another pool"
+                + " (REQ-INV-059).",
+            true,
+            true,
+            0L,
+            null,
+            null,
+            List.of());
+    NotificationRuleDto redescribed =
+        new NotificationRuleDto(
+            UUID.fromString("62200000-0000-0000-0000-000000000001"),
+            "JOB_ORDER_CREATED",
+            "JOB_ORDER_CREATED",
+            "Unsere eigene Regel für neue Aufträge",
+            true,
+            true,
+            1L,
+            null,
+            null,
+            List.of());
+    NotificationRuleDto custom =
+        new NotificationRuleDto(
+            UUID.randomUUID(),
+            "MISSION_CANCELLED",
+            "MISSION_CANCELLED",
+            "Default: eigene Regel",
+            true,
+            true,
+            0L,
+            null,
+            null,
+            List.of());
+    when(backendApiClient.get(contains("/api/v1/notifications/admin/rules"), anyTypeRef()))
+        .thenReturn(List.of(seeded, redescribed, custom));
+
+    String german =
+        mockMvc
+            .perform(
+                get("/admin/notification-rules").param("fragment", "rules").locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(german)
+        .contains(
+            "class=\"cell-sub\">Teilt einem Mitglied mit, dass jemand anderes seinen gemeinsamen"
+                + " Bestand in ein anderes Lager verschoben hat.<")
+        .contains("class=\"cell-sub\">Unsere eigene Regel für neue Aufträge<")
+        .contains("class=\"cell-sub\">Default: eigene Regel<")
+        .doesNotContain("REQ-")
+        .doesNotContain("somebody else moved");
+
+    String english =
+        mockMvc
+            .perform(
+                get("/admin/notification-rules").param("fragment", "rules").param("lang", "en"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(english)
+        .contains(
+            "class=\"cell-sub\">Tells a member that someone else moved their shared stock into"
+                + " another pool.<")
+        .doesNotContain("REQ-");
+  }
+
   /** No rule yet: the fragment carries the empty state instead of a table. */
   @Test
   @WithMockUser(roles = "ADMIN")
