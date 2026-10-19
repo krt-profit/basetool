@@ -328,6 +328,15 @@ tasks.named<Test>("test") {
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
   inputs
+    .files(
+      fileTree(layout.settingsDirectory.dir("backend/src/main/resources/db/migration")) {
+        include("*.sql")
+      },
+    )
+    .withPropertyName("backendMigrations")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+
+  inputs
     .file(layout.settingsDirectory.file("docker/test-tls/basetool-test-backend.p12"))
     .withPropertyName("testTlsKeystore")
     .withPathSensitivity(PathSensitivity.RELATIVE)

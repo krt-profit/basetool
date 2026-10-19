@@ -283,7 +283,19 @@ type and selector kind, each under a localized label (`admin.notificationRules.*
 enum code; an event-derived selector kind shows a hint instead of further fields. A save or delete
 re-swaps the rule table in place (REQ-FE-001) instead of reloading the page.
 
-**Enforced by:** `RuleEvaluationServiceTest`, `NotificationRuleEngineIntegrationTest`, `NotificationRuleServiceTest` ·
+The rule table shows a **seeded** rule's description from the message bundles in the viewer's
+language (`admin.notificationRules.defaultDescription.<rule id>`), never the English seed text and
+never a requirement id. A rule counts as seeded while its stored description still starts with the
+seed's `Default:` marker; once an admin gives it a description of their own, that text is shown,
+as it is for every rule an admin created. Every rule a migration seeds has such a key in all three
+bundles.
+
+- [x] A seeded rule's description renders in the viewer's language, without a `REQ-` id; an edited or
+  admin-created rule shows its stored description.
+- [x] Every seeded rule id has a `defaultDescription` key in every bundle.
+
+**Enforced by:** `RuleEvaluationServiceTest`, `NotificationRuleEngineIntegrationTest`, `NotificationRuleServiceTest`,
+`AdminNotificationRulePageControllerMvcTest`, `DefaultNotificationRuleDescriptionCoverageTest` ·
 **Code:** `notification/api/NotificationRule`, `notification/api/NotificationRuleSelector`,
 `notification/internal/RuleEvaluationService`, `notification/api/NotificationRuleService`,
 `notification/web/NotificationRuleController`, `db/migration/V156__create_notification_rule.sql`,

@@ -32,9 +32,10 @@
                 </thead>
                 <tbody>
                 <tr th:each="r : ${rules}" th:attr="data-rule-id=${r.id}" data-testid="rule-row">
-                    <td>
+                    <td th:with="seededDescription=${r.description != null and #strings.startsWith(r.description, 'Default:') ? #messages.msgOrNull('admin.notificationRules.defaultDescription.' + r.id) : null},
+                                 shownDescription=${seededDescription ?: r.description}">
                         <span class="cell-title" th:text="${#messages.msgOrNull('admin.notificationRules.eventType.' + r.eventType) ?: r.eventType}">Auftrag angelegt</span>
-                        <span class="cell-sub" th:if="${r.description != null and !#strings.isEmpty(r.description)}" th:text="${r.description}">…</span>
+                        <span class="cell-sub" th:if="${shownDescription != null and !#strings.isEmpty(shownDescription)}" th:text="${shownDescription}">…</span>
                     </td>
                     <td th:attr="data-label=#{admin.notificationRules.notificationType}"
                         th:text="${#messages.msgOrNull('admin.notificationRules.notificationType.' + r.notificationType) ?: r.notificationType}">Auftrag angelegt</td>
