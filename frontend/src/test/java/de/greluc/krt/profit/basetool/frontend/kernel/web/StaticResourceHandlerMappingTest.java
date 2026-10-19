@@ -189,6 +189,21 @@ class StaticResourceHandlerMappingTest {
   }
 
   /**
+   * The conventional {@code /favicon.ico} is served under its fixed, unhashed name and is
+   * revalidated, so a new icon reaches a browser without waiting out a year-long cache.
+   *
+   * @throws Exception if the request cannot be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void theFaviconIcoIsServedAndRevalidated() throws Exception {
+    mockMvc
+        .perform(get("/favicon.ico"))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Cache-Control", "no-cache"));
+  }
+
+  /**
    * A path that names no file answers 404, not 500, both inside an asset tree and outside every
    * pattern.
    *
@@ -196,7 +211,7 @@ class StaticResourceHandlerMappingTest {
    * @throws Exception if the request cannot be performed
    */
   @ParameterizedTest
-  @ValueSource(strings = {"/css/typo.css", "/favicon.ico", "/sm/deadbeef.map"})
+  @ValueSource(strings = {"/css/typo.css", "/logos/missing.svg", "/sm/deadbeef.map"})
   @WithAnonymousUser
   void aPathThatNamesNoFileAnswersNotFound(String path) throws Exception {
     mockMvc.perform(get(path)).andExpect(status().isNotFound());

@@ -61,6 +61,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
     registerRevalidatedTree(registry, "/js/**", "classpath:/static/js/");
     addAssetTree(registry, "/logos/**", "classpath:/META-INF/resources/logos/");
     addAssetTree(registry, "/robots.txt", "classpath:/static/");
+    registerRevalidatedTree(registry, "/favicon.ico", "classpath:/static/");
   }
 
   /**
