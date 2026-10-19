@@ -35,7 +35,7 @@ import java.util.UUID;
 public record RefineryGoodDto(
     UUID id,
     MaterialDto inputMaterial,
-    @Min(1) Integer inputQuantity,
+    @Min(0) Integer inputQuantity,
     MaterialDto outputMaterial,
     @Min(1) Integer outputQuantity,
     @Min(0) @Max(1000) Integer quality,

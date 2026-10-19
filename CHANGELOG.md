@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Eingangsmenge im Raffinerieauftrag optional.** Beim Anlegen und Bearbeiten darf die Eingangsmenge eines Materials leer bleiben; sie wird als `0` gespeichert und gilt damit als „nicht eingegeben“, die Übersicht zeigt dann keine Units. Qualität und Ausgangsmenge bleiben Pflicht, alle Pflichtfelder samt Dauer und Materialspalten tragen das orange Sternchen (REQ-REFINERY-025).
+
 ## [v1.19.0](https://github.com/krt-profit/basetool/releases/tag/v1.19.0) - 2026-10-19
 
 ### Changed

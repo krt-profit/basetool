@@ -441,7 +441,7 @@ public class RefineryOrderWriteController {
   private static List<RefineryGoodDto> goodsOf(RefineryOrderForm form) {
     List<RefineryGoodDto> goodsDto = new ArrayList<>();
     for (RefineryGoodForm g : form.getGoods()) {
-      if (g.getInputMaterialId() != null && g.getInputQuantity() != null) {
+      if (g.getInputMaterialId() != null) {
         MaterialDto inMat =
             new MaterialDto(
                 g.getInputMaterialId(),
@@ -482,7 +482,7 @@ public class RefineryOrderWriteController {
             new RefineryGoodDto(
                 null,
                 inMat,
-                g.getInputQuantity(),
+                g.getInputQuantity() != null ? g.getInputQuantity() : 0,
                 outMat,
                 g.getOutputQuantity(),
                 g.getQuality() != null ? g.getQuality() : 0,

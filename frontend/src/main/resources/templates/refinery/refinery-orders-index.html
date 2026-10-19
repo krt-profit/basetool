@@ -58,7 +58,7 @@
                     <td>
                         <a class="row-link" data-testid="row-link" th:href="@{/refinery-orders/{id}(id=${o.id})}">
                             <span class="cell-title" th:text="${row.outputLabel()}">Quantanium 18,4 SCU</span>
-                            <span class="cell-sub"><span th:text="'#' + ${row.shortId()}">#1042</span><th:block th:if="${row.inputCount() == 1}"> &middot; <span th:text="#{refineryorder.list.input.one(${row.inputName()}, ${row.inputUnits()})}">Quantanium-Erz 2.300 Units</span></th:block><th:block th:if="${row.inputCount() > 1}"> &middot; <span th:text="#{refineryorder.list.input.many(${row.inputCount()}, ${row.inputUnits()})}">2 Erze &middot; 1.650 Units</span></th:block></span>
+                            <span class="cell-sub"><span th:text="'#' + ${row.shortId()}">#1042</span><th:block th:if="${row.inputCount() == 1}"> &middot; <span th:text="${row.inputUnits() > 0} ? #{refineryorder.list.input.one(${row.inputName()}, ${row.inputUnits()})} : ${row.inputName()}">Quantanium-Erz 2.300 Units</span></th:block><th:block th:if="${row.inputCount() > 1}"> &middot; <span th:text="${row.inputUnits() > 0} ? #{refineryorder.list.input.many(${row.inputCount()}, ${row.inputUnits()})} : #{refineryorder.list.input.manyNoUnits(${row.inputCount()})}">2 Erze &middot; 1.650 Units</span></th:block></span>
                         </a>
                     </td>
                     <td th:attr="data-label=#{refineryorder.list.refinery}">

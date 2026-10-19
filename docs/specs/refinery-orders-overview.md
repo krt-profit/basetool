@@ -253,6 +253,21 @@ value through `/api/v1/settings/{key}`, which only ADMIN may read (REQ-SEC-083).
 **Enforced by:** `RefineryOrderControllerTest` (`CreateMyRefineryOrderTests`, `UpdateRequestShapeTests`),
 `RefineryOrderMapperTest`, `RefinerySettingsServiceTest`, `SmallRestPathCutTest` · **Code:**
 `RefineryOrderCreateRequest`, `RefineryOrderUpdateRequest`, `RefinerySettingsController`
+
+### REQ-REFINERY-025 — The input amount of a good is optional
+
+On the create and edit forms the input amount (units) of a material is optional. A left-empty input
+amount is stored as `0`, which marks it as not entered: refining 0 units is impossible, so `0` cannot
+be a real amount. The input material, the quality and the output amount stay required (quality
+`0…1000`, output amount `≥ 1`). The API accepts `inputQuantity ≥ 0` and still requires the field; the
+web form sends `0` for an empty one. The overview drops the units from a row whose input amount sums
+to `0`. Required fields carry the orange asterisk, the duration and the materials column heads
+included.
+
+**Enforced by:** `RefineryOrderDtoValidationTest`, `RefineryOrderWriteControllerGoodsTest` · **Code:** `RefineryGoodDto`, `RefineryGoodForm`,
+`RefineryOrderWriteController.goodsOf`, `refinery-orders-create.html`, `refinery-orders-details.html`,
+`refinery-orders-index.html`
+
 ## Out of scope
 
 - The order **detail**, **create**, **store**, **cancel** and screenshot-**import** flows — covered

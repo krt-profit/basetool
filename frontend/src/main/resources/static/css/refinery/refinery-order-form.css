@@ -101,6 +101,10 @@
     .rod-good--head .num {
         text-align: right;
     }
+    .rod-good--head .rod-req::after {
+        content: ' *';
+        color: var(--color-primary);
+    }
     .form-group > .rod-good__label {
         display: flex;
         flex-wrap: wrap;
@@ -284,6 +288,10 @@
             overflow: visible;
             white-space: normal;
             clip-path: none;
+        }
+        .form-group:has([required]) .rod-good__label-text::after {
+            content: ' *';
+            color: var(--color-primary);
         }
     }
     @container rod-form (width < 30rem) {
