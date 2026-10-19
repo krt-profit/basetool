@@ -24,25 +24,27 @@
 
 :root {
   color-scheme: dark;
-  --color-primary: #E77E23;
+  --color-primary: #FB8A28;
   --color-white: #FFFFFF;
   --color-bg-black: #000000;
+  --color-canvas: #202020;
   --color-accent-light: #EEB64B;
   --color-accent-dark: #C45C00;
-  --color-gray-1: #D2D2D2;
-  --color-gray-2: #646464;
-  --color-gray-3: #282828;
-  --color-gray-4: #141414;
-  --color-bg-dark-gray: #141414;
-  --color-surface-input: #1C1C1C;
+  --color-gray-1: #DADBDE;
+  --color-gray-2: #8F9399;
+  --color-gray-3: #404145;
+  --color-gray-4: #35393D;
+  --color-bg-dark-gray: #35393D;
+  --color-surface-input: #2A2D31;
+  --color-control: #3F474C;
   --color-danger: #A3000A;
   --color-success: #239E33;
   --color-warning: #FFD23F;
   --color-info: #355DDC;
-  --color-danger-text: #F2564B;
-  --color-info-text: #6C93EF;
-  --color-success-text: #2EBC3D;
-  --color-gray-2-text: #8A8A8A;
+  --color-danger-text: #FF7A70;
+  --color-info-text: #8FB2F5;
+  --color-success-text: #4CCB5C;
+  --color-gray-2-text: #B0B3B7;
   --data-fg: var(--color-white);
   --font-headline: "Lato", sans-serif;
   --font-body: "Lato", sans-serif;
@@ -92,7 +94,7 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: var(--color-bg-black);
+  background-color: var(--color-canvas);
   color: var(--color-gray-1);
   font-family: var(--font-body);
   font-weight: var(--fw-thin);
@@ -161,7 +163,7 @@ b {
   position: sticky;
   top: 0;
   z-index: 1000;
-  background-color: var(--color-bg-dark-gray);
+  background-color: var(--color-surface-input);
   border-bottom: var(--border-heading);
 }
 
@@ -271,7 +273,7 @@ b {
   overflow-y: auto;
   padding: var(--space-6) 0 var(--space-8);
   scrollbar-width: thin;
-  scrollbar-color: var(--color-gray-2) var(--color-bg-black);
+  scrollbar-color: var(--color-gray-2) var(--color-canvas);
 }
 
 .doc-nav__section {
@@ -337,7 +339,7 @@ b {
   min-height: var(--touch-target);
   padding: var(--space-2) var(--space-4);
   border-left: 4px solid var(--color-primary);
-  background-color: var(--color-surface-input);
+  background-color: var(--color-control);
   color: var(--color-gray-1);
   font-weight: var(--fw-bold);
   font-size: var(--fs-sm);
@@ -688,7 +690,7 @@ b {
 
 .doc tbody tr:hover,
 .doc tbody tr:nth-child(even):hover {
-  background-color: var(--color-gray-3);
+  background-color: var(--color-control);
 }
 
 .doc tbody tr:last-child td {
@@ -732,7 +734,7 @@ b {
   flex: none;
   margin-top: var(--space-8);
   border-top: var(--border-hairline);
-  background-color: var(--color-bg-dark-gray);
+  background-color: var(--color-surface-input);
   color: var(--color-gray-2-text);
   font-size: var(--fs-xs);
 }
@@ -811,7 +813,7 @@ b {
 }
 
 .reference-page .redoc-wrap {
-  background-color: var(--color-bg-black);
+  background-color: var(--color-canvas);
 }
 
 .reference-page .menu-content {
@@ -865,7 +867,7 @@ b {
 
 .reference-page [role="tab"] {
   border: 1px solid transparent;
-  border-radius: 0;
+  border-radius: 4px;
 }
 
 .reference-page [role="tab"][aria-selected="true"] {
@@ -874,14 +876,14 @@ b {
 }
 
 .reference-page .redoc-wrap > .menu-content + div {
-  border-radius: 0;
+  border-radius: 4px;
   box-shadow: var(--glow-primary);
 }
 
 .reference-page button,
 .reference-page .redoc-json,
 .reference-page [class*="Dropdown"] {
-  border-radius: 0;
+  border-radius: 4px;
 }
 
 @media (pointer: coarse) {

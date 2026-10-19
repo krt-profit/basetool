@@ -68,20 +68,23 @@ public class WebAppManifestController {
   /**
    * Browser-UI colour: the page header, not the page background.
    *
-   * <p>Mirrors {@code --color-surface-input}, the {@code header} bar fill. The status bar sits directly
-   * above that header on a phone, so matching the header — not the canvas body — is what makes the
-   * seam disappear.
+   * <p>Mirrors {@code --color-surface-input}, the {@code header} bar fill. The status bar sits
+   * directly above that header on a phone, so matching the header — not the canvas body — is what
+   * makes the seam disappear.
    */
   private static final String THEME_COLOR = "#2a2d31";
 
   /**
-   * Unversioned classpath path of the home-screen icon, as it exists under {@code
+   * Unversioned classpath path of the 512 px home-screen icon, as it exists under {@code
    * META-INF/resources}.
    *
    * <p>Never emitted as-is: it is the lookup key handed to {@link ResourceUrlProvider}, which
    * answers with the content-hashed path the manifest actually ships.
    */
   private static final String ICON_LOOKUP_PATH = "/logos/basetool-appicon-512.png";
+
+  /** Unversioned classpath path of the 192 px home-screen icon, resolved like the 512 px one. */
+  private static final String ICON_192_LOOKUP_PATH = "/logos/basetool-appicon-192.png";
 
   /**
    * The locales the manifest can be rendered in, keyed by primary language subtag, so the strings
@@ -158,7 +161,11 @@ public class WebAppManifestController {
             "standalone",
             BACKGROUND_COLOR,
             THEME_COLOR,
-            List.of(new ManifestIcon(iconUrl(request), "512x512", "image/png", "any")));
+            List.of(
+                new ManifestIcon(
+                    iconUrl(request, ICON_192_LOOKUP_PATH), "192x192", "image/png", "any"),
+                new ManifestIcon(
+                    iconUrl(request, ICON_LOOKUP_PATH), "512x512", "image/png", "any")));
     return ResponseEntity.ok()
         .contentType(MediaType.parseMediaType(MANIFEST_JSON))
         .cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePublic())
@@ -181,15 +188,16 @@ public class WebAppManifestController {
   }
 
   /**
-   * Resolves the home-screen icon to its content-hashed URL, falling back to the plain
+   * Resolves a home-screen icon to its content-hashed URL, falling back to the plain
    * context-prefixed path when the provider cannot resolve it.
    *
    * @param request the current request, for its context path
+   * @param lookupPath the unversioned icon path under {@code META-INF/resources}
    * @return an absolute path on this origin, fingerprinted where the resource chain allows it
    */
-  private @NotNull String iconUrl(@NotNull HttpServletRequest request) {
-    final String versioned = resourceUrlProvider.getForLookupPath(ICON_LOOKUP_PATH);
-    return request.getContextPath() + (versioned != null ? versioned : ICON_LOOKUP_PATH);
+  private @NotNull String iconUrl(@NotNull HttpServletRequest request, @NotNull String lookupPath) {
+    final String versioned = resourceUrlProvider.getForLookupPath(lookupPath);
+    return request.getContextPath() + (versioned != null ? versioned : lookupPath);
   }
 
   /**
@@ -206,7 +214,7 @@ public class WebAppManifestController {
    * @param display {@code standalone}, without a browser address bar.
    * @param backgroundColor see {@link #BACKGROUND_COLOR}.
    * @param themeColor see {@link #THEME_COLOR}.
-   * @param icons the single opaque 512 px app icon (REQ-UI-019)
+   * @param icons the opaque 192 px and 512 px app icons (REQ-UI-019)
    */
   public record WebAppManifest(
       @JsonProperty("id") String id,

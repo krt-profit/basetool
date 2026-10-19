@@ -169,17 +169,22 @@ class WebAppManifestControllerTest {
   }
 
   @Test
-  @DisplayName("offers exactly one opaque, content-hashed app icon, and never claims maskable")
+  @DisplayName("offers the opaque, content-hashed 192 and 512 px app icons, never maskable")
   void offersTheOpaqueAppIcon() throws Exception {
     mockMvc
         .perform(get(MANIFEST_PATH))
-        .andExpect(jsonPath("$.icons.length()").value(1))
+        .andExpect(jsonPath("$.icons.length()").value(2))
         .andExpect(
             jsonPath("$.icons[0].src")
-                .value(matchesPattern("/logos/basetool-appicon-512-[0-9a-f]+\\.png")))
-        .andExpect(jsonPath("$.icons[0].sizes").value("512x512"))
+                .value(matchesPattern("/logos/basetool-appicon-192-[0-9a-f]+\\.png")))
+        .andExpect(jsonPath("$.icons[0].sizes").value("192x192"))
         .andExpect(jsonPath("$.icons[0].type").value("image/png"))
-        .andExpect(jsonPath("$.icons[0].purpose").value("any"));
+        .andExpect(jsonPath("$.icons[0].purpose").value("any"))
+        .andExpect(
+            jsonPath("$.icons[1].src")
+                .value(matchesPattern("/logos/basetool-appicon-512-[0-9a-f]+\\.png")))
+        .andExpect(jsonPath("$.icons[1].sizes").value("512x512"))
+        .andExpect(jsonPath("$.icons[1].purpose").value("any"));
   }
 
   @Test

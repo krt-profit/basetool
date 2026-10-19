@@ -96,7 +96,7 @@ class BrandMarkRenderMvcTest {
         .andExpect(content().string(containsString("logos/basetool-favicon.svg")))
         .andExpect(content().string(containsString("logos/basetool-favicon-32.png")))
         .andExpect(content().string(containsString("logos/basetool-favicon-16.png")))
-        .andExpect(content().string(containsString("logos/basetool-appicon-512.png")));
+        .andExpect(content().string(containsString("logos/basetool-appicon-180.png")));
   }
 
   /** The org mark and the org favicon do not appear on an app page. */
@@ -124,6 +124,8 @@ class BrandMarkRenderMvcTest {
         "basetool-favicon-16.png",
         "basetool-favicon-32.png",
         "basetool-favicon-64.png",
+        "basetool-appicon-180.png",
+        "basetool-appicon-192.png",
         "basetool-appicon-512.png"
       })
   void brandAsset_ShouldShipOnTheClasspath(String asset) {

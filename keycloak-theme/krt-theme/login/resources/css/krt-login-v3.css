@@ -24,21 +24,25 @@
 }
 
 :root {
-    --color-primary: #E77E23;
+    --color-primary: #FB8A28;
     --color-bg-black: #000000;
-    --color-bg-dark-gray: #141414;
+    --color-canvas: #202020;
+    --color-bg-dark-gray: #35393D;
     
     --color-accent-light: #EEB64B;
     --color-accent-dark: #C45C00;
     
-    --color-gray-1: #D2D2D2;
-    --color-gray-2: #646464;
-    --color-gray-3: #282828;
-    --color-gray-4: #141414;
-    --color-surface-input: #1C1C1C;
+    --color-gray-1: #DADBDE;
+    --color-gray-2: #8F9399;
+    --color-gray-3: #404145;
+    --color-gray-4: #35393D;
+    --color-surface-input: #2A2D31;
+    --color-control: #3F474C;
+    --color-gray-2-text: #B0B3B7;
+    --radius-sm: 4px;
 
     --color-danger: #A3000A;
-    --color-danger-text: #F2564B;
+    --color-danger-text: #FF7A70;
     --color-success: #239E33;
     --color-warning: #FFD23F;
     --color-info: #355DDC;
@@ -46,14 +50,14 @@
     --font-headline: 'Lato', sans-serif;
     --font-body: 'Lato', sans-serif;
 
-    --glow-primary: 0 0 8px rgba(231, 126, 35, 0.25);
+    --glow-primary: 0 0 8px rgba(251, 138, 40, 0.25);
     --glow-danger:  0 0 8px rgba(163, 0, 10, 0.30);
 }
 
 :root, * {
-    --pf-c-form-control--BackgroundColor: var(--color-bg-black) !important;
-    --pf-v5-c-form-control--BackgroundColor: var(--color-bg-black) !important;
-    --pf-v6-c-form-control--BackgroundColor: var(--color-bg-black) !important;
+    --pf-c-form-control--BackgroundColor: var(--color-control) !important;
+    --pf-v5-c-form-control--BackgroundColor: var(--color-control) !important;
+    --pf-v6-c-form-control--BackgroundColor: var(--color-control) !important;
 
     --pf-c-button--m-primary--BackgroundColor: var(--color-primary) !important;
     --pf-v5-c-button--m-primary--BackgroundColor: var(--color-primary) !important;
@@ -63,9 +67,9 @@
     --pf-v5-c-button--m-primary--Color: var(--color-bg-black) !important;
     --pf-v6-c-button--m-primary--Color: var(--color-bg-black) !important;
 
-    --pf-c-check__input--BackgroundColor: var(--color-bg-black) !important;
-    --pf-v5-c-check__input--BackgroundColor: var(--color-bg-black) !important;
-    --pf-v6-c-check__input--BackgroundColor: var(--color-bg-black) !important;
+    --pf-c-check__input--BackgroundColor: var(--color-control) !important;
+    --pf-v5-c-check__input--BackgroundColor: var(--color-control) !important;
+    --pf-v6-c-check__input--BackgroundColor: var(--color-control) !important;
 
     --pf-c-check__input--checked--BackgroundColor: var(--color-primary) !important;
     --pf-v5-c-check__input--checked--BackgroundColor: var(--color-primary) !important;
@@ -78,7 +82,7 @@
 
 html, .login-pf-page, .login-pf-body, [class*="login-pf"], [class*="pf-c-background"], [class*="pf-v5-c-background"], [class*="pf-v6-c-background"] {
     background-image: none !important;
-    background-color: var(--color-bg-black) !important;
+    background-color: var(--color-canvas) !important;
 }
 
 * {
@@ -102,9 +106,9 @@ body {
     justify-content: center;
     align-items: center;
     min-height: 100vh;
-    background-color: var(--color-bg-black) !important;
+    background-color: var(--color-canvas) !important;
     background-image:
-        radial-gradient(circle at 50% -10%, rgba(231, 126, 35, 0.10), transparent 55%) !important;
+        radial-gradient(circle at 50% -10%, rgba(251, 138, 40, 0.10), transparent 55%) !important;
     background-repeat: no-repeat !important;
     background-attachment: fixed !important;
 }
@@ -116,7 +120,7 @@ body {
     padding: 40px;
     width: 100%;
     max-width: 450px;
-    box-shadow: 0 0 20px rgba(231, 126, 35, 0.1);
+    box-shadow: 0 0 20px rgba(251, 138, 40, 0.1);
     position: relative;
     margin: auto;
 }
@@ -170,7 +174,7 @@ input.pf-v5-c-form-control {
     width: 100%;
     padding: 12px 15px;
     margin-bottom: 20px;
-    background-color: var(--color-bg-black) !important;
+    background-color: var(--color-control) !important;
     border: 1px solid var(--color-gray-2) !important;
     border-bottom: 2px solid var(--color-primary) !important;
     color: var(--color-gray-1) !important;
@@ -181,7 +185,7 @@ input.pf-v5-c-form-control {
     box-sizing: border-box;
     appearance: none !important;
     -webkit-appearance: none !important;
-    border-radius: 0 !important;
+    border-radius: var(--radius-sm) !important;
 }
 
 .pf-c-form-control::before, .pf-c-form-control::after,
@@ -222,7 +226,7 @@ input[type="number"]:focus,
 input.pf-c-form-control:focus,
 input.pf-v5-c-form-control:focus {
     border-color: var(--color-primary) !important;
-    box-shadow: 0 0 8px rgba(231, 126, 35, 0.2) !important;
+    box-shadow: 0 0 8px rgba(251, 138, 40, 0.2) !important;
 }
 
 .krt-button,
@@ -251,7 +255,7 @@ button.pf-v5-c-button.pf-m-primary {
     font-weight: 700 !important;
     appearance: none !important;
     -webkit-appearance: none !important;
-    border-radius: 0 !important;
+    border-radius: var(--radius-sm) !important;
     box-shadow: var(--glow-primary) !important;
 }
 
@@ -322,7 +326,7 @@ button[name="cancel-aia"] {
     margin-top: 10px;
     appearance: none !important;
     -webkit-appearance: none !important;
-    border-radius: 0 !important;
+    border-radius: var(--radius-sm) !important;
     background-image: none !important;
 }
 
@@ -356,7 +360,7 @@ input[type="checkbox"],
 .pf-v6-c-check__input,
 #logout-sessions {
     accent-color: var(--color-primary);
-    background-color: var(--color-bg-black) !important;
+    background-color: var(--color-control) !important;
     border: 1px solid var(--color-primary) !important;
     width: 18px;
     height: 18px;
@@ -367,7 +371,7 @@ input[type="checkbox"],
     vertical-align: middle;
     position: relative;
     margin-right: 8px;
-    border-radius: 0 !important;
+    border-radius: 2px !important;
     background-image: none !important;
     outline: none !important;
 }
@@ -631,7 +635,7 @@ select[aria-invalid="true"],
     padding: 40px !important;
     width: 100% !important;
     max-width: 450px !important;
-    box-shadow: 0 0 20px rgba(231, 126, 35, 0.1) !important;
+    box-shadow: 0 0 20px rgba(251, 138, 40, 0.1) !important;
     position: relative !important;
     margin: auto !important;
     display: block;
@@ -685,7 +689,7 @@ select[aria-invalid="true"],
 .pf-v6-c-dropdown__toggle,
 .pf-v5-c-menu-toggle,
 .pf-v6-c-menu-toggle {
-    background-color: var(--color-bg-dark-gray) !important;
+    background-color: var(--color-control) !important;
     background-image: none !important;
     color: var(--color-gray-1) !important;
     border: 1px solid var(--color-gray-2) !important;
@@ -897,7 +901,7 @@ select[aria-invalid="true"],
     font-weight: 700;
     text-decoration: none;
     box-sizing: border-box;
-    border-radius: 0;
+    border-radius: var(--radius-sm);
     min-height: 44px;
 }
 .btn:hover {
@@ -982,7 +986,7 @@ input[type="checkbox"]:focus-visible,
     background-color: var(--color-surface-input);
     color: var(--color-gray-1);
     border: 1px solid var(--color-gray-2);
-    border-radius: 0;
+    border-radius: var(--radius-sm);
     font-family: var(--font-headline);
     font-weight: 700;
     letter-spacing: 1px;
