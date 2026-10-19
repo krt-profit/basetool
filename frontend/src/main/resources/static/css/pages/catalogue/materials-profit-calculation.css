@@ -67,7 +67,7 @@
         width: 100%;
         min-height: 44px;
         padding: 0 0.75rem;
-        background: var(--color-surface-input);
+        background: var(--control-bg);
         border: var(--border-hairline);
         color: var(--color-white);
         font-family: var(--font-body);
@@ -124,7 +124,7 @@
     }
 
     .profit-option:hover {
-        background: var(--color-surface-input);
+        background: var(--control-bg);
         color: var(--color-white);
     }
 

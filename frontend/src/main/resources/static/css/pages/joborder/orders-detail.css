@@ -13,7 +13,7 @@
         color: var(--color-gray-2-text);
     }
     .od-inv-th {
-        background: var(--color-gray-4);
+        background: var(--surface-bar);
         font-size: 0.85rem;
     }
     .od-inv-panel {

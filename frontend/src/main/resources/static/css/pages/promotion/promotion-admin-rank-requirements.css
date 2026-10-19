@@ -37,7 +37,7 @@
 
     .ar-matrix thead th {
         color: var(--color-gray-1);
-        background: var(--color-surface-input);
+        background: var(--surface-bar);
         font-size: var(--fs-2xs);
         font-weight: var(--fw-bold);
         letter-spacing: 0.06em;
@@ -55,7 +55,7 @@
     }
 
     .ar-matrix thead .ar-matrix-corner {
-        background: var(--color-surface-input);
+        background: var(--surface-bar);
     }
 
     .ar-step-label {

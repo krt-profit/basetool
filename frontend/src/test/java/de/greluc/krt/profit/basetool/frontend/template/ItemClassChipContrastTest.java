@@ -43,8 +43,8 @@ class ItemClassChipContrastTest {
   /** WCAG AA minimum for normal text. */
   private static final double MIN_CONTRAST = 4.5;
 
-  /** The card surfaces a Lager row sits on: Grau 4 and Grau 3. */
-  private static final String[] SURFACES = {"#141414", "#282828"};
+  /** The surfaces a Lager row sits on: the panel (Grau 4) and the row hover (control fill). */
+  private static final String[] SURFACES = {"#35393d", "#3f474c"};
 
   /** The backend enum whose constants each need a chip variant. */
   private static final String SHIP_COMPONENT_CLASS =

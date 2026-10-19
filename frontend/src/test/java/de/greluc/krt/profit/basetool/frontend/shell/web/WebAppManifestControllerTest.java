@@ -289,8 +289,8 @@ class WebAppManifestControllerTest {
   @Test
   @DisplayName("agrees with the rendered page AND with the stylesheet about the header fill")
   void themeColourMatchesTheRenderedPageAndTheStylesheet() throws Exception {
-    String headerFill = cssColour("--color-bg-dark-gray");
-    String pageBackground = cssColour("--color-bg-black");
+    String headerFill = cssColour("--color-surface-input");
+    String pageBackground = cssColour("--color-canvas");
 
     mockMvc
         .perform(get("/"))

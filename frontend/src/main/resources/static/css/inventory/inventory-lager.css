@@ -35,7 +35,7 @@
         width: 100%;
         min-height: var(--touch-target);
         padding: 0.375rem 2.5rem 0.375rem 0.75rem;
-        background-color: var(--color-surface-input);
+        background-color: var(--control-bg);
         border: 1px solid var(--color-gray-3);
         color: var(--color-gray-1);
         font-family: var(--font-body);

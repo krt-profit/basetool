@@ -58,21 +58,21 @@ public class WebAppManifestController {
   private static final String MANIFEST_JSON = "application/manifest+json";
 
   /**
-   * Splash-screen and install-dialog background: the page background, flat black.
+   * Splash-screen and install-dialog background: the page background, the canvas gray.
    *
-   * <p>Mirrors {@code --color-bg-black} in {@code styles.css} (REQ-UI-003). A mismatch here is
+   * <p>Mirrors {@code --color-canvas} in {@code styles.css} (REQ-UI-003). A mismatch here is
    * visible as a flash of the wrong colour while the app starts.
    */
-  private static final String BACKGROUND_COLOR = "#000000";
+  private static final String BACKGROUND_COLOR = "#202020";
 
   /**
    * Browser-UI colour: the page header, not the page background.
    *
-   * <p>Mirrors {@code --color-bg-dark-gray}, the {@code header} fill. The status bar sits directly
-   * above that header on a phone, so matching the header — not the black body — is what makes the
+   * <p>Mirrors {@code --color-surface-input}, the {@code header} bar fill. The status bar sits directly
+   * above that header on a phone, so matching the header — not the canvas body — is what makes the
    * seam disappear.
    */
-  private static final String THEME_COLOR = "#141414";
+  private static final String THEME_COLOR = "#2a2d31";
 
   /**
    * Unversioned classpath path of the home-screen icon, as it exists under {@code

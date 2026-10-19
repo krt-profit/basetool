@@ -29,7 +29,7 @@
     .me-table .me-step-row th {
         height: auto;
         padding: var(--space-3) var(--space-4);
-        background: var(--color-bg-black);
+        background: var(--surface-bar);
         color: var(--color-gray-1);
         letter-spacing: normal;
         text-transform: none;

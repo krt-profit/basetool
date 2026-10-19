@@ -268,7 +268,7 @@
     }
 
     .oc-unit-box--sk .sh {
-        color: var(--color-dept-profit);
+        color: var(--color-success-text);
     }
 
     .oc-tree + .oc-caption {

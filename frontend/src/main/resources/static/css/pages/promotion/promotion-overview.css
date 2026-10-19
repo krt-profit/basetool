@@ -24,7 +24,7 @@
         gap: var(--space-1) var(--space-3);
         align-items: center;
         padding: var(--space-2) var(--space-3);
-        background: var(--color-bg-black);
+        background: var(--surface-canvas);
         border: var(--border-hairline);
     }
 
@@ -85,7 +85,7 @@
 
     .level-card {
         padding: 0.75rem 1rem;
-        background: var(--color-bg-black);
+        background: var(--surface-canvas);
         border: var(--border-hairline);
         border-left: 3px solid var(--color-primary);
     }

@@ -74,7 +74,7 @@
     }
 
     .mtx-option:hover {
-        background: var(--color-surface-input);
+        background: var(--control-bg);
         color: var(--color-white);
     }
 
@@ -268,7 +268,7 @@
     .matrix-table th {
         position: sticky;
         z-index: 20;
-        background-color: var(--color-surface-input);
+        background-color: var(--surface-bar);
         background-clip: padding-box;
         color: var(--color-gray-1);
         font-family: var(--font-body);
@@ -356,7 +356,7 @@
 
     .matrix-table th.mtx-corner {
         z-index: 30;
-        background-color: var(--color-surface-input);
+        background-color: var(--surface-bar);
         letter-spacing: 0.06em;
         text-transform: uppercase;
     }
