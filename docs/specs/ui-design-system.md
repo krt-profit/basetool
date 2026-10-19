@@ -1932,7 +1932,8 @@ whole app.
    REQ-UI-001's single copy of a colour value).
 2. **Controls.** `.btn-ghost`, `.btn-quiet-danger`, `.btn-secondary`, text inputs, selects, textareas,
    checkbox/radio, `.pagination .page-btn` and `.chip-select` have the `--control-bg` fill and a 1px
-   `--control-border`. The hairline stays for decorative dividers only.
+   `--control-border`. A card that is itself a link (the material tiles of `/materials`) carries the
+   `--control-border` too and turns orange on hover. The hairline stays for decorative dividers only.
 3. **Toggles.** Every period, status or view toggle is `.krt-segmented` with `.krt-segmented__item`
    (and `.krt-segmented__count`): the `segmented` fragment's radios, or links with `aria-current`.
    Selected = tint, orange border and a 3px underline, never a filled orange block.

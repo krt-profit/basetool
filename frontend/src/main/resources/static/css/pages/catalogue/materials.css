@@ -5,10 +5,12 @@
         display: flex;
         flex-direction: column;
         gap: 0.5rem;
+        border-color: var(--control-border);
         cursor: pointer;
         transition:
             transform 0.2s,
-            box-shadow 0.2s;
+            box-shadow 0.2s,
+            border-color 0.2s;
         text-decoration: none;
     }
 
@@ -23,6 +25,7 @@
 
     .material-card:hover {
         transform: translateY(-2px);
+        border-color: var(--color-primary);
         box-shadow: 0 4px 8px color-mix(in srgb, var(--color-primary) 20%, transparent);
     }
 
