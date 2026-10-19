@@ -8,7 +8,7 @@
 </head>
 <body>
 <th:block th:fragment="pageContent">
-<main th:with="inputSource=${inventoryForm.source},
+<main class="page--narrow" th:with="inputSource=${inventoryForm.source},
                backHref=${inputSource == 'admin' ? '/inventory/all' : (inputSource == 'aggregated' ? '/inventory' : '/inventory/my')},
                backKey=${inputSource == 'admin' ? 'inventory.overview.global' : (inputSource == 'aggregated' ? 'nav.inventory' : 'inventory.overview.my')}">
     <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey=${backKey}, eyebrowHref=@{${backHref}},

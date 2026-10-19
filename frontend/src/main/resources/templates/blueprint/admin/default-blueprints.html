@@ -13,7 +13,7 @@
     <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{nav.admin.defaultBlueprints},
         count=${defaults != null ? #lists.size(defaults) : null}, countId='krt-dbp-count', countFor='krt-dbp-list-host')}"></th:block>
 
-    <section class="card krt-personal-inventory dbp-section" aria-labelledby="krt-dbp-add-heading">
+    <section class="card krt-personal-inventory dbp-section form-width" aria-labelledby="krt-dbp-add-heading">
         <h2 id="krt-dbp-add-heading" class="krt-bp-section-title" th:text="#{admin.defaultBlueprints.add.heading}">Standard-Blueprint hinzuf&uuml;gen</h2>
 
         <div class="form-group krt-pi-typeahead krt-bp-search">

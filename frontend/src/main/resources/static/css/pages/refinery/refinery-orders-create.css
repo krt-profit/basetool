@@ -1,6 +1,9 @@
 @layer base, components, page, utilities;
 
 @layer page {
+    .refinery-order {
+        --page-column: calc(var(--content-max-form) + var(--space-6) + 22rem);
+    }
     .form-group label {
         display: block;
         margin-bottom: 0.5rem;

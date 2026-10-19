@@ -8,7 +8,7 @@
 </head>
 <body>
 <th:block th:fragment="pageContent">
-<main>
+<main class="page--narrow">
     <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.legal', titleText=#{impressum.title})}"></th:block>
     <div class="card legal-doc" data-testid="legal-doc">
         <p th:text="#{impressum.p1}">Angaben gem\u00e4\u00df \u00a7 5 DDG</p>
