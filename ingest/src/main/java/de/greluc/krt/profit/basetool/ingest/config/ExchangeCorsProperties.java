@@ -32,8 +32,8 @@ import org.springframework.validation.annotation.Validated;
  * The browser-extension origins the gateway admits cross-origin on {@code /exchange/**}
  * (REQ-XCH-027, ADR-0303).
  *
- * @param extensionOrigins the {@code chrome-extension://<id>} origin of each approved Chromium
- *     extension build (Chrome and Edge); blank entries are ignored
+ * @param extensionOrigins the fixed {@code chrome-extension://<id>} origin of each approved
+ *     Chromium extension build (Chrome and Edge); blank entries are ignored
  * @param firefoxExtensions whether {@value #FIREFOX_EXTENSION_ORIGINS} is admitted, since a Firefox
  *     extension's origin is random per installation
  */

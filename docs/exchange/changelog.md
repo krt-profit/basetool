@@ -9,7 +9,8 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
   be approved under the [browser-extension requirements](client-security.md#browser-extensions):
   a non-extractable WebCrypto DPoP key, the refresh token in `storage.local`, host permissions only
   for the pages read and the exchange host. The gateway answers cross-origin requests on
-  `/exchange/**` from an approved extension's origin and from Firefox extensions, without
+  `/exchange/**` from an approved extension's fixed origin — from a manifest `key` or a store; no
+  listing or signing is required — and from Firefox extensions, without
   credentials, and exposes `DPoP-Nonce`, `WWW-Authenticate`, `RateLimit`, `RateLimit-Policy`,
   `Retry-After`, `Idempotency-Replayed` and `X-Correlation-Id`.
 - **New: `Exchange-Client-Agent`.** A client that cannot set its `User-Agent` sends the same value

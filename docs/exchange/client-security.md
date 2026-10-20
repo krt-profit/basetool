@@ -106,10 +106,16 @@ applies; these points replace or add to it.
   you act on uninstall, revoke there too. An uninstall URL never carries a token or an id.
 - Chromium ignores a `User-Agent` set by an extension: send `Exchange-Client-Agent` with the same
   value instead. Send it to the exchange host only; the sign-in endpoints do not allow the header.
-- The gateway answers cross-origin requests on `/exchange/**` from your approved store id (each
-  store's id is listed separately, since Edge Add-ons and the Chrome Web Store assign different
-  ones) and from any Firefox extension. It never accepts credentials: send `fetch` with the default
-  `credentials` or `"omit"`, never `"include"`.
+- **A fixed extension id.** For Chrome and Edge, the gateway and the sign-in admit the
+  `chrome-extension://<id>` origin of each build you name in the application. Any fixed id works:
+  one from a `key` in `manifest.json`, for an unpacked or self-distributed build, or one a store
+  assigns — the Chrome Web Store and Edge Add-ons each assign their own, so list both if you use
+  both. A store listing is not required, and neither is publishing the extension at all.
+- Firefox extensions are admitted whatever their per-installation origin. Firefox's release
+  builds install only Mozilla-signed add-ons permanently; AMO's unlisted self-distribution signs one
+  without a public listing. Temporary add-ons are fine for development and the sandbox.
+- The gateway never accepts credentials: send `fetch` with the default `credentials` or `"omit"`,
+  never `"include"`.
 
 ## Response and supply chain
 

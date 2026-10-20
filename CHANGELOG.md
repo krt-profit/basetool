@@ -4,7 +4,7 @@
 
 ### Added
 
-- **Browser-Erweiterungen als Exchange-Clients.** Erweiterungen für Chrome, Edge und Firefox (Manifest V3) können unter Auflagen zugelassen werden: DPoP-Schlüssel nicht exportierbar, Refresh-Token nur in `storage.local`, Host-Rechte nur für die gelesenen Seiten und den Exchange-Host. Das Ingest-Gateway beantwortet dafür CORS auf `/exchange/**` für freigegebene Erweiterungs-IDs (`IRI_EXCHANGE_CORS_EXTENSION_ORIGINS`) und Firefox-Erweiterungen, ohne Credentials; `Exchange-Client-Agent` ersetzt für die Mindestversion den nicht setzbaren `User-Agent` (REQ-XCH-024, REQ-XCH-027, ADR-0303).
+- **Browser-Erweiterungen als Exchange-Clients.** Erweiterungen für Chrome, Edge und Firefox (Manifest V3) können unter Auflagen zugelassen werden: DPoP-Schlüssel nicht exportierbar, Refresh-Token nur in `storage.local`, Host-Rechte nur für die gelesenen Seiten und den Exchange-Host. Das Ingest-Gateway beantwortet dafür CORS auf `/exchange/**` für die feste ID jeder freigegebenen Erweiterung, aus Store oder `key` im Manifest (`IRI_EXCHANGE_CORS_EXTENSION_ORIGINS`) und Firefox-Erweiterungen, ohne Credentials; `Exchange-Client-Agent` ersetzt für die Mindestversion den nicht setzbaren `User-Agent` (REQ-XCH-024, REQ-XCH-027, ADR-0303).
 
 ## [v1.19.3](https://github.com/krt-profit/basetool/releases/tag/v1.19.3) - 2026-10-20
 

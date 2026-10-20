@@ -342,6 +342,7 @@ production addresses only.
   (on Windows, `$env:SANDBOX_EXTENSION_ORIGINS = '…'` first). The id is shown on
   `chrome://extensions`; a `key` in the manifest keeps it the same across reloads and machines.
   Several origins are separated by commas.
+- Firefox needs no setting; a temporary add-on loaded from `about:debugging` is enough here.
 - The browser must trust the test CA for `https://localhost:11262` ([trusting the test
   CA](#trusting-the-test-ca)).
 

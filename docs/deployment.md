@@ -1489,7 +1489,7 @@ On production an `--apply` is a gated write like any other.
 **Approving a browser extension** (ADR-0303) takes two production writes, each gated: the
 provisioner `--apply` after the merge that adds the client to `external-clients.json` with its
 `extensionOrigins` / `firefoxExtension` (its Keycloak Web Origins), and, for a Chromium build, the
-store id's origin appended comma-separated to `IRI_EXCHANGE_CORS_EXTENSION_ORIGINS` in the host
+fixed extension id's origin (from the application) appended comma-separated to `IRI_EXCHANGE_CORS_EXTENSION_ORIGINS` in the host
 `.env`, then `env.d` re-rendered and `ingest.service` restarted. A Firefox-only extension needs no
 `.env` change: `moz-extension://*` is admitted by default.
 

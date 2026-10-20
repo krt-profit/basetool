@@ -1867,11 +1867,15 @@ conditions (owner decision 2026-10-20, ADR-0303):
   an uninstall URL never carries a token or an id.
 - **Version header.** A Chromium extension sends its `<Product>/<semver> (+url)` in
   `Exchange-Client-Agent` (REQ-XCH-024), to the exchange host only.
+- **A fixed extension id.** Each Chrome or Edge build is approved by its fixed extension id,
+  named in the application with a link to the release's `manifest.json`; the id may come from a
+  `key` in the manifest (unpacked or self-distributed) or from a store. A store listing,
+  publication and code signing are not criteria; the owner requires only a stable id.
 - The 7-day fix rule applies unchanged. Store-account two-factor authentication and reproducible
   builds are not criteria.
 
 The gateway admits extensions cross-origin on `/exchange/**` only: each approved Chromium build's
-`chrome-extension://<id>` (`app.exchange.cors.extension-origins`, from
+fixed `chrome-extension://<id>` (`app.exchange.cors.extension-origins`, from
 `IRI_EXCHANGE_CORS_EXTENSION_ORIGINS`) and `moz-extension://*` (`app.exchange.cors.firefox-extensions`,
 on by default), for `GET`, `POST` and `OPTIONS`, with `Authorization`, `DPoP`, `Content-Type`,
 `Accept`, `Accept-Language`, `Idempotency-Key`, `X-Correlation-Id`, `User-Agent` and

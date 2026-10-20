@@ -31,10 +31,12 @@ An extension differs from a desktop client in four ways that matter here:
    is a different origin, `ingest.profit-base.online` (ADR-0268): its CORS answer and a host
    permission for it give no access to the web UI's host-only `__Host-SESSION` cookie or to
    Keycloak's cookies, and the gateway itself is stateless and reads no cookie.
-3. **Its origin is fixed per store listing in Chromium and random per installation in Firefox.**
-   Chrome and Edge use `chrome-extension://<32-letter id>`, the id fixed by the store (Edge's store
-   id differs from Chrome's). Firefox uses `moz-extension://<uuid>`, a new UUID for each
-   installation. Keycloak matches a client's Web Origins exactly or through `*`, nothing in between.
+3. **Its origin can be fixed in Chromium and is random per installation in Firefox.**
+   Chrome and Edge use `chrome-extension://<32-letter id>`. The id is fixed by a `key` in the
+   manifest, whether the build is unpacked or self-distributed, or by a store listing, and the
+   Chrome Web Store and Edge Add-ons each assign their own. Firefox uses `moz-extension://<uuid>`, a
+   new UUID for each installation; its release builds install only Mozilla-signed add-ons
+   permanently, which AMO's unlisted self-distribution provides without a public listing. Keycloak matches a client's Web Origins exactly or through `*`, nothing in between.
 4. **Chromium does not let an extension set `User-Agent`.** The minimum-version gate
    (REQ-XCH-024) reads the version from that header, so a Chromium extension could not pass it once
    a minimum is set.
@@ -65,7 +67,7 @@ conditions (REQ-XCH-027):
 4. **Version header.** A client that cannot set `User-Agent` sends the same
    `<Product>/<semver> (+url)` value in `Exchange-Client-Agent`; the gateway's version gate reads
    that header when it holds text and `User-Agent` otherwise. It is sent to the exchange host only.
-5. **Gateway CORS.** On `/exchange/**` only, the gateway admits the configured
+5. **Gateway CORS.** On `/exchange/**` only, the gateway admits the configured fixed
    `chrome-extension://<id>` origin of each approved Chromium build
    (`app.exchange.cors.extension-origins`) and `moz-extension://*`
    (`app.exchange.cors.firefox-extensions`, on by default), for `GET`, `POST` and `OPTIONS`, with
@@ -79,12 +81,18 @@ conditions (REQ-XCH-027):
    reach acts on the browser's cookies — a website calling them gains nothing a server could not
    already do.
 7. **The rest of REQ-XCH-027 applies unchanged**, including the 7-day fix rule for a token-handling
-   flaw. Store-account two-factor authentication and reproducible builds are **not** required.
+   flaw ("publish a fixed release within 7 days"). Store-account two-factor authentication and
+   reproducible builds are **not** required.
+8. **No store publication and no signing requirement.** The owner requires only a stable extension
+   id. Where it comes from — a store listing, an unlisted listing, or a `key` in the manifest of an
+   unpacked or self-distributed build — does not matter, and nothing has to be published. Code
+   signing stays recommended, not required. Temporary add-ons are fine for development and the
+   sandbox.
 
 ## Consequences
 
 - An extension can be approved, and the gateway answers it cross-origin. A new Chromium build's
-  store id is one more entry in `IRI_EXCHANGE_CORS_EXTENSION_ORIGINS` and in the client's Web
+  fixed extension id is one more entry in `IRI_EXCHANGE_CORS_EXTENSION_ORIGINS` and in the client's Web
   Origins; a Firefox build needs neither.
 - `moz-extension://*` admits every Firefox extension's preflight. That opens nothing on its own:
   the gateway never accepts credentials, every exchange request still needs a DPoP-bound token of
@@ -109,3 +117,5 @@ conditions (REQ-XCH-027):
 - **Store-account 2FA and reproducible builds as criteria.** Considered and dropped by the owner:
   neither is checkable by the Basetool, and the 7-day fix rule and suspension already cover a
   compromised release.
+- **A store listing as the source of the extension id.** Dropped by the owner: a `key` in the
+  manifest fixes the id just as well, and publication is not a condition.

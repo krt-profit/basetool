@@ -134,11 +134,21 @@ body:
         - label: A descriptive User-Agent with product, version and URL, or the same value in Exchange-Client-Agent where the User-Agent cannot be set.
           required: true
 
-  - type: textarea
-    id: extension
+  - type: input
+    id: extension-ids
     attributes:
-      label: Browser extension builds
-      description: Browser extensions only. The store listing and extension id of each build (Chrome Web Store, Edge Add-ons, addons.mozilla.org), and a link to the manifest.json of the release you apply with.
+      label: Extension ids
+      description: Browser extensions only (required for them). The fixed extension id of each Chrome or Edge build, from a key in manifest.json or from a store; for Firefox, the add-on id.
+  - type: input
+    id: extension-manifest
+    attributes:
+      label: manifest.json of the release
+      description: Browser extensions only (required for them). A link to the manifest.json of the release you apply with.
+  - type: input
+    id: extension-store
+    attributes:
+      label: Store listing (optional)
+      description: Only if the extension is published in a store; unlisted listings are fine, and no listing is needed at all.
 
   - type: checkboxes
     id: extension-security
