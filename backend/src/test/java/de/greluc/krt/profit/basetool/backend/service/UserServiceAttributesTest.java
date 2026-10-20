@@ -44,6 +44,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.time.LocalDate;
 import java.util.HashSet;
@@ -198,7 +199,7 @@ class UserServiceAttributesTest {
     void rankForNeitherOfficerNorSquadronUser_isSetWithoutValidation() {
       User user = newUser(USER_ID);
       user.setVersion(1L);
-      user.setRoles(new HashSet<>(Set.of(roleNamed("Bank Employee"))));
+      user.setRoles(new HashSet<>(Set.of(role(Roles.BANK_EMPLOYEE, "Bank Employee"))));
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
       when(userRepository.save(user)).thenReturn(user);
 
@@ -226,7 +227,7 @@ class UserServiceAttributesTest {
       User user = newUser(USER_ID);
       user.setVersion(1L);
       user.setRank(15);
-      user.setRoles(new HashSet<>(Set.of(roleNamed("KRT_MEMBER"))));
+      user.setRoles(new HashSet<>(Set.of(role(Roles.KRT_MEMBER, "KRT Member"))));
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
       when(userRepository.save(user)).thenReturn(user);
 
@@ -269,7 +270,7 @@ class UserServiceAttributesTest {
       User user = newUser(USER_ID);
       user.setVersion(1L);
       user.setRank(15);
-      user.setRoles(new HashSet<>(Set.of(roleNamed("KRT_MEMBER"))));
+      user.setRoles(new HashSet<>(Set.of(role(Roles.KRT_MEMBER, "KRT Member"))));
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
       when(userRepository.save(user)).thenReturn(user);
 
@@ -296,7 +297,7 @@ class UserServiceAttributesTest {
       User user = newUser(USER_ID);
       user.setVersion(1L);
       user.setRank(15);
-      user.setRoles(new HashSet<>(Set.of(roleNamed("KRT_MEMBER"))));
+      user.setRoles(new HashSet<>(Set.of(role(Roles.KRT_MEMBER, "KRT Member"))));
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
 
       assertThrows(
@@ -322,7 +323,7 @@ class UserServiceAttributesTest {
     void officerRank_zero_isRejected() {
       User user = newUser(USER_ID);
       user.setVersion(1L);
-      user.setRoles(new HashSet<>(Set.of(roleNamed("OFFICER"))));
+      user.setRoles(new HashSet<>(Set.of(role(Roles.OFFICER, "Officer"))));
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
 
       assertThrows(
@@ -334,7 +335,7 @@ class UserServiceAttributesTest {
     void squadronRank_21_isRejected() {
       User user = newUser(USER_ID);
       user.setVersion(1L);
-      user.setRoles(new HashSet<>(Set.of(roleNamed("KRT_MEMBER"))));
+      user.setRoles(new HashSet<>(Set.of(role(Roles.KRT_MEMBER, "KRT Member"))));
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
 
       assertThrows(
@@ -345,7 +346,7 @@ class UserServiceAttributesTest {
     private void assertOfficerRankPasses(int rank) {
       User user = newUser(USER_ID);
       user.setVersion(1L);
-      user.setRoles(new HashSet<>(Set.of(roleNamed("OFFICER"))));
+      user.setRoles(new HashSet<>(Set.of(role(Roles.OFFICER, "Officer"))));
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
       when(userRepository.save(user)).thenReturn(user);
 
@@ -357,7 +358,7 @@ class UserServiceAttributesTest {
     private void assertSquadronRankPasses(int rank) {
       User user = newUser(USER_ID);
       user.setVersion(1L);
-      user.setRoles(new HashSet<>(Set.of(roleNamed("KRT_MEMBER"))));
+      user.setRoles(new HashSet<>(Set.of(role(Roles.KRT_MEMBER, "KRT Member"))));
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
       when(userRepository.save(user)).thenReturn(user);
 
@@ -494,8 +495,9 @@ class UserServiceAttributesTest {
     return u;
   }
 
-  private static Role roleNamed(String name) {
+  private static Role role(String code, String name) {
     Role r = new Role();
+    r.setCode(code);
     r.setName(name);
     return r;
   }

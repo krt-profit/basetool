@@ -203,8 +203,9 @@ public class UserService {
   }
 
   /**
-   * Checks the rank against the range of the user's stored Keycloak role (REQ-ROLE-007): {@code
-   * OFFICER} 1–12, else {@code KRT_MEMBER} 13–20; a user with neither role is not checked.
+   * Checks the rank against the range of the user's stored role, matched by role code
+   * (REQ-ROLE-007): {@code OFFICER} 1–12, else {@code KRT_MEMBER} 13–20; a user with neither role
+   * is not checked.
    *
    * @param user the user whose stored roles decide the range
    * @param rank the requested rank
@@ -213,9 +214,9 @@ public class UserService {
    */
   private static void requireRankFitsStoredRole(@NotNull User user, int rank) {
     boolean isOfficer =
-        user.getRoles().stream().anyMatch(r -> r.getName().equalsIgnoreCase(Roles.OFFICER));
+        user.getRoles().stream().anyMatch(r -> Roles.OFFICER.equalsIgnoreCase(r.getCode()));
     boolean isSquadronMember =
-        user.getRoles().stream().anyMatch(r -> r.getName().equalsIgnoreCase(Roles.KRT_MEMBER));
+        user.getRoles().stream().anyMatch(r -> Roles.KRT_MEMBER.equalsIgnoreCase(r.getCode()));
     if (!isOfficer && !isSquadronMember) {
       return;
     }
