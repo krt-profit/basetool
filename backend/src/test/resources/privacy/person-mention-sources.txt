@@ -248,6 +248,9 @@ exempt-column|role.description
 exempt-column|role.name
 exempt-column|role_permissions.permission
 exempt-column|ship.insurance
+exempt-column|ship.pledge_cost_currency
+exempt-column|ship.pledge_id
+exempt-column|ship.production_status
 exempt-column|supply_donation.decline_reason
 exempt-column|supply_donation.status
 exempt-column|supply_need.priority
