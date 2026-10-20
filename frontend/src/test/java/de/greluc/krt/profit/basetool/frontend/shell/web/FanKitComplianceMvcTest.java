@@ -42,8 +42,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Pins the Star Citizen Fan Kit compliance band (REQ-UI-018) to the home page: the "Made By The
- * Community" logo and the CIG trademark notice render together on {@code GET /}.
+ * Pins the Star Citizen Fan Kit compliance (REQ-UI-018): the band on the home page, the FAQ fan
+ * site notice with the official site link in the footer, and no CIG artwork outside the Fan Kit.
  */
 @SpringBootTest
 class FanKitComplianceMvcTest {
@@ -67,6 +67,15 @@ class FanKitComplianceMvcTest {
           + " Imperium Rights LLC and Cloud Imperium Rights Ltd.. Star Citizen®, Squadron"
           + " 42®, Roberts Space Industries®, and Cloud Imperium® are registered"
           + " trademarks of Cloud Imperium Rights LLC. All rights reserved.";
+
+  /** The fan site notice of the Fankit and Fandom FAQ, section "Fan Sites", verbatim. */
+  private static final String REQUIRED_FANSITE_NOTICE =
+      "This is an unofficial Star Citizen fan site, not affiliated with the Cloud Imperium group of"
+          + " companies. All content on this site not authored by its host or users are property of"
+          + " their respective owners.";
+
+  /** The official site the FAQ requires every fan site to link to. */
+  private static final String OFFICIAL_SITE_LINK = "href=\"https://robertsspaceindustries.com/\"";
 
   @Autowired private WebApplicationContext context;
 
@@ -101,6 +110,64 @@ class FanKitComplianceMvcTest {
         .andExpect(content().string(containsString("images/made-by-the-community.png")))
         .andExpect(content().string(containsString(REQUIRED_TRADEMARK_NOTICE)))
         .andExpect(content().string(containsString(REQUIRED_AGREEMENT_NOTICE)));
+  }
+
+  /**
+   * The public home page carries the FAQ fan site notice and a link to the official site.
+   *
+   * @throws Exception when the request fails.
+   */
+  @Test
+  void homePage_ShouldCarryFanSiteNoticeAndOfficialSiteLink_ForAnonymousVisitor() throws Exception {
+    mockMvc
+        .perform(get("/"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("class=\"krt-landing-notice\"")))
+        .andExpect(content().string(containsString(REQUIRED_FANSITE_NOTICE)))
+        .andExpect(content().string(containsString(OFFICIAL_SITE_LINK)));
+  }
+
+  /**
+   * The global footer carries the fan site notice and the official site link on every page.
+   *
+   * @param path a page rendered through the shared layout.
+   * @throws Exception when the request fails.
+   */
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"/", "/privacy", "/impressum"})
+  void footer_ShouldCarryFanSiteNoticeAndOfficialSiteLink(String path) throws Exception {
+    mockMvc
+        .perform(get(path))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("class=\"krt-footer-fansite\"")))
+        .andExpect(content().string(containsString(REQUIRED_FANSITE_NOTICE)))
+        .andExpect(content().string(containsString(OFFICIAL_SITE_LINK)));
+  }
+
+  /** The fan site notice stays verbatim English in every locale bundle. */
+  @Test
+  void fanSiteNotice_ShouldStayVerbatimEnglish_InEveryLocale() {
+    assertThat(messageSource.getMessage("fankit.fansite", null, Locale.GERMAN))
+        .as("German bundle must not translate the prescribed fan site notice")
+        .isEqualTo(REQUIRED_FANSITE_NOTICE);
+    assertThat(messageSource.getMessage("fankit.fansite", null, Locale.ENGLISH))
+        .as("English bundle must carry the prescribed fan site notice")
+        .isEqualTo(REQUIRED_FANSITE_NOTICE);
+  }
+
+  /**
+   * The public images ship no CIG artwork outside the Fan Kit.
+   *
+   * @throws java.io.IOException when the classpath cannot be scanned.
+   */
+  @Test
+  void publicImages_ShouldShipNoManufacturerLogos() throws java.io.IOException {
+    org.springframework.core.io.Resource[] svgs =
+        new org.springframework.core.io.support.PathMatchingResourcePatternResolver()
+            .getResources("classpath*:META-INF/resources/images/*.svg");
+    assertThat(java.util.Arrays.stream(svgs).map(org.springframework.core.io.Resource::getFilename))
+        .as("only the Basetool's own patterns may ship as SVG images")
+        .containsOnly("pattern.svg", "pattern_big.svg");
   }
 
   /** The trademark notice stays verbatim English in every locale bundle. */
