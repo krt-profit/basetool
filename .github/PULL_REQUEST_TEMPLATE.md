@@ -49,7 +49,7 @@ don't use "tests pass" as a stand-in.
 
 - [ ] PR title follows Conventional Commits (`feat(...)`, `fix(...)`, `chore(...)`, `docs(...)`, `refactor(...)`, `test(...)`).
 - [ ] Branch is up to date with `main` (rebased or merged, no stale diff).
-- [ ] `CHANGELOG.md` has been updated under `## [Unreleased]` (correct category: Added / Changed / Fixed / Removed / Security).
+- [ ] A changelog fragment `changelog.d/<name>.md` has been added (correct category: Added / Changed / Deprecated / Removed / Fixed / Security); `CHANGELOG.md` itself is not edited.
 - [ ] Related issues are linked (`closes #...`, `refs #...`).
 - [ ] No real secrets, tokens, passwords, keystores, or personal data in the diff.
 - [ ] I have signed the [Contributor License Agreement](../CLA.md) (one-time; see [`docs/cla-signatures.md`](../docs/cla-signatures.md) or the CLA-Assistant flow).

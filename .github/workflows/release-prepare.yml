@@ -74,7 +74,7 @@ jobs:
       - name: Tidy historical CHANGELOG drift
         run: python3 .claude/skills/release-notes/scripts/reconcile_changelog.py --write
 
-      - name: Cut [Unreleased] into the release section
+      - name: Cut [Unreleased] and the changelog fragments into the release section
         env:
           TAG: ${{ steps.ver.outputs.tag }}
         run: python3 .github/scripts/cut_release.py "${TAG}"
@@ -109,13 +109,19 @@ jobs:
           BOT_EMAIL: "41898282+github-actions[bot]@users.noreply.github.com"
         run: |
           set -euo pipefail
-          paths=(CHANGELOG.md backend/docs frontend/docs ingest/docs keycloak-spi/docs)
-          mapfile -t files < <(git diff --name-only HEAD -- "${paths[@]}")
-          if [ "${#files[@]}" -eq 0 ]; then
+          paths=(CHANGELOG.md changelog.d backend/docs frontend/docs ingest/docs keycloak-spi/docs)
+          mapfile -t files < <(git diff --name-only --diff-filter=d HEAD -- "${paths[@]}")
+          mapfile -t deleted < <(git diff --name-only --diff-filter=D HEAD -- "${paths[@]}")
+          if [ "${#files[@]}" -eq 0 ] && [ "${#deleted[@]}" -eq 0 ]; then
             echo "::error::nothing to release: no CHANGELOG/SBOM changes were produced for ${TAG}"
             exit 1
           fi
+          deletions=()
+          for path in "${deleted[@]}"; do
+            deletions+=(--delete "${path}")
+          done
           printf '::notice::committing release artifacts: %s\n' "${files[*]}"
+          printf '::notice::deleting folded fragments: %s\n' "${deleted[*]}"
           head_oid="$(git rev-parse HEAD)"
           gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
             -f "ref=refs/heads/${BRANCH}" -f "sha=${head_oid}" >/dev/null
@@ -125,6 +131,7 @@ jobs:
             --expected-head-oid "${head_oid}" \
             --message "chore(release): prepare ${TAG}" \
             --trailer "Signed-off-by: github-actions[bot] <${BOT_EMAIL}>" \
+            "${deletions[@]}" \
             "${files[@]}"
 
       - name: Build the release-notes preview for the PR body
