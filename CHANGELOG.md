@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.19.2](https://github.com/krt-profit/basetool/releases/tag/v1.19.2) - 2026-10-20
+
 ### Changed
 
 - **Fan-Site-Hinweis von CIG auf jeder Seite.** Startseite, Fußzeile und auf dem Handy das Menü zeigen jetzt den von CIG vorgeschriebenen Fan-Site-Hinweis im Wortlaut und einen Link zur offiziellen Star-Citizen-Website; ungenutzte Herstellerlogos wurden entfernt (REQ-UI-018, ADR-0296).
