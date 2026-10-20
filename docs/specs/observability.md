@@ -1228,6 +1228,10 @@ aggregated counts and bounded `app`/`host` labels.
 
 ### REQ-OBS-011 — Business metrics (`basetool_*`)
 
+> **Status: planned** (ADR-0297, ADR-0298, ADR-0299, ADR-0301, ADR-0302, map #2800) for the signals
+> in the planned amendment at the end of this requirement. Until they ship, the current text below /
+> the current code stays authoritative.
+
 The three modules expose custom `basetool_*` business metrics on existing choke points so
 operations can alarm on regressions, security signals and work-queue backlog without scraping
 logs. All of them obey REQ-OBS-006: **only bounded, enumerable labels** (application enums, a
@@ -2690,6 +2694,58 @@ described with its own metric above, and each carrying a runbook row in `monitor
 panel on dashboard `07` — 42 session evictions, 43 client errors by `kind`, 44 external fetch errors by
 `source`). Adding, renaming or removing one of these metrics keeps its alert in
 `monitoring/prometheus/alerts/business.yml` in sync in the same change.
+
+#### Planned amendment (ADR-0297, ADR-0298, ADR-0299, ADR-0301, ADR-0302)
+
+The navigation concept, the home dashboard, the assignee grant and minimum stock levels add these
+signals. Every label is bounded by REQ-OBS-006; **the quick-access search term never reaches a
+label**, a tag, an MDC field or a log line.
+
+- `basetool_navigation_preference_writes_total{section, outcome}` counter in the `navigation`
+  module, one increment per preference or dashboard write (REQ-UI-032, REQ-UI-034). `section` ∈
+  `favourites`, `hidden`, `order`, `tabbar`, `display`, `dashboard`; `outcome` ∈ `ok`, `conflict`
+  (the `409` of a stale section version), `rejected` (a `400` / `403` / `422`). A reset counts once
+  per section it wrote. Registered at zero for every pair.
+- `basetool_navigation_personalised_accounts{section}` gauge, sampled by the `navigation` module's
+  `BusinessGaugeSource` (`NavigationBusinessGauges`) on the business-metrics timer: the number of
+  accounts holding a non-default value in that section, same `section` values. It is the data base
+  for deciding a second personalisation round; it carries no account label.
+- `basetool_inventory_minimum_levels_below` gauge, sampled by the inventory module's
+  `InventoryBusinessGauges`: the number of minimum stock levels that are low (REQ-INV-067). A count
+  only, no unit, material or tier label. The metric is named after the module that owns the levels.
+- `basetool_quick_access_search_total{kind, outcome}` counter in the frontend's quick-access search
+  (REQ-UI-033), one increment per entity type per search. `kind` ∈ the eight entity types
+  (`mission`, `operation`, `material`, `blueprint`, `ship`, `org_unit`, `job_order`, `member`);
+  `outcome` ∈ `hits`, `empty`, `error` (a contributor that failed closed).
+- `basetool_notification_created_total{notification_type}` and
+  `basetool_notification_muted_total{notification_type}` gain `INVENTORY_STOCK_LEVEL_LOW`, and
+  `basetool_notification_timed_produced_total{kind}` the producer kind `stock_level_low`
+  (REQ-NOTIF-030).
+- `basetool_audit_events_total{domain}` counts the four `MIN_STOCK_LEVEL_*` events under
+  `INVENTORY` and the two `JOB_ORDER_EXTERNAL_ASSIGNEE_*` events under `JOB_ORDER`;
+  `basetool_bank_audit_events_total{event_type}` counts the `GRANT_REVOKED` rows of the
+  special-account grant removal (REQ-AUDIT-001). No new label value is needed for either.
+- The new endpoints — preferences, widgets, `/quick-access/search`, the stock-level API — are
+  covered by `http_server_requests` by route template; the dashboard's ten-minute widget poll and
+  the `assignedToMe` read need no metric of their own.
+
+**Dashboard.** `07-basetool-operations.json` gains the row „Navigation & Dashboard": preference
+writes by section and outcome, personalised accounts by section, quick-access searches by kind and
+outcome, the p95 of `/quick-access/search`, the 5xx rate of the preference and widget endpoints, and
+the low minimum stock levels.
+
+**Alerts** in `monitoring/prometheus/alerts/apps.yml`, each with a promtool test and a runbook row:
+
+- `QuickAccessSearchSlow` (warning): p95 of the frontend route `/quick-access/search` above 1 s for
+  10 min.
+- `NavigationEndpointsErroring` (warning): the 5xx share of the preference and widget endpoints
+  above 5 % for 10 min.
+
+A low minimum stock level is a notification (REQ-NOTIF-030), **never an alert**.
+
+**Enforced by (to be added):** `NavigationMetricsTest`, `NavigationBusinessGaugesTest`,
+`InventoryBusinessGaugesTest`, `QuickAccessSearchMetricsTest`, `AlertedMeterPresenceTest`,
+`navigation_alerts_test.yml`
 
 ### REQ-OBS-012 — Edge posture assertions (deny / redirect / HSTS probes)
 

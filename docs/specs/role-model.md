@@ -1,5 +1,6 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
-> **Owner area:** ROLE · **Related ADRs:** ADR-0042 (qualifies ADR-0026, ADR-0027, ADR-0029)
+> **Owner area:** ROLE · **Related ADRs:** ADR-0042 (qualifies ADR-0026, ADR-0027, ADR-0029),
+> ADR-0300 (planned)
 
 # Functional rank & permission model (squadron / area / OL)
 
@@ -64,6 +65,9 @@ Bereich/OL appointment responses) derive it from `role` at the controller / mapp
 
 ### REQ-ROLE-002 — Baseline grant for squadron leadership ranks
 
+> **Status: planned** (ADR-0300, map #2800). Until it ships, the current text below / the current
+> code stays authoritative.
+
 Each squadron leadership rank (`STAFFELLEITER` / `KOMMANDOLEITER` / `STELLV_KOMMANDOLEITER` /
 `ENSIGN`) confers officer-equivalent reach over its **own squadron only**, by minting contextual
 `LOGISTICIAN@<squadronId>` + `MISSION_MANAGER@<squadronId>` exactly as `SK_LEAD` does for an SK. The
@@ -118,6 +122,45 @@ stamped outside the caller's scope is one the caller cannot read back).
   relied on for per-row isolation.
 
 **Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (incl. `staffelleiter_getsFlatRolesAndOwnSquadronContextualOnly_noCascade`), `OwnerScopeServiceTest` (`CanActOnUserRefineryOrdersTests`), `RefineryOrderServiceLifecycleTest` (`getUserRefineryOrdersScoped_*`), `RefineryOrderRepositoryScopedTest`, `MembershipRoleMigrationEquivalenceTest` · **Code:** `CustomJwtGrantedAuthoritiesConverter`, `OrgUnitCascadeService`, `OwnerScopeService#canViewUserRefineryOrders` / `#canManageUserRefineryOrders`, `RefineryOrderService#getUserRefineryOrdersScoped`, `RefineryOrderRepository#findByOwnerIdScoped`, `RefineryOrderController` · **Decision:** ADR-0042 · **Issues:** #800 · **Security:** SEC-01
+
+#### Planned amendment (ADR-0300)
+
+**Officer reach is derived only from the seats.** The rank grants above stay; what changes is that
+the officer standing they stood next to is no longer a Keycloak role.
+
+- **Who has reach where.** The squadron leadership ranks and `SK_LEAD` reach their own unit, the
+  three area ranks the Bereich and its direct children, `OL_MEMBER` every unit
+  (`confersOwnUnitOfficerReach`, `OrgUnitCascadeService.cascadedOfficerReach`). An admin passes
+  every officer check.
+- **No manual grant.** There is no per-membership flag and no global override. Bank management
+  confers no reach; a bank manager with a seat has reach there like anyone else.
+- **`KRT Member` is required for every seat.** Appointing a member without the Keycloak role
+  `KRT Member` is refused. A seat whose holder loses the role later stays in the org chart and
+  confers no reach until the role is back (REQ-ORG-029).
+- **Gates read the target's owning unit.** An officer check asks for reach in the owning unit of the
+  mission, job order, promotion topic, ship or other target; lists are filtered to the caller's
+  officer units. The active context only narrows what navigation and lists show, with the union
+  when nothing is pinned. Hangar owner details, the Leitung page, promotion management, job-order
+  writes, mission finance and owner change, the operation's unpaid reset and the purchasing
+  `leadsUnit` check move to this per-unit reach.
+- **The Keycloak `OFFICER` role is retired** (REQ-SEC-004). The paragraph above on the operational
+  `OFFICER` grant no longer applies: no one holds `OFFICER`, and nothing reads it.
+- **No new audit event.** Reach follows the seat changes, which `ROLE_GRANTED` / `ROLE_CHANGED` /
+  `ROLE_REVOKED` already record (REQ-AUDIT-001).
+
+**Acceptance (planned)**
+
+- [ ] A Staffelleiter has officer reach in their Staffel and none in a second Staffel they are a
+  plain member of.
+- [ ] A Bereichskoordinator reaches the Bereich and its direct children; an OL member reaches every
+  unit; a bank manager without a seat reaches none.
+- [ ] An appointment of a member without `KRT Member` is refused; a seat holder who loses the role
+  keeps the seat and loses the reach.
+
+**Enforced by (to be added):** `OwnerScopeServiceTest` (officer reach per seat kind),
+`OrgUnitCascadeServiceTest`, `OrgUnitMembershipServiceTest` (appointment without `KRT Member`),
+`CustomJwtGrantedAuthoritiesConverterTest` (no `ROLE_OFFICER`), `PurchasingAccessPolicyTest`
+(`leadsUnit` by reach) · **Related:** REQ-SEC-004, REQ-SEC-015, REQ-ORG-029, ADR-0300
 
 ### REQ-ROLE-003 — Kommandogruppe entity
 
@@ -295,6 +338,9 @@ an OL member's by construction.
 
 ### REQ-ROLE-007 — The member rank follows the stored Keycloak role
 
+> **Status: planned** (ADR-0300, map #2800). Until it ships, the current text below / the current
+> code stays authoritative.
+
 Besides the functional rank of REQ-ROLE-001, every account carries a numeric **member rank** from 1
 to 20 (`app_user.rank`), which an admin sets on the member-edit page
 (`PUT /api/v1/users/{id}/attributes`). Its permitted range follows the account's **stored**
@@ -340,10 +386,39 @@ details (REQ-AUDIT-001); an unchanged or refused rank records nothing.
 `RankOutsideRoleRangeException`, `IdentityProblemCode`, `MemberManagementController#updateMemberAjax`,
 `identity/member-edit.html` · **Decision:** ADR-0264 · **Issues:** #2636
 
+#### Planned amendment (ADR-0300)
+
+The officer range follows **officer reach** (REQ-ROLE-002), not a stored `OFFICER` role, which no
+longer exists:
+
+- an **admin** may hold any rank **1–20**: the admin's pass on officer checks counts for this range;
+- for everyone else, an account with officer reach in **at least one** org unit, derived from a
+  leadership seat, holds ranks **1–12**;
+- an account with `KRT_MEMBER` and no officer reach holds ranks **13–20**;
+- an account with none of these is not range-checked; a rank outside 1–20 stays `ILLEGAL_ARGUMENT`.
+
+Because reach follows the
+seats the tool itself writes, a former lead can be given a rank above 12 as soon as their last seat
+is removed; no Keycloak change and no reconciliation is needed. The paragraph above on removing
+`OFFICER` in Keycloak no longer applies. `RANK_OUTSIDE_ROLE_RANGE`, its range fields and the
+member-edit page behave as above, except that the detail and the hint under the rank select name
+the basis of the range (the admin role, a leadership seat, or `KRT Member`) and what has to change
+in the tool.
+
+**Enforced by (to be added):** `UserServiceRankTest` (range by officer reach, a removed last seat
+frees 13–20, an admin without a seat accepts 1–20), `MemberManagementControllerTest` (the hint
+names the seat) ·
+**Related:** REQ-ROLE-002, ADR-0264, ADR-0300
+
 ## Out of scope
 
 - Per-rank / per-feature differentiation of rights beyond the SK-lead-equivalent baseline.
 - Retiring the flat Keycloak `OFFICER` role for squadrons.
+
+#### Planned amendment (ADR-0300)
+
+The second line is dropped: ADR-0300 retires the Keycloak `OFFICER` role for every unit
+(REQ-ROLE-002, REQ-SEC-004). The first line stays out of scope.
 
 ## Open questions
 

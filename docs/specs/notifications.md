@@ -1168,6 +1168,52 @@ that outlasts the limit (a stalled database) rejects the task; that is a lost no
 `platform/api/AsyncConfig#notificationExecutor`, `platform/api/BackpressureRejectedExecutionHandler`,
 `notification/internal/NotificationCreationService#recordCreated`
 
+### REQ-NOTIF-030 — A minimum stock level that falls low tells the unit's Logisticians
+
+> **Status: planned** (ADR-0302, map #2800). Until it ships, the current text below / the current
+> code stays authoritative.
+
+A minimum stock level (REQ-INV-067) whose allocated free stock drops below its minimum raises the
+notification type `INVENTORY_STOCK_LEVEL_LOW`.
+
+- **Once, with hysteresis.** The notice fires once when the level turns low. It re-arms only after
+  the level's allocated stock has reached its **target** again, so stock swinging around the minimum
+  does not flap. A new level starts armed.
+- **Produced on the timer.** The inventory module implements a `TimedNoticeProducer` (kind
+  `stock_level_low`, REQ-NOTIF-026) that evaluates the levels, so every path that changes free stock
+  — web, exchange, earmarks set by other modules, a tier change — is covered without a hook of its
+  own. The producer sets the level's „notified" marker and publishes the event in one transaction;
+  the marker is written by a conditional update that leaves the level's `@Version` alone, so a
+  Logistician's edit never 409s against it. Reaching the target clears the marker.
+- **Recipients.** The unit's direct Logisticians and the holders of a leadership seat directly in
+  the unit, with no cascade from a Bereich or the Organisationsleitung, resolved by a seeded rule
+  through the rule engine (REQ-NOTIF-007). The notice links to the unit's „Mindestbestände" tab.
+- **Switchable.** The type is mutable (REQ-NOTIF-027) and appears in the profile's
+  „Benachrichtigungen" card under the Lager area.
+- **Silent lifecycle.** Deleting a level, its catalogue entry or its unit, and deactivating its
+  tier, send no notice (REQ-INV-068).
+- **Payload.** The unit, the material or item and the tier as ids and coded parameters, the minimum
+  and the allocated amount; no member name.
+- **Observable.** `basetool_notification_created_total{notification_type}` and
+  `basetool_notification_timed_produced_total{kind}` count it (REQ-OBS-011). A low level is a
+  notice, never an alert.
+
+**Acceptance**
+
+- [ ] A level falling below its minimum notifies its unit's direct Logisticians and seat holders
+  once; a Bereich lead above the unit is not notified.
+- [ ] Stock rising above the minimum but below the target and falling again sends nothing; reaching
+  the target and falling low again sends a second notice.
+- [ ] A member who muted the type gets nothing.
+- [ ] Deleting the level or its catalogue entry, dissolving the unit and deactivating the tier send
+  nothing.
+- [ ] A Logistician's edit of a level does not 409 against the producer's marker.
+
+**Enforced by (to be added):** `StockLevelNoticeProducerTest`, `StockLevelNoticeIntegrationTest`,
+`NotificationPreferenceGroupsTest`, `NotificationTypeMessageCoverageTest` · **Code:** to be added
+(`NotificationType#INVENTORY_STOCK_LEVEL_LOW`, the inventory module's producer) · **Related:**
+REQ-INV-067, REQ-INV-068, REQ-NOTIF-024, REQ-NOTIF-026, REQ-NOTIF-027 · **Decision:** ADR-0302
+
 ## Out of scope (v1)
 
 - Per-notification e-mail routing (generic fan-out of in-app notification types to e-mail), per-channel

@@ -315,6 +315,18 @@ The platform modules reach the domains only through SPIs they own and the domain
 | `platform.api.PersonalDataExportSection` | a module's part of the Art. 15 / Art. 20 data export: the `Section` records (position, key, legal basis, statement, scrubbed and exempted columns) that select the member's own rows; `PersonalDataExportRegistry` (privacy) orders them by position and `DataExportService` runs them | identity, orgunit, orgchart, promotion, inventory, hangar, exchange, personalinventory, blueprint, notification, mission, refinery, joborder, materialexchange, bank, supply, audit (`*ExportSections`) |
 | `platform.api.PersonMentionSource` | a module's part of the admin person search: the text columns of its tables that can name a person (`Target`: area, table, column, id column, link kind) and the ones it exempts; `PersonMentionRegistry` (privacy) orders the union and `PersonSearchService` builds its one statement from it | every module that owns a text column (`*MentionSource`), and the platform's `SchemaHistoryMentionSource` |
 
+> **Planned: the `navigation` module** (ADR-0298, map #2800). It holds a user's deliberate
+> navigation and dashboard choices — favourites, hidden entries, order, tab bar, „Darstellung“,
+> dashboard layout and widget options — in `navigation.api` / `navigation.internal` /
+> `navigation.web`, each section under its own version (REQ-UI-032, REQ-UI-034). It depends on no
+> domain module: it stores entry keys and checks only their format, while the frontend's entry
+> registry knows each key's permission and asks for the deletion of keys the user may no longer
+> see. Account deletion removes the rows through the `app_user` foreign key (`ON DELETE CASCADE`),
+> not through `identity` or a `UserErasureParticipant`; it joins the data export and the account
+> merge as a `PersonalDataExportSection` and a `UserReassignmentParticipant` (REQ-SEC-058,
+> REQ-SEC-046), both in `platform.api`. Access is owner-only and not audited. Its
+> declaration follows REQ-MOD-006 ([`module-boundaries.md`](../specs/module-boundaries.md)).
+
 ## 5.3 Level 2 — inside `frontend`
 
 The frontend is packaged by domain (plan §5.9, F4, REQ-FE-032): each of the 21 domains of the

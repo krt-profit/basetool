@@ -298,6 +298,9 @@ query) · **Code:** `templates/joborder/orders-index.html`, `static/js/joborder/
 
 ### REQ-ORDERS-040 — Overview scope segment „Meine · Zu bearbeiten · Alle"
 
+> **Status: planned** (ADR-0301, map #2800). Until it ships, the current text below / the current
+> code stays authoritative.
+
 > Amended 2026-10-04: the third tab „Zu bearbeiten" is built, backed by the new `toProcess`
 > parameter of `GET /api/v1/orders`. Until then the segment was „Meine · Alle" and this requirement
 > said the third tab was not offered for lack of a backend read.
@@ -330,6 +333,37 @@ explicit `scope` query parameter wins.
 `JobOrderPageController.viewOrders`, `joborder/orders-index.html`, `static/js/joborder/orders-index.js`,
 `JobOrderController.getAllJobOrders`, `JobOrderQueryService.getAllJobOrders`,
 `JobOrderRepository.findScopedJobOrders` · **Related:** REQ-ORDERS-023, REQ-ORDERS-027, REQ-UI-027
+
+#### Planned amendment (ADR-0301)
+
+The segment becomes **„Meine · Ich bearbeite · Zu bearbeiten · Alle"**, in that order.
+
+- **Read.** `GET /api/v1/orders` gains `assignedToMe=true`: the orders on which the caller holds a
+  `JobOrderAssignee` entry, with the status filter. The visibility scope is
+  `JOB_ORDER_SCOPE_PREDICATE` widened by the assignee grant (REQ-ORDERS-047), and the parameter
+  narrows it to the caller's own entries, so it never shows an order the caller is not an assignee
+  of. It combines with neither `toProcess` nor a squadron
+  filter; the squadron filter is hidden and no squadron parameter is sent. The page total is the
+  count the „Ich bearbeite" widget (REQ-UI-034) shows.
+- **Which lists the grant widens.** `ALL` („Alle") reads the same widened scope, so the orders the
+  caller is an assignee of appear in their „Alle" list as well. `TO_PROCESS` („Zu bearbeiten") is
+  AND-ed with the normal tenancy scope, without the assignee grant.
+- **`ASSIGNED`** („Ich bearbeite") reads `/api/v1/orders?assignedToMe=true` and is offered to every
+  member who holds at least one assignee entry or may see the full queue. The widget's „alle
+  anzeigen" link opens this segment.
+- **Without profit access.** A member who lacks `canViewJobOrders` and `canViewOwnJobOrders` but
+  holds at least one assignee entry gets the capability flag `canViewAssignedJobOrders` from
+  `GET /me/capabilities`. With it the navigation shows the „Aufträge" link, and the overview offers
+  only the „Ich bearbeite" segment; a `scope` parameter cannot move such a member onto another
+  list. Without an entry the flag is `false` and the link is absent.
+- The pagination URL carries `scope=ASSIGNED` when chosen; the persisted choice
+  (`orders_scope_filter`) is restored only when that scope is offered on the page.
+
+**Enforced by (to be added):** `JobOrderControllerTest` (`getAllJobOrders_forwardsAssignedToMe`),
+`JobOrderScopeQueryIntegrationTest` (`assignedToMe_*`, `assigneeGrant_inAllNotInToProcess`),
+`OrdersListPatternRenderTest` (four segments, assignee-only segment), `MeControllerTest`
+(`canViewAssignedJobOrders`) · **Related:**
+REQ-ORDERS-047, REQ-UI-026, REQ-UI-034
 
 ## Out of scope
 

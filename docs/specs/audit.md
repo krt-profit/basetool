@@ -28,6 +28,10 @@ first). The storage choice and the unified-viewer architecture are recorded in
 
 ### REQ-AUDIT-001 — Immutable, complete, admin-only activity audit log
 
+> **Status: planned** (ADR-0298, ADR-0300, ADR-0301, ADR-0302, map #2800) for the coverage additions
+> in the planned amendment at the end of this requirement. Until they ship, the current text below /
+> the current code stays authoritative.
+
 Every state-mutating activity in the generic areas writes exactly **one** row to an **append-only**
 audit table (`audit_event`, modeled after `bank_audit_event` — no `@Version`, never updated except
 by the Art. 17 handle anonymisation of REQ-SEC-062, which overwrites the name snapshots in place;
@@ -416,6 +420,36 @@ per-domain emission assertions in the service tests · **Code:** `audit/api/Audi
 `audit/api/AuditService`, `audit/api/AuditEvent`, `audit/api/AuditDomain`, `audit/api/AuditEventType`,
 `audit/web/AuditAdminController`,
 `db/migration/V179` · **Decision:** [ADR-0037](../adr/0037-shared-multi-domain-activity-audit-log.md)
+
+#### Planned amendment (ADR-0298, ADR-0300, ADR-0301, ADR-0302)
+
+The coverage list gains:
+
+- **Lager** — minimum stock levels (REQ-INV-068): `MIN_STOCK_LEVEL_SET`, `MIN_STOCK_LEVEL_CHANGED`
+  (only when a field changed), `MIN_STOCK_LEVEL_REMOVED` and `MIN_STOCK_LEVEL_REMOVED_BY_CASCADE`
+  (one per level a catalogue deletion or unit dissolution removed). The subject is the level,
+  labelled by the material or item name; the details carry ids, the unit as `kind:id`, tier codes
+  and amounts.
+- **Aufträge** — an assignee who is not a direct member of the processing unit
+  (REQ-ORDERS-047): `JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED` / `JOB_ORDER_EXTERNAL_ASSIGNEE_REMOVED` in
+  place of `JOB_ORDER_ASSIGNEE_ADDED` / `_REMOVED`, also when the order is SK-public. The assignee
+  is the target user; the details carry no handle and no unit name.
+- **Bank trail** (`bank_audit_event`) — the removal of the `GLOBAL_ROLE OFFICER` view-grant bucket
+  on special accounts (REQ-BANK-037, ADR-0300) writes one `GRANT_REVOKED` per removed grant, with
+  the system as actor.
+
+The six new types join the viewer's per-area event-type lists and the DE/EN labels, and are counted
+by `basetool_audit_events_total{domain}` / `basetool_bank_audit_events_total{event_type}`
+(REQ-OBS-011).
+
+**Deliberately not audited:** navigation preferences (favourites, hidden entries, order, tab-bar
+slots, display mode) and the home dashboard (widgets, options, start page), including their resets.
+They are an account's own presentation choices, owner-only and read by nobody else (ADR-0298); a
+trail of them would record personal habits without serving any oversight. They are counted, not
+audited (`basetool_navigation_preference_writes_total`, REQ-OBS-011).
+
+**Enforced by (to be added):** `StockLevelServiceTest`, `JobOrderServiceAssigneeAndListTest`
+(`externalAssignee_*`), the bank grant migration test, `AdminAuditLogPageControllerTest`
 
 ### REQ-AUDIT-002 — Unified admin audit viewer
 

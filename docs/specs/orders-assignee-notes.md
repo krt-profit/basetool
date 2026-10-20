@@ -1,14 +1,15 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
-> **Owner area:** ORDERS · **Related ADRs:** none
+> **Owner area:** ORDERS · **Related ADRs:** ADR-0301
 
-# Job-order assignee notes
+# Job-order assignee notes and the assignee grant
 
 ## Context & goal
 
 A job order (Auftrag) tracks its **Bearbeiter** — the users who signed up to work on it.
 Beyond just being listed, an assignee often needs to communicate *context* to the rest of
 the team: when they will work on the order, or which part they take. This spec governs the
-optional free-text **note** attached to each assignee entry, and who may change it.
+optional free-text **note** attached to each assignee entry, who may change it, and the read
+visibility an assignee entry grants (REQ-ORDERS-047).
 
 Before this feature the assignee link was a pure many-to-many join with no extra data; the
 note promoted that link to a first-class edge (`JobOrderAssignee`) carrying the note and its
@@ -61,6 +62,60 @@ logic stays free of `SecurityContextHolder` reads (ArchUnit invariant).
 
 **Enforced by:** `JobOrderControllerTest` (set/deleteAssigneeNote auth tests)
 · **Code:** `JobOrderController.verifyAssigneeAccess` · **Issues:** —
+
+### REQ-ORDERS-047 — Being an assignee grants read visibility of that order
+
+> **Status: planned** (ADR-0301, map #2800). Until it ships, the current text below / the current
+> code stays authoritative.
+
+An assignee entry (`JobOrderAssignee`) is the only meaning of „assigned to me"; there is no separate
+responsible person. Profit members still sign themselves up and off, and a Logistician-or-above of a
+visible order still adds and removes anyone (REQ-ORDERS-014). The entry additionally grants its
+holder **read visibility of that one order**, an exception to org-unit tenancy (REQ-ORG-003,
+ADR-0301).
+
+- **Who may be assigned.** A Logistician with access to the order may assign **any active
+  account**, including members of units that are not profit-eligible. The assignee picker is a
+  handle search over all active accounts: members of the processing (responsible) unit first, every
+  other hit marked with its unit, no further personal data.
+- **What the grant shows.** An assignee who reaches the order only through the grant sees its detail
+  **in full** (materials, progress, assignees, notes) and finds it in the „Ich bearbeite" segment
+  (`assignedToMe=true`) and in the „Alle" list (`ALL`) of the overview (REQ-ORDERS-040). „Zu
+  bearbeiten" (`TO_PROCESS`) keeps the normal tenancy scope, and the grant widens no other list.
+- **What the grant allows.** Such an assignee may edit their own note (REQ-ORDERS-013) and remove
+  themselves, nothing else. Status, priority, lines, claims, handovers and production stay with the
+  processing unit; any other write answers `403`.
+- **How long it lasts.** As long as the entry exists, whatever the order's status. Leaving the unit
+  does not end it; removing the entry does. Account erasure removes the entries
+  (`JobOrderMemberUnlink`, REQ-DATA-008); no membership observer is added.
+- **Audit.** Adding or removing an assignee who is not a direct member of the processing unit
+  records `JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED` / `JOB_ORDER_EXTERNAL_ASSIGNEE_REMOVED` in the
+  Aufträge area instead of `JOB_ORDER_ASSIGNEE_ADDED` / `_REMOVED`, also when the order is visible
+  to them anyway (an SK-public order). The assignee is the target user; the details carry no
+  handle, unit name or free text (REQ-AUDIT-001). The removal by account erasure keeps its existing
+  summary event.
+- **Notice.** The assignment notice of REQ-ORDERS-043 applies unchanged.
+
+**Acceptance**
+
+- [ ] An assignee outside every visible unit opens the order's detail and sees it in full; a
+  unit-mate of that assignee who holds no entry still cannot open it.
+- [ ] Such an order appears in the assignee's „Ich bearbeite" and „Alle" lists, never in „Zu
+  bearbeiten".
+- [ ] Such an assignee edits their own note and removes themselves; a status, line or handover
+  write answers `403`.
+- [ ] The grant survives a status change and the assignee leaving their unit, and ends with the
+  entry.
+- [ ] Adding and removing a non-member of the processing unit records the two external event types;
+  a direct member records the existing ones.
+- [ ] The picker lists the processing unit's members first and marks every other hit with its unit.
+
+**Enforced by (to be added):** `JobOrderAccessPolicyTest` (`assigneeGrant_*`),
+`JobOrderAssigneeGrantIntegrationTest`, `JobOrderServiceAssigneeAndListTest`
+(`externalAssignee_*`), `AuthorizationMatrixTest`, `AdminAuditLogPageControllerTest` · **Code:**
+`JobOrderAccessPolicy.canSeeJobOrder`, `JobOrderAssigneeService`, `AuditEventType` · **Related:**
+REQ-ORDERS-013, REQ-ORDERS-014, REQ-ORDERS-040, REQ-ORDERS-043, REQ-ORG-003, REQ-AUDIT-001 ·
+**Decision:** ADR-0301
 
 ## Out of scope
 

@@ -1203,6 +1203,21 @@ listed with its reason:
 implementations, the `PersonalDataExportSection`
 implementations, `UserAccountMergeService`, the `UserReassignmentParticipant` implementations
 
+#### Planned amendment (ADR-0298)
+
+> **Status: planned** (ADR-0298, ADR-0299, map #2800). Until it ships, the current text above / the
+> current code stays authoritative.
+
+The `navigation` module's tables (REQ-UI-032, REQ-UI-034) reference the member through
+`app_user (id)` with `ON DELETE CASCADE` and take a disposition in all three registries:
+**erasure** by the cascade; **export** in the section `navigationPreferences` (REQ-SEC-058);
+**merge** as columns that follow the member, with the navigation-specific overlap rule of
+REQ-SEC-046. None is listed as not exported or not merged. The column counts and selection floors
+above grow with them.
+
+**Enforced by (to be added):** `GdprParticipantCoverageTest`, `UserAccountMergeCoverageTest`
+(the navigation columns classified) · **Related:** REQ-SEC-046, REQ-SEC-058, ADR-0298
+
 ### REQ-DATA-022 — a cached instance is never edited; caches move to read models
 
 The master-data caches are Caffeine caches that hold object references, so every reader shares the

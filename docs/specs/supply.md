@@ -42,6 +42,9 @@ and carry the setting's own version.
 
 ### REQ-SUP-003 — Raising a need
 
+> **Status: planned** (ADR-0300, ADR-0302, map #2800). Until it ships, the current text below / the
+> current code stays authoritative.
+
 The lead or a Logistician of a unit with `may_raise_needs`, and an admin, raise a need: a material xor
 a game item, an amount above zero (whole units for pieces and game items), a quality tier for a
 material (the base tier when omitted), a priority and an optional job order of that unit. Any other
@@ -49,6 +52,18 @@ caller receives 403. The catalogue entry and the tier of a need are fixed; a dif
 need.
 
 **Enforced by:** `SupplyNeedServiceTest` · **Code:** `supply/internal/SupplyNeedService`
+
+#### Planned amendment (ADR-0300, ADR-0302)
+
+The first sentence reads: „**A Logistician of a unit with `may_raise_needs`, the lead included,**
+and an admin raise a need". A unit's leadership seat always confers the contextual Logistician
+authority of that unit (`hasRoleInOrgUnit(unit, LOGISTICIAN)`, derived from officer reach), so the
+lead is no separate case and no gate evaluates the two differently. The rest of the requirement is
+unchanged. The „Bedarf anlegen" shortcut of a low minimum stock level (REQ-INV-068) uses the same
+gate.
+
+**Enforced by (to be added):** `SupplyNeedServiceTest` (`leadRaisesNeedAsLogistician`) ·
+**Related:** REQ-INV-068, REQ-ROLE-002
 
 ### REQ-SUP-004 — Purchasable flag
 
