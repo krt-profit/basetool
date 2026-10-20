@@ -893,13 +893,13 @@ groups:
           description: "The backend is refusing oversized non-multipart JSON request bodies (413) on a capped import path at an elevated rate — likely a memory-DoS probing attempt against the refinery import-extract endpoint, or a misconfigured client bypassing the frontend proxy cap."
 
       - alert: KeycloakLoginErrorSpike
-        expr: rate(keycloak_user_events_total{event=~"login_error|identity_provider_login_error"}[5m]) > 0.2
+        expr: sum by (realm) (rate(keycloak_user_events_total{event=~"login|identity_provider_login", error!=""}[5m])) > 0.2
         for: 10m
         labels:
           severity: warning
         annotations:
           summary: "Keycloak login-error spike"
-          description: "Keycloak is emitting login_error / IdP-error events at an elevated rate."
+          description: "Keycloak is recording failed logins or failed Discord-broker logins (event login / identity_provider_login with a non-empty error label) at an elevated rate. Break it down by the error label on dashboard 06 and in the Keycloak event log."
 
       - alert: KeycloakEventMetricsAbsent
         expr: >-

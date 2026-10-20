@@ -10,6 +10,10 @@
 
 - **Browser-Erweiterungen: Herkunft an den Client gebunden, kürzere Leerlaufzeit.** Das Ingest-Gateway nimmt eine `chrome-extension://`-Herkunft nur noch mit dem Token des Clients an, für den sie freigegeben ist, und `moz-extension://` nur für Clients mit Firefox-Build; alles andere endet mit `403 ORIGIN_NOT_ALLOWED` (`IRI_EXCHANGE_CORS_EXTENSION_ORIGINS` jetzt als `<clientId>=<origin>`, neu `IRI_EXCHANGE_CORS_FIREFOX_CLIENTS`). Erweiterungs-Clients müssen sich nach 14 statt 30 Tagen ohne Nutzung neu anmelden, und jede Release mit geänderten Manifest-Rechten wird vor der Auslieferung erneut geprüft (REQ-XCH-027, ADR-0304).
 
+### Fixed
+
+- **Alert `KeycloakLoginErrorSpike` feuert wieder.** Keycloak 26 meldet fehlgeschlagene Logins als `event="login"` mit gesetztem `error`-Label, nicht als `login_error`; die Regel filtert jetzt so und summiert pro Realm, ein promtool-Test deckt sie ab (Monitoring, REQ-OBS-011).
+
 ## [v1.19.3](https://github.com/krt-profit/basetool/releases/tag/v1.19.3) - 2026-10-20
 
 ### Added
