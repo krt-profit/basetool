@@ -31,6 +31,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeMapperImpl;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -185,5 +187,38 @@ class ShipMapperTest {
     assertNull(mapper.toDto(null));
     assertNull(mapper.locationToDto(null));
     assertNull(mapper.manufacturerToDto(null));
+  }
+
+  @Test
+  void toDto_leavesOutPledgeButKeepsStatus_whileToOwnerDtoCarriesIt() {
+    Ship ship = new Ship();
+    ship.setId(UUID.randomUUID());
+    ship.setInsurance("LTI");
+    ship.setProductionStatus(ShipProductionStatus.IN_CONCEPT);
+    ship.setPledgeId("113735507");
+    ship.setPledgeDate(LocalDate.of(2026, 10, 14));
+    ship.setPledgeCost(new BigDecimal("275.00"));
+    ship.setPledgeCostCurrency("USD");
+    ship.setMeltable(true);
+    ship.setGiftable(false);
+
+    ShipDto plain = mapper.toDto(ship);
+    ShipDto owner = mapper.toOwnerDto(ship);
+
+    assertNull(plain.pledge());
+    assertEquals(ShipProductionStatus.IN_CONCEPT, plain.productionStatus());
+    assertEquals(
+        new ShipPledgeDto(
+            "113735507", LocalDate.of(2026, 10, 14), new BigDecimal("275.00"), "USD", true, false),
+        owner.pledge());
+  }
+
+  @Test
+  void toOwnerDto_withoutPledgeId_carriesNoPledge() {
+    Ship ship = new Ship();
+    ship.setId(UUID.randomUUID());
+    ship.setInsurance("0");
+
+    assertNull(mapper.toOwnerDto(ship).pledge());
   }
 }

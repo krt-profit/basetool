@@ -88,6 +88,7 @@
                                         <span class="cell-title" th:text="${named ? ship.name : hull}">Iron Mule</span>
                                         <span class="cell-sub"><span th:text="${named ? hull : #messages.msg('hangar.ship.unnamed')}">Drake Cutlass Black</span><span
                                               class="hangar-row__loc" th:if="${locName != null}" th:text="' · ' + ${locName}"> · Area18</span></span>
+                                        <th:block th:replace="~{hangar/fragments/ship-meta :: shipMeta(${ship})}"></th:block>
                                     </span>
                                 </div>
                             </td>

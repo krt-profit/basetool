@@ -33,12 +33,15 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.LocationDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.ManufacturerDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.ShipTypeDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipPledgeDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.SquadronShipDetailDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.SquadronShipOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -123,7 +126,9 @@ class HangarPagePatternRenderTest {
         null,
         null,
         3L,
-        0L);
+        0L,
+        null,
+        null);
   }
 
   /**
@@ -171,7 +176,9 @@ class HangarPagePatternRenderTest {
             null,
             new SquadronReferenceDto(unitId, "Owner SK", "OSK"),
             3L,
-            4L);
+            4L,
+            null,
+            null);
     when(backendApiClient.get(startsWith(MY_SHIPS), anyTypeRef()))
         .thenReturn(page(List.of(assigned), 1L));
     when(backendApiClient.get(startsWith(OVERVIEW), anyTypeRef())).thenReturn(page(List.of(), 0L));
@@ -198,6 +205,51 @@ class HangarPagePatternRenderTest {
   }
 
   /**
+   * An imported ship shows its production status as a chip and its pledge id, date, price and the
+   * melt and gift flags under its name; a ship without imported data shows neither
+   * (REQ-HANGAR-015).
+   */
+  @Test
+  @WithMockUser
+  void rendersTheImportedProductionStatusAndPledge() throws Exception {
+    ShipDto imported =
+        new ShipDto(
+            UUID.randomUUID(),
+            null,
+            type("Arrastra", "RSI"),
+            "LTI",
+            null,
+            false,
+            null,
+            null,
+            3L,
+            0L,
+            "IN_CONCEPT",
+            new ShipPledgeDto(
+                "113735507",
+                LocalDate.of(2026, 10, 14),
+                new BigDecimal("1275.00"),
+                "USD",
+                true,
+                false));
+    when(backendApiClient.get(startsWith(MY_SHIPS), anyTypeRef()))
+        .thenReturn(page(List.of(imported, ship("Plain", "0", false)), 2L));
+    when(backendApiClient.get(startsWith(OVERVIEW), anyTypeRef())).thenReturn(page(List.of(), 0L));
+
+    String html = render("/hangar");
+
+    assertThat(html)
+        .containsPattern(
+            "class=\"chip chip--warning\" data-testid=\"hangar-ship-production\">Konzept<")
+        .contains("Pledge #113735507")
+        .contains(" · 14.10.2026")
+        .contains(" · 1.275,00 USD")
+        .contains(" · schmelzbar")
+        .contains(" · nicht verschenkbar");
+    assertThat(html.split("data-testid=\"hangar-ship-pledge\"", -1)).hasSize(2);
+  }
+
+  /**
    * Each own ship carries a selection checkbox with its id and unit, the list head a select-all
    * box, and the page a hidden selection bar outside the swapped list whose „Einheit ändern" opens
    * the unit dialog with its bulk message slot (REQ-HANGAR-010).
@@ -218,7 +270,9 @@ class HangarPagePatternRenderTest {
             null,
             new SquadronReferenceDto(unitId, "Owner SK", "OSK"),
             3L,
-            4L);
+            4L,
+            null,
+            null);
     when(backendApiClient.get(startsWith(MY_SHIPS), anyTypeRef()))
         .thenReturn(page(List.of(assigned), 1L));
     when(backendApiClient.get(startsWith(OVERVIEW), anyTypeRef())).thenReturn(page(List.of(), 0L));

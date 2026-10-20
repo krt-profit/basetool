@@ -96,7 +96,8 @@ class HangarControllerTest {
   }
 
   private static ShipDto shipDto(String name) {
-    return new ShipDto(UUID.randomUUID(), name, null, "LTI", null, true, null, null, 1L, 0L);
+    return new ShipDto(
+        UUID.randomUUID(), name, null, "LTI", null, true, null, null, 1L, 0L, null, null);
   }
 
   private static Jwt jwt(String sub) {
@@ -119,8 +120,8 @@ class HangarControllerTest {
     Page<Ship> page = new PageImpl<>(List.of(s1, s2), PageRequest.of(0, 20), 2);
     when(hangarService.getMyShipsFiltered(eq(ownerId), isNull(), isNull(), any(Pageable.class)))
         .thenReturn(page);
-    when(shipMapper.toDto(s1)).thenReturn(d1);
-    when(shipMapper.toDto(s2)).thenReturn(d2);
+    when(shipMapper.toOwnerDto(s1)).thenReturn(d1);
+    when(shipMapper.toOwnerDto(s2)).thenReturn(d2);
 
     PageResponse<ShipDto> result = controller.getMyShips(jwt, 0, 20, null, null);
 
@@ -180,6 +181,7 @@ class HangarControllerTest {
     assertThat(result.content()).containsExactly(d);
     assertThat(result.sort()).isNotEmpty();
     verify(hangarService).getAllShips(any(Pageable.class));
+    verify(shipMapper, never()).toOwnerDto(any());
   }
 
   static java.util.stream.Stream<String> callers() {
@@ -214,7 +216,7 @@ class HangarControllerTest {
     ShipDto dto = shipDto("Cutlass");
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     when(hangarService.addShip(ownerId, request)).thenReturn(created);
-    when(shipMapper.toDto(created)).thenReturn(dto);
+    when(shipMapper.toOwnerDto(created)).thenReturn(dto);
 
     ShipDto result = controller.addShip(jwt, request);
 
@@ -233,7 +235,7 @@ class HangarControllerTest {
     ShipDto dto = shipDto("Cutlass II");
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     when(hangarService.updateShip(ownerId, shipId, request)).thenReturn(updated);
-    when(shipMapper.toDto(updated)).thenReturn(dto);
+    when(shipMapper.toOwnerDto(updated)).thenReturn(dto);
 
     ShipDto result = controller.updateMyShip(jwt, shipId, request);
 
@@ -273,7 +275,7 @@ class HangarControllerTest {
     ShipDto d = shipDto("Carrack");
     Page<Ship> page = new PageImpl<>(List.of(s), PageRequest.of(0, 20), 1);
     when(hangarService.getMyShips(eq(targetUser), any(Pageable.class))).thenReturn(page);
-    when(shipMapper.toDto(s)).thenReturn(d);
+    when(shipMapper.toOwnerDto(s)).thenReturn(d);
 
     PageResponse<ShipDto> result = controller.getUserShips(targetUser, 0, 20, null);
 
@@ -290,7 +292,7 @@ class HangarControllerTest {
     Ship created = new Ship();
     ShipDto dto = shipDto("Cutlass");
     when(hangarService.addShipByAdmin(targetUser, request)).thenReturn(created);
-    when(shipMapper.toDto(created)).thenReturn(dto);
+    when(shipMapper.toOwnerDto(created)).thenReturn(dto);
 
     ShipDto result = controller.addUserShip(targetUser, request);
 
@@ -307,7 +309,7 @@ class HangarControllerTest {
     Ship updated = new Ship();
     ShipDto dto = shipDto("Cutlass");
     when(hangarService.updateShipByAdmin(targetUser, shipId, request)).thenReturn(updated);
-    when(shipMapper.toDto(updated)).thenReturn(dto);
+    when(shipMapper.toOwnerDto(updated)).thenReturn(dto);
 
     ShipDto result = controller.updateUserShip(targetUser, shipId, request);
 
@@ -332,7 +334,7 @@ class HangarControllerTest {
     MultipartFile file =
         new MockMultipartFile("file", "ships.json", "application/json", "[]".getBytes());
     FleetviewImportResponseDto response =
-        new FleetviewImportResponseDto(3, 0, 0, List.of(), List.of());
+        new FleetviewImportResponseDto(3, 0, 0, List.of(), List.of(), 0);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     when(hangarImportService.importShips(ownerId, file)).thenReturn(response);
 

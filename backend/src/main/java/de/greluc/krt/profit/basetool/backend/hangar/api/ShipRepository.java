@@ -103,6 +103,17 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   List<Ship> lockAllByIdOrderById(@Param("ids") Collection<UUID> ids);
 
   /**
+   * Locks every ship of one owner in ascending id order, so an import never matches a ship that a
+   * concurrent import of the same owner is matching (REQ-HANGAR-015).
+   *
+   * @param owner the owner's user id
+   * @return the owner's ships, locked for this transaction, ordered by id
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT s FROM Ship s WHERE s.owner.id = :owner ORDER BY s.id")
+  List<Ship> lockAllOwnedByOrderById(@Param("owner") UUID owner);
+
+  /**
    * Counts a member's ships.
    *
    * @param owner the member
@@ -277,41 +288,6 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * @return {@code true} when the member owns that ship
    */
   boolean existsByIdAndOwnerId(UUID id, UUID ownerId);
-
-  /**
-   * Counts one owner's ships per ship type in a single grouped statement, for the hangar import
-   * (REQ-DATA-003). Types the owner has no ship of are absent from the result.
-   *
-   * @param ownerId the hangar owner
-   * @return one row per ship type the owner holds, with its ship count
-   */
-  @Query(
-      """
-      SELECT s.shipType.id AS shipTypeId, COUNT(s) AS shipCount FROM Ship s
-      WHERE s.owner.id = :ownerId GROUP BY s.shipType.id
-      """)
-  List<ShipTypeCount> countShipsPerTypeByOwnerId(@Param("ownerId") UUID ownerId);
-
-  /**
-   * Row of {@link #countShipsPerTypeByOwnerId(UUID)}: a ship type and how many ships of it one
-   * owner holds.
-   */
-  interface ShipTypeCount {
-
-    /**
-     * The ship type the row counts.
-     *
-     * @return the ship type id
-     */
-    UUID getShipTypeId();
-
-    /**
-     * How many ships of that type the owner holds.
-     *
-     * @return the count, at least one
-     */
-    long getShipCount();
-  }
 
   /**
    * Derived Spring-Data query - returns entities matching {@code OwnerId}. Eagerly fetches the

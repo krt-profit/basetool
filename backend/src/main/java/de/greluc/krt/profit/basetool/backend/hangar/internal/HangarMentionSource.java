@@ -27,7 +27,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * The hangar's part of the person search: the columns of ship names that can name a person, and
- * those left out (REQ-SEC-060).
+ * those left out because they hold codes from an import (REQ-SEC-060, REQ-HANGAR-015).
  */
 @Component
 public class HangarMentionSource implements PersonMentionSource {
@@ -39,6 +39,7 @@ public class HangarMentionSource implements PersonMentionSource {
 
   @Override
   public @NotNull Set<String> exemptColumns() {
-    return Set.of("ship.insurance");
+    return Set.of(
+        "ship.insurance", "ship.production_status", "ship.pledge_id", "ship.pledge_cost_currency");
   }
 }

@@ -38,6 +38,7 @@ worth reading even if you know the domain.
 | **Qualitätsstufe** | A catalogue tier a material requirement is stated in — a code, a floor (0–1000) and two labels, maintained by an administrator. „Keine" (floor 0) accepts any stock, „Gut (650+)" only 650 and up. An order's linked stock counts toward exactly one of its tiers (REQ-ORDERS-036/037, ADR-0241). |
 | **Lager** | The warehouse — org-scoped, append-only stock: book in/out, **umbuchen** (transfer), earmark to orders and missions. |
 | **Umbuchen** | Transferring stock, individually or for a whole marked selection at once. |
+| **Pledge** | An RSI purchase in a member's hangar, one or more ships plus extras, with an id, a date, a price and whether it can be melted or gifted. An imported ship carries its pledge data, shown only to its owner and to admins (REQ-HANGAR-015, ADR-0295). |
 | **Gestohlen** | The marker on Lager stock that is stolen cargo (REQ-INV-053). Part of the stack identity, so stolen and legitimate stock never share a stack or merge; carried by every move, shown as a danger chip wherever stock appears, and gated by a server switch until the app release that shows it. |
 | **Materialbörse** | The org-wide exchange board. **Angebote** are offers of owned stock; **Gesuche** are requests, optionally with a minimum quality and a desired quantity. |
 | **Raffinerie** | Refinery — job orders, material handovers and the planet-aware materials matrix. |

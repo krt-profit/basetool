@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.hangar.model;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.LocationDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.ShipTypeDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.BackendEnumAsString;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import java.util.UUID;
@@ -39,6 +40,9 @@ import java.util.UUID;
  * @param owningSquadron the owning org unit, or {@code null} for none
  * @param version the row version, echoed on an edit of the ship's fields
  * @param owningOrgUnitVersion the unit counter, echoed on an org-unit change (ADR-0258)
+ * @param productionStatus the imported production status ({@code FLIGHT_READY}, {@code IN_CONCEPT}
+ *     or {@code IN_PRODUCTION}), or {@code null}
+ * @param pledge the imported pledge data, or {@code null} when none was imported or not disclosed
  */
 @DtoMirror
 public record ShipDto(
@@ -51,4 +55,6 @@ public record ShipDto(
     UserDto owner,
     SquadronReferenceDto owningSquadron,
     Long version,
-    Long owningOrgUnitVersion) {}
+    Long owningOrgUnitVersion,
+    @BackendEnumAsString String productionStatus,
+    ShipPledgeDto pledge) {}

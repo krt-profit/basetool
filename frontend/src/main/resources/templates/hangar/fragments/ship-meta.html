@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="shipMeta(ship)">
+    <span class="hangar-row__meta" th:if="${ship.productionStatus != null or ship.pledge != null}">
+        <span th:if="${ship.productionStatus != null}" class="chip" data-testid="hangar-ship-production"
+              th:classappend="${ship.productionStatus == 'IN_CONCEPT'} ? 'chip--warning' : (${ship.productionStatus == 'IN_PRODUCTION'} ? 'chip--info' : 'chip--success')"
+              th:text="#{${'hangar.ship.production.' + ship.productionStatus}}">Flugf&auml;hig</span>
+        <span th:if="${ship.pledge != null}" class="hangar-row__pledge" data-testid="hangar-ship-pledge"
+              th:with="p=${ship.pledge}"><span th:text="#{hangar.ship.pledge.id(${p.pledgeId})}">Pledge #113735507</span><span
+              th:if="${p.pledgeDate != null}" th:text="' · ' + ${#temporals.format(p.pledgeDate, #messages.msg('format.date'))}"> · 14.10.2026</span><span
+              th:if="${p.pledgeCost != null}" th:text="' · ' + ${#numbers.formatDecimal(p.pledgeCost, 1, 'DEFAULT', 2, 'DEFAULT')} + (${p.pledgeCostCurrency != null} ? ' ' + ${p.pledgeCostCurrency} : '')"> · 275,00 USD</span><span
+              th:if="${p.meltable != null}" th:text="' · ' + (${p.meltable} ? #{hangar.ship.pledge.meltable} : #{hangar.ship.pledge.notMeltable})"> · schmelzbar</span><span
+              th:if="${p.giftable != null}" th:text="' · ' + (${p.giftable} ? #{hangar.ship.pledge.giftable} : #{hangar.ship.pledge.notGiftable})"> · verschenkbar</span></span>
+    </span>
+</th:block>
+</body>
+</html>
