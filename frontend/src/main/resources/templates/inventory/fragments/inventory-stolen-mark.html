@@ -33,7 +33,7 @@
                 <th:block th:replace="~{kernel/fragments/scu-hint :: scuHint('stolen-mark-scu-hint', true)}"></th:block>
             </label>
             <div class="flex-gap-sm">
-                <input type="text" inputmode="decimal" data-scu-decimal id="stolenMarkAmount" step="0.001" min="0" required class="w-full" data-testid="stolen-mark-amount">
+                <input type="text" inputmode="decimal" data-number-input data-scu-decimal id="stolenMarkAmount" step="0.001" min="0" required class="w-full" data-testid="stolen-mark-amount">
                 <span id="stolenMarkAmountOfText" class="lager-amount-of" th:data-template="#{inventory.bookout.amount.of('{0}')}"></span>
                 <button type="button" class="btn btn-ghost btn-xs" th:data-trigger="${prefix + '-stolen-all'}" data-testid="stolen-mark-all" th:text="#{inventory.stolen.all}">Alles</button>
             </div>

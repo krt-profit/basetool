@@ -94,9 +94,9 @@
                     <div class="form-group">
                         <label for="durationHours" th:text="#{refineryorder.form.duration}">Dauer</label>
                         <div class="rod-duration">
-                            <input type="number" id="durationHours" th:field="*{durationHours}" required min="0" step="1" inputmode="numeric" th:placeholder="#{refineryorder.form.duration.hours}" th:aria-label="#{refineryorder.form.duration.hours}" th:readonly="${!canEdit}">
+                            <input type="text" data-number-input id="durationHours" th:field="*{durationHours}" required min="0" step="1" inputmode="numeric" th:placeholder="#{refineryorder.form.duration.hours}" th:aria-label="#{refineryorder.form.duration.hours}" th:readonly="${!canEdit}">
                             <span class="rod-unit" aria-hidden="true" th:text="#{refineryorder.form.duration.hours}">h</span>
-                            <input type="number" id="durationMinutes" th:field="*{durationMinutes}" required min="0" max="59" step="1" inputmode="numeric" th:placeholder="#{refineryorder.form.duration.minutes}" th:aria-label="#{refineryorder.form.duration.minutes}" th:readonly="${!canEdit}">
+                            <input type="text" data-number-input id="durationMinutes" th:field="*{durationMinutes}" required min="0" max="59" step="1" inputmode="numeric" th:placeholder="#{refineryorder.form.duration.minutes}" th:aria-label="#{refineryorder.form.duration.minutes}" th:readonly="${!canEdit}">
                             <span class="rod-unit" aria-hidden="true" th:text="#{refineryorder.form.duration.minutes}">min</span>
                         </div>
                     </div>
@@ -130,11 +130,11 @@
                         </div>
                         <div class="form-group">
                             <label class="rod-good__label" th:for="'quality_' + ${stat.index}"><span class="rod-good__label-text" th:text="#{refineryorder.form.material.quality}">Qualität</span></label>
-                            <input type="number" th:id="'quality_' + ${stat.index}" th:field="*{goods[__${stat.index}__].quality}" min="0" max="1000" required th:readonly="${!canEdit}">
+                            <input type="text" data-number-input th:id="'quality_' + ${stat.index}" th:field="*{goods[__${stat.index}__].quality}" min="0" max="1000" required th:readonly="${!canEdit}">
                         </div>
                         <div class="form-group">
                             <label class="rod-good__label" th:for="'inputQuantity_' + ${stat.index}"><span class="rod-good__label-text" th:text="#{refineryorder.form.material.inputQty}">Eingangsmenge (Units)</span></label>
-                            <input type="text" inputmode="numeric" class="rod-num" th:id="'inputQuantity_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputQuantity}" th:readonly="${!canEdit}">
+                            <input type="text" inputmode="numeric" class="rod-num" data-number-input min="0" th:id="'inputQuantity_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputQuantity}" th:readonly="${!canEdit}">
                         </div>
                         <span class="rod-good__arrow" aria-hidden="true"><svg class="krt-icon"><use href="#krt-icon-arrow-right"/></svg></span>
                         <div class="form-group rod-good__out">
@@ -152,11 +152,11 @@
                                       th:title="#{refineryorder.form.material.yieldBonus.help}"
                                       th:text="${(bonus > 0 ? '+' : '') + bonus + '%'}">+5%</span>
                             </label>
-                            <input type="text" inputmode="numeric" class="rod-num" th:id="'outputQuantity_' + ${stat.index}" th:field="*{goods[__${stat.index}__].outputQuantity}" th:data-index="${stat.index}" data-trigger="rod-calc-scu" required th:readonly="${!canEdit}">
+                            <input type="text" inputmode="numeric" class="rod-num" data-number-input min="1" th:id="'outputQuantity_' + ${stat.index}" th:field="*{goods[__${stat.index}__].outputQuantity}" th:data-index="${stat.index}" data-trigger="rod-calc-scu" required th:readonly="${!canEdit}">
                         </div>
                         <div class="form-group">
                             <label class="rod-good__label" th:for="'outputQuantityScu_' + ${stat.index}"><span class="rod-good__label-text" th:text="#{refineryorder.form.material.outputQtyScu}">Ausgangsmenge (SCU)</span></label>
-                            <input type="text" class="rod-num rod-good__scu" th:id="'outputQuantityScu_' + ${stat.index}" readonly tabindex="-1">
+                            <input type="text" class="rod-num rod-good__scu" data-number-input min="0" step="0.001" th:id="'outputQuantityScu_' + ${stat.index}" readonly tabindex="-1">
                         </div>
                         <div class="rod-good__actions">
                             <button th:if="${canEdit and stat.index > 0}" type="button" class="btn btn-ghost btn-icon remove-btn" data-trigger="rod-remove-material" th:title="#{refineryorder.form.material.remove}" th:aria-label="#{refineryorder.form.material.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
@@ -171,17 +171,17 @@
                 <div class="form-grid form-grid--3">
                     <div class="form-group">
                         <label for="expenses" th:text="#{refineryorder.form.expenses}">Auftragskosten</label>
-                        <input type="text" data-auec-input inputmode="numeric" id="expenses" class="rod-num" th:field="*{expenses}" min="0" th:readonly="${!canEdit}" data-trigger="rod-update-profit">
+                        <input type="text" data-number-input inputmode="numeric" id="expenses" class="rod-num" th:field="*{expenses}" min="0" th:readonly="${!canEdit}" data-trigger="rod-update-profit">
                     </div>
                     <div class="form-group">
                         <label for="otherExpenses" th:text="#{refineryorder.form.otherExpenses}">Sonstige Kosten</label>
-                        <input type="text" data-auec-input inputmode="numeric" id="otherExpenses" class="rod-num" th:field="*{otherExpenses}" min="0" step="1"
+                        <input type="text" data-number-input inputmode="numeric" id="otherExpenses" class="rod-num" th:field="*{otherExpenses}" min="0" step="1"
                                th:title="#{refineryorder.form.otherExpenses.help}"
                                th:readonly="${!canEdit}" data-trigger="rod-update-profit">
                     </div>
                     <div class="form-group">
                         <label for="oreSales" th:text="#{refineryorder.form.oreSales}">Ore Sales</label>
-                        <input type="text" data-auec-input inputmode="numeric" id="oreSales" class="rod-num" th:field="*{oreSales}" min="0" step="1" th:readonly="${!canEdit}" data-trigger="rod-update-profit">
+                        <input type="text" data-number-input inputmode="numeric" id="oreSales" class="rod-num" th:field="*{oreSales}" min="0" step="1" th:readonly="${!canEdit}" data-trigger="rod-update-profit">
                     </div>
                 </div>
             </fieldset>
@@ -316,11 +316,11 @@
                                         <th:block th:replace="~{kernel/fragments/scu-hint :: scuHint(null, false)}"></th:block>
                                     </th:block>
                                 </label>
-                                <input type="text" data-scu-decimal th:id="'storeAmount_' + ${stat.index}" th:field="*{items[__${stat.index}__].amount}" th:step="*{items[__${stat.index}__].quantityType == 'PIECE' ? '1' : '0.001'}" min="0" inputmode="decimal" required>
+                                <input type="text" data-number-input data-scu-decimal th:id="'storeAmount_' + ${stat.index}" th:field="*{items[__${stat.index}__].amount}" th:step="*{items[__${stat.index}__].quantityType == 'PIECE' ? '1' : '0.001'}" min="0" inputmode="decimal" required>
                             </div>
                             <div class="form-group">
                                 <label th:for="'storeQuality_' + ${stat.index}" th:text="#{inventory.form.quality}">Qualität</label>
-                                <input type="number" th:id="'storeQuality_' + ${stat.index}" th:field="*{items[__${stat.index}__].quality}" required min="0" max="1000">
+                                <input type="text" data-number-input th:id="'storeQuality_' + ${stat.index}" th:field="*{items[__${stat.index}__].quality}" required min="0" max="1000">
                             </div>
                             <div class="form-group">
                                 <label th:for="'storeLocation_' + ${stat.index}" th:text="#{inventory.form.location}">Lagerort</label>

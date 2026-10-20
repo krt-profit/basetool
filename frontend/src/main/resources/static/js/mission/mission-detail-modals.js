@@ -477,16 +477,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    /** @type {NodeListOf<HTMLInputElement>} */ (document.querySelectorAll('.freq-input')).forEach(
-        (input) => {
-            input.addEventListener('input', function () {
-                if (this.value.indexOf(',') !== -1) {
-                    this.value = this.value.replace(/,/g, '.');
-                }
-            });
-        },
-    );
-
     const frequencyModal = document.getElementById('frequency-modal');
     const frequencyForm = /** @type {HTMLFormElement} */ (
         document.getElementById('frequency-form')

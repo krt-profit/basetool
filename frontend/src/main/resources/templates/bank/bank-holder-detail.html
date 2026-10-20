@@ -42,7 +42,7 @@
             <h2 class="bank-holder-calc__title" th:text="#{bank.holder.calc.title}">Kontostand-Aufteilung</h2>
             <div class="bank-form-row bank-holder-calc__input">
                 <label for="bank-holder-balance-input" th:text="#{bank.holder.calc.balance}">Aktueller Kontostand (aUEC)</label>
-                <input type="text" data-auec-input id="bank-holder-balance-input" min="0" step="1" inputmode="numeric"
+                <input type="text" data-number-input id="bank-holder-balance-input" min="0" step="1" inputmode="numeric"
                        data-balance-input data-testid="bank-holder-balance-input">
                 <span class="bank-field-hint" th:text="#{bank.holder.calc.hint}">Trag deinen aktuellen Kontostand ein.</span>
             </div>

@@ -848,7 +848,7 @@
                             <span data-role="amount-unit"></span>
                             <th:block th:replace="~{kernel/fragments/scu-hint :: scuHint(null, true)}"></th:block>
                         </label>
-                        <input class="w-full" type="text" inputmode="decimal" data-scu-decimal step="0.001" data-role="material-amount" th:field="*{materials[__${stat.index}__].amount}" min="0.001" required>
+                        <input class="w-full" type="text" inputmode="decimal" data-number-input data-scu-decimal step="0.001" data-role="material-amount" th:field="*{materials[__${stat.index}__].amount}" min="0.001" required>
                     </div>
                     <div>
                         <button type="button" class="btn btn-quiet-danger btn-icon remove-material-btn" th:title="#{orders.detail.material.remove}" th:aria-label="#{orders.detail.material.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
@@ -876,7 +876,7 @@
                             <span data-role="amount-unit"></span>
                             <th:block th:replace="~{kernel/fragments/scu-hint :: scuHint(null, true)}"></th:block>
                         </label>
-                        <input class="w-full" type="text" inputmode="decimal" data-scu-decimal step="0.001" data-role="material-amount" name="materials[0].amount" min="0.001" required>
+                        <input class="w-full" type="text" inputmode="decimal" data-number-input data-scu-decimal step="0.001" data-role="material-amount" name="materials[0].amount" min="0.001" required>
                     </div>
                     <div>
                         <button type="button" class="btn btn-quiet-danger btn-icon remove-material-btn" th:title="#{orders.detail.material.remove}" th:aria-label="#{orders.detail.material.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
@@ -941,7 +941,7 @@
                 <span th:text="#{orders.claim.amount}">Menge</span>
                 <th:block th:replace="~{kernel/fragments/scu-hint :: scuHint('claim-scu-hint', true)}"></th:block>
             </label>
-            <input class="w-full" type="text" inputmode="decimal" data-scu-decimal id="claim-amount" step="0.001" min="0.001">
+            <input class="w-full" type="text" inputmode="decimal" data-number-input data-scu-decimal id="claim-amount" step="0.001" min="0.001">
             <small id="claim-open-hint" class="text-muted"></small>
         </div>
         </div>
@@ -1061,7 +1061,7 @@
                     </div>
                     <div>
                         <label class="form-label-sm" th:text="#{orders.detail.itemHandover.amount}">Menge</label>
-                        <input class="w-full" type="number" step="1" min="1" th:max="${outstanding}" th:name="|entries[${stat.index}].amount|" value=""
+                        <input class="w-full" type="text" data-number-input step="1" min="1" th:max="${outstanding}" th:name="|entries[${stat.index}].amount|" value=""
                                th:aria-label="${(item.gameItem != null ? item.gameItem.name() : '-') + ' · ' + #messages.msg('orders.detail.itemHandover.amount')}">
                     </div>
                 </div>
@@ -1084,7 +1084,7 @@
         <div class="krt-form" id="production-form" th:data-order-id="${order.id}" th:data-acting-user-id="${actingUser != null ? actingUser.id : ''}" th:data-acting-user-name="${actingUser != null ? (actingUser.effectiveName != null ? actingUser.effectiveName : actingUser.username) : ''}" th:data-responsible-org-unit-id="${order.responsibleOrgUnit != null ? order.responsibleOrgUnit.id() : ''}">
             <div class="form-group mb-1">
                 <label for="production-amount" class="form-label" th:text="#{orders.detail.production.amount}">Anzahl herstellen</label>
-                <input type="number" id="production-amount" step="1" min="1" value="1" class="w-full">
+                <input type="text" data-number-input id="production-amount" step="1" min="1" value="1" class="w-full">
                 <small class="text-muted" id="production-remaining-hint"></small>
             </div>
             <h3 class="section-title" th:text="#{orders.detail.production.consumption}">Materialverbrauch &amp; Lagerentnahme</h3>

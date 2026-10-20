@@ -131,11 +131,11 @@
                     </div>
                     <div class="form-group">
                         <label for="purchasing-deal-amount" th:text="#{purchasing.deal.amount}">Menge</label>
-                        <input type="number" id="purchasing-deal-amount" min="0.001" step="any" inputmode="decimal" required>
+                        <input type="text" data-number-input id="purchasing-deal-amount" min="0.001" step="any" inputmode="decimal" required>
                     </div>
                     <div class="form-group">
                         <label for="purchasing-deal-price" th:text="#{purchasing.deal.unitPrice}">Einzelpreis (aUEC)</label>
-                        <input type="text" data-auec-input id="purchasing-deal-price" min="1" step="1" inputmode="numeric" required>
+                        <input type="text" data-number-input id="purchasing-deal-price" min="1" step="1" inputmode="numeric" required>
                     </div>
                     <div class="form-group">
                         <label for="purchasing-deal-model" th:text="#{purchasing.deal.paymentModel}">Zahlungsmodell</label>

@@ -40,7 +40,7 @@
                 <div class="mb-modal-amount" data-mb-amount-block>
                     <label class="form-label-sm" for="mb-amount" th:text="#{materialboerse.modal.offeredAmount.label}">Menge anbieten</label>
                     <div class="mb-modal-amount-row">
-                        <input id="mb-amount" data-mb-amount type="number" min="0" step="0.001"
+                        <input id="mb-amount" data-mb-amount type="text" data-number-input min="0" step="0.001"
                                inputmode="decimal" th:aria-label="#{materialboerse.modal.offeredAmount.label}"/>
                         <span class="mb-modal-amount-unit" data-mb-amount-unit th:text="#{material.quantity.scu}">SCU</span>
                         <button type="button" class="btn btn-ghost btn-xs" data-mb-amount-max
@@ -50,7 +50,7 @@
                 </div>
                 <div class="mb-modal-qty" data-mb-qty-block hidden>
                     <label class="form-label-sm" for="mb-item-qty" th:text="#{materialboerse.modal.quantity.label}">Menge (Stück)</label>
-                    <input id="mb-item-qty" type="number" min="1" step="1" inputmode="numeric" data-mb-item-qty
+                    <input id="mb-item-qty" type="text" data-number-input min="1" step="1" inputmode="numeric" data-mb-item-qty
                            th:placeholder="#{materialboerse.modal.quantity.placeholder}"/>
                     <span class="mb-modal-qty-error" data-mb-qty-error hidden th:text="#{materialboerse.modal.quantity.invalid}">Bitte eine Menge angeben.</span>
                 </div>

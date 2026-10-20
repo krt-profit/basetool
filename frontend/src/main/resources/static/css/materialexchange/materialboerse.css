@@ -56,7 +56,7 @@
     .mb-modal-qty[hidden] {
         display: none;
     }
-    .mb-modal-qty input[type='number'] {
+    .mb-modal-qty input[data-number-input] {
         width: 140px;
         height: 34px;
         font-variant-numeric: tabular-nums;
@@ -77,7 +77,7 @@
         align-items: center;
         gap: 9px;
     }
-    .mb-modal-amount-row input[type='number'] {
+    .mb-modal-amount-row input[data-number-input] {
         width: 160px;
         height: 34px;
         font-variant-numeric: tabular-nums;

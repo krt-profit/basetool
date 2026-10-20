@@ -128,7 +128,7 @@
 
                 <div class="form-group">
                     <label for="krt-pi-quantity" th:text="#{personalInventory.field.quantity}">Menge</label>
-                    <input id="krt-pi-quantity" type="number" min="1" step="1" inputmode="numeric"
+                    <input id="krt-pi-quantity" type="text" data-number-input min="1" step="1" inputmode="numeric"
                            pattern="[0-9]*" required th:field="*{quantity}"
                            data-trigger="pi-sanitize-quantity">
                 </div>

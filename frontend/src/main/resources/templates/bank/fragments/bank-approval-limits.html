@@ -47,7 +47,7 @@
                           th:attr="data-refresh=${refresh},data-endpoint='/api/proxy/org-units/bank/accounts/{id}/approval-limit/role/' + ${role}"
                           data-method="PUT">
                         <input type="hidden" name="_id" th:value="${acct.id()}">
-                        <input type="text" data-auec-input inputmode="numeric" name="limit" min="0" step="1" required class="bank-limit-input"
+                        <input type="text" data-number-input inputmode="numeric" name="limit" min="0" step="1" required class="bank-limit-input"
                                th:value="${current != null ? @moneyFormat.round(current) : ''}"
                                th:attr="data-testid='bank-limit-role-' + ${role}"
                                th:placeholder="#{bank.approvalLimit.placeholder}">
@@ -74,7 +74,7 @@
                       data-endpoint="/api/proxy/org-units/bank/accounts/{id}/approval-limit/all-members"
                       data-method="PUT">
                     <input type="hidden" name="_id" th:value="${acct.id()}">
-                    <input type="text" data-auec-input inputmode="numeric" name="limit" min="0" step="1" required class="bank-limit-input"
+                    <input type="text" data-number-input inputmode="numeric" name="limit" min="0" step="1" required class="bank-limit-input"
                            th:value="${current != null ? @moneyFormat.round(current) : ''}"
                            data-testid="bank-limit-all-members" th:placeholder="#{bank.approvalLimit.placeholder}">
                     <button type="submit" class="btn btn-xs btn-outline"
@@ -100,7 +100,7 @@
                       data-endpoint="/api/proxy/org-units/bank/accounts/{id}/approval-limit/area-members"
                       data-method="PUT">
                     <input type="hidden" name="_id" th:value="${acct.id()}">
-                    <input type="text" data-auec-input inputmode="numeric" name="limit" min="0" step="1" required class="bank-limit-input"
+                    <input type="text" data-number-input inputmode="numeric" name="limit" min="0" step="1" required class="bank-limit-input"
                            th:value="${current != null ? @moneyFormat.round(current) : ''}"
                            data-testid="bank-limit-area-members" th:placeholder="#{bank.approvalLimit.placeholder}">
                     <button type="submit" class="btn btn-xs btn-outline"
@@ -150,7 +150,7 @@
                 </div>
                 <div class="bank-form-row">
                     <label for="bank-limit-user-amount" th:text="#{bank.approvalLimit.field.amount}">Limit (aUEC)</label>
-                    <input type="text" data-auec-input inputmode="numeric" id="bank-limit-user-amount" name="limit" min="0" step="1" required
+                    <input type="text" data-number-input inputmode="numeric" id="bank-limit-user-amount" name="limit" min="0" step="1" required
                            data-testid="bank-limit-user-amount" th:placeholder="#{bank.approvalLimit.placeholder}">
                 </div>
                 <button type="submit" class="btn btn-outline" data-testid="bank-limit-user-add"

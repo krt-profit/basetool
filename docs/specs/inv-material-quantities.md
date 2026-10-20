@@ -17,19 +17,18 @@ spec ([`ui-design-system.md`](ui-design-system.md)); amounts are persisted per
 
 ## Requirements
 
-### REQ-INV-042 — SCU amounts: positive, ≤ 3 decimals, either separator
+### REQ-INV-042 — SCU amounts: positive, ≤ 3 decimals, separators of the page language
 
 > **Renumbered 2026-09-22:** this requirement was `REQ-INV-001` until 2026-09-22; that id also named the append-only stock-entry rule in [`inventory-lager.md`](inventory-lager.md), which keeps it.
 
 A material whose quantity type is `SCU` is measured in **0.001** increments (microSCU). Every field
 that takes an amount of an SCU material accepts a **positive (> 0) decimal** with **at most three
-decimal places** (input `step` = `0.001`). The decimal separator may be typed as **either `.` or
-`,`** regardless of browser locale and is **normalised internally** to a canonical dot value before
-it leaves the field — a native `<input type="number">` only accepts the browser-locale separator,
-which is why these fields are `type="text" inputmode="decimal" data-scu-decimal`. A value typed with
-**more than three** decimals is **rounded to three using commercial rounding (round half up)** when
-the field is committed (on blur) and again before submit. The amount must be **> 0**; the one
-exception is the book-out **target stock**, which may be `0` (= "remove all") and opts out via
+decimal places** (input `step` = `0.001`). The field is a number field of REQ-UI-037: it shows and
+takes the **separators of the page language** — `12.345,678` in German, `12,345.678` in English —
+and its value is the canonical dot value (`12345.678`) for every reader and every submit. Typing
+stops at three decimals; a pasted or assigned value with **more than three** decimals is **rounded
+to three using commercial rounding (round half up)**. The amount must be **> 0**; the one exception
+is the book-out **target stock**, which may be `0` (= "remove all") and opts out via
 `data-scu-allow-zero`.
 
 An SCU field may carry an inline decimal-scale **hint** — the focusable `scu-hint` marker whose
@@ -41,18 +40,21 @@ hint unconditionally — the refinery store dialog previously showed it on PIECE
 
 **Acceptance**
 
-- [ ] Both `0,01` and `0.01` are accepted and the form submits `0.01`.
-- [ ] An amount with > 3 decimals is rounded half up to 3 (`0.0015` → `0.002`, `1.2345` → `1.235`, `12.9995` → `13`).
-- [ ] An amount that is `0`, negative, or rounds to `0` (e.g. `0.0004`) is rejected before submit; the book-out target stock may be `0`.
-- [ ] The field carries `step="0.001"` and is `type="text" inputmode="decimal" data-scu-decimal`.
+- [x] `0,01` on a German page and `0.01` on an English page are accepted and the form submits `0.01`.
+- [x] A value with > 3 decimals is rounded half up to 3 (`0.0015` → `0.002`, `1.2345` → `1.235`, `12.9995` → `13`).
+- [x] An amount that is `0`, negative, or rounds to `0` (e.g. `0.0004`) is rejected before submit; the book-out target stock may be `0`.
+- [x] The field carries `step="0.001"` and is `type="text" data-number-input data-scu-decimal`.
 - [ ] The SCU decimal-scale hint (`scu-hint`) renders only on SCU-typed rows — the refinery store dialog shows it for an SCU output material and omits it for a PIECE one.
 
-**Enforced by:** _Client_ — `scu-decimal-input.js` (mode read from the live `step` attribute) +
+**Enforced by:** _Client_ — `krt-number-input.js` (decimals read from the live `step` attribute,
+positivity for `data-scu-decimal`) + `:frontend:testNumberFormatJs` (rounding, separators) +
 `InventoryPageControllerMvcTest` (render-wiring) + `RefineryStoreScuHintRenderTest` (the SCU hint is
 gated to SCU rows only) + web-asset linting (ESLint / HTMLHint / Prettier). _Server_ — see
 [REQ-INV-003](#req-inv-003--server-side-enforcement--scu-scale-storage). **Code:**
-`frontend/.../static/js/kernel/scu-decimal-input.js`, `kernel/fragments/head.html` (`window.krtScuI18n`),
-`kernel/fragments/scu-hint.html`, `refinery/refinery-orders-details.html`. **Issues:** PR #465.
+`frontend/.../static/js/kernel/krt-number-input.js`, `frontend/.../static/js/kernel/krt-number-format.js`,
+`frontend/.../static/js/kernel/scu-decimal-input.js` (the `krtScuInput` parse/round helpers),
+`kernel/fragments/head.html` (`window.krtScuI18n`), `kernel/fragments/scu-hint.html`,
+`refinery/refinery-orders-details.html`. **Issues:** PR #465.
 
 ### REQ-INV-043 — PIECE amounts: positive whole numbers only
 
@@ -60,18 +62,20 @@ gated to SCU rows only) + web-asset linting (ESLint / HTMLHint / Prettier). _Ser
 
 A material whose quantity type is `PIECE` (Stück) is counted in whole units. The same fields, when
 the chosen material is PIECE-typed, accept **only positive whole numbers** (≥ 1): decimal separators
-are **not** accepted (they are stripped as the user types) and fractional or non-positive values are
-rejected before submit. Integer mode is signalled by `step="1"`, which the quantity-type-aware page
-scripts set when a PIECE material is selected.
+are **not** accepted (they are dropped as the user types, while the page language's thousands
+separator is inserted, `1.250` / `1,250`) and non-positive values are rejected before submit.
+Integer mode is signalled by `step="1"`, which the quantity-type-aware page scripts set when a
+PIECE material is selected.
 
 **Acceptance**
 
-- [ ] Only digits can be entered; a typed `.` or `,` is dropped.
-- [ ] A value `< 1` (including `0`) is rejected before submit.
+- [x] Only digits can be entered; a typed `.` or `,` is dropped.
+- [x] A value `< 1` (including `0`) is rejected before submit.
 
-**Enforced by:** _Client_ — `scu-decimal-input.js` (integer mode) + web-asset linting. _Server_ —
-see [REQ-INV-003](#req-inv-003--server-side-enforcement--scu-scale-storage). **Code:**
-`frontend/.../static/js/kernel/scu-decimal-input.js`. **Issues:** PR #465.
+**Enforced by:** _Client_ — `krt-number-input.js` (integer mode from `step="1"`) +
+`:frontend:testNumberFormatJs` + web-asset linting. _Server_ — see
+[REQ-INV-003](#req-inv-003--server-side-enforcement--scu-scale-storage). **Code:**
+`frontend/.../static/js/kernel/krt-number-input.js`. **Issues:** PR #465.
 
 ### REQ-INV-003 — Server-side enforcement & SCU-scale storage
 

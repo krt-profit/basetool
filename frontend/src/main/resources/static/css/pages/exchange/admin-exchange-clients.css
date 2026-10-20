@@ -44,7 +44,7 @@
     }
     .form-group input[type='text'],
     .form-group input[type='url'],
-    .form-group input[type='number'],
+    .form-group input[data-number-input],
     .form-group input[type='datetime-local'],
     .form-group select {
         width: 100%;

@@ -41,7 +41,7 @@
                 </div>
                 <div class="form-group">
                     <label for="quality" th:text="#{inventory.form.quality}">Qualität</label>
-                    <input type="number" id="quality" th:field="*{quality}" min="0" max="1000" value="100" required>
+                    <input type="text" data-number-input id="quality" th:field="*{quality}" min="0" max="1000" value="100" required>
                 </div>
             </div>
 
@@ -65,7 +65,7 @@
             <div class="form-grid">
                 <div class="form-group">
                     <label for="amount"><span th:text="#{inventory.form.amount}">Menge</span> <span id="amount-unit"></span><th:block th:replace="~{kernel/fragments/scu-hint :: scuHint('amount-scu-hint', true)}"></th:block></label>
-                    <input type="text" inputmode="decimal" data-scu-decimal id="amount" th:field="*{amount}" step="0.001" min="0" required>
+                    <input type="text" inputmode="decimal" data-number-input data-scu-decimal id="amount" th:field="*{amount}" step="0.001" min="0" required>
                 </div>
                 <div class="form-group">
                     <label for="locationId" th:text="#{inventory.form.location}">Lagerort</label>
@@ -134,7 +134,7 @@
                             <option value="" th:text="#{inventory.order.none}">-- Kein Auftrag --</option>
                             <option th:each="order : ${jobOrders}" th:value="${order.id}" th:data-materials="${order.requiredMaterialIds != null and !order.requiredMaterialIds.isEmpty() ? #strings.listJoin(order.requiredMaterialIds, ',') : ''}" th:data-game-items="${order.requiredGameItemIds != null and !order.requiredGameItemIds.isEmpty() ? #strings.listJoin(order.requiredGameItemIds, ',') : ''}" th:text="${'#' + order.displayId + ' - ' + @handles.display(order.handle) + ' (' + order.status + ')'}"></option>
                         </select>
-                        <input type="number" class="assoc-menge-input" data-alloc-amount step="0.001" min="0" th:placeholder="#{inventory.assoc.amount}" th:aria-label="#{inventory.assoc.amount}">
+                        <input type="text" data-number-input class="assoc-menge-input" data-alloc-amount step="0.001" min="0" th:placeholder="#{inventory.assoc.amount}" th:aria-label="#{inventory.assoc.amount}">
                         <button type="button" class="btn btn-ghost btn-icon" data-trigger="inv-input-remove-alloc" th:title="#{inventory.assoc.remove}" th:aria-label="#{inventory.assoc.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                     </div>
                 </template>
@@ -157,7 +157,7 @@
                             <option value="" th:text="#{inventory.mission.none}">-- Kein Einsatz --</option>
                             <option th:each="mission : ${missions}" th:value="${mission.id}" th:text="${mission.plannedStartTime != null} ? |${mission.name} - ${#temporals.format(mission.plannedStartTime, #messages.msg('format.date'), #locale)}| : ${mission.name}"></option>
                         </select>
-                        <input type="number" class="assoc-menge-input" data-alloc-amount step="0.001" min="0" th:placeholder="#{inventory.assoc.amount}" th:aria-label="#{inventory.assoc.amount}">
+                        <input type="text" data-number-input class="assoc-menge-input" data-alloc-amount step="0.001" min="0" th:placeholder="#{inventory.assoc.amount}" th:aria-label="#{inventory.assoc.amount}">
                         <button type="button" class="btn btn-ghost btn-icon" data-trigger="inv-input-remove-alloc" th:title="#{inventory.assoc.remove}" th:aria-label="#{inventory.assoc.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                     </div>
                 </template>

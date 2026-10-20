@@ -29,12 +29,12 @@
             </div>
             <div class="form-group">
                 <label for="purchasing-settings-limit" th:text="#{purchasing.admin.defaultLimit}">Monatslimit je Handelsbeauftragtem (aUEC)</label>
-                <input type="text" data-auec-input id="purchasing-settings-limit" min="0" step="1" inputmode="numeric" required
+                <input type="text" data-number-input id="purchasing-settings-limit" min="0" step="1" inputmode="numeric" required
                        th:value="${settings != null ? settings.defaultMonthlyLimit() : 0}" data-testid="purchasing-settings-limit">
             </div>
             <div class="form-group">
                 <label for="purchasing-settings-cap" th:text="#{purchasing.admin.budgetCap}">Budgetdeckel (aUEC, leer = keiner)</label>
-                <input type="text" data-auec-input id="purchasing-settings-cap" min="0" step="1" inputmode="numeric"
+                <input type="text" data-number-input id="purchasing-settings-cap" min="0" step="1" inputmode="numeric"
                        th:value="${settings != null ? settings.budgetCap() : null}">
             </div>
             <div class="form-group">
@@ -47,7 +47,7 @@
             </div>
             <div class="form-group">
                 <label for="purchasing-settings-due" th:text="#{purchasing.admin.dueDays}">Abrechnung f&auml;llig nach (Tagen)</label>
-                <input type="number" id="purchasing-settings-due" min="1" max="90" step="1" inputmode="numeric" required
+                <input type="text" data-number-input id="purchasing-settings-due" min="1" max="90" step="1" inputmode="numeric" required
                        th:value="${settings != null ? settings.settlementDueDays() : 7}">
             </div>
         </fieldset>
@@ -96,10 +96,10 @@
                         <tr th:each="c : ${riskClasses}" th:data-code="${c.code()}" th:data-version="${c.version()}" data-testid="purchasing-class-row">
                             <td th:text="#{'purchasing.deal.riskClass.' + ${c.code()}}">A</td>
                             <td class="num" th:attr="data-label=#{purchasing.admin.class.maxTotal}">
-                                <input type="text" data-auec-input class="purchasing-class-total" min="1" step="1" inputmode="numeric" th:value="${c.maxTotal()}"
+                                <input type="text" data-number-input class="purchasing-class-total" min="1" step="1" inputmode="numeric" th:value="${c.maxTotal()}"
                                        th:attr="aria-label=#{purchasing.admin.class.maxTotal}"></td>
                             <td class="num" th:attr="data-label=#{purchasing.admin.class.advance}">
-                                <input type="number" class="purchasing-class-advance" min="0" max="100" step="1" inputmode="numeric" th:value="${c.maxAdvancePercent()}"
+                                <input type="text" data-number-input class="purchasing-class-advance" min="0" max="100" step="1" inputmode="numeric" th:value="${c.maxAdvancePercent()}"
                                        th:attr="aria-label=#{purchasing.admin.class.advance}"></td>
                             <td th:attr="data-label=#{purchasing.admin.class.known}">
                                 <label class="table-check"><input type="checkbox" class="purchasing-class-known" th:checked="${c.requiresKnownPartner()}"

@@ -217,9 +217,9 @@ class JobOrderProductionE2eTest {
    * gate keeps the book button disabled until one is chosen), and books the manufacture of one
    * unit, awaiting the production POST so the mutation is not dropped.
    *
-   * <p>The allocation is typed with a fourth decimal, below the material's precision: the dialog
-   * must round it before it checks and sends, or the backend refuses the booking with 422
-   * (REQ-ORDERS-025).
+   * <p>The allocation is typed on the German page with a fourth decimal, below the material's
+   * precision: the field must not pass it on, or the backend refuses the booking with 422
+   * (REQ-ORDERS-025, REQ-UI-037).
    *
    * @param page the page to drive
    * @param baseUrl the frontend origin
@@ -232,7 +232,7 @@ class JobOrderProductionE2eTest {
     Locator allocation = page.locator("#production-materials [data-prod-alloc]").first();
     allocation.waitFor();
     page.locator("#production-amount").fill("1");
-    allocation.fill("1.0004");
+    allocation.fill("1,0004");
 
     assertThat(page.locator("#production-book-btn")).isDisabled();
     E2eSupport.selectComboboxFirstOption(

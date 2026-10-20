@@ -2574,42 +2574,60 @@ switch, admin mode) · `NavigationShortcutsE2eTest` (Alt+1 opens favourite 1, Al
 toast on a greyed or empty slot, the „Tastenkürzel" dialog) · **Related:** REQ-UI-026,
 REQ-UI-032, REQ-UI-033, REQ-UI-034, ADR-0297
 
-### REQ-UI-037 — aUEC amount fields show thousands separators while typing
+### REQ-UI-037 — Number fields use the separators of the page language while typing
 
-Every field that takes an aUEC amount shows it the way the pages display amounts — `1.500.000`,
-`1.234,50` — and inserts the separators **while the user types**, without breaking the input.
+Every field that takes a number shows it with the thousands and decimal separators of the page
+language — `1.999.999,0` in German, `1,999,999.0` in English — and inserts them **while the user
+types**, without breaking the input.
 
-- **Which fields.** Every aUEC input is an `<input type="text" data-auec-input>`: the bank and
-  org-unit bank amounts, targets, limits and tier ceilings, the holder balance calculator, the
-  mission finance amounts, the purchasing prices, tranches, settlements and limits, the refinery
-  costs and ore sales, the supply need's maximum price and the Lager sale amount. A field with a
-  whole `step` (or none) takes whole aUEC; `step="0.01"` allows two decimals. Material quantities
-  (SCU/PIECE) stay with REQ-INV-042/-043.
-- **Typing is never interrupted.** `kernel/krt-auec-input.js` reformats on every input event and
-  puts the caret back after the same digit; Backspace or Delete on a separator removes the digit
-  beside it; `.` or `,` typed or pasted into a decimal field starts the fraction; an IME composition
-  is formatted once it ends; other characters are dropped; at most 15 integer digits.
+- **Which fields.** Every number input is an `<input type="text" data-number-input>`; no template or
+  script renders `type="number"`. That covers aUEC amounts (bank, org-unit bank, purchasing,
+  refinery costs and ore sales, mission finance, supply need price, Lager sale amount), material
+  quantities in SCU and pieces (REQ-INV-042/-043, which keep `data-scu-decimal` for their
+  positivity rule), refinery input and output units, qualities, counts, days, percentages, sort
+  orders, ranks, durations, mission frequencies and the rows that page scripts build.
+- **Decimals and sign come from the field.** A whole `step` (or none) takes whole numbers;
+  `step="0.01"` two decimals, `step="0.001"` three, `step="any"` three, so an SCU amount can always
+  carry three decimals. A minus sign is accepted only when `min` is absent or negative. A field
+  whose `step`, `min` or `max` a script changes is re-read at once.
+- **Separators follow the language.** `kernel/krt-number-input.js` reads them from
+  `<html lang>` through `Intl.NumberFormat`. Only the language's decimal separator starts the
+  fraction; its group separator is dropped wherever it is typed, so `1,000` typed into an English
+  decimal field stays one thousand. A pasted number written with the other convention (`1234.56`
+  pasted into a German field) is read by its decimal point when one or two digits follow the only
+  separator.
+- **Typing is never interrupted.** The field reformats on every input event and puts the caret
+  back after the same digit; Backspace or Delete on a separator removes the digit beside it; an IME
+  composition is formatted once it ends; other characters are dropped; at most 15 integer digits.
+  Typing stops at the field's decimals; a pasted or assigned number with more is rounded half up
+  (REQ-INV-042).
 - **Readers see the canonical value.** The field's `value` and `valueAsNumber` return the
-  canonical amount (`1500000`, `1234.5`), assigning `value` formats it, and every `FormData` built
-  from the form — a native submit included — carries the canonical value, so no page script, proxy
-  or controller parses a grouped string.
-- **Validation.** `required` stays native; `min`, `max` and a whole `step` are checked on the
-  canonical value with localized messages (`money.validation.*`).
-- **Dynamic markup.** Fields in fragments swapped in later are enhanced as they appear; a form
+  canonical number (`1999999`, `-3`, `1234.5`), assigning `value` formats it, and every `FormData`
+  built from the form — a native submit included — carries the canonical value, so no page script,
+  proxy or controller parses a grouped or localized string.
+- **Validation.** `required` stays native; a whole `step`, `min` and `max` are checked on the
+  canonical value with localized messages (`number.validation.*`), the bound shown in the page
+  language; an SCU or piece field checks positivity instead (REQ-INV-042/-043).
+- **Dynamic markup.** Fields in fragments swapped in later or built by a script are enhanced as they
+  appear; a script that builds one and sets its value calls `krtNumberInput.enhance` first; a form
   reset re-formats them.
 
 **Acceptance**
 
-- [x] Typing `1234567` shows `1.234.567`; inserting a digit in the middle keeps the caret after it;
-  Backspace after a separator removes the digit before it.
-- [x] `value`, `FormData` and a native GET submit carry `1234567`; a decimal field typed `12000.5`
-  shows `12.000,5` and sends `12000.5`.
-- [x] `0` in a field with `min="1"` and `1500,5` in a whole field are invalid with the localized
-  message.
+- [x] Typing `1999999,0` on a German page shows `1.999.999,0`, `1999999.0` on an English page shows
+  `1,999,999.0`; both send `1999999.0`.
+- [x] An SCU field takes `12.345,678` (German) or `12,345.678` (English) and sends `12345.678`.
+- [x] Inserting a digit in the middle keeps the caret after it; Backspace after a separator removes
+  the digit before it.
+- [x] A sort-order field without `min` takes `-1.234`; a field with `min="0"` drops the minus.
+- [x] `value`, `FormData` and a native GET submit carry the canonical value.
+- [x] `0` in a field with `min="1"`, `1500,5` in a whole field and `0` in an SCU field are invalid
+  with the localized message.
 
-**Enforced by:** `:frontend:testAuecFormatJs` (grouping, decimals, caret, separator deletes) ·
-**Code:** `static/js/kernel/krt-auec-format.js`, `static/js/kernel/krt-auec-input.js`,
-`kernel/fragments/head.html` · **Related:** REQ-BANK-065, REQ-INV-042, REQ-FE-018
+**Enforced by:** `:frontend:testNumberFormatJs` (separators per language, sign, decimals, rounding,
+caret, separator deletes) · **Code:** `static/js/kernel/krt-number-format.js`,
+`static/js/kernel/krt-number-input.js`, `kernel/fragments/head.html` · **Related:** REQ-BANK-065,
+REQ-INV-042, REQ-INV-043, REQ-NOTIF-031, REQ-FE-018, ADR-0305
 
 ## Out of scope
 
@@ -2618,7 +2636,7 @@ the design skill `assets/`; this spec governs only *where the app applies them* 
 desktop SC Extractor's GUI design lives in
 [`docs/archive/DESIGN_SC_EXTRACTOR.md`](../archive/DESIGN_SC_EXTRACTOR.md).
 
-**Material-amount input fields** (SCU/PIECE precision, positivity, the `.`/`,` separator) are
+**Material-amount input fields** (SCU/PIECE precision, rounding, positivity) are
 cross-cutting (inventory, orders, refinery), so their rules live in their own spec —
 [`inv-material-quantities.md`](inv-material-quantities.md) (REQ-INV-042 / REQ-INV-043) — not here.
 This spec still governs how those fields *look*.

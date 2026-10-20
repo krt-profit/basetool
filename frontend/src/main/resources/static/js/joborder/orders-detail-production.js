@@ -548,7 +548,7 @@ function _renderProdMaterialEntries(card, mat) {
         )}${chips} <small>${MSG_QUALITY} ${String(e.quality)} · ${PRODUCTION_I18N.available} ${_prodFmtQty(
             cap,
             mat.quantityType,
-        )}</small></div><input type="number" min="0" step="${
+        )}</small></div><input type="text" data-number-input min="0" step="${
             mat.quantityType === 'PIECE' ? '1' : 'any'
         }" value="0" data-prod-alloc data-prod-idx="${idx}"></div>`;
     });

@@ -731,11 +731,11 @@ interface KrtScuInputApi {
     round(value: string): string;
 }
 
-/** The live thousands-separator formatting of aUEC fields installed by `krt-auec-input.js`. */
-interface KrtAuecInputApi {
-    /** Formats one `input[data-auec-input]`; its `value` stays canonical. */
+/** The live, language-dependent formatting of number fields installed by `krt-number-input.js`. */
+interface KrtNumberInputApi {
+    /** Formats one `input[data-number-input]`; its `value` stays canonical. */
     enhance(el: HTMLInputElement): void;
-    /** Formats every `input[data-auec-input]` in a subtree, the root included. */
+    /** Formats every `input[data-number-input]` in a subtree, the root included. */
     enhanceWithin(root: ParentNode | Element): void;
 }
 
@@ -921,8 +921,8 @@ interface Window {
     krtProfileI18n?: KrtI18nDict;
     /** Validation messages of the SCU / piece amount fields, from `fragments/head.html`. */
     krtScuI18n?: KrtI18nDict;
-    /** Validation messages of the aUEC amount fields, from `fragments/head.html`. */
-    krtAuecI18n?: KrtI18nDict;
+    /** Validation messages of the number fields, from `fragments/head.html`. */
+    krtNumberI18n?: KrtI18nDict;
     /** Labels of the Materialbörse page, from `materialboerse.html`. */
     materialboerseI18n?: Record<string, any>;
     /** Labels of the release dialog, from `fragments/materialboerse-modal.html`. */

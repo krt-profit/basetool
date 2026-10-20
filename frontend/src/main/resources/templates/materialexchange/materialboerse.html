@@ -79,12 +79,12 @@
                 <th:block th:ref="mb-filter-body">
                     <div class="form-group">
                         <label for="mb-min-quality" th:text="#{materialboerse.filter.minQuality}">Min. Qualität</label>
-                        <input type="number" id="mb-min-quality" name="minQuality" min="0" max="1000" step="10"
+                        <input type="text" data-number-input id="mb-min-quality" name="minQuality" min="0" max="1000" step="10"
                                data-mb-minquality th:value="${filterMinQuality}" placeholder="0"/>
                     </div>
                     <div class="form-group">
                         <label for="mb-min-amount" th:text="#{materialboerse.filter.minAmount}">Min. Menge</label>
-                        <input type="number" id="mb-min-amount" name="minAmount" min="0" step="1"
+                        <input type="text" data-number-input id="mb-min-amount" name="minAmount" min="0" step="1"
                                data-mb-minamount th:value="${filterMinAmount}" placeholder="0"/>
                     </div>
                     <div class="form-group" data-mb-offers-only th:hidden="${activeMode == 'requests'}">

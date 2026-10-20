@@ -158,7 +158,7 @@
             </div>
             <div class="bank-form-row">
                 <label for="org-unit-request-amount" th:text="#{bank.field.amount}">Betrag (aUEC)</label>
-                <input type="text" data-auec-input inputmode="numeric" id="org-unit-request-amount" name="amount" min="1" step="1" required
+                <input type="text" data-number-input inputmode="numeric" id="org-unit-request-amount" name="amount" min="1" step="1" required
                        data-testid="org-unit-request-amount" th:placeholder="#{bank.field.amount.placeholder}">
                 <span class="bank-field-hint" th:text="#{bank.field.amount.hint}">Nur ganze aUEC-Betr&auml;ge.</span>
                 <p class="bank-field-hint bank-deposit-gross" data-deposit-gross hidden
@@ -181,7 +181,7 @@
                 </div>
                 <div class="bank-form-row" data-split-row hidden>
                     <label for="org-unit-request-split-percent" th:text="#{bank.split.percent}">Prozentsatz (%)</label>
-                    <input type="number" id="org-unit-request-split-percent" name="splitPercent"
+                    <input type="text" data-number-input id="org-unit-request-split-percent" name="splitPercent"
                            min="1" max="100" step="1" disabled
                            data-testid="org-unit-request-split-percent" th:placeholder="#{bank.split.percent.placeholder}">
                     <span class="bank-field-hint" th:text="#{bank.split.hint}">Dieser Anteil wird gleichm&auml;&szlig;ig auf alle aktiven Staffelkonten verteilt; das Zielkonto erh&auml;lt den Rest.</span>

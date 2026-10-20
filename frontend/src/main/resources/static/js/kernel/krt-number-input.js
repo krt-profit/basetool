@@ -23,25 +23,30 @@ import {
     caretAfter,
     dropDigitBesideSeparator,
     formatParts,
+    pastedDecimalIndex,
     readCanonical,
     readDisplay,
-    typedDecimalDot,
-} from '/js/kernel/krt-auec-format.js';
+    roundHalfUp,
+    separatorsFor,
+} from '/js/kernel/krt-number-format.js';
 
 /**
  * The state of one enhanced field: the text last written into it and the canonical value of that
  * text.
  *
- * @typedef {{ shown: string, canonical: string }} KrtAuecState
+ * @typedef {{ shown: string, canonical: string }} KrtNumberState
  */
 
-const SELECTOR = 'input[data-auec-input]';
+const SELECTOR = 'input[data-number-input]';
+
+/** The thousands and decimal separators of the page language. */
+const SEPS = separatorsFor(document.documentElement.lang);
 
 const NATIVE_VALUE = /** @type {PropertyDescriptor} */ (
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')
 );
 
-/** @type {WeakMap<HTMLInputElement, KrtAuecState>} */
+/** @type {WeakMap<HTMLInputElement, KrtNumberState>} */
 const states = new WeakMap();
 
 /**
@@ -66,25 +71,6 @@ function writeShown(el, text) {
 }
 
 /**
- * The decimals a field allows, from its `step`: none for a whole step or none given, two for
- * `any`, otherwise the step's own decimals.
- *
- * @param {HTMLInputElement} el the field
- * @returns {number} the allowed decimals
- */
-function fractionDigits(el) {
-    const step = (el.getAttribute('step') || '').trim();
-    if (step === '' || /^\d+$/.test(step)) {
-        return 0;
-    }
-    if (step === 'any') {
-        return 2;
-    }
-    const dot = step.indexOf('.');
-    return dot < 0 ? 0 : step.length - dot - 1;
-}
-
-/**
  * Reads a numeric attribute of a field.
  *
  * @param {HTMLInputElement} el the field
@@ -101,20 +87,45 @@ function numberAttribute(el, name) {
 }
 
 /**
- * Fills a message's `{0}` with an amount in display form.
+ * How a field reads numbers. The decimals come from its `step`: none for a whole step or none
+ * given, three for `any`, otherwise the step's own decimals. A minus sign is allowed when `min` is
+ * absent or negative.
  *
- * @param {string} message the localized message
- * @param {number} bound the amount
- * @param {number} digits the field's allowed decimals
- * @returns {string} the message with the amount
+ * @param {HTMLInputElement} el the field
+ * @returns {{ fractionDigits: number, allowNegative: boolean }} the field's rules
  */
-function withBound(message, bound, digits) {
-    return message.replace('{0}', formatParts(readCanonical(String(bound), digits)));
+function rulesOf(el) {
+    const step = (el.getAttribute('step') || '').trim();
+    let fractionDigits = 0;
+    if (step === 'any') {
+        fractionDigits = 3;
+    } else if (step !== '' && !/^\d+$/.test(step)) {
+        const dot = step.indexOf('.');
+        fractionDigits = dot < 0 ? 0 : step.length - dot - 1;
+    }
+    const min = numberAttribute(el, 'min');
+    return { fractionDigits, allowNegative: min === null || min < 0 };
 }
 
 /**
- * Computes a field's validity message from its canonical value against `min`, `max` and a whole
- * `step`. An empty field is left to `required`.
+ * Fills a message's `{0}` with a number in display form.
+ *
+ * @param {string} message the localized message
+ * @param {number} bound the number
+ * @param {HTMLInputElement} el the field
+ * @returns {string} the message with the number
+ */
+function withBound(message, bound, el) {
+    return message.replace(
+        '{0}',
+        formatParts(readCanonical(String(bound), rulesOf(el), SEPS), SEPS),
+    );
+}
+
+/**
+ * Computes a field's validity message from its canonical value. An SCU or piece amount field
+ * (`data-scu-decimal`) must be positive, or zero or more with `data-scu-allow-zero`; any other
+ * field is checked against a whole `step`, `min` and `max`. An empty field is left to `required`.
  *
  * @param {HTMLInputElement} el the field
  * @param {string} canonical the field's canonical value
@@ -124,39 +135,49 @@ function validityMessage(el, canonical) {
     if (canonical === '') {
         return '';
     }
-    const i18n = window.krtAuecI18n || {};
-    const digits = fractionDigits(el);
     const n = Number(canonical);
-    if (digits === 0 && !Number.isInteger(n)) {
-        return krtI18nText(i18n.whole, 'krtAuecI18n.whole');
+    const whole = rulesOf(el).fractionDigits === 0;
+    if (el.hasAttribute('data-scu-decimal')) {
+        const allowZero = el.hasAttribute('data-scu-allow-zero');
+        if (allowZero ? n >= 0 : n > 0) {
+            return '';
+        }
+        const scu = window.krtScuI18n || {};
+        return whole
+            ? krtI18nText(scu.piece, 'krtScuI18n.piece')
+            : krtI18nText(scu.scu, 'krtScuI18n.scu');
+    }
+    const i18n = window.krtNumberI18n || {};
+    if (whole && !Number.isInteger(n)) {
+        return krtI18nText(i18n.whole, 'krtNumberI18n.whole');
     }
     const min = numberAttribute(el, 'min');
     if (min !== null && n < min) {
-        return withBound(krtI18nText(i18n.min, 'krtAuecI18n.min'), min, digits);
+        return withBound(krtI18nText(i18n.min, 'krtNumberI18n.min'), min, el);
     }
     const max = numberAttribute(el, 'max');
     if (max !== null && n > max) {
-        return withBound(krtI18nText(i18n.max, 'krtAuecI18n.max'), max, digits);
+        return withBound(krtI18nText(i18n.max, 'krtNumberI18n.max'), max, el);
     }
     return '';
 }
 
 /**
- * Shows an amount in a field, keeps its canonical value and refreshes its validity.
+ * Shows a number in a field, keeps its canonical value and refreshes its validity.
  *
  * @param {HTMLInputElement} el the field
- * @param {{ int: string, frac: string | null }} parts the amount
+ * @param {{ neg: boolean, int: string, frac: string | null }} parts the number
  * @param {number | null} significantBeforeCaret where the caret goes, or null to leave it
  */
 function show(el, parts, significantBeforeCaret) {
-    const shown = formatParts(parts);
+    const shown = formatParts(parts, SEPS);
     const canonical = canonicalOf(parts);
     if (shownText(el) !== shown) {
         writeShown(el, shown);
     }
     states.set(el, { shown, canonical });
     if (significantBeforeCaret !== null && el === document.activeElement) {
-        const caret = caretAfter(shown, significantBeforeCaret);
+        const caret = caretAfter(shown, significantBeforeCaret, SEPS);
         try {
             el.setSelectionRange(caret, caret);
         } catch (_e) {}
@@ -165,9 +186,22 @@ function show(el, parts, significantBeforeCaret) {
 }
 
 /**
- * The canonical value of a field. Text this module did not write is read as the server's
- * canonical value when it equals the `value` attribute (a form reset), else as display text (a
- * browser restoring what the user saw).
+ * Reads text this module did not write: the server's canonical value when it equals the `value`
+ * attribute (a form reset), else display text (a browser restoring what the user saw).
+ *
+ * @param {HTMLInputElement} el the field
+ * @param {string} text the shown text
+ * @returns {{ neg: boolean, int: string, frac: string | null }} the number
+ */
+function readForeign(el, text) {
+    const rules = rulesOf(el);
+    return text === el.defaultValue
+        ? readCanonical(text, rules, SEPS)
+        : readDisplay(text, 0, rules, SEPS).parts;
+}
+
+/**
+ * The canonical value of a field.
  *
  * @param {HTMLInputElement} el the field
  * @returns {string} the canonical value
@@ -178,15 +212,13 @@ function canonicalValue(el) {
     if (state && state.shown === text) {
         return state.canonical;
     }
-    const digits = fractionDigits(el);
-    const parts =
-        text === el.defaultValue ? readCanonical(text, digits) : readDisplay(text, 0, digits).parts;
-    return canonicalOf(parts);
+    return canonicalOf(readForeign(el, text));
 }
 
 /**
- * Turns a field into a live-formatted aUEC field: it shows `1.500.000`, while its `value`,
- * `valueAsNumber` and every form entry it contributes stay canonical (`1500000`).
+ * Turns a field into a live-formatted number field: it shows `1.500.000` in German and
+ * `1,500,000` in English, while its `value`, `valueAsNumber` and every form entry it contributes
+ * stay canonical (`1500000`).
  *
  * @param {HTMLInputElement} el the field
  */
@@ -200,7 +232,7 @@ function enhance(el) {
             return canonicalValue(el);
         },
         set(v) {
-            show(el, readCanonical(v, fractionDigits(el)), null);
+            show(el, readCanonical(v, rulesOf(el), SEPS), null);
         },
     });
     Object.defineProperty(el, 'valueAsNumber', {
@@ -210,24 +242,19 @@ function enhance(el) {
             return canonical === '' ? NaN : Number(canonical);
         },
         set(v) {
-            show(el, readCanonical(Number.isFinite(v) ? String(v) : '', fractionDigits(el)), null);
+            show(el, readCanonical(Number.isFinite(v) ? String(v) : '', rulesOf(el), SEPS), null);
         },
     });
-    if (!el.hasAttribute('inputmode')) {
-        el.setAttribute('inputmode', fractionDigits(el) > 0 ? 'decimal' : 'numeric');
+    const rules = rulesOf(el);
+    if (!el.hasAttribute('inputmode') && !rules.allowNegative) {
+        el.setAttribute('inputmode', rules.fractionDigits > 0 ? 'decimal' : 'numeric');
     }
     el.setAttribute('autocomplete', 'off');
-    const digits = fractionDigits(el);
-    const text = shownText(el);
-    show(
-        el,
-        text === el.defaultValue ? readCanonical(text, digits) : readDisplay(text, 0, digits).parts,
-        null,
-    );
+    show(el, readForeign(el, shownText(el)), null);
 }
 
 /**
- * Enhances every aUEC field in a subtree, the root included.
+ * Enhances every number field in a subtree, the root included.
  *
  * @param {ParentNode | Element} root the subtree
  */
@@ -239,7 +266,8 @@ function enhanceWithin(root) {
 }
 
 /**
- * Re-formats an enhanced field whose text changed without an input event, such as a reset.
+ * Re-formats an enhanced field from its canonical value, after its text or its rules changed
+ * without an input event (a reset, a rewritten `value`, `step`, `min` or `max`).
  *
  * @param {HTMLInputElement} el the field
  */
@@ -247,11 +275,7 @@ function resync(el) {
     if (!states.has(el)) {
         return;
     }
-    const state = states.get(el);
-    if (state && state.shown === shownText(el)) {
-        return;
-    }
-    show(el, readCanonical(canonicalValue(el), fractionDigits(el)), null);
+    show(el, readCanonical(canonicalValue(el), rulesOf(el), SEPS), null);
 }
 
 /**
@@ -269,7 +293,7 @@ function onInput(e) {
     if (input.isComposing) {
         return;
     }
-    const digits = fractionDigits(el);
+    const rules = rulesOf(el);
     const before = (states.get(el) || { shown: '' }).shown;
     let text = shownText(el);
     let caret = el.selectionStart === null ? text.length : el.selectionStart;
@@ -280,15 +304,18 @@ function onInput(e) {
             text,
             caret,
             type === 'deleteContentForward',
+            SEPS,
         );
         text = fixed.text;
         caret = fixed.caret;
     }
-    const typedDot =
-        type.startsWith('insert') && (input.data === null || input.data.includes('.'))
-            ? typedDecimalDot(text, digits)
-            : -1;
-    const reading = readDisplay(text, caret, digits, typedDot);
+    const isPaste = type === 'insertFromPaste' || type === 'insertFromDrop';
+    const pasted = isPaste ? pastedDecimalIndex(text, rules.fractionDigits, SEPS) : -1;
+    const reading = readDisplay(text, caret, rules, SEPS, pasted);
+    if (isPaste && reading.extra !== '') {
+        show(el, roundHalfUp(reading.parts, reading.extra), Number.MAX_SAFE_INTEGER);
+        return;
+    }
     show(el, reading.parts, reading.significantBeforeCaret);
 }
 
@@ -305,26 +332,27 @@ function onCompositionEnd(e) {
     enhance(el);
     const text = shownText(el);
     const caret = el.selectionStart === null ? text.length : el.selectionStart;
-    const reading = readDisplay(text, caret, fractionDigits(el));
+    const reading = readDisplay(text, caret, rulesOf(el), SEPS);
     show(el, reading.parts, reading.significantBeforeCaret);
 }
 
 /**
- * Tidies a field when it is committed: a dangling `,` or leading zeros go.
+ * Tidies a field when it is committed: a dangling decimal separator, a lone minus sign or leading
+ * zeros go.
  *
  * @param {Event} e the change event
  */
 function onChange(e) {
     const el = /** @type {HTMLInputElement} */ (e.target);
-    if (!(el instanceof HTMLInputElement) || !el.matches(SELECTOR) || !states.has(el)) {
+    if (!(el instanceof HTMLInputElement) || !el.matches(SELECTOR)) {
         return;
     }
-    show(el, readCanonical(canonicalValue(el), fractionDigits(el)), null);
+    resync(el);
 }
 
 /**
- * Replaces the shown text of every aUEC field in a submitted or serialized form with its canonical
- * value, so the server and every `FormData` reader get `1500000`, never `1.500.000`.
+ * Replaces the shown text of every number field in a submitted or serialized form with its
+ * canonical value, so the server and every `FormData` reader get `1500000`, never `1.500.000`.
  *
  * @param {Event} e the formdata event
  */
@@ -378,8 +406,8 @@ function onReset(e) {
 }
 
 /**
- * Enhances aUEC fields added later (dialogs, fragment swaps) and re-formats one whose `value`
- * attribute was rewritten.
+ * Enhances number fields added later (dialogs, fragment swaps, rows built in script) and
+ * re-formats one whose `value`, `step`, `min` or `max` attribute was rewritten.
  *
  * @param {MutationRecord[]} records the observed mutations
  */
@@ -414,7 +442,7 @@ new MutationObserver(onMutations).observe(document.documentElement, {
     childList: true,
     subtree: true,
     attributes: true,
-    attributeFilter: ['value', 'data-auec-input'],
+    attributeFilter: ['value', 'data-number-input', 'step', 'min', 'max'],
 });
 
-export const krtAuecInput = /** @type {KrtAuecInputApi} */ ({ enhance, enhanceWithin });
+export const krtNumberInput = /** @type {KrtNumberInputApi} */ ({ enhance, enhanceWithin });

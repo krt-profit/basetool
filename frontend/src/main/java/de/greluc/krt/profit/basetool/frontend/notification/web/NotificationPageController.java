@@ -43,6 +43,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.constraints.NotNull;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.text.DecimalFormatSymbols;
 import java.time.Duration;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -508,7 +509,7 @@ public class NotificationPageController {
       for (Map.Entry<String, String> entry : params.entrySet()) {
         String value = entry.getValue() == null ? "" : entry.getValue();
         if (AMOUNT_PARAMETERS.contains(entry.getKey())) {
-          value = groupAmount(value);
+          value = groupAmount(value, locale);
         }
         template = template.replace("{" + entry.getKey() + "}", value);
         if (isCodeParameter(entry.getKey()) && entry.getValue() != null) {
@@ -523,17 +524,21 @@ public class NotificationPageController {
   }
 
   /**
-   * Formats a plain decimal amount with a point between thousands and a comma before the fraction,
-   * as the bank pages show amounts ({@code 1500000} becomes {@code 1.500.000}, {@code 12.50}
-   * becomes {@code 12,50}); any other text is returned unchanged.
+   * Formats a plain decimal amount with the thousands and decimal separators of the member's
+   * language ({@code 1500000} becomes {@code 1.500.000} in German and {@code 1,500,000} in English,
+   * {@code 12.50} becomes {@code 12,50} or {@code 12.50}); any other text is returned unchanged.
    *
    * @param value the stored parameter value
+   * @param locale the member's locale
    * @return the grouped amount, or {@code value} when it is not a plain decimal
    */
-  static String groupAmount(String value) {
+  static String groupAmount(String value, Locale locale) {
     if (!PLAIN_AMOUNT.matcher(value).matches()) {
       return value;
     }
+    DecimalFormatSymbols symbols = DecimalFormatSymbols.getInstance(locale);
+    char groupSeparator = symbols.getGroupingSeparator();
+    char decimalSeparator = symbols.getDecimalSeparator();
     boolean negative = value.startsWith("-");
     String unsigned = negative ? value.substring(1) : value;
     int dot = unsigned.indexOf('.');
@@ -541,12 +546,12 @@ public class NotificationPageController {
     StringBuilder grouped = new StringBuilder(integer.length() + integer.length() / DIGIT_GROUP);
     for (int i = 0; i < integer.length(); i++) {
       if (i > 0 && (integer.length() - i) % DIGIT_GROUP == 0) {
-        grouped.append('.');
+        grouped.append(groupSeparator);
       }
       grouped.append(integer.charAt(i));
     }
     if (dot >= 0) {
-      grouped.append(',').append(unsigned, dot + 1, unsigned.length());
+      grouped.append(decimalSeparator).append(unsigned, dot + 1, unsigned.length());
     }
     return negative ? "-" + grouped : grouped.toString();
   }

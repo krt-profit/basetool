@@ -14,7 +14,7 @@
 
 - **Browser-Erweiterungen: Herkunft an den Client gebunden, kürzere Leerlaufzeit.** Das Ingest-Gateway nimmt eine `chrome-extension://`-Herkunft nur noch mit dem Token des Clients an, für den sie freigegeben ist, und `moz-extension://` nur für Clients mit Firefox-Build; alles andere endet mit `403 ORIGIN_NOT_ALLOWED` (`IRI_EXCHANGE_CORS_EXTENSION_ORIGINS` jetzt als `<clientId>=<origin>`, neu `IRI_EXCHANGE_CORS_FIREFOX_CLIENTS`). Erweiterungs-Clients müssen sich nach 14 statt 30 Tagen ohne Nutzung neu anmelden, und jede Release mit geänderten Manifest-Rechten wird vor der Auslieferung erneut geprüft (REQ-XCH-027, ADR-0304).
 
-- **Tausendertrennzeichen in aUEC-Feldern und Benachrichtigungen.** Alle Eingabefelder für aUEC (Bank, Org-Einheiten-Bank, Einkauf, Raffinerie, Einsatz-Finanzen, Bedarf, Lager-Verkauf) setzen die Trennpunkte schon beim Tippen, ohne die Eingabe zu stören; gesendet wird weiterhin der reine Zahlwert. Beträge in Benachrichtigungen erscheinen als `3.000.000` statt `3000000` (REQ-UI-037, REQ-NOTIF-031, ADR-0305).
+- **Zahlenfelder mit Trennzeichen der Sprache.** Alle Eingabefelder für Zahlen (aUEC-Beträge, SCU- und Stückmengen, Qualität, Anzahlen, Prozent, Frequenzen usw.) setzen Tausender- und Dezimaltrennzeichen schon beim Tippen nach der eingestellten Sprache — `1.999.999,0` auf Deutsch, `1,999,999.0` auf Englisch —, ohne die Eingabe zu stören; SCU-Mengen nehmen weiter drei Nachkommastellen, gesendet wird der reine Zahlwert. Beträge in Benachrichtigungen erscheinen ebenso je Sprache gruppiert (REQ-UI-037, REQ-INV-042, REQ-INV-043, REQ-NOTIF-031, ADR-0305).
 
 ### Fixed
 

@@ -155,7 +155,7 @@ export async function downloadItemHandoverReport(btn) {
  */
 export function validateItemHandoverForm() {
     const inputs = /** @type {NodeListOf<HTMLInputElement>} */ (
-        document.querySelectorAll('#item-handover-modal input[type="number"]')
+        document.querySelectorAll('#item-handover-modal input[data-number-input]')
     );
     for (const inp of inputs) {
         const val = parseInt(inp.value, 10);
@@ -191,7 +191,7 @@ export async function previewHandoverReport(btn) {
     const hasValidItem = Array.from(itemRows).some((row) => {
         const sel = row.querySelector('select');
         const inp = /** @type {HTMLInputElement | null} */ (
-            row.querySelector('input[type="number"]')
+            row.querySelector('input[data-number-input]')
         );
         return sel && sel.value && inp && inp.value;
     });
@@ -219,7 +219,7 @@ export async function previewHandoverReport(btn) {
     document.querySelectorAll('.handover-item-row').forEach((row) => {
         const select = row.querySelector('select');
         const amountInput = /** @type {HTMLInputElement | null} */ (
-            row.querySelector('input[type="number"]')
+            row.querySelector('input[data-number-input]')
         );
         if (select && select.value && amountInput && amountInput.value) {
             const invId = select.value;

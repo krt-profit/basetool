@@ -80,10 +80,10 @@
                     <span class="cell-sub utc-time" th:text="${r.createdAt()}">2026-06-17T14:02:00Z</span>
                 </td>
                 <td class="num">
-                    <span class="bank-req-amount" th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'POINT')} + ' aUEC'">5.000 aUEC</span>
+                    <span class="bank-req-amount" th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'DEFAULT')} + ' aUEC'">5.000 aUEC</span>
                     <span th:if="${pending and r.type() == 'DEPOSIT' and transferFeeRate != null and transferFeeRate.signum() > 0}"
                           class="cell-sub bank-req-gross" data-testid="bank-request-gross"
-                          th:text="#{bank.request.withFee(${#numbers.formatInteger(@moneyFormat.withTransferFee(r.amount(), transferFeeRate), 1, 'POINT')})}">Mit Geb&uuml;hr: 5.025 aUEC</span>
+                          th:text="#{bank.request.withFee(${#numbers.formatInteger(@moneyFormat.withTransferFee(r.amount(), transferFeeRate), 1, 'DEFAULT')})}">Mit Geb&uuml;hr: 5.025 aUEC</span>
                     <span th:if="${pending and approvalOpen}" class="chip chip--warning bank-req-route"
                           data-testid="bank-request-approval-pending"
                           th:text="'&#8594; ' + ${approverLabel}">&#8594; Bankleitung</span>

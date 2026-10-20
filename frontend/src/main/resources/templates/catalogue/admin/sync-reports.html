@@ -80,7 +80,7 @@
                     <p th:text="#{admin.syncReports.delete.help}">Berichte l&ouml;schen, die &auml;lter als die angegebene Anzahl Tage sind.</p>
                     <div class="form-group">
                         <label for="purge-days" th:text="#{admin.syncReports.delete.label}">Berichte &auml;lter als (Tage)</label>
-                        <input type="number" id="purge-days" name="days" min="1" step="1" value="30" required>
+                        <input type="text" data-number-input id="purge-days" name="days" min="1" step="1" value="30" required>
                     </div>
                     <p id="purge-confirm-message" class="m-0"
                        th:data-template="#{admin.syncReports.delete.confirm.message}"

@@ -23,7 +23,7 @@
         font-size: 0.85rem;
         color: var(--color-gray-2-text);
     }
-    .purge-form input[type='number'] {
+    .purge-form input[data-number-input] {
         width: 8rem;
         min-height: 44px;
         padding: 0.5rem;

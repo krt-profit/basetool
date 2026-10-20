@@ -18,6 +18,7 @@
  */
 
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
+import { krtNumberInput } from '/js/kernel/krt-number-input.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 /**
@@ -314,13 +315,15 @@ function buildDimBlock(prefix, dim) {
         name.textContent = tag.name;
 
         const input = document.createElement('input');
-        input.type = 'number';
+        input.type = 'text';
+        input.setAttribute('data-number-input', '');
         input.className = 'herkunft-input';
         input.setAttribute('data-herkunft-input', '');
         input.setAttribute('data-herkunft-target', tag.targetId);
         input.min = '0';
         input.max = String(tag.allocated);
         input.step = dim.isPiece ? '1' : '0.001';
+        krtNumberInput.enhance(input);
         input.value = '0';
         input.setAttribute('inputmode', dim.isPiece ? 'numeric' : 'decimal');
         if (determined) {
