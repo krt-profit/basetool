@@ -1,0 +1,164 @@
+/* DAS KARTELL — Profit Basetool Design System — generated from tokens.json */
+:root, [data-theme="dark"] {
+  --color-primary: #E77E23;
+  --color-white: #ffffff;
+  --color-bg-black: #000000;
+  --color-canvas: #0f0f0f;
+  --color-accent-light: #eeb64b;
+  --color-accent-dark: #c45c00;
+  --color-gray-1: #d1d2d3;
+  --color-gray-2: #8f9399;
+  --color-gray-3: #36373b;
+  --color-gray-4: #282c30;
+  --color-bg-dark-gray: #282c30;
+  --color-surface-input: #1a1d21;
+  --color-control: #373e43;
+  --color-control-hover: #434b51;
+  --color-count-badge: #2f394c;
+  --color-dept-raumueberlegenheit: #37bbc0;
+  --color-dept-forschung: #355ddc;
+  --color-dept-sub-radar: #a3000a;
+  --color-dept-marinekorps: #7a5e96;
+  --color-dept-profit: #239e33;
+  --color-dept-search-rescue: #ffd23f;
+  --color-dept-combat: var(--color-dept-raumueberlegenheit);
+  --color-dept-research: var(--color-dept-forschung);
+  --color-dept-marine: var(--color-dept-marinekorps);
+  --color-danger: #a3000a;
+  --color-success: #239e33;
+  --color-warning: #ffd23f;
+  --color-info: #355ddc;
+  --color-secondary: #ffd23f;
+  --krt-planet-hurston: #3a2519;
+  --krt-planet-hurston-stripe: #7a4a2e;
+  --krt-planet-crusader: #3a2c26;
+  --krt-planet-crusader-stripe: #c97a6a;
+  --krt-planet-arccorp: #3a2c1a;
+  --krt-planet-arccorp-stripe: #b5722b;
+  --krt-planet-microtech: #1f2c3a;
+  --krt-planet-microtech-stripe: #5a8fb8;
+  --krt-planet-pyro-1: #3a3019;
+  --krt-planet-pyro-1-stripe: #b89538;
+  --krt-planet-pyro-2: #2a2018;
+  --krt-planet-pyro-2-stripe: #8a6f4a;
+  --krt-planet-pyro-3: #3a1f1a;
+  --krt-planet-pyro-3-stripe: #b8503a;
+  --krt-planet-pyro-4: #1a2a2a;
+  --krt-planet-pyro-4-stripe: #4a8a8a;
+  --krt-planet-pyro-5: #2a1a2a;
+  --krt-planet-pyro-5-stripe: #8a4a8a;
+  --krt-planet-pyro-6: #2a2a18;
+  --krt-planet-pyro-6-stripe: #8a8a3a;
+  --krt-planet-terra: #1a323a;
+  --krt-planet-terra-stripe: #3a8aa8;
+  --krt-planet-delamar: #262626;
+  --krt-planet-delamar-stripe: #7a7a7a;
+  --krt-planet-hash-0: #3a2020;
+  --krt-planet-hash-0-stripe: #a85050;
+  --krt-planet-hash-1: #3a2c20;
+  --krt-planet-hash-1-stripe: #a87850;
+  --krt-planet-hash-2: #3a3a20;
+  --krt-planet-hash-2-stripe: #a8a850;
+  --krt-planet-hash-3: #2c3a20;
+  --krt-planet-hash-3-stripe: #78a850;
+  --krt-planet-hash-4: #203a20;
+  --krt-planet-hash-4-stripe: #50a850;
+  --krt-planet-hash-5: #203a2c;
+  --krt-planet-hash-5-stripe: #50a878;
+  --krt-planet-hash-6: #203a3a;
+  --krt-planet-hash-6-stripe: #50a8a8;
+  --krt-planet-hash-7: #202c3a;
+  --krt-planet-hash-7-stripe: #5078a8;
+  --krt-planet-hash-8: #20203a;
+  --krt-planet-hash-8-stripe: #5050a8;
+  --krt-planet-hash-9: #2c203a;
+  --krt-planet-hash-9-stripe: #7850a8;
+  --krt-planet-hash-10: #3a203a;
+  --krt-planet-hash-10-stripe: #a850a8;
+  --krt-planet-hash-11: #3a202c;
+  --krt-planet-hash-11-stripe: #a85078;
+  --krt-item-class-military: #8a9455;
+  --krt-item-class-military-text: #c3ca96;
+  --krt-item-class-civilian: #5c84a8;
+  --krt-item-class-civilian-text: #acc5dc;
+  --krt-item-class-industrial: #a8643f;
+  --krt-item-class-industrial-text: #e2b59c;
+  --krt-item-class-stealth: #9c6688;
+  --krt-item-class-stealth-text: #d9b5cb;
+  --krt-item-class-competition: #449c80;
+  --krt-item-class-competition-text: #91d2bc;
+  --color-danger-text: #ff7a70;
+  --color-info-text: #8fb2f5;
+  --color-success-text: #4ccb5c;
+  --color-gray-2-text: #a2a5a9;
+  --action-primary: var(--color-primary);
+  --action-emphasis: var(--color-primary);
+  --action-neutral: var(--color-gray-2);
+  --data-fg: var(--color-white);
+  --surface-canvas: var(--color-canvas);
+  --surface-panel: var(--color-gray-4);
+  --surface-inset: var(--color-canvas);
+  --surface-bar: var(--color-surface-input);
+  --surface-raised: var(--color-gray-3);
+  --control-bg: var(--color-control);
+  --control-bg-hover: var(--color-control-hover);
+  --control-border: var(--color-gray-2);
+  --control-fg: var(--color-gray-1);
+  --control-selected-bg: rgba(231, 126, 35, 0.26);
+  --control-selected-border: var(--color-primary);
+  --control-selected-fg: var(--color-white);
+  --color-danger-hover: #d41a25;
+  --color-success-hover: #2ebc3d;
+  --glow-primary: 0 0 5px rgba(231, 126, 35, 0.3);
+  --glow-primary-lg: 0 0 20px rgba(231, 126, 35, 0.2);
+  --glow-danger-lg: 0 0 20px rgba(163, 0, 10, 0.2);
+  --shadow-drawer: 5px 0 15px rgba(0, 0, 0, 0.5);
+  --shadow-dropdown: 0 8px 16px rgba(0, 0, 0, 0.8);
+}
+:root {
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --touch-target: 44px;
+  --content-max: 1200px;
+  --radius-none: 0;
+  --radius-sm: 4px;
+  --radius-pill: 999px;
+  --fs-h1: 2rem;
+  --fs-h2: 1.5rem;
+  --fs-h3: 1.17rem;
+  --fs-body: 1rem;
+  --fs-sm: 0.9rem;
+  --fs-xs: 0.8rem;
+  --fs-2xs: 0.7rem;
+  --fw-thin: 300;
+  --fw-regular: 400;
+  --fw-bold: 700;
+  --fw-black: 900;
+  --tracking-display: 0.05em;
+  --tracking-overline: 0.15em;
+  --lh-body: 1.5;
+  --font-headline: "Lato", sans-serif;
+  --font-body: "Lato", sans-serif;
+  --font-mono: "Lato", sans-serif;
+}
+.headline-h1 { font-family: var(--font-headline); font-size: 2rem; font-weight: 700; letter-spacing: 0.05em; }
+.headline-h2 { font-family: var(--font-headline); font-size: 1.5rem; font-weight: 700; letter-spacing: 0.05em; }
+.headline-h3 { font-family: var(--font-headline); font-size: 1.17rem; font-weight: 700; letter-spacing: 0.05em; }
+.text-body { font-family: var(--font-body); font-size: 1rem; font-weight: 300; line-height: 1.5; }
+.text-sm { font-family: var(--font-body); font-size: 0.9rem; font-weight: 700; letter-spacing: 0.05em; }
+.text-xs { font-family: var(--font-body); font-size: 0.8rem; font-weight: 700; }
+.text-2xs { font-family: var(--font-body); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.15em; }
+@font-face { font-family: 'Lato'; src: url('fonts/Lato-Thin.woff2') format('woff2'); font-weight: 100; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Lato'; src: url('fonts/Lato-ThinItalic.woff2') format('woff2'); font-weight: 100; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Lato'; src: url('fonts/Lato-Light.woff2') format('woff2'); font-weight: 300; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Lato'; src: url('fonts/Lato-LightItalic.woff2') format('woff2'); font-weight: 300; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Lato'; src: url('fonts/Lato-Regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Lato'; src: url('fonts/Lato-Italic.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Lato'; src: url('fonts/Lato-Bold.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Lato'; src: url('fonts/Lato-BoldItalic.woff2') format('woff2'); font-weight: 700; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Lato'; src: url('fonts/Lato-Black.woff2') format('woff2'); font-weight: 900; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Lato'; src: url('fonts/Lato-BlackItalic.woff2') format('woff2'); font-weight: 900; font-style: italic; font-display: swap; }

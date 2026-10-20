@@ -1,0 +1,1511 @@
+/* ============================================================================
+   DAS KARTELL — Profit Basetool · components/bundle.css
+   ----------------------------------------------------------------------------
+   SELF-CONTAINED stylesheet (no @import): the Design System page inlines this
+   file into every preview frame after tokens.css, so relative @imports cannot
+   resolve there. Content = colors_and_type.css (without its @import of
+   tokens.css) + krt-components.css, concatenated verbatim.
+
+   Those two files stay the editable sources (proposals and the basetool repo
+   link them). When either changes, regenerate this file from them.
+   Consumers: load tokens.css first, then this file.
+   ============================================================================ */
+
+/* ---- from colors_and_type.css ---------------------------------------- */
+:root {
+    color-scheme: dark;
+
+    /* Composite borders (shorthands reference colour tokens — not token values). */
+    --border-hairline: 1px solid var(--color-gray-3);
+    --border-accent: 1px solid var(--color-primary);
+    --border-heading: 2px solid var(--color-primary);
+
+    --measure: 80ch;     /* paragraph max line length (ch is not a token unit) */
+}
+
+/* ============================================================================
+   SEMANTIC ELEMENT DEFAULTS
+   A minimal reset so raw HTML already looks on-brand. Component CSS extends it.
+   ============================================================================ */
+body {
+    background-color: var(--surface-canvas);
+    color: var(--color-gray-1);
+    font-family: var(--font-body);
+    font-weight: var(--fw-thin);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    margin: 0;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-headline);
+    color: var(--color-primary);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-display);
+    font-weight: var(--fw-bold);   /* Lato headlines need weight to read as headings */
+    margin: 0 0 0.5em;
+}
+h1 { font-size: var(--fs-h1); }
+h2 { font-size: var(--fs-h2); }
+h3 { font-size: var(--fs-h3); }
+
+p  { max-width: var(--measure); text-wrap: pretty; }
+
+a {
+    color: var(--color-primary);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+a:hover { color: var(--color-accent-light); }
+
+strong, b { font-weight: var(--fw-bold); }
+code, kbd, samp { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
+
+/* Form labels are neutral, not orange. The accent is reserved for ACTIONS and
+   identity — labels that shout in orange add noise and bury the input values. */
+label {
+    display: block;
+    color: var(--color-gray-1);
+    font-family: var(--font-body);
+    font-weight: var(--fw-bold);
+    font-size: var(--fs-sm);
+    margin-bottom: 0.5rem;
+}
+
+::selection { background: var(--color-primary); color: var(--color-bg-black); }
+
+*, *::before, *::after { box-sizing: border-box; }
+
+/* ----------------------------------------------------------------------------
+   ACCESSIBILITY DEFAULTS
+   A visible keyboard-focus ring for EVERY interactive element (the app only
+   styled input focus before, leaving buttons/links/badges with no visible
+   focus for keyboard users). :focus-visible only shows for keyboard/AT, not
+   mouse clicks, so it doesn't add noise for pointer users. Components may
+   override with their own focus treatment.
+   ---------------------------------------------------------------------------- */
+:where(a, button, [role="button"], [tabindex], summary,
+       input, select, textarea, .btn, .btn-icon):focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+/* On a filled orange CTA the orange-on-orange ring would vanish — switch to a
+   white ring there for contrast. */
+.btn--cta:focus-visible, .btn:not([class*="btn-"]):focus-visible {
+    outline-color: var(--color-white);
+}
+
+/* Respect reduced-motion: neutralise transitions/animations for users who ask
+   for it (vestibular safety). The app uses slide-in drawers + toast motion. */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* ---- from krt-components.css ----------------------------------------- */
+/* ============================================================================
+   DAS KARTELL — Profit Basetool · Component layer
+   Depends on colors_and_type.css (tokens + element defaults).
+   Ported from the live app stylesheet. Square-cornered, dark, HUD-accented.
+   ============================================================================ */
+
+/* ---------------------------------------------------------------- BUTTONS -- */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    min-height: var(--touch-target);
+    background-color: var(--color-primary);
+    color: var(--color-bg-black);
+    font-family: var(--font-body);
+    font-weight: var(--fw-bold);
+    font-size: var(--fs-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease;
+    text-decoration: none;
+}
+.btn:hover { background-color: var(--color-accent-light); color: var(--color-bg-black); }
+
+/* ----------------------------------------------------------------------------
+   ACTION HIERARCHY. Reserve the filled orange accent for the ONE
+   primary action per context; demote routine + destructive actions.
+
+   Ladder, strongest → quietest:
+     .btn.btn--cta      primary, filled orange + bloom   (max 1 per panel)
+     .btn-success       status / state change (green)    (Check-In)
+     .btn-outline       emphasized secondary (orange outline, not filled)
+     .btn-ghost         routine secondary (neutral hairline → orange on hover)
+     .btn-quiet-danger  destructive (transparent → red on hover)
+   ---------------------------------------------------------------------------- */
+
+/* Primary call-to-action: the existing .btn plus a restrained orange bloom
+   (the brand's own elevation idiom) so the single hero action is unmistakable. */
+.btn--cta {
+    box-shadow: var(--glow-primary);
+    font-weight: var(--fw-bold);
+}
+.btn--cta:hover { box-shadow: var(--glow-primary-lg); }
+
+/* Emphasized secondary — orange outline, no fill. For the 2nd-most-important
+   action in a context (e.g. "Crew zuweisen" inside a unit box). */
+.btn-outline {
+    background-color: transparent;
+    color: var(--color-primary);
+    border: 1px solid var(--color-primary);
+}
+.btn-outline:hover {
+    background-color: rgba(231, 126, 35, 0.12);
+    color: var(--color-accent-light);
+    border-color: var(--color-accent-light);
+}
+
+/* Routine secondary — filled neutral control, lights up orange on hover. Use
+   for repeated row actions (Edit, Check-Out), Filter/Reset, toolbar buttons.
+   Control fill + Grau-2 border (≥3:1 on canvas and panel). */
+.btn-ghost {
+    background-color: var(--control-bg);
+    color: var(--control-fg);
+    border: 1px solid var(--control-border);
+}
+.btn-ghost:hover {
+    background-color: rgba(231, 126, 35, 0.07);
+    color: var(--color-accent-light);
+    border-color: var(--color-primary);
+}
+
+/* Destructive, quiet — only commits to red on hover. Same control fill/border
+   as ghost so it is recognisable as a button; text in the muted text tint. */
+.btn-quiet-danger {
+    background-color: var(--control-bg);
+    color: var(--color-gray-2-text);
+    border: 1px solid var(--control-border);
+}
+.btn-quiet-danger:hover {
+    background-color: rgba(163, 0, 10, 0.12);
+    color: var(--color-danger-text);
+    border-color: var(--color-danger);
+}
+
+.btn-secondary { background-color: var(--color-gray-3); color: var(--color-gray-1); border: 1px solid var(--control-border); }
+/* hover: orange border, white text */
+.btn-secondary:hover { background-color: var(--color-gray-3); color: var(--color-white); border-color: var(--color-primary); }
+
+.btn-danger { background-color: var(--color-danger); color: #fff; }
+.btn-danger:hover { background-color: var(--color-danger-hover); }
+
+.btn-success { background-color: var(--color-success); color: #fff; }
+.btn-success:hover { background-color: var(--color-success-hover); }
+
+.btn-outline-danger {
+    background-color: rgba(163, 0, 10, 0.1);
+    border: 1px solid var(--color-danger);
+    color: var(--color-danger-text);
+}
+.btn-outline-danger:hover { background-color: rgba(163, 0, 10, 0.2); }
+
+.btn:disabled, .btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+
+/* --------------------------------------------------------- PANEL HEADER -- */
+/* Calmer alternative to a full-orange bordered header. Surface fill + a single
+   orange left-accent bar + a light heading; orange is kept for the chevron and
+   the active/hover state only. Use for collapsible section headers so the
+   accent isn't spent on every panel frame. */
+.panel-header {
+    all: unset;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    width: 100%;
+    min-height: var(--touch-target);
+    padding: 0.8rem 1rem;
+    background-color: var(--color-surface-input);
+    border: 1px solid var(--color-gray-3);
+    border-left: 4px solid var(--color-primary);
+    cursor: pointer;
+    font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
+    color: var(--color-gray-1);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: background-color 0.2s ease;
+}
+.panel-header:hover { background-color: var(--color-gray-3); }
+.panel-header:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.panel-header h2, .panel-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--color-white);
+    font-family: var(--font-headline);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.panel-header .panel-count { color: var(--color-primary); font-family: var(--font-body); font-weight: var(--fw-bold); margin-left: 0.5rem; }
+.panel-header .toggle-icon { color: var(--color-primary); flex: 0 0 auto; }
+
+/* Data value — mission-critical readouts (names, frequencies, IDs) should read
+   as bright neutral DATA, not as an action. Orange is reserved for action +
+   identity, never for plain values. */
+.data-value {
+    color: var(--color-white);
+    font-weight: var(--fw-bold);
+    background-color: var(--color-surface-input);
+    border: 1px solid var(--color-gray-3);
+    padding: 0.2rem 0.55rem;
+}
+.data-value--mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* --------------------------------------------------------------- HUD BOX -- */
+/* The signature container: thin border + two diagonal corner brackets.       */
+.hud-box {
+    border: var(--border-hairline);
+    position: relative;
+    padding: 1rem;
+    background-color: var(--surface-panel);
+}
+.hud-box::before,
+.hud-box::after {
+    content: '';
+    position: absolute;
+    width: 10px; height: 10px;
+}
+.hud-box::before {
+    top: -1px; left: -1px;
+    border-top: 2px solid var(--color-primary);
+    border-left: 2px solid var(--color-primary);
+}
+.hud-box::after {
+    bottom: -1px; right: -1px;
+    border-bottom: 2px solid var(--color-primary);
+    border-right: 2px solid var(--color-primary);
+}
+
+/* Greeting block — page-title banner with a left accent bar + fade. */
+.greeting {
+    margin-bottom: 2rem;
+    border-left: 4px solid var(--color-primary);
+    padding: 0.5rem 0 0.5rem 1.5rem;
+    background: linear-gradient(90deg, var(--surface-panel) 0%, transparent 100%);
+}
+.greeting h1 { margin: 0; }
+.greeting p { color: var(--color-gray-1); font-size: 1.1rem; margin-top: 0.5rem; }
+
+/* ----------------------------------------------------------------- CARDS -- */
+.grid-auto-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+}
+
+/* Plain card — a simple square surface (border + dark fill), no HUD brackets.
+   Use for list items, sub-panels, summary tiles where the bracketed .hud-box
+   would be too heavy. Compose with .section-title, .kv-list, etc. */
+.card {
+    background-color: var(--color-bg-dark-gray);
+    border: var(--border-hairline);
+    padding: 1rem 1.25rem;
+}
+.card--inset { background-color: var(--color-surface-input); }   /* nested / quieter */
+.card--accent { border-top: 3px solid var(--color-primary); }    /* top accent bar */
+.card--flush { padding: 0; }                                     /* card wrapping a table/list */
+.card-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem;
+}
+.card-title {
+    font-family: var(--font-headline); font-weight: var(--fw-bold);
+    text-transform: uppercase; letter-spacing: var(--tracking-display);
+    color: var(--color-white); font-size: 0.95rem; margin: 0;
+}
+.card + .card { margin-top: 1rem; }
+
+/* ---------------------------------------------------------------- CHIPS --- */
+/* Small square (NOT pill) inline label for data tags: order kind, quality,
+   claims, counts. Pills are reserved for .squadron-badge; chips are the squared
+   counterpart for inline metadata. currentColor-driven so a tone class is all
+   that's needed. Base = neutral. */
+.chip {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    padding: 0.15rem 0.5rem;
+    font-family: var(--font-body); font-weight: var(--fw-bold);
+    font-size: var(--fs-2xs); line-height: 1.3;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    border: 1px solid var(--color-gray-3);
+    color: var(--color-gray-1);
+    background-color: var(--color-surface-input);
+    white-space: nowrap;
+}
+.chip .krt-icon { width: 0.9em; height: 0.9em; }
+/* tone variants — border + text take the hue, fill stays a faint tint */
+.chip--primary { color: var(--color-accent-light); border-color: var(--color-primary);     background-color: rgba(231, 126, 35,0.10); }
+.chip--success { color: var(--color-success-text);     border-color: var(--color-success);     background-color: rgba(35,158,51,0.12); }
+.chip--danger  { color: var(--color-danger-text); border-color: var(--color-danger);      background-color: rgba(163,0,10,0.15); }
+.chip--warning { color: var(--color-warning);     border-color: var(--color-warning);     background-color: rgba(255,210,63,0.12); }
+.chip--info    { color: var(--color-info-text);   border-color: var(--color-info);        background-color: rgba(53,93,220,0.15); }
+.chip--muted   { color: var(--color-gray-2-text);      border-color: var(--color-gray-3);       background-color: transparent; }
+/* a chip that carries "key: value" data (e.g. a claim "IRI: 1,200 SCU") */
+.chip--data { text-transform: none; letter-spacing: 0; font-weight: var(--fw-regular); }
+.chip--data strong { font-weight: var(--fw-bold); color: var(--color-white); }
+.chip--item-class-military    { color: var(--krt-item-class-military-text);    border-color: var(--krt-item-class-military);    background-color: color-mix(in srgb, var(--krt-item-class-military) 15%, transparent); }
+.chip--item-class-civilian    { color: var(--krt-item-class-civilian-text);    border-color: var(--krt-item-class-civilian);    background-color: color-mix(in srgb, var(--krt-item-class-civilian) 15%, transparent); }
+.chip--item-class-industrial  { color: var(--krt-item-class-industrial-text);  border-color: var(--krt-item-class-industrial);  background-color: color-mix(in srgb, var(--krt-item-class-industrial) 15%, transparent); }
+.chip--item-class-stealth     { color: var(--krt-item-class-stealth-text);     border-color: var(--krt-item-class-stealth);     background-color: color-mix(in srgb, var(--krt-item-class-stealth) 15%, transparent); }
+.chip--item-class-competition { color: var(--krt-item-class-competition-text); border-color: var(--krt-item-class-competition); background-color: color-mix(in srgb, var(--krt-item-class-competition) 15%, transparent); }
+
+/* ---------------------------------------------------------------- TABLES -- */
+table, .krt-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+    background-color: var(--color-bg-dark-gray);
+    border: var(--border-hairline);
+}
+th, td { padding: 1rem; text-align: left; border-bottom: var(--border-hairline); }
+th {
+    background-color: var(--color-surface-input);
+    color: var(--color-gray-1);
+    font-family: var(--font-body);
+    font-size: var(--fs-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: var(--border-heading);
+}
+td { color: var(--color-gray-1); }
+tbody tr { transition: background-color 0.2s ease; }
+tbody tr:nth-child(even) { background-color: rgba(255, 255, 255, 0.02); }
+/* hover must out-rank the stripe on even rows too (specificity 0,2,2). */
+tbody tr:hover, tbody tr:nth-child(even):hover { background-color: var(--control-bg); }
+
+/* ------------------------------------------------------ TREE TABLE ------- */
+/* Dense, hierarchical "tree table" for nested data (e.g. inventory:
+   Material → Nutzer/Stack → Eintrag). Replaces deeply-nested <table>s that
+   each repeat their own <thead>. Rules:
+   - ONE sticky header (.tree-head) for the whole tree; depth is shown by
+     INDENTATION + left rails, never by repeating column headers.
+   - Numeric columns right-aligned + tabular-nums; quality gets a 0–1000 gauge.
+   - One filled CTA per context elsewhere; row actions are outline/ghost/quiet.
+   Build each row as a CSS-grid .tree-row sharing one column template so values
+   stay aligned across depths. Set the template on the wrapper via
+   --tree-cols and reuse it on every row. */
+.tree-table { min-width: min-content; border: var(--border-hairline); background-color: var(--color-bg-dark-gray); }
+.tree-row {
+    display: grid;
+    grid-template-columns: var(--tree-cols, minmax(210px,1.5fr) minmax(220px,1.7fr) 132px 124px 172px);
+    align-items: center;
+    border-bottom: var(--border-hairline);
+}
+.tree-row:last-child { border-bottom: none; }
+.tree-cell { padding: 0.5rem 0.8rem; font-size: 0.86rem; min-width: 0; }
+.tree-cell--num { text-align: right; font-variant-numeric: tabular-nums; }
+.tree-cell--actions { display: flex; gap: 0.4rem; justify-content: flex-end; padding-left: 1.5rem; }
+/* ^ padding-left keeps a clear gutter between the amount column and the action
+   buttons so the value + buttons never collide. */
+
+/* Sticky single header */
+.tree-head { position: sticky; top: 0; z-index: 2; background-color: var(--color-surface-input); border-bottom: var(--border-heading); }
+.tree-head .tree-cell {
+    font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.07em; font-weight: var(--fw-bold);
+    color: var(--color-gray-1);
+}
+
+/* Name cell + disclosure chevron */
+.tree-name { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.tree-name .tree-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-chevron { color: var(--color-primary); font-size: 0.7rem; width: 14px; flex: none; transition: transform 0.15s ease; }
+.tree-chevron[aria-expanded="true"], .tree-chevron.is-open { transform: rotate(90deg); }
+
+/* Depth levels — indentation + rails. Orange bar marks the top group only. */
+.tree-row--group { background-color: var(--color-surface-input); border-left: 4px solid var(--color-primary); }
+.tree-row--group .tree-label { font-weight: var(--fw-bold); color: var(--color-white); text-transform: none; font-size: 0.95rem; }
+.tree-row--mid { border-left: 4px solid transparent; box-shadow: inset 18px 0 0 -17px var(--color-gray-2); }
+.tree-row--mid .tree-name { padding-left: 1.5rem; }
+.tree-row--mid .tree-label { color: var(--color-gray-1); font-weight: var(--fw-bold); }
+.tree-row--mid:hover { background-color: rgba(255,255,255,0.025); }
+.tree-row--leaf { background-color: rgba(0,0,0,0.35); border-left: 4px solid transparent; }
+.tree-row--leaf .tree-name { padding-left: 3rem; }
+
+/* Leaf "main" area: spans the freed-up name+context+quality columns so inline
+   controls (e.g. Auftrag/Einsatz selects) get real width for long labels,
+   while the amount + actions stay column-aligned. */
+.tree-leaf-main { grid-column: 1 / 4; display: flex; align-items: center; gap: 0.85rem; padding: 0.4rem 0.8rem 0.4rem 3rem; min-width: 0; }
+.tree-leaf-main .tree-leaf-tag { color: var(--color-gray-2-text); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; flex: none; }
+.tree-fieldset { display: flex; gap: 0.85rem; flex: 1; min-width: 0; }
+.tree-field { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.tree-field .tree-field-cap { font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--color-gray-2-text); }
+.tree-field select, .tree-field input { width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Entry associations — split with amounts (Lager-Eintrag). Per .tree-field the
+   single Auftrag/Einsatz select is replaced by an .assoc-split group: clickable
+   .assoc-chip tokens carrying a label + .assoc-chip__amt (Auftrag = --order /
+   orange, Einsatz = --mission / blue), a dashed .assoc-add ("+ Zuordnen"; "+"
+   once populated) in .assoc-add-wrap that opens an .assoc-pop popover (a
+   .krt-combobox to add, or an amount editor on chip click), and a trailing .chip
+   rest indicator per group. Quantities for Aufträge and Einsätze are captured
+   SEPARATELY (two independent splits); each sums against the entry total:
+   Rest 0 = .chip--success, Rest > 0 = .chip--muted ("… frei", allowed),
+   over-allocation = .chip--danger (rejected). Read-only (no association right):
+   chips render non-clickable, no .assoc-add. */
+.assoc-split { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
+.assoc-chip { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.15rem 0.5rem; font-family: var(--font-body); font-weight: var(--fw-bold); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.05em; border: 1px solid var(--color-gray-3); background-color: var(--color-surface-input); cursor: pointer; white-space: nowrap; }
+.assoc-chip--order { color: var(--color-primary); border-color: var(--color-primary); background-color: rgba(231, 126, 35,0.10); }
+.assoc-chip--mission { color: var(--color-info); border-color: var(--color-info); background-color: rgba(53,93,220,0.15); }
+.assoc-chip__amt { color: var(--color-white); font-variant-numeric: tabular-nums; }
+.assoc-chip:hover, .assoc-chip:focus-visible { box-shadow: var(--glow-primary); outline: none; }
+.assoc-add-wrap { position: relative; display: inline-flex; }
+.assoc-add { all: unset; cursor: pointer; display: inline-flex; align-items: center; padding: 0.12rem 0.5rem; font-family: var(--font-body); font-weight: var(--fw-bold); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-gray-2-text); border: 1px dashed var(--color-gray-3); }
+.assoc-add:hover, .assoc-add:focus-visible { color: var(--color-primary); border-color: var(--color-primary); outline: none; }
+/* fixed — not absolute — so horizontally-scrollende Vorfahren (overflow-x: auto
+   erzwingt overflow-y: auto) das Popover nicht an ihrer Unterkante beschneiden.
+   Fixed braucht explizite Koordinaten: JS ankert top/left an die Trigger-Rect
+   beim Öffnen und hält sie bei scroll/resize (App: assocPositionPop in
+   inventory-my.js / inventory-admin.js). */
+.assoc-pop { position: fixed; z-index: 60; width: 260px; background-color: var(--color-bg-dark-gray); border: 1px solid var(--color-primary); box-shadow: var(--shadow-dropdown, 0 4px 10px rgb(0 0 0 / 60%)); }
+.assoc-pop .krt-combobox__listbox { position: static; border: none; box-shadow: none; }
+.assoc-pop__menge { padding: 0.6rem; display: grid; gap: 0.5rem; }
+.assoc-pop__menge label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-gray-2-text); font-weight: var(--fw-bold); }
+.assoc-pop__menge .assoc-menge-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+/* Das 260px-Pop fasst Input + "Speichern" + "Entfernen" nie in einer Zeile
+   (Buttons allein ~225px): Input nimmt eine eigene volle Zeile, die Buttons
+   teilen sich die nächste; flex-wrap lässt lange Übersetzungen umbrechen
+   statt rechts auszubrechen. */
+.assoc-pop__menge .assoc-menge-input { flex: 1 0 100%; }
+.assoc-pop__menge .assoc-menge-row .btn { flex: 1 1 auto; }
+
+/* Herkunft-Picker (REQ-INV-027, Variante C) — in den Ausbuchen/Umbuchen-Modals:
+   pro Earmark-Tag und Dimension (Auftrag/Einsatz) bestimmt EIN Mengen-Input,
+   wie viel der Buchung aus dieser Zuordnung kommt; der Rest kommt aus dem
+   unverteilten Anteil. Rest-Chip nutzt die .chip-Töne; .herkunft-warn nennt das
+   Minimum, wenn der freie Rest den Abzug nicht deckt; .herkunft-proceeds (nur
+   SELL) schätzt die Gutschrift je Einsatz. Genau eine belegbare Verteilung →
+   Input gefüllt + gesperrt (--auto), .herkunft-auto erklärt warum. */
+.herkunft-help { margin: 0 0 0.5rem; font-size: var(--fs-2xs); color: var(--color-gray-2-text); }
+.herkunft-body { display: flex; flex-direction: column; gap: 0.75rem; }
+.herkunft-dim { display: flex; flex-direction: column; gap: 0.35rem; }
+.herkunft-dim-cap { font-size: 0.6rem; font-weight: var(--fw-bold); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-gray-2-text); }
+.herkunft-tag { display: flex; gap: 0.5rem; align-items: center; }
+.herkunft-tag-name { flex: 1 1 auto; min-width: 0; font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.herkunft-input { flex: 0 0 6rem; width: 6rem; text-align: right; font-variant-numeric: tabular-nums; }
+.herkunft-input--auto { cursor: not-allowed; opacity: 0.75; }
+.herkunft-auto { font-size: var(--fs-2xs); color: var(--color-gray-2-text); }
+.herkunft-tag-max { flex: 0 0 auto; font-size: var(--fs-2xs); color: var(--color-gray-2-text); font-variant-numeric: tabular-nums; }
+.herkunft-restline { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+/* Warntext IST Text → a11y-Tint. (Die App shippt hier noch --color-danger; bei
+   nächster Gelegenheit angleichen.) */
+.herkunft-warn { font-size: var(--fs-2xs); color: var(--color-danger-text); }
+.herkunft-proceeds { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.4rem 0.5rem; border-left: 2px solid var(--color-info); background-color: rgba(53,93,220,0.10); }
+.herkunft-proceeds-title { font-size: 0.6rem; font-weight: var(--fw-bold); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-info); }
+.herkunft-proceeds-line { font-size: var(--fs-2xs); color: var(--color-white); font-variant-numeric: tabular-nums; }
+.herkunft-proceeds-personal { color: var(--color-gray-2-text); }
+
+/* Quality gauge (0–1000): number above a thin orange bar. */
+.tree-gauge { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 3px; width: 100%; }
+.tree-gauge .tree-gauge-val { font-variant-numeric: tabular-nums; }
+.tree-gauge .tree-gauge-val .tree-gauge-max { color: var(--color-gray-2-text); font-size: 0.74rem; }
+.tree-gauge .tree-gauge-track { width: 64px; height: 3px; background-color: var(--color-gray-3); position: relative; }
+.tree-gauge .tree-gauge-track > span { position: absolute; left: 0; top: 0; bottom: 0; background-color: var(--color-primary); }
+
+/* Amount: bright value + dimmed unit. */
+.tree-amount { font-variant-numeric: tabular-nums; color: var(--color-white); }
+.tree-amount .tree-unit { color: var(--color-gray-2-text); font-size: 0.74rem; }
+
+/* Note: rendered ONLY when a note exists. Indented annotation block with room
+   for the full text (up to ~80ch), orange label + surface box. */
+.tree-note { background-color: rgba(0,0,0,0.35); border-bottom: var(--border-hairline); }
+.tree-note-box {
+    margin: 0 0.8rem 0.55rem 3rem;
+    background-color: var(--color-surface-input);
+    border: var(--border-hairline); border-left: 3px solid var(--color-primary);
+    padding: 0.5rem 0.8rem; display: flex; gap: 0.7rem; align-items: baseline;
+}
+.tree-note-box .tree-note-label { color: var(--color-primary); font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.09em; font-weight: var(--fw-bold); flex: none; }
+.tree-note-box .tree-note-text { color: var(--color-gray-1); font-size: 0.84rem; line-height: 1.45; max-width: 80ch; overflow-wrap: anywhere; }
+
+/* Compact action button for dense tree-table rows — the 32px dense-row
+   exception to the 44px touch-target floor (nur diese zwei Klassen).
+   Der .btn-Qualifier ist tragend: ein bloßes .btn-xs (0,1,0) verliert gegen
+   späteres/medienquery-`.btn` und rendert voll groß — .btn.btn-xs (0,2,0)
+   gewinnt überall. Qualifier nie entfernen. */
+.btn.btn-xs { min-height: 32px; padding: 0.25rem 0.55rem; font-size: 0.68rem; }
+/* Icon-only quadratische Aktion (aria-label + title Pflicht, Glyphe aria-hidden).
+   Mit .btn-xs kombiniert → 32×32. Gleiche Spezifität wie .btn.btn-xs, bewusst
+   danach deklariert, damit das Padding gewinnt. */
+.btn-icon { min-width: 32px; }
+.btn.btn-icon { gap: 0; padding: 0.25rem; }
+.btn-icon .krt-icon { width: 1.05rem; height: 1.05rem; }
+/* Dekorative Button-Glyphen dürfen Klicks nie abfangen (event.target-JS). */
+.btn .krt-icon { pointer-events: none; }
+
+
+/* --------------------------------------------------------- FORMS / INPUTS -- */
+input[type="text"], input[type="search"], input[type="password"],
+input[type="email"], input[type="number"], input[type="url"],
+input[type="date"], input[type="time"], input[type="datetime-local"],
+select, textarea {
+    background-color: var(--control-bg);
+    color: var(--color-gray-1);
+    border: 1px solid var(--control-border);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 0.75rem;
+    font-family: var(--font-body);
+    font-size: 1rem;
+    line-height: 1.5;
+    box-sizing: border-box;
+    transition: all 0.2s;
+    color-scheme: dark;
+}
+input:not([type="checkbox"]):not([type="radio"]) { height: 2.75rem; }
+select {
+    -webkit-appearance: none; appearance: none;
+    min-height: 2.75rem;
+    padding: 0.375rem 2rem 0.375rem 0.75rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23E77E23' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.65rem center;
+    background-size: 12px 8px;
+}
+input:focus, select:focus, textarea:focus {
+    border-color: var(--color-primary);
+    outline: none;
+    box-shadow: var(--glow-primary);
+}
+input::placeholder, textarea::placeholder { color: var(--color-gray-2-text); font-style: italic; }
+
+.form-group { margin-bottom: 1.25rem; }
+.form-label, .form-label-sm {
+    display: block;
+    color: var(--color-gray-1);
+    font-family: var(--font-body);
+    font-weight: var(--fw-bold);
+    margin-bottom: 0.5rem;
+}
+.form-label-sm { font-size: 0.9rem; }
+
+input[type="number"] { -moz-appearance: textfield; }
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0 0 0 var(--space-2);
+    width: 1.5rem;
+    opacity: 1;
+    cursor: pointer;
+    background-color: var(--color-gray-3);
+    border-left: 1px solid var(--color-gray-2);
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23D1D2D3'%3E%3Cpath d='M4 6L8 2L12 6Z M4 10L8 14L12 10Z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    transition: background-color 0.2s;
+}
+input[type="number"]::-webkit-inner-spin-button:hover,
+input[type="number"]::-webkit-outer-spin-button:hover {
+    background-color: var(--color-primary);
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23000000'%3E%3Cpath d='M4 6L8 2L12 6Z M4 10L8 14L12 10Z'/%3E%3C/svg%3E");
+}
+
+input[type="checkbox"], input[type="radio"] {
+    appearance: none; -webkit-appearance: none;
+    background-color: var(--control-bg);
+    border: 1px solid var(--control-border);
+    width: 1.2rem; height: 1.2rem;
+    cursor: pointer; display: inline-block;
+    position: relative; vertical-align: middle;
+}
+input[type="radio"] { border-radius: 50%; }
+input[type="checkbox"]:checked, input[type="radio"]:checked {
+    background-color: var(--color-primary); border-color: var(--color-primary);
+}
+input[type="checkbox"]:checked::after {
+    content: '✔'; font-size: 0.8rem; color: var(--color-bg-black);
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-weight: bold;
+}
+input[type="radio"]:checked::after {
+    content: ''; width: 0.5rem; height: 0.5rem; background-color: var(--color-bg-black);
+    border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+}
+
+/* ---------------------------------------------------------------- ALERTS -- */
+.alert {
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid transparent;
+    font-family: var(--font-body);
+}
+.alert-danger  { background-color: rgba(163, 0, 10, 0.2);  border-color: var(--color-danger);  border-left: 4px solid var(--color-danger);  color: var(--color-gray-1); }
+.alert-success { background-color: rgba(35, 158, 51, 0.2); border-color: var(--color-success); border-left: 4px solid var(--color-success); color: var(--color-gray-1); }
+.alert-warning { background-color: rgba(255, 210, 63, 0.15); border-color: var(--color-warning); border-left: 4px solid var(--color-warning); color: var(--color-gray-1); }
+
+/* ---------------------------------------------------------- BADGES/CHIPS -- */
+/* Pills are the ONLY rounded element in the system. */
+.squadron-badge {
+    /* Ring drawn with an inset box-shadow rather than a border: at the pill's
+       999px corners a 1px border anti-aliases thinner than the straight edges,
+       so the outline looks uneven. An inset shadow keeps a uniform 1px all the
+       way round. --ring lets the modifiers recolour it. */
+    --ring: var(--color-primary);
+    display: inline-flex; align-items: center;
+    padding: calc(0.15rem + 1px) calc(0.5rem + 1px);
+    box-shadow: inset 0 0 0 1px var(--ring);
+    border-radius: var(--radius-pill);
+    color: var(--color-primary);
+    font-family: var(--font-body);
+    font-size: 0.75rem; font-weight: var(--fw-bold); line-height: 1.2;
+    white-space: nowrap;
+}
+.squadron-badge-muted   { color: var(--color-gray-1); --ring: var(--color-gray-2); }
+.squadron-badge-foreign { color: var(--color-secondary); --ring: var(--color-secondary); }
+.squadron-badge-sk      { color: var(--color-gray-1); --ring: var(--color-gray-2); background-color: rgba(255,255,255,0.04); }
+
+/* Department tag — small square chip tinted by department color. */
+.dept-tag {
+    display: inline-flex; align-items: center;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.7rem; font-weight: var(--fw-bold);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    border: 1px solid currentColor;
+}
+/* Department tags are FILLED in the (unaltered) department colour: on the
+   gray surfaces several department hues are too dark as text or thin border.
+   Text colour per hue for ≥ 5.2:1. Plain .dept-tag (outline, currentColor)
+   is only for light department hues on the canvas. */
+.dept-tag[class*="dept-tag--"] { border-color: transparent; }
+.dept-tag--raumueberlegenheit, .dept-tag--combat   { background-color: var(--color-dept-raumueberlegenheit); color: var(--color-bg-black); }
+.dept-tag--forschung, .dept-tag--research          { background-color: var(--color-dept-forschung);          color: var(--color-white); }
+.dept-tag--sub-radar                               { background-color: var(--color-dept-sub-radar);          color: var(--color-white); }
+.dept-tag--marinekorps, .dept-tag--marine          { background-color: var(--color-dept-marinekorps);        color: var(--color-white); }
+.dept-tag--profit                                  { background-color: var(--color-dept-profit);             color: var(--color-bg-black); }
+.dept-tag--search-rescue                           { background-color: var(--color-dept-search-rescue);      color: var(--color-bg-black); }
+
+/* ----------------------------------------------------- STATUS PILL (rows) -- */
+.status-pill {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
+    font-size: 0.7rem; letter-spacing: 0.08em;
+}
+.status-pill::before { content: ''; width: 8px; height: 8px; background: currentColor; }
+.status-planned   { color: var(--color-info-text); }
+.status-active    { color: var(--color-success-text); }
+.status-completed { color: var(--color-gray-1); }
+/* Beide Enum-Schreibweisen existieren: Missionen CANCELLED, Operationen CANCELED. */
+.status-cancelled, .status-canceled { color: var(--color-danger-text); }
+/* JobOrder-Lifecycle (orders-detail Header-Pill): COMPLETED nutzt das neutrale
+   .status-completed oben. */
+.status-open { color: var(--color-info-text); }
+.status-in_progress { color: var(--color-warning); }
+.status-rejected { color: var(--color-danger-text); }
+
+/* Text color helpers — use the accessible tints so semantic colour is legible
+   as text on the dark canvas (the canonical hues are reserved for fills). */
+.text-danger  { color: var(--color-danger-text)  !important; }
+.text-success { color: var(--color-success-text) !important; }
+.text-warning { color: var(--color-warning) !important; }
+.text-muted   { color: var(--color-gray-2-text)  !important; }
+.text-primary { color: var(--color-primary); }
+
+/* ----------------------------------------------------------------- ICONS -- */
+.krt-icon {
+    display: inline-block; width: 1em; height: 1em;
+    vertical-align: -0.125em; fill: currentColor; color: currentColor;
+}
+.krt-icon-lg { width: 1.5em; height: 1.5em; }
+.krt-icon-xl { width: 2em; height: 2em; }
+.krt-icon-sprite { width: 0; height: 0; position: absolute; overflow: hidden; }
+
+/* ----------------------------------------------------------------- TOAST -- */
+.notification-toast {
+    position: relative;
+    max-width: 400px;
+    background-color: var(--surface-panel);
+    border: 1px solid var(--color-primary);
+    padding: 1.5rem;
+    box-shadow: var(--glow-primary-lg);
+}
+.notification-toast::before, .notification-toast::after { content: ''; position: absolute; width: 10px; height: 10px; }
+.notification-toast::before { top: -1px; left: -1px; border-top: 2px solid var(--color-primary); border-left: 2px solid var(--color-primary); }
+.notification-toast::after  { bottom: -1px; right: -1px; border-bottom: 2px solid var(--color-primary); border-right: 2px solid var(--color-primary); }
+.notification-toast h4 { margin: 0 0 0.5rem; color: var(--color-primary); font-family: var(--font-headline); font-weight: var(--fw-bold); font-size: 1rem; text-transform: uppercase; }
+.notification-toast p  { margin: 0; color: var(--color-gray-1); }
+.notification-toast.error-toast { border-color: var(--color-danger); box-shadow: var(--glow-danger-lg); }
+.notification-toast.error-toast::before { border-top-color: var(--color-danger); border-left-color: var(--color-danger); }
+.notification-toast.error-toast::after  { border-bottom-color: var(--color-danger); border-right-color: var(--color-danger); }
+.notification-toast.error-toast h4 { color: var(--color-danger-text); }
+
+
+/* ------------------------------------------------------------ PAGINATION -- */
+/* Square page-nav. Prev/next use chevron icons (not « » glyphs). Disabled
+   pages must be visually AND functionally disabled — an <a> can't be disabled,
+   so .disabled removes pointer-events + dims it. The current-page readout uses
+   tabular figures. Mark current with aria-current="page" in markup. */
+.pagination { display: flex; gap: 0.4rem; justify-content: center; align-items: stretch; margin-top: 1rem; }
+.pagination .page-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: var(--touch-target); min-height: var(--touch-target);
+    padding: 0 0.5rem;
+    background-color: var(--control-bg);
+    color: var(--control-fg);
+    border: 1px solid var(--control-border);
+    text-decoration: none;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+.pagination .page-btn .krt-icon { width: 1.1em; height: 1.1em; }
+.pagination .page-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.pagination .page-btn[aria-current="page"] {
+    background-color: var(--color-primary); color: var(--color-bg-black);
+    border-color: var(--color-primary); font-weight: var(--fw-bold);
+}
+.pagination .page-btn.disabled {
+    opacity: 0.4; pointer-events: none; cursor: default;
+}
+.pagination .page-status {
+    display: inline-flex; align-items: center; padding: 0 0.75rem;
+    color: var(--color-gray-1); font-variant-numeric: tabular-nums;
+}
+.pagination .page-status b { color: var(--color-primary); font-weight: var(--fw-bold); }
+
+/* ------------------------------------------------ KEY-VALUE DETAIL LIST --- */
+/* Read-only "label : value" rows (profile, detail panels, org/finance summaries).
+   Label is neutral uppercase; the VALUE is the bright thing (data, not action).
+   Built on a 2-col grid so colons/values align. Use instead of ad-hoc
+   flex rows with a fixed-width label. */
+.kv-list { display: grid; grid-template-columns: minmax(140px, max-content) 1fr; gap: 0.55rem 1.25rem; align-items: baseline; }
+.kv-list dt, .kv-list .kv-key {
+    color: var(--color-gray-2-text);
+    font-family: var(--font-body); font-weight: var(--fw-bold);
+    font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: 0.04em;
+    margin: 0;
+}
+.kv-list dd, .kv-list .kv-val {
+    color: var(--data-fg); font-size: 1.05rem; margin: 0;
+    overflow-wrap: anywhere;
+}
+/* full-width row (e.g. a form/description spanning both columns) */
+.kv-list .kv-row-wide { grid-column: 1 / -1; }
+/* hairline separators between rows */
+.kv-list.kv-ruled dt, .kv-list.kv-ruled .kv-key,
+.kv-list.kv-ruled dd, .kv-list.kv-ruled .kv-val { padding-bottom: 0.55rem; border-bottom: var(--border-hairline); }
+
+/* ----------------------------------------------- SECTION TITLE ----------- */
+/* Standard sub-section heading inside a page/panel — replaces ad-hoc inline
+   `style="color:…; font-family:'Lato'; font-weight:700"` repeated on every h3.
+   Lato bold (system font), neutral light, with a hairline rule under it. */
+.section-title {
+    font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
+    color: var(--color-gray-1);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-display);
+    font-size: 1rem;
+    margin: 2rem 0 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: var(--border-hairline);
+}
+.section-title:first-child { margin-top: 0; }
+
+/* ------------------------------------------------- INLINE FIELD ERROR ----- */
+/* Form validation text. Uses the accessible danger TEXT tint, not the dark
+   canonical red, with a warning glyph slot. Pair with the field getting a red
+   border. */
+.field-error {
+    color: var(--color-danger-text);
+    font-size: var(--fs-xs);
+    margin-top: 0.4rem;
+    display: flex; gap: 0.35rem; align-items: flex-start;
+}
+
+/* --------------------------------------------------------------- SCROLLBAR */
+/* HUD scrollbars — square, hairline-tracked, orange on hover. Works for BOTH
+   axes: the track gets a leading hairline (left for vertical, top for
+   horizontal) and the thumb is a flat block with a 2px transparent inset so it
+   reads as a "bar inside a channel". The corner where the two bars meet is
+   filled with the surface color (otherwise it renders as a bright OS default).
+
+   Tokens used: --color-bg-dark-gray (track), --color-gray-2 (thumb idle),
+   --color-gray-3 (hairline), --color-primary (active/hover). */
+
+/* --- WebKit / Chromium / Edge / Safari --------------------------------- */
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track {
+    background-color: var(--color-bg-dark-gray);
+}
+::-webkit-scrollbar-track:vertical   { border-left: 1px solid var(--color-gray-3); }
+::-webkit-scrollbar-track:horizontal { border-top:  1px solid var(--color-gray-3); }
+::-webkit-scrollbar-thumb {
+    background-color: var(--color-gray-2);
+    border: 2px solid var(--color-bg-dark-gray); /* inset → thumb sits in a channel */
+    background-clip: padding-box;
+    min-height: 32px;
+    min-width: 32px;
+}
+::-webkit-scrollbar-thumb:hover  { background-color: var(--color-accent-light); }
+::-webkit-scrollbar-thumb:active { background-color: var(--color-primary); }
+/* the box where vertical + horizontal bars cross */
+::-webkit-scrollbar-corner { background-color: var(--color-bg-dark-gray); }
+/* suppress the default up/down + left/right buttons for a cleaner HUD look */
+::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+
+/* --- Firefox ------------------------------------------------------------ */
+* { scrollbar-width: thin; scrollbar-color: var(--color-gray-2) var(--color-bg-dark-gray); }
+
+/* ----------------------------------------------------------- SCROLL AREAS */
+/* Utility wrappers for explicitly scrollable regions. Pair an axis class with
+   .hud-scroll to get a bordered scroll viewport. */
+.scroll-y { overflow-y: auto; overflow-x: hidden; }
+.scroll-x { overflow-x: auto; overflow-y: hidden; }
+.scroll-both { overflow: auto; }
+
+/* Bordered scroll viewport (use on tables/code/log panes that scroll). */
+.hud-scroll {
+    border: var(--border-hairline);
+    background-color: var(--color-bg-dark-gray);
+    position: relative;
+}
+
+/* Thin variant — 8px bars for compact panes (sidebars, dropdowns, code). */
+.scroll-thin::-webkit-scrollbar { width: 8px; height: 8px; }
+.scroll-thin::-webkit-scrollbar-thumb { border-width: 2px; }
+.scroll-thin { scrollbar-width: thin; }
+
+/* Orange-accented variant — thumb is brand orange at rest (for emphasis panes
+   like an active log/console). Hover lightens it. */
+.scroll-accent::-webkit-scrollbar-thumb { background-color: var(--color-primary); }
+.scroll-accent::-webkit-scrollbar-thumb:hover { background-color: var(--color-accent-light); }
+.scroll-accent { scrollbar-color: var(--color-primary) var(--color-bg-dark-gray); }
+
+/* -------------------------------------------------------------- TAB NAV -- */
+/* Page-level tab navigation (e.g. mission detail). Surface row; active tab =
+   white text + 3px orange underline; counts orange. Use role="tablist"/"tab"
+   + aria-selected, arrow-key navigation, and sync the active tab with a
+   ?tab=/#tab= deeplink. Specimen: components/TabNav/preview.html */
+.tab-nav { display: flex; border-bottom: var(--border-hairline); background-color: var(--surface-bar); padding: 0 12px; overflow-x: auto; }
+.tab-nav .tab {
+    font-family: var(--font-body); font-weight: var(--fw-bold); text-transform: uppercase; letter-spacing: .06em;
+    font-size: 0.72rem; color: var(--color-gray-2-text); padding: 11px 14px; border: none; background: none; cursor: pointer;
+    border-bottom: 3px solid transparent; min-height: var(--touch-target); white-space: nowrap;
+}
+.tab-nav .tab:hover { color: var(--color-gray-1); }
+.tab-nav .tab.active { color: var(--color-white); border-bottom-color: var(--color-primary); }
+.tab-nav .tab:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+.tab-nav .tab .tab-count { color: var(--color-gray-1); margin-left: 4px; font-variant-numeric: tabular-nums; }
+.tab-nav .tab.active .tab-count { color: var(--color-accent-light); }
+
+/* ------------------------------------------------------------ FACTS BAR -- */
+/* Compact key-fact strip under a sticky page head — answers the most common
+   questions without scrolling. Values use tabular figures. */
+.facts-bar { display: flex; gap: 16px; flex-wrap: wrap; padding: 8px 16px; background-color: var(--color-surface-input); border-bottom: var(--border-hairline); font-size: 0.78rem; }
+.facts-bar .fact-k { color: var(--color-gray-2-text); text-transform: uppercase; font-size: 0.62rem; letter-spacing: .08em; font-weight: var(--fw-bold); margin-right: 5px; }
+.facts-bar .fact-v { color: var(--color-white); font-weight: var(--fw-bold); font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------- META GROUP GRID -- */
+/* Detail-page header that would otherwise be a tall single-column kv-list.
+   Group related fields into 2–3 labelled columns so the header collapses to
+   ~half height and the page's primary content rises above the fold. Pair with
+   a .facts-bar (high-signal values) + a status pill in the title row.
+   Comment/description goes in .annotation, not as another kv row. */
+.meta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 28px; }
+@media (max-width: 760px) { .meta-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 480px) { .meta-grid { grid-template-columns: 1fr; } }
+.meta-grid .meta-group { border-top: 2px solid var(--color-gray-3); padding-top: 9px; margin-top: 4px; }
+.meta-grid .meta-group-title { font-size: 0.6rem; text-transform: uppercase; letter-spacing: .12em; font-weight: var(--fw-bold); color: var(--color-gray-2-text); margin-bottom: 8px; }
+/* compact two-column key/value used inside a meta-group (denser than .kv-list) */
+.kv-compact { display: grid; grid-template-columns: max-content 1fr; gap: 5px 14px; align-items: baseline; }
+.kv-compact .kv-key { color: var(--color-gray-2-text); font-size: 0.75rem; font-weight: var(--fw-bold); }
+.kv-compact .kv-val { color: var(--color-white); font-size: 0.92rem; overflow-wrap: anywhere; }
+
+/* Annotation block — a labelled note/comment with an orange left rule.
+   For free-text that shouldn't compete with structured kv data. */
+.annotation { border-left: 3px solid var(--color-primary); background: var(--color-surface-input); padding: 9px 13px; font-weight: 300; white-space: pre-wrap; }
+.annotation .annotation-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: .1em; font-weight: var(--fw-bold); color: var(--color-gray-2-text); margin-bottom: 3px; }
+
+/* ---------------------------------------------------------------- MODAL -- */
+/* KRT modal: surface + orange top edge + HUD corner brackets on a blurred
+   scrim. Rules: exactly ONE filled CTA per modal (right), Cancel = .btn-ghost,
+   close-X = icon button with aria-label; danger variant for destructive
+   confirms (consequence named in the body). Focus-trap + Esc required. */
+.krt-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 3000; }
+.krt-modal { width: 100%; max-width: 440px; background: var(--color-bg-dark-gray); border: var(--border-hairline); border-top: 3px solid var(--color-primary); position: relative; box-shadow: var(--glow-primary-lg); }
+.krt-modal::before, .krt-modal::after { content: ''; position: absolute; width: 13px; height: 13px; border: 2px solid var(--color-primary); }
+.krt-modal::before { top: -2px; left: -2px; border-right: none; border-bottom: none; }
+.krt-modal::after { bottom: -2px; right: -2px; border-left: none; border-top: none; }
+.krt-modal--danger { border-top-color: var(--color-danger); box-shadow: var(--glow-danger-lg); }
+/* Breiten-Variante für formularlastige Modals (3+ gestapelte Felder);
+   Confirms und Ein-Feld-Prompts bleiben beim kompakten 440px-Default. */
+.krt-modal--wide { max-width: 600px; }
+.krt-modal--danger::before, .krt-modal--danger::after { border-color: var(--color-danger); }
+.krt-modal-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: var(--border-hairline); }
+.krt-modal-head h2 { font-family: var(--font-headline); font-weight: var(--fw-bold); font-size: 0.85rem; color: var(--color-white); text-transform: uppercase; letter-spacing: .06em; margin: 0; }
+.krt-modal--danger .krt-modal-head h2 { color: var(--color-danger-text, #ff6b6b); }
+.krt-modal-body { padding: 14px 16px; }
+.krt-modal-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 16px; border-top: var(--border-hairline); }
+
+/* --------------------------------------------------------- ASSIGN BOARD -- */
+/* Drag-&-drop planning board (mission crew): a pool of unassigned people and
+   open-ended unit drop zones — units have NO fixed size; per-person on-board
+   function is a flexible .chip-select. Always provide a click fallback
+   (select person → click target zone) and keyboard operability. */
+.person-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--color-surface-input); border: var(--border-hairline); cursor: grab; }
+.person-row.is-selected { border-color: var(--color-primary); box-shadow: var(--glow-primary); }
+.person-row:active { cursor: grabbing; }
+.person-row .row-grip { color: var(--color-gray-2-text); flex: none; }
+.person-row .row-main { flex: 1; min-width: 0; }
+.person-row .row-sub { font-size: 0.66rem; color: var(--color-gray-2-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.status-dot { width: 8px; height: 8px; flex: none; display: inline-block; background: var(--color-gray-2); }
+.status-dot--on { background: var(--color-success); }
+.drop-zone { min-height: var(--touch-target); padding: 6px; display: flex; flex-direction: column; gap: 5px; }
+.drop-zone.is-over { outline: 2px dashed var(--color-primary); outline-offset: -4px; background: rgba(231, 126, 35,0.06); }
+.drop-hint { border: 1px dashed var(--color-gray-3); color: var(--color-gray-2-text); font-size: 0.66rem; text-align: center; padding: 7px; font-style: italic; }
+.drop-zone.is-over .drop-hint { border-color: var(--color-primary); color: var(--color-primary); }
+
+/* Chip-styled inline select — uppercase label + orange chevron; reads like a
+   .chip but is editable (e.g. on-board function in a dense row). */
+.chip-select {
+    -webkit-appearance: none; appearance: none; cursor: pointer;
+    background-color: var(--control-bg); color: var(--color-gray-1);
+    border: 1px solid var(--control-border);
+    font-family: var(--font-body); font-weight: var(--fw-bold); font-size: 0.64rem; text-transform: uppercase; letter-spacing: .05em;
+    padding: 4px 22px 4px 8px; max-width: 165px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath fill='%23E77E23' d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 7px center;
+}
+.chip-select:hover { border-color: var(--color-primary); color: var(--color-white); }
+.chip-select:focus { border-color: var(--color-primary); outline: none; box-shadow: var(--glow-primary); }
+
+/* ----------------------------------------------------------- EMPTY STATE -- */
+/* Centered placeholder for empty lists/collections: short reason + ONE next
+   action (ghost or cta). Never leave a bare "Keine Einträge." table cell. */
+.empty-state { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 28px 16px; text-align: center; border: 1px dashed var(--color-gray-3); background: var(--color-bg-dark-gray); }
+.empty-state .empty-title { font-family: var(--font-headline); font-weight: var(--fw-bold); text-transform: uppercase; letter-spacing: .06em; font-size: 0.85rem; color: var(--color-gray-1); }
+.empty-state .empty-text { font-size: 0.8rem; font-weight: 300; color: var(--color-gray-2-text); max-width: 48ch; }
+
+/* ---------------------------------------------------------- MASTER-DETAIL -- */
+/* Collection browser (e.g. blueprints): dense filterable list left, permanent
+   detail pane right. On small screens collapse to list → detail navigation
+   (back button in the pane). Keyboard: ↑/↓ move the active row. */
+.master-detail { display: grid; grid-template-columns: 300px 1fr; gap: 12px; align-items: start; }
+@media (max-width: 900px) { .master-detail { grid-template-columns: 1fr; } }
+.master-list { background: var(--color-bg-dark-gray); border: var(--border-hairline); }
+.master-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; box-sizing: border-box; padding: 8px 11px; border: none; border-bottom: var(--border-hairline); border-left: 3px solid transparent; background: none; -webkit-appearance: none; appearance: none; text-align: left; font-family: var(--font-body); cursor: pointer; font-size: 0.8rem; color: var(--color-gray-1); }
+.master-row:hover { background: rgba(255,255,255,0.03); }
+.master-row.is-active { border-left-color: var(--color-primary); background: var(--color-surface-input); color: var(--color-white); font-weight: var(--fw-bold); }
+.master-row:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+.detail-pane { background: var(--color-bg-dark-gray); border: var(--border-hairline); padding: 14px 16px; }
+
+/* ------------------------------------------------- INGREDIENT QUALITY ----- */
+/* "Stat-Beitrag nach Zutat-Qualität": every ingredient carries its OWN quality
+   (0–1000) which scales only its mapped stats (factor = 1 + (max−1)·q/1000).
+   Show the live factor on the affected stat chips; keep "min. Qualität" and
+   "höher ist besser" hints. */
+input[type="range"] { accent-color: var(--color-primary); }
+.quality-block { display: flex; flex-direction: column; gap: 4px; min-width: 250px; }
+.quality-block .quality-source { font-family: var(--font-body); font-weight: var(--fw-bold); font-size: 0.62rem; text-transform: uppercase; letter-spacing: .09em; color: var(--color-gray-2-text); }
+.quality-block .quality-name { font-size: 0.8rem; color: var(--color-gray-1); }
+.quality-block .quality-name strong { color: var(--color-white); }
+.quality-block .quality-name small { color: var(--color-gray-2-text); }
+.quality-row { display: flex; align-items: center; gap: 8px; }
+.quality-row input[type="range"] { width: 200px; height: 18px; background: transparent; }
+.quality-row .quality-value { font-variant-numeric: tabular-nums; color: var(--color-white); font-weight: var(--fw-bold); font-size: 0.76rem; min-width: 70px; }
+.quality-row .quality-value small { color: var(--color-gray-2-text); font-weight: 400; }
+.quality-affects { font-size: 0.72rem; color: var(--color-gray-2-text); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+
+/* -------------------------------------------------------------- KPI CARDS -- */
+/* Dashboard tiles (bank dashboard, home): .kpi-total = aggregate strip tile
+   (orange left-accent), .kpi-card = per-entity card with value, sign-colored
+   delta and a server-rendered inline-SVG sparkline (no chart library — spec
+   REQ-BANK-016). The whole card is the click target. */
+.kpi-total { background: var(--color-bg-dark-gray); border: var(--border-hairline); border-left: 4px solid var(--color-primary); padding: 10px 14px; }
+.kpi-label { font-size: 0.62rem; text-transform: uppercase; letter-spacing: .1em; color: var(--color-gray-2-text); font-weight: var(--fw-bold); }
+.kpi-value { font-family: var(--font-headline); font-weight: var(--fw-bold); font-size: 1.2rem; color: var(--color-white); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.kpi-card { background: var(--color-bg-dark-gray); border: var(--border-hairline); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; cursor: pointer; transition: border-color .15s; }
+.kpi-card:hover { border-color: var(--color-primary); }
+.kpi-card:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.kpi-card .kpi-title { font-weight: var(--fw-bold); color: var(--color-white); font-size: 0.85rem; }
+.kpi-card .kpi-sub { font-size: 0.66rem; color: var(--color-gray-2-text); font-variant-numeric: tabular-nums; }
+.kpi-card .kpi-value { font-size: 1.3rem; }
+.kpi-delta { font-size: 0.72rem; font-weight: var(--fw-bold); font-variant-numeric: tabular-nums; }
+.kpi-delta--pos { color: var(--color-success); }
+.kpi-delta--neg { color: var(--color-danger-text, #ff6b6b); }
+.kpi-card--closed { opacity: .55; }
+
+/* ----------------------------------------------------- HOLDER DISTRIBUTION -- */
+/* Custody partition (bank REQ-BANK-003): per-(account, holder) sub-balances
+   that always sum to the account balance. Two renderings:
+   .holder-row — one row per holder with track bar + exact value (default for
+   the account detail); .stack-bar — proportional single bar + legend (compact;
+   segment colors step through the accent shades #E77E23/#EEB64B/#C45C00). */
+.holder-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--color-surface-input); }
+.holder-row:last-child { border-bottom: none; }
+.holder-row .holder-name { font-weight: var(--fw-bold); color: var(--color-white); font-size: 0.8rem; min-width: 80px; }
+.holder-row .holder-bar { flex: 1; height: 9px; background: var(--color-surface-input); position: relative; }
+.holder-row .holder-bar i { position: absolute; inset: 0 auto 0 0; background: var(--color-primary); }
+.holder-row .holder-value { font-size: 0.76rem; min-width: 110px; text-align: right; color: var(--color-gray-1); font-variant-numeric: tabular-nums; }
+.holder-sum { border-top: var(--border-hairline); margin-top: 7px; padding-top: 7px; display: flex; justify-content: space-between; font-size: 0.76rem; }
+.stack-bar { display: flex; height: 14px; border: var(--border-hairline); overflow: hidden; }
+.stack-bar i { display: block; height: 100%; }
+.stack-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.7rem; color: var(--color-gray-2-text); margin-top: 8px; }
+.stack-legend .sw { display: inline-block; width: 9px; height: 9px; margin-right: 5px; vertical-align: -1px; }
+
+/* ------------------------------------------------------------- FLAG MATRIX -- */
+/* Permission grids (bank grants): one square toggle per capability cell
+   (deposit/withdraw/transfer). The row's EXISTENCE = view right (always ✓,
+   removed by revoking the row). Suspended rows: tr.is-inert + a reason chip. */
+.matrix-flag { display: inline-flex; width: 18px; height: 18px; border: var(--border-hairline); align-items: center; justify-content: center; cursor: pointer; background: var(--color-surface-input); }
+.matrix-flag.on { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-bg-black); font-weight: var(--fw-black); font-size: 0.7rem; }
+.matrix-flag:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+tr.is-inert td { opacity: .5; }
+
+/* Type-to-confirm hurdle — reserved for the MOST destructive admin actions
+   (bank wipe reset): inside .krt-modal--danger, the confirm button stays
+   disabled until the user types the confirm word. Everything else keeps the
+   standard click-confirm modal. */
+.krt-modal .confirm-input { width: 100%; box-sizing: border-box; background: var(--control-bg); color: var(--color-gray-1); border: 1px solid var(--control-border); padding: 7px 9px; font-size: 0.8rem; margin-top: 8px; font-family: var(--font-body); }
+.krt-modal .confirm-input:focus { border-color: var(--color-primary); outline: none; box-shadow: var(--glow-primary); }
+
+/* ====================================================================== */
+/* EINSATZ / MISSION OVERVIEW PATTERNS                                     */
+/* Canonised from the participant-overview redesign (#818). A member must  */
+/* grasp an Einsatz in ~10s: status, when/where/who, free slots, the one   */
+/* sign-up action, the run order. Three building blocks below.            */
+/* ====================================================================== */
+
+/* ------------------------------------------------------ STATUS BADGE (LG) -- */
+/* The page-level lifecycle marker for a detail header — louder than the
+   row-level .status-pill. A square block (brand has zero radius): a 3px
+   left edge + a square status dot + uppercase enum. The hue is carried by
+   the same status-* classes (info/success/warning/gray/danger) used on the
+   pill, applied here against a faint tint fill so it reads at a glance from
+   across the header. Pair with the title, never with body data. */
+.status-badge { display: inline-flex; align-items: center; gap: 0.55rem; padding: 0.4rem 0.85rem; font-family: var(--font-headline); font-weight: var(--fw-bold); text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.82rem; line-height: 1; color: var(--color-gray-1); background: var(--color-surface-input); border: var(--border-hairline); border-left: 3px solid currentColor; }
+.status-badge::before { content: ''; width: 10px; height: 10px; background: currentColor; flex: 0 0 auto; }
+.status-badge .status-badge-text { color: var(--color-white); }
+/* hue per lifecycle state — reuse the pill semantics. The element's text
+   color drives the dot + left edge; the label stays bright white. */
+.status-badge.status-planned   { color: var(--color-info-text);    background: rgba(53,93,220,0.10); }
+.status-badge.status-active    { color: var(--color-success-text); background: rgba(35,158,51,0.10); }
+.status-badge.status-briefing  { color: var(--color-warning);      background: rgba(255,210,63,0.10); }
+.status-badge.status-completed { color: var(--color-gray-1);       background: var(--color-surface-input); }
+.status-badge.status-cancelled { color: var(--color-danger-text);  background: rgba(163,0,10,0.12); }
+
+/* -------------------------------------------------------- ATTENDANCE ------ */
+/* Participation is OPEN-ENDED — an Einsatz has no maximum and no fixed slots,
+   so the overview never shows "free slots" or a name list. It answers one
+   question instead: how many signed up, and how many of them have checked in.
+   A big registered headcount + a "davon Y eingecheckt" sub-line, with an
+   optional check-in meter (green = eingecheckt, gray track = ausstehend).
+   Orange is NOT spent here — it stays on the Anmelden CTA beside it. */
+.attendance { display: flex; flex-direction: column; gap: 0.4rem; min-width: 200px; }
+.attendance-count { display: flex; align-items: baseline; gap: 0.5rem; }
+.attendance-count .att-n { font-family: var(--font-headline); font-weight: var(--fw-black); font-size: 1.9rem; line-height: 1; color: var(--color-white); font-variant-numeric: tabular-nums; }
+.attendance-count .att-label { text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.7rem; font-weight: var(--fw-bold); color: var(--color-gray-2-text); }
+.attendance-sub { font-size: 0.82rem; color: var(--color-gray-1); }
+.attendance-sub b { color: var(--color-success-text); font-variant-numeric: tabular-nums; }
+/* optional check-in progress: eingecheckt (green) of total registered (track) */
+.attendance-meter { height: 8px; background: var(--color-surface-input); border: var(--border-hairline); display: flex; overflow: hidden; }
+.attendance-meter i { display: block; height: 100%; background: var(--color-success); }
+
+/* ----------------------------------------------------------- ABLAUF STEPS - */
+/* The run order ("Durchführung") as a numbered, scannable checklist instead of
+   a prose paragraph — the single biggest readability win in #818. An ordered
+   list with a square step token + a connecting rail; an optional time/where on
+   the right. States: --done (past, green check), --now (current phase, orange
+   ring + faint tint), default (upcoming). Built as <ol> so it stays a list for
+   AT and degrades to "1. 2. 3." with no CSS. */
+.ablauf { list-style: none; margin: 0; padding: 0; counter-reset: ablauf; }
+.ablauf .step { position: relative; display: flex; align-items: flex-start; gap: 0.85rem; padding: 0 0 1.1rem 0; counter-increment: ablauf; }
+.ablauf .step:last-child { padding-bottom: 0; }
+/* connecting rail between tokens */
+.ablauf .step:not(:last-child)::before { content: ''; position: absolute; left: 14px; top: 30px; bottom: 0; width: 2px; background: var(--color-gray-3); }
+.ablauf .step-num { flex: 0 0 auto; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--color-gray-2); background: var(--surface-canvas); color: var(--color-gray-1); font-family: var(--font-headline); font-weight: var(--fw-bold); font-size: 0.9rem; font-variant-numeric: tabular-nums; position: relative; z-index: 1; }
+.ablauf .step-num::before { content: counter(ablauf); }
+.ablauf .step-body { display: flex; flex-direction: column; gap: 0.15rem; padding-top: 0.25rem; min-width: 0; }
+.ablauf .step-title { color: var(--color-white); font-weight: var(--fw-bold); }
+.ablauf .step-meta { font-size: 0.76rem; color: var(--color-gray-2-text); }
+.ablauf .step-meta .data-value { font-size: 0.72rem; padding: 0.05rem 0.4rem; }
+/* done — completed phase */
+.ablauf .step--done .step-num { border-color: var(--color-success); color: var(--color-success-text); background: rgba(35,158,51,0.10); }
+.ablauf .step--done .step-num::before { content: '✔'; font-size: 0.85rem; }
+.ablauf .step--done .step-title { color: var(--color-gray-1); }
+.ablauf .step--done:not(:last-child)::before { background: var(--color-success); }
+/* now — the current phase, the one thing to look at */
+.ablauf .step--now .step-num { border-color: var(--color-primary); color: var(--color-primary); box-shadow: var(--glow-primary); }
+.ablauf .step--now .step-title { color: var(--color-primary); }
+
+/* ====================================================================== */
+/* SHARED APP COMPONENTS — async feedback, collaborative presence,        */
+/* multi-select + searchable filters, the SCU hint tooltip and rendered    */
+/* Markdown prose. Class names match the product 1:1.                      */
+/* ====================================================================== */
+
+/* ------------------------------------------------- LOADING INDICATOR ----- */
+/* Dark, orange-accented async indicator for live-filter overlays (mission
+   list, inventory): a spinning ring + uppercase Lato label, no native
+   browser spinner. Toggle visibility with the [hidden] attribute. */
+.krt-loading-indicator { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-3); padding: var(--space-2) var(--space-3); border: var(--border-accent); background: var(--color-bg-dark-gray); color: var(--color-primary); font-family: var(--font-headline); text-transform: uppercase; letter-spacing: 0.05em; min-height: var(--touch-target); }
+.krt-loading-indicator[hidden] { display: none !important; }
+.krt-spinner { width: 20px; height: 20px; border: 2px solid rgb(231 126 35 / 25%); border-top-color: var(--color-primary); border-radius: 50%; animation: krt-spinner-rotate 0.9s linear infinite; flex: 0 0 auto; }
+.krt-loading-label { font-size: 0.85rem; }
+@keyframes krt-spinner-rotate { to { transform: rotate(360deg); } }
+
+/* ------------------------------------------- PRESENCE / LIVE-SYNC -------- */
+/* Real-time collaboration awareness (Stufe 3). A pulsing orange dot + count
+   chip marks a section other users are currently editing; the fixed
+   .mission-livesync-pill (bottom-right) offers to apply a peer's change that
+   was held back while you were mid-edit. Awareness only — never blocks input.
+   Pair a busy region with [aria-busy="true"] for the dimmed refresh state. */
+@keyframes krt-presence-pulse {
+    0%   { box-shadow: 0 0 0 0 rgb(231 126 35 / 55%); }
+    70%  { box-shadow: 0 0 0 6px rgb(231 126 35 / 0%); }
+    100% { box-shadow: 0 0 0 0 rgb(231 126 35 / 0%); }
+}
+.krt-presence-indicator { display: inline-flex; align-items: center; gap: 0.35rem; margin-left: 0.6rem; padding: 0.15rem var(--space-2) 0.15rem 0.4rem; border: var(--border-accent); border-radius: var(--radius-pill); background: rgb(231 126 35 / 8%); color: var(--color-primary); font-family: var(--font-body); font-size: var(--fs-2xs); line-height: 1; cursor: default; vertical-align: middle; }
+.krt-presence-dot { display: inline-block; width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--color-primary); animation: krt-presence-pulse 2s infinite; }
+.krt-presence-count { font-weight: var(--fw-bold); letter-spacing: 0.02em; }
+.mission-livesync-pill { position: fixed; right: var(--space-4); bottom: var(--space-4); z-index: 9000; display: inline-flex; align-items: center; gap: 0.4rem; padding: var(--space-2) var(--space-4); border: var(--border-accent); border-radius: var(--radius-pill); background: var(--color-bg-dark-gray); color: var(--color-primary); font-family: var(--font-body); font-size: var(--fs-xs); font-weight: var(--fw-bold); letter-spacing: 0.02em; text-transform: uppercase; cursor: pointer; box-shadow: 0 2px 12px rgb(0 0 0 / 45%); animation: krt-presence-pulse 2s infinite; }
+.mission-livesync-pill:hover, .mission-livesync-pill:focus-visible { background: rgb(231 126 35 / 12%); }
+
+/* ------------------------------------------- MULTI-SELECT DROPDOWN ------- */
+/* Custom multi-select filter (inventory, materials-overview): a HUD field
+   that opens a checkbox option list. Control fill, orange ▼ chevron.
+   The options popover sits above the fixed footer (z-index 1100). JS toggles
+   .open on .multi-select-options. */
+.multi-select-container { position: relative; min-width: 200px; font-family: var(--font-body); }
+.multi-select-header { padding: var(--space-2); background-color: var(--control-bg); border: var(--border-hairline); color: var(--color-gray-1); cursor: pointer; display: flex; justify-content: space-between; align-items: center; min-height: var(--touch-target); user-select: none; transition: border-color 0.2s; box-sizing: border-box; }
+.multi-select-header:hover { border-color: var(--color-primary); }
+.multi-select-header::after { content: '\25BC'; font-size: 0.7em; margin-left: var(--space-2); color: var(--color-primary); }
+.multi-select-header .selected-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+.multi-select-options { position: absolute; top: 100%; left: 0; right: 0; background-color: var(--color-surface-input); border: var(--border-accent); border-top: none; max-height: 300px; overflow-y: auto; z-index: 1100; display: none; box-shadow: 0 4px 6px rgb(0 0 0 / 50%); }
+.multi-select-options.open { display: block; }
+.multi-select-option { padding: var(--space-2) var(--space-3); display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); cursor: pointer; transition: background-color 0.2s; color: var(--color-gray-1); font-family: var(--font-body); white-space: nowrap; min-height: var(--touch-target); }
+.multi-select-option:hover { background-color: var(--color-gray-3); }
+.multi-select-option input[type='checkbox'] { margin: 0; flex-shrink: 0; }
+
+/* --------------------------------------- AUTOCOMPLETE / SEARCHABLE SELECT - */
+/* Type-to-filter lists. .autocomplete-items is the raw suggestion popover
+   (orange-on-dark rows, active row filled orange). .krt-combobox upgrades a
+   native <select> into a type-to-filter combobox with the same HUD look:
+   orange chevron + focus bloom, a flip-up (--above) variant, highlighted
+   <mark> matches, and non-selectable .krt-combobox__notice status rows. */
+.autocomplete-items { position: absolute; border: var(--border-accent); border-top: none; z-index: 99; top: 100%; left: 0; right: 0; background-color: var(--color-bg-dark-gray); box-shadow: 0 4px 8px rgb(0 0 0 / 50%); }
+.autocomplete-items div { padding: 10px; cursor: pointer; background-color: var(--color-bg-dark-gray); border-bottom: var(--border-hairline); color: var(--color-gray-1); font-family: var(--font-body); }
+.autocomplete-items div:hover { background-color: var(--color-gray-3); color: var(--color-primary); }
+.autocomplete-active { background-color: var(--color-primary) !important; color: var(--color-bg-black) !important; }
+.krt-combobox { position: relative; width: 100%; }
+.krt-combobox .krt-combobox__input { width: 100%; padding: 0.75rem var(--space-8) 0.75rem 0.75rem; cursor: text; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23E77E23' d='M1 1l5 5 5-5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.65rem center; background-size: 12px 8px; }
+.krt-combobox__listbox { position: absolute; top: 100%; left: 0; right: 0; z-index: 99; max-height: 18rem; margin: 0; padding: 0; overflow-y: auto; list-style: none; background-color: var(--color-bg-dark-gray); border: var(--border-accent); border-top: none; box-shadow: var(--shadow-dropdown); }
+.krt-combobox__listbox[hidden] { display: none; }
+.krt-combobox__listbox--above { border-top: var(--border-accent); border-bottom: none; }
+.krt-combobox__option { display: flex; align-items: center; min-height: var(--touch-target); padding: 0.625rem 0.75rem; color: var(--color-gray-1); font-family: var(--font-body); cursor: pointer; border-bottom: var(--border-hairline); }
+.krt-combobox__option:last-child { border-bottom: none; }
+.krt-combobox__option:hover { color: var(--color-primary); background-color: var(--color-gray-3); }
+.krt-combobox__option--active { color: var(--color-bg-black); background-color: var(--color-primary); }
+.krt-combobox__option[aria-selected='true']:not(.krt-combobox__option--active) { color: var(--color-primary); box-shadow: inset 3px 0 0 var(--color-primary); }
+.krt-combobox__option mark { color: inherit; font-weight: var(--fw-bold); background-color: transparent; }
+/* "Zuordnung entfernen"-Option (REQ-FE-011): gedämpft + kursiv = "keine Auswahl";
+   Hover/Active heben sie wie jede Option hervor. */
+.krt-combobox__option--clear { color: var(--color-gray-2-text); font-style: italic; }
+.krt-combobox__option > .krt-combobox__label { min-width: 0; }
+.krt-combobox__notice { padding: 0.75rem; color: var(--color-gray-2-text); font-family: var(--font-body); font-style: italic; }
+
+/* ------------------------------------------------------ SCU HINT TOOLTIP - */
+/* An inline "?" disc + HUD tooltip bubble shown next to SCU quantity inputs
+   (explains that fractional SCU — cSCU 0.01, µSCU 0.001 — are accepted).
+   Pure-CSS show on hover/focus/focus-within; the bubble floats above the disc
+   (z-index 4000, above the modal layer) and never intercepts the pointer.
+   --hint-shift (set by JS) slides the bubble back inside a clipping scroll
+   container; the arrow counter-shifts to keep pointing at the disc. Reusable
+   as the house tooltip idiom for any inline help marker. */
+.scu-hint { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 1.05rem; height: 1.05rem; margin-left: 0.35rem; border: 1px solid var(--color-gray-2); border-radius: 50%; color: var(--color-gray-1); font-family: var(--font-body); font-size: 0.72rem; font-weight: var(--fw-bold); line-height: 1; text-transform: none; vertical-align: middle; cursor: help; transition: color 0.2s ease, border-color 0.2s ease; }
+.scu-hint:hover { color: var(--color-primary); border-color: var(--color-primary); }
+.scu-hint:focus-visible { color: var(--color-primary); border-color: var(--color-primary); outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.scu-hint__bubble { position: absolute; bottom: calc(100% + 0.5rem); left: 50%; z-index: 4000; width: max-content; max-width: min(17rem, 78vw); padding: var(--space-2) 0.6rem; transform: translateX(calc(-50% + var(--hint-shift, 0px))); background: var(--color-control); border: 1px solid var(--color-primary); box-shadow: 0 0 10px rgb(231 126 35 / 30%); color: var(--color-gray-1); font-family: var(--font-body); font-size: 0.78rem; font-weight: var(--fw-regular); line-height: 1.4; letter-spacing: normal; text-align: left; text-transform: none; white-space: normal; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.2s ease, visibility 0.2s ease; }
+.scu-hint:hover .scu-hint__bubble, .scu-hint:focus .scu-hint__bubble, .scu-hint:focus-within .scu-hint__bubble { opacity: 1; visibility: visible; }
+.scu-hint__bubble::after { content: ''; position: absolute; top: 100%; left: calc(50% - var(--hint-shift, 0px)); border: 0.3rem solid transparent; border-top-color: var(--color-primary); transform: translateX(-50%); }
+
+/* ---------------------------------------------------- MARKDOWN CONTENT --- */
+/* Server-rendered user Markdown (mission description, order/offer remarks).
+   Source HTML is generated + sanitised server-side (@markdown bean); these
+   rules only give the generated tags the KRT look — quiet gray prose, bright
+   strong, uppercase headings, surface-filled code/blockquote, capped at 80ch.
+   Wrap the generated HTML in .markdown-content. */
+.markdown-content { font-size: 0.85rem; font-weight: 300; color: var(--color-gray-1); line-height: 1.55; max-width: 80ch; }
+.markdown-content > :first-child { margin-top: 0; }
+.markdown-content > :last-child { margin-bottom: 0; }
+.markdown-content p, .markdown-content ul, .markdown-content ol, .markdown-content blockquote, .markdown-content pre { margin: 0 0 0.6em; }
+.markdown-content ul, .markdown-content ol { padding-left: 1.4em; }
+.markdown-content li + li { margin-top: 0.2em; }
+.markdown-content strong { color: var(--color-white); }
+.markdown-content h1, .markdown-content h2, .markdown-content h3, .markdown-content h4, .markdown-content h5, .markdown-content h6 { font-family: var(--font-body); font-weight: var(--fw-bold); text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-gray-1); margin: 0.9em 0 0.4em; }
+.markdown-content h1 { font-size: 1rem; }
+.markdown-content h2 { font-size: 0.9rem; }
+.markdown-content h3, .markdown-content h4, .markdown-content h5, .markdown-content h6 { font-size: 0.8rem; }
+.markdown-content code { font-family: var(--font-mono); font-size: 0.78rem; background-color: var(--color-surface-input); border: var(--border-hairline); padding: 0.05em 0.35em; }
+.markdown-content pre { background-color: var(--color-surface-input); border: var(--border-hairline); padding: 0.6em 0.8em; overflow-x: auto; }
+.markdown-content pre code { background: none; border: none; padding: 0; }
+.markdown-content blockquote { border-left: 3px solid var(--color-primary); padding-left: 0.8em; color: var(--color-gray-2-text); }
+.markdown-content hr { border: none; border-top: var(--border-hairline); margin: 0.8em 0; }
+.markdown-content table { border-collapse: collapse; margin: 0 0 0.6em; }
+.markdown-content th, .markdown-content td { border: var(--border-hairline); padding: 0.25em 0.6em; }
+
+
+/* ====================================================================== */
+/* KRT CONFIRM (showKrtConfirm) — JS-generiertes, ephemeres Bestätigungs-  */
+/* Modal (fragments/toast.html). Ersetzt window.confirm() vollständig;     */
+/* Schwester von .krt-modal (das für Form-/Detail-Modals bleibt).          */
+/* ====================================================================== */
+.krt-confirm-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center; z-index: 10000; padding: var(--space-4); }
+.krt-confirm-dialog { background: var(--color-bg-dark-gray); border: var(--border-accent); max-width: 480px; width: 100%; padding: var(--space-6); color: var(--color-gray-1); font-family: var(--font-body); box-shadow: 0 0 24px rgba(231, 126, 35,0.35); }
+.krt-confirm-title { font-family: var(--font-headline); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-primary); margin: 0 0 var(--space-3); font-size: 1.05rem; }
+.krt-confirm-message { margin: 0 0 1.25rem; line-height: 1.4; font-weight: var(--fw-thin); }
+.krt-confirm-actions { display: flex; gap: var(--space-3); justify-content: flex-end; }
+.krt-confirm-actions .btn { min-height: var(--touch-target); min-width: 96px; }
+.krt-confirm-actions .btn-secondary { background: transparent; color: var(--color-gray-1); border: 1px solid var(--color-gray-2); }
+.krt-confirm-actions .btn-secondary:hover { border-color: var(--color-gray-1); color: var(--color-white); }
+.krt-confirm-actions .btn-danger { background: var(--color-primary); color: var(--color-bg-black); border: 1px solid var(--color-primary); }
+.krt-confirm-actions .btn-danger:hover { background: var(--color-accent-light); border-color: var(--color-accent-light); }
+@media (width <= 768px) { .krt-confirm-dialog { padding: var(--space-4); } .krt-confirm-actions { flex-direction: column-reverse; } .krt-confirm-actions .btn { width: 100%; } }
+
+/* ====================================================================== */
+/* FILTERLEISTE (.search-form) — Listenseiten-Filterzeile.                 */
+/* Spalten richten sich via align-items: flex-end an der Unterkante aus;   */
+/* Label-Zeilen sind auf eine Zeile gepinnt (min-height + nowrap), damit   */
+/* jede Spalte identische Höhe beiträgt (Inputs global 2.75rem = 44px).    */
+/* ====================================================================== */
+.search-form { display: flex; align-items: flex-end; gap: var(--space-2); margin-bottom: var(--space-4); flex-wrap: wrap; }
+.search-form > div { gap: 0.2rem; }
+/* Nur Label-tragende Spalten bekommen die deterministische Gesamthöhe —
+   Button-only-Spalten (Filter, "Neuer Einsatz") würden sonst gestreckt. */
+.search-form > div:has(> label) { display: flex; flex-direction: column; justify-content: flex-end; min-height: 3.95rem; }
+.search-form > div > label { min-height: 1.25rem; line-height: 1.25; margin: 0; padding: 0; white-space: nowrap; }
+.search-form > div > input[type='hidden'] { display: none; }
+.search-form-actions { align-self: flex-end; display: flex; gap: var(--space-2); }
+.search-form-flex-1 { flex: 1; min-width: 150px; }
+.search-form-checkbox-col { display: flex; flex-direction: column; gap: 0.2rem; }
+.search-form-checkbox-spacer { height: 1.2rem; }
+.search-form-checkbox-label { display: flex; align-items: center; cursor: pointer; gap: var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid transparent; }
+/* Datum + Zeit als getrenntes Paar: feste Breiten — das Datumsfeld braucht
+   Platz für "23.04.2026" + Kalender-Icon, das Zeitfeld bleibt kompakt. */
+.datetime-split-inputs { display: flex; gap: var(--space-2); width: 100%; }
+.datetime-split-inputs input[type='date'] { flex: 0 0 auto; width: 10.5rem; min-width: 10.5rem; max-width: 10.5rem; }
+.datetime-split-inputs input[type='time'] { flex: 0 0 auto; width: 7rem; min-width: 7rem; max-width: 7rem; }
+.search-form > div.datetime-split-group { display: flex; flex-direction: column; gap: 0.2rem; justify-content: flex-end; min-height: 4.2rem; }
+@media (width <= 768px) { .datetime-split-inputs { flex-direction: column; } .search-form > div:has(> label), .search-form > div.datetime-split-group { min-height: 0; } }
+/* Assoziations-Select (Lager, Auftrag/Einsatz): volle Breite, oranger Rahmen,
+   padding-right groß genug, damit der orange ▼ den Text nicht überlagert. */
+select.association-select { width: 100%; min-width: 190px; min-height: var(--touch-target); padding: 0.375rem 2.5rem 0.375rem var(--space-3); background-color: var(--color-bg-dark-gray); border: 1px solid var(--color-primary); color: var(--color-gray-1); box-sizing: border-box; }
+
+/* ====================================================================== */
+/* APP-CHROME — Admin-Modus, fixer Footer, Fan-Kit-Band                    */
+/* ====================================================================== */
+/* Admin-Modus: sidebar-JS setzt body.admin-mode auf /admin/* — die Header-
+   Unterkante wechselt auf Zierfarbe dunkel, der Chip benennt den Kontext. */
+body.admin-mode header { border-bottom-color: var(--color-accent-dark); }
+.admin-mode-chip { display: inline-flex; align-items: center; gap: 0.4rem; margin-left: auto; padding: 0.35rem 0.7rem; background-color: rgba(196,92,0,0.15); border: 1px solid var(--color-accent-dark); color: var(--color-accent-light); font-family: var(--font-headline); font-weight: var(--fw-bold); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: var(--tracking-overline); }
+body:not(.admin-mode) .admin-mode-chip { display: none; }
+/* Fixer Seiten-Footer (von sidebar.html-JS injiziert). z-index unter Header
+   (1000), Drawer (2000), Modals (3000), Toasts (9999). <main> reserviert Platz
+   via padding-bottom: calc(var(--krt-footer-height, 5rem) + 5rem). */
+.krt-footer { position: fixed; bottom: 0; left: 0; right: 0; z-index: 999; padding: var(--space-4) var(--space-8); background-color: var(--surface-bar); border-top: var(--border-hairline); color: var(--color-gray-2-text); font-size: var(--fs-xs); display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: center; justify-content: space-between; }
+.krt-footer-links { display: flex; gap: var(--space-4); flex-wrap: wrap; }
+.krt-footer-links a, .krt-footer-meta a { color: var(--color-gray-1); text-decoration: none; }
+.krt-footer-links a:hover, .krt-footer-meta a:hover { color: var(--color-primary); }
+.krt-footer-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); }
+.krt-footer-github { display: inline-flex; align-items: center; padding: var(--space-1); }
+.krt-footer-github .krt-icon { width: 1.25em; height: 1.25em; }
+/* Version in gray-1: it reads as secondary through its small size. */
+.krt-footer-version { color: var(--color-gray-1); font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 0.75rem; }
+@media (width <= 768px) { .krt-footer { flex-direction: column; align-items: flex-start; } }
+/* Star-Citizen-Fan-Kit-Band — am Ende des Home-<main> (REQ-UI-018), NICHT im
+   fixen Footer. Logo unverändert rendern (Fan-Kit Guidelines §3); Trademark-
+   Notice ≥ 10pt (§2b) → --fs-sm statt --fs-xs. */
+.krt-fankit-band { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-8); padding-top: var(--space-4); border-top: var(--border-hairline); }
+.krt-fankit-logo { width: 2.25rem; height: 2.25rem; flex-shrink: 0; }
+.krt-fankit-trademark { font-size: var(--fs-sm); color: var(--color-gray-1); line-height: 1.4; }
+
+
+/* ====================================================================== */
+/* LIST PAGE                                                              */
+/* 1) every control has a fill + Grau-2 border (--control-*),             */
+/* 2) toolbar + table + footer sit together on ONE panel (.list-panel),   */
+/* 3) selection = tint + border + underline, never a filled orange block  */
+/*    (that is reserved for the CTA).                                     */
+/* Specimen: components/ListPanel/preview.html                            */
+/* ====================================================================== */
+
+/* ---------------------------------------------------------- PAGE HEAD --- */
+/* Eyebrow (Bereich) · Titel + Zähler · Aktionen rechts. Sitzt auf dem Canvas,
+   OBERHALB des .list-panel. Genau eine .btn--cta in .page-head__actions. */
+.page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-6); }
+.page-head__eyebrow { display: block; font-family: var(--font-body); font-weight: var(--fw-bold); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: var(--tracking-overline); color: var(--color-gray-2-text); margin-bottom: var(--space-2); }
+.page-head__title { display: flex; align-items: center; gap: var(--space-3); margin: 0; font-size: var(--fs-h1); color: var(--color-primary); }
+.page-head__actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+
+/* -------------------------------------------------------- COUNT BADGE --- */
+/* Total next to a title ("Einsatzverwaltung 3"). Filled #2f394c, white bold
+   digits (10:1). The number is information, not an action → not orange. */
+.count-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 2em; height: 1.6em; padding: 0 0.5em;
+    background-color: var(--color-count-badge);
+    color: var(--color-white);
+    font-family: var(--font-body); font-weight: var(--fw-bold);
+    font-size: 0.5em;            /* relativ zum Titel: h1 2rem → 1rem */
+    letter-spacing: 0; line-height: 1;
+    font-variant-numeric: tabular-nums;
+    vertical-align: middle;
+}
+/* Freistehend (nicht in einer Überschrift): feste Größe. */
+.count-badge--sm { font-size: var(--fs-xs); }
+
+/* ------------------------------------------------------- LIST PANEL ----- */
+/* The working surface of a list page: toolbar, table and footer on ONE panel
+   with a hairline frame. The table sits flush (no own border). */
+.list-panel {
+    background-color: var(--surface-panel);
+    border: var(--border-hairline);
+    border-radius: var(--radius-sm);   /* kein overflow:hidden — Filter-Popover/Autocomplete dürfen herausragen */
+}
+.list-panel__toolbar {
+    display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;
+    padding: var(--space-4);
+    border-bottom: var(--border-hairline);
+}
+.list-panel__toolbar .list-panel__search { flex: 1 1 260px; min-width: 200px; position: relative; }
+.list-panel__toolbar .list-panel__search input { width: 100%; padding-left: 2.4rem; }
+.list-panel__toolbar .list-panel__search .krt-icon { position: absolute; left: 0.8rem; top: 50%; transform: translateY(-50%); color: var(--color-gray-2-text); pointer-events: none; }
+.list-panel__toolbar .list-panel__spacer { flex: 1 1 auto; }
+/* aktive Filter-Chips als eigene Zeile unter der Toolbar */
+.list-panel__chips { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; padding: 0 var(--space-4) var(--space-3); margin-top: calc(-1 * var(--space-1)); border-bottom: var(--border-hairline); }
+.list-panel__toolbar:has(+ .list-panel__chips) { border-bottom: none; }
+.list-panel > table, .list-panel > .hud-scroll > table, .list-panel .krt-table { margin: 0; border: none; background-color: transparent; }
+.list-panel__footer {
+    display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap;
+    padding: var(--space-3) var(--space-4);
+    border-top: var(--border-hairline);
+    color: var(--color-gray-2-text); font-size: var(--fs-sm); font-variant-numeric: tabular-nums;
+}
+.list-panel__footer .pagination { margin: 0; }
+/* Leerzustand innerhalb der Fläche: kein doppelter Rahmen */
+.list-panel .empty-state { border: none; background: transparent; }
+@media (width <= 768px) {
+    .list-panel__toolbar { padding: var(--space-3); }
+    .list-panel__toolbar .list-panel__search { flex-basis: 100%; }
+}
+
+/* --------------------------------------------------- SEGMENTED CONTROL -- */
+/* Zeitraum-/Status-/Ansichts-Umschalter: Kommend|Vergangen|Alle,
+   Läuft|Abholbereit|Abgeschlossen|Alle, Alle|Meine, Globales|Mein Lager.
+   EIN gerahmter Block mit Füllung; Segmente durch Grau-2-Trennlinien.
+   Auswahl: Orange-Tönung + weißer fetter Text + 2px Orange-Unterstrich
+   (Form-Hinweis, nicht nur Farbe). Markup — Links: aria-current="page";
+   Buttons: aria-pressed="true"; Radiogruppe: role="radiogroup" +
+   role="radio" aria-checked. .is-active als Fallback.
+   NIE als zwei normale Buttons (einer gefüllt orange) bauen — das liest sich
+   als CTA ("Mein Lager"), nicht als Auswahl. */
+.krt-segmented {
+    display: inline-flex; align-items: stretch;
+    background-color: var(--control-bg);
+    border: 1px solid var(--control-border);
+    max-width: 100%; overflow-x: auto;
+}
+.krt-segmented__item {
+    all: unset; box-sizing: border-box;
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+    min-height: calc(var(--touch-target) - 2px);
+    padding: 0 1rem;
+    font-family: var(--font-body); font-weight: var(--fw-bold);
+    font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--control-fg);
+    white-space: nowrap; cursor: pointer; text-decoration: none;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+.krt-segmented__item + .krt-segmented__item { border-left: 1px solid var(--control-border); }
+.krt-segmented__item:hover { background-color: var(--control-bg-hover); color: var(--color-white); }
+.krt-segmented__item:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -3px; }
+.krt-segmented__item[aria-current="page"],
+.krt-segmented__item[aria-pressed="true"],
+.krt-segmented__item[aria-checked="true"],
+.krt-segmented__item.is-active {
+    background-color: var(--control-selected-bg);
+    color: var(--control-selected-fg);
+    box-shadow: inset 0 0 0 1px var(--control-selected-border), inset 0 -3px 0 0 var(--control-selected-border);
+    cursor: default;
+}
+/* Zähler im Segment ("Abgeschlossen 115"): ruhig, tabellarisch. */
+.krt-segmented__count { font-weight: var(--fw-bold); color: var(--color-gray-2-text); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.krt-segmented__item:is([aria-current="page"],[aria-pressed="true"],[aria-checked="true"],.is-active) .krt-segmented__count { color: var(--control-selected-fg); }
+.krt-segmented__count--success { color: var(--color-success-text); }
+.krt-segmented__count--warning { color: var(--color-warning); }
+/* Kompakt (in dichten Detail-Köpfen, Desktop only) */
+.krt-segmented--sm .krt-segmented__item { min-height: 34px; padding: 0 0.75rem; font-size: var(--fs-2xs); }
+@media (width <= 768px) { .krt-segmented--sm .krt-segmented__item { min-height: calc(var(--touch-target) - 2px); } }
+
+/* ------------------------------------------------ FILTER BUTTON STATE --- */
+/* Filter-Button = .btn.btn-ghost. Sind Filter aktiv: .is-filtered (oranger
+   Rand + Text) und die Anzahl als ECKIGES Badge (keine Kreis-Pille — rund
+   sind nur Squadron-Pills). */
+.btn.is-filtered { border-color: var(--color-primary); color: var(--color-accent-light); }
+.filter-count {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 1.35rem; height: 1.35rem; padding: 0 0.3rem;
+    background-color: var(--color-primary); color: var(--color-bg-black);
+    font-weight: var(--fw-black); font-size: 0.72rem; letter-spacing: 0;
+    font-variant-numeric: tabular-nums; line-height: 1;
+}
+/* Entfernbarer aktiver Filter ("Offen ×") */
+.filter-chip {
+    display: inline-flex; align-items: center; gap: 0.45rem;
+    min-height: 28px; padding: 0 0.3rem 0 0.6rem;
+    background-color: rgba(231, 126, 35,0.10);
+    border: 1px solid var(--color-primary); color: var(--color-primary);
+    font-family: var(--font-body); font-weight: var(--fw-bold); font-size: var(--fs-2xs);
+    text-transform: uppercase; letter-spacing: 0.06em;
+}
+.filter-chip__remove { all: unset; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; color: var(--color-gray-1); }
+.filter-chip__remove:hover { color: var(--color-white); background-color: rgba(231, 126, 35,0.25); }
+.filter-chip__remove:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 0; }
+
+/* ------------------------------------------------------------- SWITCH --- */
+/* Ein/Aus-Schalter ("Meine Aufträge"). <label class="krt-switch"><input
+   type="checkbox" role="switch"> Text</label>. Eckig. Aus = gefüllter Track mit
+   Grau-2-Rand, Knopf links grau; An = Orange-Track, Knopf rechts schwarz.
+   Zustand also über Position UND Farbe, nicht nur Farbe. */
+.krt-switch { display: inline-flex; align-items: center; gap: var(--space-3); min-height: var(--touch-target); cursor: pointer; color: var(--color-gray-1); font-weight: var(--fw-bold); font-size: var(--fs-sm); margin: 0; }
+.krt-switch input[type="checkbox"] {
+    appearance: none; -webkit-appearance: none; margin: 0; flex: none;
+    position: relative; width: 2.75rem; height: 1.5rem;
+    background-color: var(--control-bg); border: 1px solid var(--control-border);
+    cursor: pointer; transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+.krt-switch input[type="checkbox"]::after {
+    content: ''; position: absolute; top: 3px; left: 3px; width: calc(1.5rem - 8px); height: calc(1.5rem - 8px);
+    background-color: var(--color-gray-1); transform: none; transition: left 0.2s ease, background-color 0.2s ease;
+}
+.krt-switch input[type="checkbox"]:checked { background-color: var(--color-primary); border-color: var(--color-primary); }
+.krt-switch input[type="checkbox"]:checked::after { content: ''; left: calc(100% - (1.5rem - 8px) - 3px); top: 3px; background-color: var(--color-bg-black); transform: none; }
+.krt-switch input[type="checkbox"]:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+/* ===================================================================== */
+/* RADIUS — controls and surfaces use 4 px (--radius-sm). Pills, circles,  */
+/* table cells, accent bars and gauges keep their own shape. HUD brackets */
+/* sit on the corners.                                                    */
+/* ===================================================================== */
+.card, .hud-box, .krt-modal, .krt-confirm-dialog, .alert, .chip, .assoc-chip,
+.dept-tag, .status-badge, .admin-mode-chip, .count-badge, .filter-count, .filter-chip,
+.chip-select, .krt-segmented, .pagination .page-btn, .panel-header, .data-value,
+.multi-select-header, .multi-select-options, .autocomplete-items, .krt-combobox__listbox,
+.empty-state, .kpi-card, .kpi-total, .master-list, .detail-pane, .tree-table,
+.person-row, .drop-zone, .drop-hint, .annotation, .tree-note-box, .facts-bar,
+.markdown-content pre, .krt-switch input[type="checkbox"], .matrix-flag {
+    border-radius: var(--radius-sm);
+}
+input[type="checkbox"] { border-radius: 2px; }
+.krt-switch input[type="checkbox"]::after { border-radius: 2px; }
