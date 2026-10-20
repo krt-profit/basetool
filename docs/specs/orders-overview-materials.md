@@ -169,10 +169,13 @@ The order-overview list (`GET /orders`) MUST fetch one **server-side page** of o
 the former unbounded `size=1000` pull, rendering the shared pagination component (the `.pagination`
 page-nav + the square `.page-btn` size picker from `kernel/fragments/pagination.html`, REQ-INV-013 /
 REQ-API-005). The page sizes are **{50, 100, 200} with a default of 100** — a deliberate deviation
-from the shared 10/50/100 / default-50 contract — because the LOGISTICIAN drag-and-drop priority
-reorder operates on the rows of the **current page** (it derives the target priority from adjacent
-visible rows and re-renders the whole results fragment), so the active queue must comfortably fit
-on the first page in the common case. The default status filter (`OPEN`+`IN_PROGRESS`) keeps the
+from the shared 10/50/100 / default-50 contract — because the LOGISTICIAN priority reorder operates
+on the rows of the **current page** (it derives the target priority from adjacent visible rows and
+re-renders the whole results fragment), so the active queue must comfortably fit on the first page
+in the common case. The reorder works without dragging (REQ-UI-031): each queue row carries up/down
+buttons named „Auftrag #<Nr.> nach oben/unten verschieben", Alt+ArrowUp/ArrowDown moves the focused
+row, and a polite live region announces the new position; drag and drop stays as an extra on a fine
+pointer. The default status filter (`OPEN`+`IN_PROGRESS`) keeps the
 queue — the only draggable rows, since completed/rejected orders carry no priority — naturally
 bounded. A crafted out-of-list `size` snaps back to the default; the sort stays `priority,asc` so
 queue order is preserved across pages. Page and size links MUST keep the active status and
@@ -187,11 +190,16 @@ live **inside** the `ordersResults` AJAX-swap fragment so a filter change re-ren
   repeatable) params; changing the size jumps back to page 0.
 - [ ] The drag-reorder still persists and re-renders within the current page (sort stays
   `priority,asc`).
+- [ ] The up/down buttons and Alt+ArrowUp/ArrowDown move a queue row one place without a drag,
+  keep the focus on it and announce the move; the first row's up and the last row's down are
+  unavailable.
 - [ ] A `?size=` outside {50,100,200} falls back to 100; a negative `?page=` clamps to 0.
 
-**Enforced by:** `JobOrderPaginationMvcTest`, `JobOrderPageStatusFilterTest` (fetch URL) · **Code:**
+**Enforced by:** `JobOrderPaginationMvcTest`, `JobOrderPageStatusFilterTest` (fetch URL),
+`OrdersQueueReorderWithoutDragE2eTest` · **Code:**
 `JobOrderPageController.viewOrders` / `buildPaginationBaseUrl`, `templates/joborder/orders-index.html`,
-`templates/kernel/fragments/pagination.html` · **Issues:** #2 (performance audit)
+`static/js/joborder/orders-index-reorder.js`, `templates/kernel/fragments/pagination.html` ·
+**Issues:** #2 (performance audit), #2800
 
 ### REQ-ORDERS-022 — Overview surfaces the responsible (processing) org unit
 

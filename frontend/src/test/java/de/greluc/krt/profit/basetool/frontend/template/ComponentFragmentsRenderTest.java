@@ -46,8 +46,9 @@ class ComponentFragmentsRenderTest {
   @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
 
   /**
-   * Verifies the canonical classes and structure of the button, alert and data-table fragments,
-   * including that an alert with a {@code null} message renders nothing.
+   * Verifies the canonical classes and structure of the button, alert, reorder and data-table
+   * fragments, including that an alert with a {@code null} message renders nothing and that the
+   * reorder controls name their item and mark the unavailable end.
    */
   @Test
   void rendersButtonAlertAndDataTableFragmentsToSpec() {
@@ -64,6 +65,17 @@ class ComponentFragmentsRenderTest {
     assertThat(html).contains("class=\"alert alert-danger mt-2\"");
 
     assertThat(html).doesNotContain("alert-success");
+
+    assertThat(html).contains("aria-label=\"Move ITEM-X up\"");
+    assertThat(html).contains("aria-label=\"Move ITEM-X down\"");
+    assertThat(html).containsPattern("data-reorder-move=\"up\"[^>]*aria-disabled=\"true\"");
+    assertThat(html).containsPattern("data-reorder-move=\"down\"[^>]*aria-disabled=\"false\"");
+    assertThat(html).contains("aria-keyshortcuts=\"Alt+ArrowUp\"");
+    assertThat(html)
+        .contains(
+            "data-reorder-announce=\"{name} moved from position {from} to position {to} of"
+                + " {total}.\"");
+    assertThat(html).contains("aria-live=\"polite\"");
 
     assertThat(html).contains("class=\"table-responsive\"");
     assertThat(html).contains("class=\"krt-table\"");

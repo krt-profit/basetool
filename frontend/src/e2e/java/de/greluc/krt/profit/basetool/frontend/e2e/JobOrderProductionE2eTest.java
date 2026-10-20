@@ -195,7 +195,9 @@ class JobOrderProductionE2eTest {
     page.locator("#item-requestingOrgUnitId").selectOption(IRIDIUM_ID);
     page.locator("#item-handle").fill(handle);
 
-    page.getByTestId("order-item-combobox").first().click();
+    Locator itemCombobox = page.getByTestId("order-item-combobox").first();
+    itemCombobox.click();
+    itemCombobox.fill(ORDERABLE_ITEM_NAME);
     page.locator("li[role='option']")
         .filter(new Locator.FilterOptions().setHasText(ORDERABLE_ITEM_NAME))
         .first()

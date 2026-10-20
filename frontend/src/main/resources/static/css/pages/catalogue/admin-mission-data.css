@@ -79,4 +79,10 @@
     .draggable-row {
         cursor: grab;
     }
+
+    @media (pointer: coarse) {
+        .draggable-row {
+            cursor: auto;
+        }
+    }
 }

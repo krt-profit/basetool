@@ -2033,6 +2033,18 @@
         cursor: not-allowed;
     }
 
+    .krt-reorder {
+        display: inline-flex;
+        gap: 0.25rem;
+        align-items: center;
+        vertical-align: middle;
+    }
+
+    .krt-reorder__btn[aria-disabled='true'] {
+        opacity: 0.45;
+        cursor: not-allowed;
+    }
+
     .visually-hidden {
         position: absolute !important;
         width: 1px;

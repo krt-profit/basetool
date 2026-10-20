@@ -101,10 +101,10 @@
                     <th class="cell-actions"><span class="visually-hidden" th:text="#{general.open}">Öffnen</span></th>
                 </tr>
                 </thead>
-                <tbody>
+                <tbody th:with="queue=${orders.?[priority != null]}">
                 <tr th:each="order : ${orders}" data-testid="order-row"
                     th:with="reorderable=${#authorization.expression('hasRole(''LOGISTICIAN'')') and order.priority != null}"
-                    th:attr="data-id=${order.id}, data-priority=${order.priority}"
+                    th:attr="data-id=${order.id}, data-priority=${order.priority}, data-reorder-name=${reorderable} ? #{orders.index.reorderName(${order.displayId})} : null"
                     th:classappend="${reorderable} ? 'draggable-row' : ''"
                     th:draggable="${reorderable} ? 'true' : 'false'">
                     <td>
@@ -134,6 +134,10 @@
                         <span th:if="${reorderable}" class="orders-drag-handle" aria-hidden="true"
                               th:title="#{orders.index.dragHandle}">☰</span>
                         <span th:text="${order.priority != null ? order.priority : '-'}">1</span>
+                        <th:block th:if="${reorderable}">
+                            <span th:replace="~{kernel/fragments/components :: reorderControls(itemName=#{orders.index.reorderName(${order.displayId})},
+                                first=${queue[0].id == order.id}, last=${queue[#lists.size(queue) - 1].id == order.id})}"></span>
+                        </th:block>
                     </td>
                     <td th:attr="data-label=#{orders.index.requesting}">
                         <span th:if="${order.requestingOrgUnit != null}" class="squadron-badge"
@@ -206,6 +210,9 @@
         <nav th:replace="~{kernel/fragments/pagination :: pageSizePicker(pageResponse=${ordersPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
         </th:block>
     </div>
+    <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN)">
+        <p th:replace="~{kernel/fragments/components :: reorderLive}"></p>
+    </th:block>
     </section>
 </main>
 </th:block>

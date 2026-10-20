@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Reihenfolge ändern ohne Ziehen.** Die Prioritäten-Warteschlange unter „Aufträge“ und die Frequenztypen unter „Einsatzdaten verwalten“ lassen sich jetzt auch mit Pfeil-Knöpfen je Zeile oder mit Alt+Pfeil hoch/runter umsortieren; der Fokus bleibt auf dem verschobenen Eintrag, ein Screenreader hört die neue Position. Ziehen bleibt am Desktop zusätzlich erhalten, auf Touch-Geräten entfällt es (WCAG 2.5.7, REQ-UI-031).
+- **Trennpunkt in gestapelten Tabellen.** Auf dem Handy steht der `·` zwischen zwei Zellen nicht mehr am Zeilenende, wenn sich das Layout nach dem Laden noch verschiebt (z. B. in der Profitrechnung, wenn die Schrift nachlädt).
+
 ### Added
 
 - **Hangar-Import aus der „Star Citizen: Hangar Extension“.** „Schiffsliste importieren“ nimmt jetzt auch das JSON (`my-fleet-*.json`) und das CSV (`my-hangar-*.csv`) der Browser-Erweiterung an; übernommen werden nur Schiffe, keine Skins, Ausrüstung oder Komponenten. Gespeichert werden der Entwicklungsstand („Flugfähig“, „Konzept“, „In Produktion“) sowie Pledge-ID, -Datum, -Preis, schmelzbar und verschenkbar, sichtbar nur für dich und die Administration; ein erneuter Import oder das CSV nach dem JSON legt keine Schiffe doppelt an, sondern ergänzt die vorhandenen (Migration V309, REQ-HANGAR-015, ADR-0295).

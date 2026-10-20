@@ -63,9 +63,14 @@
         color: var(--color-primary);
     }
 
-    .orders-table .orders-materials-cell > * {
+    .orders-table .orders-materials-cell > *,
+    .orders-table .krt-reorder {
         position: relative;
         z-index: 1;
+    }
+
+    .orders-table .krt-reorder {
+        margin-left: var(--space-2);
     }
 
     .orders-table .ord-materials-toggle .toggle-icon {
