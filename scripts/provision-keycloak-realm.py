@@ -95,6 +95,7 @@ EXCHANGE_OFFLINE_SESSION_IDLE_SECONDS = 2592000
 EXCHANGE_OFFLINE_SESSION_MAX_SECONDS = 7776000
 EXCHANGE_SESSION_IDLE_SECONDS = 2592000
 EXCHANGE_SESSION_MAX_SECONDS = 7776000
+EXTENSION_SESSION_IDLE_SECONDS = 1209600
 
 EXCHANGE_SCOPES: list[tuple[str, str]] = [
     ("exchange.connect", "xchConsentConnect"),
@@ -590,6 +591,25 @@ def external_web_origins(entry: dict) -> list[str]:
     return origins
 
 
+def is_browser_extension(entry: dict) -> bool:
+    """Whether a third-party client has a browser-extension build (ADR-0303)."""
+    return bool(entry.get("extensionOrigins")) or bool(entry.get("firefoxExtension", False))
+
+
+def external_offline_idle_seconds(entry: dict) -> int:
+    """The offline session idle timeout: 14 days for a browser extension, else 30 days."""
+    if is_browser_extension(entry):
+        return EXTENSION_SESSION_IDLE_SECONDS
+    return EXCHANGE_OFFLINE_SESSION_IDLE_SECONDS
+
+
+def external_session_idle_seconds(entry: dict) -> int:
+    """The online session idle timeout: 14 days for a browser extension, else 30 days."""
+    if is_browser_extension(entry):
+        return EXTENSION_SESSION_IDLE_SECONDS
+    return EXCHANGE_SESSION_IDLE_SECONDS
+
+
 def external_client_spec(entry: dict) -> ClientSpec:
     """The template every approved third-party client follows (REQ-XCH-005, ADR-0217)."""
     return ClientSpec(
@@ -605,9 +625,9 @@ def external_client_spec(entry: dict) -> ClientSpec:
             "access.token.header.type.rfc9068": "false",
             "backchannel.logout.revoke.offline.tokens": "false",
             "backchannel.logout.session.required": "true",
-            "client.offline.session.idle.timeout": str(EXCHANGE_OFFLINE_SESSION_IDLE_SECONDS),
+            "client.offline.session.idle.timeout": str(external_offline_idle_seconds(entry)),
             "client.offline.session.max.lifespan": str(EXCHANGE_OFFLINE_SESSION_MAX_SECONDS),
-            "client.session.idle.timeout": str(EXCHANGE_SESSION_IDLE_SECONDS),
+            "client.session.idle.timeout": str(external_session_idle_seconds(entry)),
             "client.session.max.lifespan": str(EXCHANGE_SESSION_MAX_SECONDS),
             "client.use.lightweight.access.token.enabled": "false",
             "display.on.consent.screen": "false",

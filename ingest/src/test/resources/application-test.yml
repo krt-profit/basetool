@@ -13,7 +13,8 @@ spring:
 app:
   exchange:
     cors:
-      extension-origins: chrome-extension://abcdefghijklmnopabcdefghijklmnop
+      extension-origins: versekit=chrome-extension://abcdefghijklmnopabcdefghijklmnop,other-extension=chrome-extension://bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      firefox-clients: other-extension
   ingest:
     backend-base-url: http://localhost:19999
     frontend-base-url: http://localhost:18081

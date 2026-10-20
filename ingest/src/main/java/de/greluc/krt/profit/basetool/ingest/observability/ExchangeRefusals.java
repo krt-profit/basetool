@@ -67,6 +67,9 @@ public class ExchangeRefusals {
   /** The client is suspended. */
   public static final String CLIENT_SUSPENDED = "CLIENT_SUSPENDED";
 
+  /** A browser origin the token's client is not approved for. */
+  public static final String ORIGIN_NOT_ALLOWED = "ORIGIN_NOT_ALLOWED";
+
   /** The token's DPoP key is on the deny list. */
   public static final String INSTALLATION_REVOKED = "INSTALLATION_REVOKED";
 
@@ -115,6 +118,7 @@ public class ExchangeRefusals {
           EXCHANGE_DISABLED,
           CLIENT_NOT_ALLOWED,
           CLIENT_SUSPENDED,
+          ORIGIN_NOT_ALLOWED,
           INSTALLATION_REVOKED,
           CLIENT_REVOKED,
           SCOPE_MISSING,

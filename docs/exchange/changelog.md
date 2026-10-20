@@ -5,6 +5,15 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
 
 ## 2026-10-20
 
+- **New: an extension's origin is bound to its client.** A request whose `Origin` is another
+  client's extension id, a Firefox extension for a client without a Firefox build, or a web page is
+  refused with `403 ORIGIN_NOT_ALLOWED` ([errors](errors.md)). Requests without `Origin` are
+  unchanged.
+- **New: browser-extension clients sign in again after 14 idle days.** Their offline session ends
+  after 14 days without a refresh instead of 30 ([client security](client-security.md#browser-extensions)).
+- **New: a manifest change is reviewed again.** A release that changes the manifest's host
+  permissions, optional host permissions, content-script matches or `permissions` is reviewed
+  before it ships to members ([onboarding](onboarding.md)).
 - **New: browser extensions as clients.** Extensions for Chrome, Edge and Firefox on Manifest V3 can
   be approved under the [browser-extension requirements](client-security.md#browser-extensions):
   a non-extractable WebCrypto DPoP key, the refresh token in `storage.local`, host permissions only

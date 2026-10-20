@@ -228,6 +228,8 @@ public class SecurityConfig {
    *     target
    * @param corsConfigurationSource the extension-only CORS source of {@link
    *     #corsConfigurationSource(ExchangeCorsProperties)}
+   * @param exchangeCorsProperties binds each approved extension origin to its client in the {@link
+   *     ExchangeGateFilter}
    * @return the configured filter chain
    * @throws Exception propagated from {@link HttpSecurity#build()}
    */
@@ -247,7 +249,8 @@ public class SecurityConfig {
       ExchangeIdempotency exchangeIdempotency,
       ExchangeBudget exchangeBudget,
       ExchangeStoreProperties exchangeStoreProperties,
-      CorsConfigurationSource corsConfigurationSource)
+      CorsConfigurationSource corsConfigurationSource,
+      ExchangeCorsProperties exchangeCorsProperties)
       throws Exception {
     SecurityProblemResponseHandler securityProblems =
         new SecurityProblemResponseHandler(
@@ -328,7 +331,8 @@ public class SecurityConfig {
                 exchangeRefusals,
                 objectMapper,
                 loggingProperties,
-                meterRegistry),
+                meterRegistry,
+                exchangeCorsProperties),
             ExchangeTokenGateFilter.class)
         .addFilterAfter(
             new ExchangeLimitFilter(
