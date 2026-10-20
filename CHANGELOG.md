@@ -4,7 +4,7 @@
 
 ### Changed
 
-- **Material-Übersicht: Kacheln heben sich vom Hintergrund ab.** Die Material-Kacheln nutzen jetzt die dunklere Inset-Fläche des Design Systems (`.card--inset`) statt derselben Farbe wie das umgebende Panel.
+- **Kacheln heben sich vom Hintergrund ab.** Die Material-Kacheln der Material-Übersicht und die Statistik-Karte unter „Meine Spenden“ nutzen jetzt die dunklere Inset-Fläche des Design Systems (`.card--inset`) statt derselben Farbe wie das umgebende Panel.
 
 ### Fixed
 

@@ -22,7 +22,7 @@
     <section class="list-panel">
         <div id="supply-mine-results" th:data-live-sync-topic="${supplyLiveSyncTopic}">
         <th:block th:fragment="myDonationsResults">
-            <section class="card" th:if="${myStats != null}" data-testid="supply-my-stats">
+            <section class="card card--inset" th:if="${myStats != null}" data-testid="supply-my-stats">
                 <div class="kpi-grid">
                     <div class="kpi-total">
                         <div class="kpi-label" th:text="#{supply.mine.stats}">Meine Spenden insgesamt</div>
