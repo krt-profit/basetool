@@ -98,7 +98,11 @@ applies; these points replace or add to it.
   web session. No `<all_urls>`, no `cookies`, `webRequest` or `debugger` permission, and no Basetool
   origin in `externally_connectable`. The exchange host is a separate origin and reads no cookie.
 - Reach the sign-in endpoints — device authorization, token and revocation — through CORS, without
-  a host permission. Their answers allow your extension's origin once the client is registered.
+  a host permission. Their answers allow your extension's origin once the client is registered:
+  each Chrome or Edge origin exactly. Keycloak cannot match a pattern and refuses an unlisted
+  origin, so a client with a Firefox build is registered with `*` for that client alone, which also
+  lets web pages call these endpoints for your client id. Tokens stay DPoP-bound and the member
+  still confirms the code on the Basetool's verification page.
 - **A manifest change is reviewed again.** A release whose `manifest.json` changes the host
   permissions, optional host permissions, content-script matches or `permissions` is an
   admission-relevant change: link that release's manifest in the application issue, and ship it to

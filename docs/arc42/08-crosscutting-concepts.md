@@ -82,7 +82,9 @@ Beyond roles there are three mechanisms that are easy to miss:
   The gateway's CORS admits the approved `chrome-extension://<id>` origins and `moz-extension://*`
   on `/exchange/**` and nothing elsewhere, never with credentials; the web UI and Keycloak share
   `profit-base.online`, so an extension gets no host permission there and reaches Keycloak through
-  its Web Origins (REQ-XCH-027).
+  its Web Origins (REQ-XCH-027): the exact Chromium origins, and `*` per client — never realm-wide —
+  for a client with a Firefox build, which admits every web page to that client's sign-in endpoints
+  (risk in §11.7a).
 - **A token is accepted only from a named client** ([ADR-0270](../adr/0270-the-backend-accepts-tokens-only-from-named-clients.md)).
   `aud` says the token was minted for this API; `azp` says which client asked for it, and only
   `basetool-frontend` and `basetool-ingest-gateway` are accepted. The check is a validator on the

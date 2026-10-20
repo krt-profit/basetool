@@ -52,8 +52,11 @@ class MemberEditInPlaceE2eTest {
   private static final String MEMBER_USER = "test-member";
   private static final String MEMBER_PASSWORD = "test-member-pw";
 
-  /** The rank value the test assigns and then reads back from the backend. */
-  private static final int TARGET_RANK = 7;
+  /**
+   * The rank the test assigns and reads back, inside the KRT member range 13–20 that the backend
+   * enforces for {@code test-member} (REQ-ROLE-007).
+   */
+  private static final int TARGET_RANK = 15;
 
   private static Playwright playwright;
   private static Browser browser;
