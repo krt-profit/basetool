@@ -126,6 +126,10 @@
         opacity: 0.55;
     }
 
+    .kpi-card--inset {
+        background: var(--color-surface-input);
+    }
+
     .kpi-sparkline {
         stroke: var(--color-primary);
     }
@@ -772,7 +776,7 @@
         flex-direction: column;
         gap: 10px;
         padding: 14px 16px;
-        background: var(--color-bg-dark-gray);
+        background: var(--color-surface-input);
         border: var(--border-hairline);
         transition: border-color 0.15s;
     }

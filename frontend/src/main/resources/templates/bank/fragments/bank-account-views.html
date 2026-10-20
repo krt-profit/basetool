@@ -3,7 +3,7 @@
 <body>
 
 <div th:fragment="accGrid(cards)" class="bank-acc-grid mt-2">
-    <a th:each="card : ${cards}" class="kpi-card"
+    <a th:each="card : ${cards}" class="kpi-card kpi-card--inset"
        th:classappend="${card.account().status() == 'CLOSED'} ? ' kpi-card--closed' : ''"
        th:href="@{'/bank/accounts/' + ${card.account().id()}}"
        data-testid="bank-account-card"

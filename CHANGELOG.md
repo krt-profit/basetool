@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Kacheln heben sich vom Hintergrund ab.** Die Material-Kacheln der Material-Übersicht, die Statistik-Karte unter „Meine Spenden“ die Kennzahl-Kacheln in Materialbörse, Materialgesuch und „Meine Beurteilungen“ sowie die Kontokacheln der Kartellbank und der Org-Einheiten-Bank nutzen jetzt die dunklere Inset-Fläche des Design Systems (`.card--inset`, `.kpi-total--inset`, `.kpi-card--inset`) statt derselben Farbe wie das umgebende Panel.
+
 ### Fixed
 
 - **Reihenfolge ändern ohne Ziehen.** Die Prioritäten-Warteschlange unter „Aufträge“ und die Frequenztypen unter „Einsatzdaten verwalten“ lassen sich jetzt auch mit Pfeil-Knöpfen je Zeile oder mit Alt+Pfeil hoch/runter umsortieren; der Fokus bleibt auf dem verschobenen Eintrag, ein Screenreader hört die neue Position. Ziehen bleibt am Desktop zusätzlich erhalten, auf Touch-Geräten entfällt es (WCAG 2.5.7, REQ-UI-031).
