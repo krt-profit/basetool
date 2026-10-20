@@ -89,6 +89,7 @@ REALM_SETTINGS: dict[str, bool | int | str] = {
 }
 
 EXTERNAL_CLIENTS_FILE = Path(__file__).resolve().parent / "keycloak" / "external-clients.json"
+CHROMIUM_EXTENSION_ORIGIN = r"chrome-extension://[a-p]{32}"
 
 EXCHANGE_OFFLINE_SESSION_IDLE_SECONDS = 2592000
 EXCHANGE_OFFLINE_SESSION_MAX_SECONDS = 7776000
@@ -546,7 +547,10 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
 
 
 def load_external_clients(path: Path) -> list[dict]:
-    """Read and check the approved third-party clients, one `{clientId, name, description}` each."""
+    """Read and check the approved third-party clients, one `{clientId, name, description}` each.
+
+    A browser extension adds `extensionOrigins` and `firefoxExtension` (ADR-0303).
+    """
     try:
         entries = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
@@ -567,8 +571,23 @@ def load_external_clients(path: Path) -> list[dict]:
             raise SystemExit(f"{path}: clientId '{client_id}' is reserved or listed twice")
         if not isinstance(entry.get("name"), str) or not entry["name"].strip():
             raise SystemExit(f"{path}: client '{client_id}' needs a name for the consent page")
+        origins = entry.get("extensionOrigins", [])
+        if not isinstance(origins, list) or not all(
+                isinstance(o, str) and re.fullmatch(CHROMIUM_EXTENSION_ORIGIN, o) for o in origins):
+            raise SystemExit(f"{path}: client '{client_id}' lists extensionOrigins that are not "
+                             f"chrome-extension://<32 letters a-p> origins (ADR-0303)")
+        if not isinstance(entry.get("firefoxExtension", False), bool):
+            raise SystemExit(f"{path}: client '{client_id}' needs a true or false firefoxExtension")
         seen.add(client_id)
     return entries
+
+
+def external_web_origins(entry: dict) -> list[str]:
+    """The Web Origins of a third-party client: its Chromium extension origins, `*` for Firefox."""
+    origins = list(entry.get("extensionOrigins", []))
+    if entry.get("firefoxExtension", False):
+        origins.append("*")
+    return origins
 
 
 def external_client_spec(entry: dict) -> ClientSpec:
@@ -602,7 +621,7 @@ def external_client_spec(entry: dict) -> ClientSpec:
             "use.refresh.tokens": "true",
         },
         redirect_uris=[],
-        web_origins=[],
+        web_origins=external_web_origins(entry),
         default_scopes=["basic"],
         optional_scopes=[*EXCHANGE_SCOPE_NAMES, "offline_access"],
         withheld_scopes=["acr", "address", "email", "extractor-ingest", "extractor-ingest-only",

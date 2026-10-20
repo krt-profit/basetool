@@ -31,6 +31,7 @@ import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
+import de.greluc.krt.profit.basetool.ingest.config.ExchangeCorsProperties;
 import java.time.Instant;
 import java.util.Date;
 import java.util.List;
@@ -51,13 +52,20 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.web.cors.CorsConfiguration;
 
 /**
- * Unit tests for the opt-in audience validator (REQ-INGEST-002/-008): a token passes only when its
- * {@code aud} intersects the configured expected set.
+ * Unit tests for the opt-in audience validator (REQ-INGEST-002/-008), which passes a token only
+ * when its {@code aud} intersects the configured expected set, and for the extension-only CORS
+ * source (REQ-XCH-027).
  */
 class SecurityConfigTest {
 
   /** The gateway's own token audience (ADR-0018). */
   private static final List<String> EXPECTED = List.of("basetool-ingest");
+
+  /** An approved Chromium extension's origin. */
+  private static final String CHROME = "chrome-extension://abcdefghijklmnopabcdefghijklmnop";
+
+  /** A Firefox extension installation's origin. */
+  private static final String FIREFOX = "moz-extension://0b5c4a52-7f5e-4f0a-9d3e-2c1b0a9f8e7d";
 
   private static Jwt jwtWithAudience(List<String> audience) {
     return Jwt.withTokenValue("token")
@@ -182,19 +190,60 @@ class SecurityConfigTest {
   }
 
   @Test
-  void corsSourceAllowsNoOriginAndNoCredentials() {
-    MockHttpServletRequest request =
-        new MockHttpServletRequest("POST", "/exchange/v1/me/drafts/refinery-orders");
-    request.addHeader(HttpHeaders.ORIGIN, "https://evil.example");
+  void exchangeCorsAdmitsOnlyTheApprovedExtensionsAndNoCredentials() {
+    CorsConfiguration configuration = cors("/exchange/v1/me/ships/changes", List.of(CHROME), true);
 
-    CorsConfiguration configuration =
-        new SecurityConfig().corsConfigurationSource().getCorsConfiguration(request);
+    assertThat(configuration).isNotNull();
+    assertThat(configuration.getAllowCredentials()).isFalse();
+    assertThat(configuration.checkOrigin(CHROME)).isEqualTo(CHROME);
+    assertThat(configuration.checkOrigin(FIREFOX)).isEqualTo(FIREFOX);
+    assertThat(configuration.checkOrigin("chrome-extension://bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"))
+        .isNull();
+    assertThat(configuration.checkOrigin("https://evil.example")).isNull();
+    assertThat(configuration.checkOrigin("https://profit-base.online")).isNull();
+    assertThat(configuration.getAllowedMethods())
+        .containsExactlyInAnyOrder("GET", "POST", "OPTIONS");
+    assertThat(configuration.getAllowedHeaders())
+        .contains(
+            "Authorization", "DPoP", "Idempotency-Key", "User-Agent", "Exchange-Client-Agent");
+    assertThat(configuration.getExposedHeaders())
+        .contains("DPoP-Nonce", "WWW-Authenticate", "RateLimit", "RateLimit-Policy", "Retry-After");
+  }
+
+  @Test
+  void firefoxExtensionsCanBeSwitchedOff() {
+    CorsConfiguration configuration = cors("/exchange/v1/me/ships", List.of(CHROME), false);
+
+    assertThat(configuration).isNotNull();
+    assertThat(configuration.checkOrigin(FIREFOX)).isNull();
+    assertThat(configuration.checkOrigin(CHROME)).isEqualTo(CHROME);
+  }
+
+  @Test
+  void corsOutsideTheExchangeAllowsNoOriginAndNoCredentials() {
+    CorsConfiguration configuration = cors("/v1/refinery-orders", List.of(CHROME), true);
 
     assertThat(configuration).isNotNull();
     assertThat(configuration.getAllowedOriginPatterns()).isEmpty();
     assertThat(configuration.getAllowCredentials()).isFalse();
-    assertThat(configuration.checkOrigin("https://evil.example")).isNull();
-    assertThat(configuration.getAllowedMethods()).containsExactlyInAnyOrder("POST", "OPTIONS");
+    assertThat(configuration.checkOrigin(CHROME)).isNull();
+    assertThat(configuration.checkOrigin(FIREFOX)).isNull();
+  }
+
+  /**
+   * Resolves the CORS configuration the gateway applies to one request path.
+   *
+   * @param path the request path
+   * @param chromium the configured Chromium extension origins
+   * @param firefox whether Firefox extensions are admitted
+   * @return the configuration for that path
+   */
+  private static CorsConfiguration cors(String path, List<String> chromium, boolean firefox) {
+    MockHttpServletRequest request = new MockHttpServletRequest("OPTIONS", path);
+    request.addHeader(HttpHeaders.ORIGIN, CHROME);
+    return new SecurityConfig()
+        .corsConfigurationSource(new ExchangeCorsProperties(chromium, firefox))
+        .getCorsConfiguration(request);
   }
 
   /**

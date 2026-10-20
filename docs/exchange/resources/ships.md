@@ -37,6 +37,10 @@ other's ids. Per installation, a server ship has at most one `externalId`, and a
 points at at most one ship. The feed shows each ship's `externalId` for the calling installation
 only.
 
+An `externalId` never carries a purchase identifier such as an RSI pledge id, since purchase data is
+never exchanged. Derive it instead, for example as a SHA-256 hash of the pledge id and the ship's
+index in the pledge.
+
 **Link before you create.** The member's hangar is usually not empty — it may come from a Fleetview
 import or the web. On the first sync, pull the snapshot, match your ships to the server's, and send
 a `link` for every match. Only then `upsert` the ships without a match. A client that creates first

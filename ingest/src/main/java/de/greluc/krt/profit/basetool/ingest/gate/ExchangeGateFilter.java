@@ -255,7 +255,10 @@ public class ExchangeGateFilter extends OncePerRequestFilter {
       return null;
     }
     if (!ClientVersions.meets(
-        request.getHeader(HttpHeaders.USER_AGENT), client.minClientVersion())) {
+        ClientVersions.agent(
+            request.getHeader(ClientVersions.CLIENT_AGENT_HEADER),
+            request.getHeader(HttpHeaders.USER_AGENT)),
+        client.minClientVersion())) {
       refuse(
           label,
           response,

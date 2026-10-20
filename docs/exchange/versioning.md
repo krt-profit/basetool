@@ -42,6 +42,10 @@ on every request. A release below the minimum is refused with `403 CLIENT_VERSIO
 the member to update. A missing or unparseable `User-Agent` counts as older, and a pre-release of
 the minimum itself (`2.4.0-beta.1` against `2.4.0`) is below it.
 
+A client that cannot set its `User-Agent` — Chromium ignores one set by an extension — sends the
+same value in `Exchange-Client-Agent`. When that header holds text, the gateway compares it instead
+of the `User-Agent`.
+
 ## Where changes are announced
 
 Every contract change is listed, dated, in the [changelog](changelog.md).

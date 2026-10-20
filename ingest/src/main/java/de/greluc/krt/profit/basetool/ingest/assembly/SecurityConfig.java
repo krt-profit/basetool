@@ -26,10 +26,12 @@ import de.greluc.krt.profit.basetool.ingest.auth.ExchangeTokenGateFilter;
 import de.greluc.krt.profit.basetool.ingest.auth.IdentityProviderUnavailableFilter;
 import de.greluc.krt.profit.basetool.ingest.auth.PublicUriDpopAuthenticationConverter;
 import de.greluc.krt.profit.basetool.ingest.auth.SecurityProblemResponseHandler;
+import de.greluc.krt.profit.basetool.ingest.config.ExchangeCorsProperties;
 import de.greluc.krt.profit.basetool.ingest.config.ExchangeLimitProperties;
 import de.greluc.krt.profit.basetool.ingest.config.ExchangeStoreProperties;
 import de.greluc.krt.profit.basetool.ingest.config.IngestProperties;
 import de.greluc.krt.profit.basetool.ingest.config.LoggingProperties;
+import de.greluc.krt.profit.basetool.ingest.gate.ClientVersions;
 import de.greluc.krt.profit.basetool.ingest.gate.ExchangeGateFilter;
 import de.greluc.krt.profit.basetool.ingest.idempotency.ExchangeIdempotencyFilter;
 import de.greluc.krt.profit.basetool.ingest.limits.ExchangeLimitFilter;
@@ -84,8 +86,8 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Security configuration for the ingest gateway: a stateless JWT-bearer resource server with CSRF
- * ignored for {@code /exchange/**}, empty CORS and a {@code default-src 'none'} CSP
- * (REQ-INGEST-001).
+ * ignored for {@code /exchange/**}, CORS only for approved browser extensions on {@code
+ * /exchange/**} and a {@code default-src 'none'} CSP (REQ-INGEST-001).
  *
  * <p>Every exchange route requires an authenticated caller; the exchange filters decide the rest.
  */
@@ -93,6 +95,36 @@ import tools.jackson.databind.ObjectMapper;
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
+
+  /** The methods an extension may use cross-origin on {@code /exchange/**}. */
+  static final List<String> EXCHANGE_CORS_METHODS = List.of("GET", "POST", "OPTIONS");
+
+  /** The request headers an extension may send cross-origin on {@code /exchange/**}. */
+  static final List<String> EXCHANGE_CORS_REQUEST_HEADERS =
+      List.of(
+          "Authorization",
+          "DPoP",
+          "Content-Type",
+          "Accept",
+          "Accept-Language",
+          "Idempotency-Key",
+          "X-Correlation-Id",
+          "User-Agent",
+          ClientVersions.CLIENT_AGENT_HEADER);
+
+  /** The answer headers an extension may read cross-origin on {@code /exchange/**}. */
+  static final List<String> EXCHANGE_CORS_EXPOSED_HEADERS =
+      List.of(
+          "DPoP-Nonce",
+          "WWW-Authenticate",
+          "RateLimit",
+          "RateLimit-Policy",
+          "Retry-After",
+          "Idempotency-Replayed",
+          "X-Correlation-Id");
+
+  /** How long a browser may cache an exchange preflight answer, in seconds. */
+  static final long EXCHANGE_CORS_MAX_AGE_SECONDS = 600L;
 
   /**
    * Reduces {@code app.security.jwt.expected-audiences} to its non-blank entries; an empty result
@@ -184,8 +216,8 @@ public class SecurityConfig {
   }
 
   /**
-   * The single {@link SecurityFilterChain}: CSRF ignored for {@code /exchange/**}, empty CORS,
-   * locked-down headers, the authorization matrix, JWT resource server, the
+   * The single {@link SecurityFilterChain}: CSRF ignored for {@code /exchange/**}, the
+   * extension-only CORS, locked-down headers, the authorization matrix, JWT resource server, the
    * identity-provider-unavailable 503 and stateless sessions.
    *
    * @param http the Spring Security builder
@@ -194,6 +226,8 @@ public class SecurityConfig {
    * @param loggingProperties supplies the MDC key the {@link UserIdMdcFilter} writes the subject to
    * @param ingestProperties supplies the gateway's public origin, the DPoP {@code htu} comparison
    *     target
+   * @param corsConfigurationSource the extension-only CORS source of {@link
+   *     #corsConfigurationSource(ExchangeCorsProperties)}
    * @return the configured filter chain
    * @throws Exception propagated from {@link HttpSecurity#build()}
    */
@@ -212,7 +246,8 @@ public class SecurityConfig {
       ExchangeQuotas exchangeQuotas,
       ExchangeIdempotency exchangeIdempotency,
       ExchangeBudget exchangeBudget,
-      ExchangeStoreProperties exchangeStoreProperties)
+      ExchangeStoreProperties exchangeStoreProperties,
+      CorsConfigurationSource corsConfigurationSource)
       throws Exception {
     SecurityProblemResponseHandler securityProblems =
         new SecurityProblemResponseHandler(
@@ -226,7 +261,7 @@ public class SecurityConfig {
                 csrf.csrfTokenRepository(csrfRepo)
                     .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
                     .ignoringRequestMatchers("/exchange/**"))
-        .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+        .cors(cors -> cors.configurationSource(corsConfigurationSource))
         .headers(
             headers -> {
               headers.contentSecurityPolicy(
@@ -320,22 +355,30 @@ public class SecurityConfig {
   }
 
   /**
-   * CORS source with an empty allowlist and {@code allowCredentials=false}, rejecting all
-   * cross-origin browser traffic.
+   * CORS source admitting the approved browser-extension origins on {@code /exchange/**} and no
+   * origin anywhere else, never with credentials (REQ-XCH-027, ADR-0303).
    *
-   * @return a CORS source applied to all paths
+   * @param corsProperties the admitted extension origins
+   * @return a CORS source for the exchange paths, with an empty allowlist on all other paths
    */
   @NotNull
   @Bean
-  public CorsConfigurationSource corsConfigurationSource() {
-    CorsConfiguration configuration = new CorsConfiguration();
-    configuration.setAllowedOriginPatterns(List.of());
-    configuration.setAllowedMethods(List.of("POST", "OPTIONS"));
-    configuration.setAllowedHeaders(
-        List.of("Authorization", "Content-Type", "Accept", "Accept-Language", "X-Correlation-Id"));
-    configuration.setAllowCredentials(false);
+  public CorsConfigurationSource corsConfigurationSource(
+      @NotNull ExchangeCorsProperties corsProperties) {
+    CorsConfiguration exchange = new CorsConfiguration();
+    exchange.setAllowedOriginPatterns(corsProperties.allowedOriginPatterns());
+    exchange.setAllowedMethods(EXCHANGE_CORS_METHODS);
+    exchange.setAllowedHeaders(EXCHANGE_CORS_REQUEST_HEADERS);
+    exchange.setExposedHeaders(EXCHANGE_CORS_EXPOSED_HEADERS);
+    exchange.setAllowCredentials(false);
+    exchange.setMaxAge(EXCHANGE_CORS_MAX_AGE_SECONDS);
+    CorsConfiguration elsewhere = new CorsConfiguration();
+    elsewhere.setAllowedOriginPatterns(List.of());
+    elsewhere.setAllowedMethods(List.of("POST", "OPTIONS"));
+    elsewhere.setAllowCredentials(false);
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-    source.registerCorsConfiguration("/**", configuration);
+    source.registerCorsConfiguration("/exchange/**", exchange);
+    source.registerCorsConfiguration("/**", elsewhere);
     return source;
   }
 }

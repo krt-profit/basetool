@@ -76,6 +76,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -460,6 +461,50 @@ class ExchangeGateTest {
 
     registry(true, true, Set.of("exchange.connect", "exchange.stock.read"), "2.4.0");
     call(HttpMethod.GET, STOCK).andExpect(status().isOk());
+  }
+
+  @Test
+  void anExtensionThatCannotSetItsUserAgentIsGatedByItsClientAgent() throws Exception {
+    registry(true, true, Set.of("exchange.connect", "exchange.stock.read"), "2.4.0");
+    String browser = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/141.0.0.0";
+
+    callWithAgents(browser, null)
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("CLIENT_VERSION_UNSUPPORTED"));
+    callWithAgents(browser, "HangarExporter/2.3.0 (+https://example.org/hangar)")
+        .andExpect(status().isForbidden());
+    callWithAgents(browser, "HangarExporter/2.4.0 (+https://example.org/hangar)")
+        .andExpect(status().isOk());
+  }
+
+  /**
+   * Sends one stock read with a valid nonce under the given agent headers.
+   *
+   * @param userAgent the {@code User-Agent}
+   * @param clientAgent the {@code Exchange-Client-Agent}, or {@code null} to leave it out
+   * @return the result of the second, nonce-carrying attempt
+   * @throws Exception if the request fails
+   */
+  private @NotNull ResultActions callWithAgents(
+      @NotNull String userAgent, @Nullable String clientAgent) throws Exception {
+    String nonce =
+        mockMvc
+            .perform(
+                request(HttpMethod.GET, STOCK)
+                    .header(HttpHeaders.AUTHORIZATION, "DPoP " + TOKEN)
+                    .header("DPoP", ExchangeTestSupport.proof(key, TOKEN, "GET", STOCK, null)))
+            .andReturn()
+            .getResponse()
+            .getHeader(ExchangeTokenGateFilter.DPOP_NONCE_HEADER);
+    MockHttpServletRequestBuilder builder =
+        request(HttpMethod.GET, STOCK)
+            .header(HttpHeaders.AUTHORIZATION, "DPoP " + TOKEN)
+            .header(HttpHeaders.USER_AGENT, userAgent)
+            .header("DPoP", ExchangeTestSupport.proof(key, TOKEN, "GET", STOCK, nonce));
+    if (clientAgent != null) {
+      builder.header(ClientVersions.CLIENT_AGENT_HEADER, clientAgent);
+    }
+    return mockMvc.perform(builder);
   }
 
   /**

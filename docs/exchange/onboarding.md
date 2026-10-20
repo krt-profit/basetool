@@ -22,6 +22,13 @@ is public, case by case, and for the capabilities a client actually needs.
 - A published privacy statement and a security contact.
 - Only the capabilities the client's features need; each further capability is a new pull request to
   the approved-clients list before an administrator grants it.
+- For a browser extension (Chrome, Edge or Firefox, Manifest V3): the credential storage, the
+  minimal host permissions and the disconnect of the
+  [browser-extension requirements](client-security.md#browser-extensions), checked against the
+  manifest of the release you apply with. Give the fixed extension id of each Chrome or Edge build
+  and a link to that release's `manifest.json` in the application; the gateway and the sign-in
+  admit exactly those origins. The id may come from a `key` in the manifest or from a store; a
+  store listing, publication and code signing are not required.
 - Code signing of releases is recommended, not required.
 - Trying the client against the [sandbox](sandbox.md) before applying is recommended, not required.
 

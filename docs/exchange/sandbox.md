@@ -328,6 +328,24 @@ client, never in its user interface ([client security](client-security.md)). One
 switch everything at once: the issuer, the gateway's base URL and the extra trust anchor — for
 example `BASETOOL_EXCHANGE_SANDBOX=1`. A release build may ignore it altogether.
 
+### Browser extensions
+
+An extension's sandbox build talks to the sandbox the way a release talks to production
+([browser extensions](client-security.md#browser-extensions)): Keycloak through CORS, the gateway
+cross-origin. A build switch replaces the environment variable here, and a release build carries the
+production addresses only.
+
+- **Keycloak** answers any extension origin for `sandbox-client`, whose Web Origins are `*`.
+- **The gateway** admits every Firefox extension. For Chrome or Edge, set your unpacked extension's
+  origin in `SANDBOX_EXTENSION_ORIGINS` before you start the sandbox, for example
+  `SANDBOX_EXTENSION_ORIGINS=chrome-extension://<id> scripts/sandbox.sh up`
+  (on Windows, `$env:SANDBOX_EXTENSION_ORIGINS = '…'` first). The id is shown on
+  `chrome://extensions`; a `key` in the manifest keeps it the same across reloads and machines.
+  Several origins are separated by commas.
+- Firefox needs no setting; a temporary add-on loaded from `about:debugging` is enough here.
+- The browser must trust the test CA for `https://localhost:11262` ([trusting the test
+  CA](#trusting-the-test-ca)).
+
 ## Accounts
 
 Sign in with these on the device page. They exist only in the sandbox realm; none of them uses
@@ -348,8 +366,9 @@ account check; the others have none.
 
 `sandbox-client` is a third-party client exactly as the production provisioner creates an approved
 one: public, device grant only, consent required, DPoP-bound tokens, no redirect URI, every
-`exchange.*` scope and `offline_access` optional. The registry lists it `ACTIVE` with every
-capability and the default limits.
+`exchange.*` scope and `offline_access` optional. Its Web Origins are `*`, as for an approved
+extension with a Firefox build, so a browser extension can sign in with it. The registry lists it
+`ACTIVE` with every capability and the default limits.
 
 `sandbox-suspended-client` has the same shape, but the registry lists it `SUSPENDED`, with only
 `exchange.connect` and `exchange.blueprints.read`: every call with its token is refused with
