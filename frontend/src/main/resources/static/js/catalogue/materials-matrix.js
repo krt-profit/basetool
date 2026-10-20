@@ -104,7 +104,9 @@ function initMaterialsMatrix() {
         remove: config.getAttribute('data-label-remove') || '',
     };
 
-    const NUM = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 2 });
+    const NUM = new Intl.NumberFormat(document.documentElement.lang || undefined, {
+        maximumFractionDigits: 2,
+    });
     const MINUS = '−';
     const DASH = '–';
 

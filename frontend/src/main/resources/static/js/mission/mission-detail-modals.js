@@ -532,7 +532,14 @@ document.addEventListener('DOMContentLoaded', () => {
                             (f) => f && f.frequencyType && f.frequencyType.id === typeId,
                         );
                         if (match) {
-                            const formatted = Number(match.value).toFixed(2);
+                            const formatted = Number(match.value).toLocaleString(
+                                document.documentElement.lang || undefined,
+                                {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                    useGrouping: false,
+                                },
+                            );
                             /** @type {NodeListOf<HTMLElement>} */ (
                                 document.querySelectorAll(
                                     `.freq-value-display[data-freq-type-id="${typeId}"]`,

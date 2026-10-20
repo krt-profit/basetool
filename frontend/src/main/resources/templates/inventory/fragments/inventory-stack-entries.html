@@ -16,7 +16,7 @@
                       th:title="#{inventory.stolen.chip.title}" th:text="#{inventory.stolen.chip}">Gestohlen</span>
                 <span th:if="${!#lists.isEmpty(entry.donationAllocations)}" class="chip chip--primary" data-testid="donation-chip"
                       th:title="#{supply.lager.pledged.title(${#strings.listJoin(entry.donationAllocations.![receivingUnitName], ', ')})}"
-                      th:text="#{supply.lager.pledged(${#numbers.formatDecimal(#aggregates.sum(entry.donationAllocations.![amount]), 1, 'NONE', 3, 'DEFAULT')})}">Zugesagt</span>
+                      th:text="#{supply.lager.pledged(${#numbers.formatDecimal(#aggregates.sum(entry.donationAllocations.![amount]), 1, 'DEFAULT', 3, 'DEFAULT')})}">Zugesagt</span>
                 <div class="tree-fieldset">
                     <div class="tree-field">
                         <span class="tree-field-cap" th:text="#{inventory.order}">Auftrag</span>
@@ -36,7 +36,7 @@
                                   th:title="#{inventory.assoc.amount}">
                                 <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·
                                 <span class="assoc-chip__amt"
-                                      th:text="${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(a.amount, 1, 'NONE') : #numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
+                                      th:text="${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(a.amount, 1, 'DEFAULT') : #numbers.formatDecimal(a.amount, 1, 'DEFAULT', 3, 'DEFAULT')}">1.000</span>
                             </span>
                             <span class="assoc-add-wrap">
                                 <button type="button" class="assoc-add"
@@ -53,7 +53,7 @@
                                                     th:if="${order.requiredMaterialIds != null and #lists.contains(order.requiredMaterialIds, entry.material.id) and not #lists.contains(entry.jobOrderAllocations.![jobOrderId], order.id)}"
                                                     th:with="orderNeed=${orderNeedAmounts != null ? orderNeedAmounts.get(order.id + '|' + entry.material.id) : null}"
                                                     th:value="${order.id}"
-                                                    th:text="${orderNeed == null} ? ('#' + ${order.displayId}) : ('#' + ${order.displayId} + ' · ' + #{inventory.assoc.order.need(${(entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(orderNeed, 1, 'NONE') : #numbers.formatDecimal(orderNeed, 1, 'NONE', 3, 'DEFAULT')) + ' ' + (entry.material.quantityType == 'PIECE' ? #messages.msg('material.quantity.piece') : #messages.msg('material.quantity.scu'))})})"></option>
+                                                    th:text="${orderNeed == null} ? ('#' + ${order.displayId}) : ('#' + ${order.displayId} + ' · ' + #{inventory.assoc.order.need(${(entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(orderNeed, 1, 'DEFAULT') : #numbers.formatDecimal(orderNeed, 1, 'DEFAULT', 3, 'DEFAULT')) + ' ' + (entry.material.quantityType == 'PIECE' ? #messages.msg('material.quantity.piece') : #messages.msg('material.quantity.scu'))})})"></option>
                                         </select>
                                     </div>
                                     <div class="assoc-pop__menge" hidden data-assoc-pop-amount>
@@ -74,7 +74,7 @@
                             </span>
                             <span class="chip" data-assoc-rest
                                   th:classappend="${entry.jobOrderRest == null or (entry.jobOrderRest &gt;= -0.0005 and entry.jobOrderRest &lt;= 0.0005)} ? 'chip--success' : (${entry.jobOrderRest &lt; 0} ? 'chip--danger' : 'chip--muted')"
-                                  th:text="${entry.jobOrderRest == null or (entry.jobOrderRest &gt;= -0.0005 and entry.jobOrderRest &lt;= 0.0005)} ? #{inventory.assoc.rest.zero} : (${entry.jobOrderRest &lt; 0} ? #{inventory.assoc.rest.over(${(entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(-entry.jobOrderRest, 1, 'NONE') : #numbers.formatDecimal(-entry.jobOrderRest, 1, 'NONE', 3, 'DEFAULT'))})} : #{inventory.assoc.rest.free(${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(entry.jobOrderRest, 1, 'NONE') : #numbers.formatDecimal(entry.jobOrderRest, 1, 'NONE', 3, 'DEFAULT')})})">Rest 0</span>
+                                  th:text="${entry.jobOrderRest == null or (entry.jobOrderRest &gt;= -0.0005 and entry.jobOrderRest &lt;= 0.0005)} ? #{inventory.assoc.rest.zero} : (${entry.jobOrderRest &lt; 0} ? #{inventory.assoc.rest.over(${(entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(-entry.jobOrderRest, 1, 'DEFAULT') : #numbers.formatDecimal(-entry.jobOrderRest, 1, 'DEFAULT', 3, 'DEFAULT'))})} : #{inventory.assoc.rest.free(${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(entry.jobOrderRest, 1, 'DEFAULT') : #numbers.formatDecimal(entry.jobOrderRest, 1, 'DEFAULT', 3, 'DEFAULT')})})">Rest 0</span>
                         </div>
                     </div>
                     <div class="tree-field">
@@ -96,7 +96,7 @@
                                   th:title="#{inventory.assoc.amount}">
                                 <span th:text="${#strings.isEmpty(a.missionName)} ? #{inventory.assoc.mission.unknown} : ${a.missionName}">Nachtfalke</span> ·
                                 <span class="assoc-chip__amt"
-                                      th:text="${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(a.amount, 1, 'NONE') : #numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
+                                      th:text="${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(a.amount, 1, 'DEFAULT') : #numbers.formatDecimal(a.amount, 1, 'DEFAULT', 3, 'DEFAULT')}">1.000</span>
                             </span>
                             <span class="assoc-add-wrap">
                                 <button type="button" class="assoc-add"
@@ -133,14 +133,14 @@
                             </span>
                             <span class="chip" data-assoc-rest
                                   th:classappend="${entry.missionRest == null or (entry.missionRest &gt;= -0.0005 and entry.missionRest &lt;= 0.0005)} ? 'chip--success' : (${entry.missionRest &lt; 0} ? 'chip--danger' : 'chip--muted')"
-                                  th:text="${entry.missionRest == null or (entry.missionRest &gt;= -0.0005 and entry.missionRest &lt;= 0.0005)} ? #{inventory.assoc.rest.zero} : (${entry.missionRest &lt; 0} ? #{inventory.assoc.rest.over(${(entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(-entry.missionRest, 1, 'NONE') : #numbers.formatDecimal(-entry.missionRest, 1, 'NONE', 3, 'DEFAULT'))})} : #{inventory.assoc.rest.free(${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(entry.missionRest, 1, 'NONE') : #numbers.formatDecimal(entry.missionRest, 1, 'NONE', 3, 'DEFAULT')})})">Rest 0</span>
+                                  th:text="${entry.missionRest == null or (entry.missionRest &gt;= -0.0005 and entry.missionRest &lt;= 0.0005)} ? #{inventory.assoc.rest.zero} : (${entry.missionRest &lt; 0} ? #{inventory.assoc.rest.over(${(entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(-entry.missionRest, 1, 'DEFAULT') : #numbers.formatDecimal(-entry.missionRest, 1, 'DEFAULT', 3, 'DEFAULT'))})} : #{inventory.assoc.rest.free(${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(entry.missionRest, 1, 'DEFAULT') : #numbers.formatDecimal(entry.missionRest, 1, 'DEFAULT', 3, 'DEFAULT')})})">Rest 0</span>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="tree-cell tree-cell--num tree-amount" th:switch="${entry.material.quantityType}">
                 <span th:case="'PIECE'"><span th:text="${entry.amount != null ? #numbers.formatInteger(entry.amount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">Stück</span></span>
-                <span th:case="*"><span th:text="${entry.amount != null ? #numbers.formatDecimal(entry.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'}">10.500</span> <span class="tree-unit" th:text="#{material.quantity.scu}">SCU</span></span>
+                <span th:case="*"><span th:text="${entry.amount != null ? #numbers.formatDecimal(entry.amount, 1, 'DEFAULT', 3, 'DEFAULT') : '0.000'}">10.500</span> <span class="tree-unit" th:text="#{material.quantity.scu}">SCU</span></span>
             </div>
             <div class="tree-cell tree-cell--actions">
                 <label class="inv-boerse-toggle"
@@ -256,7 +256,7 @@
                       th:title="#{inventory.stolen.chip.title}" th:text="#{inventory.stolen.chip}">Gestohlen</span>
                 <span th:if="${!#lists.isEmpty(entry.donationAllocations)}" class="chip chip--primary" data-testid="donation-chip"
                       th:title="#{supply.lager.pledged.title(${#strings.listJoin(entry.donationAllocations.![receivingUnitName], ', ')})}"
-                      th:text="#{supply.lager.pledged(${#numbers.formatDecimal(#aggregates.sum(entry.donationAllocations.![amount]), 1, 'NONE', 3, 'DEFAULT')})}">Zugesagt</span>
+                      th:text="#{supply.lager.pledged(${#numbers.formatDecimal(#aggregates.sum(entry.donationAllocations.![amount]), 1, 'DEFAULT', 3, 'DEFAULT')})}">Zugesagt</span>
                 <div class="tree-fieldset">
                     <div class="tree-field">
                         <span class="tree-field-cap" th:text="#{inventory.order}">Auftrag</span>
@@ -276,7 +276,7 @@
                                   th:title="#{inventory.assoc.amount}">
                                 <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·
                                 <span class="assoc-chip__amt"
-                                      th:text="${#numbers.formatInteger(a.amount, 1, 'NONE')}">1</span>
+                                      th:text="${#numbers.formatInteger(a.amount, 1, 'DEFAULT')}">1</span>
                             </span>
                             <span class="assoc-add-wrap">
                                 <button type="button" class="assoc-add"
@@ -314,7 +314,7 @@
                             </span>
                             <span class="chip" data-assoc-rest
                                   th:classappend="${entry.jobOrderRest == null or (entry.jobOrderRest &gt;= -0.0005 and entry.jobOrderRest &lt;= 0.0005)} ? 'chip--success' : (${entry.jobOrderRest &lt; 0} ? 'chip--danger' : 'chip--muted')"
-                                  th:text="${entry.jobOrderRest == null or (entry.jobOrderRest &gt;= -0.0005 and entry.jobOrderRest &lt;= 0.0005)} ? #{inventory.assoc.rest.zero} : (${entry.jobOrderRest &lt; 0} ? #{inventory.assoc.rest.over(${#numbers.formatInteger(-entry.jobOrderRest, 1, 'NONE')})} : #{inventory.assoc.rest.free(${#numbers.formatInteger(entry.jobOrderRest, 1, 'NONE')})})">Rest 0</span>
+                                  th:text="${entry.jobOrderRest == null or (entry.jobOrderRest &gt;= -0.0005 and entry.jobOrderRest &lt;= 0.0005)} ? #{inventory.assoc.rest.zero} : (${entry.jobOrderRest &lt; 0} ? #{inventory.assoc.rest.over(${#numbers.formatInteger(-entry.jobOrderRest, 1, 'DEFAULT')})} : #{inventory.assoc.rest.free(${#numbers.formatInteger(entry.jobOrderRest, 1, 'DEFAULT')})})">Rest 0</span>
                         </div>
                     </div>
                 </div>
@@ -471,7 +471,7 @@
                                       th:title="#{inventory.assoc.amount}">
                                     <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·
                                     <span class="assoc-chip__amt"
-                                          th:text="${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(a.amount, 1, 'NONE') : #numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
+                                          th:text="${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(a.amount, 1, 'DEFAULT') : #numbers.formatDecimal(a.amount, 1, 'DEFAULT', 3, 'DEFAULT')}">1.000</span>
                                 </span>
                                 <span class="assoc-add-wrap">
                                     <button type="button" class="assoc-add"
@@ -488,7 +488,7 @@
                                                         th:if="${order.requiredMaterialIds != null and #lists.contains(order.requiredMaterialIds, entry.material.id) and not #lists.contains(entry.jobOrderAllocations.![jobOrderId], order.id)}"
                                                         th:with="orderNeed=${orderNeedAmounts != null ? orderNeedAmounts.get(order.id + '|' + entry.material.id) : null}"
                                                         th:value="${order.id}"
-                                                        th:text="${orderNeed == null} ? ('#' + ${order.displayId}) : ('#' + ${order.displayId} + ' · ' + #{inventory.assoc.order.need(${(entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(orderNeed, 1, 'NONE') : #numbers.formatDecimal(orderNeed, 1, 'NONE', 3, 'DEFAULT')) + ' ' + (entry.material.quantityType == 'PIECE' ? #messages.msg('material.quantity.piece') : #messages.msg('material.quantity.scu'))})})"></option>
+                                                        th:text="${orderNeed == null} ? ('#' + ${order.displayId}) : ('#' + ${order.displayId} + ' · ' + #{inventory.assoc.order.need(${(entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(orderNeed, 1, 'DEFAULT') : #numbers.formatDecimal(orderNeed, 1, 'DEFAULT', 3, 'DEFAULT')) + ' ' + (entry.material.quantityType == 'PIECE' ? #messages.msg('material.quantity.piece') : #messages.msg('material.quantity.scu'))})})"></option>
                                             </select>
                                         </div>
                                         <div class="assoc-pop__menge" hidden data-assoc-pop-amount>
@@ -513,12 +513,12 @@
                                       class="assoc-chip assoc-chip--order">
                                     <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·
                                     <span class="assoc-chip__amt"
-                                          th:text="${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(a.amount, 1, 'NONE') : #numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
+                                          th:text="${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(a.amount, 1, 'DEFAULT') : #numbers.formatDecimal(a.amount, 1, 'DEFAULT', 3, 'DEFAULT')}">1.000</span>
                                 </span>
                             </th:block>
                             <span class="chip" data-assoc-rest
                                   th:classappend="${entry.jobOrderRest == null or (entry.jobOrderRest &gt;= -0.0005 and entry.jobOrderRest &lt;= 0.0005)} ? 'chip--success' : (${entry.jobOrderRest &lt; 0} ? 'chip--danger' : 'chip--muted')"
-                                  th:text="${entry.jobOrderRest == null or (entry.jobOrderRest &gt;= -0.0005 and entry.jobOrderRest &lt;= 0.0005)} ? #{inventory.assoc.rest.zero} : (${entry.jobOrderRest &lt; 0} ? #{inventory.assoc.rest.over(${(entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(-entry.jobOrderRest, 1, 'NONE') : #numbers.formatDecimal(-entry.jobOrderRest, 1, 'NONE', 3, 'DEFAULT'))})} : #{inventory.assoc.rest.free(${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(entry.jobOrderRest, 1, 'NONE') : #numbers.formatDecimal(entry.jobOrderRest, 1, 'NONE', 3, 'DEFAULT')})})">Rest 0</span>
+                                  th:text="${entry.jobOrderRest == null or (entry.jobOrderRest &gt;= -0.0005 and entry.jobOrderRest &lt;= 0.0005)} ? #{inventory.assoc.rest.zero} : (${entry.jobOrderRest &lt; 0} ? #{inventory.assoc.rest.over(${(entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(-entry.jobOrderRest, 1, 'DEFAULT') : #numbers.formatDecimal(-entry.jobOrderRest, 1, 'DEFAULT', 3, 'DEFAULT'))})} : #{inventory.assoc.rest.free(${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(entry.jobOrderRest, 1, 'DEFAULT') : #numbers.formatDecimal(entry.jobOrderRest, 1, 'DEFAULT', 3, 'DEFAULT')})})">Rest 0</span>
                         </div>
                     </div>
                     <div class="tree-field">
@@ -541,7 +541,7 @@
                                       th:title="#{inventory.assoc.amount}">
                                     <span th:text="${#strings.isEmpty(a.missionName)} ? #{inventory.assoc.mission.unknown} : ${a.missionName}">Nachtfalke</span> ·
                                     <span class="assoc-chip__amt"
-                                          th:text="${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(a.amount, 1, 'NONE') : #numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
+                                          th:text="${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(a.amount, 1, 'DEFAULT') : #numbers.formatDecimal(a.amount, 1, 'DEFAULT', 3, 'DEFAULT')}">1.000</span>
                                 </span>
                                 <span class="assoc-add-wrap">
                                     <button type="button" class="assoc-add"
@@ -582,19 +582,19 @@
                                       class="assoc-chip assoc-chip--mission">
                                     <span th:text="${#strings.isEmpty(a.missionName)} ? #{inventory.assoc.mission.unknown} : ${a.missionName}">Nachtfalke</span> ·
                                     <span class="assoc-chip__amt"
-                                          th:text="${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(a.amount, 1, 'NONE') : #numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
+                                          th:text="${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(a.amount, 1, 'DEFAULT') : #numbers.formatDecimal(a.amount, 1, 'DEFAULT', 3, 'DEFAULT')}">1.000</span>
                                 </span>
                             </th:block>
                             <span class="chip" data-assoc-rest
                                   th:classappend="${entry.missionRest == null or (entry.missionRest &gt;= -0.0005 and entry.missionRest &lt;= 0.0005)} ? 'chip--success' : (${entry.missionRest &lt; 0} ? 'chip--danger' : 'chip--muted')"
-                                  th:text="${entry.missionRest == null or (entry.missionRest &gt;= -0.0005 and entry.missionRest &lt;= 0.0005)} ? #{inventory.assoc.rest.zero} : (${entry.missionRest &lt; 0} ? #{inventory.assoc.rest.over(${(entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(-entry.missionRest, 1, 'NONE') : #numbers.formatDecimal(-entry.missionRest, 1, 'NONE', 3, 'DEFAULT'))})} : #{inventory.assoc.rest.free(${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(entry.missionRest, 1, 'NONE') : #numbers.formatDecimal(entry.missionRest, 1, 'NONE', 3, 'DEFAULT')})})">Rest 0</span>
+                                  th:text="${entry.missionRest == null or (entry.missionRest &gt;= -0.0005 and entry.missionRest &lt;= 0.0005)} ? #{inventory.assoc.rest.zero} : (${entry.missionRest &lt; 0} ? #{inventory.assoc.rest.over(${(entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(-entry.missionRest, 1, 'DEFAULT') : #numbers.formatDecimal(-entry.missionRest, 1, 'DEFAULT', 3, 'DEFAULT'))})} : #{inventory.assoc.rest.free(${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(entry.missionRest, 1, 'DEFAULT') : #numbers.formatDecimal(entry.missionRest, 1, 'DEFAULT', 3, 'DEFAULT')})})">Rest 0</span>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="tree-cell tree-cell--num tree-amount" th:switch="${entry.material.quantityType}">
                 <span th:case="'PIECE'"><span th:text="${entry.amount != null ? #numbers.formatInteger(entry.amount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">Stück</span></span>
-                <span th:case="*"><span th:text="${entry.amount != null ? #numbers.formatDecimal(entry.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'}">10.500</span> <span class="tree-unit" th:text="#{material.quantity.scu}">SCU</span></span>
+                <span th:case="*"><span th:text="${entry.amount != null ? #numbers.formatDecimal(entry.amount, 1, 'DEFAULT', 3, 'DEFAULT') : '0.000'}">10.500</span> <span class="tree-unit" th:text="#{material.quantity.scu}">SCU</span></span>
             </div>
             <div class="tree-cell tree-cell--actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN)">
                 <button type="button" class="btn btn-ghost btn-xs btn-icon"
@@ -694,7 +694,7 @@
                                       th:title="#{inventory.assoc.amount}">
                                     <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·
                                     <span class="assoc-chip__amt"
-                                          th:text="${#numbers.formatInteger(a.amount, 1, 'NONE')}">1</span>
+                                          th:text="${#numbers.formatInteger(a.amount, 1, 'DEFAULT')}">1</span>
                                 </span>
                                 <span class="assoc-add-wrap">
                                     <button type="button" class="assoc-add"
@@ -736,12 +736,12 @@
                                       class="assoc-chip assoc-chip--order">
                                     <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·
                                     <span class="assoc-chip__amt"
-                                          th:text="${#numbers.formatInteger(a.amount, 1, 'NONE')}">1</span>
+                                          th:text="${#numbers.formatInteger(a.amount, 1, 'DEFAULT')}">1</span>
                                 </span>
                             </th:block>
                             <span class="chip" data-assoc-rest
                                   th:classappend="${entry.jobOrderRest == null or (entry.jobOrderRest &gt;= -0.0005 and entry.jobOrderRest &lt;= 0.0005)} ? 'chip--success' : (${entry.jobOrderRest &lt; 0} ? 'chip--danger' : 'chip--muted')"
-                                  th:text="${entry.jobOrderRest == null or (entry.jobOrderRest &gt;= -0.0005 and entry.jobOrderRest &lt;= 0.0005)} ? #{inventory.assoc.rest.zero} : (${entry.jobOrderRest &lt; 0} ? #{inventory.assoc.rest.over(${#numbers.formatInteger(-entry.jobOrderRest, 1, 'NONE')})} : #{inventory.assoc.rest.free(${#numbers.formatInteger(entry.jobOrderRest, 1, 'NONE')})})">Rest 0</span>
+                                  th:text="${entry.jobOrderRest == null or (entry.jobOrderRest &gt;= -0.0005 and entry.jobOrderRest &lt;= 0.0005)} ? #{inventory.assoc.rest.zero} : (${entry.jobOrderRest &lt; 0} ? #{inventory.assoc.rest.over(${#numbers.formatInteger(-entry.jobOrderRest, 1, 'DEFAULT')})} : #{inventory.assoc.rest.free(${#numbers.formatInteger(entry.jobOrderRest, 1, 'DEFAULT')})})">Rest 0</span>
                         </div>
                     </div>
                 </div>

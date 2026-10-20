@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-10-20
 - **Deciders:** @greluc
-- **Related:** REQ-UI-037 · REQ-INV-042 · REQ-INV-043 · REQ-BANK-065 · REQ-BANK-033 ·
+- **Related:** REQ-UI-037 · REQ-UI-038 · REQ-INV-042 · REQ-INV-043 · REQ-BANK-065 · REQ-BANK-033 ·
   REQ-NOTIF-031 · [`ui-design-system.md`](../specs/ui-design-system.md) ·
   [`inv-material-quantities.md`](../specs/inv-material-quantities.md) ·
   [ADR-0052](0052-bank-transfer-fee-borne-by-debited-account.md)
@@ -46,7 +46,10 @@ arrives. The in-game fee rate that answers it was readable by bank staff only.
    `scu-decimal-input.js` keeps only its parse and round helpers.
 6. **Notifications group their amount parameters at render time** in the member's language; the
    backend keeps storing locale-free values.
-7. **The transfer-fee rate is readable by every authenticated caller.** It is one org-wide
+7. **Printed numbers follow the same language**: templates format with `'DEFAULT'` instead of
+   `'POINT'` / `'COMMA'`, and amounts and quantities group thousands; scripts format through
+   `formatNumber` or the page language instead of `de-DE` or `toFixed` (REQ-UI-038).
+8. **The transfer-fee rate is readable by every authenticated caller.** It is one org-wide
    percentage with no account data, and the member-facing request dialog needs it for the
    „Mit Gebühr" line, which uses the page language's separators too.
 
@@ -61,8 +64,10 @@ arrives. The in-game fee rate that answers it was readable by bank staff only.
 - A script must not write a localized string into a number field; it assigns the number or its
   canonical string.
 - `GET /api/v1/bank/transfer-fee-rate` is open to members on the internal API.
-- The amounts the pages print through `#numbers.formatInteger(…, 'POINT')` keep their fixed point
-  outside the deposit fee cells; aligning those displays with the page language is separate work.
+- A new printed number uses `'DEFAULT'` in a template or `formatNumber` in a script; a fixed
+  `'POINT'`, `'COMMA'`, `de-DE` or `toFixed` for a shown number is a defect.
+- The PDF statements and exports keep their German labels and number format (bank spec, out of
+  scope).
 
 ## Alternatives considered
 

@@ -42,7 +42,7 @@
                         <td th:attr="data-label=#{purchasing.delegate.until}"
                             th:text="${d.validUntil() != null ? #temporals.format(d.validUntil(), 'dd.MM.yyyy') : '&ndash;'}">&ndash;</td>
                         <td class="num" th:attr="data-label=#{purchasing.delegate.limit}">
-                            <span th:text="#{purchasing.money(${#numbers.formatInteger(d.effectiveLimit(), 1, 'POINT')})}">0 aUEC</span>
+                            <span th:text="#{purchasing.money(${#numbers.formatInteger(d.effectiveLimit(), 1, 'DEFAULT')})}">0 aUEC</span>
                             <span class="cell-sub" th:if="${d.monthlyLimit() == null}" th:text="#{purchasing.delegate.limit.default}">Standard</span>
                         </td>
                         <td class="cell-status">

@@ -17,6 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { formatNumber } from '/js/kernel/krt-number-format.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { krtNumberInput } from '/js/kernel/krt-number-input.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
@@ -124,7 +125,9 @@ function fmtAmount(n, isPiece) {
     if (typeof n !== 'number' || isNaN(n)) {
         return '0';
     }
-    return isPiece ? String(Math.round(n)) : n.toFixed(3);
+    return isPiece
+        ? formatNumber(Math.round(n), 0, document.documentElement.lang)
+        : formatNumber(n, 3, document.documentElement.lang);
 }
 
 /**

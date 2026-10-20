@@ -2629,6 +2629,37 @@ caret, separator deletes) · **Code:** `static/js/kernel/krt-number-format.js`,
 `static/js/kernel/krt-number-input.js`, `kernel/fragments/head.html` · **Related:** REQ-BANK-065,
 REQ-INV-042, REQ-INV-043, REQ-NOTIF-031, REQ-FE-018, ADR-0305
 
+### REQ-UI-038 — Numbers on the pages use the separators of the page language
+
+Every number a page prints — amounts, balances, prices, quantities, qualities, percentages,
+frequencies, multipliers — uses the thousands and decimal separators of the page language, the same
+as the number fields of REQ-UI-037: `1.999.999,0` in German, `1,999,999.0` in English.
+
+- **Templates** format through `#numbers.formatInteger` / `formatDecimal` with `'DEFAULT'`, which
+  follows the request's language; no template passes `'POINT'` or `'COMMA'`. Amounts and quantities
+  group thousands; only mission frequencies keep `'NONE'`, since a channel has at most three integer
+  digits.
+- **Scripts** format through `formatNumber` of `kernel/krt-number-format.js` or
+  `toLocaleString(document.documentElement.lang)`; none hard-codes `de-DE` or uses `toFixed` for a
+  number it shows.
+- **Server-side text** a page prints (`MaterialTerminalPrices`, notification amounts of
+  REQ-NOTIF-031) uses the request's or member's locale.
+- **Out of scope:** the PDF statements and exports, which render German labels by design (bank
+  spec, out of scope).
+
+**Acceptance**
+
+- [x] On an English page a pending 600 000 aUEC deposit shows `600,000 aUEC` and
+  `With fee: 603,000 aUEC`; on a German page `600.000 aUEC` and `Mit Gebühr: 603.000 aUEC`.
+- [x] A required material amount of 1000 SCU renders `1.000,000` on a German page.
+- [x] A mission frequency renders `121,50` on a German page.
+
+**Enforced by:** `BankRequestsPatternRenderTest` (German and English), `JobOrderMaterialDemandRenderTest`,
+`MissionPageControllerMvcTest`, `NotificationRenderAmountsTest` · **Code:** the templates under
+`frontend/src/main/resources/templates`, `static/js/kernel/krt-number-format.js#formatNumber`,
+`catalogue/web/MaterialTerminalPrices` · **Related:** REQ-UI-037, REQ-NOTIF-031, REQ-BANK-065,
+ADR-0305
+
 ## Out of scope
 
 The brand assets themselves — their artwork, variants and rasters — are authored and versioned in

@@ -166,7 +166,7 @@
                                     <td class="orders-material-name" th:text="${mat.material.name}" th:title="${mat.material.name}">Titanium</td>
                                     <td class="num" th:switch="${mat.material.quantityType}">
                                         <span th:case="'PIECE'" th:text="|${mat.amount != null ? #numbers.formatInteger(mat.amount, 1) : '0'} #{material.quantity.piece}|"></span>
-                                        <span th:case="*" th:text="|${mat.amount != null ? #numbers.formatDecimal(mat.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
+                                        <span th:case="*" th:text="|${mat.amount != null ? #numbers.formatDecimal(mat.amount, 1, 'DEFAULT', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
                                     </td>
                                     <td th:unless="${ownScope}" class="num" th:attr="data-label=#{orders.material.progress}" th:text="${#numbers.formatDecimal(mat.amount > 0 ? (mat.currentStock >= mat.amount ? 100.0 : (mat.currentStock * 100.0 / mat.amount)) : 0, 1, 0)} + ' %'">0 %</td>
                                 </tr>
@@ -186,7 +186,7 @@
                                     <td class="orders-material-name" th:text="${agg.material != null ? agg.material.name() : '-'}" th:title="${agg.material != null ? agg.material.name() : '-'}">Titanium</td>
                                     <td class="num" th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
                                         <span th:case="'PIECE'" th:text="|${agg.totalQuantity != null ? #numbers.formatInteger(agg.totalQuantity, 1) : '0'} #{material.quantity.piece}|"></span>
-                                        <span th:case="*" th:text="|${agg.totalQuantity != null ? #numbers.formatDecimal(agg.totalQuantity, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
+                                        <span th:case="*" th:text="|${agg.totalQuantity != null ? #numbers.formatDecimal(agg.totalQuantity, 1, 'DEFAULT', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
                                     </td>
                                     <td th:unless="${ownScope}" class="num" th:attr="data-label=#{orders.material.progress}" th:text="${#numbers.formatDecimal((agg.totalQuantity != null and agg.totalQuantity > 0) ? ((agg.currentStock != null ? agg.currentStock : 0) >= agg.totalQuantity ? 100.0 : ((agg.currentStock != null ? agg.currentStock : 0) * 100.0 / agg.totalQuantity)) : 0, 1, 0)} + ' %'">0 %</td>
                                 </tr>

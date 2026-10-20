@@ -68,12 +68,12 @@
                 <div class="bank-tiers__seg bank-tiers__seg--employee">
                     <span class="bank-tiers__name" th:text="#{bank.cartelLadder.tier.employee}">Bankmitarbeiter</span>
                     <span class="bank-tiers__range" data-tier-range="employee"
-                          th:text="${t1 != null} ? #{bank.manage.krt.upTo(${#numbers.formatInteger(@moneyFormat.round(t1), 1, 'POINT')})} : #{bank.cartelLadder.none}">bis 250.000</span>
+                          th:text="${t1 != null} ? #{bank.manage.krt.upTo(${#numbers.formatInteger(@moneyFormat.round(t1), 1, 'DEFAULT')})} : #{bank.cartelLadder.none}">bis 250.000</span>
                 </div>
                 <div class="bank-tiers__seg bank-tiers__seg--management">
                     <span class="bank-tiers__name" th:text="#{bank.cartelLadder.tier.bankManagement}">Bankleitung</span>
                     <span class="bank-tiers__range" data-tier-range="management"
-                          th:text="${t2 != null} ? #{bank.manage.krt.upTo(${#numbers.formatInteger(@moneyFormat.round(t2), 1, 'POINT')})} : #{bank.cartelLadder.above}">bis 2.000.000</span>
+                          th:text="${t2 != null} ? #{bank.manage.krt.upTo(${#numbers.formatInteger(@moneyFormat.round(t2), 1, 'DEFAULT')})} : #{bank.cartelLadder.above}">bis 2.000.000</span>
                 </div>
                 <div class="bank-tiers__seg bank-tiers__seg--ol">
                     <span class="bank-tiers__name" th:text="#{bank.cartelLadder.tier.ol}">Organisationsleitung</span>
@@ -83,8 +83,8 @@
             </div>
             <div class="bank-tiers__scale" aria-hidden="true">
                 <span>0</span>
-                <span data-tier-mark="t1" th:text="${t1 != null} ? ${#numbers.formatInteger(@moneyFormat.round(t1), 1, 'POINT')} : '0'">250.000</span>
-                <span data-tier-mark="t2" th:text="${t2 != null} ? ${#numbers.formatInteger(@moneyFormat.round(t2), 1, 'POINT')} : '&#8734;'">2.000.000</span>
+                <span data-tier-mark="t1" th:text="${t1 != null} ? ${#numbers.formatInteger(@moneyFormat.round(t1), 1, 'DEFAULT')} : '0'">250.000</span>
+                <span data-tier-mark="t2" th:text="${t2 != null} ? ${#numbers.formatInteger(@moneyFormat.round(t2), 1, 'DEFAULT')} : '&#8734;'">2.000.000</span>
             </div>
 
             <div class="bank-tiers__fields">
@@ -115,8 +115,8 @@
 
             <div class="alert alert-info bank-tiers__example" data-testid="bank-krt-example"
                  th:attr="data-template=#{bank.manage.krt.example('{0}')},data-template-ol=#{bank.manage.krt.exampleOl('{0}')}">
-                <span data-tier-example th:text="#{bank.manage.krt.example(${t1 != null ? #numbers.formatInteger(@moneyFormat.round(t1), 1, 'POINT') : '0'})}">Beispiel: Eine Auszahlung &uuml;ber 250.000 aUEC braucht die Freigabe der Bankleitung.</span>
-                <span data-tier-example-ol th:text="${t2 != null} ? #{bank.manage.krt.exampleOl(${#numbers.formatInteger(@moneyFormat.round(t2), 1, 'POINT')})} : ''">&Uuml;ber 2.000.000 aUEC gibt die Organisationsleitung frei.</span>
+                <span data-tier-example th:text="#{bank.manage.krt.example(${t1 != null ? #numbers.formatInteger(@moneyFormat.round(t1), 1, 'DEFAULT') : '0'})}">Beispiel: Eine Auszahlung &uuml;ber 250.000 aUEC braucht die Freigabe der Bankleitung.</span>
+                <span data-tier-example-ol th:text="${t2 != null} ? #{bank.manage.krt.exampleOl(${#numbers.formatInteger(@moneyFormat.round(t2), 1, 'DEFAULT')})} : ''">&Uuml;ber 2.000.000 aUEC gibt die Organisationsleitung frei.</span>
             </div>
         </form>
     </section>
@@ -144,7 +144,7 @@
                 <td th:attr="data-label=#{bank.manage.account.ref}"
                     th:text="${a.orgUnit() != null ? a.orgUnit().name() : (a.areaName() != null ? a.areaName() : '—')}">IRIDIUM</td>
                 <td class="num"
-                    th:text="${#numbers.formatInteger(@moneyFormat.round(a.balance()), 1, 'POINT')}">1.850.000</td>
+                    th:text="${#numbers.formatInteger(@moneyFormat.round(a.balance()), 1, 'DEFAULT')}">1.850.000</td>
                 <td class="cell-status">
                     <span class="status-pill"
                           th:classappend="${a.status() == 'ACTIVE'} ? ' status-active' : ' status-completed'"
@@ -222,7 +222,7 @@
                               th:text="${h.roleManaged()} ? #{bank.holder.source.auto} : #{bank.holder.source.manual}">Auto</span>
                     </td>
                     <td class="num" th:attr="data-label=#{bank.manage.holder.total}"
-                        th:text="${#numbers.formatInteger(@moneyFormat.round(h.totalHeld()), 1, 'POINT')}">1.000.000</td>
+                        th:text="${#numbers.formatInteger(@moneyFormat.round(h.totalHeld()), 1, 'DEFAULT')}">1.000.000</td>
                     <td class="cell-status">
                         <span class="status-pill"
                               th:classappend="${h.active()} ? ' status-active' : ' status-completed'"

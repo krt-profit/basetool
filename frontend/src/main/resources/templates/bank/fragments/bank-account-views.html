@@ -18,11 +18,11 @@
                   th:text="${card.account().status() == 'CLOSED'} ? #{bank.account.status.CLOSED} : #{'bank.account.type.' + ${card.account().type()}}">Staffel</span>
         </div>
         <div class="kpi-value"
-             th:text="${#numbers.formatInteger(@moneyFormat.round(card.account().balance()), 1, 'POINT')} + ' aUEC'">1.850.000 aUEC</div>
+             th:text="${#numbers.formatInteger(@moneyFormat.round(card.account().balance()), 1, 'DEFAULT')} + ' aUEC'">1.850.000 aUEC</div>
         <div class="kpi-card-foot">
             <span class="kpi-delta"
                   th:classappend="${card.account().delta30d().signum() > 0} ? ' kpi-delta--pos' : (${card.account().delta30d().signum() < 0} ? ' kpi-delta--neg' : ' kpi-delta--flat')"
-                  th:text="${card.account().delta30d().signum() > 0 ? '&#9650; +' : (card.account().delta30d().signum() < 0 ? '&#9660; ' : '&#177; ')} + ${#numbers.formatInteger(@moneyFormat.round(card.account().delta30d()), 1, 'POINT')} + ' ' + #{bank.dashboard.delta30}">&#9650; +420.000 / 30 T</span>
+                  th:text="${card.account().delta30d().signum() > 0 ? '&#9650; +' : (card.account().delta30d().signum() < 0 ? '&#9660; ' : '&#177; ')} + ${#numbers.formatInteger(@moneyFormat.round(card.account().delta30d()), 1, 'DEFAULT')} + ' ' + #{bank.dashboard.delta30}">&#9650; +420.000 / 30 T</span>
             <svg th:if="${card.sparklinePoints() != null}" width="96" height="26" viewBox="0 0 96 26" aria-hidden="true">
                 <polyline th:attr="points=${card.sparklinePoints()}"
                           th:classappend="${card.flat()} ? ' kpi-sparkline--flat' : ''"
@@ -57,11 +57,11 @@
                       th:text="${card.account().status() == 'CLOSED'} ? #{bank.account.status.CLOSED} : #{'bank.account.type.' + ${card.account().type()}}">Staffel</span>
             </td>
             <td class="text-right"
-                th:text="${#numbers.formatInteger(@moneyFormat.round(card.account().balance()), 1, 'POINT')} + ' aUEC'">1.850.000 aUEC</td>
+                th:text="${#numbers.formatInteger(@moneyFormat.round(card.account().balance()), 1, 'DEFAULT')} + ' aUEC'">1.850.000 aUEC</td>
             <td>
                 <span class="kpi-delta"
                       th:classappend="${card.account().delta30d().signum() > 0} ? ' kpi-delta--pos' : (${card.account().delta30d().signum() < 0} ? ' kpi-delta--neg' : ' kpi-delta--flat')"
-                      th:text="${card.account().delta30d().signum() > 0 ? '&#9650; +' : (card.account().delta30d().signum() < 0 ? '&#9660; ' : '&#177; ')} + ${#numbers.formatInteger(@moneyFormat.round(card.account().delta30d()), 1, 'POINT')}">&#9650; +420.000</span>
+                      th:text="${card.account().delta30d().signum() > 0 ? '&#9650; +' : (card.account().delta30d().signum() < 0 ? '&#9660; ' : '&#177; ')} + ${#numbers.formatInteger(@moneyFormat.round(card.account().delta30d()), 1, 'DEFAULT')}">&#9650; +420.000</span>
             </td>
             <td>
                 <svg th:if="${card.sparklinePoints() != null}" width="96" height="26" viewBox="0 0 96 26" aria-hidden="true">

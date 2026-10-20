@@ -27,17 +27,17 @@
     <div class="kpi-total">
         <div class="kpi-label" th:text="#{bank.detail.balance}">Kontosaldo</div>
         <div class="kpi-value" th:attr="data-testid=${balanceTestId}"
-             th:text="${#numbers.formatInteger(@moneyFormat.round(acct.balance()), 1, 'POINT')} + ' aUEC'">3.148.200 aUEC</div>
+             th:text="${#numbers.formatInteger(@moneyFormat.round(acct.balance()), 1, 'DEFAULT')} + ' aUEC'">3.148.200 aUEC</div>
     </div>
     <div class="kpi-total" th:attr="data-testid=${targetTestId}">
         <th:block th:if="${hasTarget}">
             <div class="kpi-label"
-                 th:text="#{bank.detail.kpi.target(${#numbers.formatInteger(@moneyFormat.round(acct.balanceTarget()), 1, 'POINT')})}">Ziel 5.000.000</div>
+                 th:text="#{bank.detail.kpi.target(${#numbers.formatInteger(@moneyFormat.round(acct.balanceTarget()), 1, 'DEFAULT')})}">Ziel 5.000.000</div>
             <div class="meter bank-kpi-meter" aria-hidden="true">
                 <i class="meter__fill--warning" th:attr="data-krtm-width=${pct > 100 ? 100 : (pct < 0 ? 0 : pct)}"></i>
             </div>
             <div class="kpi-sub"
-                 th:text="#{bank.detail.kpi.targetReached(${#numbers.formatInteger(pct, 1, 'POINT')})}">63 % erreicht</div>
+                 th:text="#{bank.detail.kpi.targetReached(${#numbers.formatInteger(pct, 1, 'DEFAULT')})}">63 % erreicht</div>
         </th:block>
         <th:block th:unless="${hasTarget}">
             <div class="kpi-label" th:text="#{bank.chart.legend.target}">Ziel</div>
@@ -48,7 +48,7 @@
         <div class="kpi-label" th:text="#{bank.detail.delta30}">&#177; 30 Tage</div>
         <div class="kpi-value"
              th:classappend="${delta.signum() > 0} ? ' bank-amount--pos' : (${delta.signum() < 0} ? ' bank-amount--neg' : '')"
-             th:text="${delta.signum() > 0 ? '+' : ''} + ${#numbers.formatInteger(@moneyFormat.round(delta), 1, 'POINT')}">+412.600</div>
+             th:text="${delta.signum() > 0 ? '+' : ''} + ${#numbers.formatInteger(@moneyFormat.round(delta), 1, 'DEFAULT')}">+412.600</div>
     </div>
     <div class="kpi-total">
         <div class="kpi-label" th:text="#{bank.detail.bookings}">Buchungen</div>
@@ -180,13 +180,13 @@
                 <td class="num bank-booking-amount">
                     <span class="bank-amount"
                           th:classappend="${b.amount().signum() > 0} ? ' bank-amount--pos' : (${b.amount().signum() < 0} ? ' bank-amount--neg' : ' bank-amount--zero')"
-                          th:text="${b.amount().signum() > 0 ? '+' : ''} + ${#numbers.formatInteger(@moneyFormat.round(b.amount()), 1, 'POINT')}">+240.000</span>
+                          th:text="${b.amount().signum() > 0 ? '+' : ''} + ${#numbers.formatInteger(@moneyFormat.round(b.amount()), 1, 'DEFAULT')}">+240.000</span>
                     <span class="cell-sub bank-fee-note" th:attr="data-testid=${testIdPrefix + '-fee'}"
                           th:if="${b.transferFee() != null and b.transferFee().signum() > 0 and b.amount().signum() < 0}"
-                          th:text="#{bank.fee.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.transferFee()), 1, 'POINT')} + ' &middot; ' + #{bank.fee.net.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.amount().abs().subtract(b.transferFee())), 1, 'POINT')}">Geb&uuml;hr 25 &middot; kommt an 4.975</span>
+                          th:text="#{bank.fee.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.transferFee()), 1, 'DEFAULT')} + ' &middot; ' + #{bank.fee.net.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.amount().abs().subtract(b.transferFee())), 1, 'DEFAULT')}">Geb&uuml;hr 25 &middot; kommt an 4.975</span>
                 </td>
                 <td class="num bank-balance-after" th:attr="data-label=#{bank.booking.balanceAfter}"
-                    th:text="${after != null} ? ${#numbers.formatInteger(@moneyFormat.round(after), 1, 'POINT')} : '&ndash;'">3.148.200</td>
+                    th:text="${after != null} ? ${#numbers.formatInteger(@moneyFormat.round(after), 1, 'DEFAULT')} : '&ndash;'">3.148.200</td>
                 <th:block th:if="${staff}">
                     <td class="cell-actions"
                         sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).BANK_MANAGEMENT)">

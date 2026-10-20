@@ -1,4 +1,5 @@
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { formatNumber } from '/js/kernel/krt-number-format.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
@@ -550,7 +551,7 @@ function renderQualityBlock(group, groupIndex) {
         }
         if (banded[0] && banded[0].modifierAtMaxQuality != null) {
             hintParts.push(
-                `${Math.round(qmax)} → ×${Number(banded[0].modifierAtMaxQuality).toFixed(2)}`,
+                `${formatNumber(Math.round(qmax), 0, document.documentElement.lang)} → ×${formatNumber(banded[0].modifierAtMaxQuality, 2, document.documentElement.lang)}`,
             );
         }
         if (hintParts.length > 0) {
@@ -565,7 +566,7 @@ function renderQualityBlock(group, groupIndex) {
             range.setAttribute('aria-valuetext', `${Math.round(q)} / ${Math.round(qmax)}`);
             chips.forEach((c) => {
                 const value = computeModifierValue(c.modifier, q);
-                c.out.textContent = `×${value == null ? '?' : value.toFixed(2)}`;
+                c.out.textContent = `×${value == null ? '?' : formatNumber(value, 2, document.documentElement.lang)}`;
             });
         }
         range.addEventListener('input', compute);
@@ -573,7 +574,8 @@ function renderQualityBlock(group, groupIndex) {
     } else {
         chips.forEach((c) => {
             const v = c.modifier.modifierAtMaxQuality;
-            c.out.textContent = v == null ? '–' : `×${Number(v).toFixed(2)}`;
+            c.out.textContent =
+                v == null ? '–' : `×${formatNumber(v, 2, document.documentElement.lang)}`;
         });
     }
 
@@ -597,7 +599,9 @@ function renderIngredientLine(ing) {
         if (ing.quantityType === 'PIECE') {
             metaParts.push(`${Math.round(Number(ing.quantityScu))} ${unitLabel('PIECE')}`);
         } else {
-            metaParts.push(`${Number(ing.quantityScu).toFixed(2)} ${unitLabel('SCU')}`);
+            metaParts.push(
+                `${formatNumber(ing.quantityScu, 2, document.documentElement.lang)} ${unitLabel('SCU')}`,
+            );
         }
     }
     if (ing.quantityUnits != null) {

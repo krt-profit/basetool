@@ -67,7 +67,7 @@ export function applyConfirmModalState(trigger, modal) {
             if (percentEl) {
                 percentEl.textContent = Math.round(
                     Number(trigger.getAttribute('data-field-splitpercent')),
-                ).toLocaleString('de-DE');
+                ).toLocaleString(document.documentElement.lang || undefined);
             }
         }
     }

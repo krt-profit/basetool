@@ -83,7 +83,7 @@
                             <td class="num" th:attr="data-label=#{purchasing.deal.amount}"
                                 th:text="#{purchasing.deal.amountOf(${d.acceptedAmount()}, ${d.amount()}, #{'purchasing.unit.' + ${d.quantityType()}})}">3 von 10 SCU</td>
                             <td class="num" th:attr="data-label=#{purchasing.deal.total}"
-                                th:text="#{purchasing.money(${#numbers.formatInteger(d.total(), 1, 'POINT')})}">10.000 aUEC</td>
+                                th:text="#{purchasing.money(${#numbers.formatInteger(d.total(), 1, 'DEFAULT')})}">10.000 aUEC</td>
                             <td class="cell-status">
                                 <th:block th:replace="~{purchasing/fragments/status-chip :: chip(labelKey=${'purchasing.deal.status.' + d.status()}, status=${d.status()})}"></th:block>
                                 <span class="chip chip--warning" th:if="${d.overdue()}" data-testid="purchasing-overdue"

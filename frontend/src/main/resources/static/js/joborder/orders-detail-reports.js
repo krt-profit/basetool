@@ -19,6 +19,7 @@
 
 /* global MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_OWNER, MSG_LOCATION, MSG_STOLEN, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_LOAD_ERROR, MSG_INVENTORY_BELOW_FLOOR, MSG_INVENTORY_PART_OF, MSG_INVENTORY_UNLINK_TOOLTIP, IS_LOGISTICIAN, ORDER_REQUESTING_SQUADRON_ID, ORDER_HANDOVER_I18N */
 
+import { formatNumber } from '/js/kernel/krt-number-format.js';
 import {
     cachedInventoryItems,
     fillPlaceholders,
@@ -406,12 +407,16 @@ export async function toggleInventory(row) {
             const quality = item.quality !== null ? item.quality : '-';
             const unit = amountType ? amountType : '';
             const counted = attribution ? attribution.here.get(item.id) : undefined;
-            const total = item.amount !== null ? item.amount.toFixed(3) : '0.000';
+            const total = formatNumber(
+                item.amount !== null ? item.amount : 0,
+                3,
+                document.documentElement.lang,
+            );
             let quantity = `${total} ${unit}`;
             if (counted !== undefined && Math.abs(counted - (item.amount || 0)) > 0.0005) {
                 quantity = MSG_INVENTORY_PART_OF.replace(
                     '{0}',
-                    `${counted.toFixed(3)} ${unit}`,
+                    `${formatNumber(counted, 3, document.documentElement.lang)} ${unit}`,
                 ).replace('{1}', `${total} ${unit}`);
             }
             if (attribution && counted === undefined && attribution.unattributed.has(item.id)) {

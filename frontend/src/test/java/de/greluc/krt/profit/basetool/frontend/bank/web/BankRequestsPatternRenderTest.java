@@ -282,6 +282,41 @@ class BankRequestsPatternRenderTest {
     assertThat(html.split("data-testid=\"bank-request-gross\"", -1)).hasSize(2);
   }
 
+  /**
+   * REQ-BANK-065, REQ-UI-037: on an English page the amount and its fee line group thousands with a
+   * comma.
+   */
+  @Test
+  @WithMockUser(roles = "BANK_EMPLOYEE")
+  void groupsAmountsWithTheSeparatorsOfTheEnglishPage() throws Exception {
+    when(backendApiClient.get(
+            eq("/api/v1/bank/transfer-fee-rate"), eq(BankTransferFeeRateDto.class)))
+        .thenReturn(new BankTransferFeeRateDto(new BigDecimal("0.005")));
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(startsWith("/api/v1/bank/requests"), anyTypeRef()))
+        .thenReturn(
+            new PageResponse<>(
+                List.of(request(UUID.randomUUID(), "DEPOSIT", false, false, null, null)),
+                0,
+                200,
+                1L,
+                1,
+                List.of()));
+    MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+
+    String html =
+        mockMvc
+            .perform(get("/bank/requests?lang=en").locale(Locale.ENGLISH))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("600,000 aUEC")
+        .containsPattern("data-testid=\"bank-request-gross\"[^>]*>With fee: 603,000 aUEC<");
+  }
+
   /** An empty segment renders the empty state and no table. */
   @Test
   @WithMockUser(roles = "BANK_EMPLOYEE")

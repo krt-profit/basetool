@@ -68,6 +68,23 @@ export function separatorsFor(lang) {
 }
 
 /**
+ * Formats a number for display with the separators of a language and a fixed number of
+ * decimals: `formatNumber(12345.6, 3, 'de')` is `12.345,600`, with `'en'` it is `12,345.600`.
+ *
+ * @param {number | string} value the number
+ * @param {number} fractionDigits the decimals to show
+ * @param {string} lang a BCP 47 language tag such as `de` or `en`; the browser default when empty
+ * @returns {string} the formatted number, `0` when `value` is not a number
+ */
+export function formatNumber(value, fractionDigits, lang) {
+    const n = typeof value === 'number' ? value : Number.parseFloat(value);
+    return (Number.isFinite(n) ? n : 0).toLocaleString(lang || undefined, {
+        minimumFractionDigits: fractionDigits,
+        maximumFractionDigits: fractionDigits,
+    });
+}
+
+/**
  * Strips leading zeros from an integer digit string, keeping one digit.
  *
  * @param {string} int the integer digits

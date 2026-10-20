@@ -172,7 +172,7 @@ class JobOrderMaterialDemandRenderTest {
         .contains("data-testid=\"demand-group\"");
     assertThat(html).as("the org unit's badge").contains(">IRI<");
     assertThat(html).as("the material name").contains("Titanium");
-    assertThat(html).as("required amount").contains("1000,000");
+    assertThat(html).as("required amount").contains("1.000,000");
     assertThat(html).as("booked amount").contains("250,000");
     assertThat(html).as("claimed amount").contains("100,000");
     assertThat(html).as("outstanding gap").contains("750,000");

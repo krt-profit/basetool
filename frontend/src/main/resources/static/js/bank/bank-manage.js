@@ -26,7 +26,7 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
  * @returns {string} the formatted amount
  */
 function format(value) {
-    return Math.round(value).toLocaleString('de-DE');
+    return Math.round(value).toLocaleString(document.documentElement.lang || undefined);
 }
 
 /**

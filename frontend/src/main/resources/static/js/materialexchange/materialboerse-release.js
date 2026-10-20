@@ -184,12 +184,12 @@ function initMaterialboerseRelease() {
             return String(amount);
         }
         if (quantityType === 'PIECE') {
-            return `${n.toLocaleString('de-DE', { maximumFractionDigits: 0 })} ${krtI18nText(
+            return `${n.toLocaleString(document.documentElement.lang || undefined, { maximumFractionDigits: 0 })} ${krtI18nText(
                 i18n.unitPiece,
                 'materialboerseModalI18n.unitPiece',
             )}`;
         }
-        return `${n.toLocaleString('de-DE', { maximumFractionDigits: 3 })} ${i18n.unitScu || 'SCU'}`;
+        return `${n.toLocaleString(document.documentElement.lang || undefined, { maximumFractionDigits: 3 })} ${i18n.unitScu || 'SCU'}`;
     }
 
     /**
@@ -289,7 +289,7 @@ function initMaterialboerseRelease() {
         if (ta && counter) {
             counter.textContent = fmt(
                 krtI18nText(i18n.charCounter, 'materialboerseModalI18n.charCounter'),
-                ta.value.length.toLocaleString('de-DE'),
+                ta.value.length.toLocaleString(document.documentElement.lang || undefined),
             );
         }
     }

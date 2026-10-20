@@ -43,7 +43,7 @@
                         <td class="num" th:attr="data-label=#{inventory.quality}" th:text="${item.quality}">100</td>
                         <td class="num" th:attr="data-label=#{inventory.amount}" th:switch="${item.material.quantityType}">
                             <span th:case="'PIECE'" th:text="|${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'} #{material.quantity.piece}|">10 St&uuml;ck</span>
-                            <span th:case="*" th:text="|${item.amount != null ? #numbers.formatDecimal(item.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|">10.500 SCU</span>
+                            <span th:case="*" th:text="|${item.amount != null ? #numbers.formatDecimal(item.amount, 1, 'DEFAULT', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|">10.500 SCU</span>
                         </td>
                     </tr>
                 </tbody>

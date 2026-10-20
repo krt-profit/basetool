@@ -37,13 +37,17 @@ function label(name) {
     return (config && config.getAttribute(`data-label-${name}`)) || '';
 }
 
-const WHOLE = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 });
-const PRICE = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 2 });
-const PER_SCU = new Intl.NumberFormat('de-DE', {
+const WHOLE = new Intl.NumberFormat(document.documentElement.lang || undefined, {
+    maximumFractionDigits: 0,
+});
+const PRICE = new Intl.NumberFormat(document.documentElement.lang || undefined, {
+    maximumFractionDigits: 2,
+});
+const PER_SCU = new Intl.NumberFormat(document.documentElement.lang || undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
 });
-const PERCENT = new Intl.NumberFormat('de-DE', {
+const PERCENT = new Intl.NumberFormat(document.documentElement.lang || undefined, {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
 });

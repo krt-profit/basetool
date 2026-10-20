@@ -17,6 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { formatNumber } from '/js/kernel/krt-number-format.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 /**
@@ -103,7 +104,7 @@ function compute(slider) {
         qOut.textContent = String(Math.round(q));
     }
     if (vOut) {
-        vOut.textContent = `×${value === null ? '?' : value.toFixed(2)}`;
+        vOut.textContent = `×${value === null ? '?' : formatNumber(value, 2, document.documentElement.lang)}`;
     }
 }
 

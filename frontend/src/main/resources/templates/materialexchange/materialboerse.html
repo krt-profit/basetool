@@ -156,7 +156,7 @@
                               th:text="${#numbers.formatInteger(offer.itemQuantity(), 1)} + ' ' + #{material.quantity.piece}">0 Stück</span>
                         <span class="mb-mrow-amount num" th:unless="${offer.kind() == 'ITEM'}" th:switch="${offer.material().quantityType()}"><span
                                 th:case="'PIECE'" th:text="${#numbers.formatInteger(offer.amount(), 1)} + ' ' + #{material.quantity.piece}">0 Stück</span><span
-                                th:case="*" th:text="${#numbers.formatDecimal(offer.amount(), 1, 'POINT', 3, 'DEFAULT')} + ' ' + #{material.quantity.scu}">0 SCU</span></span>
+                                th:case="*" th:text="${#numbers.formatDecimal(offer.amount(), 1, 'DEFAULT', 3, 'DEFAULT')} + ' ' + #{material.quantity.scu}">0 SCU</span></span>
                     </button>
                 </div>
 
@@ -213,7 +213,7 @@
                                             <span class="mb-kpi-unit" th:text="#{material.quantity.piece}">Stück</span>
                                         </th:block>
                                         <th:block th:case="*">
-                                            <span th:text="${#numbers.formatDecimal(offer.amount(), 1, 'POINT', 3, 'DEFAULT')}">0</span>
+                                            <span th:text="${#numbers.formatDecimal(offer.amount(), 1, 'DEFAULT', 3, 'DEFAULT')}">0</span>
                                             <span class="mb-kpi-unit" th:text="#{material.quantity.scu}">SCU</span>
                                         </th:block>
                                     </div>

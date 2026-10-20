@@ -36,17 +36,17 @@
         <div class="kpi-total">
             <div class="kpi-label" th:text="#{bank.dashboard.totals.balance}">Gesamtsaldo</div>
             <div class="kpi-value"
-                 th:text="${#numbers.formatInteger(@moneyFormat.round(dashboard.totals().totalBalance()), 1, 'POINT')} + ' aUEC'">4.812.500 aUEC</div>
+                 th:text="${#numbers.formatInteger(@moneyFormat.round(dashboard.totals().totalBalance()), 1, 'DEFAULT')} + ' aUEC'">4.812.500 aUEC</div>
         </div>
         <div class="kpi-total">
             <div class="kpi-label" th:text="#{bank.dashboard.totals.inflow}">Eing&auml;nge 30 T</div>
             <div class="kpi-value bank-amount--pos"
-                 th:text="'+' + ${#numbers.formatInteger(@moneyFormat.round(dashboard.totals().inflow30d()), 1, 'POINT')}">+1.240.000</div>
+                 th:text="'+' + ${#numbers.formatInteger(@moneyFormat.round(dashboard.totals().inflow30d()), 1, 'DEFAULT')}">+1.240.000</div>
         </div>
         <div class="kpi-total">
             <div class="kpi-label" th:text="#{bank.dashboard.totals.outflow}">Ausg&auml;nge 30 T</div>
             <div class="kpi-value bank-amount--neg"
-                 th:text="${#numbers.formatInteger(@moneyFormat.round(dashboard.totals().outflow30d()), 1, 'POINT')}">-385.000</div>
+                 th:text="${#numbers.formatInteger(@moneyFormat.round(dashboard.totals().outflow30d()), 1, 'DEFAULT')}">-385.000</div>
         </div>
         <div class="kpi-total">
             <div class="kpi-label" th:text="#{bank.dashboard.totals.accounts}">Aktive Konten</div>

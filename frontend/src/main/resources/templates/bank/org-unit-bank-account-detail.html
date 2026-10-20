@@ -71,14 +71,14 @@
             <div class="vis-row">
                 <span class="v-label" th:text="#{bank.cartelLadder.tier.employee}">Bankmitarbeiter</span>
                 <span class="vis-state bank-amount" th:if="${t1 != null}"
-                      th:text="'&#8804; ' + ${#numbers.formatInteger(@moneyFormat.round(t1), 1, 'POINT')} + ' aUEC'">&#8804; 1.000.000 aUEC</span>
+                      th:text="'&#8804; ' + ${#numbers.formatInteger(@moneyFormat.round(t1), 1, 'DEFAULT')} + ' aUEC'">&#8804; 1.000.000 aUEC</span>
                 <span class="vis-state bank-amount" th:unless="${t1 != null}"
                       th:text="#{bank.cartelLadder.none}">keine Selbstfreigabe</span>
             </div>
             <div class="vis-row">
                 <span class="v-label" th:text="#{bank.cartelLadder.tier.bankManagement}">Bankleitung</span>
                 <span class="vis-state bank-amount" th:if="${t2 != null}"
-                      th:text="'&#8804; ' + ${#numbers.formatInteger(@moneyFormat.round(t2), 1, 'POINT')} + ' aUEC'">&#8804; 5.000.000 aUEC</span>
+                      th:text="'&#8804; ' + ${#numbers.formatInteger(@moneyFormat.round(t2), 1, 'DEFAULT')} + ' aUEC'">&#8804; 5.000.000 aUEC</span>
                 <span class="vis-state bank-amount" th:unless="${t2 != null}"
                       th:text="#{bank.cartelLadder.above}">dar&uuml;ber</span>
             </div>
