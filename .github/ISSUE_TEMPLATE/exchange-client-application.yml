@@ -71,6 +71,8 @@ body:
         - label: Windows
         - label: Linux
         - label: macOS
+        - label: Browser extension for Chrome or Edge (Manifest V3)
+        - label: Browser extension for Firefox (Manifest V3)
         - label: Other (explain below)
 
   - type: checkboxes
@@ -129,8 +131,25 @@ body:
           required: true
         - label: Org demand stored at most 7 days, outside cloud-synced folders, never in backups or diagnostics, never forwarded.
           required: true
-        - label: A descriptive User-Agent with product, version and URL.
+        - label: A descriptive User-Agent with product, version and URL, or the same value in Exchange-Client-Agent where the User-Agent cannot be set.
           required: true
+
+  - type: textarea
+    id: extension
+    attributes:
+      label: Browser extension builds
+      description: Browser extensions only. The store listing and extension id of each build (Chrome Web Store, Edge Add-ons, addons.mozilla.org), and a link to the manifest.json of the release you apply with.
+
+  - type: checkboxes
+    id: extension-security
+    attributes:
+      label: Browser extension requirements
+      description: Browser extensions only; each point of the browser-extension section of docs/exchange/client-security.md.
+      options:
+        - label: The DPoP key is a non-extractable ES256 WebCrypto key kept in the extension's IndexedDB; the refresh token is in storage.local, never storage.sync.
+        - label: Tokens and the key are used only in the service worker or an extension page, never in or passed to a content script.
+        - label: Host permissions, optional host permissions and content-script matches name only the RSI pages read and https://ingest.profit-base.online/*; nothing on profit-base.online, no <all_urls>, no cookies, webRequest or debugger permission, no Basetool origin in externally_connectable.
+        - label: Disconnect revokes the refresh token and deletes the token and the key; an uninstall URL carries no token or id.
 
   - type: checkboxes
     id: sync

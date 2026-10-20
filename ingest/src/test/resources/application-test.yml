@@ -11,6 +11,9 @@ spring:
           issuer-uri: http://keycloak.example.com/realms/test
 
 app:
+  exchange:
+    cors:
+      extension-origins: chrome-extension://abcdefghijklmnopabcdefghijklmnop
   ingest:
     backend-base-url: http://localhost:19999
     frontend-base-url: http://localhost:18081

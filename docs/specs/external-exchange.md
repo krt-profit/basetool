@@ -1707,7 +1707,12 @@ client that lies.
 A missing or unparseable `User-Agent` counts as older, and a pre-release of the minimum itself
 (`2.4.0-beta.1` against `2.4.0`) is below it, while build metadata (`2.4.0+7`) is not.
 
-**Enforced by:** `ClientVersionsTest`, `ExchangeGateTest` · **Status:** built — WP 3.2 (#2082)
+A client that cannot set its `User-Agent` — a Chromium browser extension — sends the same value in
+`Exchange-Client-Agent`; when that header holds text the gate reads it instead of `User-Agent`
+(ADR-0303).
+
+**Enforced by:** `ClientVersionsTest`, `ExchangeGateTest` · **Status:** built — WP 3.2 (#2082);
+`Exchange-Client-Agent` with ADR-0303
 
 ### REQ-XCH-025 — Errors are problem+json with a stable code
 
@@ -1822,7 +1827,8 @@ WP 0.2 (#2080)
 ### REQ-XCH-027 — Approved clients meet the client security requirements
 
 A client stores tokens only in the platform's secret store (Windows Credential Manager / DPAPI;
-Linux Secret Service, with a `0600` file fallback in a `0700` directory and a visible hint), keeps the DPoP private key
+Linux Secret Service, with a `0600` file fallback in a `0700` directory and a visible hint; for a
+browser extension, as below), keeps the DPoP private key
 non-exportable where the platform allows, never writes a token into logs, backups, diagnostics or a
 problem-report channel, pins the production issuer and allows another only through a developer
 environment variable, shows the device login's `user_code` with the bare `verification_uri` and
@@ -1841,8 +1847,45 @@ client syncs on start and after a local change, and a timed sync runs at most ev
 A sandbox demonstration is recommended, not a criterion. The checklist is
 `docs/exchange/client-security.md`; the application template asks for each point.
 
+**Browser extensions** (Chrome, Edge and Firefox, Manifest V3) are admissible under these
+conditions (owner decision 2026-10-20, ADR-0303):
+
+- **Credential storage.** The DPoP key is an ES256 WebCrypto key generated non-extractable and kept
+  in the extension's IndexedDB; the refresh token is kept in `storage.local`, never in
+  `storage.sync`. For an extension this is the platform secret store. Tokens and the key are used
+  only in the service worker or an extension page, never in or passed to a content script.
+- **Minimal host permissions.** Host permissions, optional host permissions and content-script
+  matches name only the RSI pages the extension reads and `https://ingest.profit-base.online/*`:
+  nothing on `profit-base.online` or a wildcard covering it, since the web UI and Keycloak share
+  that origin (ADR-0166) and a permission there would let the extension ride the member's web and
+  SSO sessions; no `<all_urls>`, no `cookies`, `webRequest` or `debugger`, no Basetool origin in
+  `externally_connectable`. The exchange host is a separate origin whose gateway reads no cookie.
+  Keycloak is reached through CORS. The manifest is checked at application time and for every
+  release that changes its permissions.
+- **Disconnect and uninstall.** "Disconnect" revokes the refresh token (RFC 7009) and deletes the
+  token and the key. Where a browser API lets the extension act on uninstall, it revokes there too;
+  an uninstall URL never carries a token or an id.
+- **Version header.** A Chromium extension sends its `<Product>/<semver> (+url)` in
+  `Exchange-Client-Agent` (REQ-XCH-024), to the exchange host only.
+- The 7-day fix rule applies unchanged. Store-account two-factor authentication and reproducible
+  builds are not criteria.
+
+The gateway admits extensions cross-origin on `/exchange/**` only: each approved Chromium build's
+`chrome-extension://<id>` (`app.exchange.cors.extension-origins`, from
+`IRI_EXCHANGE_CORS_EXTENSION_ORIGINS`) and `moz-extension://*` (`app.exchange.cors.firefox-extensions`,
+on by default), for `GET`, `POST` and `OPTIONS`, with `Authorization`, `DPoP`, `Content-Type`,
+`Accept`, `Accept-Language`, `Idempotency-Key`, `X-Correlation-Id`, `User-Agent` and
+`Exchange-Client-Agent`, never with credentials, and exposes `DPoP-Nonce`, `WWW-Authenticate`,
+`RateLimit`, `RateLimit-Policy`, `Retry-After`, `Idempotency-Replayed` and `X-Correlation-Id`.
+Every other path keeps the empty allowlist. An extension's Keycloak client lists each approved
+Chromium origin as a Web Origin, and `*` when it has a Firefox build.
+
+**Enforced by:** `SecurityConfigTest`, `ExchangeCorsTest`, `ExchangeCorsPropertiesTest` (the
+gateway CORS); the conditions on the extension itself are checked at application.
+
 **Status:** the checklist `docs/exchange/client-security.md` is written — WP 4.6 (#2090); the
-clients' implementations with WP 5.1 (#2088), WP 5.2 (#2089)
+clients' implementations with WP 5.1 (#2088), WP 5.2 (#2089); browser-extension admission and the
+gateway CORS built with ADR-0303
 
 ### REQ-XCH-028 — The exchange is observable per client
 

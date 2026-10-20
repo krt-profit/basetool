@@ -1236,7 +1236,9 @@
       "redirectUris": [],
       "serviceAccountsEnabled": false,
       "standardFlowEnabled": false,
-      "webOrigins": []
+      "webOrigins": [
+        "*"
+      ]
     },
     {
       "attributes": {

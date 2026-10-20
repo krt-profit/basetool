@@ -1486,6 +1486,13 @@ lines. The procedure, and the `.env` values a newly created confidential client 
 [`INGEST_KEYCLOAK_SETUP.md` → *New or out-of-date realm*](archive/INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner).
 On production an `--apply` is a gated write like any other.
 
+**Approving a browser extension** (ADR-0303) takes two production writes, each gated: the
+provisioner `--apply` after the merge that adds the client to `external-clients.json` with its
+`extensionOrigins` / `firefoxExtension` (its Keycloak Web Origins), and, for a Chromium build, the
+store id's origin appended comma-separated to `IRI_EXCHANGE_CORS_EXTENSION_ORIGINS` in the host
+`.env`, then `env.d` re-rendered and `ingest.service` restarted. A Firefox-only extension needs no
+`.env` change: `moz-extension://*` is admitted by default.
+
 **The frontend's client type** (public or confidential, ADR-0001) is changed only by
 `--frontend-client public|confidential`; a run without it leaves the type as it is. The switch to
 confidential is a two-step owner rollout with no login window — the frontend receives

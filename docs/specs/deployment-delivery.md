@@ -2325,7 +2325,10 @@ there.
   public device-grant client with consent, DPoP-bound tokens, a 30/90-day offline session, `basic`
   as its only default scope and the ten `exchange.*` scopes plus `offline_access` as optional ones;
   what the template never offers is withheld wherever found. The realm pins the device code's
-  lifespan and polling interval and the `krt-theme` login theme.
+  lifespan and polling interval and the `krt-theme` login theme. A browser extension's entry adds
+  `extensionOrigins` (its `chrome-extension://<id>` origins) and `firefoxExtension`; they become the
+  client's Web Origins, with `*` for a Firefox build, and a malformed one refuses the run
+  (ADR-0303).
 - **A fresh realm is in shape after one run.** Keycloak 26 keeps its own
   `backchannel.logout.session.required` when a client is created, so the provisioner writes the
   attributes a create did not store right after it. *(Corrected 2026-09-26: until then an apply on

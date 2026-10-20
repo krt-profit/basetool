@@ -92,6 +92,7 @@ SANDBOX = Target(
             "clientId": "sandbox-client",
             "name": "Sandbox Client",
             "description": "The third-party test client of the local exchange sandbox (REQ-XCH-029)",
+            "firefoxExtension": True,
         },
         {
             "clientId": "sandbox-suspended-client",
