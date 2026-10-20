@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.19.1](https://github.com/krt-profit/basetool/releases/tag/v1.19.1) - 2026-10-20
+
 ### Changed
 
 - **Eingangsmenge im Raffinerieauftrag optional.** Beim Anlegen und Bearbeiten darf die Eingangsmenge eines Materials leer bleiben; sie wird als `0` gespeichert und gilt damit als „nicht eingegeben“, die Übersicht zeigt dann keine Units. Qualität und Ausgangsmenge bleiben Pflicht, alle Pflichtfelder samt Dauer und Materialspalten tragen das orange Sternchen (REQ-REFINERY-025).
@@ -9,11 +11,17 @@
 ### Fixed
 
 - **Farben wie auf das-kartell.org.** Die Palette stammt jetzt aus Messungen im Browser statt aus HDR-Screenshots: dunklerer Hintergrund `#0F0F0F`, Panels `#282C30`, Kopfleiste `#1A1D21`, das Orange wieder `#E77E23`, dazu die originalen Logos und Icons (REQ-UI-002, ADR-0294).
+
 - **Seitenauswahl auf dem Handy.** Die Auswahl „Einträge pro Seite“ unter langen Listen ragte auf schmalen Bildschirmen über die Karte hinaus; die Knöpfe brechen jetzt in eine zweite Zeile um (REQ-UI-009).
+
 - **Materialbeschreibung mit Zeilenumbrüchen.** Beschreibungen aus den Spieldaten (P4K-Import) zeigten Zeilenumbrüche als `\n` im Text, etwa bei Sunset Berries. Der Import speichert sie jetzt als echte Umbrüche, Migration V308 korrigiert die vorhandenen Einträge, und die Materialseite zeigt jede Zeile für sich (REQ-DATA-025).
+
 - **Raffinerieauftrag anlegen bei Mitgliedschaft in Staffel und Bereich.** Das Formular zeigt jetzt die Auswahl „Zuordnen zu“, wenn der Besitzer mehreren Organisationseinheiten gleich welcher Art angehört; vorher fehlte sie, und jedes Anlegen scheiterte mit der falschen Meldung „Materialien sind ungültig oder fehlen.“ Eine fehlende Einheit wird nun auch als solche gemeldet (REQ-ORG-023).
+
 - **„Abbrechen“ in den Dialogen von „Einsatzdaten verwalten“.** Der Abbrechen-Button der Dialoge für Staffeln, Aufgaben und Frequenztypen schließt den Dialog wieder; bisher reagierte nur das ✕ (REQ-UI-013).
+
 - **Gleich hohe Kopfzeile der Lagertabellen.** Bricht eine Spaltenüberschrift um, etwa „Kontext / Zuordnung“ auf dem Handy, sind alle Kopfzellen jetzt gleich hoch und die orange Linie liegt durchgehend auf einer Höhe (REQ-UI-009).
+
 - **Sichtbare Ränder der Material-Kacheln.** Die Kacheln der Material-Übersicht tragen jetzt den grauen Control-Rand statt der kaum sichtbaren Haarlinie und werden beim Überfahren orange (REQ-UI-028).
 
 - **Einsatz: Frequenz eines Frequenztyps entfernen.** Unter Verwaltung → Organisation → Frequenztypen hat jede gesetzte Frequenz neben dem Stift jetzt einen Löschen-Knopf; vorher ließ sie sich nur ändern, nie entfernen. Danach steht der Typ ohne Wert da und verschwindet aus dem Funk-Panel der Übersicht.
