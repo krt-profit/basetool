@@ -27,24 +27,24 @@
 
     :root {
         color-scheme: dark;
-        --color-primary: #fb8a28;
+        --color-primary: #e77e23;
         --color-white: #fff;
         --color-bg-black: #000;
-        --color-bg-dark-gray: #35393d;
-        --color-canvas: #202020;
+        --color-bg-dark-gray: #282c30;
+        --color-canvas: #0f0f0f;
 
         --color-accent-light: #eeb64b;
         --color-accent-dark: #c45c00;
 
-        --color-gray-1: #dadbde;
+        --color-gray-1: #d1d2d3;
         --color-gray-2: #8f9399;
-        --color-gray-3: #404145;
-        --color-gray-4: #35393d;
+        --color-gray-3: #36373b;
+        --color-gray-4: #282c30;
 
-        --color-surface-input: #2a2d31;
-        --color-control: #3f474c;
-        --color-control-hover: #4a535a;
-        --color-count-badge: #374256;
+        --color-surface-input: #1a1d21;
+        --color-control: #373e43;
+        --color-control-hover: #434b51;
+        --color-count-badge: #2f394c;
 
         --color-dept-raumueberlegenheit: #37bbc0;
         --color-dept-forschung: #355ddc;
@@ -128,7 +128,7 @@
         --color-info-text: #8fb2f5;
         --color-success-text: #4ccb5c;
 
-        --color-gray-2-text: #b0b3b7;
+        --color-gray-2-text: #a2a5a9;
 
         --action-primary: var(--color-primary);
         --action-emphasis: var(--color-primary);
@@ -144,7 +144,7 @@
         --control-bg-hover: var(--color-control-hover);
         --control-border: var(--color-gray-2);
         --control-fg: var(--color-gray-1);
-        --control-selected-bg: color-mix(in srgb, var(--color-primary) 18%, transparent);
+        --control-selected-bg: color-mix(in srgb, var(--color-primary) 26%, transparent);
         --control-selected-border: var(--color-primary);
         --control-selected-fg: var(--color-white);
 
@@ -423,7 +423,7 @@
         background-color: var(--control-bg);
         border: var(--border-hairline);
         border-radius: var(--radius-sm);
-        color: var(--color-gray-2-text);
+        color: var(--color-gray-1);
         font-family: var(--font-body);
         font-weight: var(--fw-thin);
         font-size: 0.85rem;
@@ -1351,7 +1351,7 @@
         appearance: none;
         padding: 0.375rem var(--space-8) 0.375rem var(--space-3);
         line-height: 1.5;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23FB8A28' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23E77E23' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
         background-repeat: no-repeat;
         background-position: right 0.65rem center;
         background-size: 12px 8px;
@@ -2121,6 +2121,7 @@
 
     .pagination {
         display: flex;
+        flex-wrap: wrap;
         gap: 0.4rem;
         justify-content: center;
         align-items: stretch;
@@ -4790,7 +4791,7 @@
     .krt-combobox .krt-combobox__input {
         width: 100%;
         cursor: text;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23FB8A28' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23E77E23' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
         background-repeat: no-repeat;
         background-position: right 0.65rem center;
         background-size: 12px 8px;
@@ -6276,7 +6277,7 @@
         letter-spacing: 0.05em;
         padding: 4px 22px 4px 8px;
         max-width: 165px;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath fill='%23FB8A28' d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath fill='%23E77E23' d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
         background-repeat: no-repeat;
         background-position: right 7px center;
     }

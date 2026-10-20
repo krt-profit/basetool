@@ -54,44 +54,44 @@ import org.openpdf.text.pdf.PdfWriter;
 public final class KrtPdfSupport {
 
   /** Page background fill, the app's canvas gray ({@code --color-canvas}). */
-  public static final Color COLOR_CANVAS = new Color(0x20, 0x20, 0x20);
+  public static final Color COLOR_CANVAS = new Color(0x0F, 0x0F, 0x0F);
 
   /** Panel background for meta rows and odd table rows ({@code --surface-panel}). */
-  public static final Color COLOR_DARK_GRAY = new Color(0x35, 0x39, 0x3D);
+  public static final Color COLOR_DARK_GRAY = new Color(0x28, 0x2C, 0x30);
 
   /**
    * DAS KARTELL primary orange ({@code --color-primary}), used only for titles, headings, header
    * accent lines, the chart line, the top bar and the logo (REQ-UI-002).
    */
-  public static final Color COLOR_ORANGE = new Color(0xFB, 0x8A, 0x28);
+  public static final Color COLOR_ORANGE = new Color(0xE7, 0x7E, 0x23);
 
   /** Default body / data-value text on the dark background (design token {@code --data-fg}). */
   public static final Color COLOR_WHITE = new Color(0xFF, 0xFF, 0xFF);
 
   /** Muted text — footers, empty-state hints and chart axis labels (Grau 1). */
-  public static final Color COLOR_LIGHT_GRAY = new Color(0xDA, 0xDB, 0xDE);
+  public static final Color COLOR_LIGHT_GRAY = new Color(0xD1, 0xD2, 0xD3);
 
   /**
-   * Muted key/meta-label gray (design token {@code --color-gray-2-text} {@code #B0B3B7}). Field
+   * Muted key/meta-label gray (design token {@code --color-gray-2-text} {@code #A2A5A9}). Field
    * labels in the meta and summary blocks are labels, not headings, so they take this neutral gray
    * — never orange.
    */
-  public static final Color COLOR_LABEL = new Color(0xB0, 0xB3, 0xB7);
+  public static final Color COLOR_LABEL = new Color(0xA2, 0xA5, 0xA9);
 
   /**
    * Half-step surface that reads just above the {@link #COLOR_DARK_GRAY} panel, used for table-head
-   * fills (design token {@code --surface-bar} {@code #2A2D31}) instead of an orange fill.
+   * fills (design token {@code --surface-bar} {@code #1A1D21}) instead of an orange fill.
    */
-  public static final Color COLOR_SURFACE_INPUT = new Color(0x2A, 0x2D, 0x31);
+  public static final Color COLOR_SURFACE_INPUT = new Color(0x1A, 0x1D, 0x21);
 
   /**
-   * Neutral hairline border / grid color (design token Grau 3 {@code #404145}). Frames every data
+   * Neutral hairline border / grid color (design token Grau 3 {@code #36373B}). Frames every data
    * cell so the table grid is quiet, with orange reserved for the single header-underline accent.
    */
-  public static final Color COLOR_HAIRLINE = new Color(0x40, 0x41, 0x45);
+  public static final Color COLOR_HAIRLINE = new Color(0x36, 0x37, 0x3B);
 
   /** Alternating (even) table row background, the canvas gray. */
-  public static final Color COLOR_TABLE_ROW_ALT = new Color(0x20, 0x20, 0x20);
+  public static final Color COLOR_TABLE_ROW_ALT = new Color(0x0F, 0x0F, 0x0F);
 
   /** Embedded Lato Regular — loaded once per JVM from the bundled TTF. */
   private static final BaseFont LATO_REGULAR = loadFont("fonts/Lato-Regular.ttf");

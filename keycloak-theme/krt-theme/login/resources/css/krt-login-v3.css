@@ -24,21 +24,21 @@
 }
 
 :root {
-    --color-primary: #FB8A28;
+    --color-primary: #E77E23;
     --color-bg-black: #000000;
-    --color-canvas: #202020;
-    --color-bg-dark-gray: #35393D;
-    
+    --color-canvas: #0F0F0F;
+    --color-bg-dark-gray: #282C30;
+
     --color-accent-light: #EEB64B;
     --color-accent-dark: #C45C00;
-    
-    --color-gray-1: #DADBDE;
+
+    --color-gray-1: #D1D2D3;
     --color-gray-2: #8F9399;
-    --color-gray-3: #404145;
-    --color-gray-4: #35393D;
-    --color-surface-input: #2A2D31;
-    --color-control: #3F474C;
-    --color-gray-2-text: #B0B3B7;
+    --color-gray-3: #36373B;
+    --color-gray-4: #282C30;
+    --color-surface-input: #1A1D21;
+    --color-control: #373E43;
+    --color-gray-2-text: #A2A5A9;
     --radius-sm: 4px;
 
     --color-danger: #A3000A;
@@ -50,7 +50,7 @@
     --font-headline: 'Lato', sans-serif;
     --font-body: 'Lato', sans-serif;
 
-    --glow-primary: 0 0 8px rgba(251, 138, 40, 0.25);
+    --glow-primary: 0 0 8px rgba(231, 126, 35, 0.25);
     --glow-danger:  0 0 8px rgba(163, 0, 10, 0.30);
 }
 
@@ -108,7 +108,7 @@ body {
     min-height: 100vh;
     background-color: var(--color-canvas) !important;
     background-image:
-        radial-gradient(circle at 50% -10%, rgba(251, 138, 40, 0.10), transparent 55%) !important;
+        radial-gradient(circle at 50% -10%, rgba(231, 126, 35, 0.10), transparent 55%) !important;
     background-repeat: no-repeat !important;
     background-attachment: fixed !important;
 }
@@ -120,7 +120,7 @@ body {
     padding: 40px;
     width: 100%;
     max-width: 450px;
-    box-shadow: 0 0 20px rgba(251, 138, 40, 0.1);
+    box-shadow: 0 0 20px rgba(231, 126, 35, 0.1);
     position: relative;
     margin: auto;
 }
@@ -226,7 +226,7 @@ input[type="number"]:focus,
 input.pf-c-form-control:focus,
 input.pf-v5-c-form-control:focus {
     border-color: var(--color-primary) !important;
-    box-shadow: 0 0 8px rgba(251, 138, 40, 0.2) !important;
+    box-shadow: 0 0 8px rgba(231, 126, 35, 0.2) !important;
 }
 
 .krt-button,
@@ -635,7 +635,7 @@ select[aria-invalid="true"],
     padding: 40px !important;
     width: 100% !important;
     max-width: 450px !important;
-    box-shadow: 0 0 20px rgba(251, 138, 40, 0.1) !important;
+    box-shadow: 0 0 20px rgba(231, 126, 35, 0.1) !important;
     position: relative !important;
     margin: auto !important;
     display: block;

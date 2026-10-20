@@ -448,7 +448,7 @@ For each tab, an admin can export that log for a **user-selected period** (from/
 
 - **PDF** — generated backend-side with OpenPDF through the shared `KrtPdfSupport` /
   `AuditLogPdfFormat` layer, following the KRT design system (dark page background, KRT orange
-  `#FB8A28`, **embedded Lato**, A4, footer + logo) exactly like the bank statement/report PDFs. The
+  `#E77E23`, **embedded Lato**, A4, footer + logo) exactly like the bank statement/report PDFs. The
   document prints the **raw, language-neutral event code** (the on-screen viewer shows the localized
   label) so the trail stays unambiguous and the backend bundle is not duplicated. The
   `X-User-Time-Zone` header localizes the document timestamps.

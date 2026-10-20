@@ -170,7 +170,7 @@
 
     .profit-route__line {
         display: block;
-        overflow-wrap: anywhere;
+        overflow-wrap: break-word;
         font-variant-numeric: tabular-nums;
     }
 

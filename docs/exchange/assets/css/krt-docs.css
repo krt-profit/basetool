@@ -24,19 +24,19 @@
 
 :root {
   color-scheme: dark;
-  --color-primary: #FB8A28;
+  --color-primary: #E77E23;
   --color-white: #FFFFFF;
   --color-bg-black: #000000;
-  --color-canvas: #202020;
+  --color-canvas: #0F0F0F;
   --color-accent-light: #EEB64B;
   --color-accent-dark: #C45C00;
-  --color-gray-1: #DADBDE;
+  --color-gray-1: #D1D2D3;
   --color-gray-2: #8F9399;
-  --color-gray-3: #404145;
-  --color-gray-4: #35393D;
-  --color-bg-dark-gray: #35393D;
-  --color-surface-input: #2A2D31;
-  --color-control: #3F474C;
+  --color-gray-3: #36373B;
+  --color-gray-4: #282C30;
+  --color-bg-dark-gray: #282C30;
+  --color-surface-input: #1A1D21;
+  --color-control: #373E43;
   --color-danger: #A3000A;
   --color-success: #239E33;
   --color-warning: #FFD23F;
@@ -44,7 +44,7 @@
   --color-danger-text: #FF7A70;
   --color-info-text: #8FB2F5;
   --color-success-text: #4CCB5C;
-  --color-gray-2-text: #B0B3B7;
+  --color-gray-2-text: #A2A5A9;
   --data-fg: var(--color-white);
   --font-headline: "Lato", sans-serif;
   --font-body: "Lato", sans-serif;

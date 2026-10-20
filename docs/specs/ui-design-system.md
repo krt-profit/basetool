@@ -113,22 +113,22 @@ inside `var()` (2026-09-22), and an override applies `color-no-hex` to `material
 
 ### REQ-UI-002 — Brand colour & logo
 
-The primary brand colour is **`#FB8A28`** (orange, the house orange of das-kartell.org). The
+The primary brand colour is **`#E77E23`** (orange, the house orange of das-kartell.org). The
 logo appears **only** in this orange, white, or black. Text on orange is always dark
-(`--color-bg-black`); white on orange reaches only 2.4:1 and is not allowed. Orange marks *action and identity* (CTAs, badges, headings),
+(`--color-bg-black`); white on orange reaches only 2.8:1 and is not allowed. Orange marks *action and identity* (CTAs, badges, headings),
 never plain data values.
 
 This action-hierarchy is **surface-agnostic** — it governs generated documents (the PDF
 exports: handover protocol, bank statement, three-month report) exactly as it governs
 screens. In those PDFs orange is reserved for the title, the section headers, a single
 accent line under each table header, the balance-chart line, the thin page top-accent bar
-and the logo; page surfaces and the data-cell grid stay neutral (canvas `#202020`, panel
-`#35393D`, bar `#2A2D31` fills, `#404145` hairlines), so the orange never overwhelms the
+and the logo; page surfaces and the data-cell grid stay neutral (canvas `#0F0F0F`, panel
+`#282C30`, bar `#1A1D21` fills, `#36373B` hairlines), so the orange never overwhelms the
 document.
 
 **Acceptance**
 
-- [ ] Logo renders only in `#FB8A28` / white / black.
+- [ ] Logo renders only in `#E77E23` / white / black.
 - [ ] The single filled-orange CTA marks the one primary action per context.
 - [ ] Generated PDFs use orange only as a heading/identity accent (title, section headers,
   one table-header accent line, chart line, top bar, logo); table-head fills and data-cell
@@ -136,21 +136,25 @@ document.
 
 ### REQ-UI-003 — Dark-only surfaces
 
-The surfaces are the gray ladder of das-kartell.org (design system 2026-10):
+The surfaces are the gray ladder of das-kartell.org, measured in the browser
+([ADR-0294](../adr/0294-the-app-wears-the-measured-website-palette.md), which supersedes the colour
+values of ADR-0292; its radius and component rules stand). Palette values are read from the live
+site with `getComputedStyle` or the DevTools eyedropper, never from screenshots (HDR capture
+lightens every value):
 
 | Token | Value | Role |
 | :-- | :-- | :-- |
-| `--surface-canvas` | `#202020` | page background, page head |
-| `--surface-bar` | `#2A2D31` | header, footer, sidebar, tab bars, table heads |
-| `--surface-panel` | `#35393D` | cards, list panels, modals, toasts, dropdowns |
-| `--surface-inset` | `#202020` | a box set into a panel |
-| `--control-bg` | `#3F474C` | every control fill and the table row hover |
+| `--surface-canvas` | `#0F0F0F` | page background, page head |
+| `--surface-bar` | `#1A1D21` | header, footer, sidebar, tab bars, table heads |
+| `--surface-panel` | `#282C30` | cards, list panels, modals, toasts, dropdowns |
+| `--surface-inset` | `#0F0F0F` | a box set into a panel |
+| `--control-bg` | `#373E43` | every control fill and the table row hover |
 
 `--color-bg-black` `#000000` is **no page background**: it is the text on orange and the base
 of shadows and scrims. The page background is **flat** — no ambient pattern or texture; a
 subtle radial **top bloom** of the primary fading to transparent is permitted on the login /
 entry surfaces. `color-scheme: dark`; there is **no light theme**. The PWA `theme-color` is
-the bar (`#2A2D31`), the manifest `background_color` the canvas (`#202020`).
+the bar (`#1A1D21`), the manifest `background_color` the canvas (`#0F0F0F`).
 
 > **Contrast note.** Muted **text** uses the accessible `--color-gray-2-text` tint per
 > REQ-UI-006, not the canonical `--color-gray-2`, which is a control border colour.
@@ -207,15 +211,15 @@ Status hues reuse Bereichsfarben values by appearance: danger `#A3000A`, success
 surfaces and fail WCAG AA as small text. When a semantic
 colour is the **text itself** (inline validation messages, status labels, price up/down),
 use the lightened tints — `--color-danger-text` `#FF7A70`, `--color-info-text` `#8FB2F5`,
-`--color-success-text` `#4CCB5C` (all ≥ 4.5:1 on the panel `#35393D`). Keep the canonical hues for fills,
+`--color-success-text` `#4CCB5C` (all ≥ 4.5:1 on the panel `#282C30`). Keep the canonical hues for fills,
 borders and the brand Bereichsfarben tags. An invalid field additionally takes a red
 hairline (`.input-error`) beside its `.field-error` message.
 
 The same rule applies to the **muted grayscale**: Grau 2 (`--color-gray-2` `#8F9399`)
-is the control border (3.8:1 on the panel) and fails WCAG AA as small text. When muted grey
+is the control border (4.5:1 on the panel) and fails WCAG AA as small text. When muted grey
 **is the text itself** — `.text-muted`, secondary
 labels, hints, placeholders, the quiet-danger button label — use `--color-gray-2-text`
-`#B0B3B7` (≥ 5.6:1 on the panel and the bar, 7.6:1 on the canvas). Keep the canonical
+`#A2A5A9` (≥ 5.6:1 on the panel and the bar, 7.7:1 on the canvas). Keep the canonical
 `--color-gray-2` for control borders, scrollbar thumbs and disabled fills. A glyph that
 sits in text — even an `aria-hidden` one — takes the tint too (DS-1, REQ-UI-027).
 
@@ -1218,7 +1222,7 @@ Binding placement:
 | iOS home screen / pinned site                                                 | `logos/basetool-appicon-180.png`                                         |
 | Keycloak login theme                                                          | `img/basetool-logo.svg`                                                  |
 | Exchange API docs site (GitHub Pages, REQ-XCH-002) — header + browser tab     | `assets/logos/basetool-*`, copied from the frontend at build time        |
-| Generated PDF exports (handover protocol, bank statement, three-month report) | `krt.png` / `krt.svg` — **org mark** in `#FB8A28`                        |
+| Generated PDF exports (handover protocol, bank statement, three-month report) | `krt.png` / `krt.svg` — **org mark** in `#E77E23`                        |
 | Fan Kit compliance band                                                       | `images/made-by-the-community.png` — CIG artwork, untouched (REQ-UI-018) |
 
 Binding details:
@@ -1237,7 +1241,7 @@ Binding details:
 - **`height="50"` on the header mark is the whole box, padding included.** The SVG's 240×240
   viewBox carries roughly 30 % breathing room by design — that is the mark's specified presentation,
   not slack to be cropped. Do not fork a tightened copy of the asset to "fill" the box.
-- **The mark renders only in `#FB8A28`, white or black** (REQ-UI-002). `basetool-logo-white.svg` is
+- **The mark renders only in `#E77E23`, white or black** (REQ-UI-002). `basetool-logo-white.svg` is
   the white variant for print/overlay; no other recolour exists.
 - The sibling app draws from the same family — the SC Extractor's desktop icon from
   `basetool-extractor-*`. Its integration is governed in its own repo; only the shared source of
@@ -1273,7 +1277,7 @@ Binding surface:
 |------------------------------|------------------------------------------------------------------------------------------------------------------|
 | `/manifest.webmanifest`      | Rendered by `WebAppManifestController`, media type `application/manifest+json`, **no `produces` on the mapping** |
 | `<link rel="manifest">`      | In `kernel/fragments/head.html`, **with `?locale=` and no `crossorigin`** — the fetch must stay anonymous               |
-| `theme-color`                | `#2a2d31` — the header bar fill, not the canvas page background                                                  |
+| `theme-color`                | `#1a1d21` — the header bar fill, not the canvas page background                                                  |
 | `mobile-web-app-capable`     | Standard spelling, plus the `apple-` prefixed legacy one; **both** ship                                          |
 | `apple-mobile-web-app-title` | From `pwa.short_name` — short, and the **same in both locales**, because the product name is a proper noun       |
 | `apple-touch-icon`           | Shipped by REQ-UI-019 (180 px); the manifest lists the 192 px and 512 px tiles at their **content-hashed** URLs  |

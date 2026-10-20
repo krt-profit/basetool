@@ -485,7 +485,7 @@ justification (REQ-BANK-045), signed amount, running balance) and the closing ba
 per-account **holder
 distribution** is **removed** (ADR-0039: custody is no longer per-account); each booking row
 keeps its holder annotation, derived from the transaction's holder leg. The PDF is generated backend-side with OpenPDF, follows
-the KRT design system (page background, KRT orange `#FB8A28`, **embedded Lato** — the
+the KRT design system (page background, KRT orange `#E77E23`, **embedded Lato** — the
 existing Helvetica-based reports predate the rule), and is delivered via the established
 `ResponseEntity<byte[]>` + frontend-proxy + fetch/blob download pattern with the
 `X-User-Time-Zone` header. Statement labels come from the backend message bundles
