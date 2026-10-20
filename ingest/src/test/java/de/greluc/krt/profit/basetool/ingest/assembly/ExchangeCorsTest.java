@@ -114,7 +114,7 @@ class ExchangeCorsTest {
 
   @Test
   void anUnapprovedExtensionOrAWebsiteIsRefused() throws Exception {
-    preflight(SHIP_CHANGES, "chrome-extension://bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "POST")
+    preflight(SHIP_CHANGES, "chrome-extension://cccccccccccccccccccccccccccccccc", "POST")
         .andExpect(status().isForbidden())
         .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
     preflight(SHIP_CHANGES, "https://profit-base.online", "POST")

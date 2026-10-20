@@ -6,6 +6,10 @@
 
 - **Browser-Erweiterungen als Exchange-Clients.** Erweiterungen für Chrome, Edge und Firefox (Manifest V3) können unter Auflagen zugelassen werden: DPoP-Schlüssel nicht exportierbar, Refresh-Token nur in `storage.local`, Host-Rechte nur für die gelesenen Seiten und den Exchange-Host. Das Ingest-Gateway beantwortet dafür CORS auf `/exchange/**` für die feste ID jeder freigegebenen Erweiterung, aus Store oder `key` im Manifest (`IRI_EXCHANGE_CORS_EXTENSION_ORIGINS`) und Firefox-Erweiterungen, ohne Credentials; `Exchange-Client-Agent` ersetzt für die Mindestversion den nicht setzbaren `User-Agent` (REQ-XCH-024, REQ-XCH-027, ADR-0303).
 
+### Changed
+
+- **Browser-Erweiterungen: Herkunft an den Client gebunden, kürzere Leerlaufzeit.** Das Ingest-Gateway nimmt eine `chrome-extension://`-Herkunft nur noch mit dem Token des Clients an, für den sie freigegeben ist, und `moz-extension://` nur für Clients mit Firefox-Build; alles andere endet mit `403 ORIGIN_NOT_ALLOWED` (`IRI_EXCHANGE_CORS_EXTENSION_ORIGINS` jetzt als `<clientId>=<origin>`, neu `IRI_EXCHANGE_CORS_FIREFOX_CLIENTS`). Erweiterungs-Clients müssen sich nach 14 statt 30 Tagen ohne Nutzung neu anmelden, und jede Release mit geänderten Manifest-Rechten wird vor der Auslieferung erneut geprüft (REQ-XCH-027, ADR-0304).
+
 ### Fixed
 
 - **Alert `KeycloakLoginErrorSpike` feuert wieder.** Keycloak 26 meldet fehlgeschlagene Logins als `event="login"` mit gesetztem `error`-Label, nicht als `login_error`; die Regel filtert jetzt so und summiert pro Realm, ein promtool-Test deckt sie ab (Monitoring, REQ-OBS-011).

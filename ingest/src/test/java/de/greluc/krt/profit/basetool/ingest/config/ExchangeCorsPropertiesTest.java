@@ -30,14 +30,24 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
 
-/** Tests which extension origins the exchange CORS configuration accepts (REQ-XCH-027). */
+/**
+ * Tests which extension origins the exchange accepts and the client each is bound to (REQ-XCH-027).
+ */
 class ExchangeCorsPropertiesTest {
 
   private static final String CHROME = "chrome-extension://abcdefghijklmnopabcdefghijklmnop";
+  private static final String OTHER = "chrome-extension://ponmlkjihgfedcbaponmlkjihgfedcba";
+  private static final String FIREFOX = "moz-extension://0b5c4a52-7f5e-4f0a-9d3e-2c1b0a9f8e7d";
+
+  private static final ExchangeCorsProperties BOUND =
+      new ExchangeCorsProperties(
+          List.of("hangar-exporter=" + CHROME, "other-extension=" + OTHER),
+          List.of("hangar-exporter"));
 
   private static ValidatorFactory factory;
   private static Validator validator;
@@ -56,60 +66,115 @@ class ExchangeCorsPropertiesTest {
   }
 
   @Test
-  void aChromiumExtensionOriginAndABlankEntryPass() {
-    assertThat(validator.validate(new ExchangeCorsProperties(List.of(CHROME, " "), true)))
+  void boundOriginsFirefoxClientsAndBlankEntriesPass() {
+    assertThat(
+            validator.validate(
+                new ExchangeCorsProperties(
+                    List.of("hangar-exporter=" + CHROME, " "), List.of("hangar-exporter", ""))))
         .isEmpty();
   }
 
   @ParameterizedTest
   @ValueSource(
       strings = {
-        "chrome-extension://*",
-        "chrome-extension://abcdefghijklmnopabcdefghijklmnoq",
-        "chrome-extension://abcdefghijklmnopabcdefghijklmno",
-        "chrome-extension://abcdefghijklmnopabcdefghijklmnop/",
-        "moz-extension://*",
-        "https://profit-base.online",
+        "chrome-extension://abcdefghijklmnopabcdefghijklmnop",
+        "hangar-exporter=chrome-extension://*",
+        "hangar-exporter=chrome-extension://abcdefghijklmnopabcdefghijklmnoq",
+        "hangar-exporter=chrome-extension://abcdefghijklmnopabcdefghijklmnop/",
+        "hangar-exporter=moz-extension://*",
+        "hangar-exporter=https://profit-base.online",
+        "Hangar=chrome-extension://abcdefghijklmnopabcdefghijklmnop",
         "*"
       })
-  void anythingButOneChromiumExtensionOriginIsRefused(String origin) {
-    assertThat(validator.validate(new ExchangeCorsProperties(List.of(origin), true)))
+  void anythingButOneClientBoundChromiumOriginIsRefused(String entry) {
+    assertThat(validator.validate(new ExchangeCorsProperties(List.of(entry), List.of())))
         .singleElement()
         .satisfies(v -> assertThat(v.getPropertyPath().toString()).startsWith("extensionOrigins"));
   }
 
   @Test
-  void theFirefoxPatternFollowsTheConfiguredOriginsAndBlanksAreDropped() {
-    assertThat(new ExchangeCorsProperties(List.of(CHROME, ""), true).allowedOriginPatterns())
-        .containsExactly(CHROME, ExchangeCorsProperties.FIREFOX_EXTENSION_ORIGINS);
-    assertThat(new ExchangeCorsProperties(List.of(), false).allowedOriginPatterns()).isEmpty();
+  void oneOriginCannotBeBoundToTwoClients() {
+    assertThat(
+            validator.validate(
+                new ExchangeCorsProperties(
+                    List.of("hangar-exporter=" + CHROME, "other-extension=" + CHROME), List.of())))
+        .singleElement()
+        .satisfies(
+            v -> assertThat(v.getPropertyPath().toString()).isEqualTo("eachOriginBoundOnce"));
   }
 
   @Test
-  void anEmptyEnvironmentValueBindsToNoChromiumOrigin() {
-    ExchangeCorsProperties bound =
-        new Binder(
-                new MapConfigurationPropertySource(
-                    Map.of("app.exchange.cors.extension-origins", "")))
-            .bindOrCreate("app.exchange.cors", ExchangeCorsProperties.class);
-
-    assertThat(bound.allowedOriginPatterns())
-        .containsExactly(ExchangeCorsProperties.FIREFOX_EXTENSION_ORIGINS);
+  void aFirefoxClientMustBeAClientId() {
+    assertThat(
+            validator.validate(new ExchangeCorsProperties(List.of(), List.of("moz-extension://*"))))
+        .singleElement()
+        .satisfies(v -> assertThat(v.getPropertyPath().toString()).startsWith("firefoxClients"));
   }
 
   @Test
-  void aCommaSeparatedEnvironmentValueBindsEachOrigin() {
-    String other = "chrome-extension://ponmlkjihgfedcbaponmlkjihgfedcba";
+  void theCorsPatternsAreTheBoundOriginsAndFirefoxOnlyWhileAClientHasAFirefoxBuild() {
+    assertThat(BOUND.allowedOriginPatterns())
+        .containsExactly(CHROME, OTHER, ExchangeCorsProperties.FIREFOX_EXTENSION_ORIGINS);
+    assertThat(
+            new ExchangeCorsProperties(List.of("hangar-exporter=" + CHROME), List.of(" "))
+                .allowedOriginPatterns())
+        .containsExactly(CHROME);
+    assertThat(BOUND.chromiumOrigins())
+        .containsExactlyInAnyOrderEntriesOf(
+            Map.of(CHROME, "hangar-exporter", OTHER, "other-extension"));
+  }
+
+  @ParameterizedTest
+  @CsvSource(
+      nullValues = "NULL",
+      value = {
+        "hangar-exporter, NULL, true",
+        "versekit, NULL, true",
+        "versekit, '', true",
+        "hangar-exporter, " + CHROME + ", true",
+        "other-extension, " + CHROME + ", false",
+        "versekit, " + CHROME + ", false",
+        "hangar-exporter, " + FIREFOX + ", true",
+        "other-extension, " + FIREFOX + ", false",
+        "hangar-exporter, https://evil.example, false",
+        "hangar-exporter, https://profit-base.online, false",
+        "hangar-exporter, null, false",
+        "NULL, " + CHROME + ", false"
+      })
+  void anOriginIsAdmittedOnlyWithTheClientItIsBoundTo(
+      String clientId, String origin, boolean expected) {
+    assertThat(BOUND.admits(clientId, origin)).isEqualTo(expected);
+  }
+
+  @Test
+  void commaSeparatedEnvironmentValuesBindEachEntry() {
     ExchangeCorsProperties bound =
         new Binder(
                 new MapConfigurationPropertySource(
                     Map.of(
                         "app.exchange.cors.extension-origins",
-                        CHROME + "," + other,
-                        "app.exchange.cors.firefox-extensions",
-                        "false")))
+                        "hangar-exporter=" + CHROME + ",other-extension=" + OTHER,
+                        "app.exchange.cors.firefox-clients",
+                        "hangar-exporter")))
             .bindOrCreate("app.exchange.cors", ExchangeCorsProperties.class);
 
-    assertThat(bound.allowedOriginPatterns()).containsExactly(CHROME, other);
+    assertThat(bound.allowedOriginPatterns())
+        .containsExactly(CHROME, OTHER, ExchangeCorsProperties.FIREFOX_EXTENSION_ORIGINS);
+    assertThat(bound.admits("other-extension", OTHER)).isTrue();
+  }
+
+  @Test
+  void emptyEnvironmentValuesBindToNoExtension() {
+    ExchangeCorsProperties bound =
+        new Binder(
+                new MapConfigurationPropertySource(
+                    Map.of(
+                        "app.exchange.cors.extension-origins", "",
+                        "app.exchange.cors.firefox-clients", "")))
+            .bindOrCreate("app.exchange.cors", ExchangeCorsProperties.class);
+
+    assertThat(bound.allowedOriginPatterns()).isEmpty();
+    assertThat(bound.admits("versekit", null)).isTrue();
+    assertThat(bound.admits("versekit", FIREFOX)).isFalse();
   }
 }

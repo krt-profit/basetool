@@ -34,6 +34,11 @@ is public, case by case, and for the capabilities a client actually needs.
 
 ## After approval
 
+- **A browser extension's manifest change is reviewed again.** A release whose `manifest.json`
+  changes the host permissions, optional host permissions, content-script matches or `permissions`
+  is an admission-relevant change. Comment on the application issue with a link to that release's
+  manifest, and ship it to members only after the review. Every release you apply with links its
+  manifest.
 - A reported token-handling flaw must be fixed in a published release within **7 days**, or the
   client is suspended, or restricted to a minimum version that has the fix.
 - Administrators can suspend a client, revoke it for every member, or require a minimum version at
