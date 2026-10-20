@@ -2686,7 +2686,12 @@ relay on 2026-09-28); the `basetool_http_error_total`
 / `AccessDeniedSpike` / `PendingApprovalBlockSpike` (and the all-codes HTTP-error panel on dashboard
 `07`); the `basetool_keycloak_sync_fetch_failures_total` and `basetool_scheduled_job_step_failures_total`
 counters feed `KeycloakSyncFetchFailing` / `ScWikiStepFailing`; and `KeycloakEventMetricsAbsent` guards
-the `keycloak_user_events_total` series that `KeycloakLoginErrorSpike` depends on. The 2026-08 logging
+the `keycloak_user_events_total` series that `KeycloakLoginErrorSpike` depends on. Keycloak exports a
+failed event under the event name without its `_error` suffix and puts the error code into the `error`
+label (`event="login", error="invalid_user_credentials"`; `error=""` on success), so every rule and
+panel that counts Keycloak failures selects `error!=""` on the base event name — a `*_error` event
+name matches no series; `KeycloakLoginErrorSpike` sums `login` and `identity_provider_login` failures
+per `realm` and is pinned by `monitoring/prometheus/tests/keycloak_login_error_spike_test.yml`. The 2026-08 logging
 audit closed the last three unwatched signals, all in `business-warning`: `basetool_client_error_total`
 → `ClientErrorSpike`, `basetool_session_evicted_total` → `SessionEvictionSpike`, and
 `basetool_external_fetch_errors_total{source="scwiki"}` → `ScWikiCensusIncompleteStreak` (each
