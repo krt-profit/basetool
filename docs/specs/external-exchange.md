@@ -1865,6 +1865,13 @@ conditions (owner decision 2026-10-20, ADR-0303):
 - **Disconnect and uninstall.** "Disconnect" revokes the refresh token (RFC 7009) and deletes the
   token and the key. Where a browser API lets the extension act on uninstall, it revokes there too;
   an uninstall URL never carries a token or an id.
+- **Shorter idle timeout.** A client with a browser-extension build idles out after 14 days instead
+  of 30 (`client.offline.session.idle.timeout` and `client.session.idle.timeout`, set by the
+  provisioner from `external-clients.json`); the 90-day maximum stays (ADR-0304).
+- **Review on every manifest change.** A release whose `manifest.json` changes the host
+  permissions, optional host permissions, content-script matches or `permissions` is
+  admission-relevant: it is reviewed again before it ships to members, and the applicant links that
+  release's manifest each time (ADR-0304).
 - **Version header.** A Chromium extension sends its `<Product>/<semver> (+url)` in
   `Exchange-Client-Agent` (REQ-XCH-024), to the exchange host only.
 - **A fixed extension id.** Each Chrome or Edge build is approved by its fixed extension id,
@@ -1875,24 +1882,30 @@ conditions (owner decision 2026-10-20, ADR-0303):
   builds are not criteria.
 
 The gateway admits extensions cross-origin on `/exchange/**` only: each approved Chromium build's
-fixed `chrome-extension://<id>` (`app.exchange.cors.extension-origins`, from
-`IRI_EXCHANGE_CORS_EXTENSION_ORIGINS`) and `moz-extension://*` (`app.exchange.cors.firefox-extensions`,
-on by default), for `GET`, `POST` and `OPTIONS`, with `Authorization`, `DPoP`, `Content-Type`,
+fixed `chrome-extension://<id>`, bound to its client as `<clientId>=chrome-extension://<id>`
+(`app.exchange.cors.extension-origins`, from `IRI_EXCHANGE_CORS_EXTENSION_ORIGINS`), and
+`moz-extension://*` while one client has a Firefox build (`app.exchange.cors.firefox-clients`, from
+`IRI_EXCHANGE_CORS_FIREFOX_CLIENTS`), for `GET`, `POST` and `OPTIONS`, with `Authorization`, `DPoP`, `Content-Type`,
 `Accept`, `Accept-Language`, `Idempotency-Key`, `X-Correlation-Id`, `User-Agent` and
 `Exchange-Client-Agent`, never with credentials, and exposes `DPoP-Nonce`, `WWW-Authenticate`,
 `RateLimit`, `RateLimit-Policy`, `Retry-After`, `Idempotency-Replayed` and `X-Correlation-Id`.
-Every other path keeps the empty allowlist. An extension's Keycloak client lists each approved
-Chromium origin as a Web Origin. A client with a Firefox build gets `*`, set per client and never
-realm-wide, because Keycloak matches Web Origins only exactly or by `*` and refuses an unlisted
-`Origin` with `403 Invalid origin`, while Firefox sends a random `moz-extension://<uuid>` per
-installation. `*` admits every origin, web pages included: any page can call that client's device
-authorization, token and revocation endpoints from a browser. Tokens stay DPoP-bound, no endpoint
-acts on cookies, and the verification page keeps its phishing warning; the accepted remaining risk
-is a phishing page that drives that client's device flow in the victim's browser (ADR-0303,
-arc42 §11.7a).
+Every other path keeps the empty allowlist. **The origin is bound to the client** (ADR-0304): the
+registry gate refuses with `403 ORIGIN_NOT_ALLOWED` a request whose `Origin` is a
+`chrome-extension://` origin bound to another client than the token's `azp`, a `moz-extension://`
+origin for a client without a Firefox build, or any other browser origin; a request without
+`Origin`, as a desktop client sends it, is unchanged. The refusal is counted on
+`basetool_ingest_exchange_refused_total` as `origin_not_allowed` under the client's label. An
+extension's Keycloak client lists each approved Chromium origin as a Web Origin. A client with a
+Firefox build gets `*`, set per client and never realm-wide, because Keycloak matches Web Origins
+only exactly or by `*` and refuses an unlisted `Origin` with `403 Invalid origin`, while Firefox
+sends a random `moz-extension://<uuid>` per installation. `*` admits every origin, web pages
+included: any page can call that client's device authorization, token and revocation endpoints
+from a browser. Tokens stay DPoP-bound, no endpoint acts on cookies, and the verification page
+keeps its phishing warning; the accepted remaining risk is a phishing page that drives that
+client's device flow in the victim's browser (ADR-0303, arc42 §11.7a).
 
 **Enforced by:** `SecurityConfigTest`, `ExchangeCorsTest`, `ExchangeCorsPropertiesTest` (the
-gateway CORS); the conditions on the extension itself are checked at application.
+gateway CORS), `ExchangeGateTest` (the origin binding); the conditions on the extension itself are checked at application.
 
 **Status:** the checklist `docs/exchange/client-security.md` is written — WP 4.6 (#2090); the
 clients' implementations with WP 5.1 (#2088), WP 5.2 (#2089); browser-extension admission and the

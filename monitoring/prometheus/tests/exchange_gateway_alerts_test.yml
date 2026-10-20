@@ -99,6 +99,22 @@ tests:
               summary: "A registered exchange client is refused unusually often"
               description: "The ingest gateway refused more than 30 requests of one registered client (client_id) in 15 minutes for a reason other than its own limits - typically a release below the minimum version, a capability the registry does not grant, revoked keys or broken DPoP proofs after a client update (REQ-XCH-028). Check the per-client panel and the refusal reasons on the operations dashboard, then contact the client's author or suspend it under Administration - Verbundene Anwendungen."
 
+  - name: fires - an extension origin keeps arriving with another client's token
+    interval: 1m
+    input_series:
+      - series: 'basetool_ingest_exchange_refused_total{job="basetool-ingest", instance="ingest:11272", reason="origin_not_allowed", client_id="versekit"}'
+        values: "0+3x40"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: ExchangeClientRefusalsSpike
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              client_id: versekit
+            exp_annotations:
+              summary: "A registered exchange client is refused unusually often"
+              description: "The ingest gateway refused more than 30 requests of one registered client (client_id) in 15 minutes for a reason other than its own limits - typically a release below the minimum version, a capability the registry does not grant, revoked keys or broken DPoP proofs after a client update (REQ-XCH-028). Check the per-client panel and the refusal reasons on the operations dashboard, then contact the client's author or suspend it under Administration - Verbundene Anwendungen."
+
   - name: silent - a client over its own limits is not a spike
     interval: 1m
     input_series:

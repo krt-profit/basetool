@@ -308,8 +308,8 @@ since the go-live of 2026-09-28, so these risks hold now.
   where a browser extension cannot set one, so it stops honest old releases, never a client that
   lies about its version (REQ-XCH-024).
 - **Browser extensions widen two allowlists** (owner decision 2026-10-20, ADR-0303). The gateway
-  admits every Firefox extension's origin. A client with a Firefox build carries `*` as its
-  Keycloak Web Origins, set per client and never realm-wide: Firefox sends a random
+  admits every Firefox extension's origin for a client with a Firefox build. Such a client carries
+  `*` as its Keycloak Web Origins, set per client and never realm-wide: Firefox sends a random
   `moz-extension://<uuid>` per installation, and Keycloak 26.8 matches only exactly or by `*` and
   refuses any other `Origin` with `403 Invalid origin`. That `*` admits **every origin, every web
   page included**: for that client, any page can call device authorization, token and revocation
@@ -322,6 +322,12 @@ since the go-live of 2026-09-28, so these risks hold now.
   through the gateway, is in ADR-0303. The extension's own permissions are checked against its
   manifest at application, not enforced by the Basetool; a refresh token outlives an uninstalled
   extension until the member disconnects it or the offline session expires.
+- **An extension's origin is bound to its client, but only by configuration** (ADR-0304). The
+  gateway refuses an extension origin carrying another client's token. The binding lives in the
+  gateway's `.env` and is set by hand at approval; a missing entry fails closed (`403
+  ORIGIN_NOT_ALLOWED` or a failed CORS check), a wrong one binds the origin to the wrong client
+  until it is corrected. A permission-widening release is caught only by the re-review the
+  developer asks for — nothing in the Basetool sees the manifest of what members install.
 - **The org demand feed has no low-count suppression.** A unit's single open order is recognisable
   to anyone who knows the unit; the feed goes only to a member the web's job-order gate admits
   (`canViewJobOrders`, under the exchange's reduced authorities), who could read the same order in

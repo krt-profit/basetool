@@ -51,6 +51,7 @@ services:
     environment:
       FRONTEND_URL: https://localhost:18081
       APP_EXCHANGE_CORS_EXTENSIONORIGINS: ${SANDBOX_EXTENSION_ORIGINS:-}
+      APP_EXCHANGE_CORS_FIREFOXCLIENTS: sandbox-client
       APP_RATE_LIMIT_IP_CAPACITY: "6000"
       APP_RATE_LIMIT_IP_REFILL_TOKENS: "6000"
     extra_hosts: !override []

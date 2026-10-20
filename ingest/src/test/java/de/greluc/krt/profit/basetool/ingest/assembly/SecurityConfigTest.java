@@ -191,7 +191,8 @@ class SecurityConfigTest {
 
   @Test
   void exchangeCorsAdmitsOnlyTheApprovedExtensionsAndNoCredentials() {
-    CorsConfiguration configuration = cors("/exchange/v1/me/ships/changes", List.of(CHROME), true);
+    CorsConfiguration configuration =
+        cors("/exchange/v1/me/ships/changes", List.of("hangar-exporter=" + CHROME), true);
 
     assertThat(configuration).isNotNull();
     assertThat(configuration.getAllowCredentials()).isFalse();
@@ -211,8 +212,9 @@ class SecurityConfigTest {
   }
 
   @Test
-  void firefoxExtensionsCanBeSwitchedOff() {
-    CorsConfiguration configuration = cors("/exchange/v1/me/ships", List.of(CHROME), false);
+  void firefoxExtensionsAreRefusedWhileNoClientHasAFirefoxBuild() {
+    CorsConfiguration configuration =
+        cors("/exchange/v1/me/ships", List.of("hangar-exporter=" + CHROME), false);
 
     assertThat(configuration).isNotNull();
     assertThat(configuration.checkOrigin(FIREFOX)).isNull();
@@ -221,7 +223,8 @@ class SecurityConfigTest {
 
   @Test
   void corsOutsideTheExchangeAllowsNoOriginAndNoCredentials() {
-    CorsConfiguration configuration = cors("/v1/refinery-orders", List.of(CHROME), true);
+    CorsConfiguration configuration =
+        cors("/v1/refinery-orders", List.of("hangar-exporter=" + CHROME), true);
 
     assertThat(configuration).isNotNull();
     assertThat(configuration.getAllowedOriginPatterns()).isEmpty();
@@ -234,15 +237,16 @@ class SecurityConfigTest {
    * Resolves the CORS configuration the gateway applies to one request path.
    *
    * @param path the request path
-   * @param chromium the configured Chromium extension origins
-   * @param firefox whether Firefox extensions are admitted
+   * @param chromium the configured {@code <clientId>=<origin>} entries
+   * @param firefox whether one client has a Firefox build
    * @return the configuration for that path
    */
   private static CorsConfiguration cors(String path, List<String> chromium, boolean firefox) {
     MockHttpServletRequest request = new MockHttpServletRequest("OPTIONS", path);
     request.addHeader(HttpHeaders.ORIGIN, CHROME);
     return new SecurityConfig()
-        .corsConfigurationSource(new ExchangeCorsProperties(chromium, firefox))
+        .corsConfigurationSource(
+            new ExchangeCorsProperties(chromium, firefox ? List.of("hangar-exporter") : List.of()))
         .getCorsConfiguration(request);
   }
 
