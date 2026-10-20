@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-15.
-> **Owner area:** HANGAR/UI · **Related ADRs:** [ADR-0258](../adr/0258-a-ships-org-unit-has-its-own-optimistic-counter.md)
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-20.
+> **Owner area:** HANGAR/UI · **Related ADRs:** [ADR-0258](../adr/0258-a-ships-org-unit-has-its-own-optimistic-counter.md), [ADR-0295](../adr/0295-a-hangar-import-matches-ships-by-pledge-and-keeps-pledge-data-private.md)
 
 # Personal hangar overview — pagination & server-side sort/filter
 
@@ -118,7 +118,8 @@ names, never values. Deleting a ship first detaches it from mission units and re
 **Acceptance**
 
 - [x] Create, edit (only with a changed field), delete, empty, import (only when ships were
-  created), fitted reset (only when a flag was cleared) and home location each record one event.
+  created or updated, REQ-HANGAR-015), fitted reset (only when a flag was cleared) and home
+  location each record one event.
 - [x] A deleted ship's mission units are detached and each detachment is recorded.
 - [x] The Hangar tab in the admin audit viewer lists, filters, exports and purges the area.
 - [x] A connected application's create, update and delete record the same events.
@@ -323,6 +324,67 @@ of a connected application's create (REQ-XCH-017) plus the pin, and an exception
 `HangarImportIntegrationTest#importFleetview_memberOfSeveralUnitsWithoutPin_importsShipsWithoutUnit`,
 `HangarImportServiceTest` · **Code:** `OrgUnitStampingService#resolveOrgUnitForImport`,
 `HangarImportService#importShips`.
+### REQ-HANGAR-015 — The Hangar Extension export imports status and pledge data
+
+„Schiffsliste importieren" MUST also accept the two exports of the browser extension „Star Citizen:
+Hangar Extension": the fleet JSON (`my-fleet-*.json`) and the hangar CSV (`my-hangar-*.csv`). The
+format is detected from the payload, like the other formats (REQ-HANGAR-014 keeps the unit rule).
+
+- **Ships only.** Only ship types go into the hangar. From the JSON every record is a ship; from the
+  CSV only the rows whose `Content Type` is `Ship` or `Included Ship`. Skins, equipment,
+  components, hangar decorations, credits, coupons, insurance rows and rows without a type are
+  dropped silently; an `Insurance` row only lends its insurance to the ships of the same pledge. A
+  ship row that matches no ship type is listed under „Nicht erkannt", as for every format. A CSV
+  name is matched without its leading manufacturer word first („Mirai Fury LX" as „Fury LX"), so
+  the prefix does not make a model ambiguous with its shorter siblings, then in full.
+- **Production status.** The JSON's `status` is stored per ship as `FLIGHT_READY`,
+  `IN_CONCEPT` or `IN_PRODUCTION` (case, spaces and hyphens ignored; any other text stores
+  nothing). „Meine Schiffe" and the admin member hangar show it as a chip under the ship name:
+  „Flugfähig" (success), „Konzept" (warning), „In Produktion" (info).
+- **Pledge data.** From the CSV, `Pledge ID`, `Pledge Date` (`October 15, 2026` or ISO),
+  `Pledge Cost` (amount and currency, `15,000.00 USD`), `Meltable` and `Giftable` (`yes` / `no`)
+  are stored per ship when present and readable; an unreadable value stores nothing instead of
+  failing the import. The cost is the price of the whole pledge, shared by every ship in it. The
+  row shows „Pledge #id · date · cost · schmelzbar / nicht schmelzbar · verschenkbar / nicht
+  verschenkbar".
+- **Insurance.** `LTI` and „Lifetime Insurance" become `LTI`, `<n>MI` and „<n> Month Insurance"
+  become `n` months (0 – 120); a ship without readable insurance gets the default `0`. Each
+  created ship takes its own entry's insurance.
+- **Matching instead of duplicating.** Per ship type each upload entry is matched to one ship
+  already in the hangar — first a ship with the same pledge id, then a ship without a pledge id
+  (preferring one with the same insurance); only entries left over create ships. A matched ship
+  takes the entry's status and pledge data and keeps everything else (name, insurance, location,
+  fitted, unit). So JSON then CSV, or the same file twice, never duplicates ships; ships missing
+  from the upload are never deleted. The other formats follow the same matching and carry no
+  status or pledge data. The importer's ships are locked in ascending id order for the run.
+- **Locking.** Status and pledge columns are written only by the import and lie outside the ship's
+  `version` (ADR-0295): an import never 409s a concurrent edit, and an edit never overwrites
+  imported data.
+- **Privacy.** Pledge data are the owner's purchase data. They leave the backend only on the
+  owner's own hangar endpoints (`/my-ships`, the owner's add / edit / unit change) and on the
+  admin member hangar; `/ships`, the mission views and every other `ShipDto` carry `pledge = null`.
+  The production status is shown wherever the ship is.
+- **Result.** The result dialog shows „Importiert", „Aktualisiert", „Bereits im Hangar" and
+  „Nicht erkannt"; the list refreshes in place when ships were created or updated. The audit event
+  `HANGAR_IMPORTED` (REQ-HANGAR-004) is recorded when ships were created or updated, with the
+  counts `created`, `updated`, `alreadyPresent` and `unmatched`, never pledge values.
+
+**Acceptance**
+
+- [x] The JSON creates one ship per record with its status and insurance; the CSV creates one ship
+  per `Ship` / `Included Ship` row with its pledge data, and nothing for the other rows.
+- [x] A re-import, and the CSV after the JSON, creates no ship and fills the existing ones; a
+  re-import that changes nothing records no event.
+- [x] Pledge data appear on „Meine Schiffe" and the admin member hangar, never in `/ships` or a
+  mission.
+- [x] An import does not change a ship's `version`.
+
+**Enforced by:** `HangarImportServiceTest` (`importShips_hangarExtension*`),
+`HangarExtensionCsvParserTest`, `HangarImportIntegrationTest#importHangarExtension_jsonThenCsv_fillsTheSameShipsWithoutDuplicates`,
+`ShipMapperTest`, `MissionPeerRedactorTest`, `HangarControllerTest`, `HangarPagePatternRenderTest` ·
+**Code:** `FleetExportParser`, `HangarExtensionCsvParser`, `HangarImportService#importShips`,
+`ShipRepository#lockAllOwnedByOrderById`, `ShipMapper#toOwnerDto`, `ShipProductionStatus`,
+`V309__add_ship_pledge_and_production_status.sql`, `hangar/fragments/ship-meta.html`.
 
 ## Out of scope
 

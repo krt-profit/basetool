@@ -53,7 +53,7 @@ class HangarBackendClientTest {
       "{\"content\":[],\"page\":0,\"size\":50,\"totalElements\":0,\"totalPages\":0}";
   private static final String IMPORT_RESULT =
       "{\"importedCount\":2,\"skippedCount\":1,\"duplicateCount\":0,"
-          + "\"skippedShips\":[\"Odd\"],\"duplicateShips\":[]}";
+          + "\"skippedShips\":[\"Odd\"],\"duplicateShips\":[],\"updatedCount\":3}";
 
   private BackendClientHarness backend;
   private HangarBackendClient client;
@@ -235,7 +235,8 @@ class HangarBackendClientTest {
 
     FleetviewImportResponseDto ships = client.importShips(upload("shiplist.json"));
 
-    assertThat(ships).isEqualTo(new FleetviewImportResponseDto(2, 1, 0, List.of("Odd"), List.of()));
+    assertThat(ships)
+        .isEqualTo(new FleetviewImportResponseDto(2, 1, 0, List.of("Odd"), List.of(), 3));
     RecordedRequest request = backend.expect("POST", "/api/v1/hangar/import/ships");
     assertThat(request.getHeader("Content-Type")).startsWith("multipart/form-data");
     assertThat(request.getBody().readString(StandardCharsets.UTF_8))

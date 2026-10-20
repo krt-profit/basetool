@@ -542,6 +542,7 @@ document.addEventListener('DOMContentLoaded', () => {
          */
         function openResultModal(data) {
             resultElement('import-res-imported').textContent = String(data.importedCount ?? '');
+            resultElement('import-res-updated').textContent = String(data.updatedCount ?? '');
             resultElement('import-res-skipped').textContent = String(data.skippedCount ?? '');
             resultElement('import-res-duplicates').textContent = String(data.duplicateCount ?? '');
 
@@ -568,7 +569,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!btn) return;
             btn.addEventListener('click', () => {
                 krtModal.close(resultModal);
-                if (resultElement('import-res-imported').textContent !== '0') {
+                if (
+                    resultElement('import-res-imported').textContent !== '0' ||
+                    resultElement('import-res-updated').textContent !== '0'
+                ) {
                     afterHangarWrite();
                 }
             });
@@ -581,7 +585,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         /**
-         * Uploads the chosen FleetView export and shows the result dialog.
+         * Uploads the chosen ship export (JSON or Hangar Extension CSV) and shows the result dialog.
          *
          * @param {File} file the chosen file
          */

@@ -107,7 +107,8 @@ class MemberHangarPageControllerTest {
             "Cutlass",
             0,
             false);
-    ShipDto ship = new ShipDto(SHIP, "Iron Mule", type, "LTI", null, true, null, null, 3L, 0L);
+    ShipDto ship =
+        new ShipDto(SHIP, "Iron Mule", type, "LTI", null, true, null, null, 3L, 0L, null, null);
     when(backendApiClient.get(eq(SHIPS_READ), anyTypeRef(), eq(MEMBER)))
         .thenReturn(new PageResponse<>(List.of(ship), 0, 50, 1, 1, List.of()));
     when(backendApiClient.get(eq("/api/v1/users/{id}"), eq(UserDto.class), eq(MEMBER)))
@@ -318,7 +319,9 @@ class MemberHangarPageControllerTest {
             null,
             new SquadronReferenceDto(unit, "Sondereinheit", "SE"),
             3L,
-            4L);
+            4L,
+            null,
+            null);
     when(backendApiClient.get(eq(SHIPS_READ), anyTypeRef(), eq(MEMBER)))
         .thenReturn(new PageResponse<>(List.of(ship), 0, 50, 1, 1, List.of()));
     when(backendApiClient.get(

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Hangar-Import aus der „Star Citizen: Hangar Extension“.** „Schiffsliste importieren“ nimmt jetzt auch das JSON (`my-fleet-*.json`) und das CSV (`my-hangar-*.csv`) der Browser-Erweiterung an; übernommen werden nur Schiffe, keine Skins, Ausrüstung oder Komponenten. Gespeichert werden der Entwicklungsstand („Flugfähig“, „Konzept“, „In Produktion“) sowie Pledge-ID, -Datum, -Preis, schmelzbar und verschenkbar, sichtbar nur für dich und die Administration; ein erneuter Import oder das CSV nach dem JSON legt keine Schiffe doppelt an, sondern ergänzt die vorhandenen (Migration V309, REQ-HANGAR-015, ADR-0295).
+
 ## [v1.19.1](https://github.com/krt-profit/basetool/releases/tag/v1.19.1) - 2026-10-20
 
 ### Changed

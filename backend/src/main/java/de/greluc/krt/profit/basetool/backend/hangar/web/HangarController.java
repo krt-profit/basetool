@@ -128,7 +128,7 @@ public class HangarController {
     Page<Ship> p =
         hangarService.getMyShipsFiltered(
             userService.getUserIdFromJwt(jwt), search, fitted, pageable);
-    return PageResponse.of(p.map(shipMapper::toDto));
+    return PageResponse.of(p.map(shipMapper::toOwnerDto));
   }
 
   /**
@@ -209,7 +209,8 @@ public class HangarController {
   @Transactional
   public ShipDto addShip(
       @AuthenticationPrincipal Jwt jwt, @RequestBody @Valid ShipRequestDto shipRequest) {
-    return shipMapper.toDto(hangarService.addShip(userService.getUserIdFromJwt(jwt), shipRequest));
+    return shipMapper.toOwnerDto(
+        hangarService.addShip(userService.getUserIdFromJwt(jwt), shipRequest));
   }
 
   /**
@@ -225,7 +226,7 @@ public class HangarController {
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
       @RequestBody @Valid @NotNull ShipRequestDto shipRequest) {
-    return shipMapper.toDto(
+    return shipMapper.toOwnerDto(
         hangarService.updateShip(userService.getUserIdFromJwt(jwt), id, shipRequest));
   }
 
@@ -256,7 +257,7 @@ public class HangarController {
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
       @RequestBody @Valid @NotNull ShipOrgUnitRequestDto request) {
-    return shipMapper.toDto(
+    return shipMapper.toOwnerDto(
         hangarService.changeShipOrgUnit(
             userService.getUserIdFromJwt(jwt),
             id,
@@ -345,7 +346,7 @@ public class HangarController {
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("name", "insurance", "fitted", "id"), "name");
     Page<Ship> p = hangarService.getMyShips(userId, pageable);
-    return PageResponse.of(p.map(shipMapper::toDto));
+    return PageResponse.of(p.map(shipMapper::toOwnerDto));
   }
 
   /** Admin-only: adds a ship to a target user's hangar. */
@@ -354,7 +355,7 @@ public class HangarController {
   @Transactional
   public ShipDto addUserShip(
       @PathVariable @NotNull UUID userId, @RequestBody @Valid ShipRequestDto shipRequest) {
-    return shipMapper.toDto(hangarService.addShipByAdmin(userId, shipRequest));
+    return shipMapper.toOwnerDto(hangarService.addShipByAdmin(userId, shipRequest));
   }
 
   /** Admin-only: updates a target user's ship. */
@@ -365,7 +366,7 @@ public class HangarController {
       @PathVariable @NotNull UUID userId,
       @PathVariable @NotNull UUID shipId,
       @RequestBody @Valid @NotNull ShipRequestDto shipRequest) {
-    return shipMapper.toDto(hangarService.updateShipByAdmin(userId, shipId, shipRequest));
+    return shipMapper.toOwnerDto(hangarService.updateShipByAdmin(userId, shipId, shipRequest));
   }
 
   /**
@@ -397,7 +398,7 @@ public class HangarController {
       @PathVariable @NotNull UUID userId,
       @PathVariable @NotNull UUID shipId,
       @RequestBody @Valid @NotNull ShipOrgUnitRequestDto request) {
-    return shipMapper.toDto(
+    return shipMapper.toOwnerDto(
         hangarService.changeShipOrgUnitByAdmin(
             userId, shipId, request.orgUnitId(), request.owningOrgUnitVersion()));
   }

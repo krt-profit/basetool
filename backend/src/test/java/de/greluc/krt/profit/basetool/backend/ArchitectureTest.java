@@ -100,6 +100,8 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeGate;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeMirrorProperties;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClients;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDto;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipPledgeDto;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipProductionStatus;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarService;
 import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.identity.api.RejectedRegistrationRetentionProperties;
@@ -423,6 +425,8 @@ class ArchitectureTest {
           SubjectAuthentication.class,
           TermsConsentCheck.class,
           ShipDto.class,
+          ShipPledgeDto.class,
+          ShipProductionStatus.class,
           LocationDto.class,
           ShipTypeDto.class,
           ManufacturerDto.class,
@@ -1189,7 +1193,7 @@ class ArchitectureTest {
 
   @Test
   void leafHelpersMustStayDependencyLeaves() {
-    assertClassFloor("leafHelpersMustStayDependencyLeaves", LEAF_HELPERS, 70);
+    assertClassFloor("leafHelpersMustStayDependencyLeaves", LEAF_HELPERS, 72);
     leafHelpersMustStayDependencyLeavesRule(
             LEAF_HELPERS, LEAF_HELPERS.or(MODEL_CODE).or(REPOSITORY_CODE), ROOT_PACKAGE)
         .check(CLASSES);

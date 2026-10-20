@@ -30,6 +30,7 @@ import java.util.List;
  * @param duplicateCount how many entries were already in the hangar
  * @param skippedShips the names of the skipped entries
  * @param duplicateShips the names of the duplicate entries
+ * @param updatedCount how many matched ships took a new production status or pledge data
  */
 @DtoMirror
 public record FleetviewImportResponseDto(
@@ -37,4 +38,5 @@ public record FleetviewImportResponseDto(
     int skippedCount,
     int duplicateCount,
     List<String> skippedShips,
-    List<String> duplicateShips) {}
+    List<String> duplicateShips,
+    int updatedCount) {}

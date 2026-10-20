@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -32,13 +33,17 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipProductionStatus;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -62,8 +67,9 @@ import tools.jackson.databind.json.JsonMapper;
  *       Wolf"}).
  *   <li>Unmatched entries surface in {@code skippedShips} with their original casing, deduplicated
  *       case-insensitively.
- *   <li>Hangar count never exceeds the JSON count: {@code max(0, jsonCount - hangarCount)}
- *       additional ships are created per distinct ship type.
+ *   <li>Each upload entry is matched to one hangar ship of its type, by pledge id first; only the
+ *       entries left over create ships, so a re-import creates nothing.
+ *   <li>A matched ship takes the entry's production status and pledge data (REQ-HANGAR-015).
  *   <li>Surplus ships already in the hangar are never deleted.
  *   <li>Empty file / unparseable JSON / unknown user surface as the expected exceptions for the
  *       controller's HTTP-status mapping.
@@ -219,14 +225,13 @@ class HangarImportServiceTest {
 
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
-    when(shipRepository.countShipsPerTypeByOwnerId(userId))
-        .thenReturn(List.of(typeCount(type.getId(), 1L)));
+    when(shipRepository.lockAllOwnedByOrderById(userId)).thenReturn(owned(type, 1));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(2);
-    assertThat(result.duplicateCount()).isEqualTo(0);
+    assertThat(result.duplicateCount()).isEqualTo(1);
     verify(shipRepository, times(2)).save(any(Ship.class));
   }
 
@@ -250,8 +255,7 @@ class HangarImportServiceTest {
 
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
-    when(shipRepository.countShipsPerTypeByOwnerId(userId))
-        .thenReturn(List.of(typeCount(type.getId(), 3L)));
+    when(shipRepository.lockAllOwnedByOrderById(userId)).thenReturn(owned(type, 3));
 
     FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
 
@@ -281,8 +285,7 @@ class HangarImportServiceTest {
 
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
-    when(shipRepository.countShipsPerTypeByOwnerId(userId))
-        .thenReturn(List.of(typeCount(type.getId(), 5L)));
+    when(shipRepository.lockAllOwnedByOrderById(userId)).thenReturn(owned(type, 5));
 
     FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
 
@@ -315,16 +318,16 @@ class HangarImportServiceTest {
 
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(typeA, typeB));
-    when(shipRepository.countShipsPerTypeByOwnerId(userId))
-        .thenReturn(List.of(typeCount(typeA.getId(), 2L), typeCount(typeB.getId(), 1L)));
+    when(shipRepository.lockAllOwnedByOrderById(userId))
+        .thenReturn(concat(owned(typeA, 2), owned(typeB, 1)));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(2);
-    assertThat(result.duplicateCount()).isEqualTo(1);
+    assertThat(result.duplicateCount()).isEqualTo(2);
     verify(shipRepository, times(2)).save(any(Ship.class));
-    verify(shipRepository, times(1)).countShipsPerTypeByOwnerId(userId);
+    verify(shipRepository, times(1)).lockAllOwnedByOrderById(userId);
     verify(ownerScopeService, times(1)).resolveOrgUnitForImport(any());
   }
 
@@ -1537,18 +1540,326 @@ class HangarImportServiceTest {
         "file", "fleetview.json", "application/json", json.getBytes(StandardCharsets.UTF_8));
   }
 
-  /** A grouped-count row of {@code ShipRepository.countShipsPerTypeByOwnerId}. */
-  private static ShipRepository.ShipTypeCount typeCount(UUID shipTypeId, long count) {
-    return new ShipRepository.ShipTypeCount() {
-      @Override
-      public UUID getShipTypeId() {
-        return shipTypeId;
-      }
+  @Test
+  void importShips_hangarExtensionJson_createsShipsWithStatusAndOwnInsurance() {
+    UUID userId = UUID.randomUUID();
+    User user = userWithId(userId);
+    ShipType cat = shipTypeWithName("Caterpillar");
+    ShipType arrastra = shipTypeWithName("Arrastra");
 
-      @Override
-      public long getShipCount() {
-        return count;
-      }
-    };
+    String json =
+        """
+        [
+          {"manufacturer":{"code":"DRAK","name":"Drake Interplanetary"},"code":"DRAK_Caterpillar",
+           "matrix":"Caterpillar","status":"Flight-Ready","insurance":"LTI","name":"Caterpillar"},
+          {"manufacturer":{"code":"DRAK","name":"Drake Interplanetary"},"code":"DRAK_Caterpillar",
+           "matrix":"Caterpillar","status":"Flight-Ready","insurance":"6MI","name":"Caterpillar"},
+          {"manufacturer":{"code":"RSI","name":"Roberts Space Industries"},"code":"RSI_Arrastra",
+           "matrix":"Arrastra","status":"In-Concept","insurance":"120MI","name":"Arrastra"}
+        ]
+        """;
+
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(cat, arrastra));
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    FleetviewImportResponseDto result =
+        hangarImportService.importShips(userId, multipartFile(json));
+
+    assertThat(result.importedCount()).isEqualTo(3);
+    assertThat(result.updatedCount()).isZero();
+    ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
+    verify(shipRepository, times(3)).save(captor.capture());
+    assertThat(captor.getAllValues())
+        .extracting(Ship::getInsurance, Ship::getProductionStatus)
+        .containsExactly(
+            tuple("LTI", ShipProductionStatus.FLIGHT_READY),
+            tuple("6", ShipProductionStatus.FLIGHT_READY),
+            tuple("120", ShipProductionStatus.IN_CONCEPT));
+  }
+
+  @Test
+  void importShips_hangarExtensionJson_existingShip_updatesStatusWithoutCreating() {
+    UUID userId = UUID.randomUUID();
+    User user = userWithId(userId);
+    ShipType cat = shipTypeWithName("Caterpillar");
+    List<Ship> hangar = owned(cat, 1);
+
+    String json =
+        """
+        [{"matrix":"Caterpillar","status":"Flight-Ready","insurance":"LTI","name":"Caterpillar"}]
+        """;
+
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(cat));
+    when(shipRepository.lockAllOwnedByOrderById(userId)).thenReturn(hangar);
+
+    FleetviewImportResponseDto result =
+        hangarImportService.importShips(userId, multipartFile(json));
+
+    assertThat(result.importedCount()).isZero();
+    assertThat(result.duplicateCount()).isEqualTo(1);
+    assertThat(result.updatedCount()).isEqualTo(1);
+    assertThat(hangar.getFirst().getProductionStatus())
+        .isEqualTo(ShipProductionStatus.FLIGHT_READY);
+    assertThat(hangar.getFirst().getInsurance()).isEqualTo("0");
+    verify(shipRepository, never()).save(any(Ship.class));
+    verify(auditService)
+        .record(
+            eq(AuditEventType.HANGAR_IMPORTED),
+            isNull(),
+            isNull(),
+            eq(userId),
+            argThat(d -> d.toString().contains("updated=1")));
+  }
+
+  @Test
+  void importShips_hangarExtensionJson_slugFallback_resolvesViaUexSlug() {
+    UUID userId = UUID.randomUUID();
+    User user = userWithId(userId);
+    ShipType type = shipTypeWithSlugs("600i Explorer Edition", "600i-explorer", null);
+
+    String json =
+        """
+        [{"matrix":"Six Hundred","status":"Flight-Ready","insurance":"LTI","name":"600i-explorer"}]
+        """;
+
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(type));
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    FleetviewImportResponseDto result =
+        hangarImportService.importShips(userId, multipartFile(json));
+
+    assertThat(result.importedCount()).isEqualTo(1);
+    assertThat(result.skippedShips()).isEmpty();
+  }
+
+  @Test
+  void importShips_hangarExtensionCsv_importsOnlyShipRowsWithPledgeData() {
+    UUID userId = UUID.randomUUID();
+    User user = userWithId(userId);
+    ShipType centaurus = shipTypeWithName("Constellation Mk V Centaurus");
+    ShipType skylark = shipTypeWithName("Skylark");
+
+    String csv =
+        HEADER
+            + """
+            "1001","October 14, 2026","1,275.00 USD","yes","no","Centaurus Pack","RSI Constellation Mk V Centaurus","Ship"
+            "1001","October 14, 2026","1,275.00 USD","yes","no","Centaurus Pack","RSI Skylark","Included Ship"
+            "1001","October 14, 2026","1,275.00 USD","yes","no","Centaurus Pack","Lifetime Insurance","Insurance"
+            "1001","October 14, 2026","1,275.00 USD","yes","no","Centaurus Pack","Skylark - Magnitude Paint","Skin"
+            "1001","October 14, 2026","1,275.00 USD","yes","no","Centaurus Pack","Revel & York Hangar",""
+            "1002","October 10, 2026","0.00 USD","no","no","Reward","Helios IP-10","Component"
+            """;
+
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(centaurus, skylark));
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, csvFile(csv));
+
+    assertThat(result.importedCount()).isEqualTo(2);
+    assertThat(result.skippedShips()).isEmpty();
+    ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
+    verify(shipRepository, times(2)).save(captor.capture());
+    Ship ship = captor.getAllValues().getFirst();
+    assertThat(ship.getShipType()).isSameAs(centaurus);
+    assertThat(ship.getInsurance()).isEqualTo("LTI");
+    assertThat(ship.getPledgeId()).isEqualTo("1001");
+    assertThat(ship.getPledgeDate()).isEqualTo(LocalDate.of(2026, 10, 14));
+    assertThat(ship.getPledgeCost()).isEqualByComparingTo("1275.00");
+    assertThat(ship.getPledgeCostCurrency()).isEqualTo("USD");
+    assertThat(ship.getMeltable()).isTrue();
+    assertThat(ship.getGiftable()).isFalse();
+    assertThat(captor.getAllValues().get(1).getShipType()).isSameAs(skylark);
+    assertThat(captor.getAllValues().get(1).getPledgeId()).isEqualTo("1001");
+  }
+
+  @Test
+  void importShips_hangarExtensionCsv_reimport_matchesByPledgeIdAndCreatesNothing() {
+    UUID userId = UUID.randomUUID();
+    User user = userWithId(userId);
+    ShipType fury = shipTypeWithName("Fury");
+    List<Ship> hangar = owned(fury, 3);
+    hangar.get(0).setPledgeId("2001");
+    hangar.get(1).setPledgeId("2002");
+    hangar.get(2).setPledgeId("2002");
+
+    String csv =
+        HEADER
+            + """
+            "2002","May 1, 2025","90.00 USD","yes","yes","Fury Pack","Mirai Fury","Ship"
+            "2002","May 1, 2025","90.00 USD","yes","yes","Fury Pack","Mirai Fury","Ship"
+            """;
+
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(fury));
+    when(shipRepository.lockAllOwnedByOrderById(userId)).thenReturn(hangar);
+
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, csvFile(csv));
+
+    assertThat(result.importedCount()).isZero();
+    assertThat(result.duplicateCount()).isEqualTo(2);
+    assertThat(result.updatedCount()).isEqualTo(2);
+    assertThat(hangar.get(0).getPledgeDate()).isNull();
+    assertThat(hangar.get(1).getPledgeDate()).isEqualTo(LocalDate.of(2025, 5, 1));
+    assertThat(hangar.get(2).getPledgeDate()).isEqualTo(LocalDate.of(2025, 5, 1));
+    verify(shipRepository, never()).save(any(Ship.class));
+  }
+
+  @Test
+  void importShips_hangarExtensionCsv_fillsShipWithoutPledgePreferringSameInsurance() {
+    UUID userId = UUID.randomUUID();
+    User user = userWithId(userId);
+    ShipType cat = shipTypeWithName("Caterpillar");
+    List<Ship> hangar = owned(cat, 2);
+    hangar.get(0).setInsurance("6");
+    hangar.get(1).setInsurance("LTI");
+
+    String csv =
+        HEADER
+            + """
+            "3001","June 2, 2020","295.00 USD","yes","yes","Caterpillar","Drake Caterpillar","Ship"
+            "3001","June 2, 2020","295.00 USD","yes","yes","Caterpillar","Lifetime Insurance","Insurance"
+            """;
+
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(cat));
+    when(shipRepository.lockAllOwnedByOrderById(userId)).thenReturn(hangar);
+
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, csvFile(csv));
+
+    assertThat(result.importedCount()).isZero();
+    assertThat(result.updatedCount()).isEqualTo(1);
+    assertThat(hangar.get(0).getPledgeId()).isNull();
+    assertThat(hangar.get(1).getPledgeId()).isEqualTo("3001");
+  }
+
+  @Test
+  void importShips_hangarExtensionCsv_unchangedReimport_recordsNothing() {
+    UUID userId = UUID.randomUUID();
+    User user = userWithId(userId);
+    ShipType cat = shipTypeWithName("Caterpillar");
+    List<Ship> hangar = owned(cat, 1);
+    Ship ship = hangar.getFirst();
+    ship.setPledgeId("3001");
+    ship.setPledgeDate(LocalDate.of(2020, 6, 2));
+    ship.setPledgeCost(new BigDecimal("295.0"));
+    ship.setPledgeCostCurrency("USD");
+    ship.setMeltable(true);
+    ship.setGiftable(true);
+
+    String csv =
+        HEADER
+            + """
+            "3001","June 2, 2020","295.00 USD","yes","yes","Caterpillar","Drake Caterpillar","Ship"
+            """;
+
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(cat));
+    when(shipRepository.lockAllOwnedByOrderById(userId)).thenReturn(hangar);
+
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, csvFile(csv));
+
+    assertThat(result.updatedCount()).isZero();
+    assertThat(result.duplicateCount()).isEqualTo(1);
+    verifyNoInteractions(auditService);
+    verifyNoInteractions(unitLiveSync);
+  }
+
+  @Test
+  void importShips_hangarExtensionCsv_unknownShipIsSkippedButNonShipsAreNot() {
+    UUID userId = UUID.randomUUID();
+    User user = userWithId(userId);
+
+    String csv =
+        "﻿"
+            + HEADER.replace("\n", "\r\n")
+            + "\"4001\",\"January 1, 2024\",\"5.00 USD\",\"no\",\"no\",\"Odd, Pack\","
+            + "\"Mystery Craft\",\"Ship\"\r\n"
+            + "\"4001\",\"January 1, 2024\",\"5.00 USD\",\"no\",\"no\",\"Odd, Pack\","
+            + "\"Gemini R97 \"\"Runic\"\" Shotgun\",\"FPS Equipment\"\r\n";
+
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(shipTypeWithName("Caterpillar")));
+
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, csvFile(csv));
+
+    assertThat(result.importedCount()).isZero();
+    assertThat(result.skippedShips()).containsExactly("Mystery Craft");
+  }
+
+  @Test
+  void importShips_hangarExtensionCsv_manufacturerPrefixDoesNotMakeSiblingsAmbiguous() {
+    UUID userId = UUID.randomUUID();
+    User user = userWithId(userId);
+    ShipType fury = shipTypeWithName("Fury");
+    ShipType furyLx = shipTypeWithName("Fury LX");
+    ShipType hercules = shipTypeWithName("C2 Hercules Starlifter");
+
+    String csv =
+        HEADER
+            + """
+            "5001","May 1, 2025","90.00 USD","yes","yes","Pack","Mirai Fury LX","Ship"
+            "5001","May 1, 2025","90.00 USD","yes","yes","Pack","Mirai Fury","Ship"
+            "5002","May 1, 2025","400.00 USD","yes","yes","C2","Crusader C2 Hercules","Ship"
+            """;
+
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(fury, furyLx, hercules));
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, csvFile(csv));
+
+    assertThat(result.skippedShips()).isEmpty();
+    ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
+    verify(shipRepository, times(3)).save(captor.capture());
+    assertThat(captor.getAllValues())
+        .extracting(Ship::getShipType)
+        .containsExactly(furyLx, fury, hercules);
+  }
+
+  @Test
+  void importShips_csvWithoutPledgeIdColumn_throws400() {
+    MockMultipartFile file = csvFile("Name,Type\nCaterpillar,Ship\n");
+
+    assertThrows(
+        BadRequestException.class, () -> hangarImportService.importShips(UUID.randomUUID(), file));
+  }
+
+  private static final String HEADER =
+      "Pledge ID,Pledge Date,Pledge Cost,Meltable,Giftable,Pledge Name,Pledge Content,Content"
+          + " Type\n";
+
+  private static User userWithId(UUID userId) {
+    User user = new User();
+    user.setId(userId);
+    return user;
+  }
+
+  private static MockMultipartFile csvFile(String csv) {
+    return new MockMultipartFile(
+        "file", "my-hangar.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8));
+  }
+
+  /** {@code count} pledge-less hangar ships of one type, with insurance {@code "0"}. */
+  private static List<Ship> owned(ShipType type, int count) {
+    List<Ship> ships = new ArrayList<>();
+    for (int i = 0; i < count; i++) {
+      Ship ship = new Ship();
+      ship.setId(UUID.randomUUID());
+      ship.setShipType(type);
+      ship.setInsurance("0");
+      ships.add(ship);
+    }
+    return ships;
+  }
+
+  /** The two lists one after the other. */
+  private static List<Ship> concat(List<Ship> first, List<Ship> second) {
+    List<Ship> all = new ArrayList<>(first);
+    all.addAll(second);
+    return all;
   }
 }

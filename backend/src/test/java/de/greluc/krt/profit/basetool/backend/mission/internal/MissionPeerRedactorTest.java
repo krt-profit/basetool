@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.backend.mission.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDto;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipPledgeDto;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipProductionStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
@@ -30,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionStepDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionUnitDto;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
@@ -162,6 +165,19 @@ class MissionPeerRedactorTest {
     assertThat(redacted.assignedUnits().getFirst().ship().name()).isEqualTo("Rocinante");
   }
 
+  /**
+   * A peer sees the ship's production status but never its owner's pledge data (REQ-HANGAR-015).
+   */
+  @Test
+  void cleanupMissionForPeer_dropsTheShipsPledgeButKeepsItsStatus() {
+    MissionDto redacted =
+        redactor.cleanupMissionForPeer(missionWithUnit(unitWithShipOwnedBy(fullUser())));
+
+    ShipDto ship = redacted.assignedUnits().getFirst().ship();
+    assertThat(ship.pledge()).isNull();
+    assertThat(ship.productionStatus()).isEqualTo(ShipProductionStatus.IN_CONCEPT);
+  }
+
   /** A unit without an assigned ship must not blow up the redaction pass. */
   @Test
   void cleanupUnitForPeer_toleratesAUnitWithoutAShip() {
@@ -188,7 +204,9 @@ class MissionPeerRedactorTest {
             owner,
             new SquadronReferenceDto(UUID.randomUUID(), "Squadron", "SQ"),
             1L,
-            0L);
+            0L,
+            ShipProductionStatus.IN_CONCEPT,
+            new ShipPledgeDto("1001", LocalDate.of(2026, 1, 2), BigDecimal.TEN, "USD", true, true));
     return new MissionUnitDto(
         UUID.randomUUID(), "Alpha", null, ship, 8.5, true, null, "note", 1L, List.of());
   }
