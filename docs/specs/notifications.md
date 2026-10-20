@@ -1214,6 +1214,24 @@ notification type `INVENTORY_STOCK_LEVEL_LOW`.
 (`NotificationType#INVENTORY_STOCK_LEVEL_LOW`, the inventory module's producer) · **Related:**
 REQ-INV-067, REQ-INV-068, REQ-NOTIF-024, REQ-NOTIF-026, REQ-NOTIF-027 · **Decision:** ADR-0302
 
+### REQ-NOTIF-031 — Amounts in a notification carry thousands separators
+
+The backend stores an amount parameter locale-free (`3000000`, `12.50`). The web inbox and bell
+render the parameters `amount`, `fee`, `balance`, `total`, `open` and `donation` the way the bank
+pages show amounts: a point between thousands and a comma before the fraction (`3.000.000`,
+`12,50`). Every other parameter — an account number, a deal number, a count, a name — renders as
+stored, and so does a value that is not a plain decimal. Lists the producer pre-renders (`lots`,
+`outputs`) are outside the rule.
+
+**Acceptance**
+
+- [x] „{amount} aUEC (Konto {accountNo}, Gebühr {fee} aUEC)" with `3000000`, `1234567` and `15000`
+  renders „3.000.000 aUEC (Konto 1234567, Gebühr 15.000 aUEC)".
+- [x] `12.50` renders `12,50`, `-25000` renders `-25.000`, a non-numeric value renders as itself.
+
+**Enforced by:** `NotificationRenderAmountsTest` · **Code:** `NotificationPageController#render`,
+`NotificationPageController#groupAmount` · **Related:** REQ-NOTIF-028, REQ-BANK-059
+
 ## Out of scope (v1)
 
 - Per-notification e-mail routing (generic fan-out of in-app notification types to e-mail), per-channel

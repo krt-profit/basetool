@@ -1398,7 +1398,8 @@ superseding the carve-out model of ADR-0041):
   (`amount + fee`), so the **destination receives the full entered amount** and the **debited
   account bears the fee**. A 500 000 transfer at 0.5% therefore costs the source 502 500. The fee
   and the gross debited are shown explicitly — a live preview in the booking modals (fed by `GET
-  /api/v1/bank/transfer-fee-rate`) and, on every outgoing leg of the account/holder history, the
+  /api/v1/bank/transfer-fee-rate`, readable by every authenticated member because it carries only
+  the org-wide rate) and, on every outgoing leg of the account/holder history, the
   fee plus the amount that arrived (`|leg| − fee`).
 - **Rate:** the same runtime-editable setting the operation payout uses
   (`operation.transfer_fee_rate`, default 0.5%, editable at `/admin/settings`) — one rate for the
@@ -3019,6 +3020,43 @@ pin ignored for the set, no holders), `OrgUnitBankVisibleAccountsQueryTest` (bac
 `OrgUnitBankVisibleAccountsDtoTest` (no holder field) · **Code (planned):**
 `bank/internal/OrgUnitBankAccessService`, `bank/web/OrgUnitBankController` · **Related:** REQ-BANK-021, REQ-BANK-035, REQ-BANK-037,
 REQ-API-005, REQ-UI-034, ADR-0299
+
+### REQ-BANK-065 — A deposit shows what the depositor transfers with the in-game fee
+
+A depositor pays the in-game transfer fee on top of what arrives (REQ-BANK-033). So that a member
+knows straight away how much to send for the requested amount to land on the account, every place
+that states a deposit amount to be transferred shows a small line **„Mit Gebühr: X aUEC"** beneath
+it, with `X = amount + round(amount × rate)` in whole aUEC, HALF_UP — the backend's
+`BankTransferFeeService.totalDebit` formula.
+
+- **Request queue** (`/bank/requests`): under the amount of every **pending** deposit request.
+- **Own and foreign requests** on the org-unit bank page (`/org-unit-bank`): under the amount of
+  every **pending** deposit request.
+- **Request dialog** (org-unit bank page and account drill-in) and **direct-booking dialog**
+  (`/bank`, `/bank/requests`, account detail): a live line under the amount field while the
+  operation is a deposit and the amount is positive; hidden for withdrawals and transfers, which
+  keep their own fee preview (REQ-BANK-033).
+- **No rate, no line.** A rate of `0`, or a rate that failed to load, hides the line; a confirmed,
+  rejected or cancelled request shows none, because the rate it was paid at may differ.
+- **The rate** comes from `GET /api/v1/bank/transfer-fee-rate`, open to every authenticated caller
+  (it carries the org-wide rate and no account data). Display only: the ledger books what it booked
+  before.
+
+**Acceptance**
+
+- [x] A pending 600 000 aUEC deposit at 0.5% shows „Mit Gebühr: 603.000 aUEC" in the queue; a
+  withdrawal shows no such line.
+- [x] The dialogs show the live line for a deposit and hide it for a withdrawal or transfer.
+- [x] `withTransferFee` adds `round(amount × rate)` HALF_UP and returns the whole amount without a
+  rate.
+
+**Enforced by:** `BankRequestsPatternRenderTest#showsTheDepositAmountWithTheTransferFee`,
+`MoneyFormatTest` (`withTransferFee_*`), the backend `authorization-matrix.txt` entry of
+`getTransferFeeRate` · **Code:** `frontend/kernel/web/MoneyFormat#withTransferFee`,
+`bank/bank-requests.html`, `bank/org-unit-bank.html`, `bank/fragments/bank-movement-modal.html`,
+`bank/fragments/org-unit-bank-views.html`, `static/js/bank/bank-previews.js#updateDepositGross`,
+`backend/bank/web/BankBookingController#getTransferFeeRate` · **Related:** REQ-BANK-033,
+REQ-BANK-022, REQ-BANK-023, REQ-UI-037
 
 ## Out of scope
 

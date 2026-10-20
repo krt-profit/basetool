@@ -31,6 +31,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankBookingRequestDto;
+import de.greluc.krt.profit.basetool.frontend.bank.model.BankTransferFeeRateDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import java.math.BigDecimal;
@@ -251,6 +252,34 @@ class BankRequestsPatternRenderTest {
         .containsPattern("data-testid=\"bank-request-waiting\"[^>]*>wartet auf Bankleitung<")
         .contains("id=\"bank-req-more-" + OPEN_ID + "\"")
         .contains("data-testid=\"bank-request-approval-granted\"");
+  }
+
+  /**
+   * REQ-BANK-065: a pending deposit shows what the depositor transfers with the in-game fee, a
+   * withdrawal does not.
+   */
+  @Test
+  @WithMockUser(roles = "BANK_EMPLOYEE")
+  void showsTheDepositAmountWithTheTransferFee() throws Exception {
+    when(backendApiClient.get(
+            eq("/api/v1/bank/transfer-fee-rate"), eq(BankTransferFeeRateDto.class)))
+        .thenReturn(new BankTransferFeeRateDto(new BigDecimal("0.005")));
+    PageResponse<BankBookingRequestDto> page =
+        new PageResponse<>(
+            List.of(
+                request(UUID.randomUUID(), "DEPOSIT", false, false, null, null),
+                request(OPEN_ID, "WITHDRAWAL", false, false, null, null)),
+            0,
+            200,
+            2L,
+            1,
+            List.of());
+
+    String html = render(page, "");
+
+    assertThat(html)
+        .containsPattern("data-testid=\"bank-request-gross\"[^>]*>Mit Gebühr: 603\\.000 aUEC<");
+    assertThat(html.split("data-testid=\"bank-request-gross\"", -1)).hasSize(2);
   }
 
   /** An empty segment renders the empty state and no table. */

@@ -52,6 +52,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Nullable;
@@ -157,6 +158,17 @@ public class NotificationPageController {
 
   /** The suffix that marks a render parameter as a code with a localized word (REQ-NOTIF-028). */
   private static final String CODE_SUFFIX = "Code";
+
+  /** Render parameters that carry an amount and are shown with thousands separators. */
+  private static final Set<String> AMOUNT_PARAMETERS =
+      Set.of("amount", "fee", "balance", "total", "open", "donation");
+
+  /**
+   * A plain, locale-free decimal as the backend stores it, e.g. {@code 1500000} or {@code 12.50}.
+   */
+  private static final Pattern PLAIN_AMOUNT = Pattern.compile("-?\\d+(\\.\\d+)?");
+
+  private static final int DIGIT_GROUP = 3;
 
   private static final DateTimeFormatter DISPLAY_FORMAT =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm 'UTC'").withZone(ZoneOffset.UTC);
@@ -494,9 +506,11 @@ public class NotificationPageController {
     }
     if (params != null) {
       for (Map.Entry<String, String> entry : params.entrySet()) {
-        template =
-            template.replace(
-                "{" + entry.getKey() + "}", entry.getValue() == null ? "" : entry.getValue());
+        String value = entry.getValue() == null ? "" : entry.getValue();
+        if (AMOUNT_PARAMETERS.contains(entry.getKey())) {
+          value = groupAmount(value);
+        }
+        template = template.replace("{" + entry.getKey() + "}", value);
         if (isCodeParameter(entry.getKey()) && entry.getValue() != null) {
           String name = entry.getKey().substring(0, entry.getKey().length() - CODE_SUFFIX.length());
           String valueKey = "notifications.value." + name + "." + entry.getValue();
@@ -506,6 +520,35 @@ public class NotificationPageController {
       }
     }
     return template;
+  }
+
+  /**
+   * Formats a plain decimal amount with a point between thousands and a comma before the fraction,
+   * as the bank pages show amounts ({@code 1500000} becomes {@code 1.500.000}, {@code 12.50}
+   * becomes {@code 12,50}); any other text is returned unchanged.
+   *
+   * @param value the stored parameter value
+   * @return the grouped amount, or {@code value} when it is not a plain decimal
+   */
+  static String groupAmount(String value) {
+    if (!PLAIN_AMOUNT.matcher(value).matches()) {
+      return value;
+    }
+    boolean negative = value.startsWith("-");
+    String unsigned = negative ? value.substring(1) : value;
+    int dot = unsigned.indexOf('.');
+    String integer = dot < 0 ? unsigned : unsigned.substring(0, dot);
+    StringBuilder grouped = new StringBuilder(integer.length() + integer.length() / DIGIT_GROUP);
+    for (int i = 0; i < integer.length(); i++) {
+      if (i > 0 && (integer.length() - i) % DIGIT_GROUP == 0) {
+        grouped.append('.');
+      }
+      grouped.append(integer.charAt(i));
+    }
+    if (dot >= 0) {
+      grouped.append(',').append(unsigned, dot + 1, unsigned.length());
+    }
+    return negative ? "-" + grouped : grouped.toString();
   }
 
   /**
