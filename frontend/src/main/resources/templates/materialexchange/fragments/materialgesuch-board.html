@@ -78,11 +78,11 @@
                     </div>
 
                     <div class="kpi-grid mb-kpis">
-                        <div class="kpi-total">
+                        <div class="kpi-total kpi-total--inset">
                             <div class="kpi-label" th:text="#{materialgesuch.facts.minQuality}">Min. Qualität</div>
                             <div class="kpi-value mb-kpi-quality" th:text="${request.minQuality() != null ? request.minQuality() : '–'}">0</div>
                         </div>
-                        <div class="kpi-total">
+                        <div class="kpi-total kpi-total--inset">
                             <div class="kpi-label" th:text="#{materialboerse.facts.amount}">Menge</div>
                             <div class="kpi-value" th:if="${request.kind() == 'ITEM'}">
                                 <span th:text="${#numbers.formatInteger(request.itemQuantity(), 1)}">0</span>
@@ -99,7 +99,7 @@
                                 </th:block>
                             </div>
                         </div>
-                        <div class="kpi-total">
+                        <div class="kpi-total kpi-total--inset">
                             <div class="kpi-label" th:text="#{materialgesuch.interest.label}">Lieferanten</div>
                             <div class="kpi-value" data-testid="mg-interest-count" th:text="${request.interestCount()}">0</div>
                         </div>

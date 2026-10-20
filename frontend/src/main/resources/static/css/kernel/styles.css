@@ -7884,6 +7884,10 @@
         border-left: 4px solid var(--color-primary);
     }
 
+    .kpi-total--inset {
+        background-color: var(--color-surface-input);
+    }
+
     .kpi-label {
         color: var(--color-gray-2-text);
         font-size: 0.62rem;

@@ -32,19 +32,19 @@
         </div>
 
         <div class="kpi-grid">
-            <div class="kpi-total">
+            <div class="kpi-total kpi-total--inset">
                 <div class="kpi-label" th:text="#{promotion.overview.your.rank}">Dein Rang</div>
                 <div class="kpi-value" data-testid="me-kpi-rank" th:text="${currentUserRank != null ? currentUserRank : '—'}">20</div>
             </div>
-            <div class="kpi-total">
+            <div class="kpi-total kpi-total--inset">
                 <div class="kpi-label" th:text="#{promotion.my.kpi.next}">Nächster Rang</div>
                 <div class="kpi-value" data-testid="me-kpi-next" th:text="${next != null ? next.toRank : '—'}">19</div>
             </div>
-            <div class="kpi-total">
+            <div class="kpi-total kpi-total--inset">
                 <div class="kpi-label" th:text="#{promotion.my.kpi.checks}">Voraussetzungen erfüllt</div>
                 <div class="kpi-value" data-testid="me-kpi-checks" th:text="${next != null ? nextMet + ' / ' + #lists.size(nextChecks) : '—'}">2 / 3</div>
             </div>
-            <div class="kpi-total">
+            <div class="kpi-total kpi-total--inset">
                 <div class="kpi-label" th:text="#{promotion.my.eligibility.progress.label}">Fortschritt</div>
                 <div class="kpi-value" data-testid="me-kpi-progress" th:text="${next != null ? #messages.msg('promotion.my.kpi.percent', nextProgressPercent) : '—'}">66 %</div>
             </div>
