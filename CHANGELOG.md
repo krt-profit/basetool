@@ -4,6 +4,8 @@
 
 ### Added
 
+- **Überwachung der Anmeldungen je Exchange-Client.** Keycloak zählt seine Ereignisse jetzt je Client und auch für den Gerätefluss (`KC_EVENT_METRICS_USER_TAGS` mit `clientId`, `oauth2_device_*`-Ereignisse); `ExchangeClientDeviceLoginSurge` und `ExchangeClientTokenRequestSurge` melden, wenn ein Client in einer Stunde mehr als das Dreifache seiner üblichen Stunde erreicht, `KeycloakEventMetricsUntagged`, wenn die Client-Kennung fehlt; das Exchange-Dashboard zeigt die Ereignisse je Client (REQ-XCH-028, ADR-0303).
+
 - **Browser-Erweiterungen als Exchange-Clients.** Erweiterungen für Chrome, Edge und Firefox (Manifest V3) können unter Auflagen zugelassen werden: DPoP-Schlüssel nicht exportierbar, Refresh-Token nur in `storage.local`, Host-Rechte nur für die gelesenen Seiten und den Exchange-Host. Das Ingest-Gateway beantwortet dafür CORS auf `/exchange/**` für die feste ID jeder freigegebenen Erweiterung, aus Store oder `key` im Manifest (`IRI_EXCHANGE_CORS_EXTENSION_ORIGINS`) und Firefox-Erweiterungen, ohne Credentials; `Exchange-Client-Agent` ersetzt für die Mindestversion den nicht setzbaren `User-Agent` (REQ-XCH-024, REQ-XCH-027, ADR-0303).
 
 ### Changed

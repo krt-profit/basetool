@@ -916,6 +916,47 @@ groups:
           summary: "Keycloak user-event metrics absent while Keycloak is up"
           description: "keycloak_user_events_total is not being exported while the Keycloak scrape is up — KeycloakLoginErrorSpike is blind. Check the Keycloak metrics/event listener config."
 
+      - alert: KeycloakEventMetricsUntagged
+        expr: >-
+          sum(increase(keycloak_user_events_total{event="refresh_token", error=""}[1h])) > 0
+          unless on() sum(increase(keycloak_user_events_total{event="refresh_token", error="", client_id!=""}[1h])) > 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Keycloak user events carry no client_id"
+          description: "Keycloak counts refresh_token events but none carries a client_id, so ExchangeClientDeviceLoginSurge and ExchangeClientTokenRequestSurge are blind. KC_EVENT_METRICS_USER_TAGS must include clientId and KC_EVENT_METRICS_USER_EVENTS the oauth2_device_* events (ADR-0303, REQ-XCH-028)."
+
+      - alert: ExchangeClientDeviceLoginSurge
+        expr: >-
+          (
+            sum by (client_id) (increase(keycloak_user_events_total{event="oauth2_device_verify_user_code", error="", client_id!~"|unknown|null"}[1h]))
+            > 3 * sum by (client_id) (increase(keycloak_user_events_total{event="oauth2_device_verify_user_code", error="", client_id!~"|unknown|null"}[7d] offset 1h)) / 168
+          )
+          and
+          sum by (client_id) (increase(keycloak_user_events_total{event="oauth2_device_verify_user_code", error="", client_id!~"|unknown|null"}[1h])) >= 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unusually many device logins for one client"
+          description: "Members confirmed device codes for {{ $labels.client_id }} more than three times as often in the last hour as in its average hour of the past week (at least 5). For a client with a browser-extension build, whose Keycloak Web Origins are *, this is the signal of a page driving that client's device flow in members' browsers (ADR-0303). Check who connected on the Exchange dashboard and the connected-apps audit trail; suspend the client under Administration - Verbundene Anwendungen if the logins are not the client's own."
+
+      - alert: ExchangeClientTokenRequestSurge
+        expr: >-
+          (
+            sum by (client_id) (increase(keycloak_user_events_total{event=~"oauth2_device_code_to_token|refresh_token", client_id!~"|unknown|null|basetool-frontend|grafana|backend-service|basetool-ingest-gateway|basetool-provisioner|admin-cli|account|security-admin-console"}[1h]))
+            > 3 * sum by (client_id) (increase(keycloak_user_events_total{event=~"oauth2_device_code_to_token|refresh_token", client_id!~"|unknown|null|basetool-frontend|grafana|backend-service|basetool-ingest-gateway|basetool-provisioner|admin-cli|account|security-admin-console"}[7d] offset 1h)) / 168
+          )
+          and
+          sum by (client_id) (increase(keycloak_user_events_total{event=~"oauth2_device_code_to_token|refresh_token", client_id!~"|unknown|null|basetool-frontend|grafana|backend-service|basetool-ingest-gateway|basetool-provisioner|admin-cli|account|security-admin-console"}[1h])) >= 30
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unusually many token requests for one exchange client"
+          description: "Keycloak answered token requests (device-code redemptions and refreshes, failed ones included) for {{ $labels.client_id }} more than three times as often in the last hour as in its average hour of the past week (at least 30). Either a client release refreshes in a loop, or someone drives that client's sign-in from browsers (ADR-0303). Compare with the client's gateway traffic on the Exchange dashboard before suspending it."
+
       - alert: LiveSyncRedisFanoutBroken
         expr: sum(rate(basetool_livesync_redis_errors_total{op="publish"}[5m])) > 0 or sum(rate(basetool_sse_redis_errors_total{op="publish"}[5m])) > 0
         for: 10m
