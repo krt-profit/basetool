@@ -143,7 +143,7 @@ body:
     id: extension-manifest
     attributes:
       label: manifest.json of the release
-      description: Browser extensions only (required for them). A link to the manifest.json of the release you apply with.
+      description: Browser extensions only (required for them). A link to the manifest.json of the release you apply with; link it again in this issue for every later release that changes its permissions.
   - type: input
     id: extension-store
     attributes:
@@ -160,6 +160,7 @@ body:
         - label: Tokens and the key are used only in the service worker or an extension page, never in or passed to a content script.
         - label: Host permissions, optional host permissions and content-script matches name only the RSI pages read and https://ingest.profit-base.online/*; nothing on profit-base.online, no <all_urls>, no cookies, webRequest or debugger permission, no Basetool origin in externally_connectable.
         - label: Disconnect revokes the refresh token and deletes the token and the key; an uninstall URL carries no token or id.
+        - label: A release that changes host permissions, optional host permissions, content-script matches or permissions in manifest.json is linked here and reviewed again before it ships to members.
 
   - type: checkboxes
     id: sync
