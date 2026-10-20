@@ -1118,13 +1118,14 @@ ADR-0120.
 
 ### REQ-UI-018 — Star Citizen Fan Kit compliance band lives on the home page
 
-The app is a Star Citizen fan project and uses Fan Kit assets, so **two CIG documents bind it, and
+The app is a Star Citizen fan project and uses Fan Kit assets, so **three CIG documents bind it, and
 they apply cumulatively**:
 
 |             Document             |                                         Requires                                         |
 |----------------------------------|------------------------------------------------------------------------------------------|
 | Fan Kit **Guidelines** §2/§2b    | the "Made By The Community" logo and the short **trademark notice** (`fankit.trademark`) |
 | Fankit **Agreement** clause 2(g) | a separate, longer **non-affiliation notice** (`fankit.disclaimer`)                      |
+| Fankit and Fandom **FAQ**, "Fan Sites" | the **fan site notice** (`fankit.fansite`), openly visible, and a **link to the official site** |
 
 Clause 2(g) asks for its notice "in a reasonably prominent location, on your fan site or other fan
 work wherever materials, trademarks, or properties owned by CIG are located" — which is where the
@@ -1176,6 +1177,18 @@ Binding details:
 - **The home page stays publicly reachable** (`/` is permitAll in `SecurityConfig`), so the notice
   is visible without a login. Gating `/` behind authentication would forfeit this placement and
   require moving the band back to an always-visible navigation area.
+- **The FAQ fan site notice is on every page** ([ADR-0296](../adr/0296-every-page-carries-the-fan-site-notice-of-the-cig-faq.md)).
+  `fankit.fansite` quotes the FAQ verbatim, English in every bundle, and renders with a link to
+  `https://robertsspaceindustries.com/` in the footer's full-width `.krt-footer-fansite` row and, on
+  the phone where the tab bar hides the footer, in the drawer's `.nav-legal` group. The public home
+  page shows it in the greeting as well. It is never smaller than the other notices (`--fs-sm`).
+  Checked against the FAQ revision of 2026-09-02, which writes "fan site" as two words and has no
+  trademark sentence.
+- **The band links the official site** (`.krt-fankit-official`) as its fourth element.
+- **No CIG artwork outside the Fan Kit ships.** Manufacturer logos, the Star Citizen logo or any
+  other CIG artwork appear only as unmodified Fan Kit files and only where a page uses them;
+  redrawn or unused copies are deleted. `FanKitComplianceMvcTest` fails on an SVG under
+  `META-INF/resources/images/` other than the Basetool's own `pattern*.svg`.
 - A mention in the Nutzungsbedingungen or Impressum is a welcome *addition* but never a
   **substitute** — a legal subpage is neither of the two sanctioned surfaces.
 
@@ -1201,11 +1214,17 @@ Binding details:
 - [x] The two notices keep their **differing** ® spacing, and 2(g) keeps `Ltd..`.
 - [ ] Both notices render at ≥ 10 pt with an AA-clearing contrast on their surface.
 - [ ] No page carries the logo without both notices.
+- [x] An anonymous `GET /` renders the FAQ fan site notice and a link to robertsspaceindustries.com;
+  the footer of every layout page carries both.
+- [x] `fankit.fansite` is byte-identical in the DE, EN and default bundles.
+- [x] No manufacturer logo or other non-Fan-Kit CIG artwork ships under `META-INF/resources/images/`.
 
-**Enforced by:** `FanKitComplianceMvcTest` · design review against the Fan Kit Guidelines and the
-Fankit Agreement ·
-**Code:** `shell/fragments/fankit.html`, `dashboard/index.html`, `.krt-fankit-*` in `styles.css`,
-`fankit.*` in the three message bundles · **Related:** REQ-UI-009.
+**Enforced by:** `FanKitComplianceMvcTest` · design review against the Fan Kit Guidelines, the
+Fankit Agreement and the Fankit and Fandom FAQ ·
+**Code:** `shell/fragments/fankit.html`, `dashboard/index.html`, `dashboard/landing.html`,
+`kernel/fragments/footer.html`, `kernel/fragments/sidebar.html`, `.krt-fankit-*`,
+`.krt-footer-fansite` and `.nav-legal-fansite` in `styles.css`, `fankit.*` in the three message
+bundles · **Related:** REQ-UI-009.
 
 ### REQ-UI-019 — The app wears the Basetool mark; the org mark stays on org surfaces
 

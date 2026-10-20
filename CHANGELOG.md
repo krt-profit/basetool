@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Fan-Site-Hinweis von CIG auf jeder Seite.** Startseite, Fußzeile und auf dem Handy das Menü zeigen jetzt den von CIG vorgeschriebenen Fan-Site-Hinweis im Wortlaut und einen Link zur offiziellen Star-Citizen-Website; ungenutzte Herstellerlogos wurden entfernt (REQ-UI-018, ADR-0296).
+
 ### Fixed
 
 - **Reihenfolge ändern ohne Ziehen.** Die Prioritäten-Warteschlange unter „Aufträge“ und die Frequenztypen unter „Einsatzdaten verwalten“ lassen sich jetzt auch mit Pfeil-Knöpfen je Zeile oder mit Alt+Pfeil hoch/runter umsortieren; der Fokus bleibt auf dem verschobenen Eintrag, ein Screenreader hört die neue Position. Ziehen bleibt am Desktop zusätzlich erhalten, auf Touch-Geräten entfällt es (WCAG 2.5.7, REQ-UI-031).
