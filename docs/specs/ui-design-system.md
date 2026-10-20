@@ -150,6 +150,11 @@ lightens every value):
 | `--surface-inset` | `#0F0F0F` | a box set into a panel |
 | `--control-bg` | `#373E43` | every control fill and the table row hover |
 
+A card never takes the fill of the surface it sits on: a `.card` placed inside a panel
+(`.list-panel`, another card, a modal) is `.card--inset` and takes the bar fill `#1A1D21`, so the
+tile stands apart from its container. A lighter tile is not an option — `#36373B` and `#373E43`
+are reserved for hairlines, `.btn-secondary` and controls.
+
 `--color-bg-black` `#000000` is **no page background**: it is the text on orange and the base
 of shadows and scrims. The page background is **flat** — no ambient pattern or texture; a
 subtle radial **top bloom** of the primary fading to transparent is permitted on the login /

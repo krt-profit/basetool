@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="de">
 <body>
-<a th:fragment="materialCard(mat)" th:href="@{/materials/{id}(id=${mat.id})}" class="card material-card">
+<a th:fragment="materialCard(mat)" th:href="@{/materials/{id}(id=${mat.id})}" class="card card--inset material-card">
     <h3 class="material-title">
         <span th:if="${mat.isIllegal == true}" class="text-danger material-flag" th:title="#{material.is_illegal}">&#9888;</span><span th:if="${mat.isVolatileQt == true}" class="text-warning material-flag" th:title="#{material.is_volatile_qt}">&#9888;</span><span th:if="${mat.isVolatileTime == true}" class="text-warning material-flag" th:title="#{material.is_volatile_time}">&#9888;</span><span th:text="${mat.name}">Material Name</span>
     </h3>
