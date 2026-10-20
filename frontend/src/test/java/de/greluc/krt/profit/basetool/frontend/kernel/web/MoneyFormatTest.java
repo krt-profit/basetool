@@ -102,4 +102,26 @@ class MoneyFormatTest {
   void roundNumber_nullReturnsNull() {
     assertNull(moneyFormat.roundNumber(null));
   }
+
+  @Test
+  void withTransferFee_addsTheRoundedFeeOnTop() {
+    BigDecimal rate = new BigDecimal("0.005");
+    assertEquals(
+        new BigDecimal("3015000"), moneyFormat.withTransferFee(new BigDecimal("3000000"), rate));
+    assertEquals(new BigDecimal("101"), moneyFormat.withTransferFee(new BigDecimal("100"), rate));
+    assertEquals(new BigDecimal("1"), moneyFormat.withTransferFee(new BigDecimal("1"), rate));
+  }
+
+  @Test
+  void withTransferFee_withoutARateIsTheWholeAmount() {
+    assertEquals(new BigDecimal("1500"), moneyFormat.withTransferFee(new BigDecimal("1500"), null));
+    assertEquals(
+        new BigDecimal("1500"),
+        moneyFormat.withTransferFee(new BigDecimal("1499.5"), BigDecimal.ZERO));
+  }
+
+  @Test
+  void withTransferFee_nullAmountReturnsNull() {
+    assertNull(moneyFormat.withTransferFee(null, new BigDecimal("0.005")));
+  }
 }

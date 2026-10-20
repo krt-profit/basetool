@@ -199,7 +199,7 @@
                     <input type="hidden" name="version" th:value="${settings.version()}">
                     <div class="bank-form-row">
                         <label for="org-unit-target-amount" th:text="#{bank.orgUnit.field.target}">Zielkontostand (aUEC)</label>
-                        <input type="number" id="org-unit-target-amount" name="target" min="1" step="1"
+                        <input type="text" data-auec-input inputmode="numeric" id="org-unit-target-amount" name="target" min="1" step="1"
                                th:value="${settings.balanceTarget() != null ? @moneyFormat.round(settings.balanceTarget()) : ''}"
                                data-testid="org-unit-target-amount" th:placeholder="#{bank.field.amount.placeholder}">
                         <span class="bank-field-hint" th:text="#{bank.orgUnit.settings.target.clearHint}">Leer lassen und speichern entfernt das Ziel.</span>

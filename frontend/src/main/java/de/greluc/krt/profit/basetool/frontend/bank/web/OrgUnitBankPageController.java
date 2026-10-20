@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.bank.model.BankAccountRefDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankBalanceSeriesDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankBookingDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankBookingRequestDto;
+import de.greluc.krt.profit.basetool.frontend.bank.model.BankTransferFeeRateDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.OrgUnitBankAccountDetailDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.OrgUnitBankAccountSettingsDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.OrgUnitBankBalanceDto;
@@ -177,6 +178,7 @@ public class OrgUnitBankPageController {
     model.addAttribute("approvalExemptAccountIds", approvalExemptAccountIds);
     model.addAttribute("requesterId", CurrentUser.userIdText(principal));
     model.addAttribute("requesterHandle", requesterHandle(principal));
+    model.addAttribute("transferFeeRate", fetchTransferFeeRate());
     if ("orgUnitBank".equals(fragment)) {
       return "bank/org-unit-bank :: orgUnitBank";
     }
@@ -241,6 +243,19 @@ public class OrgUnitBankPageController {
         SectionFallback.load(
             log, "org-unit-bank-foreign-requests", bankClient::foreignOrgUnitRequests, null);
     return requests == null ? List.of() : requests;
+  }
+
+  /**
+   * Fetches the in-game transfer-fee rate for the "Mit Gebühr" amount of a deposit request
+   * (REQ-BANK-065); a failed or empty answer counts as no fee.
+   *
+   * @return the fee rate as a fraction, never {@code null}
+   */
+  private BigDecimal fetchTransferFeeRate() {
+    BankTransferFeeRateDto rate =
+        SectionFallback.load(
+            log, "org-unit-bank-transfer-fee-rate", bankClient::transferFeeRate, null);
+    return rate == null || rate.rate() == null ? BigDecimal.ZERO : rate.rate();
   }
 
   /**
@@ -338,6 +353,7 @@ public class OrgUnitBankPageController {
       @Nullable OrgUnitBankAccountDetailDto detail,
       @Nullable OidcUser principal,
       @NotNull Model model) {
+    model.addAttribute("transferFeeRate", fetchTransferFeeRate());
     List<BankAccountRefDto> transferTargets =
         BankAccountOrder.byName(fetchTransferTargets(), BankAccountRefDto::name);
     List<BankAccountRefDto> sources =

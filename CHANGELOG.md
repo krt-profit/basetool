@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- **„Mit Gebühr" bei Einzahlungen.** Offene Einzahlungsanträge (Antragsliste der Bank, eigene und fremde Anträge der Org-Einheiten-Bank) sowie das Antrags- und das Direktbuchungs-Modal zeigen unter dem Betrag klein, wie viel inklusive Überweisungsgebühr überwiesen werden muss, damit der Betrag auf dem Konto ankommt. Den Gebührensatz dürfen dafür jetzt alle angemeldeten Mitglieder lesen (REQ-BANK-065).
+
+### Changed
+
+- **Tausendertrennzeichen in aUEC-Feldern und Benachrichtigungen.** Alle Eingabefelder für aUEC (Bank, Org-Einheiten-Bank, Einkauf, Raffinerie, Einsatz-Finanzen, Bedarf, Lager-Verkauf) setzen die Trennpunkte schon beim Tippen, ohne die Eingabe zu stören; gesendet wird weiterhin der reine Zahlwert. Beträge in Benachrichtigungen erscheinen als `3.000.000` statt `3000000` (REQ-UI-037, REQ-NOTIF-031, ADR-0305).
+
 ## [v1.19.3](https://github.com/krt-profit/basetool/releases/tag/v1.19.3) - 2026-10-20
 
 ### Added

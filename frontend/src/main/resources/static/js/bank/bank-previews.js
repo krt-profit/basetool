@@ -109,6 +109,54 @@ function recomputeFeePreviewFrom(target) {
 }
 
 /**
+ * Shows what a depositor transfers in game so that the entered deposit arrives, `amount +
+ * round(amount * rate)` (REQ-BANK-065). The rate comes from the block's `data-fee-rate`; the block
+ * is hidden for any other operation, without a rate or without a positive amount.
+ *
+ * @param {HTMLFormElement} form the booking or request form carrying a `[data-deposit-gross]` block
+ */
+export function updateDepositGross(form) {
+    const block = /** @type {HTMLElement | null} */ (form.querySelector('[data-deposit-gross]'));
+    const amountEl = /** @type {HTMLInputElement | null} */ (
+        form.querySelector('input[name="amount"]')
+    );
+    if (!block || !amountEl) {
+        return;
+    }
+    const typeEl = /** @type {HTMLSelectElement | null} */ (
+        form.querySelector(
+            '[data-role="bank-movement-type"], select[data-role="org-unit-request-type"]',
+        )
+    );
+    const rawRate = Number(block.getAttribute('data-fee-rate'));
+    const rate = Number.isFinite(rawRate) && rawRate > 0 && rawRate < 1 ? rawRate : 0;
+    const amount = Number(amountEl.value);
+    const isDeposit = !typeEl || typeEl.value === 'DEPOSIT';
+    if (!isDeposit || rate === 0 || !Number.isFinite(amount) || amount <= 0) {
+        block.hidden = true;
+        return;
+    }
+    const whole = Math.round(amount);
+    const valueEl = block.querySelector('[data-deposit-gross-value]');
+    if (valueEl) {
+        valueEl.textContent = (whole + Math.round(whole * rate)).toLocaleString('de-DE');
+    }
+    block.hidden = false;
+}
+
+/**
+ * Recomputes the deposit gross for the form the edited field belongs to.
+ *
+ * @param {Element | null} target the field that fired the event
+ */
+function recomputeDepositGrossFrom(target) {
+    const form = target && target.closest ? target.closest('form') : null;
+    if (form && form.querySelector('[data-deposit-gross]')) {
+        updateDepositGross(form);
+    }
+}
+
+/**
  * Shows the advisory owner-approval warning on the org-unit request modal when a withdrawal or
  * transfer exceeds the source option's `data-limit` (REQ-BANK-041). A missing limit always warns;
  * a `data-exempt="true"` account never does.
@@ -327,6 +375,7 @@ function updateBalanceCalc(input) {
  */
 function onBankFieldEdit(target) {
     recomputeFeePreviewFrom(target);
+    recomputeDepositGrossFrom(target);
     recomputeLimitWarningFrom(target);
     recomputeJustificationRequiredFrom(target);
     recomputeSplitPreviewFrom(target);

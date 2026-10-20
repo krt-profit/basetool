@@ -20,7 +20,12 @@
 import { applyConfirmModalState } from '/js/bank/bank-confirm-modal.js';
 import { clearErrors } from '/js/bank/bank-form-errors.js';
 import { syncMovementRows } from '/js/bank/bank-movement-rows.js';
-import { toggleSplitRow, updateFeePreview, updateLimitWarning } from '/js/bank/bank-previews.js';
+import {
+    toggleSplitRow,
+    updateDepositGross,
+    updateFeePreview,
+    updateLimitWarning,
+} from '/js/bank/bank-previews.js';
 import { syncRequestTypeRows } from '/js/bank/bank-request-rows.js';
 
 /**
@@ -62,6 +67,9 @@ function primeModal(trigger, modal) {
     }
     if (form && form.querySelector('[data-fee-preview]')) {
         updateFeePreview(form);
+    }
+    if (form && form.querySelector('[data-deposit-gross]')) {
+        updateDepositGross(form);
     }
     if (form && form.querySelector('[data-limit-warning]')) {
         const typeSelect = /** @type {HTMLSelectElement | null} */ (

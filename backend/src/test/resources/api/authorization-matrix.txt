@@ -72,7 +72,7 @@ GET /api/v1/bank/requests | BankRequestController#getQueue | pre=hasRole('BANK_E
 POST /api/v1/bank/requests/{id}/confirm | BankRequestController#confirm | pre=hasRole('BANK_EMPLOYEE') | url=anyRequest -> authenticated
 POST /api/v1/bank/requests/{id}/reject | BankRequestController#reject | pre=hasRole('BANK_EMPLOYEE') | url=anyRequest -> authenticated
 POST /api/v1/bank/transactions/{id}/reversal | BankBookingController#reverseTransaction | pre=hasRole('BANK_MANAGEMENT') | url=anyRequest -> authenticated
-GET /api/v1/bank/transfer-fee-rate | BankBookingController#getTransferFeeRate | pre=hasRole('BANK_EMPLOYEE') | url=anyRequest -> authenticated
+GET /api/v1/bank/transfer-fee-rate | BankBookingController#getTransferFeeRate | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/bank/transfers | BankBookingController#bookTransfer | pre=hasRole('BANK_EMPLOYEE') and @bankSecurityService.canTransfer(#request.sourceAccountId, authentication) | url=anyRequest -> authenticated
 POST /api/v1/bank/withdrawals | BankBookingController#bookWithdrawal | pre=hasRole('BANK_EMPLOYEE') and @bankSecurityService.canWithdraw(#request.accountId, authentication) | url=anyRequest -> authenticated
 GET /api/v1/blueprints | BlueprintController#getBlueprints | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
