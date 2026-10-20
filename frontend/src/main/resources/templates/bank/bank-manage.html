@@ -90,7 +90,7 @@
             <div class="bank-tiers__fields">
                 <div class="bank-form-row">
                     <label for="bank-krt-t1" th:text="#{bank.manage.krt.employeeCeiling}">Bankmitarbeiter gibt frei bis (aUEC)</label>
-                    <input type="number" id="bank-krt-t1" name="employeeCeiling" min="0" step="1"
+                    <input type="text" data-auec-input id="bank-krt-t1" name="employeeCeiling" min="0" step="1"
                            inputmode="numeric" data-testid="bank-krt-t1" data-tier-input="t1"
                            th:value="${t1 != null ? t1.toBigInteger() : ''}"
                            th:placeholder="#{bank.manage.krt.ceiling.placeholder}">
@@ -99,7 +99,7 @@
                 </div>
                 <div class="bank-form-row">
                     <label for="bank-krt-t2" th:text="#{bank.manage.krt.areaLeadCeiling}">Bankleitung gibt frei bis (aUEC)</label>
-                    <input type="number" id="bank-krt-t2" name="areaLeadCeiling" min="0" step="1"
+                    <input type="text" data-auec-input id="bank-krt-t2" name="areaLeadCeiling" min="0" step="1"
                            inputmode="numeric" data-testid="bank-krt-t2" data-tier-input="t2"
                            th:value="${t2 != null ? t2.toBigInteger() : ''}"
                            th:placeholder="#{bank.manage.krt.ceiling.placeholder}">
@@ -335,7 +335,7 @@
                 <div class="krt-modal-body">
                     <div class="bank-form-row">
                         <label for="bank-target-amount" th:text="#{bank.orgUnit.field.target}">Zielkontostand (aUEC)</label>
-                        <input type="number" id="bank-target-amount" name="target" min="1" step="1"
+                        <input type="text" data-auec-input inputmode="numeric" id="bank-target-amount" name="target" min="1" step="1"
                                data-testid="bank-target-amount" th:placeholder="#{bank.field.amount.placeholder}">
                         <span class="bank-field-hint" th:text="#{bank.orgUnit.settings.target.clearHint}">Leer lassen und speichern entfernt das Ziel.</span>
                         <span class="bank-field-error" data-error-for="target"></span>
@@ -486,7 +486,7 @@
                     </div>
                     <div class="bank-form-row">
                         <label for="bank-holder-transfer-amount" th:text="#{bank.field.amount}">Betrag (aUEC)</label>
-                        <input type="number" id="bank-holder-transfer-amount" name="amount" step="1" min="1"
+                        <input type="text" data-auec-input id="bank-holder-transfer-amount" name="amount" step="1" min="1"
                                inputmode="numeric" required data-testid="bank-holder-transfer-amount">
                         <span class="bank-field-error" data-error-for="amount"></span>
                     </div>

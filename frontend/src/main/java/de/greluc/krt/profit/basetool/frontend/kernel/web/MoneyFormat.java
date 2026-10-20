@@ -63,4 +63,26 @@ public class MoneyFormat {
     }
     return round(new BigDecimal(value.toString()));
   }
+
+  /**
+   * Computes what a sender transfers in game so that {@code amount} arrives: {@code amount +
+   * round(amount × rate)} in whole aUEC (HALF_UP), the backend's transfer-fee formula
+   * (REQ-BANK-033).
+   *
+   * @param amount the amount that must arrive; {@code null} is passed through
+   * @param rate the transfer-fee rate as a fraction; {@code null} counts as no fee
+   * @return the whole-aUEC gross including the fee, or {@code null} if {@code amount} was {@code
+   *     null}
+   */
+  @Nullable
+  public BigDecimal withTransferFee(@Nullable BigDecimal amount, @Nullable BigDecimal rate) {
+    if (amount == null) {
+      return null;
+    }
+    BigDecimal whole = round(amount);
+    if (rate == null || rate.signum() <= 0 || whole.signum() <= 0) {
+      return whole;
+    }
+    return whole.add(whole.multiply(rate).setScale(0, RoundingMode.HALF_UP));
+  }
 }

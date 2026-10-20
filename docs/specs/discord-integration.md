@@ -186,7 +186,7 @@ requirement is that the member is never stranded:
   from the link, completing every step in the same browser. Keycloak's own text blames disabled
   cookies only.
 - **Nothing new is logged or measured.** The event stays in Keycloak's event log and in
-  `keycloak_user_events_total{event="identity_provider_login_error"}`, which the existing
+  `keycloak_user_events_total{event="identity_provider_login", error="cookie_not_found"}`, which the existing
   `KeycloakLoginErrorSpike` alert already reads.
 
 **Acceptance**

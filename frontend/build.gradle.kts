@@ -874,6 +874,22 @@ val testSearchJs =
     outputs.upToDateWhen { false }
   }
 
+val testAuecFormatJs =
+  tasks.register<NodeTask>("testAuecFormatJs") {
+    group = "verification"
+    description =
+      "Regression tests for the aUEC field formatting: grouping, decimals, caret placement and separator deletes."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(layout.projectDirectory.file("scripts/krt-auec-format.test.mjs").asFile)
+    ignoreExitValue.set(false)
+    inputs.file(layout.projectDirectory.file("scripts/krt-auec-format.test.mjs"))
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-auec-format.js"),
+    )
+    outputs.upToDateWhen { false }
+  }
+
 val testEslintBans =
   tasks.register<NodeTask>("testEslintBans") {
     group = "verification"
@@ -1000,6 +1016,7 @@ tasks.named("check").configure {
     testTableSort,
     testReorderJs,
     testSearchJs,
+    testAuecFormatJs,
     testEslintBans,
     testTypecheckRatchet,
     testPromotionCsvEscape,

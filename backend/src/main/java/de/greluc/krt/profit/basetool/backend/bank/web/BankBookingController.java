@@ -73,16 +73,17 @@ public class BankBookingController {
   private final BankDirectBookingNotifier bankDirectBookingNotifier;
 
   /**
-   * Returns the current in-game transfer-fee rate (ADR-0052, REQ-BANK-033) so the booking modals
-   * can render a live "Gebühr / wird abgebucht" preview (fee plus the gross debited) as the staffer
-   * types the amount. Open to all bank staff (it reveals only the org-wide rate, no account data).
+   * Returns the current in-game transfer-fee rate (ADR-0052, REQ-BANK-033) for the live fee
+   * previews of the booking and request dialogs and the "Mit Gebühr" amount of a deposit
+   * (REQ-BANK-065). Open to every authenticated caller: it reveals only the org-wide rate, no
+   * account data.
    *
    * @return the current fee rate (fraction in {@code [0, 1)})
    */
   @NotNull
   @Operation(summary = "Read the current in-game transfer-fee rate")
   @GetMapping("/transfer-fee-rate")
-  @PreAuthorize(Roles.HAS_ROLE_BANK_EMPLOYEE)
+  @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public BankTransferFeeRateDto getTransferFeeRate() {
     return new BankTransferFeeRateDto(bankTransferFeeService.resolveTransferFeeRate());

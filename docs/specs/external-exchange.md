@@ -1889,13 +1889,20 @@ fixed `chrome-extension://<id>`, bound to its client as `<clientId>=chrome-exten
 `Accept`, `Accept-Language`, `Idempotency-Key`, `X-Correlation-Id`, `User-Agent` and
 `Exchange-Client-Agent`, never with credentials, and exposes `DPoP-Nonce`, `WWW-Authenticate`,
 `RateLimit`, `RateLimit-Policy`, `Retry-After`, `Idempotency-Replayed` and `X-Correlation-Id`.
-Every other path keeps the empty allowlist. **The origin is bound to the client** (ADR-0304): the registry
-gate refuses with `403 ORIGIN_NOT_ALLOWED` a request whose `Origin` is a `chrome-extension://`
-origin bound to another client than the token's `azp`, a `moz-extension://` origin for a client
-without a Firefox build, or any other browser origin; a request without `Origin`, as a desktop
-client sends it, is unchanged. The refusal is counted on `basetool_ingest_exchange_refused_total`
-as `origin_not_allowed` under the client's label. An extension's Keycloak client lists each approved
-Chromium origin as a Web Origin, and `*` when it has a Firefox build.
+Every other path keeps the empty allowlist. **The origin is bound to the client** (ADR-0304): the
+registry gate refuses with `403 ORIGIN_NOT_ALLOWED` a request whose `Origin` is a
+`chrome-extension://` origin bound to another client than the token's `azp`, a `moz-extension://`
+origin for a client without a Firefox build, or any other browser origin; a request without
+`Origin`, as a desktop client sends it, is unchanged. The refusal is counted on
+`basetool_ingest_exchange_refused_total` as `origin_not_allowed` under the client's label. An
+extension's Keycloak client lists each approved Chromium origin as a Web Origin. A client with a
+Firefox build gets `*`, set per client and never realm-wide, because Keycloak matches Web Origins
+only exactly or by `*` and refuses an unlisted `Origin` with `403 Invalid origin`, while Firefox
+sends a random `moz-extension://<uuid>` per installation. `*` admits every origin, web pages
+included: any page can call that client's device authorization, token and revocation endpoints
+from a browser. Tokens stay DPoP-bound, no endpoint acts on cookies, and the verification page
+keeps its phishing warning; the accepted remaining risk is a phishing page that drives that
+client's device flow in the victim's browser (ADR-0303, arc42 §11.7a).
 
 **Enforced by:** `SecurityConfigTest`, `ExchangeCorsTest`, `ExchangeCorsPropertiesTest` (the
 gateway CORS), `ExchangeGateTest` (the origin binding); the conditions on the extension itself are checked at application.
@@ -1938,6 +1945,17 @@ tombstones and journal reports task metrics.
   `exchange_mirror_age_alerts_test.yml`.*
 - [x] A dedicated Grafana dashboard „Exchange" (`15-exchange.json`) shows all of the above per
   client, with the gateway's log lines filtered by client.
+- [x] Sign-ins per client from Keycloak's own event metrics: `KC_EVENT_METRICS_USER_TAGS` carries
+  `clientId` and `KC_EVENT_METRICS_USER_EVENTS` the `oauth2_device_*` events, so
+  `keycloak_user_events_total` has a `client_id` label (bounded by the realm's clients, `unknown`
+  for any other). `ExchangeClientDeviceLoginSurge` fires when members confirm device codes for one
+  client more than three times as often in an hour as in its average hour of the past week (at
+  least 5), `ExchangeClientTokenRequestSurge` on the same relative rule for device-code redemptions
+  and refreshes of an exchange client (at least 30), and `KeycloakEventMetricsUntagged` when the
+  tag goes missing; the „Exchange" dashboard shows the events per client. A device flow that is only
+  started or polled emits no Keycloak event (verified against 26.8: `DeviceEndpoint` raises
+  `OAUTH2_DEVICE_AUTH` for errors only), so the signal is the confirmed code, not the start
+  (ADR-0303). *`exchange_signin_surge_alerts_test.yml`.*
 - `basetool_ingest_gate_enforcing` is not extended to the exchange gates, since they cannot be
   switched off (owner decision 2026-09-27).
 

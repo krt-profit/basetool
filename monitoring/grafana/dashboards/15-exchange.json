@@ -1138,6 +1138,57 @@
           }
         }
       ]
+    },
+    {
+      "id": 28,
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 91
+      },
+      "type": "timeseries",
+      "title": "Keycloak sign-in events per client",
+      "description": "Keycloak's own user events of the selected clients per hour: device codes members confirmed (oauth2_device_verify_user_code), device codes redeemed for tokens (oauth2_device_code_to_token) and refreshes, failed ones under their error. A device flow that is only started or polled emits no event, so it does not show here. ExchangeClientDeviceLoginSurge and ExchangeClientTokenRequestSurge compare the last hour with the client's own week (ADR-0303, REQ-XCH-028).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (client_id, event, error) (increase(keycloak_user_events_total{event=~\"oauth2_device_verify_user_code|oauth2_device_code_to_token|refresh_token\", client_id=~\"$client_id\"}[1h]))",
+          "refId": "A",
+          "legendFormat": "{{client_id}} {{event}} {{error}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
     }
   ]
 }

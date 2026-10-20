@@ -447,7 +447,7 @@
                 </div>
                 <div class="form-group mb-1">
                     <label for="sellAmount" class="form-label" th:text="#{inventory.bookout.sellAmount}">Verkaufsbetrag</label>
-                    <input type="number" id="sellAmount" th:field="*{sellAmount}" step="0.01" min="0" class="w-full">
+                    <input type="text" data-auec-input inputmode="decimal" id="sellAmount" th:field="*{sellAmount}" step="0.01" min="0" class="w-full">
                 </div>
             </div>
 

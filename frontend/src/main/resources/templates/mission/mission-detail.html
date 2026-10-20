@@ -1445,7 +1445,7 @@
 
                 <div class="form-group">
                     <label th:text="#{mission.finance.amount}">Betrag (aUEC)</label>
-                    <input type="number" step="1" min="0" inputmode="numeric" name="amount" th:value="*{amount}" required>
+                    <input type="text" data-auec-input step="1" min="0" inputmode="numeric" name="amount" th:value="*{amount}" required>
                     <div th:if="${#fields.hasErrors('amount')}" th:errors="*{amount}" class="field-error"></div>
                 </div>
 
@@ -1481,7 +1481,7 @@
 
                 <div class="form-group">
                     <label th:text="#{mission.finance.amount}">Betrag (aUEC)</label>
-                    <input type="number" step="1" min="0" inputmode="numeric" name="amount" id="edit-finance-amount" required>
+                    <input type="text" data-auec-input step="1" min="0" inputmode="numeric" name="amount" id="edit-finance-amount" required>
                 </div>
 
                 <div class="form-group">

@@ -113,6 +113,8 @@
       "kernel/datetime-splitter.js",
       "kernel/event-delegation.js",
       "kernel/inline-style-apply.js",
+      "kernel/krt-auec-format.js",
+      "kernel/krt-auec-input.js",
       "kernel/krt-bank-account-search.js",
       "kernel/krt-catalog-search.js",
       "kernel/krt-chrome.js",

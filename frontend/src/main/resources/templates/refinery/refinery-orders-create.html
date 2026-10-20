@@ -196,17 +196,17 @@
                 <div class="form-grid form-grid--3">
                     <div class="form-group">
                         <label for="expenses" th:text="#{refineryorder.form.expenses}">Auftragskosten</label>
-                        <input type="number" id="expenses" class="rod-num" th:field="*{expenses}" min="0" data-trigger="rfc-update-profit">
+                        <input type="text" data-auec-input inputmode="numeric" id="expenses" class="rod-num" th:field="*{expenses}" min="0" data-trigger="rfc-update-profit">
                     </div>
                     <div class="form-group">
                         <label for="otherExpenses" th:text="#{refineryorder.form.otherExpenses}">Sonstige Kosten</label>
-                        <input type="number" id="otherExpenses" class="rod-num" th:field="*{otherExpenses}" min="0" step="1"
+                        <input type="text" data-auec-input inputmode="numeric" id="otherExpenses" class="rod-num" th:field="*{otherExpenses}" min="0" step="1"
                                th:title="#{refineryorder.form.otherExpenses.help}"
                                data-trigger="rfc-update-profit">
                     </div>
                     <div class="form-group">
                         <label for="oreSales" th:text="#{refineryorder.form.oreSales}">Ore Sales</label>
-                        <input type="number" id="oreSales" class="rod-num" th:field="*{oreSales}" min="0" step="1" data-trigger="rfc-update-profit">
+                        <input type="text" data-auec-input inputmode="numeric" id="oreSales" class="rod-num" th:field="*{oreSales}" min="0" step="1" data-trigger="rfc-update-profit">
                     </div>
                 </div>
             </fieldset>

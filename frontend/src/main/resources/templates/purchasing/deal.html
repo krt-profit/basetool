@@ -229,7 +229,7 @@
                     </div>
                     <div class="form-group">
                         <label for="purchasing-edit-price" th:text="#{purchasing.deal.unitPrice}">Einzelpreis (aUEC)</label>
-                        <input type="number" id="purchasing-edit-price" min="1" step="1" inputmode="numeric" required>
+                        <input type="text" data-auec-input id="purchasing-edit-price" min="1" step="1" inputmode="numeric" required>
                     </div>
                     <div class="form-group">
                         <label for="purchasing-edit-model" th:text="#{purchasing.deal.paymentModel}">Zahlungsmodell</label>
@@ -272,7 +272,7 @@
                     </div>
                     <div class="form-group">
                         <label for="purchasing-tranche-amount" th:text="#{purchasing.tranche.amount}">Betrag (aUEC)</label>
-                        <input type="number" id="purchasing-tranche-amount" min="1" step="1" inputmode="numeric" required data-testid="purchasing-tranche-amount">
+                        <input type="text" data-auec-input id="purchasing-tranche-amount" min="1" step="1" inputmode="numeric" required data-testid="purchasing-tranche-amount">
                         <p id="purchasing-tranche-hint" class="form-hint"></p>
                     </div>
                 </div>
@@ -319,11 +319,11 @@
                     <div class="form-group"><p id="purchasing-settle-received" class="m-0"></p></div>
                     <div class="form-group">
                         <label for="purchasing-settle-paid" th:text="#{purchasing.settlement.paid}">An Gegenpartei gezahlt (aUEC)</label>
-                        <input type="number" id="purchasing-settle-paid" min="0" step="1" inputmode="numeric" required data-testid="purchasing-settle-paid">
+                        <input type="text" data-auec-input id="purchasing-settle-paid" min="0" step="1" inputmode="numeric" required data-testid="purchasing-settle-paid">
                     </div>
                     <div class="form-group">
                         <label for="purchasing-settle-loss" th:text="#{purchasing.settlement.loss}">Verlust (aUEC)</label>
-                        <input type="number" id="purchasing-settle-loss" min="0" step="1" inputmode="numeric" value="0" data-testid="purchasing-settle-loss">
+                        <input type="text" data-auec-input id="purchasing-settle-loss" min="0" step="1" inputmode="numeric" value="0" data-testid="purchasing-settle-loss">
                     </div>
                     <div class="form-group" id="purchasing-settle-reason-row" hidden>
                         <label for="purchasing-settle-reason" th:text="#{purchasing.settlement.lossReason}">Verlustgrund</label>

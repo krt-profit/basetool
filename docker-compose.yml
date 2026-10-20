@@ -135,8 +135,8 @@ x-keycloak: &keycloak-template
     KRT_BACKEND_TRUSTSTORE_PASSWORD: ${KRT_BACKEND_TRUSTSTORE_PASSWORD:-}
     KC_METRICS_ENABLED: ${KC_METRICS_ENABLED:-false}
     KC_EVENT_METRICS_USER_ENABLED: ${KC_EVENT_METRICS_USER_ENABLED:-false}
-    KC_EVENT_METRICS_USER_EVENTS: ${KC_EVENT_METRICS_USER_EVENTS:-login,logout,register,code_to_token,refresh_token,identity_provider_login,identity_provider_first_login,identity_provider_post_login}
-    KC_EVENT_METRICS_USER_TAGS: ${KC_EVENT_METRICS_USER_TAGS:-realm,idp}
+    KC_EVENT_METRICS_USER_EVENTS: ${KC_EVENT_METRICS_USER_EVENTS:-login,logout,register,code_to_token,refresh_token,identity_provider_login,identity_provider_first_login,identity_provider_post_login,oauth2_device_auth,oauth2_device_verify_user_code,oauth2_device_code_to_token}
+    KC_EVENT_METRICS_USER_TAGS: ${KC_EVENT_METRICS_USER_TAGS:-realm,idp,clientId}
     KC_TRACING_ENABLED: ${KC_TRACING_ENABLED:-false}
     KC_TRACING_ENDPOINT: ${KC_TRACING_ENDPOINT:-http://alloy:4317}
   healthcheck:
