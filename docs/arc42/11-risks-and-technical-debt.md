@@ -308,13 +308,20 @@ since the go-live of 2026-09-28, so these risks hold now.
   where a browser extension cannot set one, so it stops honest old releases, never a client that
   lies about its version (REQ-XCH-024).
 - **Browser extensions widen two allowlists** (owner decision 2026-10-20, ADR-0303). The gateway
-  admits every Firefox extension's origin, and a client with a Firefox build carries `*` as its
-  Keycloak Web Origins, because Firefox assigns a random origin per installation. Neither carries a
-  credential: the gateway never allows one and reads no cookie, and the device, token and
-  revocation endpoints act on no cookie for that public, device-only client. Any page can start a
-  device login for such a client id, as any server always could. The extension's own permissions are
-  checked against its manifest at application, not enforced by the Basetool; a refresh token
-  outlives an uninstalled extension until the member disconnects it or the offline session expires.
+  admits every Firefox extension's origin for a client with a Firefox build. Such a client carries
+  `*` as its Keycloak Web Origins, set per client and never realm-wide: Firefox sends a random
+  `moz-extension://<uuid>` per installation, and Keycloak 26.8 matches only exactly or by `*` and
+  refuses any other `Origin` with `403 Invalid origin`. That `*` admits **every origin, every web
+  page included**: for that client, any page can call device authorization, token and revocation
+  from a browser. The impact is bounded — the client is public and device-only, its tokens are
+  DPoP-bound, none of those endpoints acts on cookies, the gateway never allows credentials, and the
+  device verification page keeps its phishing warning. The remaining risk is that a phishing page
+  can drive that client's device flow entirely in the victim's browser. **Revisit** when more
+  clients with a Firefox build are approved, or when Keycloak changes its CORS behaviour again
+  (upstream keycloak/keycloak#51831); the rejected alternative, relaying the sign-in endpoints
+  through the gateway, is in ADR-0303. The extension's own permissions are checked against its
+  manifest at application, not enforced by the Basetool; a refresh token outlives an uninstalled
+  extension until the member disconnects it or the offline session expires.
 - **An extension's origin is bound to its client, but only by configuration** (ADR-0304). The
   gateway refuses an extension origin carrying another client's token. The binding lives in the
   gateway's `.env` and is set by hand at approval; a missing entry fails closed (`403

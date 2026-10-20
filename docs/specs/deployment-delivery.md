@@ -2327,7 +2327,8 @@ there.
   what the template never offers is withheld wherever found. The realm pins the device code's
   lifespan and polling interval and the `krt-theme` login theme. A browser extension's entry adds
   `extensionOrigins` (its `chrome-extension://<id>` origins) and `firefoxExtension`; they become the
-  client's Web Origins, with `*` for a Firefox build, and a malformed one refuses the run
+  client's Web Origins, with `*` on that client alone for a Firefox build (it admits every origin,
+  web pages included; ADR-0303), and a malformed one refuses the run
   (ADR-0303).
 - **A fresh realm is in shape after one run.** Keycloak 26 keeps its own
   `backchannel.logout.session.required` when a client is created, so the provisioner writes the
