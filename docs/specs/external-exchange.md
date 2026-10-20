@@ -1938,6 +1938,17 @@ tombstones and journal reports task metrics.
   `exchange_mirror_age_alerts_test.yml`.*
 - [x] A dedicated Grafana dashboard „Exchange" (`15-exchange.json`) shows all of the above per
   client, with the gateway's log lines filtered by client.
+- [x] Sign-ins per client from Keycloak's own event metrics: `KC_EVENT_METRICS_USER_TAGS` carries
+  `clientId` and `KC_EVENT_METRICS_USER_EVENTS` the `oauth2_device_*` events, so
+  `keycloak_user_events_total` has a `client_id` label (bounded by the realm's clients, `unknown`
+  for any other). `ExchangeClientDeviceLoginSurge` fires when members confirm device codes for one
+  client more than three times as often in an hour as in its average hour of the past week (at
+  least 5), `ExchangeClientTokenRequestSurge` on the same relative rule for device-code redemptions
+  and refreshes of an exchange client (at least 30), and `KeycloakEventMetricsUntagged` when the
+  tag goes missing; the „Exchange" dashboard shows the events per client. A device flow that is only
+  started or polled emits no Keycloak event (verified against 26.8: `DeviceEndpoint` raises
+  `OAUTH2_DEVICE_AUTH` for errors only), so the signal is the confirmed code, not the start
+  (ADR-0303). *`exchange_signin_surge_alerts_test.yml`.*
 - `basetool_ingest_gate_enforcing` is not extended to the exchange gates, since they cannot be
   switched off (owner decision 2026-09-27).
 

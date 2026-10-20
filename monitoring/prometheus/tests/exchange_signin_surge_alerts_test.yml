@@ -1,0 +1,106 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: fires - device logins for one client jump far above its own week
+    interval: 30m
+    input_series:
+      - series: 'keycloak_user_events_total{job="keycloak", realm="iri", idp="", event="oauth2_device_verify_user_code", error="", client_id="hangar-exporter"}'
+        values: "0+0.5x336 178+10x6"
+    alert_rule_test:
+      - eval_time: 170h
+        alertname: ExchangeClientDeviceLoginSurge
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              client_id: hangar-exporter
+            exp_annotations:
+              summary: "Unusually many device logins for one client"
+              description: "Members confirmed device codes for hangar-exporter more than three times as often in the last hour as in its average hour of the past week (at least 5). For a client with a browser-extension build, whose Keycloak Web Origins are *, this is the signal of a page driving that client's device flow in members' browsers (ADR-0303). Check who connected on the Exchange dashboard and the connected-apps audit trail; suspend the client under Administration - Verbundene Anwendungen if the logins are not the client's own."
+
+  - name: silent - a busy client at its usual rate is not a surge
+    interval: 30m
+    input_series:
+      - series: 'keycloak_user_events_total{job="keycloak", realm="iri", idp="", event="oauth2_device_verify_user_code", error="", client_id="versekit"}'
+        values: "0+10x348"
+    alert_rule_test:
+      - eval_time: 170h
+        alertname: ExchangeClientDeviceLoginSurge
+        exp_alerts: []
+
+  - name: silent - a new client's first few logins stay under the floor
+    interval: 30m
+    input_series:
+      - series: 'keycloak_user_events_total{job="keycloak", realm="iri", idp="", event="oauth2_device_verify_user_code", error="", client_id="hangar-exporter"}'
+        values: "0x336 1+1x6"
+    alert_rule_test:
+      - eval_time: 170h
+        alertname: ExchangeClientDeviceLoginSurge
+        exp_alerts: []
+
+  - name: silent - failed code entries and unknown clients do not count
+    interval: 30m
+    input_series:
+      - series: 'keycloak_user_events_total{job="keycloak", realm="iri", idp="", event="oauth2_device_verify_user_code", error="invalid_oauth2_user_code", client_id="null"}'
+        values: "0x336 50+50x6"
+      - series: 'keycloak_user_events_total{job="keycloak", realm="iri", idp="", event="oauth2_device_verify_user_code", error="", client_id="unknown"}'
+        values: "0x336 50+50x6"
+    alert_rule_test:
+      - eval_time: 170h
+        alertname: ExchangeClientDeviceLoginSurge
+        exp_alerts: []
+
+  - name: fires - token requests for one exchange client jump far above its own week
+    interval: 30m
+    input_series:
+      - series: 'keycloak_user_events_total{job="keycloak", realm="iri", idp="", event="refresh_token", error="", client_id="hangar-exporter"}'
+        values: "0+5x336 1730+50x6"
+      - series: 'keycloak_user_events_total{job="keycloak", realm="iri", idp="", event="oauth2_device_code_to_token", error="", client_id="hangar-exporter"}'
+        values: "0+0.5x336 178+10x6"
+    alert_rule_test:
+      - eval_time: 170h
+        alertname: ExchangeClientTokenRequestSurge
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              client_id: hangar-exporter
+            exp_annotations:
+              summary: "Unusually many token requests for one exchange client"
+              description: "Keycloak answered token requests (device-code redemptions and refreshes, failed ones included) for hangar-exporter more than three times as often in the last hour as in its average hour of the past week (at least 30). Either a client release refreshes in a loop, or someone drives that client's sign-in from browsers (ADR-0303). Compare with the client's gateway traffic on the Exchange dashboard before suspending it."
+
+  - name: silent - the web frontend's refreshes are not an exchange client
+    interval: 30m
+    input_series:
+      - series: 'keycloak_user_events_total{job="keycloak", realm="iri", idp="", event="refresh_token", error="", client_id="basetool-frontend"}'
+        values: "0+5x336 1730+500x6"
+    alert_rule_test:
+      - eval_time: 170h
+        alertname: ExchangeClientTokenRequestSurge
+        exp_alerts: []
+
+  - name: fires - refresh events arrive without any client_id
+    interval: 5m
+    input_series:
+      - series: 'keycloak_user_events_total{job="keycloak", realm="iri", idp="", event="refresh_token", error=""}'
+        values: "0+2x40"
+    alert_rule_test:
+      - eval_time: 3h
+        alertname: KeycloakEventMetricsUntagged
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Keycloak user events carry no client_id"
+              description: "Keycloak counts refresh_token events but none carries a client_id, so ExchangeClientDeviceLoginSurge and ExchangeClientTokenRequestSurge are blind. KC_EVENT_METRICS_USER_TAGS must include clientId and KC_EVENT_METRICS_USER_EVENTS the oauth2_device_* events (ADR-0303, REQ-XCH-028)."
+
+  - name: silent - refresh events carry their client_id
+    interval: 5m
+    input_series:
+      - series: 'keycloak_user_events_total{job="keycloak", realm="iri", idp="", event="refresh_token", error="", client_id="basetool-frontend"}'
+        values: "0+2x40"
+    alert_rule_test:
+      - eval_time: 3h
+        alertname: KeycloakEventMetricsUntagged
+        exp_alerts: []

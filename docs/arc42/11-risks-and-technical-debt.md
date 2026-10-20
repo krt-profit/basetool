@@ -321,6 +321,13 @@ since the go-live of 2026-09-28, so these risks hold now.
   ORIGIN_NOT_ALLOWED` or a failed CORS check), a wrong one binds the origin to the wrong client
   until it is corrected. A permission-widening release is caught only by the re-review the
   developer asks for — nothing in the Basetool sees the manifest of what members install.
+- **An in-browser device phishing run is seen only once members confirm codes.** Keycloak 26.8
+  emits no event for a device flow that is started or polled, and the edge log carries neither the
+  request's `Origin` nor a public client's `client_id`. `ExchangeClientDeviceLoginSurge` therefore
+  compares confirmed device codes per client with that client's own week; a campaign that gets no
+  member to confirm stays invisible, and one that does is seen within the hour. Logging the
+  `Origin` on Keycloak's device and token paths at the edge would show the attempts too; it is not
+  built.
 - **The org demand feed has no low-count suppression.** A unit's single open order is recognisable
   to anyone who knows the unit; the feed goes only to a member the web's job-order gate admits
   (`canViewJobOrders`, under the exchange's reduced authorities), who could read the same order in
