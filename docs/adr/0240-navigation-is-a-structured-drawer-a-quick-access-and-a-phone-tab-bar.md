@@ -1,6 +1,11 @@
 # ADR-0240 — Navigation is a structured drawer, a quick access and a phone tab bar
 
 - **Status:** Accepted — owner decision 2026-10-03 (design hand-off „Navigation neu", Turn 2).
+  Decisions 2, 3, 4 (for entities) and 5, in the affected parts, and the rejection of a fixed
+  sidebar and an icon rail are **partially superseded by
+  [ADR-0297](0297-the-navigation-is-one-task-grouped-default-with-desktop-modes-a-configurable-tab-bar-and-a-scoped-entity-search.md)**
+  (2026-10-20): task-grouped default and admin hub, three desktop modes, a configurable tab bar
+  and a backend-scoped entity search. Decision 1 and decision 4 for pages stand.
 - **Date:** 2026-10-03
 - **Deciders:** @greluc
 - **Related:** spec [`ui-design-system.md`](../specs/ui-design-system.md) (`REQ-UI-026`, `REQ-UI-009`,

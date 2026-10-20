@@ -42,6 +42,8 @@ runbook. Individual features, plans and decisions are **not** re-documented here
 - **i18n & Keycloak theme** — every user-visible string is translated (German default, English); a custom Keycloak theme carries the DAS KARTELL corporate design.
 - **Companion clients** — the desktop SC extractor ([`krt-profit/basetool-sc-extractor`](https://github.com/krt-profit/basetool-sc-extractor)) sends refinery and blueprint data through the ingest gateway, which is also where approved third-party clients reach the exchange API. Neither carries business logic of its own. The native Android app is discontinued; members use the installable web app (ADR-0164), and the API vhost it needed was removed with it (ADR-0268).
 
+> **Planned** (accepted, not yet built; ADR-0297…0302): a task-grouped navigation with three desktop modes and a configurable phone tab bar (REQ-UI-026 amended), personal favourites, hiding and order kept server-side in a new `navigation` module (REQ-UI-032), a quick access that also finds missions, orders and other entities (REQ-UI-033), a personalisable widget dashboard as the home page with a chosen start page (REQ-UI-034), navigation keyboard shortcuts (REQ-UI-035), officer reach derived per org unit with the Keycloak `OFFICER` role retired, job-order assignees who can read the order they work on, and minimum stock levels per unit. Until it ships, the list above describes the application.
+
 The full permission model is in [ROLES_AND_PERMISSIONS.md](ROLES_AND_PERMISSIONS.md); per-feature behaviour is specified under [`docs/specs/`](docs/specs/INDEX.md).
 
 ### High-level architecture

@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-11.
-> **Owner area:** MOD · **Related ADRs:** ADR-0231, ADR-0233
+> **Owner area:** MOD · **Related ADRs:** ADR-0231, ADR-0233, ADR-0298
 
 # Backend module boundaries
 
@@ -240,6 +240,33 @@ wire records sit in `exchange.internal.dto`.
       sub-package of it annotated into the same interface is not reported.
 
 **Enforced by:** `ModularityTest` · **Fixture:** `architecturefixture.modulithapi`
+
+#### Planned amendment (ADR-0298)
+
+> **Status: planned** (ADR-0298, map #2800). Until it ships, the current text above / the current
+> code stays authoritative.
+
+The navigation preference store becomes the module `navigation`, declared in the same pull request
+that creates its package:
+
+- the domain map gains `module navigation 1` and a `package navigation` rule; rank 1 lets it depend
+  on `kernel` and `platform` only, and no `allow` row is added;
+- its `package-info` declares `@ApplicationModule` with `allowedDependencies = {"kernel",
+  "platform::api"}`, and it is laid out in `navigation.api`, `navigation.internal` and
+  `navigation.web`;
+- no domain module depends on it; the composition root `app` may, like on every module;
+- account deletion reaches its tables through the `app_user` foreign key with `ON DELETE CASCADE`,
+  so the module names neither `identity` nor `platform.api.UserErasureParticipant`;
+- it takes part in the Art. 15 / Art. 20 export (REQ-SEC-058) and the account merge (REQ-SEC-046)
+  by implementing `platform.api.PersonalDataExportSection` and
+  `platform.api.UserReassignmentParticipant`. Both SPIs are owned by `platform` and lie in its
+  `api`, which `platform::api` already allows, so the allowed dependencies stay as listed; the
+  orchestrators that run them collect the participants as beans and are not a dependency.
+
+The module count of REQ-MOD-001 and the declared floor of REQ-MOD-006 and `ModularityTest` each grow
+by one when it lands.
+
+**Enforced by:** `ModularityTest`, `DomainMapTest` (the new module's entries, to be added)
 
 ## Out of scope
 

@@ -1,6 +1,9 @@
 # ADR-0282 — The quick access loads sub-pages that need a backend read on demand
 
-- **Status:** Accepted
+- **Status:** Accepted — amended by
+  [ADR-0297](0297-the-navigation-is-one-task-grouped-default-with-desktop-modes-a-configurable-tab-bar-and-a-scoped-entity-search.md):
+  entity search runs through a query-taking sibling seam, `QuickAccessSearchContributor`, behind
+  `GET /quick-access/search`; the on-demand page entries of this ADR stand.
 - **Date:** 2026-10-18
 - **Deciders:** @greluc
 - **Related:** spec `REQ-UI-026` ([`ui-design-system.md`](../specs/ui-design-system.md)) ·

@@ -337,6 +337,9 @@ account-bound org-chart seat (REQ-ROLE-006).
 
 ### Operational OFFICER grant (leadership & bank)
 
+> **Planned:** ADR-0300 retires this grant; see
+> [§7](#7-planned-adr-0300-adr-0301-adr-0302). Until it ships, the text below stays authoritative.
+
 The `OFFICER` Keycloak role is granted **operatively** (manually, in Keycloak — no code derives it
 from a rank) in addition to the OrgUnit membership:
 
@@ -1251,3 +1254,60 @@ einbuchen“ only for `LOGISTICIAN`, „Administration öffnen“ only for `ADMI
 `/ship-data` is the one listed admin screen whose **read** is not admin-gated in the frontend: a
 member who types the URL sees the manufacturer / ship-type visibility table (the same catalogue the
 backend serves every member) but no control that writes.
+
+---
+
+## 7. Planned (ADR-0300, ADR-0301, ADR-0302)
+
+> **Status: planned** (map #2800). The decisions below are accepted and not implemented. Until they
+> ship, §0–§6 and the code stay authoritative; this section changes none of their rows.
+
+### 7.1 Officer reach per org unit (ADR-0300, REQ-ROLE-002, REQ-ROLE-007)
+
+- **Officer reach is derived per org unit from leadership seats only:** a Staffel leadership rank
+  (Staffelleiter, Kommandoleiter, stellvertretender Kommandoleiter, Ensign) and an SK lead reach
+  their own unit; the three Bereich ranks reach the Bereich and its direct children; an OL member
+  reaches every unit. Admin passes every officer check. There is no manual grant.
+- **The Keycloak role `OFFICER` is retired** in one release: no gate reads it, the role mirror
+  ignores it, and the seeded role and its permissions are removed. Every column „Officer“ above then
+  means officer reach in the target's owning unit; lists are filtered to the caller's officer units.
+- **Bank Management keeps its `BANK_*` rights only** (REQ-BANK-007) and gets no officer reach of its
+  own; a bank manager who also holds a leadership seat has reach there like anyone else.
+- **Every leadership seat requires `KRT Member`:** an appointment without it is refused; a seat
+  whose holder loses it stays in the org chart and confers no reach. Membership rights rest on
+  `KRT Member` alone.
+- An admin may hold any member rank 1–20; for everyone else a rank 1–12 requires officer reach in
+  at least one unit (REQ-ROLE-007). The bank's global
+  `OFFICER` view-grant bucket for special accounts is removed (REQ-BANK-037).
+
+### 7.2 External assignee of a job order (ADR-0301, REQ-ORDERS-047)
+
+A Logistician with access to an order may enter any active account as its assignee (Bearbeiter). An
+**external assignee** reaches the order only through that entry:
+
+| Function | External assignee |
+| --- | --- |
+| Read the full order (materials, progress, assignees) | ✅ |
+| Edit their own assignee note | ✅ |
+| Remove themselves as assignee | ✅ |
+| Change status, lines or handovers; anything else on the order | ❌ |
+| See the „Aufträge“ link, with only the „Ich bearbeite“ segment, without profit access | ✅ |
+
+The grant lasts as long as the assignee entry exists, whatever the order's status; leaving the unit
+does not end it.
+
+### 7.3 Minimum stock levels (ADR-0302, REQ-INV-067, REQ-INV-068, REQ-SUP-003)
+
+| Function | Who |
+| --- | --- |
+| Set, change and remove a unit's minimum stock levels; „Bedarf anlegen“ / „Auftrag anlegen“ from a low row | the unit's Logisticians, its leadership included (`hasRoleInOrgUnit(unit, LOGISTICIAN)`) |
+| See the „Mindestbestände“ tab, the „niedrig“ badge and the „Bestand niedrig“ widget | everyone who can see the unit's pool |
+| Receive the low-stock notification (REQ-NOTIF-030) | the unit's direct Logisticians and direct leadership seats |
+
+### 7.4 Navigation preferences (ADR-0298, REQ-UI-032, REQ-UI-034)
+
+Favourites, hidden entries, order, tab bar, „Darstellung“, the dashboard and the start page are
+**owner-only**: only the user reads, edits and resets their own. There is no admin view and no
+admin reset, and the preferences are not audited. They are part of the data export — the admin
+export for somebody who cannot sign in included (REQ-SEC-058) — and of the admin account merge,
+where the surviving account's choices win (REQ-SEC-046).

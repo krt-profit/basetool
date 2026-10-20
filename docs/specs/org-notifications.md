@@ -15,6 +15,9 @@ name and coded words, and have a seeded, admin-editable rule. Each can be muted 
 
 ### REQ-ORG-029 — A leadership change that does not fit the OFFICER role tells the admins
 
+> **Status: planned** (ADR-0300, map #2800). Until it ships, the current text below / the current
+> code stays authoritative.
+
 `OrgUnitMembershipService` calls `OrgUnitSeatNotifier#seatChanged` after `assignSquadronRank`,
 `removeSquadronRank`, `addBereichLeader`, `removeBereichLeader`, `addOlMember`, `removeOlMember` and
 `toggleLead`. A member **holds a seat** when any of their memberships is not a plain member
@@ -29,6 +32,28 @@ and neither `OFFICER` nor `ADMIN`, or holds `OFFICER` without a seat and without
   notice. So does a role reconciliation that makes them fit: `UserReconciliationService` tells the
   identity-owned `RolesChangedObserver` (implemented by `OrgUnitSeatNotifier#onRolesChanged`)
   whenever it replaces a member's roles.
+
+#### Planned amendment (ADR-0300)
+
+The notice is repurposed to **a leadership seat holder without `KRT Member`**. `OFFICER` is retired
+(REQ-SEC-004), so a seat can no longer disagree with it; what can still drift is the Keycloak role
+`KRT Member`, which every seat requires (REQ-ROLE-002).
+
+- **When it fires.** An appointment of a member without `KRT Member` is refused, so the mismatch
+  arises when a seat holder loses the role later: `OrgUnitSeatNotifier#onRolesChanged` sees a member
+  who holds a seat and no `KRT Member`. The seat stays in the org chart and confers no reach. The
+  seat-change calls stay, so that removing the last seat clears an open notice.
+- **What it says.** `ORG_LEADERSHIP_ROLE_MISMATCH` and its default rule (every admin) stay; the only
+  `mismatchCode` is `MISSING_KRT_MEMBER`. `MISSING_OFFICER` and `SURPLUS_OFFICER` go. The payload
+  stays the member, the unit, the seat (`rankCode`) and coded words.
+- **When it clears.** `ORG_LEADERSHIP_ROLE_MISMATCH_CLEARED` clears the notice once the member holds
+  `KRT Member` again or holds no seat any more.
+- **Before the cut.** A report of every seat holder without `KRT Member` precedes the release that
+  retires `OFFICER`; the release ships only when that report is empty (REQ-SEC-004).
+
+**Enforced by (to be added):** `OrgUnitSeatNotifierTest` (a seat holder who loses `KRT Member`, a
+regained role, a removed last seat), `OrgNoticeIntegrationTest`, `UserReconciliationServiceTest`
+· **Related:** REQ-ROLE-002, REQ-SEC-004, ADR-0300
 
 ### REQ-ORG-030 — A departed member tells the leadership of their units
 

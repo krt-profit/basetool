@@ -16,7 +16,8 @@
 > [0242](../adr/0242-page-patterns-a-to-c-and-the-design-system-update-2026-10.md) (REQ-UI-027, REQ-UI-009) ·
 > [0243](../adr/0243-colours-and-stacking-layers-are-written-through-tokens.md) (REQ-UI-001, REQ-UI-023) ·
 > [0280](../adr/0280-touch-ergonomics-follow-the-pointer-and-the-tablet-is-supported-in-both-orientations.md) (REQ-UI-009, REQ-UI-020) ·
-> **Next free id:** `REQ-UI-032` · **Visual source of truth:** the design
+> ADR-0297, ADR-0298 and ADR-0299 (REQ-UI-026 amendment, REQ-UI-032…035, planned) ·
+> **Next free id:** `REQ-UI-036` · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)),
 > read at the design system's latest `main` ([ADR-0259](../adr/0259-the-design-system-submodule-follows-its-main.md)).
@@ -1631,6 +1632,9 @@ SVG hygiene, the copy in every bundle, every section non-empty) · `ScLinksPageC
 
 ### REQ-UI-026 — Navigation: a structured drawer, a quick access and a phone tab bar
 
+> **Status: planned** (ADR-0297, map #2800). Until it ships, the current text below stays
+> authoritative; the planned amendment at the end of this requirement replaces the parts it names.
+
 The navigation has grown to about 65 links for a member with many roles, several viewport heights
 of one flat drawer. It is one model on every device
 ([ADR-0240](../adr/0240-navigation-is-a-structured-drawer-a-quick-access-and-a-phone-tab-bar.md)),
@@ -1726,6 +1730,134 @@ chrome budget) · **Code:** `kernel/fragments/header.html`, `kernel/fragments/si
 `static/js/kernel/krt-palette.js`, `static/js/kernel/krt-search.js`, `shell/web/QuickAccessController.java`,
 `kernel/layout/QuickAccessContributor.java` · **Related:** REQ-UI-009, REQ-UI-013, REQ-UI-019,
 ADR-0282
+
+#### Planned amendment (ADR-0297)
+
+**What it replaces.** The *List* zone and the admin groups of „The drawer" and „Information
+architecture", the 769 px drawer threshold, the tab-bar line of „Phones" and the „No data,
+nothing mutates" bullet (preferences are written, REQ-UI-032). The header, the context and foot
+zones, the menu filter, tolerant matching, „Rights stay on the server" and accessibility stay; the
+quick access is extended by REQ-UI-033.
+
+**Counting rule.** A default is measured in clickable links with every group open; group headings
+do not count. Groups are cut by task, at most four for members.
+
+**Member default: 10 links in 4 task groups** (+1 group for bank staff). Each link opens one page;
+its former sibling pages become tabs of it.
+
+| Group | Icon | Links (tabs) |
+|---|---|---|
+| Einsatz & Flotte | wedge | Missionen (Missionen · Operationen), Hangar (Hangar · Schiffskatalog) |
+| Logistik | crate | Lager (Lager · Mindestbestände), Raffinerie, Aufträge (Aufträge · Materialbedarf · Blueprint-Verfügbarkeit) |
+| Handel | swap arrows | Material (Liste · Übersicht · Profitberechnung), Materialbörse, Beschaffung (Bedarf · Meine Spenden · Ankauf) |
+| Staffel | users | Organisation (Organigramm · Staffel-Bank · *Leitung*), Beförderung (Übersicht · Meine Bewertungen · *Verwaltung*) |
+| Kartellbank (bank staff only) | bank | Kartellbank (Dashboard · Verwaltung · Berechtigungen · Anträge) |
+
+- *Italic* tabs are officer-only (officer reach per org unit, ADR-0300); Beförderung's
+  „Verwaltung" holds Bewertungen, Themenbereiche and Rangvoraussetzungen. Officers therefore also
+  see 10 links, bank staff 11.
+- The tab names are i18n labels; „Lager · Mindestbestände" is „Storage · Minimum levels" in English
+  (REQ-INV-068).
+- **The storage page has exactly these two tabs.** „Mein Lager" and „Globales Lager" are neither
+  tabs nor pages of their own: they become a switch inside the „Lager" tab (a `.krt-segmented`
+  control, REQ-UI-028), each option shown under the same role condition as today's page. Their
+  quick-access entries open the „Lager" tab with that option selected and keep their own stable
+  entry keys (REQ-UI-032), so they can still be favourites, tab-bar slots and start pages; the old
+  URLs `/inventory/my` and `/inventory/all` redirect to the tab with the option.
+- The ship catalogue, readable by every signed-in user, is a Hangar tab; editing it stays in
+  admin mode.
+- A user without profit access who is an assignee of at least one job order sees „Aufträge" with
+  only the „Ich bearbeite" segment (REQ-ORDERS-047).
+- **Out of the link list:** „Startseite" — the logo leads to the home dashboard (REQ-UI-034);
+  „Benachrichtigungen" — the bell with the unread count sits right of the logo in the header;
+  „Star-Citizen-Links" (REQ-UI-025) — a footer link next to Handbuch and Impressum.
+- **Personal pages stay in the user menu:** Mein Inventar (Inventar · Blueprints), Profil,
+  Verbundene Anwendungen.
+
+**Admin mode: the admin dashboard plus 13 links in 3 groups, collapsed by default.** The admin
+dashboard (REQ-UI-034) carries the hub of tiles; the groups replace the four current admin groups.
+
+| Group | Icon | Links (tabs) |
+|---|---|---|
+| Mitglieder & Organisation | users | Mitgliederverwaltung (Mitglieder · Discord-Registrierungen · Zustimmung Nutzungsbedingungen), Organisationsstruktur (Struktur · Staffeln · Spezialkommandos), Datenschutz-Anfragen (Personensuche · Löschanträge) |
+| Stammdaten | database | Missionsdaten (Aufgaben, Frequenzen), Orte (Orte · UEX-Standorte & Terminals), Schiffsdaten, Materialien (Materialien · Aliase · Qualitätsstufen), Blueprints (Blueprints · Standard), Datenimporte (P4K-Import · Sync-Berichte) |
+| Betrieb | gear | Audit-Logs, Systemeinstellungen (Allgemein · Bedarf & Spenden · Ankauf · Gefahrenzone), Verbundene Anwendungen, Benachrichtigungsregeln |
+
+Page merges this needs:
+
+- All four org-unit kinds are managed on Organisationsstruktur. Staffel CRUD leaves Missionsdaten;
+  the per-unit switches „Beförderung aktiv" and „Auftragsbearbeitung" leave Systemeinstellungen
+  for the unit's row.
+- The person detail (`/members/{id}`) gets the tabs Stammdaten · Hangar · Inventar · Blueprints ·
+  Export; the admin personal-inventory and personal-blueprints pages and their member picker go.
+- „Gefahrenzone" holds the destructive one-off actions: the bank wipe-reset and deleting every
+  user's blueprints.
+- „Informationen" (the home-page announcement) is edited inline in its dashboard widget; it has no
+  admin link.
+
+**One default for every role; visibility follows the active context.**
+
+- Roles and the active org-unit context decide **whether** an entry shows, never **where** it
+  sits: no per-role order, no per-role open groups, no pre-seeded favourites.
+- *Context-bound:* the per-unit switches, the Logistician and Mission-Manager grants and officer
+  reach. *User-wide:* Bank and Admin. The frontend reads them as capabilities of the active
+  context.
+- With no unit pinned („Alle meine Einheiten") the **union** applies: an entry shows if it is
+  permitted or enabled in at least one of the user's units.
+- A link unavailable in the active context is not rendered, and the quick access drops it the same
+  way. A newly permitted entry appears at its default position, after its default predecessor,
+  with no badge and no toast.
+- A tab whose feature is off or whose role is missing is not rendered; a page left with no tab
+  loses its link.
+
+**Old URLs redirect** to their new page and tab, so bookmarks and notification links keep working.
+
+**Three desktop modes**, chosen with a three-state switch in the sidebar head (next to „Anpassen")
+and under „Darstellung" in the profile; one mode for member and admin mode, stored server-side
+(REQ-UI-032).
+
+| Mode | Width | Behaviour |
+|---|---|---|
+| Drawer (default) | ≥ 769 px | The current 320 px overlay. |
+| Icon rail | ≥ 1025 px | Icons only, one entry per group. |
+| Pinned sidebar | ≥ 1280 px | The labelled sidebar fixed beside `main`, with the drawer's zones. Between 1025 and 1279 px it renders as the rail. |
+
+Below 1025 px the drawer (769–1024 px) and the phone layout (≤ 768 px) apply automatically; the
+stored mode is kept.
+
+- **Rail entries:** Favoriten (star; only with at least one favourite), the task groups,
+  Kartellbank for bank staff — in admin mode Favoriten and the three admin groups — and „Mehr"
+  (dots) below them only while a page is hidden. The foot holds the admin-mode icon (shield; only
+  with the role) and the avatar, whose flyout holds the personal panel, the user row and the
+  org-unit switcher. The rail has no menu filter; `Strg K` covers it.
+- **Flyouts** are disclosures (`<button aria-expanded aria-controls>`), neither dialogs nor ARIA
+  menus. They open on hover after about 200 ms and on click, Enter or Space; a hover-opened flyout
+  stays while hovered, closes about 300 ms after the pointer leaves, and closes on Escape with focus
+  back on the icon (WCAG 1.4.13). A click pins it until an outside click, Escape or a followed link.
+  The flyout header is the group name; the icon's `aria-label` is the group name, with no extra
+  tooltip. A flyout lists its group's links; tabs appear only in the Favoriten flyout. The icon of
+  the group holding the current page is highlighted.
+- Rail entries are `<button>`s with the touch floor of ADR-0176. Rail and pinned sidebar set
+  `scroll-padding-inline-start` to their width (WCAG 2.4.11).
+- „Anpassen" in rail mode opens the labelled sidebar as an overlay; „Fertig" returns to the rail.
+- **Icons** are 24 × 24 with stroke 2 in the sprite's style; missing ones go into the design
+  system's sprite.
+
+**Phone tab bar: five slots.** Slots 1–3 are configurable (REQ-UI-032), slot 4 is the fixed
+„Meldungen" with the live unread count, slot 5 the fixed „Menü", the only way into the
+navigation. One bar per mode.
+
+| Mode | Default slots 1–3 |
+|---|---|
+| Member | Missionen · Lager · Aufträge |
+| Admin | Admin-Dashboard · Mitgliederverwaltung · Audit-Logs |
+
+**Enforced by (to be added):** `NavigationRenderMvcTest` (the default groups, links and tabs per
+role and context, the union without a pin, admin mode's three collapsed groups, no „Startseite" or
+„Benachrichtigungen" link) · `NavigationLegacyRedirectMvcTest` (every old URL reaches its page and
+tab) · `NavigationE2eTest` (the three desktop modes and their width fallbacks, rail flyouts by
+hover, click and keyboard, the default tab bar per mode) · **Related:** REQ-UI-032, REQ-UI-033,
+REQ-UI-034, REQ-UI-035, REQ-ORDERS-047, REQ-INV-068, ADR-0297, ADR-0300
 
 ### REQ-UI-027 — Work pages follow three page patterns built from shared fragments
 
@@ -2089,6 +2221,358 @@ page use it; positions there count the reorderable rows of the rendered page.
 `static/js/joborder/orders-index-reorder.js`, `templates/joborder/orders-index.html`,
 `static/js/catalogue/mission-data.js`, `templates/catalogue/admin/mission-data.html` ·
 **Related:** REQ-UI-009, REQ-FE-001, REQ-ORDERS-020 · **Issues:** #2800, #2802
+
+### REQ-UI-032 — Navigation personalisation: favourites, „Mehr", order and the tab bar
+
+> **Status: planned** (ADR-0297, ADR-0298, map #2800). Until it ships, the current code stays
+> authoritative.
+
+A user may adapt the default of REQ-UI-026 on top of it; nothing here changes the default.
+
+**Entry keys.** Every page and every tab of a tabbed page — the personal pages included — has a
+stable entry key (e.g. `missions.list`, `orders.demand`) from a frontend-side entry registry,
+never a URL path. So do the two storage views „Mein Lager" and „Globales Lager": entries that open
+the „Lager" tab with that switch selected (REQ-UI-026), keyed and handled like a tab. The backend
+checks the key's format only. A renamed page keeps its key or gets an explicit key remap; an
+unknown key from a new release (entry or group) is placed after its default predecessor, with no
+server-side migration.
+
+**Favourites.**
+
+- A „Favoriten" group at the top of the navigation, rendered only with at least one favourite.
+  A favourite is a copy: the entry stays in its task group.
+- Pages and tabs can be favourites; entities cannot (REQ-UI-033 finds them).
+- **At most 12**, enforced by the backend; at the cap the star is disabled with a hint.
+- One list for both modes: admin entries render only in admin mode, member entries only in member
+  mode; the cap is shared.
+- A favourite unavailable in the active context stays stored, keeps its place and counts towards
+  the cap; it renders greyed with „In <Einheit> nicht verfügbar".
+
+**Hiding.**
+
+- Pages only, and no personal page (Profil, Mein Inventar, Meine Blueprints, Verbundene
+  Anwendungen). A hidden page moves into a collapsed „Mehr" area at the end of the navigation and
+  is shown again from there.
+- A hidden page and its tabs leave the quick access; its entity hits and actions stay findable.
+- A group whose links are all hidden is not rendered; it reappears in edit mode.
+- **Favourite and hidden exclude each other per entry key:** favouriting a hidden entry un-hides
+  it, hiding a favourite removes the favourite — one request that writes both sections and checks
+  both versions. A favourited tab of a hidden page stays (it has its own key).
+
+**Order.** Groups among themselves and links within their group; a link never changes group.
+Stored per mode, only for the keys the user moved. The controls are those of REQ-UI-031 (buttons,
+Alt+↑/↓, focus kept, live announcement); drag is only an extra.
+
+**Phone tab bar (slots 1–3 of REQ-UI-026).** A slot holds a page or tab that can be a favourite,
+never an entity or an action; one bar per mode.
+
+| State | Filling |
+|---|---|
+| Automatic (no stored rows; initial) | The favourites of the mode in their order, skipping greyed ones, then the mode's default (REQ-UI-026), no duplicates. No favourites = the default. |
+| Explicit (stored rows) | The first edit of any slot stores the shown assignment of all three slots; favourites no longer affect the bar. |
+
+- Choosing an entry that sits in another slot swaps the two slots.
+- **Stand-in:** a slot whose entry is unavailable in the active context, or was deleted on loss of
+  permission, shows the next favourite not yet shown, else the next free default entry. A
+  context-only gap keeps the stored choice, which returns on a context switch; a deleted slot stays
+  automatic until the user assigns it again.
+- Edited in the „Tab-Leiste" section of „Anpassen": one picker per slot with the favourites first,
+  and left/right buttons that swap neighbours. A long-press on a tab opens its picker as an extra
+  path only (WCAG 2.5.7).
+
+**Editing.** „Anpassen" at the top of the drawer, the pinned sidebar (the rail opens its overlay,
+REQ-UI-026) and the phone menu shows per link star, hide and up/down, and per group up/down.
+Outside edit mode every page and tab header carries a star and „Als Startseite festlegen"
+(REQ-UI-034). Admin mode works the same way. The edit controls are at least 44 × 44 px up to
+1024 px and 32 px above (REQ-UI-009).
+
+**Resets.**
+
+| Control | Clears |
+|---|---|
+| „Alle wieder einblenden" (in „Mehr") | hidden entries |
+| „Alle Favoriten entfernen" | favourites |
+| „Standardreihenfolge" | the order of the current mode |
+| „Tab-Leiste zurücksetzen" | the tab bar of the current mode (back to automatic) |
+| Full reset in the profile, after a confirmation dialog (REQ-UI-013) | all five sections in both modes, both dashboards and both start pages (REQ-UI-034); the desktop mode returns to the drawer |
+
+„Darstellung" has no reset of its own.
+
+**Store.** Server-side in the `navigation` module (ADR-0298), five sections, each with its own
+optimistic-lock version, so an edit in one never 409s another:
+
+| Section | Holds | Kept |
+|---|---|---|
+| Favoriten | up to 12 entry keys in order | once per user |
+| Ausgeblendet | hidden page keys | once per user |
+| Reihenfolge | moved group and link keys | per mode, own version each |
+| Tab-Leiste | slots 1–3 (none = automatic) | per mode, own version each |
+| Darstellung | desktop mode, `shortcutsEnabled` (REQ-UI-035), start page per mode | once per user |
+
+- Relational tables, Flyway-owned, each `REFERENCES app_user (id) ON DELETE CASCADE`, so account
+  erasure removes them (REQ-DATA-021).
+- **Data export and account merge:** the preferences are part of the Art. 15 / Art. 20 export in
+  their own section `navigationPreferences` (REQ-SEC-058) and of the admin account merge
+  (REQ-SEC-046), through the `platform.api` participants `PersonalDataExportSection` and
+  `UserReassignmentParticipant`. In a merge the target account's sections win: favourites are
+  unioned (the target's first, then the other account's, deduplicated, cut at 12); hidden entries
+  are unioned minus every entry that is a favourite; order, tab bar and „Darstellung" (start pages
+  included) are the target's.
+- **Owner-only:** only the user reads, edits and resets their own preferences; no admin view and
+  no admin reset. The admin data export (REQ-SEC-058) and the admin account merge (REQ-SEC-046)
+  are the privacy flows, not a preference view.
+- **Not audited:** personal UI preferences lie outside every audited area of REQ-AUDIT-001; the
+  absence of audit events is deliberate.
+- **Deletion on next load:** an entry the user may no longer see user-wide is detected by the
+  frontend while it builds the navigation and deleted from every section through the backend,
+  which holds no key-to-permission knowledge. Unavailability in the active context deletes
+  nothing. Regaining a role restores nothing.
+
+**Browser-side state stays in the browser** (REQ-UI-017, ADR-0120): group collapse
+(`krt.sidebar.*`), the recent pages (`krt.recent`) and the „Häufig" ranking (REQ-UI-033).
+
+**Sync and conflicts.**
+
+- Every write saves through `krtFetch` and updates the page in place (REQ-FE-001).
+- **Preferences are not pushed live.** They are personal, not a shared surface, so the peer
+  live-update rule (REQ-FE-015) does not apply: another tab or device shows the change on its
+  next page load, an open dashboard on its 10-minute poll (REQ-UI-034).
+- A write that meets a version conflict (409) is dropped, only the affected section reloads, and
+  the hint „In einem anderen Fenster geändert – bitte erneut versuchen" shows; the other sections
+  stay as they are.
+
+**Monitoring:** `basetool_navigation_preference_writes_total{section,outcome}` and
+`basetool_navigation_personalised_accounts{section}` (REQ-OBS-011); the endpoints count in
+`http_server_requests` by route template, and their 5xx rate alerts above 5 %.
+
+**Enforced by (to be added):** `NavigationPreferenceServiceTest` (cap of 12, mutual exclusion in
+one write, per-section and per-mode versions, owner-only, deletion of unknown-permission keys) ·
+`NavigationPreferenceControllerTest` (owner gate, 409 per section) · `NavigationRenderMvcTest`
+(Favoriten, greyed favourites, „Mehr", stored order with unknown keys, tab-bar filling and
+stand-ins) · `NavigationPersonalisationE2eTest` (edit mode, resets, the full reset's confirmation,
+44 px controls up to 1024 px, the 409 hint) · the export and merge tests of REQ-SEC-058 and
+REQ-SEC-046 · **Related:** REQ-UI-026, REQ-UI-031, REQ-UI-033, REQ-UI-034, REQ-UI-035,
+REQ-UI-017, REQ-OBS-011, REQ-SEC-046, REQ-SEC-058, REQ-DATA-021, ADR-0297, ADR-0298
+
+### REQ-UI-033 — The quick access finds entities, takes prefixes and ranks by use
+
+> **Status: planned** (ADR-0297, map #2800). Until it ships, the current code and the quick-access
+> text of REQ-UI-026 stay authoritative.
+
+Extends the quick access of REQ-UI-026; its dialog, matching, keyboard and rights rules stay.
+
+**Entity search.** `GET /quick-access/search?q=` asks one `QuickAccessSearchContributor` per type
+(`results(query, limit)`, the sibling seam of `QuickAccessContributor`, ADR-0282) in parallel;
+each type is scoped by its domain's rules and fails closed on its own.
+
+| Type | Matched on | Opens |
+|---|---|---|
+| Mission | name | mission detail |
+| Operation | name | operation detail |
+| Material | name | material detail |
+| Blueprint | name | blueprint detail |
+| Ship | ship type | hangar filtered to that type |
+| Org unit | name | org chart with the unit highlighted |
+| Job order | number (`displayId`, exact or prefix), through a scoped number lookup | job order detail |
+| Member | name | org chart with the person highlighted; in admin mode the member edit page |
+
+- A hit carries a slim projection (id, name, status, date). A member finds exactly the people the
+  org chart shows them, with the same fields; no search reveals more than the page it opens.
+- **Limits:** debounced, at least 2 characters (1 digit for a job-order number), 5 hits per type,
+  aborted when the user types on.
+- **The term stays a query parameter;** it never reaches a path, an MDC field or a metric label.
+
+**Prefixes.** Symbol and word are equivalent; both languages' words are accepted in either UI
+language; `?` shows the prefix help.
+
+| Kind | Symbol | Words (DE / EN) |
+|---|---|---|
+| Actions | `>` | `aktion:` / `action:` |
+| Pages and tabs | `/` | `seite:` / `page:` |
+| Job orders | `#` | `auftrag:` / `order:` |
+| Members | `@` | `mitglied:` / `member:` |
+| Missions | — | `mission:` / `mission:` |
+| Operations | — | `operation:` / `operation:` |
+| Materials | — | `material:` / `material:` |
+| Blueprints | — | `blueprint:` / `blueprint:` |
+| Ships | — | `schiff:` / `ship:` |
+| Org units | — | `einheit:` / `unit:` |
+
+**Ranking.** One mixed list, scored by match quality plus the „Häufig" weight (pages and tabs
+only). Entity hits arrive later and the list re-sorts, but the highlighted hit stays highlighted
+and Enter opens exactly it.
+
+**„Häufig".** A per-device ranking in `localStorage`: every page or tab visit counts, however it
+was reached; entry keys only; each visit decays over about 30 days. It ranks typed results and
+fills the empty state; the navigation never reorders itself by use.
+
+**Empty state.** Favoriten, then Häufig, then Zuletzt (`krt.recent`), without duplicates: an
+entry shown in a higher section is left out of the lower ones. Entity hits never enter Zuletzt or
+Häufig, so no entity or member name reaches `localStorage`.
+
+**Filtering.** A hidden page and its tabs, and every entry unavailable in the active context
+(REQ-UI-026), are left out; entity hits and actions of a hidden page stay.
+
+**Actions** (in addition to those of REQ-UI-026):
+
+- Navigation: favourite / unfavourite this page, hide this page, open „Anpassen" (REQ-UI-032).
+- Create actions for the tabbed pages, each gated like the form it opens.
+- **Page context actions:** a page may contribute actions that only navigate or open the dialog or
+  form it already has; they never mutate, so confirmation, permission, audit and live update stay
+  on the existing path.
+
+**Keys in the dialog.** Ctrl+Enter opens the highlighted hit in a new browser tab; Tab accepts a
+suggested prefix row; Ctrl+D favourites or unfavourites the highlighted page or tab (intercepted
+only while the dialog is open).
+
+**Monitoring:** `basetool_quick_access_search_total{kind,outcome}` (REQ-OBS-011); the p95 of
+`/quick-access/search` alerts above 1 s for 10 minutes.
+
+**Enforced by (to be added):** `QuickAccessSearchControllerTest` (parallel contributors, fail
+closed per type, limits, term not in the path or MDC) · one `…QuickAccessSearchContributorTest` per
+type (scope, member visibility equal to the org chart) · `:frontend:testSearchJs` (prefix parsing,
+ranking, decay, empty-state de-duplication) · `NavigationE2eTest` (late hits keep the highlight,
+Ctrl+Enter, Tab, Ctrl+D, `?` help, hidden pages filtered) · **Related:** REQ-UI-026, REQ-UI-032,
+REQ-SEC-007, REQ-OBS-011, ADR-0282, ADR-0297
+
+### REQ-UI-034 — The home page is a personalisable widget dashboard
+
+> **Status: planned** (ADR-0299, map #2800). Until it ships, the current code stays authoritative.
+
+The home page is a dashboard of widgets the user composes, in member and admin mode, each with its
+own layout. The logo always leads to the dashboard of the current mode. The Fan Kit band of
+REQ-UI-018 stays on it.
+
+**Layout.** Two columns, 2 : 1 (pattern B, REQ-UI-027); each instance sits in one column. On the
+phone one column, the wide column first, then the narrow one; one stored order for every device.
+An empty dashboard shows an empty state with „Widget hinzufügen".
+
+**Defaults.**
+
+| Mode | Wide column | Narrow column |
+|---|---|---|
+| Member | Nächste Tage (7 days), Information | Favoriten, Benachrichtigungen |
+| Admin | Hub | Offene Löschanträge, Discord-Registrierungen, Sync- & Importstatus, Offene Nutzungsbedingungen |
+
+Favoriten without favourites explains how to set one. The Hub holds the 13 admin links of
+REQ-UI-026 as tiles and is an ordinary, removable widget.
+
+**Instances.** A widget may be added more than once; at most **12 instances per mode**, enforced
+by the backend. Each instance renders only for a user allowed to read its data.
+
+**Catalogue and options.** Default in bold. *Rows* is 3 / 5 / 10, default **5** unless stated.
+*Unit* defaults to **follows the active context** and can be pinned to one unit; following a
+context with no unit pinned („Alle meine Einheiten") it shows the union, each row labelled with its
+unit.
+
+| Mode | Widget | Shows | Options |
+|---|---|---|---|
+| Member | Nächste Tage | the missions of the coming days | unit; 3 / **7** / 14 days; rows |
+| Member | Nächster Einsatz | the user's next mission | — |
+| Member | Hangar-Bereitschaft | readiness of the user's hangar | — |
+| Member | Aufträge zu bearbeiten | orders the user's unit processes | unit; status **Offen + In Bearbeitung** / Offen / In Bearbeitung; rows |
+| Member | Meine Aufträge | orders the user requested | status **Laufend** / Abgeschlossen / Alle; rows |
+| Member | Ich bearbeite | orders the user is an assignee of, by priority (REQ-ORDERS-047) | status as „Aufträge zu bearbeiten"; rows |
+| Member | Materialbedarf | open material demand | unit; rows |
+| Member | Raffinerie: fertig | finished refinery jobs | rows |
+| Member | Bestand niedrig | low minimum stock levels, by fill ratio, empty first (REQ-INV-068) | unit; rows |
+| Member | Materialbörse | open market entries | status **Angebote + Gesuche** / Angebote / Gesuche; rows |
+| Member | Bedarf & Spenden | open supply needs | unit; status **Alle offenen** / Ungedeckt / Teilweise gedeckt; rows |
+| Member | Meine Bankanträge | the user's bank requests | status **Offen** / Entschieden / Alle; rows, default **3** |
+| Member | Bank | balances of the viewable org-unit bank accounts in the backend's order — KRT first, then the active context's, then by account number; page 0 with the row count as size (REQ-BANK-064) | rows, default **3** |
+| Member | Information | the announcement; administrators edit it inline | — |
+| Member | Benachrichtigungen | the user's notifications | status **Ungelesen** / Alle; rows |
+| Member | Favoriten | the user's favourites | — |
+| Admin | Hub | the admin links as tiles | — |
+| Admin | Offene Löschanträge | pending deletion requests | rows |
+| Admin | Discord-Registrierungen | pending registrations | rows |
+| Admin | Offene Nutzungsbedingungen | members without accepted terms | rows |
+| Admin | Sync- & Importstatus | the latest sync and import runs | range 24 h / **7 Tage** / 30 Tage |
+
+A widget with a list links „Alle anzeigen" to its page or tab („Ich bearbeite" to that segment,
+„Bestand niedrig" to „Mindestbestände", „Bank" to `/org-unit-bank`). Widgets carry no action
+buttons. „Bank" has no unit option — its set ignores the context, only its order uses it — and is
+not part of the default. A new option is a change to this table.
+
+**Availability.**
+
+- An instance pinned to a unit unavailable in the active context renders greyed with a hint, like
+  an unavailable favourite.
+- Losing user-wide the role a widget needs deletes its instances on the next load (REQ-UI-032).
+
+**Data and freshness.** Widgets read the existing endpoints (a page total serves as a count) and
+new summary reads where a list would otherwise be loaded whole (hangar readiness, next mission)
+or data is new (REQ-ORDERS-040 `assignedToMe`, REQ-INV-068, REQ-BANK-064). Each widget loads and
+fails on its own, never blocking the page. A widget whose area has a live-sync topic updates live
+(REQ-FE-015); the others poll every 10 minutes, only while the tab is visible, staggered, and
+reload at once when the tab becomes visible again.
+
+**Store.** In the `navigation` module, owner-only and not audited, like REQ-UI-032: the layout
+(instances, column, order) is one section per mode with its own version, and the options of each
+instance carry their own version, so an option change never collides with a reorder. Conflicts and
+the absence of a live push follow REQ-UI-032. The dashboards are part of the data export's
+`navigationPreferences` section (REQ-SEC-058); in an account merge (REQ-SEC-046) both modes'
+dashboards — layout and instance options — are the target account's.
+
+**Editing.** „Anpassen" in the page head: per instance up/down (REQ-UI-031), column switch, remove
+and an options dialog; a catalogue dialog adds; „Standard wiederherstellen" restores the mode's
+default. Dialogs follow REQ-UI-013; edit controls follow the size rule of REQ-UI-032.
+
+**Start page.**
+
+- One per mode: any page or tab that can be a favourite, personal pages included. Chosen under
+  „Darstellung" in the profile and with „Als Startseite festlegen" next to the header star; stored
+  in „Darstellung" (REQ-UI-032).
+- It opens after a plain login, on launching the installed app (REQ-UI-020) and, for the admin
+  start page, on switching into admin mode. A deep link that triggered the login wins.
+- A start page no longer permitted or unavailable in the active context falls back to the
+  dashboard.
+
+**Hint.** A one-time, dismissible hint on the dashboard points to „Anpassen" (navigation and
+dashboard). Its dismissal is kept in the browser; it also goes once the user sets a favourite or
+changes the dashboard.
+
+**Monitoring:** the widget and layout endpoints count in `http_server_requests` by route template
+and alert on a 5xx rate above 5 %; layout and option writes count in
+`basetool_navigation_preference_writes_total` (REQ-OBS-011).
+
+**Enforced by (to be added):** `DashboardLayoutServiceTest` (12-instance cap per mode, layout and
+option versions, owner-only, deletion on role loss) · `DashboardRenderMvcTest` (defaults per mode,
+widgets gated by their data, greyed pinned instances) · `StartPageRedirectMvcTest` (start page per
+mode, deep-link precedence, fallback) · `DashboardE2eTest` (edit mode, catalogue and options,
+phone single column, 10-minute poll on visibility, the hint) · **Related:** REQ-UI-018,
+REQ-UI-026, REQ-UI-027, REQ-UI-032, REQ-ORDERS-047, REQ-INV-068, REQ-BANK-064, REQ-SEC-046,
+REQ-SEC-058, ADR-0299
+
+### REQ-UI-035 — Favourites and the dashboard have keyboard shortcuts
+
+> **Status: planned** (ADR-0297, map #2800). Until it ships, the current code stays authoritative.
+
+| Keys | Opens |
+|---|---|
+| Alt+1 … Alt+9 | favourite 1–9 of the Favoriten group (pages and tabs); favourites 10–12 get no key |
+| Alt+0 | the home dashboard (REQ-UI-034) |
+
+- Only the top digit row counts (`KeyboardEvent.code` `Digit0` … `Digit9`), never the numpad
+  (Alt+numpad is Windows Alt-code entry); matching on `code` makes Option+digit work on macOS.
+- Numbering follows the position in the Favoriten group. If favourite *n* is greyed in the active
+  context or does not exist, nothing navigates and a short toast says so.
+- Inactive while a dialog is open (the topmost-dialog check of `Strg K`); active inside input
+  fields.
+- **Member mode only:** in admin mode Alt+0 … Alt+9 do nothing. No phone counterpart.
+- **Switch:** `shortcutsEnabled` in „Darstellung" (REQ-UI-032), one value per user, default on.
+- **Discoverability:** tooltip and `aria-keyshortcuts` on the favourite links and the dashboard
+  link only where the key currently works. A „Tastenkürzel" dialog (REQ-UI-013), opened from the
+  quick access and the profile menu, always lists `Strg K` and the dialog keys of REQ-UI-033; for
+  Alt+0 … Alt+9 it shows the keys, or „ausgeschaltet" with a link to „Darstellung", or „nur im
+  Mitgliedermodus" in admin mode.
+- Not shortcuts: the desktop mode, „Anpassen" (both stay buttons and quick-access actions), and
+  „back" (the browser's Alt+Left). No single-character shortcut, so WCAG 2.1.4 does not apply.
+
+**Enforced by (to be added):** `:frontend:testShortcutsJs` (digit-row `code` only, dialog gate,
+switch, admin mode) · `NavigationShortcutsE2eTest` (Alt+1 opens favourite 1, Alt+0 the dashboard,
+toast on a greyed or empty slot, the „Tastenkürzel" dialog) · **Related:** REQ-UI-026,
+REQ-UI-032, REQ-UI-033, REQ-UI-034, ADR-0297
 
 ## Out of scope
 
