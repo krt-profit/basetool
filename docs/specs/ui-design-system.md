@@ -776,7 +776,9 @@ a geometric check had no rule for:
   an item, never before the next one. A count beside a name (`(1)`) never wraps on its own.
 - **A tree table fits the touch classes.** Up to 1024px or on a coarse pointer a `.tree-table`
   takes no more width than its columns' minimum and a row's name wraps instead of truncating, so
-  the first column and its chips never slide out of the scroll area.
+  the first column and its chips never slide out of the scroll area. When a heading wraps, every
+  cell of the head row stretches to the tallest one and centres its text, so the head's background
+  and underline run level across all columns.
 - **A chip never shrinks below its text.** In a flex row whose children may shrink, the chip
   declares `flex-shrink: 0` and the name beside it gives way.
 - **A required star is drawn once.** The automatic star of a required field steps back when the label

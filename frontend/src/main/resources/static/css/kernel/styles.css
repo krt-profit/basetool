@@ -636,9 +636,13 @@
         position: sticky;
         top: 0;
         z-index: 2;
+        align-items: stretch;
     }
 
     .tree-head .tree-cell {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
         color: var(--color-gray-1);
         background-color: var(--surface-bar);
         border-bottom: var(--border-heading);
