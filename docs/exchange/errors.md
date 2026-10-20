@@ -30,6 +30,7 @@ codes, whichever side refuses it.
 | --- | --- | --- | --- | --- |
 | `CLIENT_NOT_ALLOWED` | 403 | gateway, backend | The token's client is not in the registry. | Stop; the client is not approved. |
 | `CLIENT_SUSPENDED` | 403 | gateway, backend | The client is suspended in the registry. | Stop and tell the member. Nothing tells a client when the suspension ends, so do not retry on a timer: try again at the client's next start or when the member asks. |
+| `ORIGIN_NOT_ALLOWED` | 403 | gateway | The request's `Origin` is a browser origin this client is not approved for: another client's extension id, a Firefox extension for a client without a Firefox build, or a web page. | Stop; send requests only from the extension builds named in the approval. |
 | `CLIENT_REVOKED` | 401 | gateway, backend | The member disconnected this client after this connection was made: an offline token issued before the disconnect, or a token without `offline_access` whose sign-in (`auth_time`) came before it. | Discard tokens; start a new device login only when the member asks. |
 | `INSTALLATION_REVOKED` | 401 | gateway, backend | The member disconnected this installation; its DPoP key is refused for good. | Discard tokens **and** the DPoP key; reconnecting needs a new key. |
 | `CLIENT_VERSION_UNSUPPORTED` | 403 | gateway | The `User-Agent` version is below the client's minimum. | Ask the member to update. |

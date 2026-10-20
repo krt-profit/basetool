@@ -336,12 +336,14 @@ cross-origin. A build switch replaces the environment variable here, and a relea
 production addresses only.
 
 - **Keycloak** answers any extension origin for `sandbox-client`, whose Web Origins are `*`.
-- **The gateway** admits every Firefox extension. For Chrome or Edge, set your unpacked extension's
-  origin in `SANDBOX_EXTENSION_ORIGINS` before you start the sandbox, for example
-  `SANDBOX_EXTENSION_ORIGINS=chrome-extension://<id> scripts/sandbox.sh up`
+- **The gateway** admits every Firefox extension for `sandbox-client`. For Chrome or Edge, bind
+  your unpacked extension's origin to `sandbox-client` in `SANDBOX_EXTENSION_ORIGINS` before you
+  start the sandbox, for example
+  `SANDBOX_EXTENSION_ORIGINS=sandbox-client=chrome-extension://<id> scripts/sandbox.sh up`
   (on Windows, `$env:SANDBOX_EXTENSION_ORIGINS = '…'` first). The id is shown on
   `chrome://extensions`; a `key` in the manifest keeps it the same across reloads and machines.
-  Several origins are separated by commas.
+  Several entries are separated by commas. An origin you did not bind fails the CORS check, and a
+  bound origin sending another client's token is refused with `403 ORIGIN_NOT_ALLOWED`.
 - Firefox needs no setting; a temporary add-on loaded from `about:debugging` is enough here.
 - The browser must trust the test CA for `https://localhost:11262` ([trusting the test
   CA](#trusting-the-test-ca)).

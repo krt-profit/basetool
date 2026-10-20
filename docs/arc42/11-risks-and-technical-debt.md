@@ -315,6 +315,12 @@ since the go-live of 2026-09-28, so these risks hold now.
   device login for such a client id, as any server always could. The extension's own permissions are
   checked against its manifest at application, not enforced by the Basetool; a refresh token
   outlives an uninstalled extension until the member disconnects it or the offline session expires.
+- **An extension's origin is bound to its client, but only by configuration** (ADR-0304). The
+  gateway refuses an extension origin carrying another client's token. The binding lives in the
+  gateway's `.env` and is set by hand at approval; a missing entry fails closed (`403
+  ORIGIN_NOT_ALLOWED` or a failed CORS check), a wrong one binds the origin to the wrong client
+  until it is corrected. A permission-widening release is caught only by the re-review the
+  developer asks for — nothing in the Basetool sees the manifest of what members install.
 - **An in-browser device phishing run is seen only once members confirm codes.** Keycloak 26.8
   emits no event for a device flow that is started or polled, and the edge log carries neither the
   request's `Origin` nor a public client's `client_id`. `ExchangeClientDeviceLoginSurge` therefore

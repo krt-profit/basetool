@@ -99,7 +99,16 @@ applies; these points replace or add to it.
   origin in `externally_connectable`. The exchange host is a separate origin and reads no cookie.
 - Reach the sign-in endpoints — device authorization, token and revocation — through CORS, without
   a host permission. Their answers allow your extension's origin once the client is registered.
-- The manifest is checked when you apply, and again for every release that changes its permissions.
+- **A manifest change is reviewed again.** A release whose `manifest.json` changes the host
+  permissions, optional host permissions, content-script matches or `permissions` is an
+  admission-relevant change: link that release's manifest in the application issue, and ship it to
+  members only after it was reviewed again. A release that changes none of these ships as before.
+- **The connection idles out after 14 days.** An extension client's session ends after 14 days
+  without a refresh, instead of the 30 a desktop client has, and after 90 days at the latest; ask
+  the member to sign in again then ([authentication](authentication.md)).
+- **The origin is bound to your client.** The gateway accepts your extension's origin only with
+  your own client's token: another client's token, a Firefox extension for a client without a
+  Firefox build, or a web page is refused with `403 ORIGIN_NOT_ALLOWED` ([errors](errors.md)).
 - **Disconnect** revokes the refresh token (RFC 7009) and deletes the token and the key. No browser
   runs extension code on uninstall; it deletes `storage.local` and IndexedDB with the extension,
   and the member ends the grant under *Connected applications* in the Basetool. Where a browser lets
