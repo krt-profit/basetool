@@ -1,0 +1,18 @@
+<title>Basetool Navigation Prototype</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="bundle.css">
+<link rel="stylesheet" href="prototype.css">
+<style>
+:root { color-scheme: dark; }
+body { background: var(--surface-canvas, #0F0F0F); color: var(--color-gray-1, #D1D2D3); }
+#proto-bar { bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+#proto-state { padding-top: calc(14px + env(safe-area-inset-top, 0px)); }
+</style>
+<div id="stage">
+  <div id="device" aria-label="Basetool"></div>
+</div>
+<div id="proto-bar" role="region" aria-label="Prototype controls"></div>
+<aside id="proto-state" hidden aria-label="Prototype state"></aside>
+<div id="sr-live" class="sr-only" aria-live="polite"></div>
+<script src="prototype.js" defer></script>
