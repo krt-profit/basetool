@@ -6,6 +6,10 @@
 
 - **Hangar-Import aus der „Star Citizen: Hangar Extension“.** „Schiffsliste importieren“ nimmt jetzt auch das JSON (`my-fleet-*.json`) und das CSV (`my-hangar-*.csv`) der Browser-Erweiterung an; übernommen werden nur Schiffe, keine Skins, Ausrüstung oder Komponenten. Gespeichert werden der Entwicklungsstand („Flugfähig“, „Konzept“, „In Produktion“) sowie Pledge-ID, -Datum, -Preis, schmelzbar und verschenkbar, sichtbar nur für dich und die Administration; ein erneuter Import oder das CSV nach dem JSON legt keine Schiffe doppelt an, sondern ergänzt die vorhandenen (Migration V309, REQ-HANGAR-015, ADR-0295).
 
+### Fixed
+
+- **Mitgliedsrang: Bereich 13–20 für KRT-Mitglieder wird wieder geprüft.** Die Rangprüfung verglich den Rollennamen „KRT Member“ mit dem Code `KRT_MEMBER` und griff deshalb bei normalen Mitgliedern nie; ein Rang unter 13 oder über 20 wird jetzt mit `RANK_OUTSIDE_ROLE_RANGE` bzw. als ungültig abgelehnt (`UserService`, REQ-ROLE-007).
+
 ## [v1.19.2](https://github.com/krt-profit/basetool/releases/tag/v1.19.2) - 2026-10-20
 
 ### Changed

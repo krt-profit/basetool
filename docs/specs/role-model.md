@@ -305,6 +305,9 @@ Keycloak realm roles, the set `UserReconciliationService` last mirrored from a t
 - an account with neither role is not range-checked; a role holder's rank outside 1–20 is
   `ILLEGAL_ARGUMENT`.
 
+The roles are identified by their stable role code (`role.code`: `OFFICER`, `KRT_MEMBER`), never by
+the display name the realm role and the `role.name` column carry (`Officer`, `KRT Member`).
+
 `OFFICER` is granted and removed by hand in Keycloak (the operational grant of
 [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md)), and the tool writes no realm role. A
 former lead who still holds `OFFICER` therefore cannot be given a rank above 12 until the role is

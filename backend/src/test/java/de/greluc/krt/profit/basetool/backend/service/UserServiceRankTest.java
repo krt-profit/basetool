@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.*;
@@ -72,8 +73,7 @@ class UserServiceRankTest {
     User user = new User();
     user.setId(id);
     user.setVersion(0L);
-    Role officerRole = new Role();
-    officerRole.setName("OFFICER");
+    Role officerRole = role(Roles.OFFICER, "Officer");
     user.setRoles(Set.of(officerRole));
 
     when(userRepository.findById(id)).thenReturn(Optional.of(user));
@@ -95,10 +95,8 @@ class UserServiceRankTest {
     user.setId(id);
     user.setVersion(0L);
     user.setRank(8);
-    Role officerRole = new Role();
-    officerRole.setName("OFFICER");
-    Role memberRole = new Role();
-    memberRole.setName("KRT_MEMBER");
+    Role officerRole = role(Roles.OFFICER, "Officer");
+    Role memberRole = role(Roles.KRT_MEMBER, "KRT Member");
     user.setRoles(Set.of(officerRole, memberRole));
 
     when(userRepository.findById(id)).thenReturn(Optional.of(user));
@@ -118,8 +116,7 @@ class UserServiceRankTest {
     User user = new User();
     user.setId(id);
     user.setVersion(0L);
-    Role officerRole = new Role();
-    officerRole.setName("OFFICER");
+    Role officerRole = role(Roles.OFFICER, "Officer");
     user.setRoles(Set.of(officerRole));
 
     when(userRepository.findById(id)).thenReturn(Optional.of(user));
@@ -133,8 +130,7 @@ class UserServiceRankTest {
     User user = new User();
     user.setId(id);
     user.setVersion(0L);
-    Role memberRole = new Role();
-    memberRole.setName("KRT_MEMBER");
+    Role memberRole = role(Roles.KRT_MEMBER, "KRT Member");
     user.setRoles(Set.of(memberRole));
 
     when(userRepository.findById(id)).thenReturn(Optional.of(user));
@@ -153,12 +149,54 @@ class UserServiceRankTest {
     User user = new User();
     user.setId(id);
     user.setVersion(0L);
-    Role memberRole = new Role();
-    memberRole.setName("KRT_MEMBER");
+    Role memberRole = role(Roles.KRT_MEMBER, "KRT Member");
     user.setRoles(Set.of(memberRole));
 
     when(userRepository.findById(id)).thenReturn(Optional.of(user));
 
     userService.updateUserAttributes(id, 15, null, null, 0L, null);
+  }
+
+  @Test
+  void updateUserAttributes_SeededMemberRole_Rank12_IsRefusedAndNotSaved() {
+    UUID id = UUID.randomUUID();
+    User user = new User();
+    user.setId(id);
+    user.setVersion(0L);
+    user.setRank(15);
+    user.setRoles(Set.of(role(Roles.KRT_MEMBER, "KRT Member")));
+
+    when(userRepository.findById(id)).thenReturn(Optional.of(user));
+
+    RankOutsideRoleRangeException thrown =
+        assertThrows(
+            RankOutsideRoleRangeException.class,
+            () -> userService.updateUserAttributes(id, 12, null, null, 0L, null));
+    assertEquals(Roles.KRT_MEMBER, thrown.getRole());
+    assertEquals(15, user.getRank());
+    verify(userRepository, never()).save(any());
+  }
+
+  @Test
+  void updateUserAttributes_SeededMemberRole_Rank21_IsRejected() {
+    UUID id = UUID.randomUUID();
+    User user = new User();
+    user.setId(id);
+    user.setVersion(0L);
+    user.setRoles(Set.of(role(Roles.KRT_MEMBER, "KRT Member")));
+
+    when(userRepository.findById(id)).thenReturn(Optional.of(user));
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> userService.updateUserAttributes(id, 21, null, null, 0L, null));
+    verify(userRepository, never()).save(any());
+  }
+
+  private static Role role(String code, String name) {
+    Role role = new Role();
+    role.setCode(code);
+    role.setName(name);
+    return role;
   }
 }
