@@ -74,7 +74,7 @@ class StaticResourcesCachingTest {
    */
   @Test
   void staticResource_ShouldBeImmutableWithLastModified_AndCarryNoEtag() throws Exception {
-    String resource = "/images/drake_interplanetary_black.svg";
+    String resource = "/images/pattern.svg";
 
     String lastModified =
         mockMvc
