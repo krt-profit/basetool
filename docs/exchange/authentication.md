@@ -19,7 +19,7 @@ the gateway and the identity provider check it. The
 | Client | public, your registered client id, **no secret**, device grant only |
 | Proof of possession | DPoP with ES256 (P-256) on every token request and every API call |
 | Access token | lives **300 s**, audience `basetool-ingest` |
-| Connection | ends after **30 days** without use and after **90 days** at the latest, with or without `offline_access` |
+| Connection | ends after **30 days** without use (**14 days** for a browser extension) and after **90 days** at the latest, with or without `offline_access` |
 
 Take the endpoints from the discovery document, and use it only when its `issuer` is exactly the
 pinned value. Another issuer — the local sandbox — may be chosen only through a developer
@@ -40,8 +40,8 @@ Request, space-separated:
   after the member disconnected the client, a token without `offline_access` counts from the
   browser session's sign-in, which a device login that joins it does not renew: it stays
   `CLIENT_REVOKED` until the member signs in again. A client that omits it holds an online session,
-  which ends like an offline one after 30 days without use and after 90 days at the latest; the
-  member then signs in again.
+  which ends like an offline one after 30 days without use (14 days for a browser extension) and
+  after 90 days at the latest; the member then signs in again.
 
 Do not request `openid`, `profile` or `email`: the client receives no personal data. The token
 response's `scope` lists what was granted. A route passes only when its scope is in the token
@@ -259,7 +259,8 @@ The proof comes from the same key, without `ath`. When the answer carries a `ref
 it in place of the old one.
 
 - `400 invalid_grant` means the connection is over: the member disconnected the client, left the
-  organisation, did not use it for 30 days, or reached the 90-day limit. Delete the stored refresh
+  organisation, did not use it for 30 days (14 for a browser extension), or reached the 90-day
+  limit. Delete the stored refresh
   token and start a new device login only when the member asks for it.
 - A refused proof — `400` with `invalid_dpop_proof` or `invalid_request` — says nothing about the
   refresh token. Keep the credential, fix the proof or the clock, and retry once.

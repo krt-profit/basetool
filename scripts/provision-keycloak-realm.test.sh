@@ -1105,6 +1105,32 @@ assert_eq "$([[ $rc -ne 0 ]] && echo refused || echo accepted)" "refused" "--see
 assert_eq "$(wc -l <"${state}/calls.log" | tr -d ' ')" "0" "and refuses before kcadm is called"
 rm -rf "$state"
 
+echo "22. a browser-extension client gets its Chromium origins, * for Firefox, and 14 idle days (ADR-0303)"
+state="$(mktemp -d)"
+make_stub "$state" empty
+printf '[{"clientId": "hangar-exporter", "name": "Hangar-Exporter", "extensionOrigins": ["chrome-extension://abcdefghijklmnopabcdefghijklmnop"], "firefoxExtension": true}, {"clientId": "desktop-only", "name": "Desktop Only"}]' >"${state}/clients.json"
+output="$(run_provisioner "$state" --apply --external-clients "$(to_child_path "${state}/clients.json")")"
+assert_eq "$(cat "${state}/rc")" "0" "the apply succeeds and verifies clean"
+assert_eq "$(query "$state" "sorted(client('hangar-exporter')['webOrigins'])")" \
+  "['*', 'chrome-extension://abcdefghijklmnopabcdefghijklmnop']" "the extension client allows its origins"
+assert_eq "$(query "$state" "client('desktop-only')['webOrigins']")" "[]" "a desktop client keeps no Web Origin"
+assert_eq "$(query "$state" "[client('hangar-exporter')['attributes'][k] for k in ('client.offline.session.idle.timeout', 'client.session.idle.timeout')]")" \
+  "['1209600', '1209600']" "the extension client's sessions end after 14 idle days"
+assert_eq "$(query "$state" "[client('desktop-only')['attributes'][k] for k in ('client.offline.session.idle.timeout', 'client.session.idle.timeout')]")" \
+  "['2592000', '2592000']" "a desktop client keeps 30 idle days"
+assert_eq "$(query "$state" "client('hangar-exporter')['attributes']['client.offline.session.max.lifespan']")" \
+  "7776000" "the extension client keeps the 90-day maximum"
+output="$(run_provisioner "$state" --apply --external-clients "$(to_child_path "${state}/clients.json")")"
+assert_contains "$output" "No changes" "a second run changes nothing"
+printf '[{"clientId": "hangar-exporter", "name": "Hangar-Exporter", "extensionOrigins": ["https://profit-base.online"]}]' >"${state}/bad.json"
+output="$(run_provisioner "$state" --external-clients "$(to_child_path "${state}/bad.json")")"
+assert_eq "$(cat "${state}/rc")" "1" "a web origin in extensionOrigins exits 1"
+assert_contains "$output" "chrome-extension://<32 letters a-p>" "and says why"
+printf '[{"clientId": "hangar-exporter", "name": "Hangar-Exporter", "firefoxExtension": "yes"}]' >"${state}/bad.json"
+output="$(run_provisioner "$state" --external-clients "$(to_child_path "${state}/bad.json")")"
+assert_contains "$output" "needs a true or false firefoxExtension" "a non-boolean firefoxExtension is refused"
+rm -rf "$state"
+
 echo
 if [[ $tests_failed -gt 0 ]]; then
   echo "FAILED: ${tests_failed} of ${tests_run} assertions"

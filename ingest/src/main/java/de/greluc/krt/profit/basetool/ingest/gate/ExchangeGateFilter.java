@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.ingest.gate;
 
 import de.greluc.krt.profit.basetool.ingest.auth.ExchangeTokenGateFilter;
+import de.greluc.krt.profit.basetool.ingest.config.ExchangeCorsProperties;
 import de.greluc.krt.profit.basetool.ingest.config.LoggingProperties;
 import de.greluc.krt.profit.basetool.ingest.contract.ExchangeRoutes;
 import de.greluc.krt.profit.basetool.ingest.observability.ExchangeLogContext;
@@ -55,11 +56,12 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * The registry gate of the exchange routes, after the token gate: the route must exist, the
- * exchange be switched on, the client be active in the registry, neither the installation key nor
- * the client be revoked for this member, the route's capability be both in the token and granted,
- * and the client's version meet its minimum (REQ-XCH-001, -003, -004, -008, -024). An admitted
- * request carries an {@link ExchangeRequestContext}, and every request past the token gate is
- * tagged in the log with its registry client and route ({@link ExchangeLogContext}).
+ * exchange be switched on, the client be active in the registry, a browser origin be one approved
+ * for that client, neither the installation key nor the client be revoked for this member, the
+ * route's capability be both in the token and granted, and the client's version meet its minimum
+ * (REQ-XCH-001, -003, -004, -008, -024, -027). An admitted request carries an {@link
+ * ExchangeRequestContext}, and every request past the token gate is tagged in the log with its
+ * registry client and route ({@link ExchangeLogContext}).
  *
  * <p>The registry comes through a five-second cache; the revocations are read on every request.
  * Anything unreadable fails closed with {@code 503 REGISTRY_UNAVAILABLE}.
@@ -83,6 +85,10 @@ public class ExchangeGateFilter extends OncePerRequestFilter {
 
   /** The detail of {@code 403 CLIENT_SUSPENDED}. */
   public static final String CLIENT_SUSPENDED_DETAIL = "This client is suspended.";
+
+  /** The detail of {@code 403 ORIGIN_NOT_ALLOWED}. */
+  public static final String ORIGIN_NOT_ALLOWED_DETAIL =
+      "This browser origin is not approved for this client.";
 
   /** The detail of {@code 401 INSTALLATION_REVOKED}. */
   public static final String INSTALLATION_REVOKED_DETAIL =
@@ -108,6 +114,9 @@ public class ExchangeGateFilter extends OncePerRequestFilter {
   private final ObjectMapper objectMapper;
   private final LoggingProperties loggingProperties;
   private final MeterRegistry meterRegistry;
+
+  /** Binds each approved browser-extension origin to its client (REQ-XCH-027, ADR-0303). */
+  private final ExchangeCorsProperties corsProperties;
 
   /**
    * Admits or refuses one authenticated exchange request.
@@ -212,6 +221,15 @@ public class ExchangeGateFilter extends OncePerRequestFilter {
           CLIENT_SUSPENDED_DETAIL);
       return null;
     }
+    if (!corsProperties.admits(clientId, request.getHeader(HttpHeaders.ORIGIN))) {
+      refuse(
+          label,
+          response,
+          HttpStatus.FORBIDDEN,
+          ExchangeRefusals.ORIGIN_NOT_ALLOWED,
+          ORIGIN_NOT_ALLOWED_DETAIL);
+      return null;
+    }
     String thumbprint = thumbprint(jwt);
     String member = jwt.getSubject();
     if (thumbprint == null || member == null) {
@@ -255,7 +273,10 @@ public class ExchangeGateFilter extends OncePerRequestFilter {
       return null;
     }
     if (!ClientVersions.meets(
-        request.getHeader(HttpHeaders.USER_AGENT), client.minClientVersion())) {
+        ClientVersions.agent(
+            request.getHeader(ClientVersions.CLIENT_AGENT_HEADER),
+            request.getHeader(HttpHeaders.USER_AGENT)),
+        client.minClientVersion())) {
       refuse(
           label,
           response,

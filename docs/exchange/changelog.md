@@ -3,6 +3,31 @@
 Changes to the Exchange API contract, newest first. Every change within `v1` is additive
 ([versioning](versioning.md)).
 
+## 2026-10-20
+
+- **New: an extension's origin is bound to its client.** A request whose `Origin` is another
+  client's extension id, a Firefox extension for a client without a Firefox build, or a web page is
+  refused with `403 ORIGIN_NOT_ALLOWED` ([errors](errors.md)). Requests without `Origin` are
+  unchanged.
+- **New: browser-extension clients sign in again after 14 idle days.** Their offline session ends
+  after 14 days without a refresh instead of 30 ([client security](client-security.md#browser-extensions)).
+- **New: a manifest change is reviewed again.** A release that changes the manifest's host
+  permissions, optional host permissions, content-script matches or `permissions` is reviewed
+  before it ships to members ([onboarding](onboarding.md)).
+- **New: browser extensions as clients.** Extensions for Chrome, Edge and Firefox on Manifest V3 can
+  be approved under the [browser-extension requirements](client-security.md#browser-extensions):
+  a non-extractable WebCrypto DPoP key, the refresh token in `storage.local`, host permissions only
+  for the pages read and the exchange host. The gateway answers cross-origin requests on
+  `/exchange/**` from an approved extension's fixed origin — from a manifest `key` or a store; no
+  listing or signing is required — and from Firefox extensions, without
+  credentials, and exposes `DPoP-Nonce`, `WWW-Authenticate`, `RateLimit`, `RateLimit-Policy`,
+  `Retry-After`, `Idempotency-Replayed` and `X-Correlation-Id`.
+- **New: `Exchange-Client-Agent`.** A client that cannot set its `User-Agent` sends the same value
+  in this header; the minimum-version check reads it first
+  ([versioning](versioning.md#minimum-client-version)).
+- **Clarified: no pledge ids in `externalId`.** An `externalId` never carries a purchase identifier
+  such as an RSI pledge id; derive it, for example as a hash ([ships](resources/ships.md#links)).
+
 ## 2026-10-18
 
 - **New: the member's Logistician units on the org stock.** Every unit in `units` of an org-stock

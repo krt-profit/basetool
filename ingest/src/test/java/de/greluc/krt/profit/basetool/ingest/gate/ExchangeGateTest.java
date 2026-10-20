@@ -76,6 +76,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -460,6 +461,111 @@ class ExchangeGateTest {
 
     registry(true, true, Set.of("exchange.connect", "exchange.stock.read"), "2.4.0");
     call(HttpMethod.GET, STOCK).andExpect(status().isOk());
+  }
+
+  @Test
+  void anExtensionOriginBoundToTheTokensClientIsAdmitted() throws Exception {
+    callWithOrigin("chrome-extension://abcdefghijklmnopabcdefghijklmnop")
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void anotherClientsExtensionOriginIsRefusedAndCounted() throws Exception {
+    double before = refused("origin_not_allowed");
+
+    callWithOrigin("chrome-extension://bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("ORIGIN_NOT_ALLOWED"));
+
+    assertThat(refused("origin_not_allowed")).isEqualTo(before + 1);
+  }
+
+  @Test
+  void aFirefoxOriginIsRefusedForAClientWithoutAFirefoxBuild() throws Exception {
+    callWithOrigin("moz-extension://0b5c4a52-7f5e-4f0a-9d3e-2c1b0a9f8e7d")
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("ORIGIN_NOT_ALLOWED"));
+  }
+
+  @Test
+  void aWebPageOriginIsRefusedBeforeTheGate() throws Exception {
+    callWithOrigin("https://evil.example")
+        .andExpect(status().isForbidden())
+        .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
+  }
+
+  @Test
+  void aRequestWithoutAnOriginIsAdmittedAsBefore() throws Exception {
+    call(HttpMethod.GET, STOCK).andExpect(status().isOk());
+  }
+
+  /**
+   * Sends one stock read with a valid nonce from a browser origin.
+   *
+   * @param origin the {@code Origin}
+   * @return the result of the second, nonce-carrying attempt
+   * @throws Exception if the request fails
+   */
+  private @NotNull ResultActions callWithOrigin(@NotNull String origin) throws Exception {
+    String nonce =
+        mockMvc
+            .perform(
+                request(HttpMethod.GET, STOCK)
+                    .header(HttpHeaders.AUTHORIZATION, "DPoP " + TOKEN)
+                    .header("DPoP", ExchangeTestSupport.proof(key, TOKEN, "GET", STOCK, null)))
+            .andReturn()
+            .getResponse()
+            .getHeader(ExchangeTokenGateFilter.DPOP_NONCE_HEADER);
+    return mockMvc.perform(
+        request(HttpMethod.GET, STOCK)
+            .header(HttpHeaders.AUTHORIZATION, "DPoP " + TOKEN)
+            .header(HttpHeaders.USER_AGENT, USER_AGENT)
+            .header(HttpHeaders.ORIGIN, origin)
+            .header("DPoP", ExchangeTestSupport.proof(key, TOKEN, "GET", STOCK, nonce)));
+  }
+
+  @Test
+  void anExtensionThatCannotSetItsUserAgentIsGatedByItsClientAgent() throws Exception {
+    registry(true, true, Set.of("exchange.connect", "exchange.stock.read"), "2.4.0");
+    String browser = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/141.0.0.0";
+
+    callWithAgents(browser, null)
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("CLIENT_VERSION_UNSUPPORTED"));
+    callWithAgents(browser, "HangarExporter/2.3.0 (+https://example.org/hangar)")
+        .andExpect(status().isForbidden());
+    callWithAgents(browser, "HangarExporter/2.4.0 (+https://example.org/hangar)")
+        .andExpect(status().isOk());
+  }
+
+  /**
+   * Sends one stock read with a valid nonce under the given agent headers.
+   *
+   * @param userAgent the {@code User-Agent}
+   * @param clientAgent the {@code Exchange-Client-Agent}, or {@code null} to leave it out
+   * @return the result of the second, nonce-carrying attempt
+   * @throws Exception if the request fails
+   */
+  private @NotNull ResultActions callWithAgents(
+      @NotNull String userAgent, @Nullable String clientAgent) throws Exception {
+    String nonce =
+        mockMvc
+            .perform(
+                request(HttpMethod.GET, STOCK)
+                    .header(HttpHeaders.AUTHORIZATION, "DPoP " + TOKEN)
+                    .header("DPoP", ExchangeTestSupport.proof(key, TOKEN, "GET", STOCK, null)))
+            .andReturn()
+            .getResponse()
+            .getHeader(ExchangeTokenGateFilter.DPOP_NONCE_HEADER);
+    MockHttpServletRequestBuilder builder =
+        request(HttpMethod.GET, STOCK)
+            .header(HttpHeaders.AUTHORIZATION, "DPoP " + TOKEN)
+            .header(HttpHeaders.USER_AGENT, userAgent)
+            .header("DPoP", ExchangeTestSupport.proof(key, TOKEN, "GET", STOCK, nonce));
+    if (clientAgent != null) {
+      builder.header(ClientVersions.CLIENT_AGENT_HEADER, clientAgent);
+    }
+    return mockMvc.perform(builder);
   }
 
   /**

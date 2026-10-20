@@ -30,6 +30,12 @@ import org.jetbrains.annotations.Nullable;
  */
 public final class ClientVersions {
 
+  /**
+   * The header a client that cannot set its {@code User-Agent}, such as a Chromium extension, names
+   * its product and version in instead (REQ-XCH-024, ADR-0303).
+   */
+  public static final String CLIENT_AGENT_HEADER = "Exchange-Client-Agent";
+
   /** {@code <Product>/<major.minor.patch>[-pre|+build] [(+url)]}. */
   private static final Pattern USER_AGENT =
       Pattern.compile(
@@ -41,6 +47,18 @@ public final class ClientVersions {
 
   /** Not instantiable. */
   private ClientVersions() {}
+
+  /**
+   * Picks the agent the version gate compares: the {@value #CLIENT_AGENT_HEADER} header when it
+   * holds text, otherwise the {@code User-Agent}.
+   *
+   * @param clientAgent the {@value #CLIENT_AGENT_HEADER} header, or {@code null}
+   * @param userAgent the {@code User-Agent} header, or {@code null}
+   * @return the agent to compare, or {@code null} when neither header is sent
+   */
+  public static @Nullable String agent(@Nullable String clientAgent, @Nullable String userAgent) {
+    return clientAgent == null || clientAgent.isBlank() ? userAgent : clientAgent;
+  }
 
   /**
    * Whether a request's {@code User-Agent} meets the minimum.

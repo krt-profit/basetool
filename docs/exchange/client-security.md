@@ -40,10 +40,14 @@ How each step works is on the [authentication](authentication.md) page.
 
 - Send only the signed-in member's own data, and never purchase data, account ids or other members'
   data. The RSI handle goes only to the account check.
+- An `externalId` never carries a purchase identifier such as an RSI pledge id; derive it, for
+  example as a hash ([ships](resources/ships.md#links)).
 - Store the org demand for at most 7 days, outside cloud-synced folders, never in backups or
   diagnostics, and never forward it.
 - Send a descriptive `User-Agent`: product, version and a URL, for example
-  `ExampleClient/1.2.0 (+https://example.org/client)`.
+  `ExampleClient/1.2.0 (+https://example.org/client)`. A client that cannot set its `User-Agent`,
+  such as a Chromium extension, sends the same value in `Exchange-Client-Agent`
+  ([versioning](versioning.md#minimum-client-version)).
 
 ## Sync behaviour
 
@@ -75,6 +79,52 @@ against:
   ([back-off](sync-guide.md#back-off-and-sync-cadence)).
 - Syncs run on start and after a local change, and a timed sync at most every 5 minutes
   ([sync cadence](sync-guide.md#back-off-and-sync-cadence)).
+
+## Browser extensions
+
+Extensions for Chrome, Edge and Firefox on Manifest V3 can be approved (ADR-0303). Everything above
+applies; these points replace or add to it.
+
+- **Credential storage.** Generate the DPoP key with WebCrypto as a non-extractable ES256 key
+  (`extractable: false`) and keep the `CryptoKey` in the extension's IndexedDB. Keep the refresh
+  token in `storage.local`, **never** in `storage.sync`, which copies it to every browser the member
+  signs in to. For an extension, this is the platform's secret store.
+- Use tokens and the key only in the service worker or an extension page. A content script on the
+  RSI pages reads the hangar and hands the data over; it never receives a token or the key.
+- **Minimal host permissions.** `host_permissions`, `optional_host_permissions` and the
+  content-script `matches` name only the RSI pages you read and `https://ingest.profit-base.online/*`.
+  Nothing on `profit-base.online` and no wildcard that covers it: the Basetool web UI and its
+  sign-in share that origin, and a permission there would let the extension act in the member's
+  web session. No `<all_urls>`, no `cookies`, `webRequest` or `debugger` permission, and no Basetool
+  origin in `externally_connectable`. The exchange host is a separate origin and reads no cookie.
+- Reach the sign-in endpoints — device authorization, token and revocation — through CORS, without
+  a host permission. Their answers allow your extension's origin once the client is registered.
+- **A manifest change is reviewed again.** A release whose `manifest.json` changes the host
+  permissions, optional host permissions, content-script matches or `permissions` is an
+  admission-relevant change: link that release's manifest in the application issue, and ship it to
+  members only after it was reviewed again. A release that changes none of these ships as before.
+- **The connection idles out after 14 days.** An extension client's session ends after 14 days
+  without a refresh, instead of the 30 a desktop client has, and after 90 days at the latest; ask
+  the member to sign in again then ([authentication](authentication.md)).
+- **The origin is bound to your client.** The gateway accepts your extension's origin only with
+  your own client's token: another client's token, a Firefox extension for a client without a
+  Firefox build, or a web page is refused with `403 ORIGIN_NOT_ALLOWED` ([errors](errors.md)).
+- **Disconnect** revokes the refresh token (RFC 7009) and deletes the token and the key. No browser
+  runs extension code on uninstall; it deletes `storage.local` and IndexedDB with the extension,
+  and the member ends the grant under *Connected applications* in the Basetool. Where a browser lets
+  you act on uninstall, revoke there too. An uninstall URL never carries a token or an id.
+- Chromium ignores a `User-Agent` set by an extension: send `Exchange-Client-Agent` with the same
+  value instead. Send it to the exchange host only; the sign-in endpoints do not allow the header.
+- **A fixed extension id.** For Chrome and Edge, the gateway and the sign-in admit the
+  `chrome-extension://<id>` origin of each build you name in the application. Any fixed id works:
+  one from a `key` in `manifest.json`, for an unpacked or self-distributed build, or one a store
+  assigns — the Chrome Web Store and Edge Add-ons each assign their own, so list both if you use
+  both. A store listing is not required, and neither is publishing the extension at all.
+- Firefox extensions are admitted whatever their per-installation origin. Firefox's release
+  builds install only Mozilla-signed add-ons permanently; AMO's unlisted self-distribution signs one
+  without a public listing. Temporary add-ons are fine for development and the sandbox.
+- The gateway never accepts credentials: send `fetch` with the default `credentials` or `"omit"`,
+  never `"include"`.
 
 ## Response and supply chain
 

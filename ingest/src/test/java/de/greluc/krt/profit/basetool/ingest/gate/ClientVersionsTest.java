@@ -51,6 +51,17 @@ class ClientVersionsTest {
   }
 
   @Test
+  void theClientAgentWinsOverTheUserAgentWheneverItHoldsText() {
+    String browser = "Mozilla/5.0 (Windows NT 10.0) Chrome/141.0.0.0";
+
+    assertThat(ClientVersions.agent("HangarExporter/1.0.0", browser))
+        .isEqualTo("HangarExporter/1.0.0");
+    assertThat(ClientVersions.agent(null, browser)).isEqualTo(browser);
+    assertThat(ClientVersions.agent("  ", browser)).isEqualTo(browser);
+    assertThat(ClientVersions.agent(null, null)).isNull();
+  }
+
+  @Test
   void numbersCompareByValueWhateverTheirLeadingZerosOrLength() {
     assertThat(ClientVersions.compareNumbers("10", "9")).isPositive();
     assertThat(ClientVersions.compareNumbers("007", "7")).isZero();
