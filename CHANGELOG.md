@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [v1.19.3](https://github.com/krt-profit/basetool/releases/tag/v1.19.3) - 2026-10-20
+
+### Added
+
+- **Hangar-Import aus der „Star Citizen: Hangar Extension“.** „Schiffsliste importieren“ nimmt jetzt auch das JSON (`my-fleet-*.json`) und das CSV (`my-hangar-*.csv`) der Browser-Erweiterung an; übernommen werden nur Schiffe, keine Skins, Ausrüstung oder Komponenten. Gespeichert werden der Entwicklungsstand („Flugfähig“, „Konzept“, „In Produktion“) sowie Pledge-ID, -Datum, -Preis, schmelzbar und verschenkbar, sichtbar nur für dich und die Administration; ein erneuter Import oder das CSV nach dem JSON legt keine Schiffe doppelt an, sondern ergänzt die vorhandenen (Migration V309, REQ-HANGAR-015, ADR-0295).
+
 ### Changed
 
 - **Kacheln heben sich vom Hintergrund ab.** Die Material-Kacheln der Material-Übersicht, die Statistik-Karte unter „Meine Spenden“ die Kennzahl-Kacheln in Materialbörse, Materialgesuch und „Meine Beurteilungen“ sowie die Kontokacheln der Kartellbank und der Org-Einheiten-Bank nutzen jetzt die dunklere Inset-Fläche des Design Systems (`.card--inset`, `.kpi-total--inset`, `.kpi-card--inset`) statt derselben Farbe wie das umgebende Panel.
@@ -9,13 +15,8 @@
 ### Fixed
 
 - **Reihenfolge ändern ohne Ziehen.** Die Prioritäten-Warteschlange unter „Aufträge“ und die Frequenztypen unter „Einsatzdaten verwalten“ lassen sich jetzt auch mit Pfeil-Knöpfen je Zeile oder mit Alt+Pfeil hoch/runter umsortieren; der Fokus bleibt auf dem verschobenen Eintrag, ein Screenreader hört die neue Position. Ziehen bleibt am Desktop zusätzlich erhalten, auf Touch-Geräten entfällt es (WCAG 2.5.7, REQ-UI-031).
+
 - **Trennpunkt in gestapelten Tabellen.** Auf dem Handy steht der `·` zwischen zwei Zellen nicht mehr am Zeilenende, wenn sich das Layout nach dem Laden noch verschiebt (z. B. in der Profitrechnung, wenn die Schrift nachlädt).
-
-### Added
-
-- **Hangar-Import aus der „Star Citizen: Hangar Extension“.** „Schiffsliste importieren“ nimmt jetzt auch das JSON (`my-fleet-*.json`) und das CSV (`my-hangar-*.csv`) der Browser-Erweiterung an; übernommen werden nur Schiffe, keine Skins, Ausrüstung oder Komponenten. Gespeichert werden der Entwicklungsstand („Flugfähig“, „Konzept“, „In Produktion“) sowie Pledge-ID, -Datum, -Preis, schmelzbar und verschenkbar, sichtbar nur für dich und die Administration; ein erneuter Import oder das CSV nach dem JSON legt keine Schiffe doppelt an, sondern ergänzt die vorhandenen (Migration V309, REQ-HANGAR-015, ADR-0295).
-
-### Fixed
 
 - **Mitgliedsrang: Bereich 13–20 für KRT-Mitglieder wird wieder geprüft.** Die Rangprüfung verglich den Rollennamen „KRT Member“ mit dem Code `KRT_MEMBER` und griff deshalb bei normalen Mitgliedern nie; ein Rang unter 13 oder über 20 wird jetzt mit `RANK_OUTSIDE_ROLE_RANGE` bzw. als ungültig abgelehnt (`UserService`, REQ-ROLE-007).
 
