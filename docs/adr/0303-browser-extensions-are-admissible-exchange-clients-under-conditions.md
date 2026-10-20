@@ -36,7 +36,13 @@ An extension differs from a desktop client in four ways that matter here:
    manifest, whether the build is unpacked or self-distributed, or by a store listing, and the
    Chrome Web Store and Edge Add-ons each assign their own. Firefox uses `moz-extension://<uuid>`, a
    new UUID for each installation; its release builds install only Mozilla-signed add-ons
-   permanently, which AMO's unlisted self-distribution provides without a public listing. Keycloak matches a client's Web Origins exactly or through `*`, nothing in between.
+   permanently, which AMO's unlisted self-distribution provides without a public listing.
+   Firefox sends that origin on its fetches (Mozilla bugs 1405971 and 1507814, both open), and a
+   host permission does not reliably drop it. Keycloak matches a client's Web Origins exactly or
+   through `*`, nothing in between (`DefaultCors.isOriginAllowed`), and echoes the request origin
+   on a match; since 26.6.3 (CVE-2026-37977, our pin 26.8.1) it refuses a request whose `Origin` is
+   not allowed with `403 Invalid origin` before any endpoint logic. `moz-extension://*` is therefore
+   impossible in Keycloak.
 4. **Chromium does not let an extension set `User-Agent`.** The minimum-version gate
    (REQ-XCH-024) reads the version from that header, so a Chromium extension could not pass it once
    a minimum is set.
@@ -75,11 +81,17 @@ conditions (REQ-XCH-027):
    `RateLimit`, `RateLimit-Policy`, `Retry-After`, `Idempotency-Replayed` and `X-Correlation-Id`
    exposed. Every other path keeps the empty allowlist.
 6. **Keycloak Web Origins.** An extension's Keycloak client lists the exact `chrome-extension://`
-   origin of each approved Chromium build. A client with a Firefox build lists `*`, since its origin
-   cannot be enumerated. This is safe for exactly this client shape: public, device grant only,
-   standard flow and direct grants off, no redirect URI, so none of the endpoints the client can
-   reach acts on the browser's cookies — a website calling them gains nothing a server could not
-   already do.
+   origin of each approved Chromium build. A client with a Firefox build gets `*` — set **per
+   client**, only on clients with a Firefox build, never realm-wide — because Keycloak allows no
+   pattern and refuses an unlisted origin. `*` admits **every origin, every web page included**,
+   not only Firefox extensions: for that client, any page can call the device authorization, token
+   and revocation endpoints from a browser. The impact is bounded: the client is public and device
+   grant only, with standard flow, direct grants and redirect URIs off; its tokens are DPoP-bound;
+   none of those endpoints acts on cookies; and the device-flow verification page keeps its
+   phishing warning and the code to compare. The remaining risk is that a phishing page can drive
+   that client's device flow entirely in the victim's browser. It is accepted (arc42 §11.7a) and
+   revisited when more clients with a Firefox build arrive or Keycloak changes its CORS behaviour
+   again.
 7. **The rest of REQ-XCH-027 applies unchanged**, including the 7-day fix rule for a token-handling
    flaw ("publish a fixed release within 7 days"). Store-account two-factor authentication and
    reproducible builds are **not** required.
@@ -97,9 +109,10 @@ conditions (REQ-XCH-027):
 - `moz-extension://*` admits every Firefox extension's preflight. That opens nothing on its own:
   the gateway never accepts credentials, every exchange request still needs a DPoP-bound token of
   a registered client, and the registry gate refuses the rest.
-- A Firefox-capable client's `*` Web Origins means any page can start a device login for that
-  client id and poll it. A server could always do the same; the member still has to type the code
-  and consent.
+- A Firefox-capable client's `*` Web Origins means any web page can start a device login for that
+  client id and poll it from the visitor's browser. A server could always start one; what is new
+  is that a phishing page can run the whole flow in the victim's browser. The member still has to
+  type the code on the warning page and consent.
 - The minimum-version gate works for extensions, at the price of one cooperative header beside
   `User-Agent`. It stays cooperative: a client that lies passes either way.
 - A refresh token outlives an uninstalled extension until the member disconnects it or the offline
@@ -112,6 +125,14 @@ conditions (REQ-XCH-027):
 - **Host permission for Keycloak instead of CORS.** It would avoid `*` Web Origins for Firefox, but
   Keycloak shares `profit-base.online` with the web UI, so the same permission would let the
   extension ride the member's web and SSO sessions. Refused.
+- **Relaying the sign-in endpoints through the ingest gateway.** Device authorization, token and
+  revocation would go to the gateway, which checks `moz-extension://*` and forwards to Keycloak,
+  keeping `*` out of Keycloak. Rejected: the DPoP proof's `htu` would have to name Keycloak's URL
+  while the request goes to the gateway, a deviation from RFC 9449; the pinned issuer and its
+  discovery documents would break or need a special case; refresh and access tokens would pass
+  through the internet-facing gateway; Keycloak would see only the gateway's address, weakening
+  its brute-force protection and events; sign-in would depend on the gateway being up; and it is a
+  large effort for a bounded gain. Revisited under the same triggers as the `*` itself.
 - **One wildcard such as `chrome-extension://*` on the gateway.** Simpler to operate, but it would
   admit any Chromium extension's preflight while a fixed id is available; per-build ids are kept.
 - **Store-account 2FA and reproducible builds as criteria.** Considered and dropped by the owner:

@@ -1882,7 +1882,14 @@ on by default), for `GET`, `POST` and `OPTIONS`, with `Authorization`, `DPoP`, `
 `Exchange-Client-Agent`, never with credentials, and exposes `DPoP-Nonce`, `WWW-Authenticate`,
 `RateLimit`, `RateLimit-Policy`, `Retry-After`, `Idempotency-Replayed` and `X-Correlation-Id`.
 Every other path keeps the empty allowlist. An extension's Keycloak client lists each approved
-Chromium origin as a Web Origin, and `*` when it has a Firefox build.
+Chromium origin as a Web Origin. A client with a Firefox build gets `*`, set per client and never
+realm-wide, because Keycloak matches Web Origins only exactly or by `*` and refuses an unlisted
+`Origin` with `403 Invalid origin`, while Firefox sends a random `moz-extension://<uuid>` per
+installation. `*` admits every origin, web pages included: any page can call that client's device
+authorization, token and revocation endpoints from a browser. Tokens stay DPoP-bound, no endpoint
+acts on cookies, and the verification page keeps its phishing warning; the accepted remaining risk
+is a phishing page that drives that client's device flow in the victim's browser (ADR-0303,
+arc42 §11.7a).
 
 **Enforced by:** `SecurityConfigTest`, `ExchangeCorsTest`, `ExchangeCorsPropertiesTest` (the
 gateway CORS); the conditions on the extension itself are checked at application.
