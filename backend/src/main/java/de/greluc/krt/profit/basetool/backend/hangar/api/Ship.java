@@ -27,6 +27,8 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.platform.api.TenantScoped;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -35,6 +37,8 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -111,4 +115,50 @@ public class Ship extends AbstractEntity<UUID> {
   @Column(name = "owning_org_unit_version", nullable = false)
   @OptimisticLock(excluded = true)
   private long owningOrgUnitVersion;
+
+  /**
+   * RSI production status reported by the last hangar import, or {@code null} when none was
+   * imported. Written only by the import and outside the row {@code @Version} (REQ-HANGAR-015).
+   */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "production_status", length = 16)
+  @OptimisticLock(excluded = true)
+  @Nullable
+  private ShipProductionStatus productionStatus;
+
+  /** RSI pledge id the ship belongs to, from a hangar import (REQ-HANGAR-015). */
+  @Column(name = "pledge_id", length = 32)
+  @OptimisticLock(excluded = true)
+  @Nullable
+  private String pledgeId;
+
+  /** Date the pledge was bought, from a hangar import. */
+  @Column(name = "pledge_date")
+  @OptimisticLock(excluded = true)
+  @Nullable
+  private LocalDate pledgeDate;
+
+  /** Price of the whole pledge, from a hangar import; shared by every ship of the pledge. */
+  @Column(name = "pledge_cost", precision = 12, scale = 2)
+  @OptimisticLock(excluded = true)
+  @Nullable
+  private BigDecimal pledgeCost;
+
+  /** ISO currency code of {@link #pledgeCost}, e.g. {@code "USD"}. */
+  @Column(name = "pledge_cost_currency", length = 3)
+  @OptimisticLock(excluded = true)
+  @Nullable
+  private String pledgeCostCurrency;
+
+  /** Whether RSI lets the pledge be melted, from a hangar import. */
+  @Column(name = "meltable")
+  @OptimisticLock(excluded = true)
+  @Nullable
+  private Boolean meltable;
+
+  /** Whether RSI lets the pledge be gifted, from a hangar import. */
+  @Column(name = "giftable")
+  @OptimisticLock(excluded = true)
+  @Nullable
+  private Boolean giftable;
 }

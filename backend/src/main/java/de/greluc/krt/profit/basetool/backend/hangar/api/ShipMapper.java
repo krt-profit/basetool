@@ -27,8 +27,10 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeMapper;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import de.greluc.krt.profit.basetool.backend.platform.api.CentralMapperConfig;
+import org.jetbrains.annotations.Nullable;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.Named;
 
 /** MapStruct mapper between Ship entities and DTOs. */
 @Mapper(
@@ -36,13 +38,46 @@ import org.mapstruct.Mapping;
     uses = {UserMapper.class, SquadronMapper.class, ShipTypeMapper.class})
 public interface ShipMapper {
   /**
-   * Maps a {@link Ship} to its DTO, publishing the owning org unit as {@code owningSquadron}.
+   * Maps a {@link Ship} to its DTO, publishing the owning org unit as {@code owningSquadron} and
+   * leaving out the pledge data, which only {@link #toOwnerDto} carries (REQ-HANGAR-015).
    *
    * @param ship the entity to project; {@code null} returns {@code null}
-   * @return the ship DTO
+   * @return the ship DTO without pledge data
    */
   @Mapping(target = "owningSquadron", source = "owningOrgUnit")
+  @Mapping(target = "pledge", ignore = true)
   ShipDto toDto(Ship ship);
+
+  /**
+   * Maps a {@link Ship} to its DTO including the imported pledge data, for the owner and for admins
+   * (REQ-HANGAR-015).
+   *
+   * @param ship the entity to project; {@code null} returns {@code null}
+   * @return the ship DTO with pledge data
+   */
+  @Named("withPledge")
+  @Mapping(target = "owningSquadron", source = "owningOrgUnit")
+  @Mapping(target = "pledge", source = "ship")
+  ShipDto toOwnerDto(Ship ship);
+
+  /**
+   * Collects the imported pledge columns of a ship.
+   *
+   * @param ship the entity to read
+   * @return the pledge data, or {@code null} when the ship carries no pledge id
+   */
+  default @Nullable ShipPledgeDto pledgeOf(@Nullable Ship ship) {
+    if (ship == null || ship.getPledgeId() == null) {
+      return null;
+    }
+    return new ShipPledgeDto(
+        ship.getPledgeId(),
+        ship.getPledgeDate(),
+        ship.getPledgeCost(),
+        ship.getPledgeCostCurrency(),
+        ship.getMeltable(),
+        ship.getGiftable());
+  }
 
   /** Nested mapping for the ship's stationing {@link Location}. */
   LocationDto locationToDto(Location location);

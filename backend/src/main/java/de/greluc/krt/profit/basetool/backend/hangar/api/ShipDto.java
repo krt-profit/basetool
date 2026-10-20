@@ -39,6 +39,10 @@ import org.jetbrains.annotations.Nullable;
  * @param owningSquadron the owning org unit, or {@code null} for none
  * @param version the row version, echoed on an edit of the ship's fields
  * @param owningOrgUnitVersion the unit counter, echoed on an org-unit change (ADR-0258)
+ * @param productionStatus the imported RSI production status, or {@code null} when none was
+ *     imported
+ * @param pledge the imported pledge data, or {@code null} when none was imported or the caller is
+ *     neither the owner nor an admin (REQ-HANGAR-015)
  */
 public record ShipDto(
     UUID id,
@@ -50,4 +54,6 @@ public record ShipDto(
     @Nullable UserDto owner,
     @Nullable SquadronReferenceDto owningSquadron,
     Long version,
-    long owningOrgUnitVersion) {}
+    long owningOrgUnitVersion,
+    @Nullable ShipProductionStatus productionStatus,
+    @Nullable ShipPledgeDto pledge) {}

@@ -48,6 +48,18 @@
     .hangar-table .hangar-row__loc {
         display: none;
     }
+    .hangar-row__meta {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-1) var(--space-2);
+        margin-top: var(--space-1);
+    }
+    .hangar-row__pledge {
+        color: var(--color-gray-2-text);
+        font-size: var(--fs-2xs);
+        font-variant-numeric: tabular-nums;
+    }
     .hangar-table .hangar-cell-ins {
         width: 1%;
         white-space: nowrap;

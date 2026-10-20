@@ -20,7 +20,7 @@
                         th:data-error-toolarge="#{hangar.import.error.tooLarge}"
                         th:data-max-bytes="${hangarImportMaxBytes}"
                         th:data-error-failed="#{hangar.import.error.failed}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-upload"/></svg> <span th:text="#{hangar.import.open}">Schiffsliste importieren</span></button>
-                <input type="file" id="fleetview-file" accept=".json,application/json" hidden
+                <input type="file" id="fleetview-file" accept=".json,.csv,application/json,text/csv" hidden
                        data-testid="hangar-import-file" th:attr="aria-label=#{hangar.import.label}">
                 <button type="button" id="add-ship-btn" data-testid="hangar-add-ship" class="btn btn--cta"
                         data-trigger="hangar-add-ship" th:data-action="@{/hangar/add}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{hangar.ship.add}">Schiff hinzuf&uuml;gen</span></button>
@@ -124,6 +124,7 @@
                                         <span class="cell-title" th:text="${named ? ship.name : hull}">Iron Mule</span>
                                         <span class="cell-sub"><span th:text="${named ? hull : #messages.msg('hangar.ship.unnamed')}">Drake Cutlass Black</span><span
                                               class="hangar-row__loc" th:if="${locName != null}" th:text="' · ' + ${locName}"> · Area18</span></span>
+                                        <th:block th:replace="~{hangar/fragments/ship-meta :: shipMeta(${ship})}"></th:block>
                                     </span>
                                 </div>
                             </td>
@@ -360,6 +361,10 @@
             <div class="stat-row">
                 <span th:text="#{hangar.import.result.imported}">Importiert</span>
                 <span id="import-res-imported">0</span>
+            </div>
+            <div class="stat-row">
+                <span th:text="#{hangar.import.result.updated}">Aktualisiert</span>
+                <span id="import-res-updated">0</span>
             </div>
             <div class="stat-row">
                 <span th:text="#{hangar.import.result.skipped}">Nicht erkannt</span>

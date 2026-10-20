@@ -2033,10 +2033,23 @@ class MissionPageControllerMvcTest {
             participantUser,
             null,
             1L,
-            0L);
+            0L,
+            null,
+            null);
     de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto outsiderShip =
         new de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto(
-            outsiderShipId, "O-Ship", shipType, "10", null, false, outsiderUser, null, 1L, 0L);
+            outsiderShipId,
+            "O-Ship",
+            shipType,
+            "10",
+            null,
+            false,
+            outsiderUser,
+            null,
+            1L,
+            0L,
+            null,
+            null);
 
     MissionDto mission =
         new MissionDto(
@@ -2188,13 +2201,37 @@ class MissionPageControllerMvcTest {
             participantUser,
             null,
             1L,
-            0L);
+            0L,
+            null,
+            null);
     de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto assignedShip =
         new de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto(
-            assignedShipId, "A-Ship", shipType, "10", null, false, outsiderUser, null, 1L, 0L);
+            assignedShipId,
+            "A-Ship",
+            shipType,
+            "10",
+            null,
+            false,
+            outsiderUser,
+            null,
+            1L,
+            0L,
+            null,
+            null);
     de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto strayShip =
         new de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto(
-            strayShipId, "S-Ship", shipType, "10", null, false, outsiderUser, null, 1L, 0L);
+            strayShipId,
+            "S-Ship",
+            shipType,
+            "10",
+            null,
+            false,
+            outsiderUser,
+            null,
+            1L,
+            0L,
+            null,
+            null);
 
     de.greluc.krt.profit.basetool.frontend.mission.model.MissionUnitDto assignedUnit =
         new de.greluc.krt.profit.basetool.frontend.mission.model.MissionUnitDto(

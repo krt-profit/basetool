@@ -46,7 +46,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Proxies third-party ship-export uploads (CCU Game Fleetview, HangarXPLOR, Fleetyards, StarJump
- * FleetViewer) to {@code POST /api/v1/hangar/import/ships}, which detects the format.
+ * FleetViewer, Hangar Extension JSON and CSV) to {@code POST /api/v1/hangar/import/ships}, which
+ * detects the format.
  *
  * <p>Uploads above {@link #MAX_IMPORT_BYTES} are refused with {@code 413} unread; accepted ones are
  * streamed through {@link HangarBackendClient}, which maps a backend failure like any other backend
@@ -74,10 +75,10 @@ public class HangarImportProxyController {
   private final MessageSource messageSource;
 
   /**
-   * Proxies a ship-export JSON file upload from the browser to the backend import endpoint.
+   * Proxies a ship-export file upload from the browser to the backend import endpoint.
    *
-   * @param file the uploaded JSON file (Fleetview, HangarXPLOR Shiplist, Fleetyards or StarJump
-   *     FleetViewer)
+   * @param file the uploaded JSON or CSV file (Fleetview, HangarXPLOR Shiplist, Fleetyards,
+   *     StarJump FleetViewer or Hangar Extension)
    * @return the backend's {@link FleetviewImportResponseDto}, or a {@code 413} JSON body when the
    *     upload exceeds {@link #MAX_IMPORT_BYTES}
    */

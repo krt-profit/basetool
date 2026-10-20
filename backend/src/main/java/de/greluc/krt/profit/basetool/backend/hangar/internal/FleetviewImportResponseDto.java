@@ -26,10 +26,18 @@ import java.util.List;
  *
  * <p>Returns import statistics and lists of ships that could not be processed, so the user can take
  * corrective action (e.g. run a UEX sync or rename ships manually).
+ *
+ * @param importedCount ships created
+ * @param skippedCount distinct ship names that matched no ship type
+ * @param duplicateCount upload entries matched to a ship already in the hangar
+ * @param skippedShips the unmatched ship names
+ * @param duplicateShips reserved, always empty
+ * @param updatedCount matched ships whose production status or pledge data changed
  */
 public record FleetviewImportResponseDto(
     int importedCount,
     int skippedCount,
     int duplicateCount,
     List<String> skippedShips,
-    List<String> duplicateShips) {}
+    List<String> duplicateShips,
+    int updatedCount) {}

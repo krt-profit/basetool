@@ -19,12 +19,18 @@
 
 package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipProductionStatus;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipTypeMatcher;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -36,8 +42,8 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Parses an uploaded ship-export file (CCU Game Fleetview, HangarXPLOR Shiplist, Fleetyards,
- * StarJump FleetViewer) into the format-agnostic {@link FleetImportEntry} stream that {@code
- * HangarImportService} imports.
+ * StarJump FleetViewer, Hangar Extension JSON and CSV) into the format-agnostic {@link
+ * FleetImportEntry} stream that {@code HangarImportService} imports.
  *
  * <p>Stateless; takes the caller's {@link ObjectMapper}. Uploads above {@link #MAX_IMPORT_BYTES}
  * are rejected before parsing.
@@ -69,16 +75,22 @@ public final class FleetExportParser {
    */
   private static final int MAX_IMPORT_ENTRIES = 20_000;
 
+  /** Matches {@code "6mi"}, {@code "120 month insurance"} and the like, lower-cased. */
+  private static final Pattern INSURANCE_MONTHS =
+      Pattern.compile("^(\\d{1,3})\\s*(?:mi|months?(?:\\s+insurance)?)$");
+
   private FleetExportParser() {}
 
   /**
    * Reads the upload, detects its format from the payload shape and converts every ship record into
    * a {@link FleetImportEntry}.
    *
-   * <p>An object root with a {@code starjumpFleetviewer} type or a {@code canvasItems} array is
-   * StarJump FleetViewer; an array root is probed by field name ({@code pledge_id}/{@code
-   * ship_code} HangarXPLOR, {@code shipname}/{@code type} Fleetview, {@code shipCode}/{@code
-   * manufacturerCode} Fleetyards). Records without a name or that are not ships are dropped.
+   * <p>An upload that does not open with {@code [} or <code>{</code> is the Hangar Extension CSV
+   * when its header names {@code Pledge ID}. An object root with a {@code starjumpFleetviewer} type
+   * or a {@code canvasItems} array is StarJump FleetViewer; an array root is probed by field name
+   * ({@code matrix} Hangar Extension, {@code pledge_id}/{@code ship_code} HangarXPLOR, {@code
+   * shipname}/{@code type} Fleetview, {@code shipCode}/{@code manufacturerCode} Fleetyards).
+   * Records without a name or that are not ships are dropped.
    *
    * @param objectMapper the caller's configured JSON mapper
    * @param file multipart upload from the controller
@@ -114,10 +126,25 @@ public final class FleetExportParser {
               + (MAX_IMPORT_BYTES / (1024 * 1024))
               + " MB).");
     }
+    byte[] bytes;
+    try {
+      bytes = file.getBytes();
+    } catch (IOException e) {
+      log.debug("Hangar import: failed to read the upload", e);
+      throw new BadRequestException("The uploaded file could not be read.");
+    }
+    String text = stripBom(new String(bytes, StandardCharsets.UTF_8));
+    if (!looksLikeJson(text)) {
+      if (HangarExtensionCsvParser.looksLikeHangarCsv(text)) {
+        return HangarExtensionCsvParser.parse(text);
+      }
+      throw new BadRequestException(
+          "Unknown ship-list format. Expected a JSON export or the Hangar Extension CSV.");
+    }
     JsonNode root;
     try {
-      root = objectMapper.readTree(file.getInputStream());
-    } catch (IOException | JacksonException e) {
+      root = objectMapper.readTree(text);
+    } catch (JacksonException e) {
       log.debug("Hangar import: failed to parse JSON", e);
       throw new BadRequestException(
           "The uploaded file could not be parsed as a valid ship-list JSON.");
@@ -145,6 +172,14 @@ public final class FleetExportParser {
       throw new BadRequestException("The uploaded file does not contain any objects to import.");
     }
 
+    if (probe.has("matrix")) {
+      List<HangarExtensionShipDto> raw =
+          objectMapper.convertValue(root, new TypeReference<List<HangarExtensionShipDto>>() {});
+      return raw.stream()
+          .map(FleetExportParser::mapHangarExtensionEntry)
+          .filter(Objects::nonNull)
+          .toList();
+    }
     if (probe.has("pledge_id") || probe.has("ship_code")) {
       List<ShiplistEntryDto> raw =
           objectMapper.convertValue(root, new TypeReference<List<ShiplistEntryDto>>() {});
@@ -170,8 +205,86 @@ public final class FleetExportParser {
           .toList();
     }
     throw new BadRequestException(
-        "Unknown ship-list format. Expected CCU Game Fleetview, HangarXPLOR Shiplist or Fleetyards"
-            + " JSON.");
+        "Unknown ship-list format. Expected CCU Game Fleetview, HangarXPLOR Shiplist, Fleetyards or"
+            + " Hangar Extension JSON.");
+  }
+
+  /**
+   * Drops a leading UTF-8 byte-order mark.
+   *
+   * @param text the decoded upload
+   * @return the text without a leading {@code U+FEFF}
+   */
+  private static @NotNull String stripBom(@NotNull String text) {
+    return !text.isEmpty() && text.charAt(0) == '﻿' ? text.substring(1) : text;
+  }
+
+  /**
+   * Tells a JSON upload from a CSV one by its first non-blank character.
+   *
+   * @param text the decoded upload without byte-order mark
+   * @return {@code true} when the text opens with {@code [} or <code>{</code>, or is blank
+   */
+  private static boolean looksLikeJson(@NotNull String text) {
+    for (int i = 0; i < text.length(); i++) {
+      char c = text.charAt(i);
+      if (!Character.isWhitespace(c)) {
+        return c == '[' || c == '{';
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Maps a Hangar Extension fleet record to an entry: {@code matrix} is the model name, {@code
+   * name} the slug fallback, {@code status} the production status and {@code insurance} the
+   * insurance (REQ-HANGAR-015).
+   *
+   * @param dto raw Hangar Extension entry
+   * @return internal entry, or {@code null} if it has neither a matrix name nor a name
+   */
+  private static @Nullable FleetImportEntry mapHangarExtensionEntry(
+      @Nullable HangarExtensionShipDto dto) {
+    if (dto == null) {
+      return null;
+    }
+    String slug = (dto.name() != null && !dto.name().isBlank()) ? dto.name().trim() : null;
+    String name = (dto.matrix() != null && !dto.matrix().isBlank()) ? dto.matrix().trim() : slug;
+    if (name == null) {
+      return null;
+    }
+    return new FleetImportEntry(
+        name,
+        null,
+        parseInsurance(dto.insurance()),
+        slug,
+        ShipProductionStatus.fromExport(dto.status()),
+        null,
+        null);
+  }
+
+  /**
+   * Reads an insurance text into the hangar's insurance value: {@code "LTI"} and {@code "Lifetime
+   * Insurance"} become {@code "LTI"}, {@code "<n>MI"} and {@code "<n> Month Insurance"} become
+   * {@code "<n>"} for {@code n} from 0 to 120.
+   *
+   * @param raw the export's insurance text
+   * @return the insurance value, or {@code null} when blank or unreadable
+   */
+  static @Nullable String parseInsurance(@Nullable String raw) {
+    if (raw == null || raw.isBlank()) {
+      return null;
+    }
+    String lower = raw.trim().toLowerCase(Locale.ROOT);
+    if ("lti".equals(lower) || lower.startsWith("lifetime")) {
+      return LTI_INSURANCE;
+    }
+    Matcher m = INSURANCE_MONTHS.matcher(lower);
+    if (!m.matches()) {
+      return null;
+    }
+    int months = Integer.parseInt(m.group(1));
+    return months <= 120 ? Integer.toString(months) : null;
   }
 
   /**
@@ -319,11 +432,54 @@ public final class FleetExportParser {
    * @param insurance explicit insurance string (e.g. {@code "LTI"}), or {@code null} to let the
    *     service fall back to {@link #DEFAULT_INSURANCE}
    * @param slug source-provided ship slug used for the slug-fallback match stage (StarJump
-   *     FleetViewer and Fleetyards), or {@code null} for formats that carry no slug
+   *     FleetViewer, Fleetyards and Hangar Extension JSON), or {@code null} for formats that carry
+   *     no slug
+   * @param productionStatus the production status (Hangar Extension JSON), or {@code null}
+   * @param pledge the pledge data (Hangar Extension CSV), or {@code null}
+   * @param unprefixedName the name without its leading manufacturer word, tried before {@code name}
+   *     (Hangar Extension CSV), or {@code null}
    */
   public record FleetImportEntry(
       @NotNull String name,
       @Nullable String individualName,
       @Nullable String insurance,
-      @Nullable String slug) {}
+      @Nullable String slug,
+      @Nullable ShipProductionStatus productionStatus,
+      @Nullable PledgeInfo pledge,
+      @Nullable String unprefixedName) {
+
+    /**
+     * Creates an entry of a format that carries neither production status nor pledge data.
+     *
+     * @param name the ship-model name
+     * @param individualName custom display name, or {@code null}
+     * @param insurance explicit insurance string, or {@code null}
+     * @param slug source-provided slug, or {@code null}
+     */
+    public FleetImportEntry(
+        @NotNull String name,
+        @Nullable String individualName,
+        @Nullable String insurance,
+        @Nullable String slug) {
+      this(name, individualName, insurance, slug, null, null, null);
+    }
+  }
+
+  /**
+   * Pledge data of one ship row of the Hangar Extension CSV (REQ-HANGAR-015).
+   *
+   * @param pledgeId the RSI pledge id
+   * @param pledgeDate the purchase date, or {@code null}
+   * @param pledgeCost the price of the whole pledge, or {@code null}
+   * @param pledgeCostCurrency the ISO currency code of the price, or {@code null}
+   * @param meltable whether the pledge can be melted, or {@code null}
+   * @param giftable whether the pledge can be gifted, or {@code null}
+   */
+  public record PledgeInfo(
+      @NotNull String pledgeId,
+      @Nullable LocalDate pledgeDate,
+      @Nullable BigDecimal pledgeCost,
+      @Nullable String pledgeCostCurrency,
+      @Nullable Boolean meltable,
+      @Nullable Boolean giftable) {}
 }

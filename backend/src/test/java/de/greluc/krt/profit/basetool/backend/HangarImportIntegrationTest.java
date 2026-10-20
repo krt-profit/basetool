@@ -28,6 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipProductionStatus;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.FleetviewImportResponseDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -37,8 +38,10 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -282,7 +285,7 @@ class HangarImportIntegrationTest {
     FleetviewImportResponseDto result =
         objectMapper.readValue(response, FleetviewImportResponseDto.class);
     assertEquals(1, result.importedCount());
-    assertEquals(0, result.duplicateCount());
+    assertEquals(1, result.duplicateCount());
 
     assertEquals(2, shipRepository.findByOwnerId(user1.getId()).size());
   }
@@ -423,5 +426,75 @@ class HangarImportIntegrationTest {
 
     Ship imported = shipRepository.findByOwnerId(user1.getId()).stream().findFirst().orElseThrow();
     assertEquals("My Little Ship", imported.getName());
+  }
+
+  @Test
+  void importHangarExtension_jsonThenCsv_fillsTheSameShipsWithoutDuplicates() throws Exception {
+    String json =
+        """
+        [
+          {"manufacturer":{"code":"ORIG","name":"Origin Jumpworks"},"code":"ORIG_135c",
+           "matrix":"135c","status":"Flight-Ready","insurance":"LTI","name":"135c"},
+          {"manufacturer":{"code":"RSI","name":"Roberts Space Industries"},"code":"RSI_Zeus",
+           "matrix":"Zeus Mk II MR","status":"In-Concept","insurance":"6MI","name":"Zeus Mk II MR"}
+        ]
+        """;
+    FleetviewImportResponseDto first = upload("my-fleet.json", "application/json", json);
+    assertEquals(2, first.importedCount());
+
+    UUID zeusId =
+        shipRepository.findByOwnerId(user1.getId()).stream()
+            .filter(s -> s.getShipType().getId().equals(typeZeus.getId()))
+            .findFirst()
+            .orElseThrow()
+            .getId();
+    Long versionBefore = shipRepository.findById(zeusId).orElseThrow().getVersion();
+
+    String csv =
+        """
+        Pledge ID,Pledge Date,Pledge Cost,Meltable,Giftable,Pledge Name,Pledge Content,Content Type
+        "500","October 14, 2026","1,275.00 USD","yes","no","Zeus Pack","RSI Zeus Mk II MR","Ship"
+        "500","October 14, 2026","1,275.00 USD","yes","no","Zeus Pack","6 Month Insurance","Insurance"
+        "500","October 14, 2026","1,275.00 USD","yes","no","Zeus Pack","Zeus - Paint","Skin"
+        "501","May 1, 2015","45.00 USD","no","no","135c","Origin 135c","Ship"
+        """;
+    FleetviewImportResponseDto second = upload("my-hangar.csv", "text/csv", csv);
+    assertEquals(0, second.importedCount());
+    assertEquals(2, second.duplicateCount());
+    assertEquals(2, second.updatedCount());
+
+    FleetviewImportResponseDto third = upload("my-hangar.csv", "text/csv", csv);
+    assertEquals(0, third.importedCount());
+    assertEquals(0, third.updatedCount());
+
+    shipRepository.flush();
+    assertEquals(2, shipRepository.findByOwnerId(user1.getId()).size());
+    Ship zeus = shipRepository.findById(zeusId).orElseThrow();
+    assertEquals(ShipProductionStatus.IN_CONCEPT, zeus.getProductionStatus());
+    assertEquals("6", zeus.getInsurance());
+    assertEquals("500", zeus.getPledgeId());
+    assertEquals(LocalDate.of(2026, 10, 14), zeus.getPledgeDate());
+    assertEquals(0, new BigDecimal("1275.00").compareTo(zeus.getPledgeCost()));
+    assertEquals("USD", zeus.getPledgeCostCurrency());
+    assertEquals(Boolean.TRUE, zeus.getMeltable());
+    assertEquals(Boolean.FALSE, zeus.getGiftable());
+    assertEquals(versionBefore, zeus.getVersion());
+  }
+
+  private FleetviewImportResponseDto upload(String name, String type, String body)
+      throws Exception {
+    MockMultipartFile file =
+        new MockMultipartFile("file", name, type, body.getBytes(StandardCharsets.UTF_8));
+    String response =
+        mockMvc
+            .perform(
+                multipart("/api/v1/hangar/import/ships")
+                    .file(file)
+                    .with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    return objectMapper.readValue(response, FleetviewImportResponseDto.class);
   }
 }

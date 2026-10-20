@@ -81762,6 +81762,10 @@
             "items" : {
               "type" : "string"
             }
+          },
+          "updatedCount" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         }
       },
@@ -90699,6 +90703,13 @@
           "owningSquadron" : {
             "$ref" : "#/components/schemas/SquadronReferenceDto"
           },
+          "pledge" : {
+            "$ref" : "#/components/schemas/ShipPledgeDto"
+          },
+          "productionStatus" : {
+            "type" : "string",
+            "enum" : [ "FLIGHT_READY", "IN_CONCEPT", "IN_PRODUCTION" ]
+          },
           "shipType" : {
             "$ref" : "#/components/schemas/ShipTypeDto"
           },
@@ -90721,6 +90732,30 @@
           }
         },
         "required" : [ "owningOrgUnitVersion" ]
+      },
+      "ShipPledgeDto" : {
+        "type" : "object",
+        "properties" : {
+          "giftable" : {
+            "type" : "boolean"
+          },
+          "meltable" : {
+            "type" : "boolean"
+          },
+          "pledgeCost" : {
+            "type" : "number"
+          },
+          "pledgeCostCurrency" : {
+            "type" : "string"
+          },
+          "pledgeDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "pledgeId" : {
+            "type" : "string"
+          }
+        }
       },
       "ShipRequestDto" : {
         "type" : "object",
