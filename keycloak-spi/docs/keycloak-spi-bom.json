@@ -1,10 +1,10 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:a4a0b409-ad94-4ecb-8e27-8f61fb5755e0",
+  "serialNumber" : "urn:uuid:4fe697e4-add9-4439-a02b-bb41d062163e",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-10-20T09:19:49Z",
+    "timestamp" : "2026-10-20T13:28:53Z",
     "tools" : {
       "components" : [
         {
@@ -26,7 +26,7 @@
       "externalReferences" : [
         {
           "type" : "build-system",
-          "url" : "https://github.com/krt-profit/basetool/actions/runs/39397864493"
+          "url" : "https://github.com/krt-profit/basetool/actions/runs/39430306422"
         },
         {
           "type" : "vcs",
