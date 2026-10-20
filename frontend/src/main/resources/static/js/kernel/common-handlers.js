@@ -334,17 +334,22 @@ function markStackLineEnds() {
 }
 
 /**
- * Keeps the `stack-line-end` marks current across resizes, orientation changes and DOM updates
- * such as fragment swaps, measuring at most once per animation frame.
+ * Keeps the `stack-line-end` marks current across resizes, orientation changes, DOM updates such
+ * as fragment swaps and reflows of a stacked table such as a late web font, measuring at most once
+ * per animation frame.
  */
 function trackStackLineEnds() {
     let pending = false;
+    const tableSizes = new ResizeObserver(() => schedule());
     const schedule = () => {
         if (pending) return;
         pending = true;
         requestAnimationFrame(() => {
             pending = false;
             markStackLineEnds();
+            for (const table of document.querySelectorAll('.data-table--stack')) {
+                tableSizes.observe(table);
+            }
         });
     };
     schedule();

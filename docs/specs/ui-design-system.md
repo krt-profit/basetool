@@ -771,7 +771,8 @@ a geometric check had no rule for:
   sits in the gap after a cell, positioned against the cell rather than flowing as text, so it can
   never begin a line or wrap away on its own; a cell that holds a block (a progress bar, a list), an
   empty cell and a `.cell-block` cell take no separator, and neither does a cell whose next cell
-  starts a new line (`stack-line-end`, measured on the page). The status bar of a stacked row runs
+  starts a new line (`stack-line-end`, measured on the page and again whenever a stacked table
+  changes size, such as when a web font arrives after the rows). The status bar of a stacked row runs
   along the card's edge, not over its first cell. A list rendered inline puts its comma after
   an item, never before the next one. A count beside a name (`(1)`) never wraps on its own.
 - **A tree table fits the touch classes.** Up to 1024px or on a coarse pointer a `.tree-table`

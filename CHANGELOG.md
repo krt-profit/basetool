@@ -5,6 +5,7 @@
 ### Fixed
 
 - **Reihenfolge ändern ohne Ziehen.** Die Prioritäten-Warteschlange unter „Aufträge“ und die Frequenztypen unter „Einsatzdaten verwalten“ lassen sich jetzt auch mit Pfeil-Knöpfen je Zeile oder mit Alt+Pfeil hoch/runter umsortieren; der Fokus bleibt auf dem verschobenen Eintrag, ein Screenreader hört die neue Position. Ziehen bleibt am Desktop zusätzlich erhalten, auf Touch-Geräten entfällt es (WCAG 2.5.7, REQ-UI-031).
+- **Trennpunkt in gestapelten Tabellen.** Auf dem Handy steht der `·` zwischen zwei Zellen nicht mehr am Zeilenende, wenn sich das Layout nach dem Laden noch verschiebt (z. B. in der Profitrechnung, wenn die Schrift nachlädt).
 
 ### Added
 
