@@ -237,7 +237,7 @@ class MaterialboersePatternRenderTest {
         .contains("data-mb-counts")
         .doesNotContain("mb-mrow-int");
     String detail = html.substring(html.indexOf("id=\"mb-detail\""));
-    assertThat(detail.split("class=\"kpi-total\"", -1)).hasSize(4);
+    assertThat(detail.split("class=\"kpi-total kpi-total--inset\"", -1)).hasSize(4);
     assertThat(detail)
         .containsPattern("data-testid=\"mb-interest-count\">3<")
         .containsPattern("class=\"btn btn--cta\"[^>]*data-mb-interest")
