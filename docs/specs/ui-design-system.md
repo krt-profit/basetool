@@ -16,7 +16,7 @@
 > [0242](../adr/0242-page-patterns-a-to-c-and-the-design-system-update-2026-10.md) (REQ-UI-027, REQ-UI-009) ·
 > [0243](../adr/0243-colours-and-stacking-layers-are-written-through-tokens.md) (REQ-UI-001, REQ-UI-023) ·
 > [0280](../adr/0280-touch-ergonomics-follow-the-pointer-and-the-tablet-is-supported-in-both-orientations.md) (REQ-UI-009, REQ-UI-020) ·
-> **Next free id:** `REQ-UI-031` · **Visual source of truth:** the design
+> **Next free id:** `REQ-UI-032` · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)),
 > read at the design system's latest `main` ([ADR-0259](../adr/0259-the-design-system-submodule-follows-its-main.md)).
@@ -2027,6 +2027,42 @@ until it moves onto the helper.
 `static/js/catalogue/materials-profit-calculation.js`, `templates/catalogue/material-detail.html`,
 `static/js/catalogue/material-detail.js` ·
 **Related:** REQ-UI-009, REQ-UI-017 · **Issues:** #2635, #2634
+
+### REQ-UI-031 — A list the user reorders never needs a drag
+
+A list whose order the user changes (WCAG 2.2 SC 2.5.7, Dragging Movements) offers the move
+without a drag, and every such list uses the one kernel helper `krtReorder`
+(`static/js/kernel/krt-reorder.js`) with the `components :: reorderControls` and
+`components :: reorderLive` fragments instead of a page's own copy.
+
+1. **Controls.** Every movable item carries a visible up and down button
+   (`.krt-reorder__btn`, chevron icons, `data-reorder-move="up|down"`) whose label and title name
+   the item (`reorder.moveUp` / `reorder.moveDown`, „<Name> nach oben verschieben"). The first
+   item's up and the last item's down are `aria-disabled="true"`, not `disabled`, so the focus can
+   stay on them. The buttons have the 44px touch target of REQ-UI-009.
+2. **Keyboard.** Alt+ArrowUp / Alt+ArrowDown move the item that holds the focus one place
+   (`aria-keyshortcuts` on the buttons); the arrow keys without Alt, and with Ctrl, Shift or Meta,
+   keep their usual meaning.
+3. **Focus.** After the move, and again after the list is re-rendered from the server, the focus
+   is on the same control of the moved item.
+4. **Announcement.** A polite live region outside the re-rendered fragment (`[data-reorder-live]`)
+   announces the item with its old and new position and the length of the list
+   (`reorder.announce`) once the server accepted the move; a refused move is not announced.
+5. **Persistence.** The page saves a move through its own `krtFetch` write and re-renders the
+   list in place (REQ-FE-001); a second move is ignored while one is saving.
+6. **Drag stays an extra.** A page may keep drag and drop beside the controls; on a coarse pointer
+   (phones, tablets) the helper cancels a drag start, so a swipe scrolls instead of grabbing a row.
+
+The job-order priority queue (REQ-ORDERS-020) and the frequency types of the mission-data admin
+page use it; positions there count the reorderable rows of the rendered page.
+
+**Enforced by:** `:frontend:testReorderJs` (`scripts/krt-reorder.test.mjs`),
+`OrdersQueueReorderWithoutDragE2eTest`, `AdminFrequencyTypeReorderWithoutDragE2eTest` ·
+**Code:** `static/js/kernel/krt-reorder.js`, `templates/kernel/fragments/components.html`
+(`reorderControls`, `reorderLive`), `static/css/kernel/styles.css` (`.krt-reorder`),
+`static/js/joborder/orders-index-reorder.js`, `templates/joborder/orders-index.html`,
+`static/js/catalogue/mission-data.js`, `templates/catalogue/admin/mission-data.html` ·
+**Related:** REQ-UI-009, REQ-FE-001, REQ-ORDERS-020 · **Issues:** #2800, #2802
 
 ## Out of scope
 

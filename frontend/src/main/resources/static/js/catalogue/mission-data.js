@@ -25,6 +25,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtReorder } from '/js/kernel/krt-reorder.js';
 
 const MISSION_KINDS = ['squadrons', 'jobtypes', 'freqtypes'];
 
@@ -435,7 +436,32 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /**
- * Makes the rows of a table container draggable and posts the new order after a drop.
+ * Posts the order of a section's rows and re-renders the frequency types.
+ *
+ * @param {HTMLElement[]} rows the rows in their new order
+ * @param {string} reorderUrl endpoint that receives the ordered row ids
+ * @returns {Promise<boolean>} whether the server accepted the order
+ */
+async function persistMissionOrder(rows, reorderUrl) {
+    const result = await missionData.write({
+        method: 'POST',
+        url: reorderUrl,
+        payload: rows.map((row) => row.dataset.id),
+        toast: false,
+        errorMessage: MISSION_MSG.error,
+        conflict: MISSION_CONFLICT,
+        onError() {
+            showFrontendErrorToast(MISSION_MSG.error);
+            return true;
+        },
+    });
+    await missionData.refresh('freqtypes');
+    return result.ok;
+}
+
+/**
+ * Makes the rows of a table container movable by their up/down controls, by Alt+ArrowUp/ArrowDown
+ * and by drag and drop, and posts the new order after each move.
  *
  * @param {string} containerId id of the element holding the draggable rows
  * @param {string} reorderUrl endpoint that receives the ordered row ids
@@ -443,6 +469,12 @@ document.addEventListener('DOMContentLoaded', () => {
 function setupDragAndDrop(containerId, reorderUrl) {
     const container = document.getElementById(containerId);
     if (!container) return;
+
+    krtReorder.attach({
+        container,
+        itemSelector: 'tr.draggable-row',
+        persist: ({ rows }) => persistMissionOrder(rows, reorderUrl),
+    });
 
     /** @type {HTMLElement | null} */
     let draggedRow = null;
@@ -465,22 +497,7 @@ function setupDragAndDrop(containerId, reorderUrl) {
         const rows = /** @type {HTMLElement[]} */ (
             Array.from(container.querySelectorAll('tr.draggable-row'))
         );
-        const newOrderIds = rows.map((row) => row.dataset.id);
-
-        missionData
-            .write({
-                method: 'POST',
-                url: reorderUrl,
-                payload: newOrderIds,
-                toast: false,
-                errorMessage: MISSION_MSG.error,
-                conflict: MISSION_CONFLICT,
-                onError() {
-                    showFrontendErrorToast(MISSION_MSG.error);
-                    return true;
-                },
-            })
-            .then(() => missionData.refresh('freqtypes'));
+        persistMissionOrder(rows, reorderUrl);
         draggedRow = null;
     });
 

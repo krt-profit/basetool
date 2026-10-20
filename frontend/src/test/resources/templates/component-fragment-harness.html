@@ -10,6 +10,10 @@
 <div id="harness-alert-null">
     <th:block th:replace="~{kernel/fragments/components :: alert(type='success', msgKey=${missingKey}, extraClass=null)}"></th:block>
 </div>
+<div id="harness-reorder">
+    <th:block th:replace="~{kernel/fragments/components :: reorderControls(itemName='ITEM-X', first=true, last=false)}"></th:block>
+    <th:block th:replace="~{kernel/fragments/components :: reorderLive}"></th:block>
+</div>
 <div id="harness-table">
     <div th:replace="~{kernel/fragments/components :: dataTable(head=~{::harnessHead}, body=~{::harnessBody})}">
         <th:block th:fragment="harnessHead">

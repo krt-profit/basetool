@@ -227,13 +227,15 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr th:each="freq : ${frequencyTypes}" th:classappend="${!freq.active} ? 'md-row--inactive' : ''"
-                            draggable="true" class="draggable-row" th:data-id="${freq.id}">
+                        <tr th:each="freq, freqStat : ${frequencyTypes}" th:classappend="${!freq.active} ? 'md-row--inactive' : ''"
+                            draggable="true" class="draggable-row" th:data-id="${freq.id}" th:data-reorder-name="${freq.name}"
+                            data-testid="freqtype-row">
                             <td>
                                 <span class="cell-title"><span th:text="${freq.name}">Name</span><span th:if="${!freq.active}" class="badge-inactive" th:text="#{admin.job_type.inactive}">Inaktiv</span></span>
                             </td>
                             <td class="md-desc" th:text="${freq.description}">Desc</td>
                             <td class="cell-actions">
+                                <span th:replace="~{kernel/fragments/components :: reorderControls(itemName=${freq.name}, first=${freqStat.first}, last=${freqStat.last})}"></span>
                                 <button type="button" class="btn btn-ghost btn-icon edit-freqtype-btn"
                                         th:data-action="@{/admin/mission-data/frequency-types/{id}/update(id=${freq.id})}"
                                         th:data-id="${freq.id}"
@@ -257,6 +259,7 @@
             </th:block>
             </th:block>
         </div>
+        <p th:replace="~{kernel/fragments/components :: reorderLive}"></p>
         </section>
 
         </div>

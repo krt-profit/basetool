@@ -21,13 +21,17 @@
 
 import { showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtReorder } from '/js/kernel/krt-reorder.js';
 import { joborderHooks } from '/js/joborder/joborder-hooks.js';
+
+const QUEUE_ROW = 'tr.draggable-row';
 
 /**
  * Moves a job order to a priority slot, refreshes the queue and toasts the outcome.
  *
- * @param {string | undefined} orderId the id of the dragged job order
+ * @param {string | undefined} orderId the id of the moved job order
  * @param {string} targetPriority the priority of the neighbouring order it takes over
+ * @returns {Promise<boolean>} whether the server accepted the new priority
  */
 async function persistOrderReorder(orderId, targetPriority) {
     const container = document.getElementById('orders-results');
@@ -61,11 +65,37 @@ async function persistOrderReorder(orderId, targetPriority) {
     if (res.ok) {
         showFrontendSuccessToast(KRT_ORDERS_REORDER_I18N.success);
     }
+    return res.ok;
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+/**
+ * Finds the priority a moved order takes over: the one of the neighbour it passed.
+ *
+ * @param {HTMLElement[]} rows the queue rows in their new order
+ * @param {number} from the zero-based position before the move
+ * @param {number} to the zero-based position after the move
+ * @returns {string | undefined} the target priority, undefined when the order did not move
+ */
+function targetPriorityOf(rows, from, to) {
+    if (to > from) return rows[to - 1]?.dataset.priority;
+    if (to < from) return rows[to + 1]?.dataset.priority;
+    return undefined;
+}
+
+/** Wires the queue's up/down controls, its Alt+Arrow keys and its drag-and-drop reorder. */
+function initOrdersReorder() {
     const container = document.getElementById('orders-results');
     if (!container) return;
+
+    krtReorder.attach({
+        container,
+        itemSelector: QUEUE_ROW,
+        async persist({ row, rows, from, to }) {
+            const targetPriority = targetPriorityOf(rows, from, to);
+            if (!targetPriority) return false;
+            return persistOrderReorder(row.dataset.id, targetPriority);
+        },
+    });
 
     /** @type {HTMLTableRowElement | null} */
     let draggedRow = null;
@@ -77,13 +107,11 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     const rowOf = (e) =>
         /** @type {HTMLTableRowElement | null} */ (
-            /** @type {Element} */ (e.target).closest('tr.draggable-row')
+            /** @type {Element} */ (e.target).closest(QUEUE_ROW)
         );
 
     const queueRows = () =>
-        /** @type {HTMLTableRowElement[]} */ (
-            Array.from(container.querySelectorAll('tr.draggable-row'))
-        );
+        /** @type {HTMLTableRowElement[]} */ (Array.from(container.querySelectorAll(QUEUE_ROW)));
 
     container.addEventListener('dragstart', (e) => {
         draggedRow = rowOf(e);
@@ -96,8 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
             e.dataTransfer.setData('text/plain', draggedRow.dataset.id ?? '');
         }
 
-        const rows = queueRows();
-        oldIndex = rows.indexOf(draggedRow);
+        oldIndex = queueRows().indexOf(draggedRow);
     });
 
     container.addEventListener('dragend', (_e) => {
@@ -130,20 +157,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!draggedRow || oldIndex === -1) return;
 
         const rows = queueRows();
-        const newIndex = rows.indexOf(draggedRow);
-
-        if (newIndex === oldIndex) return;
-
-        /** @type {string | undefined} */
-        let targetPriority;
-        if (newIndex > oldIndex) {
-            targetPriority = rows[newIndex - 1].dataset.priority;
-        } else if (newIndex < oldIndex) {
-            targetPriority = rows[newIndex + 1].dataset.priority;
-        }
-
+        const targetPriority = targetPriorityOf(rows, oldIndex, rows.indexOf(draggedRow));
         if (targetPriority) {
             persistOrderReorder(draggedRow.dataset.id, targetPriority);
         }
     });
-});
+}
+
+document.addEventListener('DOMContentLoaded', initOrdersReorder);

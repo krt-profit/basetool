@@ -604,7 +604,8 @@ UX — an "in-place" swap would amount to re-rendering the whole page anyway (RE
 
 The **admin CRUD** long tail (#582 — the last epic child) converts the remaining admin reference-data
 pages. The list-level CRUD on **mission-data** (squadrons / job-types / frequency-types create / edit
-/ delete / activate, plus the frequency-type drag-drop **reorder**) and **special-commands** (SK
+/ delete / activate, plus the frequency-type **reorder** by drag and drop or by the up/down buttons
+and Alt+ArrowUp/ArrowDown of REQ-UI-031) and **special-commands** (SK
 create / edit / delete / activate; member add / remove / role-flag / lead-toggle on the detail page)
 save through header-gated `X-Requested-With` twins and re-render the affected section fragment — the
 same `?fragment=…` fragment the include-inactive filters already swap, plus a new

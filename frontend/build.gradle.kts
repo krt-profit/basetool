@@ -846,6 +846,20 @@ val testTableSort =
     outputs.upToDateWhen { false }
   }
 
+val testReorderJs =
+  tasks.register<NodeTask>("testReorderJs") {
+    group = "verification"
+    description =
+      "Regression tests for krtReorder, the accessible list reorder: controls, Alt+Arrow keys, focus and announcement."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(layout.projectDirectory.file("scripts/krt-reorder.test.mjs").asFile)
+    ignoreExitValue.set(false)
+    inputs.file(layout.projectDirectory.file("scripts/krt-reorder.test.mjs"))
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-reorder.js"))
+    outputs.upToDateWhen { false }
+  }
+
 val testSearchJs =
   tasks.register<NodeTask>("testSearchJs") {
     group = "verification"
@@ -984,6 +998,7 @@ tasks.named("check").configure {
     testClientErrorCspJs,
     testSafeUrl,
     testTableSort,
+    testReorderJs,
     testSearchJs,
     testEslintBans,
     testTypecheckRatchet,
