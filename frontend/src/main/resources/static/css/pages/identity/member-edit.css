@@ -43,6 +43,7 @@
         gap: var(--space-4);
         align-items: end;
         padding: var(--space-4);
+        background: var(--surface-bar);
         border: var(--border-hairline);
     }
     .staffel-slot > .form-group {
