@@ -82,6 +82,9 @@ class PendingApprovalRenderMvcTest {
         .contains(message("pendingApproval.title", Locale.GERMAN))
         .contains(message("pendingApproval.message", Locale.GERMAN))
         .contains(message("pendingApproval.patience", Locale.GERMAN));
+    assertThat(html)
+        .as("a member who closes the page learns to come back and sign in through Discord")
+        .contains(message("pendingApproval.returnLater", Locale.GERMAN));
 
     assertThat(openingTagOf(html, "pending-approval-rejected"))
         .as("the rejection block ships hidden alongside it, so the poll can reveal it in place")
@@ -118,7 +121,8 @@ class PendingApprovalRenderMvcTest {
         .as("no waiting copy survives on the rejection page")
         .doesNotContain(message("pendingApproval.message", Locale.GERMAN))
         .doesNotContain(message("pendingApproval.patience", Locale.GERMAN))
-        .doesNotContain(message("pendingApproval.help", Locale.GERMAN));
+        .doesNotContain(message("pendingApproval.help", Locale.GERMAN))
+        .doesNotContain(message("pendingApproval.returnLater", Locale.GERMAN));
     assertThat(html)
         .as("a rejected account must not poll for an approval that can never arrive")
         .doesNotContain("pending-approval.js");

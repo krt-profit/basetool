@@ -157,6 +157,10 @@ second time for the nickname. All Discord calls of the provider JAR share one `H
   krt-theme `login.ftl` social block, so the Discord entry point is reachable from the credential
   form, the extractor's device-grant verification page, and any direct login — not only the app
   sidebar. Requires the `discord` IdP's "Hide on login page" = OFF.
+- [x] A failed username/password login points to the Discord button: the krt-theme overrides
+  `invalidUserMessage` (DE/EN) with the hint that an account registered through Discord has no
+  password. The text is the same for every failed attempt, whether the username exists or not, so
+  it reveals no account.
 
 - [x] The gate makes exactly one Discord call per first login; the precheck's nickname comes from
   that call's member object (`DiscordGuildRoleGateAuthenticatorTest`).
@@ -455,6 +459,9 @@ new PENDING registration (REQ-NOTIF-012), keyed off the PENDING transition itsel
   cannot be used until an admin approves the account, and sets the expectation that approval is
   manual and may take 1–2 days (`pendingApproval.message` / `pendingApproval.patience` in the
   default/de/en bundles).
+- [x] The waiting page also tells the member that it need not stay open, that closing it means no
+  message about the approval arrives, and that a member registered through Discord signs in again
+  with "Mit Discord anmelden", never with a username and password (`pendingApproval.returnLater`).
 - [x] **`PENDING` and `REJECTED` share the route but never the copy.** `BackendRoleSyncFilter`
   sends both to `/pending-approval` because both are equally access-less — that equivalence is
   access control, and it must not reach the text. `PendingApprovalPageController` therefore re-reads
