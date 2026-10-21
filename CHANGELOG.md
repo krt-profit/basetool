@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.19.4](https://github.com/krt-profit/basetool/releases/tag/v1.19.4) - 2026-10-21
+
 ### Added
 
 - **Überwachung der Anmeldungen je Exchange-Client.** Keycloak zählt seine Ereignisse jetzt je Client und auch für den Gerätefluss (`KC_EVENT_METRICS_USER_TAGS` mit `clientId`, `oauth2_device_*`-Ereignisse); `ExchangeClientDeviceLoginSurge` und `ExchangeClientTokenRequestSurge` melden, wenn ein Client in einer Stunde mehr als das Dreifache seiner üblichen Stunde erreicht, `KeycloakEventMetricsUntagged`, wenn die Client-Kennung fehlt; das Exchange-Dashboard zeigt die Ereignisse je Client (REQ-XCH-028, ADR-0303).
@@ -15,6 +17,14 @@
 - **Browser-Erweiterungen: Herkunft an den Client gebunden, kürzere Leerlaufzeit.** Das Ingest-Gateway nimmt eine `chrome-extension://`-Herkunft nur noch mit dem Token des Clients an, für den sie freigegeben ist, und `moz-extension://` nur für Clients mit Firefox-Build; alles andere endet mit `403 ORIGIN_NOT_ALLOWED` (`IRI_EXCHANGE_CORS_EXTENSION_ORIGINS` jetzt als `<clientId>=<origin>`, neu `IRI_EXCHANGE_CORS_FIREFOX_CLIENTS`). Erweiterungs-Clients müssen sich nach 14 statt 30 Tagen ohne Nutzung neu anmelden, und jede Release mit geänderten Manifest-Rechten wird vor der Auslieferung erneut geprüft (REQ-XCH-027, ADR-0304).
 
 - **Tausendertrennzeichen in aUEC-Feldern und Benachrichtigungen.** Alle Eingabefelder für aUEC (Bank, Org-Einheiten-Bank, Einkauf, Raffinerie, Einsatz-Finanzen, Bedarf, Lager-Verkauf) setzen die Trennpunkte schon beim Tippen, ohne die Eingabe zu stören; gesendet wird weiterhin der reine Zahlwert. Beträge in Benachrichtigungen erscheinen als `3.000.000` statt `3000000` (REQ-UI-037, REQ-NOTIF-031, ADR-0305).
+
+- **Zahlen in der Sprache der Seite.** Alle Eingabefelder für Zahlen — aUEC-Beträge, SCU- und
+  Stückmengen, Qualität, Anzahlen, Prozent, Frequenzen und mehr — setzen Tausender- und
+  Dezimaltrennzeichen beim Tippen nach der eingestellten Sprache: `1.999.999,0` auf Deutsch,
+  `1,999,999.0` auf Englisch. SCU-Mengen nehmen weiter drei Nachkommastellen, gesendet wird der reine
+  Zahlwert. Auch alle angezeigten Zahlen — Beträge, Kontostände, Preise, Mengen, Frequenzen,
+  „Mit Gebühr" und Benachrichtigungen — folgen der Sprache, Mengen bekommen Tausendertrennzeichen
+  (REQ-UI-037, REQ-UI-038, REQ-INV-042, REQ-INV-043, REQ-NOTIF-031, ADR-0305).
 
 ### Fixed
 
