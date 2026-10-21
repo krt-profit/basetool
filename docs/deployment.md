@@ -508,7 +508,8 @@ monitoring units are derived from the unit directory rather than listed.
 Two phases, PR-based; no hand-pushed tag, no tag ever moved.
 
 1. **Prepare.** *Actions → Release · Prepare → Run workflow*, version without the `v` (e.g.
-   `1.9.3`). It cuts `[Unreleased]` into a dated CHANGELOG section, regenerates the CycloneDX SBOMs
+   `1.9.3`). It cuts `[Unreleased]` into a dated CHANGELOG section, folds the fragments of `changelog.d/`
+   into it and deletes them (REQ-OPS-051), regenerates the CycloneDX SBOMs
    (`*/docs/*-bom.{json,xml}` — release-only artefacts), and opens a `chore(release): vX.Y.Z` PR.
    The SBOMs are always a fresh generation: both SBOM tasks are untracked in the build conventions (`build-logic`) and
    the step passes `--no-build-cache`, so a restored Gradle cache cannot hand back an older

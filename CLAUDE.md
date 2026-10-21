@@ -265,7 +265,7 @@ Moved to [`docs/specs/observability.md`](docs/specs/observability.md) (`REQ-OBS-
 
 - **Every** user-visible string comes from `messages.properties` (`messages_de.properties` / `messages_en.properties`). No exceptions — labels, buttons, tooltips, error messages, flash messages, alerts, placeholders, titles. No hardcoded text in HTML, JS, or Java. Translation keys for the personal-inventory feature live under `personalInventory.*` and `admin.personalInventory.*`.
 - **In `.properties` files**, German umlauts (`ä ö ü Ä Ö Ü ß`) MUST be encoded as `\uXXXX` (e.g. `\u00e4` for `ä`).
-- **In Markdown files** (`CHANGELOG.md`, `README.md`, …), German umlauts MUST be literal UTF-8 characters. Never use `\uXXXX` outside `.properties`.
+- **In Markdown files** (`CHANGELOG.md`, `changelog.d/*.md`, `README.md`, …), German umlauts MUST be literal UTF-8 characters. Never use `\uXXXX` outside `.properties`.
 
 ## Testing
 
@@ -281,7 +281,7 @@ and load when you work with `.java` files.
 
 ## Documentation
 
-- **Maintain `CHANGELOG.md`** for every user-visible change (features, fixes, env-var additions). No exceptions.
+- **Maintain the changelog** for every user-visible change (features, fixes, env-var additions). No exceptions. **A change adds a fragment `changelog.d/<name>.md` and never edits `CHANGELOG.md`** — the first line `### Added|Changed|Deprecated|Removed|Fixed|Security`, then the `- ` items; a pull request that adds an item under `[Unreleased]` fails `repo-lint.yml`, and `release-prepare.yml` folds the fragments into the version section (REQ-OPS-051, ADR-0306, [`changelog.d/README.md`](changelog.d/README.md)).
 - **CHANGELOG entries must be short, terse and to the point — only the essentials.** One to three sentences per bullet covering *what* changed and *why it matters to the user*. No multi-paragraph design rationales, no exhaustive file lists, no copy-pasted commit messages, no architectural reasoning that belongs in the PR description or Javadoc. Mention the area affected (controller / migration / config) and the user-visible effect — anything beyond that is noise. If a bullet grows past ~3 sentences, cut it.
 - **Code comments and Javadoc length** follow the HARD RULE below.
 

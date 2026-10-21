@@ -3202,6 +3202,52 @@ neither tool can reach production (ADR-0279).
 **Runbook:** [`deployment.md` → Seeding and emptying the testing system](../deployment.md#seeding-and-emptying-the-testing-system) ·
 **Related:** REQ-OPS-033, REQ-SEC-024, REQ-ORG-017
 
+### REQ-OPS-051 — A change records its changelog entry as a fragment, and the release folds it in
+
+A pull request does not edit `CHANGELOG.md`. Its user-visible change adds a fragment under
+`changelog.d/`, and `release-prepare.yml` folds every fragment into the release section, so two open
+pull requests never conflict over the changelog (ADR-0306).
+
+- **The fragment.** `changelog.d/<name>.md`, the name of lowercase letters, digits and hyphens (an
+  issue number or a branch slug). Its first line is `### <section>` with one of `Added`, `Changed`,
+  `Deprecated`, `Removed`, `Fixed`, `Security`; then one or more `- ` items in the style of
+  `CHANGELOG.md`, continuation lines indented by two spaces, blank lines between items allowed, no
+  further heading and no loose text. UTF-8 without BOM, LF line endings. `changelog.d/README.md`
+  documents the form and is not a fragment.
+- **`[Unreleased]` is closed.** A pull request whose `CHANGELOG.md` has an item under
+  `[Unreleased]` that the base branch does not have fails `repo-lint.yml`. The items already there
+  stay until the next release cuts them; nothing is migrated. The release pull request passes,
+  because its `[Unreleased]` is empty.
+- **The release folds.** `cut_release.py` cuts `[Unreleased]` into the dated version section as
+  before, then adds each fragment's items to their `### <section>` of that version, after the entries
+  already there and in the order the fragments were added on `main`; a missing section is created in
+  the order above. It then deletes the folded fragments, and the release commit carries the
+  deletions.
+- **A fragment goes where it shipped.** A fragment whose adding commit is already contained in an
+  older release tag joins that tag's section instead, when the CHANGELOG has one: a pull request
+  merged while a release pull request was open ships in that release.
+- **A broken fragment stops the release.** `cut_release.py` checks every fragment first and changes
+  nothing when one is malformed.
+- **The release notes see the fragments.** `gather_changes.py` prints the fragments present at the
+  window end as their own source, so notes written ahead of a release miss no entry.
+
+**Acceptance**
+
+- [x] `check_changelog_fragments.py --selftest` covers every malformed shape (section, missing item,
+  second heading, loose text, name, CRLF), the README, a new `[Unreleased]` item, legacy items and
+  the release pull request.
+- [x] `cut_release.py --selftest` covers the fold with section order and continuation lines, the
+  deletion, the older-tag attribution, an uncommitted fragment, the unchanged cut without fragments,
+  and that a malformed fragment changes nothing.
+- [x] `create_signed_commit.py --selftest` covers deletions in `fileChanges`;
+  `gather_changes.py --selftest` covers the fragments at the window end.
+
+**Enforced by:** `.github/scripts/check_changelog_fragments.py` (`repo-lint.yml`, `repo-gates`) ·
+`.github/scripts/cut_release.py` · `.github/scripts/create_signed_commit.py` (`--delete`) ·
+`release-prepare.yml` · `.claude/skills/release-notes/scripts/gather_changes.py` · **Decision:**
+[ADR-0306](../adr/0306-changelog-entries-are-fragments-folded-at-the-release.md) ·
+**Related:** REQ-OPS-029
+
 ## Open questions
 
 - Deepening the infra health gate beyond `redis-cli ping` / `pg_isready` (which do not

@@ -80,7 +80,7 @@ body:
         - label: Requires multi-user data isolation (filter by JWT `sub`)
         - label: Has a UI component (responsive check on Smartphone/Tablet/Desktop/Ultra-wide required)
         - label: Introduces new user-visible strings (i18n keys in de + en + fallback)
-        - label: Requires an entry in `CHANGELOG.md` under `[Unreleased]`
+        - label: Requires a changelog fragment in `changelog.d/`
         - label: Requires OpenAPI updates (`openapi.json` + SpringDoc annotations)
         - label: Requires Resilience4j configuration for new backend calls
 
@@ -93,7 +93,7 @@ body:
         - [ ]
         - [ ] Tests in place (unit + MVC/integration test if applicable)
         - [ ] `./gradlew check` passes green
-        - [ ] CHANGELOG entry added
+        - [ ] Changelog fragment added
 
   - type: checkboxes
     id: confirm

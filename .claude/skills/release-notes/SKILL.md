@@ -132,6 +132,15 @@ Fenster exakt ab und signalisiert über die Commit-Typen `feat`/`fix`/`perf` vs.
 Changelog nur die Einträge, die zu den Commits deines Fensters passen — **kopiere
 nie blind einen ganzen Block**.
 
+**Changelog-Fragmente (Quelle 1b).** Seit REQ-OPS-051 schreibt kein PR mehr in
+`CHANGELOG.md`, sondern legt `changelog.d/<name>.md` an (eine `### `-Rubrik plus
+Punkte); erst `release-prepare.yml` sortiert die Fragmente in den Versionsabschnitt
+ein. Endet dein Fenster nach dem letzten Release (Normalfall `--until HEAD`), stehen
+die neuesten Änderungen also **nur** in den Fragmenten. Das Skript gibt sie als
+„SOURCE 1b" aus, so wie sie am Fensterende vorliegen; behandle sie wie
+`[Unreleased]`-Einträge und gleiche sie ebenso mit dem Git-Log ab. Liegt das
+Fensterende auf einem Tag, ist 1b meist leer.
+
 **Achtung Release-Kadenz:** Hier werden mehrmals am Tag Tags geschnitten
 (`v0.3.40`, `v0.3.41`, `v0.3.42` am selben Tag). „Seit dem letzten Release" kann
 also fast leer sein. Liefert dein Bereich auffällig wenige Commits, frag nach, ob
@@ -448,6 +457,14 @@ hier ist deshalb das Sicherheitsnetz für Einträge, die am Release-PR vorbei in
 `[Unreleased]` gelandet sind — auf einem sauberen Changelog meldet er schlicht
 keine Verschiebung (idempotent, siehe unten).
 
+**Fragmente fasst dieser Schritt nicht an.** `reconcile_changelog.py` liest nur
+`CHANGELOG.md`; die Fragmente in `changelog.d/` sortiert allein `cut_release.py`
+beim Release ein, und zwar in den Abschnitt des Tags, das den Commit des Fragments
+als erstes enthält. Sortiere sie nie von Hand ein und schreibe keinen Eintrag nach
+`[Unreleased]` — der Gate in `repo-lint.yml` lehnt einen neuen Punkt dort ab.
+Nach dem Einsortieren zeigt `git blame` auf den Release-Commit; den ursprünglichen
+PR findest du über `git log --diff-filter=A -- changelog.d/<name>.md`.
+
 Das macht ein zweites Hilfsskript mechanisch. **Immer erst der Probelauf**, den
 Bericht prüfen, dann schreiben:
 
@@ -575,6 +592,8 @@ triffst du auch in Grenzfällen die richtige Entscheidung:
 - [ ] **Kein einziges Emoji** — Überschriften und Punkte rein als Text.
 - [ ] Echte Umlaute (ä/ö/ü/ß, kein ue/oe/ae/ss), keine Mojibake aus den Quelldaten.
 - [ ] Etwaiger Handlungsbedarf der Nutzer genannt.
+- [ ] Unveröffentlichte Fragmente (SOURCE 1b) gesichtet, wenn das Fenster nach dem letzten
+      Release endet.
 - [ ] CHANGELOG nachgeführt (Schritt 6): Probelauf geprüft, dann `--write`; veröffentlichte
       `[Unreleased]`-Einträge stehen unter ihrem `## [vX.Y.Z]`-Abschnitt, `git diff` gesichtet.
 - [ ] Fortschrittsmarker fortgeschrieben (Schritt 7): nach fertigen Notes
