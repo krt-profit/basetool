@@ -261,6 +261,21 @@ jobs:
           ADR_BASE_REF: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.merge_group.base_sha || '' }}
         run: scripts/check-adr-numbering.sh
 
+      - name: changelog-fragments / Self-test the fragment checker, the release cut and its consumers
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/check_changelog_fragments.py --selftest
+          python3 .github/scripts/cut_release.py --selftest
+          python3 .github/scripts/create_signed_commit.py --selftest
+          python3 .claude/skills/release-notes/scripts/gather_changes.py --selftest
+
+      - name: changelog-fragments / Check the changelog fragments and the closed [Unreleased] block
+        if: ${{ !cancelled() }}
+        env:
+          CHANGELOG_BASE_REF: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.merge_group.base_sha || '' }}
+        run: python3 .github/scripts/check_changelog_fragments.py --base "${CHANGELOG_BASE_REF}"
+
       - name: adr-registry / Self-test the ADR registry checker
         if: ${{ !cancelled() }}
         run: |

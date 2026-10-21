@@ -9,7 +9,7 @@ existing branch whose tip must equal ``--expected-head-oid``. The token comes fr
 Usage:
     create_signed_commit.py --repo owner/name --branch release/v1.2.3 \\
         --expected-head-oid <sha> --message "chore(release): prepare v1.2.3" \\
-        [--trailer "Signed-off-by: Name <email>"] [--dry-run] FILE [FILE ...]
+        [--trailer "Signed-off-by: Name <email>"] [--delete PATH ...] [--dry-run] [FILE ...]
 
 Prints the created commit's OID on success; exits non-zero with the GraphQL
 error otherwise.
@@ -23,6 +23,7 @@ import contextlib
 import json
 import os
 import sys
+import tempfile
 import urllib.error
 import urllib.request
 
@@ -46,6 +47,7 @@ def build_payload(
     message: str,
     trailers: list[str],
     files: list[str],
+    deletions: list[str] | None = None,
 ) -> dict:
     """Build the GraphQL request body for ``createCommitOnBranch``.
 
@@ -55,6 +57,7 @@ def build_payload(
     :param message: the commit headline.
     :param trailers: commit-body lines; blank entries are dropped.
     :param files: working-tree paths to commit, each Base64-encoded.
+    :param deletions: repository paths the commit deletes.
     :return: a ``{"query", "variables"}`` dict ready to POST to the GraphQL API.
     """
     additions = []
@@ -78,7 +81,10 @@ def build_payload(
                 },
                 "expectedHeadOid": head_oid,
                 "message": message_obj,
-                "fileChanges": {"additions": additions},
+                "fileChanges": {
+                    "additions": additions,
+                    "deletions": [{"path": path} for path in deletions or []],
+                },
             }
         },
     }
@@ -119,8 +125,33 @@ def create_commit(payload: dict, token: str) -> str:
         raise SystemExit("Unexpected GraphQL response: " + json.dumps(result))
 
 
+def selftest() -> int:
+    """Check that additions and deletions reach the ``fileChanges`` of the payload.
+
+    :return: 0 when every check passed, 1 otherwise.
+    """
+    with tempfile.TemporaryDirectory(prefix="signed-commit-selftest-") as directory:
+        changelog = os.path.join(directory, "CHANGELOG.md")
+        with open(changelog, "wb") as handle:
+            handle.write(b"# Changelog\n")
+        payload = build_payload("krt-profit/basetool", "release/v1.0.0", "abc", "chore: x", [],
+                                [changelog], ["changelog.d/suche.md", "changelog.d/hangar.md"])
+    changes = payload["variables"]["input"]["fileChanges"]
+    expected = {
+        "additions": [{"path": changelog, "contents": "IyBDaGFuZ2Vsb2cK"}],
+        "deletions": [{"path": "changelog.d/suche.md"}, {"path": "changelog.d/hangar.md"}],
+    }
+    if changes != expected:
+        print(f"SELFTEST FAIL: fileChanges\n  expected {expected}\n  got      {changes}")
+        return 1
+    print("selftest: ok")
+    return 0
+
+
 def main() -> None:
     """Parse arguments, build the payload, and create (or preview) the commit."""
+    if "--selftest" in sys.argv:
+        raise SystemExit(selftest())
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -135,12 +166,16 @@ def main() -> None:
                         help="Commit-body line, repeatable (e.g. Signed-off-by).")
     parser.add_argument("--dry-run", action="store_true",
                         help="Print the payload (contents elided) without POSTing.")
-    parser.add_argument("files", nargs="+", help="Working-tree paths to commit.")
+    parser.add_argument("--delete", action="append", default=[],
+                        help="Repository path the commit deletes, repeatable.")
+    parser.add_argument("files", nargs="*", help="Working-tree paths to commit.")
     args = parser.parse_args()
+    if not args.files and not args.delete:
+        parser.error("nothing to commit: pass at least one FILE or --delete")
 
     payload = build_payload(
         args.repo, args.branch, args.expected_head_oid,
-        args.message, args.trailer, args.files,
+        args.message, args.trailer, args.files, args.delete,
     )
 
     if args.dry_run:

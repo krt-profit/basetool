@@ -156,8 +156,9 @@ When the advisory is published we will:
 1. Release a patched version and the corresponding container image tags.
 2. Publish the GitHub Security Advisory with details, affected versions,
    workarounds, and credit.
-3. Add a `### Security` entry to [`CHANGELOG.md`](../CHANGELOG.md) referring
-   to the advisory.
+3. Add a `### Security` changelog fragment under
+   [`changelog.d/`](../changelog.d/README.md) referring to the advisory; the
+   release folds it into [`CHANGELOG.md`](../CHANGELOG.md).
 
 ## Safe Harbor
 

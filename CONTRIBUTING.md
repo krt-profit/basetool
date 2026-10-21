@@ -19,8 +19,9 @@ If you only have a couple of minutes, the very short version is:
    [Conventional Commits](#commit-messages), and must pass
    `./gradlew check` + `./gradlew spotlessApply` locally before they are
    pushed.
-5. **Every user-visible change updates
-   [`CHANGELOG.md`](CHANGELOG.md)** under `## [Unreleased]`.
+5. **Every user-visible change adds a changelog fragment** under
+   [`changelog.d/`](changelog.d/README.md) instead of editing
+   [`CHANGELOG.md`](CHANGELOG.md); the release folds it in (REQ-OPS-051).
 6. **Sign the [Contributor License Agreement](CLA.md) once** before
    your first PR, and **add a `Signed-off-by:` trailer
    ([DCO](#developer-certificate-of-origin-dco-sign-off)) to every
@@ -76,7 +77,7 @@ matches what you are about to change *before* you open a PR:
 | Topic                                                                                               | Where                                                                                                                                                                            |
 |:----------------------------------------------------------------------------------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Project overview, prerequisites, local dev/test stack, deployment runbook                           | [`README.md`](README.md)                                                                                                                                                         |
-| Release notes and every user-visible change                                                         | [`CHANGELOG.md`](CHANGELOG.md)                                                                                                                                                   |
+| Release notes and every user-visible change                                                         | [`CHANGELOG.md`](CHANGELOG.md), unreleased entries as fragments in [`changelog.d/`](changelog.d/README.md)                                                                          |
 | Security vulnerability reporting, supported versions, scope, safe harbor                            | [`.github/SECURITY.md`](.github/SECURITY.md)                                                                                                                                     |
 | Architectural invariants, build/test commands, AI-assistant guardrails                              | [`CLAUDE.md`](CLAUDE.md)                                                                                                                                                         |
 | Role and permission matrix (realm roles + contextual `LOGISTICIAN` / `MISSION_MANAGER` grants)       | [`ROLES_AND_PERMISSIONS.md`](ROLES_AND_PERMISSIONS.md)                                                                                                                           |
@@ -174,7 +175,7 @@ The template intentionally asks for:
 - **Alternatives** you considered and rejected.
 - A scope checklist that flags non-obvious follow-on work (Flyway
   migration, role logic, multi-user / multi-squadron isolation,
-  responsive UI work, i18n keys in DE + EN + fallback, CHANGELOG entry,
+  responsive UI work, i18n keys in DE + EN + fallback, changelog fragment,
   OpenAPI updates, Resilience4j configuration for new backend calls).
 
 If your proposal needs a Flyway migration or touches the role model or
@@ -1099,7 +1100,7 @@ the PR — every box should be reasonably tickable.
 - [ ] Every new / changed public API has Javadoc — concrete, code-specific, no boilerplate.
 - [ ] New / changed code has tests (`*Test`, Given/When/Then); concurrency-sensitive changes test the optimistic-lock path.
 - [ ] No production credentials in test artefacts, stack spin-ups, or screenshots.
-- [ ] `CHANGELOG.md` updated under `## [Unreleased]` in the correct category (`Added` / `Changed` / `Fixed` / `Removed` / `Security`) — entries are written in German, short and user-facing, like the existing ones.
+- [ ] A changelog fragment `changelog.d/<name>.md` added in the correct category (`Added` / `Changed` / `Deprecated` / `Removed` / `Fixed` / `Security`), `CHANGELOG.md` itself untouched — entries are written in German, short and user-facing, like the existing ones ([`changelog.d/README.md`](changelog.d/README.md)).
 - [ ] No tokens, passwords, real names, emails, or JWTs in the diff or in logs.
 - [ ] My [CLA](CLA.md) is on file (one-time, signature in [`docs/cla-signatures.md`](docs/cla-signatures.md) or via CLA-Assistant).
 - [ ] **Every** commit in the PR carries a `Signed-off-by:` trailer (DCO; `git commit -s`).

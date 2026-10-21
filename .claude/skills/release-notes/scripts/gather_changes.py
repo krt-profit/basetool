@@ -26,6 +26,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 
 for _stream in (sys.stdout, sys.stderr):
     with contextlib.suppress(AttributeError, ValueError):
@@ -137,6 +138,24 @@ def select_changelog(changelog_path: str, since: str, until: str,
             out.append(header)
             out.extend(body)
     return "\n".join(out).strip() or "(no [Unreleased] or in-window version sections)"
+
+
+def unreleased_fragments(repo: str, rev: str) -> str:
+    """Return the changelog fragments in ``changelog.d/`` at ``rev``, each under its path.
+
+    These are entries merged but not yet folded into a release section.
+    """
+    exists = subprocess.run(["git", "cat-file", "-e", f"{rev}:changelog.d"],
+                            cwd=repo, capture_output=True).returncode == 0
+    listing = run_git(repo, ["ls-tree", "--name-only", f"{rev}:changelog.d"]) if exists else ""
+    out: list[str] = []
+    for name in sorted(listing.split()):
+        if name == "README.md" or not name.endswith(".md"):
+            continue
+        out.append(f"--- changelog.d/{name}")
+        out.append(run_git(repo, ["show", f"{rev}:changelog.d/{name}"]).strip())
+        out.append("")
+    return "\n".join(out).strip() or "(no unreleased fragments in changelog.d/)"
 
 
 def as_git_date(value: str, *, end: bool = False) -> str | None:
@@ -296,8 +315,52 @@ def resolve_since(repo: str, arg_since: str | None, state):
     return sha, True, f"{anchor} (covered through {covered.get('date', '?')})"
 
 
+def selftest() -> int:
+    """Check that the fragments at the window end appear and README and later ones do not.
+
+    :return: 0 when every check passed, 1 otherwise.
+    """
+    env =dict(os.environ, GIT_AUTHOR_NAME="Selftest", GIT_AUTHOR_EMAIL="selftest@example.invalid",
+               GIT_COMMITTER_NAME="Selftest", GIT_COMMITTER_EMAIL="selftest@example.invalid",
+               GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull)
+
+    def git(repo: str, *args: str) -> str:
+        return subprocess.run(["git", "-c", "commit.gpgsign=false", *args], cwd=repo, env=env,
+                              capture_output=True, text=True, encoding="utf-8", check=True).stdout
+
+    def write(repo: str, path: str, text: str) -> None:
+        os.makedirs(os.path.dirname(os.path.join(repo, path)), exist_ok=True)
+        with open(os.path.join(repo, path), "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(text)
+
+    failures = []
+    with tempfile.TemporaryDirectory(prefix="gather-selftest-") as repo:
+        git(repo, "init", "-q", "-b", "main")
+        write(repo, "changelog.d/README.md", "# Changelog fragments\n")
+        write(repo, "changelog.d/suche.md", "### Fixed\n\n- **Suche.** Behoben.\n")
+        git(repo, "add", "-A")
+        git(repo, "commit", "-q", "-m", "fix: suche")
+        end = git(repo, "rev-parse", "HEAD").strip()
+        write(repo, "changelog.d/spaeter.md", "### Added\n\n- **Später.** Nach dem Fenster.\n")
+        git(repo, "add", "-A")
+        git(repo, "commit", "-q", "-m", "feat: spaeter")
+        shown = unreleased_fragments(repo, end)
+        if "changelog.d/suche.md" not in shown or "- **Suche.** Behoben." not in shown:
+            failures.append(f"the fragment at the window end is missing:\n{shown}")
+        if "README" in shown or "Später" in shown:
+            failures.append(f"the README or a later fragment was shown:\n{shown}")
+    for failure in failures:
+        print(f"SELFTEST FAIL: {failure}")
+    if failures:
+        return 1
+    print("selftest: ok")
+    return 0
+
+
 def main() -> None:
     """Parse arguments, gather both sources, and print the digest to stdout."""
+    if "--selftest" in sys.argv:
+        raise SystemExit(selftest())
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--since", default=None,
@@ -351,6 +414,11 @@ def main() -> None:
     print("#   then holds only not-yet-released entries. A legacy all-in-[Unreleased]")
     print("#   changelog prints whole. Cross-check the git log for the exact boundary.\n")
     print(select_changelog(os.path.join(repo, "CHANGELOG.md"), since, args.until, exclude_tags))
+
+    print("\n### SOURCE 1b -- changelog.d/: fragments merged but not yet in a release section")
+    print("# Each fragment is one '### <section>' with its items; release-prepare folds them")
+    print("#   into the version section. Shown as of the window end.\n")
+    print(unreleased_fragments(repo, window_end_commit(repo, args.until)))
 
     print("\n\n### SOURCE 2 -- git log in range, bucketed by Conventional-Commit type")
     print("# feat/fix/perf are the user-facing candidates; the internal bucket is")
