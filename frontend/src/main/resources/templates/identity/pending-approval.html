@@ -25,6 +25,7 @@
             <p th:text="#{pendingApproval.message}">Dein Account wurde erstellt und wartet auf die Freigabe durch einen Administrator. Du kannst das Tool erst nutzen, sobald ein Administrator deinen Zugang freigegeben hat.</p>
             <p class="pending-approval-emphasis" th:text="#{pendingApproval.patience}">Die Freigabe erfolgt manuell und kann 1 bis 2 Tage dauern. Bitte habe so lange etwas Geduld.</p>
             <p class="pending-approval-help" th:text="#{pendingApproval.help}">Sobald du freigeschaltet bist, geht es hier automatisch weiter.</p>
+            <p id="pending-approval-return-later" class="pending-approval-help" th:text="#{pendingApproval.returnLater}">Du musst diese Seite nicht offen lassen.</p>
             <p id="pending-approval-approved" class="pending-approval-emphasis" hidden th:text="#{pendingApproval.approved}">Freigabe erteilt. Du wirst weitergeleitet.</p>
         </div>
         <div id="pending-approval-no-role" th:if="${registrationNoRole and !registrationRejected}">
