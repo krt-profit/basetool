@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [v1.19.5](https://github.com/krt-profit/basetool/releases/tag/v1.19.5) - 2026-10-21
+
+### Changed
+
+- Login: a failed username/password sign-in now says that an account registered through Discord has no password and signs in with the Discord button.
+
+- Waiting page for a pending registration: it now says the page need not stay open, that no message arrives once approved, and that Discord members sign in again through "Mit Discord anmelden".
+
+### Fixed
+
+- **Tabellen in Karten.** Eine Tabelle innerhalb einer Karte trägt nicht mehr dasselbe Grau wie
+  die Karte, sondern hebt sich dunkler ab – etwa unter „Mitglied bearbeiten → Mitgliedschaften",
+  im Einkauf, in den Einstellungen und bei den verbundenen Anwendungen. Der Staffel-Block im
+  Reiter „Mitgliedschaften" hebt sich ebenso vom Panel ab.
+
 ## [v1.19.4](https://github.com/krt-profit/basetool/releases/tag/v1.19.4) - 2026-10-21
 
 ### Added
