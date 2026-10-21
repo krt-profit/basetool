@@ -2292,7 +2292,7 @@ verifying image signatures (cosign keyless)
 
 **The host cosign** is installed by the role (`15-cosign.yml`) from the upstream release, verified
 against the sha256 pinned in `ansible/roles/basetool_host/defaults/main.yml`
-(`basetool_host_cosign_version`, currently v3.1.3) — it is in no Rocky or EPEL repository. It must
+(`basetool_host_cosign_version`, currently v3.1.4) — it is in no Rocky or EPEL repository. It must
 never be an older major than the cosign CI signs with (`sigstore/cosign-installer`, v4.1.2 →
 cosign 3.x): cosign 2.x cannot verify 3.x signatures, and the fail-closed gate would stop every
 deploy. To upgrade: change the version and the checksum in `defaults/main.yml` in a reviewed commit,
