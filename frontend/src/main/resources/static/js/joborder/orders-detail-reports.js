@@ -19,6 +19,7 @@
 
 /* global MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_OWNER, MSG_LOCATION, MSG_STOLEN, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_LOAD_ERROR, MSG_INVENTORY_BELOW_FLOOR, MSG_INVENTORY_PART_OF, MSG_INVENTORY_UNLINK_TOOLTIP, IS_LOGISTICIAN, ORDER_REQUESTING_SQUADRON_ID, ORDER_HANDOVER_I18N */
 
+import { formatNumber } from '/js/kernel/krt-number-format.js';
 import {
     cachedInventoryItems,
     fillPlaceholders,
@@ -155,7 +156,7 @@ export async function downloadItemHandoverReport(btn) {
  */
 export function validateItemHandoverForm() {
     const inputs = /** @type {NodeListOf<HTMLInputElement>} */ (
-        document.querySelectorAll('#item-handover-modal input[type="number"]')
+        document.querySelectorAll('#item-handover-modal input[data-number-input]')
     );
     for (const inp of inputs) {
         const val = parseInt(inp.value, 10);
@@ -191,7 +192,7 @@ export async function previewHandoverReport(btn) {
     const hasValidItem = Array.from(itemRows).some((row) => {
         const sel = row.querySelector('select');
         const inp = /** @type {HTMLInputElement | null} */ (
-            row.querySelector('input[type="number"]')
+            row.querySelector('input[data-number-input]')
         );
         return sel && sel.value && inp && inp.value;
     });
@@ -219,7 +220,7 @@ export async function previewHandoverReport(btn) {
     document.querySelectorAll('.handover-item-row').forEach((row) => {
         const select = row.querySelector('select');
         const amountInput = /** @type {HTMLInputElement | null} */ (
-            row.querySelector('input[type="number"]')
+            row.querySelector('input[data-number-input]')
         );
         if (select && select.value && amountInput && amountInput.value) {
             const invId = select.value;
@@ -406,12 +407,16 @@ export async function toggleInventory(row) {
             const quality = item.quality !== null ? item.quality : '-';
             const unit = amountType ? amountType : '';
             const counted = attribution ? attribution.here.get(item.id) : undefined;
-            const total = item.amount !== null ? item.amount.toFixed(3) : '0.000';
+            const total = formatNumber(
+                item.amount !== null ? item.amount : 0,
+                3,
+                document.documentElement.lang,
+            );
             let quantity = `${total} ${unit}`;
             if (counted !== undefined && Math.abs(counted - (item.amount || 0)) > 0.0005) {
                 quantity = MSG_INVENTORY_PART_OF.replace(
                     '{0}',
-                    `${counted.toFixed(3)} ${unit}`,
+                    `${formatNumber(counted, 3, document.documentElement.lang)} ${unit}`,
                 ).replace('{1}', `${total} ${unit}`);
             }
             if (attribution && counted === undefined && attribution.unattributed.has(item.id)) {

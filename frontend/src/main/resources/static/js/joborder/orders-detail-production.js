@@ -19,6 +19,7 @@
 
 /* global MSG_STOLEN, MSG_QUALITY, MSG_INVENTORY_BELOW_FLOOR, MSG_PRODUCTION_COUNTED_HIGHER, PRODUCTION_I18N */
 
+import { formatNumber } from '/js/kernel/krt-number-format.js';
 import { krtOrderWrite } from '/js/joborder/orders-detail-edit.js';
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
@@ -300,7 +301,9 @@ function _prodRoundForType(x, quantityType) {
  * @returns {string} the formatted value
  */
 function _prodFmtNum(x, quantityType) {
-    return quantityType === 'PIECE' ? String(Math.round(x)) : _prodRound3(x).toFixed(3);
+    return quantityType === 'PIECE'
+        ? formatNumber(Math.round(x), 0, document.documentElement.lang)
+        : formatNumber(_prodRound3(x), 3, document.documentElement.lang);
 }
 
 /**
@@ -312,8 +315,8 @@ function _prodFmtNum(x, quantityType) {
  */
 function _prodFmtQty(x, quantityType) {
     return quantityType === 'PIECE'
-        ? `${String(Math.round(x))} ${PRODUCTION_I18N.unitPiece}`
-        : `${_prodRound3(x).toFixed(3)} ${PRODUCTION_I18N.unitScu}`;
+        ? `${formatNumber(Math.round(x), 0, document.documentElement.lang)} ${PRODUCTION_I18N.unitPiece}`
+        : `${formatNumber(_prodRound3(x), 3, document.documentElement.lang)} ${PRODUCTION_I18N.unitScu}`;
 }
 
 /**
@@ -548,7 +551,7 @@ function _renderProdMaterialEntries(card, mat) {
         )}${chips} <small>${MSG_QUALITY} ${String(e.quality)} · ${PRODUCTION_I18N.available} ${_prodFmtQty(
             cap,
             mat.quantityType,
-        )}</small></div><input type="number" min="0" step="${
+        )}</small></div><input type="text" data-number-input min="0" step="${
             mat.quantityType === 'PIECE' ? '1' : 'any'
         }" value="0" data-prod-alloc data-prod-idx="${idx}"></div>`;
     });

@@ -18,6 +18,15 @@
  */
 
 /**
+ * The language of the page, for numbers in the previews.
+ *
+ * @returns {string | undefined} the page's language tag, or undefined for the browser default
+ */
+function pageLocale() {
+    return document.documentElement.lang || undefined;
+}
+
+/**
  * Reads the org-wide in-game transfer-fee rate from `<main data-transfer-fee-rate>`
  * (REQ-BANK-033).
  *
@@ -85,13 +94,13 @@ export function updateFeePreview(form) {
     const debitEl = preview.querySelector('[data-fee-debit]');
     const arrivesEl = preview.querySelector('[data-fee-arrives]');
     if (valueEl) {
-        valueEl.textContent = fee.toLocaleString('de-DE');
+        valueEl.textContent = fee.toLocaleString(pageLocale());
     }
     if (debitEl) {
-        debitEl.textContent = debited.toLocaleString('de-DE');
+        debitEl.textContent = debited.toLocaleString(pageLocale());
     }
     if (arrivesEl) {
-        arrivesEl.textContent = arrives.toLocaleString('de-DE');
+        arrivesEl.textContent = arrives.toLocaleString(pageLocale());
     }
     preview.hidden = false;
 }
@@ -139,7 +148,7 @@ export function updateDepositGross(form) {
     const whole = Math.round(amount);
     const valueEl = block.querySelector('[data-deposit-gross-value]');
     if (valueEl) {
-        valueEl.textContent = (whole + Math.round(whole * rate)).toLocaleString('de-DE');
+        valueEl.textContent = (whole + Math.round(whole * rate)).toLocaleString(pageLocale());
     }
     block.hidden = false;
 }
@@ -318,10 +327,10 @@ function updateSplitPreview(form) {
     const sliceEl = preview.querySelector('[data-split-slice]');
     const remainderEl = preview.querySelector('[data-split-remainder]');
     if (sliceEl) {
-        sliceEl.textContent = slice.toLocaleString('de-DE');
+        sliceEl.textContent = slice.toLocaleString(pageLocale());
     }
     if (remainderEl) {
-        remainderEl.textContent = (gross - slice).toLocaleString('de-DE');
+        remainderEl.textContent = (gross - slice).toLocaleString(pageLocale());
     }
     preview.hidden = false;
 }
@@ -361,7 +370,7 @@ function updateBalanceCalc(input) {
     }
     const reserved = Number(panel.getAttribute('data-reserved'));
     const own = balance - (Number.isFinite(reserved) ? reserved : 0);
-    ownEl.textContent = `${Math.round(own).toLocaleString('de-DE')} aUEC`;
+    ownEl.textContent = `${Math.round(own).toLocaleString(pageLocale())} aUEC`;
     ownEl.classList.toggle('bank-amount--neg', own < 0);
     ownEl.classList.toggle('bank-amount--pos', own > 0);
     result.hidden = false;

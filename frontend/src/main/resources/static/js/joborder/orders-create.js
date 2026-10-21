@@ -574,7 +574,7 @@ function addItemLine(prefill) {
             </div>
             <div class="form-group flex-1 mb-0">
                 <label>${ITEM_I18N.amount}</label>
-                <input type="number" step="1" name="items[${idx}].amount" data-role="amount" min="${minAmount}" value="${prefill.amount || 1}" required>
+                <input type="text" data-number-input step="1" name="items[${idx}].amount" data-role="amount" min="${minAmount}" value="${prefill.amount || 1}" required>
             </div>
             ${removeButton}
         </div>

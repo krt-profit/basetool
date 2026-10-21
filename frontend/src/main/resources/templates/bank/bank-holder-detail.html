@@ -29,7 +29,7 @@
                 <div class="kpi-label" th:text="#{bank.manage.holder.total}">H&auml;lt gesamt</div>
                 <div class="kpi-value" data-testid="bank-holder-total"
                      th:classappend="${holder.totalHeld().signum() < 0} ? ' bank-amount--neg' : ''"
-                     th:text="${#numbers.formatInteger(@moneyFormat.round(holder.totalHeld()), 1, 'POINT')} + ' aUEC'">1.000.000 aUEC</div>
+                     th:text="${#numbers.formatInteger(@moneyFormat.round(holder.totalHeld()), 1, 'DEFAULT')} + ' aUEC'">1.000.000 aUEC</div>
             </div>
             <div class="kpi-total">
                 <div class="kpi-label" th:text="#{bank.detail.bookings}">Buchungen</div>
@@ -42,7 +42,7 @@
             <h2 class="bank-holder-calc__title" th:text="#{bank.holder.calc.title}">Kontostand-Aufteilung</h2>
             <div class="bank-form-row bank-holder-calc__input">
                 <label for="bank-holder-balance-input" th:text="#{bank.holder.calc.balance}">Aktueller Kontostand (aUEC)</label>
-                <input type="text" data-auec-input id="bank-holder-balance-input" min="0" step="1" inputmode="numeric"
+                <input type="text" data-number-input id="bank-holder-balance-input" min="0" step="1" inputmode="numeric"
                        data-balance-input data-testid="bank-holder-balance-input">
                 <span class="bank-field-hint" th:text="#{bank.holder.calc.hint}">Trag deinen aktuellen Kontostand ein.</span>
             </div>
@@ -56,7 +56,7 @@
                         <span class="sw stack-seg-0"></span>
                         <span th:text="#{bank.holder.calc.reserved}">Bank-reserviert</span>
                         <strong th:classappend="${holder.totalHeld().signum() < 0} ? ' bank-amount--neg' : ''"
-                                th:text="${#numbers.formatInteger(@moneyFormat.round(holder.totalHeld()), 1, 'POINT')} + ' aUEC'">1.000.000 aUEC</strong>
+                                th:text="${#numbers.formatInteger(@moneyFormat.round(holder.totalHeld()), 1, 'DEFAULT')} + ' aUEC'">1.000.000 aUEC</strong>
                     </span>
                     <span>
                         <span class="sw stack-seg-1"></span>
@@ -110,10 +110,10 @@
                     <td class="num">
                         <span class="bank-amount"
                               th:classappend="${b.amount().signum() > 0} ? ' bank-amount--pos' : (${b.amount().signum() < 0} ? ' bank-amount--neg' : ' bank-amount--zero')"
-                              th:text="${b.amount().signum() > 0 ? '+' : ''} + ${#numbers.formatInteger(@moneyFormat.round(b.amount()), 1, 'POINT')}">+250.000</span>
+                              th:text="${b.amount().signum() > 0 ? '+' : ''} + ${#numbers.formatInteger(@moneyFormat.round(b.amount()), 1, 'DEFAULT')}">+250.000</span>
                         <span class="bank-fee-note cell-sub" data-testid="bank-holder-booking-fee"
                               th:if="${b.transferFee() != null and b.transferFee().signum() > 0 and b.amount().signum() < 0}"
-                              th:text="#{bank.fee.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.transferFee()), 1, 'POINT')} + ' &middot; ' + #{bank.fee.net.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.amount().abs().subtract(b.transferFee())), 1, 'POINT')}">Geb&uuml;hr 25 &middot; kommt an 4.975.000</span>
+                              th:text="#{bank.fee.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.transferFee()), 1, 'DEFAULT')} + ' &middot; ' + #{bank.fee.net.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.amount().abs().subtract(b.transferFee())), 1, 'DEFAULT')}">Geb&uuml;hr 25 &middot; kommt an 4.975.000</span>
                     </td>
                 </tr>
                 </tbody>

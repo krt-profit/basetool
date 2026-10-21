@@ -65,19 +65,48 @@ class NotificationRenderAmountsTest {
         controller().render("PAYOUT", params, Locale.GERMAN));
   }
 
+  @Test
+  void anEnglishMemberGetsCommasBetweenThousands() {
+    StaticMessageSource messages = new StaticMessageSource();
+    messages.addMessage(
+        "notifications.type.PAYOUT", Locale.ENGLISH, "{actor} paid out {amount} aUEC (fee {fee})");
+    NotificationPageController controller =
+        new NotificationPageController(
+            mock(NotificationBackendClient.class),
+            messages,
+            new BackendSideChannels(mock(WebClient.class), null),
+            mock(OAuth2AuthorizedClientManager.class),
+            new SimpleMeterRegistry());
+    Map<String, String> params = new LinkedHashMap<>();
+    params.put("actor", "Ada");
+    params.put("amount", "3000000");
+    params.put("fee", "12.50");
+
+    assertEquals(
+        "Ada paid out 3,000,000 aUEC (fee 12.50)",
+        controller.render("PAYOUT", params, Locale.ENGLISH));
+  }
+
   @ParameterizedTest
   @CsvSource({
-    "0, 0",
-    "999, 999",
-    "1000, 1.000",
-    "1234567, 1.234.567",
-    "12.50, '12,50'",
-    "1500000.25, '1.500.000,25'",
-    "-25000, -25.000",
-    "abc, abc",
-    "'1,5', '1,5'"
+    "de, 0, 0",
+    "de, 999, 999",
+    "de, 1000, 1.000",
+    "de, 1234567, 1.234.567",
+    "de, 12.50, '12,50'",
+    "de, 1500000.25, '1.500.000,25'",
+    "de, -25000, -25.000",
+    "de, abc, abc",
+    "de, '1,5', '1,5'",
+    "de, 1999999.0, '1.999.999,0'",
+    "en, 1999999.0, '1,999,999.0'",
+    "en, 1234567, '1,234,567'",
+    "en, 12.50, 12.50",
+    "en, -25000, '-25,000'"
   })
-  void groupAmountFormatsOnlyPlainDecimals(String stored, String shown) {
-    assertEquals(shown, NotificationPageController.groupAmount(stored));
+  void groupAmountFormatsOnlyPlainDecimalsInTheMembersLanguage(
+      String language, String stored, String shown) {
+    assertEquals(
+        shown, NotificationPageController.groupAmount(stored, Locale.forLanguageTag(language)));
   }
 }

@@ -43,7 +43,7 @@
                                 <span class="bp-ingredient" th:each="ing : ${g.ingredients()}">
                                     <span th:text="${ing.name() != null ? ing.name() : '?'}">Zutat</span>
                                     <span class="bp-meta" th:if="${ing.quantityScu() != null}"
-                                          th:text="'· ' + ${#numbers.formatDecimal(ing.quantityScu(),1,2,'POINT')} + ' SCU'">· 0.36 SCU</span>
+                                          th:text="'· ' + ${#numbers.formatDecimal(ing.quantityScu(),1,2,'DEFAULT')} + ' SCU'">· 0.36 SCU</span>
                                     <span class="bp-meta" th:if="${ing.quantityUnits() != null}"
                                           th:text="'· ' + ${ing.quantityUnits()} + 'x'">· 7x</span>
                                     <span class="bp-meta" th:if="${ing.minQuality() != null}">
@@ -66,10 +66,10 @@
                                         <span class="bp-seg" th:each="seg : ${m.segments()}"
                                               th:attr="data-qmin=${seg.qualityMin()},data-qmax=${seg.qualityMax()},data-vstart=${seg.modifierAtStart()},data-vend=${seg.modifierAtEnd()}"></span>
                                         <span class="bp-slider-row">
-                                            <span class="bp-slider-end" th:text="${#numbers.formatDecimal(m.effectiveQualityMin(),1,0,'POINT')}">0</span>
+                                            <span class="bp-slider-end" th:text="${#numbers.formatDecimal(m.effectiveQualityMin(),1,0,'DEFAULT')}">0</span>
                                             <input type="range" class="bp-range" step="1"
                                                    th:attr="min=${m.effectiveQualityMin()},max=${m.effectiveQualityMax()},value=${m.effectiveQualityMax()}">
-                                            <span class="bp-slider-end bp-slider-end-max" th:text="${#numbers.formatDecimal(m.effectiveQualityMax(),1,0,'POINT')}">1000</span>
+                                            <span class="bp-slider-end bp-slider-end-max" th:text="${#numbers.formatDecimal(m.effectiveQualityMax(),1,0,'DEFAULT')}">1000</span>
                                         </span>
                                         <span class="bp-slider-out">
                                             <output class="bp-q">&ndash;</output>
@@ -80,7 +80,7 @@
                                     <span class="bp-dep"
                                           th:unless="${m.effectiveQualityMin() != null and m.effectiveQualityMax() != null and m.effectiveQualityMax() > m.effectiveQualityMin()}">
                                         <span class="bp-dep-val" th:if="${m.modifierAtMaxQuality() != null}"
-                                              th:text="'×' + ${#numbers.formatDecimal(m.modifierAtMaxQuality(),1,2,'POINT')}">&times;1.05</span>
+                                              th:text="'×' + ${#numbers.formatDecimal(m.modifierAtMaxQuality(),1,2,'DEFAULT')}">&times;1.05</span>
                                         <span class="bp-empty-hint" th:unless="${m.modifierAtMaxQuality() != null}">&ndash;</span>
                                     </span>
                                 </span>

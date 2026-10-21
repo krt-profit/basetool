@@ -55,7 +55,7 @@
                         <span th:text="#{bank.field.amount}">Betrag (aUEC)</span>
                         <th:block th:replace="~{kernel/fragments/scu-hint :: fieldHint('bank.field.amount.hint')}"></th:block>
                     </label>
-                    <input type="text" data-auec-input inputmode="numeric" id="bank-mv-amount" name="amount" min="1" step="1" required
+                    <input type="text" data-number-input inputmode="numeric" id="bank-mv-amount" name="amount" min="1" step="1" required
                            data-testid="bank-movement-amount" th:placeholder="#{bank.field.amount.placeholder}">
                     <span class="bank-field-error" data-error-for="amount"></span>
                     <p class="bank-field-hint bank-fee-preview" data-fee-preview hidden
@@ -96,7 +96,7 @@
                             <span th:text="#{bank.split.percent}">Prozentsatz (%)</span>
                             <th:block th:replace="~{kernel/fragments/scu-hint :: fieldHint('bank.split.hint')}"></th:block>
                         </label>
-                        <input type="number" id="bank-mv-split-percent" name="splitPercent"
+                        <input type="text" data-number-input id="bank-mv-split-percent" name="splitPercent"
                                min="1" max="100" step="1" disabled
                                data-testid="bank-movement-split-percent" th:placeholder="#{bank.split.percent.placeholder}">
                         <p class="bank-field-hint bank-split-preview" data-split-preview hidden

@@ -2443,10 +2443,10 @@ class MissionPageControllerMvcTest {
                                     .claim("preferred_username", "viewer1"))))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("Befehl")))
-        .andExpect(content().string(containsString("121.50")))
+        .andExpect(content().string(containsString("121,50")))
         .andExpect(content().string(not(containsString("Notfall"))))
         .andExpect(content().string(containsString("Alpha")))
-        .andExpect(content().string(containsString("243.75")))
+        .andExpect(content().string(containsString("243,75")))
         .andExpect(content().string(not(containsString("Bravo"))));
   }
 
@@ -2538,7 +2538,7 @@ class MissionPageControllerMvcTest {
                                     .claim("preferred_username", "viewer1"))))
         .andExpect(status().isOk())
         .andExpect(content().string(not(containsString(">Funk<"))))
-        .andExpect(content().string(not(containsString("121.50"))));
+        .andExpect(content().string(not(containsString("121,50"))));
   }
 
   /**

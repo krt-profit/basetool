@@ -19,6 +19,7 @@
 
 /* global supplyI18n */
 
+import { formatNumber } from '/js/kernel/krt-number-format.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
@@ -75,7 +76,9 @@ function fillUnits(target, units) {
  */
 function formatAmount(value, quantityType) {
     const whole = quantityType === 'PIECE' || quantityType === 'ITEM';
-    return whole ? String(Math.round(value)) : value.toFixed(3);
+    return whole
+        ? formatNumber(Math.round(value), 0, document.documentElement.lang)
+        : formatNumber(value, 3, document.documentElement.lang);
 }
 
 document.addEventListener('DOMContentLoaded', () => {

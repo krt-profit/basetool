@@ -11,23 +11,23 @@
              th:if="${limits.roleLimits().containsKey(role)}" data-testid="bank-approval-limit-display-role">
             <span class="v-label" th:text="#{'bank.orgUnit.visibility.role.' + ${role}}">Kommandoleiter</span>
             <span class="vis-state bank-amount"
-                  th:text="${#numbers.formatInteger(@moneyFormat.round(limits.roleLimits().get(role)), 1, 'POINT')} + ' aUEC'">1.000.000 aUEC</span>
+                  th:text="${#numbers.formatInteger(@moneyFormat.round(limits.roleLimits().get(role)), 1, 'DEFAULT')} + ' aUEC'">1.000.000 aUEC</span>
         </div>
         <div class="vis-row" th:if="${limits.allMembersLimit() != null}">
             <span class="v-label" th:text="#{bank.approvalLimit.tier.allMembers}">Alle Mitglieder der Org-Einheit</span>
             <span class="vis-state bank-amount"
-                  th:text="${#numbers.formatInteger(@moneyFormat.round(limits.allMembersLimit()), 1, 'POINT')} + ' aUEC'">500.000 aUEC</span>
+                  th:text="${#numbers.formatInteger(@moneyFormat.round(limits.allMembersLimit()), 1, 'DEFAULT')} + ' aUEC'">500.000 aUEC</span>
         </div>
         <div class="vis-row" th:if="${limits.areaMembersLimit() != null}"
              data-testid="bank-approval-limit-display-area-members">
             <span class="v-label" th:text="#{bank.orgUnit.settings.visibility.areaMembers}">Mitglieder des Bereichs</span>
             <span class="vis-state bank-amount"
-                  th:text="${#numbers.formatInteger(@moneyFormat.round(limits.areaMembersLimit()), 1, 'POINT')} + ' aUEC'">500.000 aUEC</span>
+                  th:text="${#numbers.formatInteger(@moneyFormat.round(limits.areaMembersLimit()), 1, 'DEFAULT')} + ' aUEC'">500.000 aUEC</span>
         </div>
         <div class="vis-row" th:each="u : ${limits.userLimits()}" data-testid="bank-approval-limit-display-user">
             <span class="v-label" th:text="${u.displayName()}">greluc</span>
             <span class="vis-state bank-amount"
-                  th:text="${#numbers.formatInteger(@moneyFormat.round(u.limitAmount()), 1, 'POINT')} + ' aUEC'">2.000.000 aUEC</span>
+                  th:text="${#numbers.formatInteger(@moneyFormat.round(u.limitAmount()), 1, 'DEFAULT')} + ' aUEC'">2.000.000 aUEC</span>
         </div>
     </div>
 </th:block>
@@ -47,7 +47,7 @@
                           th:attr="data-refresh=${refresh},data-endpoint='/api/proxy/org-units/bank/accounts/{id}/approval-limit/role/' + ${role}"
                           data-method="PUT">
                         <input type="hidden" name="_id" th:value="${acct.id()}">
-                        <input type="text" data-auec-input inputmode="numeric" name="limit" min="0" step="1" required class="bank-limit-input"
+                        <input type="text" data-number-input inputmode="numeric" name="limit" min="0" step="1" required class="bank-limit-input"
                                th:value="${current != null ? @moneyFormat.round(current) : ''}"
                                th:attr="data-testid='bank-limit-role-' + ${role}"
                                th:placeholder="#{bank.approvalLimit.placeholder}">
@@ -74,7 +74,7 @@
                       data-endpoint="/api/proxy/org-units/bank/accounts/{id}/approval-limit/all-members"
                       data-method="PUT">
                     <input type="hidden" name="_id" th:value="${acct.id()}">
-                    <input type="text" data-auec-input inputmode="numeric" name="limit" min="0" step="1" required class="bank-limit-input"
+                    <input type="text" data-number-input inputmode="numeric" name="limit" min="0" step="1" required class="bank-limit-input"
                            th:value="${current != null ? @moneyFormat.round(current) : ''}"
                            data-testid="bank-limit-all-members" th:placeholder="#{bank.approvalLimit.placeholder}">
                     <button type="submit" class="btn btn-xs btn-outline"
@@ -100,7 +100,7 @@
                       data-endpoint="/api/proxy/org-units/bank/accounts/{id}/approval-limit/area-members"
                       data-method="PUT">
                     <input type="hidden" name="_id" th:value="${acct.id()}">
-                    <input type="text" data-auec-input inputmode="numeric" name="limit" min="0" step="1" required class="bank-limit-input"
+                    <input type="text" data-number-input inputmode="numeric" name="limit" min="0" step="1" required class="bank-limit-input"
                            th:value="${current != null ? @moneyFormat.round(current) : ''}"
                            data-testid="bank-limit-area-members" th:placeholder="#{bank.approvalLimit.placeholder}">
                     <button type="submit" class="btn btn-xs btn-outline"
@@ -124,7 +124,7 @@
                 <span class="v-label">
                     <span th:text="${u.displayName()}">greluc</span>
                     <span class="text-muted"
-                          th:text="' &middot; ' + ${#numbers.formatInteger(@moneyFormat.round(u.limitAmount()), 1, 'POINT')} + ' aUEC'"> &middot; 2.000.000 aUEC</span>
+                          th:text="' &middot; ' + ${#numbers.formatInteger(@moneyFormat.round(u.limitAmount()), 1, 'DEFAULT')} + ' aUEC'"> &middot; 2.000.000 aUEC</span>
                 </span>
                 <span class="vis-state">
                     <form class="bank-ajax-form no-track" data-livesync="bank:@account/account orgunit-bank/orgUnitBankSettings" th:data-livesync-account="${acct.id()}"
@@ -150,7 +150,7 @@
                 </div>
                 <div class="bank-form-row">
                     <label for="bank-limit-user-amount" th:text="#{bank.approvalLimit.field.amount}">Limit (aUEC)</label>
-                    <input type="text" data-auec-input inputmode="numeric" id="bank-limit-user-amount" name="limit" min="0" step="1" required
+                    <input type="text" data-number-input inputmode="numeric" id="bank-limit-user-amount" name="limit" min="0" step="1" required
                            data-testid="bank-limit-user-amount" th:placeholder="#{bank.approvalLimit.placeholder}">
                 </div>
                 <button type="submit" class="btn btn-outline" data-testid="bank-limit-user-add"

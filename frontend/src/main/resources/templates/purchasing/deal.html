@@ -39,16 +39,16 @@
                 </th:block>
                 <dt th:text="#{purchasing.deal.unitPrice}">Einzelpreis</dt>
                 <dd class="flex-gap-sm">
-                    <span th:text="#{purchasing.money(${#numbers.formatInteger(deal.unitPrice(), 1, 'POINT')})}">100 aUEC</span>
+                    <span th:text="#{purchasing.money(${#numbers.formatInteger(deal.unitPrice(), 1, 'DEFAULT')})}">100 aUEC</span>
                     <span class="text-muted" th:if="${deal.uexReferencePrice() != null}"
-                          th:text="#{purchasing.deal.uexReference(${#numbers.formatDecimal(deal.uexReferencePrice(), 1, 'POINT', 0, 'COMMA')})}">UEX: 90 aUEC</span>
+                          th:text="#{purchasing.deal.uexReference(${#numbers.formatDecimal(deal.uexReferencePrice(), 1, 'DEFAULT', 0, 'DEFAULT')})}">UEX: 90 aUEC</span>
                 </dd>
                 <dt th:text="#{purchasing.deal.total}">Summe</dt>
-                <dd th:text="#{purchasing.money(${#numbers.formatInteger(deal.total(), 1, 'POINT')})}">10.000 aUEC</dd>
+                <dd th:text="#{purchasing.money(${#numbers.formatInteger(deal.total(), 1, 'DEFAULT')})}">10.000 aUEC</dd>
                 <dt th:text="#{purchasing.deal.paymentModel}">Zahlungsmodell</dt>
                 <dd th:text="#{'purchasing.deal.paymentModel.' + ${deal.paymentModel()}}">Vorkasse</dd>
                 <dt th:text="#{purchasing.deal.funded}">Bewilligt</dt>
-                <dd th:text="#{purchasing.deal.fundedOf(${#numbers.formatInteger(deal.fundedAmount(), 1, 'POINT')}, ${#numbers.formatInteger(deal.requestedAmount(), 1, 'POINT')})}">0 von 0 aUEC</dd>
+                <dd th:text="#{purchasing.deal.fundedOf(${#numbers.formatInteger(deal.fundedAmount(), 1, 'DEFAULT')}, ${#numbers.formatInteger(deal.requestedAmount(), 1, 'DEFAULT')})}">0 von 0 aUEC</dd>
                 <dt th:text="#{purchasing.deal.delegate}">Handelsbeauftragter</dt>
                 <dd th:text="${deal.delegateName() != null ? deal.delegateName() : '&ndash;'}">Name</dd>
                 <dt th:text="#{purchasing.deal.partner}">Partner</dt>
@@ -122,7 +122,7 @@
                         <tr th:each="t : ${deal.tranches()}" data-testid="purchasing-tranche-row">
                             <td th:text="#{'purchasing.tranche.kind.' + ${t.kind()}}">Vorkasse</td>
                             <td class="num" th:attr="data-label=#{purchasing.tranche.amount}"
-                                th:text="#{purchasing.money(${#numbers.formatInteger(t.amount(), 1, 'POINT')})}">1.000 aUEC</td>
+                                th:text="#{purchasing.money(${#numbers.formatInteger(t.amount(), 1, 'DEFAULT')})}">1.000 aUEC</td>
                             <td class="cell-status">
                                 <th:block th:replace="~{purchasing/fragments/status-chip :: chip(labelKey=${'purchasing.tranche.state.' + t.state()}, status=${t.state()})}"></th:block>
                             </td>
@@ -191,14 +191,14 @@
             </div>
             <dl class="kv-list">
                 <dt th:text="#{purchasing.settlement.received}">Erhalten</dt>
-                <dd th:text="#{purchasing.money(${#numbers.formatInteger(deal.settlement().moneyReceived(), 1, 'POINT')})}">0 aUEC</dd>
+                <dd th:text="#{purchasing.money(${#numbers.formatInteger(deal.settlement().moneyReceived(), 1, 'DEFAULT')})}">0 aUEC</dd>
                 <dt th:text="#{purchasing.settlement.paid}">An Gegenpartei gezahlt</dt>
-                <dd th:text="#{purchasing.money(${#numbers.formatInteger(deal.settlement().moneyPaid(), 1, 'POINT')})}">0 aUEC</dd>
+                <dd th:text="#{purchasing.money(${#numbers.formatInteger(deal.settlement().moneyPaid(), 1, 'DEFAULT')})}">0 aUEC</dd>
                 <dt th:text="#{purchasing.settlement.remainder}">R&uuml;ckfluss</dt>
-                <dd th:text="#{purchasing.money(${#numbers.formatInteger(deal.settlement().remainder(), 1, 'POINT')})}">0 aUEC</dd>
+                <dd th:text="#{purchasing.money(${#numbers.formatInteger(deal.settlement().remainder(), 1, 'DEFAULT')})}">0 aUEC</dd>
                 <dt th:text="#{purchasing.settlement.loss}">Verlust</dt>
                 <dd class="flex-gap-sm">
-                    <span th:text="#{purchasing.money(${#numbers.formatInteger(deal.settlement().lossAmount(), 1, 'POINT')})}">0 aUEC</span>
+                    <span th:text="#{purchasing.money(${#numbers.formatInteger(deal.settlement().lossAmount(), 1, 'DEFAULT')})}">0 aUEC</span>
                     <span class="text-muted" th:if="${deal.settlement().lossReason() != null}" th:text="#{'purchasing.settlement.lossReason.' + ${deal.settlement().lossReason()}}">Betrug</span>
                 </dd>
                 <th:block th:if="${deal.settlement().settledAt() == null and deal.settlement().remainderRequestId() != null}">
@@ -225,11 +225,11 @@
                     </div>
                     <div class="form-group">
                         <label for="purchasing-edit-amount" th:text="#{purchasing.deal.amount}">Menge</label>
-                        <input type="number" id="purchasing-edit-amount" min="0.001" step="any" inputmode="decimal" required>
+                        <input type="text" data-number-input id="purchasing-edit-amount" min="0.001" step="any" inputmode="decimal" required>
                     </div>
                     <div class="form-group">
                         <label for="purchasing-edit-price" th:text="#{purchasing.deal.unitPrice}">Einzelpreis (aUEC)</label>
-                        <input type="text" data-auec-input id="purchasing-edit-price" min="1" step="1" inputmode="numeric" required>
+                        <input type="text" data-number-input id="purchasing-edit-price" min="1" step="1" inputmode="numeric" required>
                     </div>
                     <div class="form-group">
                         <label for="purchasing-edit-model" th:text="#{purchasing.deal.paymentModel}">Zahlungsmodell</label>
@@ -272,7 +272,7 @@
                     </div>
                     <div class="form-group">
                         <label for="purchasing-tranche-amount" th:text="#{purchasing.tranche.amount}">Betrag (aUEC)</label>
-                        <input type="text" data-auec-input id="purchasing-tranche-amount" min="1" step="1" inputmode="numeric" required data-testid="purchasing-tranche-amount">
+                        <input type="text" data-number-input id="purchasing-tranche-amount" min="1" step="1" inputmode="numeric" required data-testid="purchasing-tranche-amount">
                         <p id="purchasing-tranche-hint" class="form-hint"></p>
                     </div>
                 </div>
@@ -291,7 +291,7 @@
                     <input type="hidden" id="purchasing-delivery-deal">
                     <div class="form-group">
                         <label for="purchasing-delivery-amount" th:text="#{purchasing.delivery.amount}">Menge</label>
-                        <input type="number" id="purchasing-delivery-amount" min="0.001" step="any" inputmode="decimal" required data-testid="purchasing-delivery-amount">
+                        <input type="text" data-number-input id="purchasing-delivery-amount" min="0.001" step="any" inputmode="decimal" required data-testid="purchasing-delivery-amount">
                         <p id="purchasing-delivery-hint" class="form-hint"></p>
                     </div>
                     <div class="form-group">
@@ -319,11 +319,11 @@
                     <div class="form-group"><p id="purchasing-settle-received" class="m-0"></p></div>
                     <div class="form-group">
                         <label for="purchasing-settle-paid" th:text="#{purchasing.settlement.paid}">An Gegenpartei gezahlt (aUEC)</label>
-                        <input type="text" data-auec-input id="purchasing-settle-paid" min="0" step="1" inputmode="numeric" required data-testid="purchasing-settle-paid">
+                        <input type="text" data-number-input id="purchasing-settle-paid" min="0" step="1" inputmode="numeric" required data-testid="purchasing-settle-paid">
                     </div>
                     <div class="form-group">
                         <label for="purchasing-settle-loss" th:text="#{purchasing.settlement.loss}">Verlust (aUEC)</label>
-                        <input type="text" data-auec-input id="purchasing-settle-loss" min="0" step="1" inputmode="numeric" value="0" data-testid="purchasing-settle-loss">
+                        <input type="text" data-number-input id="purchasing-settle-loss" min="0" step="1" inputmode="numeric" value="0" data-testid="purchasing-settle-loss">
                     </div>
                     <div class="form-group" id="purchasing-settle-reason-row" hidden>
                         <label for="purchasing-settle-reason" th:text="#{purchasing.settlement.lossReason}">Verlustgrund</label>
@@ -371,11 +371,11 @@
                     <div class="form-group"><p id="purchasing-accept-total" class="m-0"></p></div>
                     <div class="form-group">
                         <label for="purchasing-accept-accepted" th:text="#{purchasing.delivery.acceptedAmount}">Angenommen</label>
-                        <input type="number" id="purchasing-accept-accepted" min="0" step="any" inputmode="decimal" required data-testid="purchasing-accept-accepted">
+                        <input type="text" data-number-input id="purchasing-accept-accepted" min="0" step="any" inputmode="decimal" required data-testid="purchasing-accept-accepted">
                     </div>
                     <div class="form-group">
                         <label for="purchasing-accept-rejected" th:text="#{purchasing.delivery.rejectedAmount}">Abgelehnt</label>
-                        <input type="number" id="purchasing-accept-rejected" min="0" step="any" inputmode="decimal" value="0" data-testid="purchasing-accept-rejected">
+                        <input type="text" data-number-input id="purchasing-accept-rejected" min="0" step="any" inputmode="decimal" value="0" data-testid="purchasing-accept-rejected">
                     </div>
                     <div class="form-group" id="purchasing-accept-reason-row" hidden>
                         <label for="purchasing-accept-reason" th:text="#{purchasing.delivery.rejectReasonLabel}">Ablehnungsgrund</label>
@@ -386,7 +386,7 @@
                     </div>
                     <div class="form-group" id="purchasing-accept-quality-row">
                         <label for="purchasing-accept-quality" th:text="#{purchasing.delivery.measuredQuality}">Gemessene Qualit&auml;t (0&ndash;1000)</label>
-                        <input type="number" id="purchasing-accept-quality" min="0" max="1000" step="1" inputmode="numeric" data-testid="purchasing-accept-quality">
+                        <input type="text" data-number-input id="purchasing-accept-quality" min="0" max="1000" step="1" inputmode="numeric" data-testid="purchasing-accept-quality">
                         <p id="purchasing-accept-quality-hint" class="form-hint"></p>
                     </div>
                     <div class="form-group" id="purchasing-accept-location-row">

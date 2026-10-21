@@ -31,13 +31,13 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
+import org.springframework.context.i18n.LocaleContextHolder;
 
 /**
  * The terminal table and the price figures of the material detail page: each terminal's prices with
@@ -301,7 +301,8 @@ public final class MaterialTerminalPrices {
   }
 
   /**
-   * Formats a price with German grouping and at most two decimals, like the price matrix.
+   * Formats a price with the separators of the request's language and at most two decimals, like
+   * the price matrix.
    *
    * @param price the price, or {@code null}
    * @return the formatted price, or a dash for {@code null}
@@ -312,7 +313,8 @@ public final class MaterialTerminalPrices {
       return NO_PRICE;
     }
     DecimalFormat format =
-        new DecimalFormat("#,##0.##", DecimalFormatSymbols.getInstance(Locale.GERMANY));
+        new DecimalFormat(
+            "#,##0.##", DecimalFormatSymbols.getInstance(LocaleContextHolder.getLocale()));
     format.setRoundingMode(RoundingMode.HALF_UP);
     return format.format(price);
   }

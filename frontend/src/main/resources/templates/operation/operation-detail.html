@@ -46,13 +46,13 @@
             <div class="kpi-label" th:text="#{operation.finances.total}">Gesamtergebnis</div>
             <div class="kpi-value"><span id="op-kpi-total"
                     th:classappend="${operationFinance != null and operationFinance.totalSum != null and operationFinance.totalSum.signum() < 0} ? 'is-neg'"
-                    th:text="${operationFinance != null and operationFinance.totalSum != null ? #numbers.formatInteger(@moneyFormat.round(operationFinance.totalSum), 1, 'POINT') : '0'}">0</span>
+                    th:text="${operationFinance != null and operationFinance.totalSum != null ? #numbers.formatInteger(@moneyFormat.round(operationFinance.totalSum), 1, 'DEFAULT') : '0'}">0</span>
                 <span class="kpi-unit">aUEC</span></div>
         </div>
         <div class="kpi-total" sec:authorize="isAuthenticated()">
             <div class="kpi-label" th:text="#{operation.finances.donations}">Davon gespendet</div>
             <div class="kpi-value"><span id="op-kpi-donated"
-                    th:text="${operationDonationTotal != null ? #numbers.formatInteger(@moneyFormat.round(operationDonationTotal), 1, 'POINT') : '0'}">0</span>
+                    th:text="${operationDonationTotal != null ? #numbers.formatInteger(@moneyFormat.round(operationDonationTotal), 1, 'DEFAULT') : '0'}">0</span>
                 <span class="kpi-unit">aUEC</span></div>
         </div>
         <div class="kpi-total">
@@ -76,8 +76,8 @@
             <span id="operation-head-meta" hidden
                   th:with="totalNegative=${operationFinance != null and operationFinance.totalSum != null and operationFinance.totalSum.signum() < 0},
                            statusLabel=${#messages.msg('operation.status.' + #strings.toLowerCase(operation.status))},
-                           kpiTotal=${operationFinance != null and operationFinance.totalSum != null ? #numbers.formatInteger(@moneyFormat.round(operationFinance.totalSum), 1, 'POINT') : '0'},
-                           kpiDonated=${operationDonationTotal != null ? #numbers.formatInteger(@moneyFormat.round(operationDonationTotal), 1, 'POINT') : '0'}"
+                           kpiTotal=${operationFinance != null and operationFinance.totalSum != null ? #numbers.formatInteger(@moneyFormat.round(operationFinance.totalSum), 1, 'DEFAULT') : '0'},
+                           kpiDonated=${operationDonationTotal != null ? #numbers.formatInteger(@moneyFormat.round(operationDonationTotal), 1, 'DEFAULT') : '0'}"
                   th:attr="data-name=${operation.name},
                            data-status=${#strings.toLowerCase(operation.status)},
                            data-status-label=${statusLabel},
@@ -98,7 +98,7 @@
                             <span class="op-result-name" th:text="${msnFin.missionName}" th:title="${msnFin.missionName}">Einsatz</span>
                             <span class="meter op-result-meter" aria-hidden="true"><i th:attr="data-krtm-width=${(msnFin.totalSum != null and msnFin.totalSum.signum() > 0 and operationMaxMissionResult != null and operationMaxMissionResult.signum() > 0) ? (msnFin.totalSum.doubleValue() * 100 / operationMaxMissionResult.doubleValue()) : 0}"></i></span>
                             <span class="op-result-value" th:classappend="${msnFin.totalSum != null and msnFin.totalSum.signum() < 0} ? 'is-neg'"
-                                  th:text="${msnFin.totalSum != null ? #numbers.formatInteger(@moneyFormat.round(msnFin.totalSum), 1, 'POINT') : '0'}">0</span>
+                                  th:text="${msnFin.totalSum != null ? #numbers.formatInteger(@moneyFormat.round(msnFin.totalSum), 1, 'DEFAULT') : '0'}">0</span>
                             <svg class="row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
                         </a>
                     </th:block>
@@ -118,7 +118,7 @@
                         <dl class="op-payout-facts">
                             <div sec:authorize="isAuthenticated()">
                                 <dt th:text="#{operation.payout.card.open}">Offen</dt>
-                                <dd th:text="${#numbers.formatInteger(@moneyFormat.round(payoutProgress.openAmount()), 1, 'POINT')} + ' aUEC'">0 aUEC</dd>
+                                <dd th:text="${#numbers.formatInteger(@moneyFormat.round(payoutProgress.openAmount()), 1, 'DEFAULT')} + ' aUEC'">0 aUEC</dd>
                             </div>
                             <div>
                                 <dt th:text="#{operation.payout.card.donors}">Spenden-Wunsch</dt>
@@ -216,16 +216,16 @@
                             <tr th:each="payout : ${operationPayouts}" th:attr="data-participant-id=${payout.participantId}">
                                 <td><span class="cell-title" th:text="${payout.participantName != null ? payout.participantName : #messages.msg('mission.participant.deleted')}">User</span></td>
                                 <td class="num" sec:authorize="isAuthenticated()" th:attr="data-label=#{mission.payout.percentage}"
-                                    th:text="${#numbers.formatDecimal(payout.participationPercentage, 1, 'POINT', 2, 'COMMA')} + ' %'">0,00 %</td>
+                                    th:text="${#numbers.formatDecimal(payout.participationPercentage, 1, 'DEFAULT', 2, 'DEFAULT')} + ' %'">0,00 %</td>
                                 <td th:attr="data-label=#{mission.payout.preference}">
                                     <span th:if="${payout.payoutPreference.name() == 'PAYOUT'}" class="chip" th:text="#{mission.payout.preference.payout}">Auszahlen</span>
                                     <span th:if="${payout.payoutPreference.name() == 'DONATE'}" class="chip chip--success" th:text="#{mission.payout.preference.donate}">Spenden</span>
                                 </td>
                                 <td class="num" sec:authorize="isAuthenticated()" th:attr="data-label=#{operation.payout.amount}">
-                                    <span class="cell-title" th:text="${#numbers.formatInteger(@moneyFormat.round(payout.payoutAmount), 1, 'POINT')} + ' aUEC'">0 aUEC</span>
-                                    <span class="cell-sub" th:if="${payout.personalExpenses != null and payout.personalExpenses.signum() > 0}" th:text="#{operation.payout.amount.reimbursement} + ': ' + ${#numbers.formatInteger(@moneyFormat.round(payout.personalExpenses), 1, 'POINT')} + ' aUEC'">davon Auslagen: 0 aUEC</span>
-                                    <span class="cell-sub" th:if="${payout.transferFee != null and payout.transferFee.signum() > 0}" th:text="#{operation.payout.amount.transferfee} + ': ' + ${#numbers.formatInteger(@moneyFormat.round(payout.transferFee), 1, 'POINT')} + ' aUEC'">0 aUEC</span>
-                                    <span class="cell-sub" th:if="${payout.donatedAmount != null and payout.donatedAmount.signum() > 0}" th:text="#{operation.payout.amount.donation} + ': ' + ${#numbers.formatInteger(@moneyFormat.round(payout.donatedAmount), 1, 'POINT')} + ' aUEC'">gespendet: 0 aUEC</span>
+                                    <span class="cell-title" th:text="${#numbers.formatInteger(@moneyFormat.round(payout.payoutAmount), 1, 'DEFAULT')} + ' aUEC'">0 aUEC</span>
+                                    <span class="cell-sub" th:if="${payout.personalExpenses != null and payout.personalExpenses.signum() > 0}" th:text="#{operation.payout.amount.reimbursement} + ': ' + ${#numbers.formatInteger(@moneyFormat.round(payout.personalExpenses), 1, 'DEFAULT')} + ' aUEC'">davon Auslagen: 0 aUEC</span>
+                                    <span class="cell-sub" th:if="${payout.transferFee != null and payout.transferFee.signum() > 0}" th:text="#{operation.payout.amount.transferfee} + ': ' + ${#numbers.formatInteger(@moneyFormat.round(payout.transferFee), 1, 'DEFAULT')} + ' aUEC'">0 aUEC</span>
+                                    <span class="cell-sub" th:if="${payout.donatedAmount != null and payout.donatedAmount.signum() > 0}" th:text="#{operation.payout.amount.donation} + ': ' + ${#numbers.formatInteger(@moneyFormat.round(payout.donatedAmount), 1, 'DEFAULT')} + ' aUEC'">gespendet: 0 aUEC</span>
                                 </td>
                                 <td class="cell-actions payout-paid-cell" sec:authorize="isAuthenticated()" th:attr="data-label=#{operation.payout.paid}">
                                     <label class="payout-paid-label" th:if="${canEdit}">
@@ -249,9 +249,9 @@
                             <tr class="payout-sum" data-testid="operation-payout-sum">
                                 <td colspan="3"><span class="cell-title" th:text="#{operation.payout.sum}">Summe</span></td>
                                 <td class="num" th:attr="data-label=#{operation.payout.amount}">
-                                    <span class="cell-title" th:text="${#numbers.formatInteger(@moneyFormat.round(payoutProgress.totalAmount()), 1, 'POINT')} + ' aUEC'">0 aUEC</span>
+                                    <span class="cell-title" th:text="${#numbers.formatInteger(@moneyFormat.round(payoutProgress.totalAmount()), 1, 'DEFAULT')} + ' aUEC'">0 aUEC</span>
                                     <span class="cell-sub" th:if="${operationDonationTotal != null and operationDonationTotal.signum() > 0}"
-                                          th:text="#{operation.payout.donation.total} + ': ' + ${#numbers.formatInteger(@moneyFormat.round(operationDonationTotal), 1, 'POINT')} + ' aUEC'">Spenden gesamt: 0 aUEC</span>
+                                          th:text="#{operation.payout.donation.total} + ': ' + ${#numbers.formatInteger(@moneyFormat.round(operationDonationTotal), 1, 'DEFAULT')} + ' aUEC'">Spenden gesamt: 0 aUEC</span>
                                 </td>
                                 <td class="cell-actions" th:attr="data-label=#{operation.payout.paid}">
                                     <span id="op-payout-paid-count" th:text="|${payoutProgress.paidOut()} / ${payoutProgress.participants()}|">0 / 0</span>
@@ -278,7 +278,7 @@
                         <summary>
                             <span class="op-fin-name" th:text="${msnFin.missionName}">Einsatz</span>
                             <span class="op-fin-value" th:classappend="${msnFin.totalSum != null and msnFin.totalSum.signum() < 0} ? 'is-neg'"
-                                  th:text="${msnFin.totalSum != null ? #numbers.formatInteger(@moneyFormat.round(msnFin.totalSum), 1, 'POINT') : '0'} + ' aUEC'">0 aUEC</span>
+                                  th:text="${msnFin.totalSum != null ? #numbers.formatInteger(@moneyFormat.round(msnFin.totalSum), 1, 'DEFAULT') : '0'} + ' aUEC'">0 aUEC</span>
                         </summary>
                         <div class="op-finance-detail-body" data-loaded="false">
                             <p class="op-fin-note" th:text="#{operation.finance.detail.loading}">Details werden geladen&hellip;</p>
@@ -314,13 +314,13 @@
                                     </td>
                                     <td th:attr="data-label=#{general.user}" th:text="${entry.participant == null ? '-' : (entry.participant.user != null ? entry.participant.user.effectiveName : (entry.participant.guestName != null ? entry.participant.guestName : #messages.msg('mission.participant.deleted')))}">User</td>
                                     <td th:attr="data-label=#{mission.finance.note}" th:text="${entry.note}">Notiz</td>
-                                    <td class="num" th:attr="data-label=#{mission.finance.amount}" th:text="${(entry.type.name() == 'INCOME' ? '+' : '&minus;') + #numbers.formatInteger(@moneyFormat.round(entry.amount), 1, 'POINT')} + ' aUEC'">0 aUEC</td>
+                                    <td class="num" th:attr="data-label=#{mission.finance.amount}" th:text="${(entry.type.name() == 'INCOME' ? '+' : '&minus;') + #numbers.formatInteger(@moneyFormat.round(entry.amount), 1, 'DEFAULT')} + ' aUEC'">0 aUEC</td>
                                 </tr>
                                 <tr th:each="order : ${financeDetail.refineryOrders}" th:if="${order.expenses != null and order.expenses > 0}">
                                     <td><span class="chip chip--danger" th:text="#{mission.finance.type.expense}">Ausgabe</span></td>
                                     <td th:attr="data-label=#{general.user}" th:text="${order.owner != null ? order.owner.effectiveName : '-'}">User</td>
                                     <td th:attr="data-label=#{mission.finance.note}"><a th:href="@{/refinery-orders/{id}(id=${order.id})}" th:text="#{mission.finance.refinery_order}" class="op-fin-link">Raffinerieauftrag</a></td>
-                                    <td class="num" th:attr="data-label=#{mission.finance.amount}" th:text="'&minus;' + ${#numbers.formatInteger(@moneyFormat.roundNumber(order.expenses), 1, 'POINT')} + ' aUEC'">0 aUEC</td>
+                                    <td class="num" th:attr="data-label=#{mission.finance.amount}" th:text="'&minus;' + ${#numbers.formatInteger(@moneyFormat.roundNumber(order.expenses), 1, 'DEFAULT')} + ' aUEC'">0 aUEC</td>
                                 </tr>
                             </tbody>
                         </table>

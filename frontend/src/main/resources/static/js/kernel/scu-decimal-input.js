@@ -1,6 +1,3 @@
-import { krtI18nText } from '/js/kernel/krt-i18n.js';
-
-const SELECTOR = 'input[data-scu-decimal]';
 const MAX_DECIMALS = 3;
 
 /**
@@ -84,22 +81,6 @@ function round(s) {
 }
 
 /**
- * Reduces a canonical dot string to a non-negative integer string, dropping any fractional part
- * and leading zeros ("007" -> "7", "12.9" -> "12").
- *
- * @param {string} s a canonical dot string from `normalize`
- * @returns {string} the integer string, or "" when there is no number
- */
-function toInteger(s) {
-    if (!s) {
-        return s;
-    }
-    const dot = s.indexOf('.');
-    const intPart = (dot === -1 ? s : s.slice(0, dot)).replace(/^0+(?=\d)/, '');
-    return intPart === '' ? '0' : intPart;
-}
-
-/**
  * Parses a user-entered amount via `normalize`, accepting "." and "," as the decimal
  * separator.
  *
@@ -110,137 +91,5 @@ function parse(raw) {
     const n = parseFloat(normalize(raw));
     return Number.isFinite(n) ? n : NaN;
 }
-
-/**
- * Reports whether a field is in integer (PIECE) mode, inferred from an integral `step`
- * attribute; a missing or "any" step counts as decimal.
- *
- * @param {HTMLInputElement} el the amount field
- * @returns {boolean} true when only whole digits are allowed
- */
-function isIntegerMode(el) {
-    const step = el.getAttribute('step');
-    if (!step || step === 'any') {
-        return false;
-    }
-    const n = parseFloat(step.replace(',', '.'));
-    return Number.isInteger(n);
-}
-
-/**
- * The canonical value a field should hold: an integer string in PIECE mode, or
- * a dot string rounded to three decimals in SCU mode.
- *
- * @param {HTMLInputElement} el the amount field
- * @returns {string} the canonical value
- */
-function canonicalValue(el) {
-    const v = normalize(el.value);
-    return isIntegerMode(el) ? toInteger(v) : round(v);
-}
-
-/**
- * Computes the field's custom validity message from its canonical value: it must be positive, or
- * zero or more with data-scu-allow-zero. Empty fields are left to the native `required` constraint.
- *
- * @param {HTMLInputElement} el the amount field
- * @returns {string} the validity message, or "" when valid
- */
-function validityMessage(el) {
-    if (normalize(el.value) === '') {
-        return '';
-    }
-    const n = parseFloat(canonicalValue(el));
-    const allowZero = el.hasAttribute('data-scu-allow-zero');
-    if (Number.isFinite(n) && (allowZero ? n >= 0 : n > 0)) {
-        return '';
-    }
-    const i18n = window.krtScuI18n || {};
-    return isIntegerMode(el)
-        ? krtI18nText(i18n.piece, 'krtScuI18n.piece')
-        : krtI18nText(i18n.scu, 'krtScuI18n.scu');
-}
-
-/**
- * Refreshes a field's constraint-validation state from its current value.
- *
- * @param {HTMLInputElement} el the amount field
- */
-function validate(el) {
-    el.setCustomValidity(validityMessage(el));
-}
-
-/**
- * Strips every character not allowed in the field's current mode, preserving the caret, and
- * refreshes its validity.
- *
- * @param {Event} e the input event
- */
-function onInput(e) {
-    const el = /** @type {HTMLInputElement} */ (e.target);
-    if (!el || typeof el.matches !== 'function' || !el.matches(SELECTOR)) {
-        return;
-    }
-    const disallowed = isIntegerMode(el) ? /[^0-9]/g : /[^0-9.,]/g;
-    const before = el.value;
-    const cleaned = before.replace(disallowed, '');
-    if (cleaned !== before) {
-        const caret = el.selectionStart;
-        el.value = cleaned;
-        if (caret !== null && caret !== undefined) {
-            const pos = Math.max(0, caret - (before.length - cleaned.length));
-            try {
-                el.setSelectionRange(pos, pos);
-            } catch (_e) {}
-        }
-    }
-    validate(el);
-}
-
-/**
- * Canonicalises a field on change (SCU rounded to three decimals, PIECE reduced to an integer)
- * and refreshes its validity.
- *
- * @param {Event} e the change event
- */
-function onCommit(e) {
-    const el = /** @type {HTMLInputElement} */ (e.target);
-    if (!el || typeof el.matches !== 'function' || !el.matches(SELECTOR)) {
-        return;
-    }
-    el.value = canonicalValue(el);
-    validate(el);
-}
-
-/**
- * On submit, rewrites every managed field to its canonical value and re-validates it; an invalid
- * field blocks the submit and shows the native message.
- *
- * @param {Event} e the submit event
- */
-function canonicaliseForm(e) {
-    const form = /** @type {HTMLFormElement} */ (e.target);
-    if (!form || typeof form.querySelectorAll !== 'function') {
-        return;
-    }
-    let blocked = false;
-    /** @type {NodeListOf<HTMLInputElement>} */ (form.querySelectorAll(SELECTOR)).forEach((el) => {
-        el.value = canonicalValue(el);
-        validate(el);
-        if (!el.checkValidity()) {
-            blocked = true;
-        }
-    });
-    if (blocked) {
-        e.preventDefault();
-        if (typeof form.reportValidity === 'function') {
-            form.reportValidity();
-        }
-    }
-}
-
-document.addEventListener('input', onInput, true);
-document.addEventListener('change', onCommit, true);
-document.addEventListener('submit', canonicaliseForm, true);
 
 export const krtScuInput = /** @type {KrtScuInputApi} */ ({ normalize, parse, round });

@@ -142,7 +142,7 @@
                                 <td class="num ou-open-amount">
                                     <span class="bank-amount"
                                           th:classappend="${r.type() == 'DEPOSIT'} ? ' bank-amount--pos' : (${r.type() == 'WITHDRAWAL'} ? ' bank-amount--neg' : '')"
-                                          th:text="(${r.type() == 'DEPOSIT'} ? '+ ' : '&#8722; ') + ${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'POINT')}">&#8722; 180.000</span>
+                                          th:text="(${r.type() == 'DEPOSIT'} ? '+ ' : '&#8722; ') + ${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'DEFAULT')}">&#8722; 180.000</span>
                                 </td>
                             </tr>
                             </tbody>
@@ -190,10 +190,10 @@
                                     </td>
                                     <td th:text="#{'bank.request.type.' + ${r.type()}}">Einzahlung</td>
                                     <td class="text-right bank-amount">
-                                        <span th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'POINT')} + ' aUEC'">5.000 aUEC</span>
+                                        <span th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'DEFAULT')} + ' aUEC'">5.000 aUEC</span>
                                         <span th:if="${r.status() == 'PENDING' and r.type() == 'DEPOSIT' and transferFeeRate != null and transferFeeRate.signum() > 0}"
                                               class="cell-sub" data-testid="org-unit-bank-request-gross"
-                                              th:text="#{bank.request.withFee(${#numbers.formatInteger(@moneyFormat.withTransferFee(r.amount(), transferFeeRate), 1, 'POINT')})}">Mit Geb&uuml;hr: 5.025 aUEC</span>
+                                              th:text="#{bank.request.withFee(${#numbers.formatInteger(@moneyFormat.withTransferFee(r.amount(), transferFeeRate), 1, 'DEFAULT')})}">Mit Geb&uuml;hr: 5.025 aUEC</span>
                                     </td>
                                     <td>
                                         <span class="chip"
@@ -281,7 +281,7 @@
                                 </div>
                                 <div class="bank-form-row">
                                     <label th:for="'ou-req-edit-amount-' + ${r.id()}" th:text="#{bank.field.amount}">Betrag (aUEC)</label>
-                                    <input type="text" data-auec-input inputmode="numeric" th:id="'ou-req-edit-amount-' + ${r.id()}" name="amount" min="1" step="1" required
+                                    <input type="text" data-number-input inputmode="numeric" th:id="'ou-req-edit-amount-' + ${r.id()}" name="amount" min="1" step="1" required
                                            th:value="${@moneyFormat.round(r.amount())}"
                                            data-testid="org-unit-bank-edit-amount">
                                     <span class="bank-field-hint" th:text="#{bank.request.edit.amountHint}">&Auml;nderst du den Betrag, wird die Freigabepflicht neu bewertet.</span>
@@ -388,10 +388,10 @@
                                     </td>
                                     <td th:text="#{'bank.request.type.' + ${r.type()}}">Einzahlung</td>
                                     <td class="text-right bank-amount">
-                                        <span th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'POINT')} + ' aUEC'">5.000 aUEC</span>
+                                        <span th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'DEFAULT')} + ' aUEC'">5.000 aUEC</span>
                                         <span th:if="${r.status() == 'PENDING' and r.type() == 'DEPOSIT' and transferFeeRate != null and transferFeeRate.signum() > 0}"
                                               class="cell-sub" data-testid="org-unit-bank-request-gross"
-                                              th:text="#{bank.request.withFee(${#numbers.formatInteger(@moneyFormat.withTransferFee(r.amount(), transferFeeRate), 1, 'POINT')})}">Mit Geb&uuml;hr: 5.025 aUEC</span>
+                                              th:text="#{bank.request.withFee(${#numbers.formatInteger(@moneyFormat.withTransferFee(r.amount(), transferFeeRate), 1, 'DEFAULT')})}">Mit Geb&uuml;hr: 5.025 aUEC</span>
                                     </td>
                                     <td th:text="${@handles.display(r.requesterHandle())}">greluc</td>
                                     <td>

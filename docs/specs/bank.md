@@ -3027,7 +3027,8 @@ A depositor pays the in-game transfer fee on top of what arrives (REQ-BANK-033).
 knows straight away how much to send for the requested amount to land on the account, every place
 that states a deposit amount to be transferred shows a small line **„Mit Gebühr: X aUEC"** beneath
 it, with `X = amount + round(amount × rate)` in whole aUEC, HALF_UP — the backend's
-`BankTransferFeeService.totalDebit` formula.
+`BankTransferFeeService.totalDebit` formula — and the separators of the page language
+(`3.015.000` in German, `3,015,000` in English), like the amount above it.
 
 - **Request queue** (`/bank/requests`): under the amount of every **pending** deposit request.
 - **Own and foreign requests** on the org-unit bank page (`/org-unit-bank`): under the amount of
@@ -3044,8 +3045,8 @@ it, with `X = amount + round(amount × rate)` in whole aUEC, HALF_UP — the bac
 
 **Acceptance**
 
-- [x] A pending 600 000 aUEC deposit at 0.5% shows „Mit Gebühr: 603.000 aUEC" in the queue; a
-  withdrawal shows no such line.
+- [x] A pending 600 000 aUEC deposit at 0.5% shows „Mit Gebühr: 603.000 aUEC" in the German
+  queue; a withdrawal shows no such line.
 - [x] The dialogs show the live line for a deposit and hide it for a withdrawal or transfer.
 - [x] `withTransferFee` adds `round(amount × rate)` HALF_UP and returns the whole amount without a
   rate.

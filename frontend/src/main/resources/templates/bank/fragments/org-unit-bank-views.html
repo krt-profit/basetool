@@ -25,7 +25,7 @@
         </div>
         <div class="ou-card-figures">
             <div class="ou-card-bal">
-                <span th:text="${#numbers.formatInteger(@moneyFormat.round(b.balance()), 1, 'POINT')}">3.148.200</span>
+                <span th:text="${#numbers.formatInteger(@moneyFormat.round(b.balance()), 1, 'DEFAULT')}">3.148.200</span>
                 <span class="unit">aUEC</span>
             </div>
             <svg th:if="${spark != null and spark.points() != null}" class="ou-card-spark" width="92" height="26"
@@ -38,7 +38,7 @@
         <div class="ou-card-delta">
             <span class="kpi-delta"
                   th:classappend="${b.delta30d().signum() > 0} ? ' kpi-delta--pos' : (${b.delta30d().signum() < 0} ? ' kpi-delta--neg' : ' kpi-delta--flat')"
-                  th:text="${b.delta30d().signum() > 0 ? '+ ' : (b.delta30d().signum() < 0 ? '&#8722; ' : '&#177; ')} + ${#numbers.formatInteger(@moneyFormat.round(b.delta30d().abs()), 1, 'POINT')}">+ 412.600</span>
+                  th:text="${b.delta30d().signum() > 0 ? '+ ' : (b.delta30d().signum() < 0 ? '&#8722; ' : '&#177; ')} + ${#numbers.formatInteger(@moneyFormat.round(b.delta30d().abs()), 1, 'DEFAULT')}">+ 412.600</span>
             <span class="ou-card-delta-label" th:text="'&middot; ' + #{bank.chart.range.30d}">&middot; 30 Tage</span>
         </div>
         <div class="ou-target" data-testid="org-unit-bank-card-target" th:if="${hasTarget}"
@@ -47,7 +47,7 @@
                 <i class="meter__fill--warning" th:attr="data-krtm-width=${pct > 100 ? 100 : (pct < 0 ? 0 : pct)}"></i>
             </div>
             <div class="ou-target-meta"
-                 th:text="#{bank.orgUnit.card.targetOf(${#numbers.formatInteger(pct, 1, 'POINT')}, ${#numbers.formatInteger(@moneyFormat.round(b.balanceTarget()), 1, 'POINT')})}">63 % von 5.000.000</div>
+                 th:text="#{bank.orgUnit.card.targetOf(${#numbers.formatInteger(pct, 1, 'DEFAULT')}, ${#numbers.formatInteger(@moneyFormat.round(b.balanceTarget()), 1, 'DEFAULT')})}">63 % von 5.000.000</div>
         </div>
         <div class="r-noziel" th:unless="${hasTarget}" th:text="#{bank.orgUnit.noTarget}">&mdash; kein Ziel</div>
     </article>
@@ -81,7 +81,7 @@
         <div class="r-trend">
             <span class="kpi-delta"
                   th:classappend="${b.delta30d().signum() > 0} ? ' kpi-delta--pos' : (${b.delta30d().signum() < 0} ? ' kpi-delta--neg' : ' kpi-delta--flat')"
-                  th:text="${b.delta30d().signum() > 0 ? '&#9650; +' : (b.delta30d().signum() < 0 ? '&#9660; ' : '&#177; ')} + ${#numbers.formatInteger(@moneyFormat.round(b.delta30d()), 1, 'POINT')}">&#9650; +420.000</span>
+                  th:text="${b.delta30d().signum() > 0 ? '&#9650; +' : (b.delta30d().signum() < 0 ? '&#9660; ' : '&#177; ')} + ${#numbers.formatInteger(@moneyFormat.round(b.delta30d()), 1, 'DEFAULT')}">&#9650; +420.000</span>
             <svg th:if="${spark != null and spark.points() != null}" width="92" height="20" viewBox="0 0 96 26" aria-hidden="true">
                 <polyline th:attr="points=${spark.points()}"
                           th:classappend="${spark.flat()} ? ' kpi-sparkline--flat' : ''"
@@ -89,7 +89,7 @@
             </svg>
         </div>
         <div class="r-bal">
-            <span th:text="${#numbers.formatInteger(@moneyFormat.round(b.balance()), 1, 'POINT')}">1.850.000</span>
+            <span th:text="${#numbers.formatInteger(@moneyFormat.round(b.balance()), 1, 'DEFAULT')}">1.850.000</span>
             <span class="unit">aUEC</span>
         </div>
         <div class="ou-target" data-testid="org-unit-bank-card-target"
@@ -99,8 +99,8 @@
                 <i class="meter__fill--warning" th:attr="data-krtm-width=${pct > 100 ? 100 : (pct < 0 ? 0 : pct)}"></i>
             </div>
             <div class="ou-target-meta">
-                <b th:text="${#numbers.formatDecimal(pct, 1, 'NONE', 1, 'COMMA')} + ' %'">18,5 %</b>
-                <span th:text="${#numbers.formatInteger(@moneyFormat.round(b.balanceTarget()), 1, 'POINT')} + ' aUEC'">10.000.000 aUEC</span>
+                <b th:text="${#numbers.formatDecimal(pct, 1, 'DEFAULT', 1, 'DEFAULT')} + ' %'">18,5 %</b>
+                <span th:text="${#numbers.formatInteger(@moneyFormat.round(b.balanceTarget()), 1, 'DEFAULT')} + ' aUEC'">10.000.000 aUEC</span>
             </div>
         </div>
         <div class="r-noziel" th:unless="${b.balanceTarget() != null and b.balanceTarget().signum() > 0}"
@@ -158,7 +158,7 @@
             </div>
             <div class="bank-form-row">
                 <label for="org-unit-request-amount" th:text="#{bank.field.amount}">Betrag (aUEC)</label>
-                <input type="text" data-auec-input inputmode="numeric" id="org-unit-request-amount" name="amount" min="1" step="1" required
+                <input type="text" data-number-input inputmode="numeric" id="org-unit-request-amount" name="amount" min="1" step="1" required
                        data-testid="org-unit-request-amount" th:placeholder="#{bank.field.amount.placeholder}">
                 <span class="bank-field-hint" th:text="#{bank.field.amount.hint}">Nur ganze aUEC-Betr&auml;ge.</span>
                 <p class="bank-field-hint bank-deposit-gross" data-deposit-gross hidden
@@ -181,7 +181,7 @@
                 </div>
                 <div class="bank-form-row" data-split-row hidden>
                     <label for="org-unit-request-split-percent" th:text="#{bank.split.percent}">Prozentsatz (%)</label>
-                    <input type="number" id="org-unit-request-split-percent" name="splitPercent"
+                    <input type="text" data-number-input id="org-unit-request-split-percent" name="splitPercent"
                            min="1" max="100" step="1" disabled
                            data-testid="org-unit-request-split-percent" th:placeholder="#{bank.split.percent.placeholder}">
                     <span class="bank-field-hint" th:text="#{bank.split.hint}">Dieser Anteil wird gleichm&auml;&szlig;ig auf alle aktiven Staffelkonten verteilt; das Zielkonto erh&auml;lt den Rest.</span>

@@ -92,7 +92,7 @@
                     </div>
                     <div class="form-group">
                         <label for="qt-min-quality" class="form-label" th:text="#{admin.qualityTiers.column.minQuality}">Mindestqualität</label>
-                        <input type="number" id="qt-min-quality" name="minQuality" required min="0" max="1000" step="1" aria-describedby="qt-floor-hint">
+                        <input type="text" data-number-input id="qt-min-quality" name="minQuality" required min="0" max="1000" step="1" aria-describedby="qt-floor-hint">
                         <p id="qt-floor-hint" class="form-hint" th:text="#{admin.qualityTiers.hint.floor}">0 bis 1000. Bei einer Stufe, die bereits von Aufträgen verwendet wird, bleibt sie unverändert.</p>
                     </div>
                     <div class="form-group">
@@ -105,7 +105,7 @@
                     </div>
                     <div class="form-group">
                         <label for="qt-sort-order" class="form-label" th:text="#{admin.qualityTiers.column.sortOrder}">Sortierung</label>
-                        <input type="number" id="qt-sort-order" name="sortOrder" required step="1">
+                        <input type="text" data-number-input id="qt-sort-order" name="sortOrder" required step="1">
                     </div>
                     <div class="form-group" data-testid="qt-active">
                         <span class="form-label" aria-hidden="true" th:text="#{admin.qualityTiers.column.status}">Status</span>

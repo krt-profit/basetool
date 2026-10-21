@@ -9,11 +9,11 @@
     <div class="price-info">
         <div>
             <div class="price-label" th:text="#{materials.minPriceBuy}">Min. Einkaufspreis</div>
-            <div class="price-value" th:text="${mat.minPriceBuy != null ? #numbers.formatInteger(mat.minPriceBuy, 1, 'POINT') + ' aUEC' : '-'}">-</div>
+            <div class="price-value" th:text="${mat.minPriceBuy != null ? #numbers.formatInteger(mat.minPriceBuy, 1, 'DEFAULT') + ' aUEC' : '-'}">-</div>
         </div>
         <div class="price-info__end">
             <div class="price-label" th:text="#{materials.maxPriceSell}">Max. Verkaufspreis</div>
-            <div class="price-value" th:text="${mat.maxPriceSell != null ? #numbers.formatInteger(mat.maxPriceSell, 1, 'POINT') + ' aUEC' : '-'}">-</div>
+            <div class="price-value" th:text="${mat.maxPriceSell != null ? #numbers.formatInteger(mat.maxPriceSell, 1, 'DEFAULT') + ' aUEC' : '-'}">-</div>
         </div>
     </div>
 </a>

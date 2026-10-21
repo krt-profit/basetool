@@ -60,19 +60,19 @@
             </div>
             <div class="kpi-total">
                 <div class="kpi-label" th:text="#{purchasing.report.funded}">Bewilligt</div>
-                <div class="kpi-value" th:text="#{purchasing.money(${#numbers.formatInteger(report.totals().funded(), 1, 'POINT')})}">0 aUEC</div>
+                <div class="kpi-value" th:text="#{purchasing.money(${#numbers.formatInteger(report.totals().funded(), 1, 'DEFAULT')})}">0 aUEC</div>
             </div>
             <div class="kpi-total">
                 <div class="kpi-label" th:text="#{purchasing.report.returned}">Zur&uuml;ckgeflossen</div>
-                <div class="kpi-value" th:text="#{purchasing.money(${#numbers.formatInteger(report.totals().returned(), 1, 'POINT')})}">0 aUEC</div>
+                <div class="kpi-value" th:text="#{purchasing.money(${#numbers.formatInteger(report.totals().returned(), 1, 'DEFAULT')})}">0 aUEC</div>
             </div>
             <div class="kpi-total">
                 <div class="kpi-label" th:text="#{purchasing.report.spent}">Netto ausgegeben</div>
-                <div class="kpi-value" th:text="#{purchasing.money(${#numbers.formatInteger(report.totals().spent(), 1, 'POINT')})}">0 aUEC</div>
+                <div class="kpi-value" th:text="#{purchasing.money(${#numbers.formatInteger(report.totals().spent(), 1, 'DEFAULT')})}">0 aUEC</div>
             </div>
             <div class="kpi-total">
                 <div class="kpi-label" th:text="#{purchasing.report.loss}">Verlust</div>
-                <div class="kpi-value" th:text="#{purchasing.money(${#numbers.formatInteger(report.totals().loss(), 1, 'POINT')})}">0 aUEC</div>
+                <div class="kpi-value" th:text="#{purchasing.money(${#numbers.formatInteger(report.totals().loss(), 1, 'DEFAULT')})}">0 aUEC</div>
             </div>
         </div>
 
@@ -96,8 +96,8 @@
                             <td th:text="${m.month()}">2026-10</td>
                             <td class="num" th:attr="data-label=#{purchasing.report.deals}" th:text="${m.dealCount()}">0</td>
                             <td class="num" th:attr="data-label=#{purchasing.report.bought}" th:text="${m.boughtAmount()}">0</td>
-                            <td class="num" th:attr="data-label=#{purchasing.report.spent}" th:text="${#numbers.formatInteger(m.spent(), 1, 'POINT')}">0</td>
-                            <td class="num" th:attr="data-label=#{purchasing.report.loss}" th:text="${#numbers.formatInteger(m.loss(), 1, 'POINT')}">0</td>
+                            <td class="num" th:attr="data-label=#{purchasing.report.spent}" th:text="${#numbers.formatInteger(m.spent(), 1, 'DEFAULT')}">0</td>
+                            <td class="num" th:attr="data-label=#{purchasing.report.loss}" th:text="${#numbers.formatInteger(m.loss(), 1, 'DEFAULT')}">0</td>
                         </tr>
                     </tbody>
                 </table>
@@ -125,9 +125,9 @@
                             <td class="num" th:attr="data-label=#{purchasing.report.deals}" th:text="${m.dealCount()}">0</td>
                             <td class="num" th:attr="data-label=#{purchasing.report.bought}" th:text="${m.boughtAmount()}">0</td>
                             <td class="num" th:attr="data-label=#{purchasing.report.avgPrice}"
-                                th:text="${#numbers.formatDecimal(m.averageUnitPrice(), 1, 'POINT', 0, 'COMMA')}">0</td>
+                                th:text="${#numbers.formatDecimal(m.averageUnitPrice(), 1, 'DEFAULT', 0, 'DEFAULT')}">0</td>
                             <td class="num" th:attr="data-label=#{purchasing.report.uex}"
-                                th:text="${m.uexReferencePrice() != null ? #numbers.formatDecimal(m.uexReferencePrice(), 1, 'POINT', 0, 'COMMA') : '&ndash;'}">&ndash;</td>
+                                th:text="${m.uexReferencePrice() != null ? #numbers.formatDecimal(m.uexReferencePrice(), 1, 'DEFAULT', 0, 'DEFAULT') : '&ndash;'}">&ndash;</td>
                         </tr>
                     </tbody>
                 </table>

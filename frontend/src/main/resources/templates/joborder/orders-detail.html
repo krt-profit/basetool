@@ -212,11 +212,11 @@
                 </td>
                 <td class="num" th:attr="data-label=#{orders.detail.amount}" th:switch="${mat.material.quantityType}">
                     <span th:case="'PIECE'" th:text="|${mat.amount != null ? #numbers.formatInteger(mat.amount, 1) : '0'} #{material.quantity.piece}|"></span>
-                    <span th:case="*" th:text="|${mat.amount != null ? #numbers.formatDecimal(mat.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
+                    <span th:case="*" th:text="|${mat.amount != null ? #numbers.formatDecimal(mat.amount, 1, 'DEFAULT', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
                 </td>
                 <td th:unless="${requesterView}" class="num" th:attr="data-label=#{orders.detail.stock}" th:switch="${mat.material.quantityType}">
                     <span th:case="'PIECE'" th:text="|${mat.currentStock != null ? #numbers.formatInteger(mat.currentStock, 1) : '0'} #{material.quantity.piece}|"></span>
-                    <span th:case="*" th:text="|${mat.currentStock != null ? #numbers.formatDecimal(mat.currentStock, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
+                    <span th:case="*" th:text="|${mat.currentStock != null ? #numbers.formatDecimal(mat.currentStock, 1, 'DEFAULT', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
                 </td>
                 <td th:if="${showClaims}" data-claim-control th:attr="data-label=#{orders.detail.claims}">
                     <span th:if="${mat.claims == null or mat.claims.isEmpty()}" class="text-muted">&#8212;</span>
@@ -225,7 +225,7 @@
                         <strong th:text="${c.claimingOrgUnit != null ? c.claimingOrgUnit.shorthand : '?'}">SQ</strong>:
                         <span th:switch="${mat.material.quantityType}">
                             <span th:case="'PIECE'" th:text="|${#numbers.formatInteger(c.amount, 1)} #{material.quantity.piece}|"></span>
-                            <span th:case="*" th:text="|${#numbers.formatDecimal(c.amount, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
+                            <span th:case="*" th:text="|${#numbers.formatDecimal(c.amount, 1, 'DEFAULT', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
                         </span>
                         <button th:if="${isLogistician}" type="button" class="btn btn-ghost btn-icon btn-claim-edit" data-claim-control data-trigger="claim-edit"
                                 th:title="#{orders.claim.edit}"
@@ -246,7 +246,7 @@
                     <div class="claim-open-cell">
                         <span class="claim-open-amount" th:switch="${mat.material.quantityType}">
                             <span th:case="'PIECE'" th:text="|${mat.openAmount != null ? #numbers.formatInteger(mat.openAmount, 1) : '0'} #{material.quantity.piece}|"></span>
-                            <span th:case="*" th:text="|${mat.openAmount != null ? #numbers.formatDecimal(mat.openAmount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
+                            <span th:case="*" th:text="|${mat.openAmount != null ? #numbers.formatDecimal(mat.openAmount, 1, 'DEFAULT', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
                         </span>
                         <button th:if="${isLogistician}" type="button" class="btn btn-ghost btn-xs btn-claim-add" data-claim-control data-trigger="claim-add"
                                 th:data-material-id="${mat.material.id}"
@@ -354,7 +354,7 @@
                                 <span th:text="${m.material != null ? m.material.name() : '-'}"></span>
                                 <span th:switch="${m.material != null ? m.material.quantityType() : 'SCU'}">
                                     <span th:case="'PIECE'" th:text="|${#numbers.formatInteger(perUnit, 1)} #{material.quantity.piece}|"></span>
-                                    <span th:case="*" th:text="|${#numbers.formatDecimal(perUnit, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
+                                    <span th:case="*" th:text="|${#numbers.formatDecimal(perUnit, 1, 'DEFAULT', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
                                 </span><span th:if="${!st.last}"> · </span>
                             </th:block>
                         </span>
@@ -435,11 +435,11 @@
                 </td>
                 <td class="num" th:attr="data-label=#{orders.detail.aggregated.amount}" th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
                     <span th:case="'PIECE'" th:text="|${#numbers.formatInteger(agg.totalQuantity, 1)} #{material.quantity.piece}|"></span>
-                    <span th:case="*" th:text="|${#numbers.formatDecimal(agg.totalQuantity, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
+                    <span th:case="*" th:text="|${#numbers.formatDecimal(agg.totalQuantity, 1, 'DEFAULT', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
                 </td>
                 <td class="num" th:attr="data-label=#{orders.detail.aggregated.stock}" th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
                     <span th:case="'PIECE'" th:text="|${agg.currentStock != null ? #numbers.formatInteger(agg.currentStock, 1) : '0'} #{material.quantity.piece}|"></span>
-                    <span th:case="*" th:text="|${agg.currentStock != null ? #numbers.formatDecimal(agg.currentStock, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
+                    <span th:case="*" th:text="|${agg.currentStock != null ? #numbers.formatDecimal(agg.currentStock, 1, 'DEFAULT', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
                 </td>
                 <td th:if="${showClaims}" data-claim-control th:attr="data-label=#{orders.detail.claims}">
                     <div class="claim-open-cell">
@@ -450,7 +450,7 @@
                                 <strong th:text="${c.claimingOrgUnit != null ? c.claimingOrgUnit.shorthand : '?'}">SQ</strong>:
                                 <span th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
                                     <span th:case="'PIECE'" th:text="|${#numbers.formatInteger(c.amount, 1)} #{material.quantity.piece}|"></span>
-                                    <span th:case="*" th:text="|${#numbers.formatDecimal(c.amount, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
+                                    <span th:case="*" th:text="|${#numbers.formatDecimal(c.amount, 1, 'DEFAULT', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
                                 </span>
                                 <button th:if="${isLogistician}" type="button" class="btn btn-ghost btn-icon btn-claim-edit" data-claim-control data-trigger="claim-edit"
                                         th:title="#{orders.claim.edit}"
@@ -512,7 +512,7 @@
                     <td class="num" th:attr="data-label=#{orders.detail.orphanedInventory.quality}" th:text="${inv.quality}">0</td>
                     <td class="num" th:attr="data-label=#{orders.detail.orphanedInventory.amount}" th:switch="${inv.material != null ? inv.material.quantityType() : 'SCU'}">
                         <span th:case="'PIECE'" th:text="|${#numbers.formatInteger(inv.amount, 1)} #{material.quantity.piece}|"></span>
-                        <span th:case="*" th:text="|${#numbers.formatDecimal(inv.amount, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
+                        <span th:case="*" th:text="|${#numbers.formatDecimal(inv.amount, 1, 'DEFAULT', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
                     </td>
                 </tr>
                 </tbody>
@@ -699,7 +699,7 @@
                                 <span th:text="${item.material.name}"></span>
                                 <span th:text="#{orders.detail.handover.quality(${item.quality})}"></span>:
                                 <span th:if="${item.material.quantityType == 'PIECE'}" th:text="|${#numbers.formatInteger(item.amount, 1)} #{material.quantity.piece}|"></span>
-                                <span th:unless="${item.material.quantityType == 'PIECE'}" th:text="|${#numbers.formatDecimal(item.amount, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
+                                <span th:unless="${item.material.quantityType == 'PIECE'}" th:text="|${#numbers.formatDecimal(item.amount, 1, 'DEFAULT', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
                                 <span th:if="${item.stolen}" class="chip chip--danger chip-xs" data-testid="stolen-chip"
                                       th:title="#{inventory.stolen.chip.title}" th:text="#{inventory.stolen.chip}">Gestohlen</span>
                             </li>
@@ -848,7 +848,7 @@
                             <span data-role="amount-unit"></span>
                             <th:block th:replace="~{kernel/fragments/scu-hint :: scuHint(null, true)}"></th:block>
                         </label>
-                        <input class="w-full" type="text" inputmode="decimal" data-scu-decimal step="0.001" data-role="material-amount" th:field="*{materials[__${stat.index}__].amount}" min="0.001" required>
+                        <input class="w-full" type="text" inputmode="decimal" data-number-input data-scu-decimal step="0.001" data-role="material-amount" th:field="*{materials[__${stat.index}__].amount}" min="0.001" required>
                     </div>
                     <div>
                         <button type="button" class="btn btn-quiet-danger btn-icon remove-material-btn" th:title="#{orders.detail.material.remove}" th:aria-label="#{orders.detail.material.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
@@ -876,7 +876,7 @@
                             <span data-role="amount-unit"></span>
                             <th:block th:replace="~{kernel/fragments/scu-hint :: scuHint(null, true)}"></th:block>
                         </label>
-                        <input class="w-full" type="text" inputmode="decimal" data-scu-decimal step="0.001" data-role="material-amount" name="materials[0].amount" min="0.001" required>
+                        <input class="w-full" type="text" inputmode="decimal" data-number-input data-scu-decimal step="0.001" data-role="material-amount" name="materials[0].amount" min="0.001" required>
                     </div>
                     <div>
                         <button type="button" class="btn btn-quiet-danger btn-icon remove-material-btn" th:title="#{orders.detail.material.remove}" th:aria-label="#{orders.detail.material.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
@@ -941,7 +941,7 @@
                 <span th:text="#{orders.claim.amount}">Menge</span>
                 <th:block th:replace="~{kernel/fragments/scu-hint :: scuHint('claim-scu-hint', true)}"></th:block>
             </label>
-            <input class="w-full" type="text" inputmode="decimal" data-scu-decimal id="claim-amount" step="0.001" min="0.001">
+            <input class="w-full" type="text" inputmode="decimal" data-number-input data-scu-decimal id="claim-amount" step="0.001" min="0.001">
             <small id="claim-open-hint" class="text-muted"></small>
         </div>
         </div>
@@ -1061,7 +1061,7 @@
                     </div>
                     <div>
                         <label class="form-label-sm" th:text="#{orders.detail.itemHandover.amount}">Menge</label>
-                        <input class="w-full" type="number" step="1" min="1" th:max="${outstanding}" th:name="|entries[${stat.index}].amount|" value=""
+                        <input class="w-full" type="text" data-number-input step="1" min="1" th:max="${outstanding}" th:name="|entries[${stat.index}].amount|" value=""
                                th:aria-label="${(item.gameItem != null ? item.gameItem.name() : '-') + ' · ' + #messages.msg('orders.detail.itemHandover.amount')}">
                     </div>
                 </div>
@@ -1084,7 +1084,7 @@
         <div class="krt-form" id="production-form" th:data-order-id="${order.id}" th:data-acting-user-id="${actingUser != null ? actingUser.id : ''}" th:data-acting-user-name="${actingUser != null ? (actingUser.effectiveName != null ? actingUser.effectiveName : actingUser.username) : ''}" th:data-responsible-org-unit-id="${order.responsibleOrgUnit != null ? order.responsibleOrgUnit.id() : ''}">
             <div class="form-group mb-1">
                 <label for="production-amount" class="form-label" th:text="#{orders.detail.production.amount}">Anzahl herstellen</label>
-                <input type="number" id="production-amount" step="1" min="1" value="1" class="w-full">
+                <input type="text" data-number-input id="production-amount" step="1" min="1" value="1" class="w-full">
                 <small class="text-muted" id="production-remaining-hint"></small>
             </div>
             <h3 class="section-title" th:text="#{orders.detail.production.consumption}">Materialverbrauch &amp; Lagerentnahme</h3>

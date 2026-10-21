@@ -19,6 +19,8 @@
 
 /* global labelPiece, labelScu, scuHintText, labelMenge, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_HANDOVER_MISSION_HERKUNFT, MSG_HANDOVER_MISSION_REST, MSG_HANDOVER_MISSION_MIN, MSG_STOLEN, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR, ORDER_CONFLICT, ORDER_HANDOVER_I18N */
 
+import { formatNumber } from '/js/kernel/krt-number-format.js';
+import { krtNumberInput } from '/js/kernel/krt-number-input.js';
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
@@ -256,7 +258,9 @@ function orderSliceAmount(inv) {
  * @returns {string} the formatted amount
  */
 function _handoverFmtAmount(n, isPiece) {
-    return isPiece ? String(Math.round(n)) : Number(n).toFixed(3);
+    return isPiece
+        ? formatNumber(Math.round(n), 0, document.documentElement.lang)
+        : formatNumber(n, 3, document.documentElement.lang);
 }
 
 /**
@@ -444,7 +448,11 @@ export function addHandoverItemRow() {
     cachedInventoryItems.forEach((inv) => {
         const isPiece = inv.material && inv.material.quantityType === 'PIECE';
         const qtyLabel = isPiece ? labelPiece : labelScu;
-        const formattedAmount = isPiece ? inv.amount.toFixed(0) : inv.amount.toFixed(3);
+        const formattedAmount = formatNumber(
+            inv.amount,
+            isPiece ? 0 : 3,
+            document.documentElement.lang,
+        );
         const matName = (inv.material && inv.material.name) || '';
         const userName = (inv.user && inv.user.effectiveName) || '';
         const optionLabel =
@@ -575,10 +583,12 @@ function _refreshHandoverMissionPicker(row) {
             name.style.fontSize = '0.7rem';
             name.textContent = m.missionName;
             const input = document.createElement('input');
-            input.type = 'number';
+            input.type = 'text';
+            input.setAttribute('data-number-input', '');
             input.min = '0';
             input.step = isPiece ? '1' : '0.001';
             input.max = String(m.amount);
+            krtNumberInput.enhance(input);
             input.value = '0';
             input.style.width = '6rem';
             input.style.textAlign = 'right';

@@ -37,12 +37,12 @@
                         </div>
                         <div class="form-group" id="supply-pledge-quality-row">
                             <label for="supply-pledge-quality" th:text="#{supply.pledge.quality}">Qualit&auml;t (0&ndash;1000)</label>
-                            <input type="number" id="supply-pledge-quality" min="0" max="1000" step="1" inputmode="numeric" value="0">
+                            <input type="text" data-number-input id="supply-pledge-quality" min="0" max="1000" step="1" inputmode="numeric" value="0">
                         </div>
                     </div>
                     <div class="form-group">
                         <label for="supply-pledge-amount" th:text="#{supply.need.amount}">Menge</label>
-                        <input type="number" id="supply-pledge-amount" min="0.001" step="any" inputmode="decimal" required>
+                        <input type="text" data-number-input id="supply-pledge-amount" min="0.001" step="any" inputmode="decimal" required>
                     </div>
                 </div>
                 <div class="krt-modal-foot">

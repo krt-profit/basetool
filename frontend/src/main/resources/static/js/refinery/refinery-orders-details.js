@@ -141,15 +141,9 @@ function calcScu(index) {
         document.getElementById(`outputQuantityScu_${index}`)
     );
     if (unitInput && scuInput) {
-        const valStr = unitInput.value.replace(/\./g, '').replace(',', '.');
-        const val = parseInt(valStr, 10);
+        const val = parseInt(unitInput.value, 10);
         if (!isNaN(val)) {
-            const scu = val / 100.0;
-            scuInput.value = scu.toLocaleString('de-DE', {
-                minimumFractionDigits: 3,
-                maximumFractionDigits: 3,
-                useGrouping: false,
-            });
+            scuInput.value = (val / 100.0).toFixed(3);
         } else {
             scuInput.value = '';
         }

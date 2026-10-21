@@ -258,7 +258,7 @@
                         </div>
                         <div class="tree-cell tree-cell--num tree-amount" th:switch="${group.material.quantityType}">
                             <span th:case="'PIECE'"><span th:text="${group.totalAmount != null ? #numbers.formatInteger(group.totalAmount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">St&uuml;ck</span></span>
-                            <span th:case="*"><span th:text="${group.totalAmount != null ? #numbers.formatDecimal(group.totalAmount, 1, 'NONE', 3, 'DEFAULT') : '0.000'}">10.500</span> <span class="tree-unit" th:text="#{material.quantity.scu}">SCU</span></span>
+                            <span th:case="*"><span th:text="${group.totalAmount != null ? #numbers.formatDecimal(group.totalAmount, 1, 'DEFAULT', 3, 'DEFAULT') : '0.000'}">10.500</span> <span class="tree-unit" th:text="#{material.quantity.scu}">SCU</span></span>
                         </div>
                         <div class="tree-cell"></div>
                     </div>
@@ -289,7 +289,7 @@
                                 </div>
                                 <div class="tree-cell tree-cell--num tree-amount" th:switch="${group.material.quantityType}">
                                     <span th:case="'PIECE'"><span th:text="${stack.totalAmount != null ? #numbers.formatInteger(stack.totalAmount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">St&uuml;ck</span></span>
-                                    <span th:case="*"><span th:text="${stack.totalAmount != null ? #numbers.formatDecimal(stack.totalAmount, 1, 'NONE', 3, 'DEFAULT') : '0.000'}">10.500</span> <span class="tree-unit" th:text="#{material.quantity.scu}">SCU</span></span>
+                                    <span th:case="*"><span th:text="${stack.totalAmount != null ? #numbers.formatDecimal(stack.totalAmount, 1, 'DEFAULT', 3, 'DEFAULT') : '0.000'}">10.500</span> <span class="tree-unit" th:text="#{material.quantity.scu}">SCU</span></span>
                                 </div>
                                 <div class="tree-cell tree-cell--num lager-cell-count">
                                     <span class="stack-entry-count" th:text="${stack.entryCount == 1} ? #{inventory.tree.entryCount.one} : #{inventory.tree.entryCount.many(${stack.entryCount})}">1 Eintrag</span>
@@ -385,7 +385,7 @@
                     <span th:text="#{inventory.bookout.targetAmount}">Zielbestand</span>
                     <th:block th:replace="~{kernel/fragments/scu-hint :: scuHint('bookout-target-scu-hint', true)}"></th:block>
                 </label>
-                <input type="text" inputmode="decimal" data-scu-decimal data-scu-allow-zero id="targetAmount" th:field="*{targetAmount}" step="0.001" min="0" class="w-full" data-trigger="inv-admin-amount-from-target">
+                <input type="text" inputmode="decimal" data-number-input data-scu-decimal data-scu-allow-zero id="targetAmount" th:field="*{targetAmount}" step="0.001" min="0" class="w-full" data-trigger="inv-admin-amount-from-target">
             </div>
 
             <div class="form-group mb-1">
@@ -394,7 +394,7 @@
                     <th:block th:replace="~{kernel/fragments/scu-hint :: scuHint('bookout-amount-scu-hint', true)}"></th:block>
                 </label>
                 <div class="flex-gap-sm">
-                    <input type="text" inputmode="decimal" data-scu-decimal id="amount" th:field="*{amount}" step="0.001" min="0" required class="w-full" data-trigger="inv-admin-target-from-amount">
+                    <input type="text" inputmode="decimal" data-number-input data-scu-decimal id="amount" th:field="*{amount}" step="0.001" min="0" required class="w-full" data-trigger="inv-admin-target-from-amount">
                     <span id="amountOfText" class="lager-amount-of" th:data-template="#{inventory.bookout.amount.of('{0}')}" th:text="${inventoryBookOutForm.maxAmount != null ? #messages.msg('inventory.bookout.amount.of', inventoryBookOutForm.maxAmount) : ''}"></span>
                 </div>
             </div>
@@ -421,7 +421,7 @@
                 </div>
                 <div class="form-group mb-1">
                     <label for="sellAmount" class="form-label" th:text="#{inventory.bookout.sellAmount}">Verkaufsbetrag</label>
-                    <input type="text" data-auec-input inputmode="decimal" id="sellAmount" th:field="*{sellAmount}" step="0.01" min="0" class="w-full">
+                    <input type="text" data-number-input inputmode="decimal" id="sellAmount" th:field="*{sellAmount}" step="0.01" min="0" class="w-full">
                 </div>
             </div>
 
@@ -457,7 +457,7 @@
                     <span th:text="#{inventory.rebook.targetAmount}">Verbleibend</span>
                     <th:block th:replace="~{kernel/fragments/scu-hint :: scuHint('umbuchen-target-scu-hint', true)}"></th:block>
                 </label>
-                <input type="text" inputmode="decimal" data-scu-decimal data-scu-allow-zero id="umbuchenTargetAmount" step="0.001" min="0" class="w-full" data-trigger="inv-admin-umbuchen-amount-from-target">
+                <input type="text" inputmode="decimal" data-number-input data-scu-decimal data-scu-allow-zero id="umbuchenTargetAmount" step="0.001" min="0" class="w-full" data-trigger="inv-admin-umbuchen-amount-from-target">
             </div>
 
             <div class="form-group mb-1">
@@ -466,7 +466,7 @@
                     <th:block th:replace="~{kernel/fragments/scu-hint :: scuHint('umbuchen-amount-scu-hint', true)}"></th:block>
                 </label>
                 <div class="flex-gap-sm">
-                    <input type="text" inputmode="decimal" data-scu-decimal id="umbuchenAmount" step="0.001" min="0" required class="w-full" data-trigger="inv-admin-umbuchen-target-from-amount">
+                    <input type="text" inputmode="decimal" data-number-input data-scu-decimal id="umbuchenAmount" step="0.001" min="0" required class="w-full" data-trigger="inv-admin-umbuchen-target-from-amount">
                     <span id="umbuchenAmountOfText" class="lager-amount-of" th:data-template="#{inventory.bookout.amount.of('{0}')}"></span>
                 </div>
             </div>
@@ -564,7 +564,7 @@
             </div>
             <div class="form-group mb-1">
                 <label for="poolChangeAmount" class="form-label" th:text="#{inventory.poolChange.amount}">Menge</label>
-                <input type="number" id="poolChangeAmount" class="w-full" min="0" step="any" data-testid="pool-change-amount">
+                <input type="text" data-number-input id="poolChangeAmount" class="w-full" min="0" step="any" data-testid="pool-change-amount">
                 <p class="form-hint" th:text="#{inventory.poolChange.amount.hint}">Der ganze Eintrag beh&auml;lt seine Reservierungen; eine Teilmenge kommt aus dem freien Bestand.</p>
             </div>
             <div class="form-group check-row mb-1">

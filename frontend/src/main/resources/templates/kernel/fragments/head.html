@@ -49,10 +49,10 @@
         };
     </script>
     <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-        window.krtAuecI18n = {
-            whole: /*[[#{money.validation.whole}]]*/ 'Enter a whole aUEC amount.',
-            min: /*[[#{money.validation.min}]]*/ 'Enter at least {0} aUEC.',
-            max: /*[[#{money.validation.max}]]*/ 'Enter at most {0} aUEC.'
+        window.krtNumberI18n = {
+            whole: /*[[#{number.validation.whole}]]*/ 'Enter a whole number.',
+            min: /*[[#{number.validation.min}]]*/ 'Enter at least {0}.',
+            max: /*[[#{number.validation.max}]]*/ 'Enter at most {0}.'
         };
     </script>
     <script type="module" th:src="@{/js/kernel/krt-html.js}" th:attr="nonce=${cspNonce}"></script>
@@ -134,7 +134,7 @@
     <script type="module" th:src="@{/js/notification/notifications.js}" th:attr="nonce=${cspNonce}"></script>
     <script type="module" th:src="@{/js/kernel/datetime-splitter.js}" th:attr="nonce=${cspNonce}"></script>
     <script type="module" th:src="@{/js/kernel/scu-decimal-input.js}" th:attr="nonce=${cspNonce}"></script>
-    <script type="module" th:src="@{/js/kernel/krt-auec-input.js}" th:attr="nonce=${cspNonce}"></script>
+    <script type="module" th:src="@{/js/kernel/krt-number-input.js}" th:attr="nonce=${cspNonce}"></script>
     <script type="module" th:src="@{/js/kernel/inline-style-apply.js}" th:attr="nonce=${cspNonce}"></script>
 
     <script type="module" th:src="@{/js/kernel/krt-filter-panel.js}" th:attr="nonce=${cspNonce}"></script>

@@ -221,19 +221,19 @@
                                           th:with="f=${frequencyByTypeId[freqType.id]}">
                                     <dt th:text="${freqType.name}">Funk</dt>
                                     <dd>
-                                        <span class="data-value data-value--mono freq-value-display" th:attr="data-freq-type-id=${freqType.id}" th:text="${#strings.replace(#numbers.formatDecimal(f.value, 3, 'NONE', 2, 'DEFAULT'), ',', '.')}">123.45</span>
+                                        <span class="data-value data-value--mono freq-value-display" th:attr="data-freq-type-id=${freqType.id}" th:text="${#numbers.formatDecimal(f.value, 3, 'NONE', 2, 'DEFAULT')}">123.45</span>
                                     </dd>
                                 </th:block>
                                 <th:block th:each="cf : ${customFrequencies}">
                                     <dt th:text="${cf.name}">Funk</dt>
                                     <dd>
-                                        <span class="data-value data-value--mono" th:text="${#strings.replace(#numbers.formatDecimal(cf.value, 3, 'NONE', 2, 'DEFAULT'), ',', '.')}">123.45</span>
+                                        <span class="data-value data-value--mono" th:text="${#numbers.formatDecimal(cf.value, 3, 'NONE', 2, 'DEFAULT')}">123.45</span>
                                     </dd>
                                 </th:block>
                                 <th:block th:each="unit : ${unitsWithFreq}">
                                     <dt><span th:text="${unit.name}">Einheit</span> <small class="kv-sub" th:text="#{mission.overview.radio.unit}">Einheit</small></dt>
                                     <dd>
-                                        <span class="data-value data-value--mono" th:text="${#strings.replace(#numbers.formatDecimal(unit.frequency, 3, 'NONE', 2, 'DEFAULT'), ',', '.')}">123.45</span>
+                                        <span class="data-value data-value--mono" th:text="${#numbers.formatDecimal(unit.frequency, 3, 'NONE', 2, 'DEFAULT')}">123.45</span>
                                     </dd>
                                 </th:block>
                             </dl>
@@ -290,7 +290,7 @@
                                 <small>
                                     <th:block th:if="${unit.shipType != null}">&mdash; <span th:text="${unit.shipType.name}">Typ</span></th:block>
                                     <th:block th:if="${unitResponsible != null}">&middot; <span th:text="${unitResponsible}" th:title="#{mission.unit.responsible}">Owner</span></th:block>
-                                    <th:block th:if="${unit.frequency != null}">&middot; <span class="data-value--mono" th:text="#{mission.unit.frequency} + ' ' + ${#strings.replace(#numbers.formatDecimal(unit.frequency, 3, 'NONE', 2, 'DEFAULT'), ',', '.')}">Freq</span></th:block>
+                                    <th:block th:if="${unit.frequency != null}">&middot; <span class="data-value--mono" th:text="#{mission.unit.frequency} + ' ' + ${#numbers.formatDecimal(unit.frequency, 3, 'NONE', 2, 'DEFAULT')}">Freq</span></th:block>
                                     <span th:if="${!#strings.isEmpty(unit.note)}" class="notemark" th:title="${unit.note}" tabindex="0" th:attr="aria-label=#{mission.unit.note} + ': ' + ${unit.note}">&#x270E;</span>
                                 </small>
                                 <span th:if="${unit.highValueUnit}" class="chip chip--warning chip-xs" th:title="#{mission.unit.hvu.tooltip}" th:text="#{mission.unit.hvu.short}">HVU</span>
@@ -345,22 +345,22 @@
             <div class="kpi-grid fin-kpis" data-testid="mission-finance-kpis" th:if="${financeSum != null}" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).KRT_MEMBER,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).MISSION_MANAGER)">
                 <div class="kpi-total">
                     <div class="kpi-label" th:text="#{mission.finance.kpi.total}">Gesamtergebnis</div>
-                    <div class="kpi-value"><span th:classappend="${financeSum >= 0 ? 'is-pos' : 'is-neg'}" th:text="${#numbers.formatInteger(@moneyFormat.round(financeSum), 1, 'POINT')}">0</span> <span class="kpi-unit">aUEC</span></div>
+                    <div class="kpi-value"><span th:classappend="${financeSum >= 0 ? 'is-pos' : 'is-neg'}" th:text="${#numbers.formatInteger(@moneyFormat.round(financeSum), 1, 'DEFAULT')}">0</span> <span class="kpi-unit">aUEC</span></div>
                     <div class="kpi-sub" th:text="|${financeIncomeCount + financeExpenseCount} ${#messages.msg('mission.finance.entries')}|">0 Eintr&auml;ge</div>
                 </div>
                 <div class="kpi-total">
                     <div class="kpi-label" th:text="#{mission.finance.income_sum}">Einnahmen</div>
-                    <div class="kpi-value"><span class="is-pos" th:text="'+' + ${#numbers.formatInteger(@moneyFormat.round(financeIncomeSum), 1, 'POINT')}">0</span> <span class="kpi-unit">aUEC</span></div>
+                    <div class="kpi-value"><span class="is-pos" th:text="'+' + ${#numbers.formatInteger(@moneyFormat.round(financeIncomeSum), 1, 'DEFAULT')}">0</span> <span class="kpi-unit">aUEC</span></div>
                     <div class="kpi-sub" th:text="|${financeIncomeCount} ${#messages.msg('mission.finance.entries')}|">0 Eintr&auml;ge</div>
                 </div>
                 <div class="kpi-total">
                     <div class="kpi-label" th:text="#{mission.finance.expense_sum}">Ausgaben</div>
-                    <div class="kpi-value"><span class="is-neg" th:text="'&minus;' + ${#numbers.formatInteger(@moneyFormat.round(financeExpenseSum), 1, 'POINT')}">0</span> <span class="kpi-unit">aUEC</span></div>
+                    <div class="kpi-value"><span class="is-neg" th:text="'&minus;' + ${#numbers.formatInteger(@moneyFormat.round(financeExpenseSum), 1, 'DEFAULT')}">0</span> <span class="kpi-unit">aUEC</span></div>
                     <div class="kpi-sub" th:text="|${financeExpenseCount} ${#messages.msg('mission.finance.entries')} &middot; ${#messages.msg('mission.finance.incl_refinery')}|">0 Eintr&auml;ge</div>
                 </div>
                 <div class="kpi-total">
                     <div class="kpi-label" th:text="#{mission.finance.per_share}">Je Anteil</div>
-                    <div class="kpi-value"><span th:text="${financePerShare != null ? #numbers.formatInteger(financePerShare, 1, 'POINT') : '&mdash;'}">0</span> <span class="kpi-unit" th:if="${financePerShare != null}">aUEC</span></div>
+                    <div class="kpi-value"><span th:text="${financePerShare != null ? #numbers.formatInteger(financePerShare, 1, 'DEFAULT') : '&mdash;'}">0</span> <span class="kpi-unit" th:if="${financePerShare != null}">aUEC</span></div>
                     <div class="kpi-sub" th:text="#{mission.finance.per_share.participants(${mission.registeredParticipants ?: 0})}">0 Teilnehmer</div>
                 </div>
             </div>
@@ -391,7 +391,7 @@
                                         <span th:if="${entry.type.name() == 'INCOME'}" class="chip chip--success chip-xs" th:text="#{mission.finance.type.income}">Einnahme</span>
                                         <span th:if="${entry.type.name() == 'EXPENSE'}" class="chip chip--danger chip-xs" th:text="#{mission.finance.type.expense}">Ausgabe</span>
                                     </td>
-                                    <td class="num" th:classappend="${entry.type.name() == 'INCOME'} ? 'is-pos' : 'is-neg'" th:text="${(entry.type.name() == 'INCOME' ? '+' : '&minus;') + #numbers.formatInteger(@moneyFormat.round(entry.amount), 1, 'POINT')} + ' aUEC'">1.000</td>
+                                    <td class="num" th:classappend="${entry.type.name() == 'INCOME'} ? 'is-pos' : 'is-neg'" th:text="${(entry.type.name() == 'INCOME' ? '+' : '&minus;') + #numbers.formatInteger(@moneyFormat.round(entry.amount), 1, 'DEFAULT')} + ' aUEC'">1.000</td>
                                     <td class="cell-actions" sec:authorize="isAuthenticated()">
                                         <button type="button" class="btn btn-ghost btn-icon edit-finance-btn"
                                                 th:with="financeEditAmount=${@moneyFormat.round(entry.amount)}"
@@ -413,7 +413,7 @@
                                     <td class="cell-status">
                                         <span class="chip chip--danger chip-xs" th:text="#{mission.finance.type.expense}">Ausgabe</span>
                                     </td>
-                                    <td class="num is-neg" th:text="'&minus;' + ${#numbers.formatInteger(@moneyFormat.roundNumber(order.expenses), 1, 'POINT')} + ' aUEC'">1.000</td>
+                                    <td class="num is-neg" th:text="'&minus;' + ${#numbers.formatInteger(@moneyFormat.roundNumber(order.expenses), 1, 'DEFAULT')} + ' aUEC'">1.000</td>
                                     <td class="cell-actions" sec:authorize="isAuthenticated()">
                                         <span class="auto-marker" th:title="#{mission.finance.auto.tooltip}" th:text="#{mission.finance.auto}">auto</span>
                                     </td>
@@ -442,7 +442,7 @@
                             <tbody>
                                 <tr th:each="p : ${participants}" th:attr="data-participant-id=${p?.id}, data-version=${p?.version}">
                                     <td><span class="cell-title" th:text="${p?.user != null ? p.user.effectiveName : (p?.guestName != null ? p.guestName : #messages.msg('mission.participant.deleted'))}">Username</span></td>
-                                    <td class="num" th:attr="data-label=#{mission.participant.participation_percentage}" th:text="${#numbers.formatDecimal(participationPercentages[p.id] ?: 0.0, 1, 'NONE', 2, 'DEFAULT')} + ' %'" sec:authorize="isAuthenticated()">0.00 %</td>
+                                    <td class="num" th:attr="data-label=#{mission.participant.participation_percentage}" th:text="${#numbers.formatDecimal(participationPercentages[p.id] ?: 0.0, 1, 'DEFAULT', 2, 'DEFAULT')} + ' %'" sec:authorize="isAuthenticated()">0.00 %</td>
                                     <td class="cell-actions">
                                         <select class="form-control payout-select"
                                                 th:aria-label="#{mission.participant.payout_preference}"
@@ -495,7 +495,7 @@
                                                 <span th:text="${good.outputMaterial != null ? good.outputMaterial.name : '-'}">Material</span>
                                                 <span class="goods-amount" th:switch="${good.outputMaterial?.quantityType}">
                                                     <span th:case="'PIECE'" th:text="${good.outputQuantity != null} ? |${#numbers.formatInteger(good.outputQuantity, 1)} #{material.quantity.piece}| : '-'">10 St&uuml;ck</span>
-                                                    <span th:case="*" th:text="${good.outputQuantity != null} ? |${#numbers.formatDecimal(good.outputQuantity / 100.0, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}| : '-'">10.500 SCU</span>
+                                                    <span th:case="*" th:text="${good.outputQuantity != null} ? |${#numbers.formatDecimal(good.outputQuantity / 100.0, 1, 'DEFAULT', 3, 'DEFAULT')} #{material.quantity.scu}| : '-'">10.500 SCU</span>
                                                 </span>
                                                 <span class="goods-quality" th:if="${good.quality != null}" th:text="|#{refinery.quality} ${good.quality}|">Qualit&auml;t 500</span>
                                             </li>
@@ -533,7 +533,7 @@
                                     <td th:attr="data-label=#{inventory.location}" th:text="${item.location != null ? item.location.name : '-'}">Standort</td>
                                     <td class="num" th:switch="${item.material?.quantityType}">
                                         <span th:case="'PIECE'" th:text="${item.amount != null} ? |${#numbers.formatInteger(item.amount, 1)} #{material.quantity.piece}| : '-'">10 St&uuml;ck</span>
-                                        <span th:case="*" th:text="${item.amount != null} ? |${#numbers.formatDecimal(item.amount, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}| : '-'">10.500 SCU</span>
+                                        <span th:case="*" th:text="${item.amount != null} ? |${#numbers.formatDecimal(item.amount, 1, 'DEFAULT', 3, 'DEFAULT')} #{material.quantity.scu}| : '-'">10.500 SCU</span>
                                     </td>
                                     <td class="num" th:attr="data-label=#{inventory.quality}" th:text="${item.quality != null ? item.quality : '-'}">Qualit&auml;t</td>
                                     <td th:attr="data-label=#{inventory.order}">
@@ -541,7 +541,7 @@
                                               class="assoc-chip assoc-chip--order">
                                             <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·
                                             <span class="assoc-chip__amt"
-                                                  th:text="${item.material?.quantityType == 'PIECE' ? #numbers.formatInteger(a.amount, 1, 'NONE') : #numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
+                                                  th:text="${item.material?.quantityType == 'PIECE' ? #numbers.formatInteger(a.amount, 1, 'DEFAULT') : #numbers.formatDecimal(a.amount, 1, 'DEFAULT', 3, 'DEFAULT')}">1.000</span>
                                         </span>
                                         <span th:if="${#lists.isEmpty(item.jobOrderAllocations)}">-</span>
                                     </td>
@@ -886,7 +886,7 @@
                                              th:attr="data-freq-type-id=${freqType.id}, data-version=${f != null ? f.version : ''}">
                                             <span class="freq-value-display data-value data-value--mono"
                                                   th:attr="data-freq-type-id=${freqType.id}"
-                                                  th:text="${f != null ? #strings.replace(#numbers.formatDecimal(f.value, 3, 'NONE', 2, 'DEFAULT'), ',', '.') : ''}"
+                                                  th:text="${f != null ? #numbers.formatDecimal(f.value, 3, 'NONE', 2, 'DEFAULT') : ''}"
                                                   th:hidden="${f == null}">123.45</span>
 
                                             <button th:if="${!isNew and mission.canEdit}" type="button" class="btn btn-ghost btn-icon set-freq-btn"
@@ -911,7 +911,7 @@
                                          th:attr="data-custom-freq-id=${cf.id}, data-version=${cf.version}, data-name=${cf.name}, data-value=${cf.value}">
                                         <strong class="freq-name" th:text="${cf.name}">Name</strong>
                                         <div class="flex-gap-sm">
-                                            <span class="data-value data-value--mono" th:text="${#strings.replace(#numbers.formatDecimal(cf.value, 3, 'NONE', 2, 'DEFAULT'), ',', '.')}">123.45</span>
+                                            <span class="data-value data-value--mono" th:text="${#numbers.formatDecimal(cf.value, 3, 'NONE', 2, 'DEFAULT')}">123.45</span>
                                             <button th:if="${mission.canEdit}" type="button" class="btn btn-ghost btn-icon" data-trigger="custom-freq-edit"
                                                     th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
                                             <button th:if="${mission.canEdit}" type="button" class="btn btn-quiet-danger btn-icon" data-trigger="custom-freq-delete"
@@ -1262,7 +1262,7 @@
                 </div>
                 <div class="form-group">
                     <label th:text="#{mission.unit.frequency}">Frequenz</label>
-                    <input type="text" inputmode="decimal" class="freq-input" pattern="^\d{1,3}([.,]\d{1,2})?$" name="frequency" th:value="*{frequency}" th:placeholder="#{mission.unit.frequency.placeholder}">
+                    <input type="text" inputmode="decimal" class="freq-input" data-number-input min="0" max="999.99" step="0.01" pattern="^\d{1,3}([.,]\d{1,2})?$" name="frequency" th:value="*{frequency}" th:placeholder="#{mission.unit.frequency.placeholder}">
                     <div th:if="${#fields.hasErrors('frequency')}" th:errors="*{frequency}" class="field-error"></div>
                 </div>
                 <div class="form-group flex-gap-sm">
@@ -1292,7 +1292,7 @@
                 <input type="hidden" name="frequencyTypeId" id="freq-type-id" value="">
                 <div class="form-group">
                     <label th:text="#{mission.unit.frequency}">Frequenz (z.B. 123.45)</label>
-                    <input type="text" inputmode="decimal" class="freq-input" pattern="^\d{1,3}([.,]\d{1,2})?$" name="value" id="freq-value" required>
+                    <input type="text" inputmode="decimal" class="freq-input" data-number-input min="0" max="999.99" step="0.01" pattern="^\d{1,3}([.,]\d{1,2})?$" name="value" id="freq-value" required>
                 </div>
                 </div>
                 <div class="krt-modal-foot">
@@ -1318,7 +1318,7 @@
                 </div>
                 <div class="form-group">
                     <label th:text="#{mission.frequency.custom.value}">Frequenz (z.B. 123.45)</label>
-                    <input type="text" inputmode="decimal" class="freq-input" pattern="^\d{1,3}([.,]\d{1,2})?$" id="custom-freq-value" required>
+                    <input type="text" inputmode="decimal" class="freq-input" data-number-input min="0" max="999.99" step="0.01" pattern="^\d{1,3}([.,]\d{1,2})?$" id="custom-freq-value" required>
                 </div>
                 </div>
                 <div class="krt-modal-foot">
@@ -1371,7 +1371,7 @@
                 </div>
                 <div class="form-group">
                     <label th:text="#{mission.unit.frequency}">Frequenz</label>
-                    <input type="text" inputmode="decimal" class="freq-input" pattern="^\d{1,3}([.,]\d{1,2})?$" name="frequency" id="edit-unit-frequency" th:value="*{frequency}" th:placeholder="#{mission.unit.frequency.placeholder}">
+                    <input type="text" inputmode="decimal" class="freq-input" data-number-input min="0" max="999.99" step="0.01" pattern="^\d{1,3}([.,]\d{1,2})?$" name="frequency" id="edit-unit-frequency" th:value="*{frequency}" th:placeholder="#{mission.unit.frequency.placeholder}">
                     <div th:if="${#fields.hasErrors('frequency')}" th:errors="*{frequency}" class="field-error"></div>
                 </div>
                 <div class="form-group flex-gap-sm">
@@ -1445,7 +1445,7 @@
 
                 <div class="form-group">
                     <label th:text="#{mission.finance.amount}">Betrag (aUEC)</label>
-                    <input type="text" data-auec-input step="1" min="0" inputmode="numeric" name="amount" th:value="*{amount}" required>
+                    <input type="text" data-number-input step="1" min="0" inputmode="numeric" name="amount" th:value="*{amount}" required>
                     <div th:if="${#fields.hasErrors('amount')}" th:errors="*{amount}" class="field-error"></div>
                 </div>
 
@@ -1481,7 +1481,7 @@
 
                 <div class="form-group">
                     <label th:text="#{mission.finance.amount}">Betrag (aUEC)</label>
-                    <input type="text" data-auec-input step="1" min="0" inputmode="numeric" name="amount" id="edit-finance-amount" required>
+                    <input type="text" data-number-input step="1" min="0" inputmode="numeric" name="amount" id="edit-finance-amount" required>
                 </div>
 
                 <div class="form-group">

@@ -69,7 +69,7 @@
                                     <span th:if="${n.purchasable()}" class="chip chip--info" data-testid="supply-need-purchasable"
                                           th:text="#{supply.need.purchasable}">Zukauf m&ouml;glich</span>
                                     <span th:if="${n.maxUnitPrice() != null}" class="chip chip--muted"
-                                          th:text="#{supply.need.maxPrice(${#numbers.formatInteger(n.maxUnitPrice(), 1, 'POINT')})}">max. 1.000 aUEC</span></span></td>
+                                          th:text="#{supply.need.maxPrice(${#numbers.formatInteger(n.maxUnitPrice(), 1, 'DEFAULT')})}">max. 1.000 aUEC</span></span></td>
                             <td th:attr="data-label=#{supply.need.progress}">
                                 <div class="meter supply-meter" aria-hidden="true">
                                     <i class="meter__fill--warning" th:attr="data-krtm-width=${n.fulfilledPercent()}"></i>
@@ -170,7 +170,7 @@
                     </div>
                     <div class="form-group">
                         <label for="supply-need-amount" th:text="#{supply.need.amount}">Menge</label>
-                        <input type="number" id="supply-need-amount" min="0.001" step="any" inputmode="decimal" required>
+                        <input type="text" data-number-input id="supply-need-amount" min="0.001" step="any" inputmode="decimal" required>
                     </div>
                     <div class="form-group">
                         <label for="supply-need-priority" th:text="#{supply.need.priority}">Priorit&auml;t</label>
@@ -194,7 +194,7 @@
                         </div>
                         <div class="form-group">
                             <label for="supply-need-max-price" th:text="#{supply.need.maxPriceLabel}">H&ouml;chstpreis je Einheit (aUEC)</label>
-                            <input type="text" data-auec-input id="supply-need-max-price" min="1" step="1" inputmode="numeric">
+                            <input type="text" data-number-input id="supply-need-max-price" min="1" step="1" inputmode="numeric">
                         </div>
                     </div>
                 </div>

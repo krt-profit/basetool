@@ -19,6 +19,7 @@
 
 /* global stackEntriesI18n, bookOutI18n, inventoryConflictI18n, assocI18n, stolenMarkI18n */
 
+import { formatNumber } from '/js/kernel/krt-number-format.js';
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
@@ -1293,7 +1294,9 @@ function createLager(cfg) {
     function assocFormatAmount(amount, isPiece) {
         const n = typeof amount === 'number' ? amount : parseFloat(amount);
         if (isNaN(n)) return '0';
-        return isPiece ? String(Math.round(n)) : n.toFixed(3);
+        return isPiece
+            ? formatNumber(Math.round(n), 0, document.documentElement.lang)
+            : formatNumber(n, 3, document.documentElement.lang);
     }
 
     /**

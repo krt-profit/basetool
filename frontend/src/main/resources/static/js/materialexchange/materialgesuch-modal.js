@@ -156,7 +156,7 @@ function initMaterialgesuchModal() {
         if (ta && counter) {
             counter.textContent = fmt(
                 krtI18nText(i18n.charCounter, 'materialgesuchModalI18n.charCounter'),
-                ta.value.length.toLocaleString('de-DE'),
+                ta.value.length.toLocaleString(document.documentElement.lang || undefined),
             );
         }
     }

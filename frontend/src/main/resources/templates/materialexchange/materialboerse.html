@@ -79,12 +79,12 @@
                 <th:block th:ref="mb-filter-body">
                     <div class="form-group">
                         <label for="mb-min-quality" th:text="#{materialboerse.filter.minQuality}">Min. Qualität</label>
-                        <input type="number" id="mb-min-quality" name="minQuality" min="0" max="1000" step="10"
+                        <input type="text" data-number-input id="mb-min-quality" name="minQuality" min="0" max="1000" step="10"
                                data-mb-minquality th:value="${filterMinQuality}" placeholder="0"/>
                     </div>
                     <div class="form-group">
                         <label for="mb-min-amount" th:text="#{materialboerse.filter.minAmount}">Min. Menge</label>
-                        <input type="number" id="mb-min-amount" name="minAmount" min="0" step="1"
+                        <input type="text" data-number-input id="mb-min-amount" name="minAmount" min="0" step="1"
                                data-mb-minamount th:value="${filterMinAmount}" placeholder="0"/>
                     </div>
                     <div class="form-group" data-mb-offers-only th:hidden="${activeMode == 'requests'}">
@@ -156,7 +156,7 @@
                               th:text="${#numbers.formatInteger(offer.itemQuantity(), 1)} + ' ' + #{material.quantity.piece}">0 Stück</span>
                         <span class="mb-mrow-amount num" th:unless="${offer.kind() == 'ITEM'}" th:switch="${offer.material().quantityType()}"><span
                                 th:case="'PIECE'" th:text="${#numbers.formatInteger(offer.amount(), 1)} + ' ' + #{material.quantity.piece}">0 Stück</span><span
-                                th:case="*" th:text="${#numbers.formatDecimal(offer.amount(), 1, 'POINT', 3, 'DEFAULT')} + ' ' + #{material.quantity.scu}">0 SCU</span></span>
+                                th:case="*" th:text="${#numbers.formatDecimal(offer.amount(), 1, 'DEFAULT', 3, 'DEFAULT')} + ' ' + #{material.quantity.scu}">0 SCU</span></span>
                     </button>
                 </div>
 
@@ -213,7 +213,7 @@
                                             <span class="mb-kpi-unit" th:text="#{material.quantity.piece}">Stück</span>
                                         </th:block>
                                         <th:block th:case="*">
-                                            <span th:text="${#numbers.formatDecimal(offer.amount(), 1, 'POINT', 3, 'DEFAULT')}">0</span>
+                                            <span th:text="${#numbers.formatDecimal(offer.amount(), 1, 'DEFAULT', 3, 'DEFAULT')}">0</span>
                                             <span class="mb-kpi-unit" th:text="#{material.quantity.scu}">SCU</span>
                                         </th:block>
                                     </div>

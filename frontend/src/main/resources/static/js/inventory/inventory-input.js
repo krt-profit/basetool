@@ -19,6 +19,7 @@
 
 /* global MSG_UNIT_PIECE, MSG_UNIT_SCU, INV_ADD_MSG, INV_ORDER_NEED_MSG, INV_OWNER_PICKER_MSG */
 
+import { formatNumber } from '/js/kernel/krt-number-format.js';
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
@@ -776,7 +777,9 @@ function pickedMaterialQuantityType() {
 function formatNeedAmount(amount, isPiece) {
     const n = typeof amount === 'number' ? amount : parseFloat(amount);
     if (isNaN(n)) return '0';
-    return isPiece ? String(Math.round(n)) : n.toFixed(3);
+    return isPiece
+        ? formatNumber(Math.round(n), 0, document.documentElement.lang)
+        : formatNumber(n, 3, document.documentElement.lang);
 }
 
 function relabelOrderOptions() {
