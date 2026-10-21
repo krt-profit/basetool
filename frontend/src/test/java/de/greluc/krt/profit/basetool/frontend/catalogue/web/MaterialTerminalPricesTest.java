@@ -28,8 +28,12 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.i18n.LocaleContextHolder;
 
 /**
  * Unit tests of {@link MaterialTerminalPrices}: row order, locations and planet tints, and the
@@ -42,6 +46,18 @@ class MaterialTerminalPricesTest {
 
   /** The instant every UEX age is measured against. */
   private static final Instant NOW = Instant.parse("2026-10-17T12:00:00Z");
+
+  /** Renders the prices as a German page does, whatever the machine's default locale. */
+  @BeforeEach
+  void germanPage() {
+    LocaleContextHolder.setLocale(Locale.GERMAN);
+  }
+
+  /** Leaves no locale behind for the next test. */
+  @AfterEach
+  void resetLocale() {
+    LocaleContextHolder.resetLocaleContext();
+  }
 
   /**
    * Each row carries the age of its own UEX update; only an update older than seven days is stale,
@@ -134,6 +150,21 @@ class MaterialTerminalPricesTest {
     assertThat(summary.averageSell()).isEqualByComparingTo("88.23");
     assertThat(summary.sellTerminals()).isEqualTo(3);
     assertThat(summary.averageSellText()).isEqualTo("88,23");
+  }
+
+  /** An English page shows the same prices with a decimal point (REQ-UI-038). */
+  @Test
+  void prices_followTheLanguageOfThePage() {
+    LocaleContextHolder.setLocale(Locale.ENGLISH);
+    MaterialTerminalPrices.Summary summary =
+        MaterialTerminalPrices.summarize(
+            MaterialTerminalPrices.rows(
+                List.of(price("Area18 TDD", "80", "1289.6"), price("Lorville CBD", "75.5", "88.2")),
+                List.of(),
+                NOW));
+
+    assertThat(summary.bestSellText()).isEqualTo("1,289.6");
+    assertThat(summary.averageSellText()).isEqualTo("688.9");
   }
 
   /** Without any price every figure is empty and shown as a dash. */
