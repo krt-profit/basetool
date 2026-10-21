@@ -154,7 +154,9 @@ lightens every value):
 A tile never takes the fill of the surface it sits on: a `.card`, `.kpi-total` or `.kpi-card`
 placed inside a panel (`.list-panel`, another card, a `.detail-pane`, a modal) is `.card--inset` /
 `.kpi-total--inset` / `.kpi-card--inset` and takes the bar fill `#1A1D21`, so the tile stands
-apart from its container; a page's own tile class inside a panel takes the same fill. A lighter tile is not an option — `#36373B` and `#373E43`
+apart from its container; a page's own tile class inside a panel takes the same fill. A framed
+`.data-table` inside a padded card lays its rows on `--surface-inset`, so the rows, the bar-filled
+head and the card stay three distinct levels. A lighter tile is not an option — `#36373B` and `#373E43`
 are reserved for hairlines, `.btn-secondary` and controls.
 
 `--color-bg-black` `#000000` is **no page background**: it is the text on orange and the base

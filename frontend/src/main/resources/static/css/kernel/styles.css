@@ -7486,6 +7486,9 @@
         margin-top: 0;
         border: 0;
     }
+    .card:not(.card--flush) .data-table {
+        background-color: var(--surface-inset);
+    }
     .data-table--compact td {
         height: 44px;
         padding-block: 0.5rem;
