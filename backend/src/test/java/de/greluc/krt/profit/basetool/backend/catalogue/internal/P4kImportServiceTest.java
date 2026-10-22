@@ -515,7 +515,7 @@ class P4kImportServiceTest {
   void ship_unmatchedSeedable_isCreatedAndGuardsUniqueName() {
     UUID guid = UUID.randomUUID();
     when(shipTypeRepository.findByExternalUuid(guid)).thenReturn(Optional.empty());
-    when(shipTypeRepository.findByClassNameIgnoreCase("ship_new")).thenReturn(List.of());
+    when(shipTypeRepository.findByClassNameOrUexAlias("ship_new")).thenReturn(List.of());
     when(shipTypeRepository.findByNameIgnoreCase("New Ship")).thenReturn(Optional.empty());
 
     String json =
@@ -532,6 +532,31 @@ class P4kImportServiceTest {
     assertEquals("New Ship", seeded.getName());
     assertEquals(guid, seeded.getExternalUuid());
     assertEquals(GameItemSourceSystem.P4K, seeded.getSourceSystems());
+  }
+
+  @Test
+  void ship_classNameMiss_matchesTheAliasedUexRowInsteadOfSeeding() {
+    UUID guid = UUID.randomUUID();
+    ShipType uexRow = new ShipType();
+    uexRow.setId(UUID.randomUUID());
+    uexRow.setName("San tok.Yai");
+    uexRow.setUexVehicleId(173);
+    uexRow.setSourceSystems(GameItemSourceSystem.UEX_ONLY);
+    when(shipTypeRepository.findByExternalUuid(guid)).thenReturn(Optional.empty());
+    when(shipTypeRepository.findByClassNameOrUexAlias("XNAA_SanTokYai"))
+        .thenReturn(List.of(uexRow));
+
+    String json =
+        "{\"ships\":[{\"guid\":\""
+            + guid
+            + "\",\"className\":\"XNAA_SanTokYai\",\"name\":\"San'tok.yai\"}]}";
+
+    P4kImportResultDto result = service.applyImport(upload(json), true);
+
+    assertEquals(1, result.ships().matched());
+    assertEquals(0, result.ships().created());
+    assertEquals("XNAA_SanTokYai", uexRow.getClassName());
+    verify(shipTypeRepository, never()).findByNameIgnoreCase(any());
   }
 
   @Test
@@ -842,7 +867,7 @@ class P4kImportServiceTest {
     UUID shipGuid = UUID.randomUUID();
     UUID commodityGuid = UUID.randomUUID();
     when(shipTypeRepository.findByExternalUuid(shipGuid)).thenReturn(Optional.empty());
-    when(shipTypeRepository.findByClassNameIgnoreCase("ship_new")).thenReturn(List.of());
+    when(shipTypeRepository.findByClassNameOrUexAlias("ship_new")).thenReturn(List.of());
     when(shipTypeRepository.findByNameIgnoreCase("New Ship")).thenReturn(Optional.empty());
     when(materialRepository.findByScwikiUuid(commodityGuid)).thenReturn(Optional.empty());
     when(materialRepository.findByNameIgnoreCase("Quantanium")).thenReturn(Optional.empty());

@@ -1107,7 +1107,7 @@ added to both. `deletion_request` sits with identity, as do the GDPR classes onc
 | `identity` | 7 | `app_user`, `deletion_request`, `role`, `role_permissions`, `terms_acceptance`, `user_approval_event`, `user_roles` |
 | `audit` | 1 | `audit_event` |
 | `notification` | 3 | `notification`, `notification_rule`, `notification_rule_selector` |
-| `catalogue` | 36 | `blueprint`, `blueprint_dismantle_return`, `blueprint_ingredient`, `blueprint_modifier_segment`, `blueprint_requirement_group`, `blueprint_requirement_modifier`, `blueprint_summary_property`, `city`, `external_sync_report`, `faction`, `frequency_type`, `game_item`, `game_item_price`, `job_type`, `jurisdiction`, `location`, `manufacturer`, `manufacturer_uex_company`, `material`, `material_category`, `material_external_alias`, `material_price`, `moon`, `orbit`, `outpost`, `p4k_import_job`, `p4k_import_job_payload`, `planet`, `poi`, `refinery_yield`, `refining_method`, `ship_type`, `space_station`, `star_system`, `terminal`, `uex_category` |
+| `catalogue` | 37 | `blueprint`, `blueprint_dismantle_return`, `blueprint_ingredient`, `blueprint_modifier_segment`, `blueprint_requirement_group`, `blueprint_requirement_modifier`, `blueprint_summary_property`, `city`, `external_sync_report`, `faction`, `frequency_type`, `game_item`, `game_item_price`, `job_type`, `jurisdiction`, `location`, `manufacturer`, `manufacturer_uex_company`, `material`, `material_category`, `material_external_alias`, `material_price`, `moon`, `orbit`, `outpost`, `p4k_import_job`, `p4k_import_job_payload`, `planet`, `poi`, `refinery_yield`, `refining_method`, `ship_type`, `ship_type_uex_alias`, `space_station`, `star_system`, `terminal`, `uex_category` |
 | `orgunit` | 3 | `kommando_group`, `org_unit`, `org_unit_membership` |
 | `admin` | 1 | `system_setting` |
 | `dashboard` | 1 | `announcement` |
@@ -1340,6 +1340,47 @@ already stored. The material detail page shows the line breaks (`white-space: pr
 **Enforced by:** `P4kTextTest`, `P4kImportServiceTest#commodity_seededDescription_hasRealLineBreaks`,
 `V308MigrationTest` · **Code:** `P4kText`, the compact constructors of `P4kCommodityDto`,
 `P4kManufacturerDto`, `P4kItemDto` and `P4kShipDto`, V308, `catalogue/material-detail.css`
+
+### REQ-DATA-026 — a UEX vehicle reaches its ship type through a curated alias when nothing else ties them (ADR-0307)
+
+UEX serves some vehicles without the in-game UUID and under a name that differs from the in-game
+one (`San tok.Yāi` / `San'tok.yāi`, `Ares Inferno Starfighter` / `Ares Star Fighter Inferno`). The
+UEX vehicle sync then finds no row and seeds a `UEX_ONLY` ship type, and the SC Wiki sync and the
+P4K import seed a second one for the same ship. Both halves live on; hangar ships, mission units
+and items bind to either.
+
+The `ship_type_uex_alias` table ties such a UEX vehicle id to the game class name of its ship type
+(one row per vehicle, the class name unique ignoring case). The table is curated by migration; no
+request and no sync writes it.
+
+- **The UEX vehicle sync** resolves by `external_uuid`, then `uex_vehicle_id`, then the aliased
+  class name when exactly one ship type carries it, then the name, and only then seeds.
+- **The SC Wiki vehicle sync** resolves by `external_uuid`, then the ship type that holds the UEX
+  vehicle id aliased to its class name, then the name.
+- **The P4K import** resolves by `external_uuid`, then the class name, and when no row carries the
+  class name, the ship type that holds the aliased UEX vehicle id, then the name.
+- A row matched through the alias keeps its own `name`; each source writes only its own columns, as
+  for any other match.
+- **V310** created the table, curated the twelve pairs found in production and merged each pair
+  whose UEX half is `UEX_ONLY` without a class name and whose class name is unique. The other half
+  survives with its in-game name and takes the UEX columns, the UEX vehicle id and every `ship`,
+  `mission_unit` and `game_item` reference; each moved row's `version` is bumped, and the UEX half
+  is deleted.
+
+**Acceptance**
+
+- [x] A UEX vehicle whose alias names a single ship type updates that row instead of seeding one; an
+  alias naming several rows falls through to the name.
+- [x] A Wiki vehicle and a P4K ship whose class name is aliased link the UEX row instead of seeding
+  a twin.
+- [x] The V310 merge moves every reference onto the survivor, carries the UEX columns over, bumps
+  the versions and deletes the UEX half; a half that is not `UEX_ONLY`, or an ambiguous class name,
+  merges nothing.
+
+**Enforced by:** `UexVehicleServiceUuidMatchTest`, `ScWikiVehicleSyncServiceTest`,
+`P4kImportServiceTest`, `V310MigrationTest` · **Code:** `ShipTypeUexAlias`, the three
+`ShipTypeRepository#findBy…UexAlias…` queries, `UexVehicleService`, `ScWikiVehicleSyncService`,
+`P4kImportService`, V310
 
 ## Out of scope
 
