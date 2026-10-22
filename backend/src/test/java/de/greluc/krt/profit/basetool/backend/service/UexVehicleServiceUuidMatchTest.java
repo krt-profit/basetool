@@ -146,6 +146,53 @@ class UexVehicleServiceUuidMatchTest {
   }
 
   @Test
+  void aliasedClassName_linksTheWikiRow_beforeTheNameFallback() {
+    UexVehicleDto dto = vehicleDto(173, "", "San tok.Yai");
+    ShipType wikiRow = new ShipType();
+    wikiRow.setId(UUID.randomUUID());
+    wikiRow.setName("San'tok.yai");
+    wikiRow.setClassName("XNAA_SanTokYai");
+    wikiRow.setSourceSystems(GameItemSourceSystem.WIKI_ONLY);
+    when(uexClient.getVehicles()).thenReturn(fetched(List.of(dto)));
+    when(shipTypeRepository.findByUexVehicleId(173)).thenReturn(Optional.empty());
+    when(shipTypeRepository.findByUexAliasOfVehicleId(173)).thenReturn(List.of(wikiRow));
+    when(shipTypeRepository.save(any(ShipType.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(shipTypeRepository.markUexDeletedExcept(any(), any())).thenReturn(0);
+
+    service.syncVehicles();
+
+    ArgumentCaptor<ShipType> saved = ArgumentCaptor.forClass(ShipType.class);
+    verify(shipTypeRepository).save(saved.capture());
+    assertSame(wikiRow, saved.getValue());
+    assertEquals(173, wikiRow.getUexVehicleId());
+    assertEquals("San'tok.yai", wikiRow.getName(), "the matched row keeps its own name");
+    assertEquals(GameItemSourceSystem.BOTH, wikiRow.getSourceSystems());
+    verify(shipTypeRepository, never()).findByNameIgnoreCase(any());
+  }
+
+  @Test
+  void aliasedClassName_onSeveralRows_fallsThroughToTheName() {
+    UexVehicleDto dto = vehicleDto(174, "", "Twin");
+    ShipType first = new ShipType();
+    first.setClassName("DUP_Class");
+    ShipType second = new ShipType();
+    second.setClassName("DUP_Class");
+    when(uexClient.getVehicles()).thenReturn(fetched(List.of(dto)));
+    when(shipTypeRepository.findByUexVehicleId(174)).thenReturn(Optional.empty());
+    when(shipTypeRepository.findByUexAliasOfVehicleId(174)).thenReturn(List.of(first, second));
+    when(shipTypeRepository.findByNameIgnoreCase("Twin")).thenReturn(Optional.empty());
+    when(shipTypeRepository.save(any(ShipType.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(shipTypeRepository.markUexDeletedExcept(any(), any())).thenReturn(0);
+
+    service.syncVehicles();
+
+    ArgumentCaptor<ShipType> saved = ArgumentCaptor.forClass(ShipType.class);
+    verify(shipTypeRepository).save(saved.capture());
+    assertEquals(GameItemSourceSystem.UEX_ONLY, saved.getValue().getSourceSystems());
+    assertNull(saved.getValue().getClassName());
+  }
+
+  @Test
   void createsNewRowAsUexOnly_whenNoMatchFound() {
     UexVehicleDto dto = vehicleDto(9, externalUuid.toString(), "Custom Ship");
     when(uexClient.getVehicles()).thenReturn(fetched(List.of(dto)));

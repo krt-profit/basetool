@@ -389,11 +389,11 @@ public class P4kImportService {
   }
 
   /**
-   * Reconciles ships: resolve by {@code external_uuid} → unique case-insensitive {@code class_name}
-   * → case-insensitive {@code name}, backfill {@code external_uuid} (guarded), fill-if-null {@code
-   * class_name} / {@code manufacturer} / {@code description_en} / {@code description_de}, stamp the
-   * P4K lane, or seed a new ship. Crew and SCU are deliberately left untouched on enriched rows and
-   * unset on seeded rows (the DCB entity does not carry them).
+   * Reconciles ships: resolve by {@code external_uuid} → unique {@code class_name} or its UEX alias
+   * (REQ-DATA-026) → case-insensitive {@code name}, backfill {@code external_uuid} (guarded),
+   * fill-if-null {@code class_name} / {@code manufacturer} / {@code description_en} / {@code
+   * description_de}, stamp the P4K lane, or seed a new ship. Crew and SCU are deliberately left
+   * untouched on enriched rows and unset on seeded rows (the DCB entity does not carry them).
    *
    * @param dtos inbound ship records (may be {@code null})
    * @param manufacturerByGuid the GUID→manufacturer index built from the manufacturer pass
@@ -422,7 +422,7 @@ public class P4kImportService {
               guid,
               shipTypeRepository::findByExternalUuid,
               dto.className(),
-              shipTypeRepository::findByClassNameIgnoreCase,
+              shipTypeRepository::findByClassNameOrUexAlias,
               dto.name(),
               name ->
                   shipTypeRepository.findByNameIgnoreCase(name).map(List::of).orElseGet(List::of));

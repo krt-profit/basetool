@@ -40,7 +40,8 @@ import org.springframework.util.StringUtils;
 
 /**
  * Fills the Wiki-owned columns of the {@code ship_type} rows from the SC Wiki vehicle feed ({@code
- * /api/vehicles}), matched by {@code external_uuid} or case-insensitive name.
+ * /api/vehicles}), matched by {@code external_uuid}, by the UEX vehicle id the {@code
+ * ship_type_uex_alias} table ties the class name to (REQ-DATA-026), or by case-insensitive name.
  *
  * <p>Never overwrites UEX-canonical columns; an unmatched vehicle becomes a {@code WIKI_ONLY} ship
  * type. Gated behind {@code krt.scwiki.vehicle-sync-enabled} (default {@code false}).
@@ -108,6 +109,9 @@ public class ScWikiVehicleSyncService {
       }
       try {
         Optional<ShipType> match = shipTypeRepository.findByExternalUuid(dto.uuid());
+        if (match.isEmpty() && StringUtils.hasText(dto.className())) {
+          match = shipTypeRepository.findByUexAliasOfClassName(dto.className());
+        }
         if (match.isEmpty() && StringUtils.hasText(dto.name())) {
           match = shipTypeRepository.findByNameIgnoreCase(dto.name());
         }

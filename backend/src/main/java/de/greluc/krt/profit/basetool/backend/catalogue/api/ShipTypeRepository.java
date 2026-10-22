@@ -68,6 +68,54 @@ public interface ShipTypeRepository extends LookupTableRepository<ShipType, UUID
   List<ShipType> findByClassNameIgnoreCase(String className);
 
   /**
+   * Finds the ship types carrying a class name ignoring case, or, when none does, the ship type
+   * holding the UEX vehicle id the {@code ship_type_uex_alias} table ties the class name to
+   * (REQ-DATA-026).
+   *
+   * @param className the game class name
+   * @return the direct matches, else the aliased UEX row, else an empty list
+   */
+  @Query(
+      """
+      SELECT s FROM ShipType s
+      WHERE lower(s.className) = lower(:className)
+      OR (NOT EXISTS (SELECT d FROM ShipType d WHERE lower(d.className) = lower(:className))
+          AND s.uexVehicleId IN (SELECT a.uexVehicleId FROM ShipTypeUexAlias a
+                                 WHERE lower(a.className) = lower(:className)))
+      """)
+  List<ShipType> findByClassNameOrUexAlias(@Param("className") String className);
+
+  /**
+   * Finds the ship type holding the UEX vehicle id the {@code ship_type_uex_alias} table ties a
+   * class name to (REQ-DATA-026).
+   *
+   * @param className the game class name
+   * @return the ship type holding the aliased UEX vehicle id, or empty when there is none
+   */
+  @Query(
+      """
+      SELECT s FROM ShipType s
+      WHERE s.uexVehicleId IN (SELECT a.uexVehicleId FROM ShipTypeUexAlias a
+                               WHERE lower(a.className) = lower(:className))
+      """)
+  Optional<ShipType> findByUexAliasOfClassName(@Param("className") String className);
+
+  /**
+   * Finds the ship types carrying the class name the {@code ship_type_uex_alias} table ties a UEX
+   * vehicle id to (REQ-DATA-026).
+   *
+   * @param uexVehicleId UEX integer vehicle id
+   * @return every ship type carrying the aliased class name ignoring case; empty without an alias
+   */
+  @Query(
+      """
+      SELECT s FROM ShipType s
+      WHERE lower(s.className) IN (SELECT lower(a.className) FROM ShipTypeUexAlias a
+                                   WHERE a.uexVehicleId = :uexVehicleId)
+      """)
+  List<ShipType> findByUexAliasOfVehicleId(@Param("uexVehicleId") Integer uexVehicleId);
+
+  /**
    * Soft-deletes UEX-side ownership of every row whose {@code uex_vehicle_id} is set, NOT included
    * in {@code seenIds}, and whose {@code uex_deleted_at} is currently NULL. Gated by a non-empty
    * {@code seenIds} so a failed sync run does not wipe local data.

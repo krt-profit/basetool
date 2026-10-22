@@ -145,6 +145,38 @@ class ScWikiVehicleSyncServiceTest {
   }
 
   @Test
+  void syncVehicles_linksTheAliasedUexRow_insteadOfCreatingAWikiOnlyTwin() {
+    UUID uuid = UUID.randomUUID();
+    ShipType uexShip = new ShipType();
+    uexShip.setId(UUID.randomUUID());
+    uexShip.setName("San tok.Yai");
+    uexShip.setUexVehicleId(173);
+    uexShip.setSourceSystems(GameItemSourceSystem.UEX_ONLY);
+    ScWikiVehicleDto dto =
+        new ScWikiVehicleDto(
+            uuid, "xnaa-santokyai", "San'tok.yai", null, "XNAA_SanTokYai", null, null);
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
+    when(shipTypeRepository.findByExternalUuid(uuid)).thenReturn(Optional.empty());
+    when(shipTypeRepository.findByUexAliasOfClassName("XNAA_SanTokYai"))
+        .thenReturn(Optional.of(uexShip));
+    when(shipTypeRepository.save(any(ShipType.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(shipTypeRepository.markScwikiDeletedExcept(any(), any())).thenReturn(0);
+
+    service.syncVehicles();
+
+    ArgumentCaptor<ShipType> saved = ArgumentCaptor.forClass(ShipType.class);
+    verify(shipTypeRepository).save(saved.capture());
+    ShipType result = saved.getValue();
+    assertSame(uexShip, result);
+    assertEquals(uuid, result.getExternalUuid());
+    assertEquals("XNAA_SanTokYai", result.getClassName());
+    assertEquals(GameItemSourceSystem.BOTH, result.getSourceSystems());
+    assertEquals("San tok.Yai", result.getName());
+    verify(shipTypeRepository, never()).findByNameIgnoreCase(any());
+  }
+
+  @Test
   void syncVehicles_createsWikiOnly_whenNoLocalMatch() {
     UUID uuid = UUID.randomUUID();
     ScWikiVehicleDto dto =

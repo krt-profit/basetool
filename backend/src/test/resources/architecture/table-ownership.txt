@@ -124,6 +124,7 @@ role identity
 role_permissions identity
 ship hangar
 ship_type catalogue
+ship_type_uex_alias catalogue
 space_station catalogue
 star_system catalogue
 supply_donation supply

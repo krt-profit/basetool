@@ -49,6 +49,8 @@ import org.springframework.util.StringUtils;
  * <ol>
  *   <li>{@code findByExternalUuid(dto.uuid)};
  *   <li>{@code findByUexVehicleId(dto.id)}, for rows stamped without a UUID;
+ *   <li>the class name the {@code ship_type_uex_alias} table ties {@code dto.id} to, when exactly
+ *       one ship type carries it (REQ-DATA-026);
  *   <li>{@code findByNameIgnoreCase(dto.name)}, which backfills {@code external_uuid} and {@code
  *       uex_vehicle_id} on a hit;
  *   <li>a new row stamped {@link GameItemSourceSystem#UEX_ONLY}.
@@ -148,6 +150,12 @@ public class UexVehicleService {
     }
     if (existingOpt.isEmpty() && dto.id() != null) {
       existingOpt = shipTypeRepository.findByUexVehicleId(dto.id());
+    }
+    if (existingOpt.isEmpty() && dto.id() != null) {
+      List<ShipType> aliased = shipTypeRepository.findByUexAliasOfVehicleId(dto.id());
+      if (aliased.size() == 1) {
+        existingOpt = Optional.of(aliased.getFirst());
+      }
     }
     if (existingOpt.isEmpty()) {
       existingOpt = shipTypeRepository.findByNameIgnoreCase(dto.name());
