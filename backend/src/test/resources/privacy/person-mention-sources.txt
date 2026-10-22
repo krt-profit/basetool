@@ -280,6 +280,7 @@ exempt-table|planet
 exempt-table|poi
 exempt-table|refining_method
 exempt-table|ship_type
+exempt-table|ship_type_uex_alias
 exempt-table|space_station
 exempt-table|star_system
 exempt-table|terminal
