@@ -129,7 +129,11 @@ open instead of closing both.
    account: `ansible-playbook site.yml --limit <host> --tags access`. It creates the account, its
    keys, its grants and the audit watches, and says what is still missing.
 2. **Password.** As root on the host, interactively: `passwd greluc`. It goes into the password
-   manager and nowhere else — not the inventory, not a file, not a chat.
+   manager and nowhere else — not the inventory, not a file, not a chat. A host the CIS
+   remediation has run on enforces `pwquality` (`minclass = 4`, `minlen = 14`, `maxrepeat = 3`,
+   `maxsequence = 3`, `dictcheck`): generate it with upper case, lower case, digits **and**
+   symbols. A password without one of the four classes fails at once with
+   `BAD PASSWORD: … less than 4 character classes` and `Authentication token manipulation error`.
 3. **Prove it by hand.** From each workstation: `ssh greluc@<host>`, then `sudo -v` (asks the
    password), `sudo -n -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) podman ps` (asks nothing),
    `journalctl -u sshd -n 5` (no sudo). Keep this session open until step 5 is done.
