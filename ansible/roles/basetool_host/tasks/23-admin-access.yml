@@ -45,6 +45,7 @@
 - name: Install exactly the keys the inventory names
   ansible.posix.authorized_key:
     user: "{{ basetool_host_admin_user }}"
+    path: "{{ basetool_host_admin_home }}/.ssh/authorized_keys"
     key: "{{ basetool_host_admin_authorized_keys | join('\n') }}"
     exclusive: true
     manage_dir: true
