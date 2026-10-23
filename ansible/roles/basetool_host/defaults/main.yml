@@ -27,6 +27,25 @@ basetool_host_deploy_podman_subcommands:
   - system df
   - volume inspect
 
+basetool_host_manage_admin_access: true
+basetool_host_admin_user: ""
+basetool_host_admin_authorized_keys: []
+basetool_host_admin_groups:
+  - wheel
+  - adm
+  - systemd-journal
+basetool_host_admin_sudo_timeout_minutes: 10
+basetool_host_admin_read_podman_subcommands:
+  - image inspect
+  - inspect
+  - logs
+  - ps
+  - stats
+basetool_host_ssh_lock_root: false
+basetool_host_ssh_allow_tcp_forwarding: local
+basetool_host_ssh_max_auth_tries: 4
+basetool_host_retired_admin_users: []
+
 basetool_host_scripts_src: "{{ playbook_dir }}/../scripts"
 
 basetool_host_subuid_base: 100000

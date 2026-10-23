@@ -12,9 +12,10 @@ Usage
 
     python scripts/check-conformance.py
 
-    python scripts/check-conformance.py --ssh root@198.51.100.10
+    ssh -t greluc@198.51.100.10 sudo -v
+    python scripts/check-conformance.py --ssh greluc@198.51.100.10 --sudo
 
-    python scripts/check-conformance.py --ssh root@198.51.100.10 --include-load
+    python scripts/check-conformance.py --ssh greluc@198.51.100.10 --sudo --include-load
 
     python scripts/check-conformance.py --json
     python scripts/check-conformance.py --list
@@ -154,10 +155,12 @@ class HostRunner:
         timeout: seconds before a command is abandoned.
     """
 
-    def __init__(self, ssh_target: str | None, stub: str | None, timeout: int = 45) -> None:
+    def __init__(self, ssh_target: str | None, stub: str | None, timeout: int = 45,
+                 sudo: bool = False) -> None:
         self.ssh_target = ssh_target
         self.stub = stub
         self.timeout = timeout
+        self.sudo = sudo
         self._container_cli: str | None = None
 
     @property
@@ -169,11 +172,13 @@ class HostRunner:
         """
         return bool(self.stub or self.ssh_target)
 
-    def run(self, command: str) -> str:
+    def run(self, command: str, privileged: bool = True) -> str:
         """Execute one read-only command on the host and return its stdout.
 
         Args:
             command: a shell command line, run by the remote login shell (bash).
+            privileged: run it as root through ``sudo -n`` when the runner was built with
+                ``sudo=True``; ``False`` keeps the login account's own environment.
 
         Returns:
             The command's stdout, with trailing whitespace stripped.
@@ -186,6 +191,8 @@ class HostRunner:
             raise Skip("no --ssh target and no --host-stub")
 
         command = f"cd /; {command}"
+        if self.sudo and privileged:
+            command = f"cd /; sudo -n bash -c {shlex.quote(command)}"
 
         if self.stub:
             argv = shlex.split(self.stub) + [command]
@@ -279,7 +286,7 @@ class HostRunner:
             The client address from ``SSH_CONNECTION``/``SSH_CLIENT``, or ``None`` when unavailable.
         """
         try:
-            out = self.run("echo ${SSH_CONNECTION:-${SSH_CLIENT:-}}")
+            out = self.run("echo ${SSH_CONNECTION:-${SSH_CLIENT:-}}", privileged=False)
         except (Skip, CheckFailed):
             return None
         return out.split()[0] if out.split() else None
@@ -1421,6 +1428,44 @@ def check_security_updates_enabled(ctx: Context) -> str:
     return f"dnf-automatic.timer {enabled}/{active}, security-only, runtime excluded"
 
 
+def check_ssh_root_login_refused(ctx: Context) -> str:
+    """sshd refuses root, admits only the named admin account, and only by key.
+
+    Reads the effective configuration with ``sshd -T`` for a root connection, through the admin
+    account's password-free grant when the run is not already root.
+
+    Args:
+        ctx: the run context.
+
+    Returns:
+        The effective ``permitrootlogin``, ``allowusers`` and ``passwordauthentication``.
+
+    Raises:
+        Skip: when no host access is configured.
+        CheckFailed: when root may log in, password authentication is on, or no ``AllowUsers``
+            restricts the logins (REQ-OPS-052).
+    """
+    out = ctx.runner.run(
+        "c='/usr/sbin/sshd -T -C user=root,host=conformance,addr=192.0.2.1'; "
+        "if [ \"$(id -u)\" -eq 0 ]; then $c; else sudo -n $c; fi")
+    settings: dict[str, str] = {}
+    for line in out.splitlines():
+        key, _, value = line.partition(" ")
+        settings.setdefault(key.lower(), value.strip())
+
+    problems = []
+    if settings.get("permitrootlogin") != "no":
+        problems.append(f"permitrootlogin is {settings.get('permitrootlogin') or 'unset'}, expected no")
+    if settings.get("passwordauthentication") != "no":
+        problems.append("passwordauthentication is not no")
+    if not settings.get("allowusers"):
+        problems.append("no AllowUsers -- every account with a shell and a key may log in")
+    if problems:
+        raise CheckFailed("; ".join(problems))
+    return (f"permitrootlogin no, allowusers {settings['allowusers']}, "
+            "passwordauthentication no")
+
+
 CHECKS: tuple[Check, ...] = (
     Check("vhost-reachable", "REQ-OPS-014", False, check_vhost_reachable),
     Check("certificate-valid", "REQ-OPS-026", False, check_certificate_valid),
@@ -1447,6 +1492,8 @@ CHECKS: tuple[Check, ...] = (
           check_host_exporter_versions),
     Check("security-updates-enabled", "REQ-OPS-032", True,
           check_security_updates_enabled),
+    Check("ssh-root-login-refused", "REQ-OPS-052", True,
+          check_ssh_root_login_refused),
 )
 
 
@@ -1500,6 +1547,9 @@ def _parse_args(argv: Sequence[str]) -> argparse.Namespace:
                    help="override a vhost, e.g. --host frontend=staging.example. Repeatable.")
     p.add_argument("--ssh", metavar="USER@HOST",
                    help="enable the host-side checks over read-only SSH")
+    p.add_argument("--sudo", action="store_true",
+                   help="run each host command as root through `sudo -n`; prime it first with "
+                        "`ssh -t USER@HOST sudo -v` (REQ-OPS-052)")
     p.add_argument("--host-stub", metavar="CMD",
                    help="run host commands through this command line instead of ssh, "
                         "e.g. \"bash tools/stub.sh\". The host command is appended as "
@@ -1593,7 +1643,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     ctx = Context(
         hosts=_resolve_hosts(args.host),
-        runner=HostRunner(args.ssh, args.host_stub),
+        runner=HostRunner(args.ssh, args.host_stub, sudo=args.sudo),
         include_load=args.include_load,
         log_window=args.log_window,
     )

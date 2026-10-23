@@ -2,5 +2,6 @@
 - name: Prepare a host to run the Basetool stack under rootless Podman
   hosts: basetool_hosts
   gather_facts: true
+  become: true
   roles:
     - role: basetool_host

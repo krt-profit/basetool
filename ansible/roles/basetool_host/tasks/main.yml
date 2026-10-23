@@ -19,6 +19,11 @@
   ansible.builtin.import_tasks: 22-deploy-user.yml
   tags: [user, deploy]
 
+- name: The operator's login, and root's lockout from SSH
+  ansible.builtin.import_tasks: 23-admin-access.yml
+  when: basetool_host_manage_admin_access | bool
+  tags: [access]
+
 - name: Directory layout and its namespace-translated ownership
   ansible.builtin.import_tasks: 30-directories.yml
   tags: [directories]

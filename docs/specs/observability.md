@@ -1184,10 +1184,18 @@ abuse detection:
 - **SSH / host-auth logs** (`app="host-auth"`) — Debian's `/var/log/auth.log` or, on the RHEL
   family, `/var/log/secure`; `config.alloy` tails both names under `/hostlog`, and on a given host
   exactly one exists (REQ-OBS-019): failed-auth spikes, invalid users, sudo failures, successful
-  root logins, and a successful password/keyboard-interactive login on a key-only host.
+  root logins, and a successful password/keyboard-interactive login on a key-only host. A key-only
+  sshd logs a rejected key as `Connection closed by` / `Disconnected from authenticating user …
+  [preauth]` rather than `Failed publickey`, so the failed-auth match and the *Failed SSH auth*
+  panel count that shape; the sudo match accepts `sudo[<pid>]:` as well as `sudo:`. The unsplit
+  count panels of the *SSH / host auth* dashboard end in `or vector(0)`, so a quiet host reads 0
+  instead of "No data"; *Accepted logins* is split by account and method and shows 0 when
+  nobody logged in.
 - **Host auditd log** — `/var/log/audit/audit.log`: file-integrity watch events on `sshd_config`(.d)
-  and root `authorized_keys` (the acting `auid` + path; catches a smuggled key or a security
-  downgrade). Ingested unmasked so the acting user stays attributable. `AuditdSshTamper` must match
+  and the `authorized_keys` directories of root and the admin account (the acting `auid` + path;
+  catches a smuggled key or a security downgrade). The role installs the watches as
+  `/etc/audit/rules.d/50-basetool-ssh.rules` (REQ-OPS-052). Ingested unmasked so the acting user
+  stays attributable. `AuditdSshTamper` must match
   **`type=SYSCALL` only**: auditd stamps each rule's `key=` onto its own `add_rule` / `remove_rule`
   `CONFIG_CHANGE` records as well, so an unscoped `key=` match turns every auditd restart — the
   nightly unattended `libc6` upgrade restarts it — into a tamper page with no file actually touched
@@ -1195,7 +1203,10 @@ abuse detection:
   so a benign `known_hosts` append by an outbound `ssh` is a genuine, attributable hit and stays in
   scope on purpose.
 - **Host fail2ban log** — `/var/log/fail2ban.log`: SSH-jail ban/unban events carrying the offending
-  client IP — the active-blocking complement to the `SshFailedAuthSpike` detection.
+  client IP — the active-blocking complement to the `SshFailedAuthSpike` detection. The
+  *SSH / host auth* dashboard reads it: detected failures, bans and unbans over time, the bans
+  and detected failures in the selected range, the ten most frequent offending addresses, and
+  the ban/unban lines themselves.
 
 An NPM admin-UI login stream was originally planned as a fifth stream and **descoped**
 (nginx-proxy-manager never logged admin logins to stdout). The question has since disappeared with

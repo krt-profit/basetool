@@ -386,6 +386,13 @@ case "$cmd" in
   *"alloy_build_info"*)
     echo "alloy_build_info{branch=\"HEAD\",goarch=\"amd64\",goos=\"linux\",goversion=\"go1.24.1\",revision=\"x\",tags=\"\",version=\"v${STUB_ALLOY_PIN}\"} 1"
     ;;
+  *"sshd -T -C user=root"*)
+    case "$scenario" in
+      root-allowed) printf 'permitrootlogin without-password\npasswordauthentication no\n' ;;
+      no-allowusers) printf 'permitrootlogin no\npasswordauthentication no\n' ;;
+      *) printf 'port 22\npermitrootlogin no\nallowusers greluc\npasswordauthentication no\n' ;;
+    esac
+    ;;
   *"is-enabled dnf-automatic.timer"*)
     case "$scenario" in updates-disabled) echo "disabled" ;; *) echo "enabled" ;; esac
     ;;
@@ -747,6 +754,19 @@ STUB_SCENARIO=updates-everything assert_status \
 STUB_SCENARIO=updates-runtime assert_status \
   "security-updates-enabled fails when the container runtime is not excluded" \
   security-updates-enabled fail "runtime is not excluded" -- "${STUB_ARGS[@]}"
+
+STUB_SCENARIO=healthy assert_status \
+  "ssh-root-login-refused passes when root is refused and AllowUsers names the admin" \
+  ssh-root-login-refused pass "allowusers greluc" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=healthy assert_status \
+  "ssh-root-login-refused passes through --sudo, still rooted at /" \
+  ssh-root-login-refused pass "allowusers greluc" -- --sudo "${STUB_ARGS[@]}"
+STUB_SCENARIO=root-allowed assert_status \
+  "ssh-root-login-refused fails when root may log in by key" \
+  ssh-root-login-refused fail "permitrootlogin is without-password" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=no-allowusers assert_status \
+  "ssh-root-login-refused fails without an AllowUsers list" \
+  ssh-root-login-refused fail "no AllowUsers" -- "${STUB_ARGS[@]}"
 
 say ""
 say "== the client-address classifier, on the spellings a scenario cannot reach =="

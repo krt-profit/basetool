@@ -975,6 +975,51 @@ The deploy path is hardened at the host layer, beyond running as an unprivileged
 **Runbook:** `docs/deployment.md` → *Accounts and what runs where*, *Internal keystore and
 certificate rotation*, *Token rotation*
 
+### REQ-OPS-052 — Operators log in under a personal account; root never logs in over SSH
+
+**Status:** Accepted · **Decision:** [ADR-0308](../adr/0308-operators-log-in-under-a-personal-account-and-root-never-over-ssh.md)
+
+Every interactive and automated SSH session on the testing and the production host uses one
+personal, key-only admin account (`basetool_host_admin_user`, `greluc`), never `root`. The account
+becomes root only through `sudo` **with its password**, so a stolen key alone is not root. sshd
+admits that account and nothing else.
+
+- **Two phases, and the second proves the first.** The role creates the account, its exact
+  `authorized_keys`, its read grant and the audit watches while root can still log in. Root is
+  locked (`basetool_host_ssh_lock_root: true`) only by a run that itself connects as the admin
+  account and becomes root with its sudo password; the role refuses the lock from any other
+  session and refuses an account without a password.
+- **The policy** is `/etc/ssh/sshd_config.d/00-basetool-access.conf`, first in lexical order so no
+  later drop-in can loosen it: `PermitRootLogin no`, `AllowUsers <admin>`, publickey only, no
+  X11 or agent forwarding, local TCP forwarding only (the Loki and Grafana tunnels need it). The
+  role checks the effective result with `sshd -T -C user=root` before sshd reloads. Root's
+  `authorized_keys` is emptied in the same run.
+- **No password for reading.** The admin account is in `adm` and `systemd-journal`, and sudoers
+  grants it without a password exactly the read-only `podman` sub-commands of
+  `basetool_host_admin_read_podman_subcommands` as the service user, `sshd -T` and
+  `fail2ban-client status`. Everything else needs the password. `timestamp_type=global` lets one
+  `sudo -v` cover the conformance suite's separate SSH sessions for
+  `basetool_host_admin_sudo_timeout_minutes`.
+- **Generic accounts are retired.** `sysadm`, created by cloud-init, is removed once root is
+  locked (`basetool_host_retired_admin_users`), together with its `NOPASSWD: ALL` grant.
+
+**Acceptance**
+
+- [ ] `sshd -T -C user=root,host=x,addr=192.0.2.1` prints `permitrootlogin no` and
+  `allowusers <admin>` on both hosts (`check-conformance.py` → `ssh-root-login-refused`).
+- [ ] `sudo -l -U <admin>` shows `(ALL) ALL` without `NOPASSWD`, and no account holds
+  `NOPASSWD: ALL`.
+- [ ] `ssh root@<host> true` is refused; `ssh <admin>@<host> sudo -v` asks for the password.
+- [ ] auditd watches `/etc/ssh/sshd_config(.d)`, `/root/.ssh` and the admin's `~/.ssh`
+  (`AuditdSshTamper`).
+- [ ] An accepted root login is visible as `SshRootLoginAccepted` and on the *SSH / host auth*
+  dashboard's *Accepted logins* panel.
+
+**Enforced by:** `ansible/roles/basetool_host/tasks/23-admin-access.yml` ·
+`ansible/cloud-init/hetzner-rocky10.yaml` · `scripts/check-conformance.py` (`--sudo`,
+`ssh-root-login-refused`) · `monitoring/loki/rules/fake/basetool-log-alerts.yml` ·
+**Runbook:** `docs/deployment.md` → *Management access*
+
 ### REQ-OPS-018 — Redis session store: durable persistence and a session-safe memory ceiling
 
 > [!note] Planned — the production rollout (epic #2078, WP 2.1, #2092)
