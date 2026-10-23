@@ -3,7 +3,10 @@ basetool_hosts:
   hosts:
     testing:
       ansible_host: 10.0.0.0          # the Rocky Linux 10 testing guest (ADR-0163)
-      ansible_user: sysadm
+      ansible_user: greluc
+      basetool_host_ssh_lock_root: true
+      basetool_host_retired_admin_users:
+        - sysadm
       basetool_host_public_name_aliases:
         - "basetool.example.test:host-gateway"
         - "api.basetool.example.test:host-gateway"
@@ -12,7 +15,10 @@ basetool_hosts:
       basetool_host_jvm_truststore_path: /var/iri/secrets/truststore.p12
     production:
       ansible_host: 203.0.113.0       # the new Hetzner CPX42
-      ansible_user: root
+      ansible_user: greluc
+      basetool_host_ssh_lock_root: true
+      basetool_host_retired_admin_users:
+        - sysadm
       basetool_host_public_name_aliases:
         - "basetool.example.com:host-gateway"
         - "api.basetool.example.com:host-gateway"
@@ -20,3 +26,7 @@ basetool_hosts:
         - "grafana.basetool.example.com:host-gateway"
   vars:
     basetool_host_report_uid_map: true
+    basetool_host_admin_user: greluc
+    basetool_host_admin_authorized_keys:
+      - "ssh-ed25519 AAAA... operator@workstation"
+      - "ssh-ed25519 AAAA... basetool-ansible@controller"

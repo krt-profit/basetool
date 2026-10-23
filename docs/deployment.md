@@ -129,16 +129,22 @@ alertmanager, exporters). Derive, never transcribe:
 | `iri-cert-expiry.timer` | daily 03:40 | `cert-expiry-metrics.py` as root |
 | `iri-container-metrics.timer` | every 30 s | `cgroup-container-metrics.py` as root |
 
-**Management access** is key-only SSH as `root`; `cloud-init/hetzner-rocky10.yaml` also creates a
-key-only `sysadm`. There is **no VPN**: a read-only check on 2026-09-22 found no WireGuard interface
+**Management access** is key-only SSH as the operator's personal account `greluc`, which becomes
+root through `sudo` **with its password**; sshd refuses `root` and admits no other account
+(REQ-OPS-052, [ADR-0308](adr/0308-operators-log-in-under-a-personal-account-and-root-never-over-ssh.md)).
+Reading needs no password: the account is in `adm` and `systemd-journal`, and may run the
+read-only `podman` sub-commands as `iri`, `sshd -T` and `fail2ban-client status` without one. The
+lockout is rolled out in two phases — [`ansible/README.md` → *Root's lockout*](../ansible/README.md#roots-lockout-two-phases).
+If the key and the password are both lost, the way back is Hetzner's rescue system: root is
+password-locked and the console accepts no login. There is **no VPN**: a read-only check on 2026-09-22 found no WireGuard interface
 and no `/etc/wireguard` on the production host. fail2ban guards SSH; firewalld is default-deny and
 opens SSH, 80 and 443 only; the provider's cloud firewall sits in front of it, deliberately
 ([`PODMAN_HOST_BOOTSTRAP.md` §10](archive/PODMAN_HOST_BOOTSTRAP.md)).
 
 ### Shell conventions used below
 
-Run from `/`, as root. `sudo -u <user>` keeps the caller's working directory, and neither `deploy`
-nor `iri` can enter `/root` — from there every rootless call fails with `cannot chdir to /root:
+Run from `/`, as root — `ssh greluc@<host>`, then `sudo -i`. `sudo -u <user>` keeps the caller's
+working directory, and neither `deploy` nor `iri` can enter `/root` — from there every rootless call fails with `cannot chdir to /root:
 Permission denied`, which the runtime detection reports as "no lingering user could be found".
 `deploy.sh` and `container-cleanup.sh` change to `/` themselves (deploy.sh since 2026-09-22), so for
 them the `cd /` below is belt and braces; for the ad-hoc `${UCTL}` / `${UPOD}` commands it is not.
@@ -197,11 +203,14 @@ UPOD="sudo -u iri podman"
    > a host whose data has not been restored yet becomes `latest` and is what the next restore
    > would bring back. Restore first ([`backup.md` → *Restoring*](backup.md#restoring-disaster-recovery)),
    > compare, then start `iri-backup.timer`.
-7. **Accept the host** with the conformance suite, from a checkout on the workstation — as `root`,
-   or the container checks see an empty store:
+7. **Lock root out of SSH** in the two phases of
+   [`ansible/README.md` → *Root's lockout*](../ansible/README.md#roots-lockout-two-phases).
+8. **Accept the host** with the conformance suite, from a checkout on the workstation — with
+   `--sudo`, or the container checks see an empty store:
 
    ```bash
-   python scripts/check-conformance.py --ssh root@<host>
+   ssh -t greluc@<host> sudo -v
+   python scripts/check-conformance.py --ssh greluc@<host> --sudo
    ```
 
    `client-address-visible` and the other external checks only mean something once DNS points at
@@ -571,7 +580,7 @@ PowerShell here, and the comparison strips the carriage returns.
 1. Hash every file under the scripts directory on the host (PowerShell; `<host>` is production or testing):
 
    ```powershell
-   ssh root@<host> "cd /var/iri/code/scripts && find . -type f | cut -c3- | sort | xargs sha256sum" | Set-Content -Encoding ascii host.sha256
+   ssh greluc@<host> "cd /var/iri/code/scripts && find . -type f | cut -c3- | sort | xargs sha256sum" | Set-Content -Encoding ascii host.sha256
    ```
 
 2. Hash the release tag locally, from a checkout that has the tag (`git fetch --tags origin`):
@@ -816,7 +825,7 @@ sudo -u iri podman run -d --rm --name seed-tunnel --network net-backend-frontend
 On the workstation (PowerShell), one window holds the tunnel and a second one runs the seed:
 
 ```powershell
-ssh -N -L 11299:127.0.0.1:11299 root@<testing-host>
+ssh -N -L 11299:127.0.0.1:11299 greluc@<testing-host>
 ```
 
 ```powershell
@@ -1731,7 +1740,7 @@ originates on the host arrives as loopback, and loopback can only be produced by
 on the host. `EDGE_ADMIN_ALLOW` can add literal addresses, never a prefix.
 
 ```bash
-ssh -N -L 443:127.0.0.1:443 root@<production host>
+ssh -N -L 443:127.0.0.1:443 greluc@<production host>
 ```
 
 **The local port must be 443**: Keycloak is hostname-strict and emits portless URLs, so any other
@@ -2247,7 +2256,7 @@ ${UPOD} logs --since 5m backend | grep -iE 'PKIX|subject alternative|fetch users
 systemctl start iri-deploy.timer
 ```
 
-Then run `check-conformance.py --ssh root@<host> --only scrape-targets-up --only
+Then run `check-conformance.py --ssh greluc@<host> --sudo --only scrape-targets-up --only
 containers-running` from the workstation. The monitoring-side follow-ups — Grafana's own
 certificate, the `blackbox-internal-tls` probes, what to check in the meta-monitoring dashboard —
 are in [`monitoring/README.md`](../monitoring/README.md). If Keycloak's Discord precheck uses a

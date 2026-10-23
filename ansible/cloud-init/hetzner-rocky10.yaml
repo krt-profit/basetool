@@ -1,8 +1,7 @@
 users:
-  - name: sysadm
-    groups: [wheel]
+  - name: greluc
+    groups: [wheel, adm, systemd-journal]
     shell: /bin/bash
-    sudo: "ALL=(ALL) NOPASSWD:ALL"
     lock_passwd: true
     ssh_authorized_keys:
       - ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBGaLCBXB4sF+5Qu2lpVh7K7clqvNQiS6QuKpdzIr6l6NmNuc9892vPhwFKdy0vuoh/kFtch4WNIh3fjzG+RGZ0I= lucas@LUCAS-DESKTOP

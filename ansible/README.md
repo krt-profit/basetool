@@ -41,6 +41,7 @@ The task files themselves carry the measurements behind each step. This README c
 | `15-cosign.yml` | `packages`, `cosign` | the upstream cosign binary, checked against the sha256 pinned in `defaults/main.yml` |
 | `20-user.yml` | `user` | the service user `iri`, its subuid/subgid range, lingering |
 | `22-deploy-user.yml` | `user`, `deploy` | the `deploy` account and the sudoers bridge to `iri` (the podman sub-commands in `basetool_host_deploy_podman_subcommands`, `systemctl --user *`, `systemctl restart alloy.service`) — and proves it works. The list is exactly what the `rt_*` seam and the four deploy-account scripts run; `scripts/check-deploy-podman-allowlist.py` (repo-lint) fails when a script starts using another sub-command or an entry goes unused. `podman run` and `exec` are on it, so `deploy` can still run any code **as `iri`**; it cannot become root |
+| `23-admin-access.yml` | `access` | the operator's admin account (`basetool_host_admin_user`) with exactly the inventory's keys, `wheel` + `adm` + `systemd-journal`, sudo **with its password** plus a password-free read grant (`basetool_host_admin_read_podman_subcommands` as `iri`, `sshd -T`, `fail2ban-client status`), the auditd watches on the SSH config and both `~/.ssh`; with `basetool_host_ssh_lock_root: true` also `00-basetool-access.conf` (`PermitRootLogin no`, `AllowUsers`), checked with `sshd -T` before the reload, root's keys emptied and `basetool_host_retired_admin_users` removed (REQ-OPS-052) |
 | `30-directories.yml` | `directories` | `/var/iri`, `/var/lib/iri`, `/etc/iri`, the setgid `env.d`, the backup staging tree, the unit delivery directory `/etc/containers/systemd/users/<uid>`, every data directory at its **translated** owner |
 | `25-scripts.yml` | `scripts` | `deploy.sh`, `backup.sh`, `restore-drill.sh`, `container-cleanup.sh`, `lib/container-runtime.sh`, `lib/common.sh`, `lib/restic-repo.sh`, `render-env-d.py`, `render-redis-acl.py`, `mint-internal-tls.sh` (root-owned, `0755`) and the Redis ACL rules template `redis-users.acl.tmpl` (`0644`); the four `iri-*` units and timers with their shared sandbox drop-in `10-deploy-account-sandbox.conf` (`basetool_host_deploy_account_units`) and the templated `20-service-user.conf`, which orders each after `user@<iri uid>.service` so its sandbox sees `iri`'s runtime, logrotate, the lock tmpfiles; timers **enabled, not started** |
 | `40-selinux.yml` | `selinux` | `container_file_t` on the data tree, `bin_t` on the scripts, `restorecon -RF` |
@@ -61,11 +62,12 @@ nothing to forward to before the stack exists.
 ## Before the role: the machine has to exist and let you in
 
 [`cloud-init/hetzner-rocky10.yaml`](cloud-init/hetzner-rocky10.yaml) does that and **nothing else**
-— one key-only `sudo` user (`sysadm`), two keys, a package upgrade and one reboot into the new
-kernel. Two keys, because `root` and `sysadm` are password-locked and the console accepts no login:
-the operator's key is the way in when the automation's cannot be used. Paste it into Hetzner's
-*Cloud config* field when creating the server, and check both fingerprints first. Root stays
-reachable by key (`disable_root: false`) until `sysadm` is proven.
+— the operator's key-only admin account (`greluc`, no password yet), two keys, a package upgrade
+and one reboot into the new kernel. Two keys, because `root` and `greluc` are password-locked and
+the console accepts no login: the operator's key is the way in when the automation's cannot be
+used. Paste it into Hetzner's *Cloud config* field when creating the server, and check both
+fingerprints first. Root stays reachable by key (`disable_root: false`) for the first role run;
+the role locks it in a second phase (below).
 
 The restraint is the design: anything cloud-init configures that the role also configures exists in
 two places, and two places drift.
@@ -117,6 +119,34 @@ setup, `--tags podman` for the alias drop-ins,
 `--tags cosign` after a cosign pin bump. Each task file that needs the service user's uid looks it
 up itself, so a tag-limited run does not depend on a skipped file.
 
+## Root's lockout: two phases
+
+[ADR-0308](../docs/adr/0308-operators-log-in-under-a-personal-account-and-root-never-over-ssh.md).
+Root is locked only by a run that has just used the new way in, so a mistake leaves root's door
+open instead of closing both.
+
+1. **Account.** With `basetool_host_ssh_lock_root` unset (default `false`), as root or the old
+   account: `ansible-playbook site.yml --limit <host> --tags access`. It creates the account, its
+   keys, its grants and the audit watches, and says what is still missing.
+2. **Password.** As root on the host, interactively: `passwd greluc`. It goes into the password
+   manager and nowhere else — not the inventory, not a file, not a chat.
+3. **Prove it by hand.** From each workstation: `ssh greluc@<host>`, then `sudo -v` (asks the
+   password), `sudo -n -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) podman ps` (asks nothing),
+   `journalctl -u sshd -n 5` (no sudo). Keep this session open until step 5 is done.
+4. **Lock.** Set `ansible_user: greluc` and `basetool_host_ssh_lock_root: true` for the host, then
+   `ansible-playbook site.yml --limit <host> --tags access -K --check --diff` and the same without
+   `--check`. The role refuses the lock from any other session, and refuses it while the account
+   has no password.
+5. **Prove the lock.** In a **new** terminal: `ssh root@<host> true` is refused,
+   `ssh greluc@<host> sudo -v` works, and
+   `python scripts/check-conformance.py --ssh greluc@<host> --sudo --only ssh-root-login-refused`
+   passes. Only then close the session from step 3.
+
+`basetool_host_retired_admin_users: [sysadm]` in step 4 removes the cloud-init account and its
+`NOPASSWD: ALL` grant in the same run.
+
+From then on every run is `ansible-playbook … -K` as `greluc`.
+
 > [!note] `--check` on a FRESH host stops partway, and that is not a defect
 > Many tasks read what earlier tasks install — the podman version floor, the SCAP datastream, the
 > firewalld service. In check mode nothing was installed, so those reads find nothing. The role
@@ -136,6 +166,9 @@ are not in this public repository.
 | `basetool_host_public_name_aliases_v6` | the same names on the IPv6 guest address, for `blackbox-exporter` only |
 | `basetool_host_edge_trusted_proxies` | the edge's five pinned addresses (default in `defaults/main.yml`); must equal the pins `scripts/generate-quadlet.py` writes into `edge.container` — the generator refuses a mismatch — and `EDGE_TRUSTED_PROXY` in `.env` must name the same five |
 | `basetool_host_jvm_truststore_path` | only where the edge holds a privately signed certificate (testing); production sets nothing |
+| `basetool_host_admin_user`, `basetool_host_admin_authorized_keys` | **Required.** The operator's login and its public keys; the role installs exactly these keys and no others |
+| `basetool_host_ssh_lock_root` | `false` until the two-phase lockout above; then `true`, with `ansible_user` set to the admin account |
+| `basetool_host_retired_admin_users` | accounts removed once root is locked — `[sysadm]` on both hosts |
 | `basetool_host_fail2ban_ignoreip` | loopback by default; a management network belongs here, or the jail can lock out the only way in |
 | `basetool_host_hardening_remediate` | `false` by default: scanning always, remediation only on a host you hold a snapshot of |
 | `basetool_host_report_uid_map` | print the container→host uid translation the role used |
@@ -182,10 +215,13 @@ Not "the playbook ran cleanly". A host is accepted when
 quietly become a single bucket for the entire internet.
 
 ```bash
-python scripts/check-conformance.py --ssh root@<host>
+ssh -t greluc@<host> sudo -v
+python scripts/check-conformance.py --ssh greluc@<host> --sudo
 ```
 
-As **root**: the container checks read the service user's store and `.env` is `0640 deploy:deploy`,
-so a login account sees an empty host. The external checks — `client-address-visible` among them —
+With **`--sudo`**: the container checks read the service user's store and `.env` is
+`0640 deploy:deploy`, so without root the login account sees an empty host. The first line primes
+sudo's timestamp, which is global for the admin account and covers the run's separate SSH
+sessions for ten minutes. The external checks — `client-address-visible` among them —
 describe whatever the public names resolve to, so they only speak for this host once DNS points at
 it.

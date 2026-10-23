@@ -24,7 +24,8 @@
         "y": 0
       },
       "type": "timeseries",
-      "title": "Failed SSH auth rate",
+      "title": "Failed SSH auth",
+      "description": "Failed authentications of an existing account, per interval. A key-only sshd logs a rejected key as `Connection closed by` / `Disconnected from authenticating user … [preauth]`, not as `Failed publickey`, so all three shapes are counted. Unknown account names are in *Invalid users*.",
       "datasource": {
         "type": "loki",
         "uid": "loki"
@@ -33,21 +34,8 @@
         "defaults": {
           "unit": "short",
           "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
-            ]
+            "drawStyle": "bars",
+            "fillOpacity": 60
           }
         },
         "overrides": []
@@ -63,7 +51,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate({app=\"host-auth\"} |~ \"Failed (password|publickey)\" [5m]))",
+          "expr": "sum(count_over_time({app=\"host-auth\"} |~ `sshd(-session)?\\[[0-9]+\\]: .*(authenticating user|Failed (password|publickey)|maximum authentication attempts)` [$__interval])) or vector(0)",
           "refId": "A",
           "legendFormat": "failed auth",
           "datasource": {
@@ -83,6 +71,7 @@
       },
       "type": "timeseries",
       "title": "Invalid users",
+      "description": "Login attempts for account names that do not exist on the host, per interval.",
       "datasource": {
         "type": "loki",
         "uid": "loki"
@@ -91,8 +80,8 @@
         "defaults": {
           "unit": "short",
           "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10
+            "drawStyle": "bars",
+            "fillOpacity": 60
           }
         },
         "overrides": []
@@ -108,7 +97,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate({app=\"host-auth\"} |~ \"Invalid user\" [5m]))",
+          "expr": "sum(count_over_time({app=\"host-auth\"} |~ `Invalid user` [$__interval])) or vector(0)",
           "refId": "A",
           "legendFormat": "invalid user",
           "datasource": {
@@ -128,6 +117,7 @@
       },
       "type": "timeseries",
       "title": "Sudo failures",
+      "description": "A wrong sudo password, an account without a sudo grant, or a command outside the deploy account's grant. The same match as the SudoAuthFailure alert. A flat zero is the healthy state.",
       "datasource": {
         "type": "loki",
         "uid": "loki"
@@ -136,8 +126,8 @@
         "defaults": {
           "unit": "short",
           "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10
+            "drawStyle": "bars",
+            "fillOpacity": 60
           },
           "thresholds": {
             "mode": "absolute",
@@ -166,7 +156,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate({app=\"host-auth\"} |~ \"sudo.*authentication failure\" [5m]))",
+          "expr": "sum(count_over_time({app=\"host-auth\"} |~ `sudo(\\[[0-9]+\\])?:.*(authentication failure|NOT in sudoers|command not allowed|incorrect password attempts?)` [$__interval])) or vector(0)",
           "refId": "A",
           "legendFormat": "sudo failure",
           "datasource": {
@@ -186,6 +176,7 @@
       },
       "type": "timeseries",
       "title": "Accepted logins",
+      "description": "Successful SSH logins per interval, by account and method. Any `root` bar is a finding: root may not log in over SSH.",
       "datasource": {
         "type": "loki",
         "uid": "loki"
@@ -193,9 +184,10 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
+          "noValue": "0",
           "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10
+            "drawStyle": "bars",
+            "fillOpacity": 60
           }
         },
         "overrides": []
@@ -206,14 +198,141 @@
           "placement": "bottom"
         },
         "tooltip": {
-          "mode": "single"
+          "mode": "multi"
         }
       },
       "targets": [
         {
-          "expr": "sum(rate({app=\"host-auth\"} |~ \"Accepted\" [5m]))",
+          "expr": "sum by (user, method) (count_over_time({app=\"host-auth\"} |~ `Accepted \\S+ for \\S+ from` | regexp `Accepted (?P<method>\\S+) for (?P<user>\\S+) from` [$__interval]))",
           "refId": "A",
-          "legendFormat": "accepted",
+          "legendFormat": "{{user}} ({{method}})",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          }
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 8
+      },
+      "type": "timeseries",
+      "title": "fail2ban activity",
+      "description": "The sshd jail's own log (app=\"host-fail2ban\"), per interval: each failure it detected, each ban it issued (a ban restored after a fail2ban restart included) and each unban.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({app=\"host-fail2ban\"} |~ `\\] Found ` [$__interval])) or vector(0)",
+          "refId": "A",
+          "legendFormat": "detected failure",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          }
+        },
+        {
+          "expr": "sum(count_over_time({app=\"host-fail2ban\"} |~ `\\] (Restore )?Ban ` [$__interval])) or vector(0)",
+          "refId": "B",
+          "legendFormat": "ban",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          }
+        },
+        {
+          "expr": "sum(count_over_time({app=\"host-fail2ban\"} |~ `\\] Unban ` [$__interval])) or vector(0)",
+          "refId": "C",
+          "legendFormat": "unban",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          }
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 8
+      },
+      "type": "table",
+      "title": "Top offending addresses",
+      "description": "The ten client addresses fail2ban detected the most failures for in the selected range.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "none"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "failures",
+            "desc": true
+          }
+        ]
+      },
+      "transformations": [
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "lastNotNull"
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Field": "address",
+              "Last *": "failures"
+            }
+          }
+        }
+      ],
+      "targets": [
+        {
+          "expr": "topk(10, sum by (address) (count_over_time({app=\"host-fail2ban\"} |~ `\\] Found ` | regexp `\\] Found (?P<address>\\S+) ` [$__range])))",
+          "refId": "A",
+          "queryType": "instant",
+          "legendFormat": "{{address}}",
           "datasource": {
             "type": "loki",
             "uid": "loki"
@@ -226,12 +345,12 @@
       "gridPos": {
         "h": 8,
         "w": 8,
-        "x": 8,
-        "y": 8
+        "x": 0,
+        "y": 16
       },
       "type": "timeseries",
       "title": "Edge errors & warnings",
-      "description": "nginx error-log lines of the native edge (app=\"edge\"), by severity. Anchored on the error log's own `YYYY/MM/DD HH:MM:SS [level]` prefix, so an access-log line whose path or user agent happens to contain \"error\" is not counted. Re-sourced 2026-09-22 from the retired NPM stream {app=\"npm\"}, which has had no producer since NPM was removed.",
+      "description": "nginx error-log lines of the native edge (app=\"edge\"), by severity. Anchored on the error log's own `YYYY/MM/DD HH:MM:SS [level]` prefix, so an access-log line whose path or user agent happens to contain \"error\" is not counted.",
       "datasource": {
         "type": "loki",
         "uid": "loki"
@@ -268,15 +387,127 @@
       ]
     },
     {
-      "id": 6,
+      "id": 9,
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 8,
+        "y": 16
+      },
+      "type": "stat",
+      "title": "Bans in range",
+      "description": "Bans fail2ban issued in the selected range, restored bans included.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({app=\"host-fail2ban\"} |~ `\\] (Restore )?Ban ` [$__range])) or vector(0)",
+          "refId": "A",
+          "queryType": "instant",
+          "legendFormat": "bans",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          }
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 12,
+        "y": 16
+      },
+      "type": "stat",
+      "title": "Detected failures in range",
+      "description": "Authentication failures the sshd jail counted in the selected range.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({app=\"host-fail2ban\"} |~ `\\] Found ` [$__range])) or vector(0)",
+          "refId": "A",
+          "queryType": "instant",
+          "legendFormat": "failures",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          }
+        }
+      ]
+    },
+    {
+      "id": 11,
       "gridPos": {
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 8
+        "y": 16
       },
       "type": "logs",
-      "title": "Recent host-auth lines",
+      "title": "fail2ban bans and unbans",
       "datasource": {
         "type": "loki",
         "uid": "loki"
@@ -294,7 +525,80 @@
       },
       "targets": [
         {
-          "expr": "{app=\"host-auth\"}",
+          "expr": "{app=\"host-fail2ban\"} |~ `\\] (Restore )?(Ban|Unban) `",
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          }
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "type": "logs",
+      "title": "Recent SSH lines",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true
+      },
+      "targets": [
+        {
+          "expr": "{app=\"host-auth\"} |~ `sshd(-session)?\\[[0-9]+\\]:`",
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          }
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "type": "logs",
+      "title": "Recent sudo lines (operators)",
+      "description": "sudo commands and failures, without the deploy account's routine podman and systemctl calls and without the per-command PAM session lines.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true
+      },
+      "targets": [
+        {
+          "expr": "{app=\"host-auth\"} |~ `sudo(\\[[0-9]+\\])?:` != `pam_unix(sudo:session)` !~ `sudo\\[[0-9]+\\]:\\s+deploy : PWD=`",
           "refId": "A",
           "datasource": {
             "type": "loki",

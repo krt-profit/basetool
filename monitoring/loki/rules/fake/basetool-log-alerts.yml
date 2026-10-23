@@ -68,13 +68,13 @@ groups:
           description: "A Spring Boot health contributor took >10s to respond (logged by HealthEndpointSupport) — readiness and the container's Podman health check (HealthTimeout=5s in its Quadlet unit) are already failing while the app looks alive. 2026-07-22 pattern: a hung reactive Redis PING queued successive checks for minutes. Check the named contributor and the container's health state."
 
       - alert: SshFailedAuthSpike
-        expr: sum(rate({app="host-auth"} |~ "Failed password|authentication failure|Invalid user" [5m])) > 0.3
+        expr: sum(rate({app="host-auth"} |~ "Failed (password|publickey)|authenticating user|maximum authentication attempts|authentication failure|Invalid user" [5m])) > 0.3
         for: 5m
         labels:
           severity: warning
         annotations:
           summary: "SSH failed-auth spike"
-          description: "auth.log shows an elevated rate of failed SSH authentications / invalid users."
+          description: "auth.log shows an elevated rate of failed SSH authentications / invalid users. A key-only sshd logs a rejected key as 'Connection closed by authenticating user … [preauth]', so that shape is counted too."
 
       - alert: SshRootLoginAccepted
         expr: sum(rate({app="host-auth"} |~ "Accepted (publickey|password|keyboard-interactive) for root " [5m])) > 0
@@ -83,16 +83,16 @@ groups:
           severity: warning
         annotations:
           summary: "Successful SSH root login"
-          description: "auth.log shows a successful root login. Expected only for operator admin/tunnel sessions — verify it was you."
+          description: "auth.log shows a successful root login. sshd refuses root once REQ-OPS-052 is rolled out, so on a locked host this means the access policy was changed or bypassed — treat it as compromise. Before the lock it is the operator's own session; confirm it was you."
 
       - alert: SudoAuthFailure
-        expr: sum(rate({app="host-auth"} |~ "sudo:.*(authentication failure|NOT in sudoers|command not allowed)" [10m])) > 0
+        expr: sum(rate({app="host-auth"} |~ "sudo(\\[[0-9]+\\])?:.*(authentication failure|NOT in sudoers|command not allowed|incorrect password attempts?)" [10m])) > 0
         for: 0m
         labels:
           severity: warning
         annotations:
           summary: "sudo authentication failure on the host"
-          description: "auth.log shows a sudo failure. The only non-root account has no sudo, so a failure implies an unexpected actor — investigate."
+          description: "auth.log shows a sudo failure: a wrong password for the admin account, an account without a grant, or a command outside the deploy account's bridge. A mistyped password of your own lands here too; anything else means an unexpected actor — investigate."
 
       - alert: EdgeServerErrorSpike
         expr: sum(rate({app="edge"} |~ " 5[0-9][0-9] " [5m])) > 1

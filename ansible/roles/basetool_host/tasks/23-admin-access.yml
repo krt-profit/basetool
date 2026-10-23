@@ -1,0 +1,215 @@
+---
+- name: Refuse an admin account that cannot replace root
+  ansible.builtin.assert:
+    that:
+      - basetool_host_admin_user | length > 0
+      - basetool_host_admin_user != 'root'
+      - basetool_host_admin_user not in basetool_host_retired_admin_users
+      - basetool_host_admin_authorized_keys | length > 0
+    fail_msg: >-
+      basetool_host_admin_user and basetool_host_admin_authorized_keys must be set in the inventory
+      (ADR-0308). The admin account is the only SSH login once root is locked, so it needs a name
+      that is not root, is not being retired, and at least one public key.
+
+- name: Read the service user's uid
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ basetool_host_service_user }}"
+  check_mode: false
+
+- name: Name the uid the read grant needs
+  ansible.builtin.set_fact:
+    basetool_host_service_uid: "{{ ansible_facts.getent_passwd[basetool_host_service_user][1] }}"
+
+- name: Create the admin account
+  ansible.builtin.user:
+    name: "{{ basetool_host_admin_user }}"
+    groups: "{{ basetool_host_admin_groups }}"
+    append: true
+    shell: /bin/bash
+    create_home: true
+    comment: "Operator login (ADR-0308)"
+
+- name: Read where its home is
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ basetool_host_admin_user }}"
+  failed_when: false
+  check_mode: false
+
+- name: Name its home
+  ansible.builtin.set_fact:
+    basetool_host_admin_home: >-
+      {{ (ansible_facts.getent_passwd | default({})).get(basetool_host_admin_user, [None, None, None, None, '/home/' ~ basetool_host_admin_user])[4] }}
+
+- name: Install exactly the keys the inventory names
+  ansible.posix.authorized_key:
+    user: "{{ basetool_host_admin_user }}"
+    key: "{{ basetool_host_admin_authorized_keys | join('\n') }}"
+    exclusive: true
+    manage_dir: true
+
+- name: Grant the read-only commands that need no password
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/basetool-admin
+    owner: root
+    group: root
+    mode: "0440"
+    validate: "visudo -cf %s"
+    content: |
+      Defaults:{{ basetool_host_admin_user }} timestamp_type=global, timestamp_timeout={{ basetool_host_admin_sudo_timeout_minutes }}
+      Cmnd_Alias BASETOOL_ADMIN_READ_PODMAN = {% for sub in basetool_host_admin_read_podman_subcommands -%}
+        /usr/bin/podman {{ sub }}, /usr/bin/podman {{ sub }} *{{ ', ' if not loop.last else '' }}
+        {%- endfor %}
+
+      Cmnd_Alias BASETOOL_ADMIN_READ_ROOT = /usr/sbin/sshd -T, /usr/sbin/sshd -T *, /usr/bin/fail2ban-client status, /usr/bin/fail2ban-client status *
+
+      {{ basetool_host_admin_user }} ALL=({{ basetool_host_service_user }}) NOPASSWD: SETENV: BASETOOL_ADMIN_READ_PODMAN
+      {{ basetool_host_admin_user }} ALL=(root) NOPASSWD: BASETOOL_ADMIN_READ_ROOT
+
+- name: Ask sudo what the admin account may do
+  ansible.builtin.command: sudo -l -U {{ basetool_host_admin_user }}
+  register: basetool_host_admin_sudo
+  changed_when: false
+  check_mode: false
+  when: basetool_host_admin_user in (ansible_facts.getent_passwd | default({}))
+
+- name: Refuse an admin account without the full, password-protected grant
+  ansible.builtin.assert:
+    that:
+      - basetool_host_admin_sudo.stdout is search('\(ALL(\s*:\s*ALL)?\)\s+ALL')
+      - basetool_host_admin_sudo.stdout is not search('NOPASSWD:\s*ALL')
+      - basetool_host_admin_sudo.stdout is search('podman ps')
+    fail_msg: >-
+      `sudo -l -U {{ basetool_host_admin_user }}` does not show `(ALL) ALL` behind a password, plus the
+      read grant: {{ basetool_host_admin_sudo.stdout }}. The full grant comes from `%wheel ALL=(ALL) ALL`
+      in /etc/sudoers; a NOPASSWD ALL anywhere would let a stolen key become root without the password.
+  when: basetool_host_admin_sudo is not skipped
+
+- name: Watch the SSH configuration and both authorized_keys directories
+  ansible.builtin.copy:
+    dest: /etc/audit/rules.d/50-basetool-ssh.rules
+    owner: root
+    group: root
+    mode: "0600"
+    content: |
+      -w /etc/ssh/sshd_config -p wa -k sshd-config
+      -w /etc/ssh/sshd_config.d/ -p wa -k sshd-config
+      -w /root/.ssh/ -p wa -k sshd-authkeys
+      -w {{ basetool_host_admin_home }}/.ssh/ -p wa -k sshd-authkeys
+  notify: Load the audit rules
+
+- name: Read whether the admin account has a sudo password yet
+  ansible.builtin.command: passwd -S {{ basetool_host_admin_user }}
+  register: basetool_host_admin_pwstatus
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Say what still has to happen before root can be locked
+  ansible.builtin.debug:
+    msg: >-
+      {{ basetool_host_admin_user }} exists with {{ basetool_host_admin_authorized_keys | length }} key(s).
+      Its password is
+      {{ 'set' if (basetool_host_admin_pwstatus.stdout.split() + ['', ''])[1] in ['P', 'PS'] else 'NOT set' }}.
+      Root is still allowed to log in. To lock it: set the password (`passwd {{ basetool_host_admin_user }}`
+      as root), log in as {{ basetool_host_admin_user }} and prove `sudo -v`, then run the role with
+      ansible_user={{ basetool_host_admin_user }}, -K and basetool_host_ssh_lock_root=true.
+  when: not basetool_host_ssh_lock_root | bool
+
+- name: Lock root out of SSH
+  when: basetool_host_ssh_lock_root | bool
+  block:
+    - name: Refuse to lock root from any session but the admin's own
+      ansible.builtin.assert:
+        that:
+          - ansible_user | default('root') == basetool_host_admin_user
+          - (basetool_host_admin_pwstatus.stdout.split() + ['', ''])[1] in ['P', 'PS']
+        fail_msg: >-
+          Root is locked only by a run that connects as {{ basetool_host_admin_user }} with its key and
+          becomes root with its sudo password (-K). That run is the proof that the new way in works.
+          This one connects as {{ ansible_user | default('root') }}, and the password status of
+          {{ basetool_host_admin_user }} is '{{ basetool_host_admin_pwstatus.stdout | default('?') }}'.
+      when: not ansible_check_mode
+
+    - name: Write the access policy
+      ansible.builtin.copy:
+        dest: /etc/ssh/sshd_config.d/00-basetool-access.conf
+        owner: root
+        group: root
+        mode: "0600"
+        validate: /usr/sbin/sshd -t -f %s
+        content: |
+          PermitRootLogin no
+          AllowUsers {{ basetool_host_admin_user }}
+          PubkeyAuthentication yes
+          AuthenticationMethods publickey
+          PasswordAuthentication no
+          KbdInteractiveAuthentication no
+          PermitEmptyPasswords no
+          PermitUserEnvironment no
+          MaxAuthTries {{ basetool_host_ssh_max_auth_tries }}
+          X11Forwarding no
+          AllowAgentForwarding no
+          AllowTcpForwarding {{ basetool_host_ssh_allow_tcp_forwarding }}
+      notify: Reload sshd
+
+    - name: Check the whole configuration parses
+      ansible.builtin.command: /usr/sbin/sshd -t
+      changed_when: false
+      check_mode: false
+
+    - name: Ask sshd what it would do with root and with the admin
+      ansible.builtin.command: /usr/sbin/sshd -T -C user={{ item }},host=conformance,addr=192.0.2.1
+      loop:
+        - root
+        - "{{ basetool_host_admin_user }}"
+      register: basetool_host_sshd_effective
+      changed_when: false
+      check_mode: false
+      when: not ansible_check_mode
+
+    - name: Refuse a policy that does not do what it says
+      ansible.builtin.assert:
+        that:
+          - basetool_host_sshd_effective.results[0].stdout is search('(?m)^permitrootlogin no$')
+          - basetool_host_sshd_effective.results[1].stdout is search('(?m)^allowusers ' ~ basetool_host_admin_user ~ '$')
+          - basetool_host_sshd_effective.results[1].stdout is search('(?m)^passwordauthentication no$')
+        fail_msg: >-
+          sshd parses the policy but does not apply it -- an earlier file in sshd_config.d sets the
+          same keyword first. Do NOT reload sshd until `sshd -T` shows permitrootlogin no.
+      when: not ansible_check_mode
+
+    - name: Empty root's authorized_keys
+      ansible.builtin.copy:
+        dest: /root/.ssh/authorized_keys
+        content: ""
+        owner: root
+        group: root
+        mode: "0600"
+
+- name: Retire the generic admin accounts
+  when:
+    - basetool_host_ssh_lock_root | bool
+    - basetool_host_retired_admin_users | length > 0
+  block:
+    - name: Refuse to retire the account this run connects as
+      ansible.builtin.assert:
+        that: ansible_user | default('root') not in basetool_host_retired_admin_users
+        fail_msg: "This run connects as {{ ansible_user }}, which is on basetool_host_retired_admin_users."
+
+    - name: Remove their sudo grant
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers.d/90-cloud-init-users
+        regexp: '^{{ item }}\s'
+        state: absent
+        validate: "visudo -cf %s"
+      loop: "{{ basetool_host_retired_admin_users }}"
+      failed_when: false
+
+    - name: Remove the accounts
+      ansible.builtin.user:
+        name: "{{ item }}"
+        state: absent
+        remove: true
+      loop: "{{ basetool_host_retired_admin_users }}"
