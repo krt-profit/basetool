@@ -345,10 +345,10 @@ over existing data via `GET /api/v1/personal-blueprints/craftability?includeRefi
   accent colour, the other two grey) and the count as „3×" (a dash when not craftable or not
   evaluable), with the state's name as tooltip. The detail pane opens with a key-figure block — the
   count „3×", „Craftbar" / „Nicht craftbar" / the not-evaluable reason, and a line „limitiert durch
-  <Material>" plus „Raffinerie eingerechnet" / „nur dank Raffinerie" / the ITEM hint where they
+  <Material>, <Material>" naming every material whose own count equals the blueprint's count, plus „Raffinerie eingerechnet" / „nur dank Raffinerie" / the ITEM hint where they
   apply, its edge green, the accent colour, or grey by state — followed by the ingredients table
   „Material · Bedarf · Vorrat · Qualität": the per-craft need, the qualifying stock (marked short or
-  limiting; a short cell adds „fehlt n“ beneath the stock), and the effective quality as a bar on 0–1000 with its value (the column head explains
+  limiting, every limiting material alike; a short cell adds „fehlt n“ beneath the stock), and the effective quality as a bar on 0–1000 with its value (the column head explains
   „SCU-gewichtete Qualität deines qualifizierenden Vorrats"). The toolbar's switch **„Raffinerie
   einrechnen"** is the refinery fold-in, and its segment **„Alle n · Craftbar n"** is the
   **"show only craftable" view filter** — client-side, default „Alle", hiding every master row that
