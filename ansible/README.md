@@ -219,13 +219,13 @@ Not "the playbook ran cleanly". A host is accepted when
 quietly become a single bucket for the entire internet.
 
 ```bash
-ssh -t greluc@<host> sudo -v
 python scripts/check-conformance.py --ssh greluc@<host> --sudo
 ```
 
 With **`--sudo`**: the container checks read the service user's store and `.env` is
-`0640 deploy:deploy`, so without root the login account sees an empty host. The first line primes
-sudo's timestamp, which is global for the admin account and covers the run's separate SSH
-sessions for ten minutes. The external checks — `client-address-visible` among them —
+`0640 deploy:deploy`, so without root the login account sees an empty host. The suite asks for the
+sudo password once, without echo, and hands it to `sudo -S` on each command's stdin; nothing is
+cached on the host, and no other session of the account gains root from it (ADR-0308
+Amendment 1). The external checks — `client-address-visible` among them —
 describe whatever the public names resolve to, so they only speak for this host once DNS points at
 it.

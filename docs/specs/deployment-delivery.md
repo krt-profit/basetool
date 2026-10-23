@@ -997,9 +997,11 @@ admits that account and nothing else.
 - **No password for reading.** The admin account is in `adm` and `systemd-journal`, and sudoers
   grants it without a password exactly the read-only `podman` sub-commands of
   `basetool_host_admin_read_podman_subcommands` as the service user, `sshd -T` and
-  `fail2ban-client status`. Everything else needs the password. `timestamp_type=global` lets one
-  `sudo -v` cover the conformance suite's separate SSH sessions for
-  `basetool_host_admin_sudo_timeout_minutes`.
+  `fail2ban-client status`. Everything else needs the password. sudo keeps its default
+  per-terminal timestamp: an authenticated session never lends root to another session of the
+  same account. `check-conformance.py --sudo` asks for the password once, locally and without
+  echo, and hands it to `sudo -k -S` on each command's stdin — never on a command line, never
+  cached on the host — after proving it once before the first check.
 - **Generic accounts are retired.** `sysadm`, created by cloud-init, is removed once root is
   locked (`basetool_host_retired_admin_users`), together with its `NOPASSWD: ALL` grant.
 
@@ -1008,7 +1010,8 @@ admits that account and nothing else.
 - [ ] `sshd -T -C user=root,host=x,addr=192.0.2.1` prints `permitrootlogin no` and
   `allowusers <admin>` on both hosts (`check-conformance.py` → `ssh-root-login-refused`).
 - [ ] `sudo -l -U <admin>` shows `(ALL) ALL` without `NOPASSWD`, and no account holds
-  `NOPASSWD: ALL`.
+  `NOPASSWD: ALL`. No sudoers entry sets `timestamp_type=global`: right after the admin used
+  `sudo` in one session, `sudo -n true` in another session of the same account is refused.
 - [ ] `ssh root@<host> true` is refused; `ssh <admin>@<host> sudo -v` asks for the password.
 - [ ] auditd watches `/etc/ssh/sshd_config(.d)`, `/root/.ssh` and the admin's `~/.ssh`
   (`AuditdSshTamper`).

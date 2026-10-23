@@ -209,9 +209,10 @@ UPOD="sudo -u iri podman"
    `--sudo`, or the container checks see an empty store:
 
    ```bash
-   ssh -t greluc@<host> sudo -v
    python scripts/check-conformance.py --ssh greluc@<host> --sudo
    ```
+
+   It asks for the sudo password once and passes it to `sudo -S` on stdin.
 
    `client-address-visible` and the other external checks only mean something once DNS points at
    the host. `rate-limit-active` is opt-in (`--include-load`).

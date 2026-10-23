@@ -34,7 +34,6 @@ basetool_host_admin_groups:
   - wheel
   - adm
   - systemd-journal
-basetool_host_admin_sudo_timeout_minutes: 10
 basetool_host_admin_read_podman_subcommands:
   - image inspect
   - inspect

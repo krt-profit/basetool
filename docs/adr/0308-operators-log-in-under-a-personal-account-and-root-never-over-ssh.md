@@ -34,8 +34,8 @@ acted. `SshRootLoginAccepted` fired on every routine session and therefore carri
    cannot happen by a run that has not just used the new way in.
 4. **Reading needs no password.** `adm` and `systemd-journal` for the logs, plus a NOPASSWD grant
    for the read-only `podman` sub-commands as the service user, `sshd -T` and
-   `fail2ban-client status`. One `sudo -v` covers a conformance run, because the admin's sudo
-   timestamp is global and lasts ten minutes.
+   `fail2ban-client status`. ~~One `sudo -v` covers a conformance run, because the admin's sudo
+   timestamp is global and lasts ten minutes.~~ **Replaced by Amendment 1.**
 5. **`sysadm` is retired** once root is locked, with its `NOPASSWD: ALL` grant.
 
 ## Alternatives considered
@@ -44,15 +44,34 @@ acted. `SshRootLoginAccepted` fired on every routine session and therefore carri
   unable to say who acted, and its `NOPASSWD: ALL` makes the key the only barrier.
 - **Sudo without a password.** Nothing changes for automation, but a stolen key is root at once.
   The read grant covers what automation and an assistant need without the password.
-- **A per-tty sudo timestamp.** Narrower, but every SSH command of the conformance suite would
-  need its own password prompt. The global timestamp is bounded to the admin account and ten
-  minutes.
+- ~~**A per-tty sudo timestamp.**~~ **Chosen in Amendment 1**, with the password handed to
+  `sudo -S` instead of a prompt per command.
 
 ## Consequences
 
 - Ansible runs as the admin account with `-K`; `check-conformance.py --ssh <admin>@<host> --sudo`
-  runs after `ssh -t <admin>@<host> sudo -v`.
+  asks for the password once (Amendment 1).
 - The provider console stays the only way in if the admin's key and password are both lost; root
   is password-locked, so the recovery path is the provider's rescue system.
 - `SshRootLoginAccepted` becomes a page that should never fire, and *Accepted logins* on the
   *SSH / host auth* dashboard shows who logged in.
+
+## Amendment 1 — sudo keeps its per-terminal timestamp — 2026-10-23
+
+**Context.** The first conformance run against production after the lock passed
+`redis-requires-auth`, a check that runs `podman exec` — which the read grant does not allow.
+The operator had typed the sudo password for the lock run minutes earlier. With
+`timestamp_type=global`, that one authentication gave **every** session of the admin account
+password-free root for ten minutes: the suite's sessions, and an assistant's read-only session
+alike. A read-only session silently holding root is the opposite of decision 4.
+
+**Decision.** The sudoers drop-in sets no `Defaults` for the admin account; sudo's own
+per-terminal timestamp applies. `check-conformance.py --sudo` asks for the password once, locally
+and without echo (or reads it with `--sudo-password-stdin`), proves it with one `sudo -S` call,
+and then hands it to `sudo -k -S -p ''` on each privileged command's **stdin**. It never appears on
+a command line, in the process list or in a log, and no credential is cached on the host. A wrong
+password stops the run before the first check.
+
+**Consequences.** A conformance run asks once per run, not once per ten minutes. Each privileged
+command is a fresh sudo authentication in the auth log. A session of the admin account no longer
+inherits root from another one.
