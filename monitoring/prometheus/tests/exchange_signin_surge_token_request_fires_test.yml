@@ -1,0 +1,23 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: fires - token requests for one exchange client jump far above its own week
+    interval: 30m
+    input_series:
+      - series: 'keycloak_user_events_total{job="keycloak", realm="iri", idp="", event="refresh_token", error="", client_id="hangar-exporter"}'
+        values: "0+5x336 1730+50x6"
+      - series: 'keycloak_user_events_total{job="keycloak", realm="iri", idp="", event="oauth2_device_code_to_token", error="", client_id="hangar-exporter"}'
+        values: "0+0.5x336 178+10x6"
+    alert_rule_test:
+      - eval_time: 170h
+        alertname: ExchangeClientTokenRequestSurge
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              client_id: hangar-exporter
+            exp_annotations:
+              summary: "Unusually many token requests for one exchange client"
+              description: "Keycloak answered token requests (device-code redemptions and refreshes, failed ones included) for hangar-exporter more than three times as often in the last hour as in its average hour of the past week (at least 30). Either a client release refreshes in a loop, or someone drives that client's sign-in from browsers (ADR-0303). Compare with the client's gateway traffic on the Exchange dashboard before suspending it."

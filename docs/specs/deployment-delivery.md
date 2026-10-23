@@ -1462,13 +1462,13 @@ all three on six runners. The `plan` job's main path applies only to a `push` on
 **A superseded `main`-push run skips entirely** (ADR-0137 amendment, 2026-09-23). The concurrency
 group stays per commit, so every push to `main` queues a run; when `plan` starts and the pushed commit
 is already a strict ancestor of `origin/main`'s tip, `plan` sets `skip=true` and every later job
-(`build`, `scan`, `merge`, `build-config`, `keycloak-spi-jar`, `build-keycloak-spi`) is skipped, the run
+(`build`, `merge`, `build-config`, `keycloak-spi-jar`, `build-keycloak-spi`) is skipped, the run
 green, with the reason in the job summary. Never for a range containing a release commit, a tag push or
 `workflow_dispatch`, and never when the tip cannot be read or is not a descendant (force push).
 Decided by `image_reuse_plan.py --skip-check`.
 
 `plan` emits the re-tagged modules, their verified digests and a `build` matrix of only the images to
-build; `scan` covers the built images; `merge` assembles the built ones, re-tags the others and signs
+build; each `build` cell scans the image it pushed; `merge` assembles the built ones, re-tags the others and signs
 all three. A failed build cell stops `merge` for **all three**, so a commit's `:sha-<short>` exists for
 every image or for none — which the next push's lookup relies on.
 
@@ -1506,7 +1506,8 @@ produced artifact.
   re-tags all three only when all five gates above pass for all three, and every other outcome
   yields a full build (a failed `plan` tags nothing).
 - [ ] A re-tagged image's `merge` cell re-tags the digest `plan` **verified** (no second resolution
-  between check and use) and signs it; `build` and `scan` run only for the images being built.
+  between check and use) and signs it; `build`, and with it the scan, runs only for the images being
+  built.
 - [ ] A `workflow_dispatch` run always builds — on `main` or a release tag on `main`; any other ref
   is refused by `ref-guard` before anything is built (REQ-OPS-015, since 2026-09-22).
 - [ ] The BuildKit image the builds boot is pinned **by digest** in
@@ -1519,8 +1520,10 @@ produced artifact.
 - [ ] `release-images.yml` declares no `cache-from` / `cache-to` for the app images. Before any cache
   is reintroduced, `gh api repos/{owner}/{repo}/actions/cache/usage` is checked against the 10 GB
   limit — at the quota, a new cache consumer only degrades every existing one.
-- [ ] Trivy runs in its own job, not inside `build`: a failure of the scan action or of the SARIF
-  upload must not skip `merge` and cost the release its tags and signature.
+- [ ] Trivy runs as the last steps of each `build` cell, against the digest that cell pushed, with
+  `exit-code: 0` and the SARIF category `trivy-<module>-<platform>`. A failure of the scan action or
+  of the SARIF upload fails that cell and therefore stops `merge` for all three images; the run is
+  re-run (ADR-0316).
 - [x] A `main` push rebuilds exactly the images whose own or shared inputs its range changed (all
   three on a shared input or a release commit), and re-tags each other image whose predecessor
   verifies and is at most 7 days old; an image that fails a gate is built. `image_reuse_plan.py
@@ -1543,11 +1546,12 @@ produced artifact.
   is a step of `ci.yml`'s `build` job, after the build that leaves the daemon and the Gradle caches
   warm — 28 s for all four, measured locally.
 
-**Enforced by:** `.github/workflows/release-images.yml` (`plan`, `build`, `scan`, `merge`) ·
+**Enforced by:** `.github/workflows/release-images.yml` (`plan`, `build`, `merge`) ·
 `.github/scripts/image_reuse_plan.py` · `.github/workflows/promote.yml` (`sync-testing`) ·
 `frontend/build.gradle.kts` (`resolvedAppVersion`) · `scripts/check-gitless-config-cache.sh`
 (`ci.yml`, `build`) · **Decision:** [ADR-0137](../adr/0137-one-image-build-per-commit-and-no-buildkit-layer-cache.md),
-[ADR-0210](../adr/0210-a-main-push-that-changes-no-image-input-re-tags-the-previous-build.md)
+[ADR-0210](../adr/0210-a-main-push-that-changes-no-image-input-re-tags-the-previous-build.md),
+[ADR-0316](../adr/0316-the-trivy-scan-runs-inside-the-image-build-job.md)
 
 ### REQ-OPS-022 — Non-production environments are fed by their own promotion channel
 
@@ -1805,8 +1809,8 @@ disagree about what counts.
 
 The same finding is therefore advisory at build time and blocking at promotion, and the split is
 deliberate. A build is speculative: most images produced are never promoted, and the cost of
-refusing one is that a fix cannot be shipped at all — which is why `exit-code: 0` and the move of
-Trivy out of the `build` job stand unchanged (REQ-OPS-021, ADR-0137). A promotion is the single
+refusing one is that a fix cannot be shipped at all — which is why `exit-code: 0` stands unchanged
+(REQ-OPS-021, ADR-0137, ADR-0316). A promotion is the single
 moment a specific digest is chosen to run in production, it already requires a human, and refusing
 it costs only the promotion. Until this requirement existed the answer to "what does a Trivy finding
 stop?" was "nothing, at any stage", while a vulnerable Java *library* blocked a merge outright at
@@ -2057,10 +2061,19 @@ to the shared group and restores the defect exactly.
   2026-09-22), carries the same gate expression, so a run whose gate is false builds nothing.
 - [ ] `e2e.yml` carries no `merge_group` trigger: its gate admits any event that is not a pull
   request, so a merge group would start the whole suite (REQ-OPS-044).
+- [ ] A pull request runs the suite on the three engines × `375x812` and `1600x900`; the nightly
+  `schedule` and every `workflow_dispatch` run all six device classes. `check_e2e_device_matrix.py`
+  fails when the full axis and `DEVICE_CLASSES` disagree or the pull-request axis is not a non-empty
+  subset of the full one (ADR-0312).
+- [ ] The `Exchange changes carry the e2e label` job runs on `opened`, `synchronize`, `reopened` and
+  on `labeled` only for the `e2e` label; any other label starts no runner for it (ADR-0311).
 
 **Enforced by:** `.github/workflows/e2e.yml` (`concurrency.group`, `jobs.e2e.if`,
-`jobs.build-stack.if`) · `.github/scripts/check_e2e_gate_mirror.py` ·
-`.github/workflows/repo-lint.yml` (`Repository gates` → `e2e-gate-mirror / …`) · **Decision:** [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md)
+`jobs.build-stack.if`, `jobs.exchange-label.if`, the `device` axis) ·
+`.github/scripts/check_e2e_gate_mirror.py` · `.github/scripts/check_e2e_device_matrix.py` ·
+`.github/workflows/repo-lint.yml` (`Repository gates` → `e2e-gate-mirror / …`) · **Decision:** [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md),
+[ADR-0311](../adr/0311-the-exchange-label-job-runs-only-on-events-that-can-change-its-verdict.md),
+[ADR-0312](../adr/0312-pull-requests-run-the-e2e-suite-on-two-device-classes.md)
 
 ## Out of scope
 
@@ -2948,15 +2961,15 @@ features only. No tracked file outside Markdown and the audit archive names `--e
 merge commit, one pull request per group). The strict up-to-date policy is off; the queue builds `main`
 plus the pull request before the merge instead.
 
-- **Every required status check reports on the merge group.** A required check either runs on the
-  `merge_group` event (checks whose verdict depends on the combined tree) or is answered by a job of
-  the same name in `merge-group-shims.yml` (checks decided on the pull request head: DCO,
-  gitleaks). A required context nothing reports on a merge group wedges the queue and is a defect.
+- **Every required status check runs on the merge group.** Each required context is the name of a
+  job in a workflow that triggers on `merge_group`; there are no shim jobs. DCO and gitleaks run there
+  too, as steps of `Commit & repo gates` over the group's `base_sha..head_sha` (ADR-0315). A required
+  context nothing reports on a merge group wedges the queue and is a defect.
 - **CodeQL runs for real in every merge group, and uploads nothing.** `codeql.yml` triggers on
-  `merge_group`, analyses `java-kotlin` and `javascript-typescript` and calls `analyze` with
-  `upload: never` and `upload-database: false`, so no SARIF upload races the queue's deletion of the
-  temporary branch. The group's verdict is that the analysis completes on the combined tree;
-  findings are judged on the pull request head and on `main`.
+  `merge_group`, runs `Analyze (java-kotlin)` and `Analyze (actions, python, js)` (ADR-0313) and calls
+  `analyze` with `upload: never` and `upload-database: false`, so no SARIF upload races the queue's
+  deletion of the temporary branch. The group's verdict is that the analysis completes on the
+  combined tree; findings are judged on the pull request head and on `main`.
 - **A merge group reads its base from `github.event.merge_group`**, never from `github.base_ref` or
   `github.event.pull_request`, which are empty there.
 - **No merge group starts the E2E suite.** `e2e.yml` has no `merge_group` trigger.
@@ -2970,18 +2983,21 @@ plus the pull request before the merge instead.
 
 - [ ] Every context in the `main` ruleset's `required_status_checks` is the `name:` of a job in a
   workflow that triggers on `merge_group`.
-- [ ] A queued docs-only pull request reaches `main` with all 11 contexts reported on its
+- [ ] A queued docs-only pull request reaches `main` with all 8 contexts reported on its
   `gh-readonly-queue/main/...` ref and a GitHub-verified merge commit.
-- [ ] A merge group's `Analyze (java-kotlin)` and `Analyze (javascript-typescript)` pass without
+- [ ] A merge group's `Analyze (java-kotlin)` and `Analyze (actions, python, js)` pass without
   creating a code scanning analysis on the `gh-readonly-queue/...` ref.
+- [ ] A merge group whose pull request carries a commit without a matching sign-off fails
+  `Commit & repo gates`.
 - [ ] After a queued merge, `gh pr view <n> --json mergeCommit` equals the new `main` tip.
 - [ ] Two queued pull requests that each add the same Flyway version fail the second group, not
   `main`.
 
-**Enforced by:** the ruleset `main`, `.github/workflows/merge-group-shims.yml`,
-`.github/workflows/codeql.yml` (matrix and `upload`), the `merge_group` triggers of `ci.yml`,
-`repo-lint.yml`, `wrapper-validation.yml` and `flyway-migrations.yml` · **Decision:**
-[ADR-0246](../adr/0246-pull-requests-merge-through-a-merge-queue-not-the-strict-up-to-date-policy.md) ·
+**Enforced by:** the ruleset `main`, `.github/workflows/codeql.yml` (matrix and `upload`), the
+`merge_group` triggers of `ci.yml`, `repo-lint.yml` and `commit-gates.yml` · **Decision:**
+[ADR-0246](../adr/0246-pull-requests-merge-through-a-merge-queue-not-the-strict-up-to-date-policy.md),
+[ADR-0313](../adr/0313-codeql-analyses-the-buildless-languages-in-one-job.md),
+[ADR-0315](../adr/0315-the-small-required-gates-run-as-one-job-and-for-real-in-the-merge-group.md) ·
 **Related:** REQ-OPS-027
 
 ### REQ-OPS-045 — The host scripts that apply a release are the ones it was built with, and a drift is visible
@@ -3195,9 +3211,9 @@ says so instead of disappearing (ADR-0276).
   `ci-<workflow>-<github.sha>` for a `push` and on `ci-<workflow>-<github.ref>` for every other event,
   so one `main` merge can never evict another's pending run. Pull requests keep `cancel-in-progress`,
   which is theirs alone.
-- **A superseded `main` push skips, green.** The `Superseded check` job runs
-  `scripts/ci-superseded.sh --check`; a push to `refs/heads/main` whose commit is a strict ancestor of
-  `main`'s current tip skips `Build, Test & Lint`, and the run ends successful with a `::notice` and a
+- **A superseded `main` push skips, green.** The `Superseded check` job runs on a `push` only
+  (ADR-0310) and calls `scripts/ci-superseded.sh --check`; a push to `refs/heads/main` whose commit
+  is a strict ancestor of `main`'s current tip skips `Build, Test & Lint`, and the run ends successful with a `::notice` and a
   job-summary line naming the tip. The tip's own run carries the verdict for a tree that contains the
   skipped commit.
 - **The decision fails open.** Anything but a confirmed `ahead` comparison builds — an unreadable tip,
@@ -3221,13 +3237,14 @@ says so instead of disappearing (ADR-0276).
   event, and `actionlint`, `zizmor` and `shellcheck` pass on the workflow and the script.
 - [ ] A burst of `main` merges leaves every commit's run either with a verdict or with a
   "skipped — superseded" summary, and none `cancelled`.
-- [ ] `Build, Test & Lint` still reports on every pull request and on every merge group, including one
-  whose `Superseded check` job failed.
+- [ ] `Build, Test & Lint` still reports on every pull request and on every merge group, where the
+  `Superseded check` job is skipped, and on a `main` push whose `Superseded check` job failed.
 
 **Enforced by:** `.github/workflows/ci.yml` (`concurrency`, the `supersede` job) ·
 `scripts/ci-superseded.sh` · `scripts/ci-superseded.test.sh` (`repo-lint.yml`, `Self-tests`) ·
 **Decision:**
-[ADR-0276](../adr/0276-every-main-push-gets-its-own-ci-run-and-a-superseded-one-skips.md) ·
+[ADR-0276](../adr/0276-every-main-push-gets-its-own-ci-run-and-a-superseded-one-skips.md),
+[ADR-0310](../adr/0310-the-superseded-check-runs-only-on-a-main-push.md) ·
 **Related:** REQ-OPS-044, ADR-0137
 
 ### REQ-OPS-050 — The testing system is seeded through its API and emptied by a database wipe

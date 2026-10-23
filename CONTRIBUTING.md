@@ -393,26 +393,25 @@ entry does no harm).
 - `refresh-versions.yml` changes no version and needs nothing; the PR that
   takes one of its proposals regenerates the file.
 
-The `main` ruleset makes five checks **required**: *Build, Test & Lint*
-([`ci.yml`](.github/workflows/ci.yml)), the two CodeQL *Analyze* jobs
-([`codeql.yml`](.github/workflows/codeql.yml)), *Verify Signed-off-by on
-every commit* ([`dco.yml`](.github/workflows/dco.yml)) and *Check
-migration version numbering*
-([`flyway-migrations.yml`](.github/workflows/flyway-migrations.yml)).
-Further PR checks run alongside (some only when their paths are
-touched) and are expected to pass:
-[`repo-lint.yml`](.github/workflows/repo-lint.yml) — four jobs by
+The `main` ruleset makes eight checks **required**: *Build, Test & Lint*
+([`ci.yml`](.github/workflows/ci.yml)), the two CodeQL jobs *Analyze
+(java-kotlin)* and *Analyze (actions, python, js)*
+([`codeql.yml`](.github/workflows/codeql.yml)), *Commit & repo gates*
+([`commit-gates.yml`](.github/workflows/commit-gates.yml): the Gradle
+wrapper checksum, the DCO sign-off of every commit, the gitleaks secret
+scan and the Flyway version numbering; gitleaks reads `.gitleaks.toml`
+from the **base** commit, so an allowlist change takes effect from the
+next PR on) and the four jobs of
+[`repo-lint.yml`](.github/workflows/repo-lint.yml), split by
 toolchain: *Linters* (shellcheck, actionlint, zizmor, hadolint),
 *Repository gates* (Quadlet drift, ADR numbering and registry, the cosign
 signer identity, image pins, dashboards, log masking, ansible-lint, …),
 *Self-tests* (the operational scripts' suites) and *Container checks*
 (Prometheus rules and config, Alertmanager, Alloy, Loki, the edge nginx,
 the Keycloak issuer). Every check is a step named `<check> / …` and runs
-even when an earlier one failed, so the job log lists every finding;
-[`gitleaks.yml`](.github/workflows/gitleaks.yml) (secret scan; on a PR
-it reads `.gitleaks.toml` from the **base** commit, so an allowlist
-change takes effect from the next PR on),
-[`wrapper-validation.yml`](.github/workflows/wrapper-validation.yml),
+even when an earlier one failed, so the job log lists every finding.
+Further PR checks run alongside (some only when their paths are
+touched) and are expected to pass:
 [`deploy-script.yml`](.github/workflows/deploy-script.yml) and
 [`keycloak-provisioner.yml`](.github/workflows/keycloak-provisioner.yml).
 [`cache-janitor.yml`](.github/workflows/cache-janitor.yml) is housekeeping,
@@ -519,7 +518,7 @@ CPE), `notes` saying why it is a false positive, and an `until` no more than six
 - Maintainers merge with a **merge commit** (the queue's merge method), so the commits of the branch stay on `main` as they were signed and signed off, under one merge commit per PR. Keep the commits of a branch meaningful, each with a Conventional Commit subject: they are what `git log` and the release notes show.
 - Do not force-push to a PR branch once review has started unless a reviewer asks you to; prefer additional commits. A PR no longer needs `main` merged into it to stay mergeable, so do not add *Merge origin/main* commits unless a real conflict requires it.
 - **`main` is advanced only through the GitHub merge queue** ([ADR-0246](docs/adr/0246-pull-requests-merge-through-a-merge-queue-not-the-strict-up-to-date-policy.md), `REQ-OPS-044`). Once the required checks pass on the PR head, `gh pr merge <number> --merge` (or the *Merge when ready* button) enqueues it. The queue builds `main` plus your PR and merges only if that combination is green, one PR per group, so there is no *Update branch* round and a PR is never `BEHIND`. Do not push to a queued PR: a push removes it from the queue. If a group fails, the PR leaves the queue; fix it and enqueue it again.
-- A workflow that must report in the queue triggers on `merge_group` and reads its base from `github.event.merge_group`, never from `github.base_ref` or `github.event.pull_request`. A new required check is added to `merge-group-shims.yml` under the same name unless it runs on `merge_group` itself; `e2e.yml` never gets a `merge_group` trigger.
+- A workflow that must report in the queue triggers on `merge_group` and reads its base from `github.event.merge_group`, never from `github.base_ref` or `github.event.pull_request`. Every required check runs on `merge_group` itself — there are no shim jobs that answer a context without checking ([ADR-0315](docs/adr/0315-the-small-required-gates-run-as-one-job-and-for-real-in-the-merge-group.md)); `e2e.yml` never gets a `merge_group` trigger.
 
 ---
 
@@ -656,13 +655,14 @@ Never force-push to `main` itself.
 
 ### Enforcement
 
-The [`.github/workflows/dco.yml`](.github/workflows/dco.yml) workflow
-runs on every pull request and verifies that every commit in the PR
-carries a `Signed-off-by` trailer whose name and email match the
-commit's author (case-insensitive on the email). Merge commits (two
-or more parents) and commits authored by well-known bots (Dependabot,
-refreshVersions, GitHub Actions, Renovate, the `basetool-release` App) are skipped; the exact bot
-addresses are the `bot_emails` list in the workflow.
+The `dco /` step of the *Commit & repo gates* job
+([`.github/workflows/commit-gates.yml`](.github/workflows/commit-gates.yml))
+runs on every pull request and in the merge queue and verifies that every
+commit in the PR carries a `Signed-off-by` trailer whose name and email
+match the commit's author (case-insensitive on the email). Merge commits
+(two or more parents) and commits authored by well-known bots (Dependabot,
+refreshVersions, GitHub Actions, Renovate, the `basetool-release` App) are
+skipped; the exact bot addresses are the `bot_emails` list in the workflow.
 
 If the check fails:
 

@@ -1,36 +1,70 @@
-name: DCO
+name: Commit Gates
 
 on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+    types: [checks_requested]
+  workflow_dispatch:
 
 permissions:
   contents: read
-  pull-requests: read
 
 concurrency:
-  group: dco-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: commit-gates-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  GITLEAKS_VERSION: 8.30.1
+  GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
 
 jobs:
-  check-signoff:
-    name: Verify Signed-off-by on every commit
+  gates:
+    name: Commit & repo gates
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
 
     steps:
-      - name: Checkout PR with full history
+      - name: Checkout with full history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
 
-      - name: Verify each commit carries a matching Signed-off-by trailer
+      - name: Resolve the commit range
+        id: range
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          GROUP_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+        run: |
+          set -euo pipefail
+          case "$EVENT_NAME" in
+            pull_request) base="$PR_BASE_SHA"; head="$PR_HEAD_SHA" ;;
+            merge_group) base="$GROUP_BASE_SHA"; head="$GROUP_HEAD_SHA" ;;
+            *) base=""; head="" ;;
+          esac
+          if [ -n "$base" ] && ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            echo "::error::the base commit ${base} is not in the checkout"
+            exit 1
+          fi
+          echo "base=${base}" >> "$GITHUB_OUTPUT"
+          echo "head=${head}" >> "$GITHUB_OUTPUT"
+          echo "range: ${base:-<none>}..${head:-<none>}"
+
+      - name: wrapper / Validate the Gradle wrapper JAR checksum
+        if: ${{ !cancelled() && steps.range.outcome == 'success' }}
+        uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6
+
+      - name: dco / Verify each commit carries a matching Signed-off-by trailer
+        if: ${{ !cancelled() && steps.range.outcome == 'success' && steps.range.outputs.base != '' }}
+        env:
+          BASE_SHA: ${{ steps.range.outputs.base }}
+          HEAD_SHA: ${{ steps.range.outputs.head }}
         shell: bash
         run: |
           set -euo pipefail
@@ -146,3 +180,59 @@ jobs:
 
           echo
           echo "All checked commits carry a matching Signed-off-by trailer."
+
+      - name: gitleaks / Install gitleaks
+        id: gitleaks-install
+        if: ${{ !cancelled() && steps.range.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          url="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL "$url" -o /tmp/gitleaks.tar.gz
+          echo "${GITLEAKS_SHA256}  /tmp/gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+          sudo install -m 0755 /tmp/gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: gitleaks / Scan for secrets
+        if: ${{ !cancelled() && steps.gitleaks-install.outcome == 'success' }}
+        env:
+          BASE_SHA: ${{ steps.range.outputs.base }}
+          HEAD_SHA: ${{ steps.range.outputs.head }}
+        run: |
+          set -euo pipefail
+          args=(git . --redact --no-banner --exit-code 1)
+          if [ -n "$BASE_SHA" ]; then
+            cfg="${RUNNER_TEMP}/gitleaks-base.toml"
+            if ! git show "${BASE_SHA}:.gitleaks.toml" > "$cfg"; then
+              echo "::error::could not read .gitleaks.toml at the base commit ${BASE_SHA}"
+              exit 1
+            fi
+            echo "gitleaks config: .gitleaks.toml at base ${BASE_SHA}"
+            args+=(--config "$cfg" --log-opts="--no-merges ${BASE_SHA}..${HEAD_SHA}")
+          else
+            echo "gitleaks config: .gitleaks.toml at the checked-out ref, whole history"
+            args+=(--config .gitleaks.toml)
+          fi
+          gitleaks "${args[@]}"
+
+      - name: flyway / Fetch the base branch tip
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: git fetch --no-tags origin "${BASE_REF}"
+
+      - name: flyway / Self-test the migration checker
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          chmod +x scripts/check-flyway-migrations.test.sh
+          scripts/check-flyway-migrations.test.sh
+
+      - name: flyway / Validate Flyway migration numbering
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          FLYWAY_BASE_REF: ${{ github.event.merge_group.base_sha || format('origin/{0}', github.base_ref) }}
+        run: |
+          chmod +x scripts/check-flyway-migrations.sh
+          scripts/check-flyway-migrations.sh

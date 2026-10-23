@@ -298,9 +298,9 @@ same anchored signer identity (REQ-OPS-015).
 **Everything above starts at a push to `main`, and `main` is advanced only by the GitHub merge
 queue** (REQ-OPS-044, ADR-0246): a `merge_queue` rule in the `main` ruleset merges one pull request
 (merge commit) per group after building `main` plus the pull request, so the strict up-to-date policy is off and a
-PR is never behind. The tree-dependent required checks and both CodeQL analyses (without an upload)
-run on the `merge_group` event; DCO and gitleaks are answered there by same-named shim jobs; the E2E
-suite never runs in a group. One PR per group keeps one merge commit per push, which the release and
+PR is never behind. Every required check runs on the `merge_group` event — both CodeQL analyses
+without an upload, and DCO and gitleaks over the group's commit range (ADR-0315); the E2E suite never
+runs in a group. One PR per group keeps one merge commit per push, which the release and
 image workflows inspect. The queue exists only while the repository is public.
 
 **The three app images come from one Dockerfile** (`docker/app/Dockerfile`, since 2026-09-23), with

@@ -1,0 +1,15 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: silent - the web frontend's refreshes are not an exchange client
+    interval: 30m
+    input_series:
+      - series: 'keycloak_user_events_total{job="keycloak", realm="iri", idp="", event="refresh_token", error="", client_id="basetool-frontend"}'
+        values: "0+5x336 1730+500x6"
+    alert_rule_test:
+      - eval_time: 170h
+        alertname: ExchangeClientTokenRequestSurge
+        exp_alerts: []
