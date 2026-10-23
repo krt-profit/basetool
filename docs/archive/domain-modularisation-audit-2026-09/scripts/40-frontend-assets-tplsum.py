@@ -4,8 +4,10 @@ from collections import Counter, defaultdict
 
 sys.stdout.reconfigure(encoding="utf-8")
 BASE = r"$SCRATCHPAD"
-tpl = json.load(open(BASE + r"\40-frontend-assets-tpl.json", encoding="utf-8"))
-js = json.load(open(BASE + r"\40-frontend-assets-jsast.json", encoding="utf-8"))["results"]
+with open(BASE + r"\40-frontend-assets-tpl.json", encoding="utf-8") as fh:
+    tpl = json.load(fh)
+with open(BASE + r"\40-frontend-assets-jsast.json", encoding="utf-8") as fh:
+    js = json.load(fh)["results"]
 mode = sys.argv[1] if len(sys.argv) > 1 else "totals"
 
 if mode == "totals":

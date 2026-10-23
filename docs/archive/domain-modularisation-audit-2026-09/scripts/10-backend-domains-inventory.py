@@ -5,7 +5,6 @@ Writes 10-backend-domains-inventory.json next to this script.
 import json
 import os
 import re
-import sys
 
 REPO = r"$REPO"
 SRC = os.path.join(REPO, "backend", "src", "main", "java")
@@ -89,4 +88,4 @@ def main():
     print(len(rows), "types written to", OUT)
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

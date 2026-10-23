@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderDto;
 import java.time.OffsetDateTime;
 import java.util.*;
@@ -60,5 +62,8 @@ public class RefineryOrderJsonTest {
     String json = mapper.writeValueAsString(orderDto);
 
     RefineryOrderDto dto = mapper.readValue(json, RefineryOrderDto.class);
+
+    assertThat(dto.durationMinutes()).isEqualTo(100L);
+    assertThat(dto.goods()).hasSize(1);
   }
 }

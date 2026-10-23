@@ -2,7 +2,6 @@
 import json
 import os
 import re
-import sys
 from collections import defaultdict
 
 REPO = r"$REPO"
@@ -34,4 +33,4 @@ def main():
     print("schema names with no same-named Java type:", len(unmatched), unmatched[:20])
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

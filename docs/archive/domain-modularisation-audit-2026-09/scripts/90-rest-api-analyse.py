@@ -2,7 +2,6 @@
 import csv
 import os
 import re
-import sys
 from collections import Counter, defaultdict
 
 OUT = r"$SCRATCHPAD"
@@ -205,4 +204,4 @@ def main():
             print("   ", p, sorted(c))
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

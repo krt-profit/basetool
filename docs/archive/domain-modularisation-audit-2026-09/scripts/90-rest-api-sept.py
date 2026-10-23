@@ -2,7 +2,6 @@
 import json
 import os
 import re
-import sys
 
 OUT = r"$SCRATCHPAD"
 KEYS = re.compile(r"openapi|OpenAPI|contract|Kontrakt|REQ-API|DTO|Dto|endpoint|Endpoint|problem|Problem|@Valid|@PreAuthorize|ApiDeprecation|Pageable|PageResponse|/api/v1|springdoc|allow-list|Allowlist|allowlist|vhost|Tag\b|slim", re.I)
@@ -23,4 +22,4 @@ def main():
         print("    note:", (str(f.get("note")) or "")[:200])
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

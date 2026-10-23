@@ -6,7 +6,6 @@ import collections
 import csv
 import json
 import os
-import sys
 
 REPO = r"$REPO"
 OUT = r"$SCRATCHPAD"
@@ -138,4 +137,4 @@ def main():
     print("ops with pageable object param", sum(1 for r in rows if "pageable" in r["query"].split("|")))
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

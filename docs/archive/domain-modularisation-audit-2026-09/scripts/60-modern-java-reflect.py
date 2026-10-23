@@ -31,7 +31,7 @@ for m, s, p, rel in L.iter_java():
     li = L.LineIndex(code)
     for mm in re.finditer(r"\bReflectionTestUtils\.setField\s*\(|\.setAccessible\s*\(\s*true|\bField\b[^;]*\.set\s*\(", code):
         if "setField" not in mm.group(0):
-            rows.append((rel, li.line(mm.start()), "raw-reflection", "?", "?", snippetx := re.sub(r"\s+", " ", code[mm.start():mm.start() + 90])))
+            rows.append((rel, li.line(mm.start()), "raw-reflection", "?", "?", re.sub(r"\s+", " ", code[mm.start():mm.start() + 90])))
             continue
         pc = L.match_close(code, code.index("(", mm.start()))
         args = L.split_top(code[code.index("(", mm.start()) + 1:pc])

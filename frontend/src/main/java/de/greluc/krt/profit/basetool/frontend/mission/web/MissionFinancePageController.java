@@ -160,7 +160,6 @@ public class MissionFinancePageController {
    *
    * @param id mission id (path)
    * @param entryId finance entry id (path)
-   * @param principal OIDC user
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /missions/{id}}
    */
@@ -169,7 +168,6 @@ public class MissionFinancePageController {
   public String deleteFinanceEntry(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID entryId,
-      @AuthenticationPrincipal OidcUser principal,
       RedirectAttributes redirectAttributes) {
     try {
       missionClient.deleteFinanceEntry(id, entryId);
@@ -191,15 +189,12 @@ public class MissionFinancePageController {
    * @param id mission id (path)
    * @param body finance-entry JSON ({@code participantId}, {@code note}, {@code type}, {@code
    *     amount}); {@code missionId} is taken from the path
-   * @param principal OIDC user; never {@code null} below the class-level floor
    * @return {@code 200} with the created entry, or the upstream RFC 7807 error passed through
    */
   @PostMapping(value = "/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
   public ResponseEntity<Object> addFinanceEntryAjax(
-      @PathVariable @NotNull UUID id,
-      @RequestBody MissionFinanceEntryCreateDto body,
-      @AuthenticationPrincipal OidcUser principal) {
+      @PathVariable @NotNull UUID id, @RequestBody MissionFinanceEntryCreateDto body) {
     return relay(
         log,
         "add finance entry (ajax) for mission " + id,

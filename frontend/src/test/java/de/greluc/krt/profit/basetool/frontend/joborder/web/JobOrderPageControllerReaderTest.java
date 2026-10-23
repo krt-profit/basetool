@@ -216,7 +216,7 @@ class JobOrderPageControllerReaderTest {
         .thenReturn(new JobOrderPageReader.OrderCreatePage(List.of(), false, List.of(), options));
     Model model = new ExtendedModelMap();
 
-    assertThat(controller.viewCreateForm(null, null, model)).isEqualTo("joborder/orders-create");
+    assertThat(controller.viewCreateForm(null, model)).isEqualTo("joborder/orders-create");
 
     assertThat(model.asMap())
         .containsEntry("hasOrderableItems", false)
@@ -230,7 +230,7 @@ class JobOrderPageControllerReaderTest {
         .thenReturn(new JobOrderPageReader.OrderCreatePage(List.of(), true, List.of(), List.of()));
     Model model = new ExtendedModelMap();
 
-    controller.viewCreateForm(null, null, model);
+    controller.viewCreateForm(null, model);
 
     assertThat(model.asMap())
         .containsEntry("materials", List.of())

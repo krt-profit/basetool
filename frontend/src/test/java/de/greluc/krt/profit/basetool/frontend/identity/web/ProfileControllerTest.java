@@ -413,7 +413,7 @@ class ProfileControllerTest {
 
     ProfileDescriptionForm form = new ProfileDescriptionForm("New desc", "New DN", 4L);
     ResponseEntity<Map<String, Object>> response =
-        controller.updateDescriptionAjax(form, bindingResult, principal);
+        controller.updateDescriptionAjax(form, bindingResult);
 
     assertEquals(200, response.getStatusCode().value());
     Map<String, Object> body = response.getBody();
@@ -435,7 +435,7 @@ class ProfileControllerTest {
 
     ProfileDescriptionForm form = new ProfileDescriptionForm("d", "n", 4L);
     ResponseEntity<Map<String, Object>> response =
-        controller.updateDescriptionAjax(form, bindingResult, principal);
+        controller.updateDescriptionAjax(form, bindingResult);
 
     assertNotNull(response.getBody());
     assertEquals(5L, response.getBody().get("version"));
@@ -456,7 +456,7 @@ class ProfileControllerTest {
 
     ProfileDescriptionForm form = new ProfileDescriptionForm("d", "n", 1L);
     ResponseEntity<Map<String, Object>> response =
-        controller.updateDescriptionAjax(form, bindingResult, principal);
+        controller.updateDescriptionAjax(form, bindingResult);
 
     assertEquals(409, response.getStatusCode().value());
     assertNotNull(response.getBody());
@@ -472,7 +472,7 @@ class ProfileControllerTest {
 
     ProfileDescriptionForm form = new ProfileDescriptionForm("x", "y", 1L);
     ResponseEntity<Map<String, Object>> response =
-        controller.updateDescriptionAjax(form, bindingResult, principal);
+        controller.updateDescriptionAjax(form, bindingResult);
 
     assertEquals(400, response.getStatusCode().value());
     assertNotNull(response.getBody());
@@ -566,7 +566,7 @@ class ProfileControllerTest {
 
     ProfilePayoutPreferenceForm form = new ProfilePayoutPreferenceForm(PayoutPreference.DONATE, 6L);
     ResponseEntity<Map<String, Object>> response =
-        controller.updatePayoutPreferenceAjax(form, bindingResult, principal);
+        controller.updatePayoutPreferenceAjax(form, bindingResult);
 
     assertEquals(200, response.getStatusCode().value());
     Map<String, Object> body = response.getBody();
@@ -598,7 +598,7 @@ class ProfileControllerTest {
 
     ProfilePayoutPreferenceForm form = new ProfilePayoutPreferenceForm(PayoutPreference.PAYOUT, 1L);
     ResponseEntity<Map<String, Object>> response =
-        controller.updatePayoutPreferenceAjax(form, bindingResult, principal);
+        controller.updatePayoutPreferenceAjax(form, bindingResult);
 
     assertEquals(409, response.getStatusCode().value());
     assertNotNull(response.getBody());
@@ -614,7 +614,7 @@ class ProfileControllerTest {
 
     ProfilePayoutPreferenceForm form = new ProfilePayoutPreferenceForm(PayoutPreference.PAYOUT, 1L);
     ResponseEntity<Map<String, Object>> response =
-        controller.updatePayoutPreferenceAjax(form, bindingResult, principal);
+        controller.updatePayoutPreferenceAjax(form, bindingResult);
 
     assertEquals(400, response.getStatusCode().value());
     assertNotNull(response.getBody());
@@ -651,7 +651,7 @@ class ProfileControllerTest {
 
     ProfileBlueprintSharingForm form = new ProfileBlueprintSharingForm(true, 8L);
     ResponseEntity<Map<String, Object>> response =
-        controller.updateBlueprintSharingAjax(form, bindingResult, principal);
+        controller.updateBlueprintSharingAjax(form, bindingResult);
 
     assertEquals(200, response.getStatusCode().value());
     Map<String, Object> body = response.getBody();
@@ -680,7 +680,7 @@ class ProfileControllerTest {
 
     ProfileBlueprintSharingForm form = new ProfileBlueprintSharingForm(false, 1L);
     ResponseEntity<Map<String, Object>> response =
-        controller.updateBlueprintSharingAjax(form, bindingResult, principal);
+        controller.updateBlueprintSharingAjax(form, bindingResult);
 
     assertEquals(409, response.getStatusCode().value());
     assertNotNull(response.getBody());

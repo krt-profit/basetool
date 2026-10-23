@@ -9,7 +9,8 @@ for dp, _, fns in os.walk(ROOT):
     for fn in fns:
         if fn.endswith(".java"):
             p = os.path.join(dp, fn)
-            files[p] = open(p, encoding="utf-8").read().split("\n")
+            with open(p, encoding="utf-8") as fh:
+                files[p] = fh.read().split("\n")
 
 cached = []
 for p, lines in files.items():

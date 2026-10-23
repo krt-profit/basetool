@@ -8,7 +8,6 @@ Such mappings lose their role gate if a re-cut moves them out of the URL rule's 
 import csv
 import os
 import re
-import sys
 from collections import Counter
 
 OUT = r"$SCRATCHPAD"
@@ -78,4 +77,4 @@ def main():
         print("   ", o[0], o[1].replace("/api/v1", ""), "| URL:", o[2], "|", o[4])
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

@@ -4,9 +4,12 @@ from collections import defaultdict, Counter
 
 sys.stdout.reconfigure(encoding="utf-8")
 BASE = r"$SCRATCHPAD"
-js = {r["file"]: r for r in json.load(open(BASE + r"\40-frontend-assets-jsast.json", encoding="utf-8"))["results"]}
-css = {r["file"]: r for r in json.load(open(BASE + r"\40-frontend-assets-css.json", encoding="utf-8"))["results"]}
-tpl = {r["file"]: r for r in json.load(open(BASE + r"\40-frontend-assets-tpl.json", encoding="utf-8"))}
+with open(BASE + r"\40-frontend-assets-jsast.json", encoding="utf-8") as fh:
+    js = {r["file"]: r for r in json.load(fh)["results"]}
+with open(BASE + r"\40-frontend-assets-css.json", encoding="utf-8") as fh:
+    css = {r["file"]: r for r in json.load(fh)["results"]}
+with open(BASE + r"\40-frontend-assets-tpl.json", encoding="utf-8") as fh:
+    tpl = {r["file"]: r for r in json.load(fh)}
 
 JS = {
     "core": "krt-client-error escape-html safe-url event-delegation common-handlers krt-modal krt-fetch krt-live-sync krt-user-search krt-catalog-search krt-searchable-select datetime-splitter scu-decimal-input inline-style-apply krt-filter-panel sidebar unsaved-changes toast autocomplete",

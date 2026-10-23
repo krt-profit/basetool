@@ -1184,9 +1184,8 @@ class JobOrderServiceTest {
   void unlinkMaterial_WhenJobOrderNotFound_ShouldThrowNotFound() {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.empty());
 
-    NotFoundException ex =
-        assertThrows(
-            NotFoundException.class, () -> jobOrderService.unlinkMaterial(orderId, materialId));
+    assertThrows(
+        NotFoundException.class, () -> jobOrderService.unlinkMaterial(orderId, materialId));
     verify(inventoryItemRepository, never())
         .deleteJobOrderAllocationsByJobOrderAndMaterial(any(), any());
   }
@@ -1196,10 +1195,8 @@ class JobOrderServiceTest {
     UUID otherMaterialId = UUID.randomUUID();
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
 
-    NotFoundException ex =
-        assertThrows(
-            NotFoundException.class,
-            () -> jobOrderService.unlinkMaterial(orderId, otherMaterialId));
+    assertThrows(
+        NotFoundException.class, () -> jobOrderService.unlinkMaterial(orderId, otherMaterialId));
     verify(inventoryItemRepository, never())
         .deleteJobOrderAllocationsByJobOrderAndMaterial(any(), any());
   }
@@ -1230,10 +1227,9 @@ class JobOrderServiceTest {
     UUID inventoryItemId = UUID.randomUUID();
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.empty());
 
-    NotFoundException ex =
-        assertThrows(
-            NotFoundException.class,
-            () -> jobOrderService.unlinkInventoryItem(orderId, inventoryItemId));
+    assertThrows(
+        NotFoundException.class,
+        () -> jobOrderService.unlinkInventoryItem(orderId, inventoryItemId));
     verify(inventoryItemRepository, never()).findById(any());
   }
 
@@ -1243,10 +1239,9 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(inventoryItemRepository.findById(inventoryItemId)).thenReturn(Optional.empty());
 
-    NotFoundException ex =
-        assertThrows(
-            NotFoundException.class,
-            () -> jobOrderService.unlinkInventoryItem(orderId, inventoryItemId));
+    assertThrows(
+        NotFoundException.class,
+        () -> jobOrderService.unlinkInventoryItem(orderId, inventoryItemId));
   }
 
   @Test
@@ -1265,10 +1260,9 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(inventoryItemRepository.findById(inventoryItemId)).thenReturn(Optional.of(item));
 
-    NotFoundException ex =
-        assertThrows(
-            NotFoundException.class,
-            () -> jobOrderService.unlinkInventoryItem(orderId, inventoryItemId));
+    assertThrows(
+        NotFoundException.class,
+        () -> jobOrderService.unlinkInventoryItem(orderId, inventoryItemId));
   }
 
   @Test

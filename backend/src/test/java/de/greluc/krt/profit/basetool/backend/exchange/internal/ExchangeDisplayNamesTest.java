@@ -45,17 +45,17 @@ class ExchangeDisplayNamesTest {
   @ParameterizedTest
   @ValueSource(
       strings = {
-        "Verse‮Kit",
-        "Verse​Kit",
-        "Verse⁦Kit⁩",
-        "Verse­Kit",
+        "Verse\u202eKit",
+        "Verse\u200bKit",
+        "Verse\u2066Kit\u2069",
+        "Verse\u00adKit",
         "ВerseKit",
         "ＶerseKit",
         "VerseKit 🚀",
         "Verse\tKit",
         "-VerseKit",
         "Verse<Kit>",
-        "Verse Kit"
+        "Verse\u00a0Kit"
       })
   void aControlFormatForeignScriptOrOddCharacterIsRefused(String name) {
     assertThat(ExchangeDisplayNames.violation(name)).contains(ExchangeDisplayNames.INVALID);

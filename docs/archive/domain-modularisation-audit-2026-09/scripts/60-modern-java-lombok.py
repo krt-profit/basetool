@@ -19,7 +19,6 @@ for m, s, p, rel in L.iter_java():
     src = L.read(p)
     code, _st, _cm = L.lex(src)
     imports = set(re.findall(r"(?m)^\s*import\s+([\w.]+)\s*;", code))
-    lombok_star = "lombok" in {i.rsplit(".", 1)[0] for i in imports}
     for mt in TYPE_RE.finditer(code):
         if mt.group(1) != "class":
             continue

@@ -9,7 +9,6 @@ import csv
 import json
 import os
 import re
-import sys
 from collections import Counter, defaultdict
 
 REPO = r"$REPO"
@@ -183,7 +182,6 @@ def mapping_info(name, args, cls):
         if m:
             raw = m.group(1)
         elif "=" not in a.split(",")[0]:
-            raw = a
             if a.startswith("{"):
                 raw = a[:balanced(a, 0, "{", "}")]
             else:
@@ -312,7 +310,6 @@ def parse_file(path):
                     name = mm.group(2)
                     ret = " ".join(mm.group(1).split())
                     ret = re.sub(r"^(public|protected|private|static|final|synchronized|default|abstract|\s)+", "", ret).strip()
-                    open_idx = decl_start + buf.find(name + "(", 0) + len(name) if (name + "(") in buf else None
                     pstart = buf.find("(", buf.find(" " + name) if (" " + name) in buf else 0)
                     pend = balanced(buf, pstart)
                     ptext = buf[pstart + 1:pend - 1]
@@ -495,4 +492,4 @@ def main():
         json.dump([{k: v for k, v in c.items() if k != "methods"} for c in classes], fh, indent=1)
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

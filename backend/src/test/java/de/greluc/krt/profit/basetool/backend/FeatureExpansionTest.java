@@ -330,20 +330,12 @@ class FeatureExpansionTest {
     MissionParticipant participant = new MissionParticipant();
     participant.setMission(mission);
     participant.setUser(normalUser);
-    participant = missionParticipantRepository.save(participant);
+    missionParticipantRepository.save(participant);
 
     MissionParticipant otherParticipant = new MissionParticipant();
     otherParticipant.setMission(mission);
     otherParticipant.setUser(otherUser);
     otherParticipant = missionParticipantRepository.save(otherParticipant);
-
-    de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryCreateDto req =
-        new de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryCreateDto(
-            mission.getId(),
-            participant.getId(),
-            "Fuel",
-            FinanceType.EXPENSE,
-            new BigDecimal("50.00"));
 
     de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryCreateDto reqOther =
         new de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryCreateDto(

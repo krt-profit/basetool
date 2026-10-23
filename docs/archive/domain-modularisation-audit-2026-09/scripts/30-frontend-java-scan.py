@@ -7,7 +7,6 @@ of every BackendApiClient call site. Nothing in the repository is modified.
 import json
 import os
 import re
-import sys
 from collections import Counter, defaultdict
 
 REPO = r"$REPO"
@@ -268,7 +267,6 @@ def main():
             }
             cls_mapping = re.search(r'^@RequestMapping\(\s*(?:value\s*=\s*|path\s*=\s*)?\{?\s*"([^"]*)"', src, re.M)
             handler_count = 0
-            handler_pre = 0
             response_body = 0
             for hm in re.finditer(r"^\s+@(Get|Post|Put|Patch|Delete|Request)Mapping\b", src, re.M):
                 handler_count += 1
@@ -335,4 +333,4 @@ def main():
     print("methods", Counter(c["method"] for c in calls).most_common())
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

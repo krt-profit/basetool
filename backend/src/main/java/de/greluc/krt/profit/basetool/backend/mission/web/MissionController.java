@@ -1091,7 +1091,6 @@ public class MissionController {
    *
    * @param id mission id
    * @param participantId participant id
-   * @param authentication current Spring Security authentication
    * @return 204 No Content
    */
   @DeleteMapping("/{id}/participants/{participantId}")
@@ -1100,9 +1099,7 @@ public class MissionController {
       summary = "Remove a participant (slim response)",
       description = "Removes a participant and returns 204 No Content.")
   public ResponseEntity<Void> removeParticipantSlim(
-      @PathVariable @NotNull UUID id,
-      @PathVariable @NotNull UUID participantId,
-      Authentication authentication) {
+      @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID participantId) {
     missionParticipantService.removeParticipant(id, participantId);
     return ResponseEntity.noContent().build();
   }

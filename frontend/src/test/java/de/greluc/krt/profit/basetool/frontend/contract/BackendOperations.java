@@ -61,7 +61,7 @@ final class BackendOperations {
    */
   @NotNull
   static BackendOperations of(@NotNull JsonNode openApi) {
-    return of(openApi, operation -> true);
+    return of(openApi, _ -> true);
   }
 
   /**

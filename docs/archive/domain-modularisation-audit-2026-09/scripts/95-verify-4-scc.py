@@ -8,7 +8,6 @@ import csv
 import itertools
 import os
 import re
-import sys
 from collections import Counter, defaultdict
 
 HERE = os.path.dirname(os.path.abspath(__file__))

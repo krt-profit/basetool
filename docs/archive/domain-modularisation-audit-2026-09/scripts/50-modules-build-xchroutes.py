@@ -18,7 +18,8 @@ rows = []
 for f in sorted(os.listdir(ROOT)):
     if not f.endswith(".java"):
         continue
-    src = open(os.path.join(ROOT, f), encoding="utf-8").read()
+    with open(os.path.join(ROOT, f), encoding="utf-8") as fh:
+        src = fh.read()
     cm = CLASS_MAP.search(src)
     base = cm.group(1) if cm else ""
     cp = CLASS_PRE.search(src)

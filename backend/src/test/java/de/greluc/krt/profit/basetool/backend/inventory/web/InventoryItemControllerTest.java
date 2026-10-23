@@ -332,8 +332,6 @@ class InventoryItemControllerTest {
     UUID ownerId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
-    UUID jobOrderId = UUID.randomUUID();
-    UUID missionId = UUID.randomUUID();
     UUID owningOrgUnitId = UUID.randomUUID();
     InventoryItemDto dto = inventoryItem(UUID.randomUUID());
     Page<InventoryItemDto> page = new PageImpl<>(List.of(dto), PageRequest.of(0, 100), 1);

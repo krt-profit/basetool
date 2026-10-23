@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import org.junit.jupiter.api.Test;
 import org.springframework.expression.ExpressionParser;
@@ -35,9 +37,9 @@ public class JacksonRecordTest {
     JsonMapper mapper = JsonMapper.builder().build();
     String json = mapper.writeValueAsString(dto);
 
+    assertThat(json).contains("\"isVolatileQt\":true").contains("\"isIllegal\":true");
     ExpressionParser parser = new SpelExpressionParser();
-    Boolean isVolatileQt = parser.parseExpression("isVolatileQt").getValue(dto, Boolean.class);
-
-    Boolean isIllegal = parser.parseExpression("isIllegal").getValue(dto, Boolean.class);
+    assertThat(parser.parseExpression("isVolatileQt").getValue(dto, Boolean.class)).isTrue();
+    assertThat(parser.parseExpression("isIllegal").getValue(dto, Boolean.class)).isTrue();
   }
 }

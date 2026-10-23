@@ -22,7 +22,8 @@ ungated = []
 expr = Counter()
 per_class = {}
 for f in sorted(os.listdir(CTRL)):
-    src = scanmod.strip_comments(open(os.path.join(CTRL, f), encoding="utf-8").read())
+    with open(os.path.join(CTRL, f), encoding="utf-8") as fh:
+        src = scanmod.strip_comments(fh.read())
     if not re.search(r"^@(Rest)?Controller\b", src, re.M):
         continue
     cls = f[:-5]

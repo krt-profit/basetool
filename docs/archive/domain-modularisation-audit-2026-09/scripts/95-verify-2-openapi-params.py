@@ -3,7 +3,8 @@ import re
 from collections import Counter
 
 REPO = r"$REPO"
-doc = json.load(open(REPO + r"\backend\src\main\resources\api\openapi.json", encoding="utf-8"))
+with open(REPO + r"\backend\src\main\resources\api\openapi.json", encoding="utf-8") as fh:
+    doc = json.load(fh)
 METHODS = ("get", "put", "post", "delete", "patch", "head", "options", "trace")
 ops = 0
 nonuuid = Counter()

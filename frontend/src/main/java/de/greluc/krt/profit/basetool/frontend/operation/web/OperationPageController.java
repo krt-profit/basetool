@@ -62,8 +62,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -122,7 +120,6 @@ public class OperationPageController {
    * @param size page size (default 20)
    * @param fragment when equal to {@code "results"}, render only the results fragment
    * @param model Thymeleaf model populated with the page content and metadata
-   * @param principal current OIDC user
    * @return the {@code operations-index} view name, or the results fragment for AJAX
    */
   @NotNull
@@ -138,8 +135,7 @@ public class OperationPageController {
       @RequestParam(required = false, defaultValue = "0") Integer page,
       @RequestParam(required = false, defaultValue = "20") Integer size,
       @RequestParam(required = false) String fragment,
-      Model model,
-      @AuthenticationPrincipal OidcUser principal) {
+      Model model) {
     String knownPeriod = RelayParams.oneOfOrNull(period, OPERATION_PERIODS);
     String effectivePeriod = knownPeriod != null ? knownPeriod : showPast ? "ALL" : "UPCOMING";
     model.addAttribute("showPast", !"UPCOMING".equals(effectivePeriod));

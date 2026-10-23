@@ -20,7 +20,7 @@ else:
     base = os.path.join(ROOT, "templates")
     exts = (".html",)
 
-TRIVIAL = re.compile(r"^[\s{}()\[\];,)]*$|^(\}\s*else\s*\{|\}\);?|\}\)\(\);?|return;|break;|continue;|\*/|/\*\*|\*|</?div>|</?th:block>|</?td>|</?tr>|</?span>|</?p>|</?li>|</?ul>|</?form>|</?section>|</?template>)$")
+TRIVIAL = re.compile(r"^[\s{}()\[\];,]*$|^(\}\s*else\s*\{|\}\);?|\}\)\(\);?|return;|break;|continue;|\*/|/\*\*|\*|</?div>|</?th:block>|</?td>|</?tr>|</?span>|</?p>|</?li>|</?ul>|</?form>|</?section>|</?template>)$")
 
 files = []
 for dp, dn, fn in os.walk(base):
@@ -32,7 +32,8 @@ files.sort()
 norm_lines = {}
 for p in files:
     rel = os.path.relpath(p, base).replace("\\", "/")
-    raw = open(p, encoding="utf-8").read().split("\n")
+    with open(p, encoding="utf-8") as fh:
+        raw = fh.read().split("\n")
     seq = []
     in_license = False
     for i, line in enumerate(raw):
@@ -59,7 +60,6 @@ pair_lines = defaultdict(set)
 for h, occ in windows.items():
     if len(occ) < 2:
         continue
-    files_in = set(o[0] for o in occ)
     for rel, j in occ:
         others = [o for o in occ if o != (rel, j) and not (o[0] == rel and abs(o[1] - j) < K)]
         if not others:

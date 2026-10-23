@@ -78,6 +78,7 @@ public class InventoryItem extends AbstractEntity<UUID> implements StockRow {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
+  @Getter(onMethod_ = @__(@Override))
   @ManyToOne(optional = false, fetch = FetchType.LAZY)
   @JoinColumn(name = "user_id", nullable = false)
   @ToString.Exclude
@@ -88,6 +89,7 @@ public class InventoryItem extends AbstractEntity<UUID> implements StockRow {
    * optional = true} is load-bearing: it keeps Hibernate from turning implicit joins on {@code
    * i.material} into inner joins that drop game-item rows.
    */
+  @Getter(onMethod_ = @__(@Override))
   @ManyToOne(optional = true, fetch = FetchType.LAZY)
   @JoinColumn(name = "material_id", nullable = true)
   @ToString.Exclude
@@ -100,12 +102,14 @@ public class InventoryItem extends AbstractEntity<UUID> implements StockRow {
    * whole-unit amounts; they follow the PIECE auto-merge rule of REQ-INV-026 and may be allocated
    * only to ITEM job orders requesting this game item (REQ-INV-031).
    */
+  @Getter(onMethod_ = @__(@Override))
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "game_item_id", nullable = true)
   @ToString.Exclude
   @Nullable
   private GameItem gameItem;
 
+  @Getter(onMethod_ = @__(@Override))
   @ManyToOne(optional = false, fetch = FetchType.LAZY)
   @JoinColumn(name = "location_id", nullable = false)
   @ToString.Exclude
@@ -116,16 +120,19 @@ public class InventoryItem extends AbstractEntity<UUID> implements StockRow {
    * no quality dimension, REQ-INV-029). The pairing is DB-enforced via {@code
    * chk_inventory_item_quality_by_kind} (V220).
    */
+  @Getter(onMethod_ = @__(@Override))
   @QualityValue
   @Column(nullable = true)
   @Nullable
   private Integer quality;
 
+  @Getter(onMethod_ = @__(@Override))
   @Min(0)
   @Column(nullable = false)
   @Setter(onParam_ = @__(@Nullable))
   private Double amount;
 
+  @Getter(onMethod_ = @__(@Override))
   @Column(nullable = false)
   private Boolean personal = false;
 
@@ -133,6 +140,7 @@ public class InventoryItem extends AbstractEntity<UUID> implements StockRow {
    * Whether this stock is marked „gestohlen" (stolen cargo); part of the stock identity, so a
    * stolen and a legitimate row never share a stack or merge (REQ-INV-053).
    */
+  @Getter(onMethod_ = @__(@Override))
   @Column(nullable = false)
   private Boolean stolen = false;
 
@@ -210,6 +218,7 @@ public class InventoryItem extends AbstractEntity<UUID> implements StockRow {
    * personal item visible only to its {@link #user} (and admins). Stamped via {@code
    * OwnerScopeService.resolveOrgUnitForPickerOutputNullable}.
    */
+  @Getter(onMethod_ = @__(@Override))
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owning_org_unit_id", nullable = true)
   @ToString.Exclude

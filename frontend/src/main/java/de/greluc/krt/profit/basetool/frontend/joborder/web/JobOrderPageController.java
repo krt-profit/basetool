@@ -408,16 +408,12 @@ public class JobOrderPageController {
    * catalogs and both owner-pickers (ADR-0149).
    *
    * @param source optional origin marker for the post-save redirect
-   * @param principal the caller
    * @param model Thymeleaf model populated with form and reference catalogs
    * @return the {@code order-create} view name
    */
   @NotNull
   @GetMapping("/create")
-  public String viewCreateForm(
-      @RequestParam(required = false) String source,
-      @AuthenticationPrincipal OidcUser principal,
-      Model model) {
+  public String viewCreateForm(@RequestParam(required = false) String source, Model model) {
     if (!model.containsAttribute("jobOrderForm")) {
       JobOrderForm form = new JobOrderForm();
       form.setSource(source);

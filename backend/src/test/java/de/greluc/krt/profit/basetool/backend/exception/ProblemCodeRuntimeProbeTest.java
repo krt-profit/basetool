@@ -27,6 +27,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import de.greluc.krt.profit.basetool.backend.kernel.CoreProblemCode;
 import de.greluc.krt.profit.basetool.backend.platform.api.CorrelationIdFilter;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -98,14 +99,15 @@ class ProblemCodeRuntimeProbeTest {
     }
 
     assertThat(refused).as("the per-subject export budget never refused").isNotNull();
-    JsonNode body = new ObjectMapper().readTree(refused.getContentAsString());
+    MockHttpServletResponse refusal = Objects.requireNonNull(refused);
+    JsonNode body = new ObjectMapper().readTree(refusal.getContentAsString());
     assertThat(body.path("code").asString()).isEqualTo(CoreProblemCode.RATE_LIMIT_EXCEEDED.code());
-    assertThat(refused.getHeader("X-Correlation-Id")).isNotBlank();
+    assertThat(refusal.getHeader("X-Correlation-Id")).isNotBlank();
     assertThat(body.path("correlationId").asString(null))
-        .isEqualTo(refused.getHeader("X-Correlation-Id"));
-    assertThat(refused.getHeader(HttpHeaders.RETRY_AFTER))
+        .isEqualTo(refusal.getHeader("X-Correlation-Id"));
+    assertThat(refusal.getHeader(HttpHeaders.RETRY_AFTER))
         .isNotBlank()
-        .isEqualTo(refused.getHeader("X-Rate-Limit-Retry-After-Seconds"));
+        .isEqualTo(refusal.getHeader("X-Rate-Limit-Retry-After-Seconds"));
   }
 
   /**

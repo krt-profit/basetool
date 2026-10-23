@@ -16,7 +16,8 @@ CONTRACT_SRC = REPO + r"\backend\src\test\java\de\greluc\krt\profit\basetool\bac
 SAMPLE_UUID = "00000000-0000-4000-8000-000000000000"
 METHODS = ("get", "put", "post", "delete", "patch")
 
-lines = open(CONF, encoding="utf-8").read().splitlines()
+with open(CONF, encoding="utf-8") as fh:
+    lines = fh.read().splitlines()
 adm, resets, putonly = [], [], []
 family = None
 rule_re = re.compile(r'^\s*if\s*\(\s*\$uri\s*(=|~\*?)\s*"([^"]+)"\s*\)\s*\{\s*set\s+\$(\w+)\s+"?([^";]*)"?\s*;\s*\}\s*$')
@@ -60,7 +61,8 @@ def edge(method, uri):
         return 405, hits
     return 200, hits
 
-doc = json.load(open(OPENAPI, encoding="utf-8"))
+with open(OPENAPI, encoding="utf-8") as fh:
+    doc = json.load(fh)
 CANDIDATES = {
     "enabled": ["true", "false"],
     "roleCode": ["KOMMANDOLEITER"],
@@ -95,7 +97,8 @@ for path, item in doc["paths"].items():
         passed = [o for o in outcomes if o[1] == 200]
         documented[(m.upper(), path)] = (outcomes, passed)
 
-src = open(CONTRACT_SRC, encoding="utf-8").read()
+with open(CONTRACT_SRC, encoding="utf-8") as fh:
+    src = fh.read()
 contract = set((m.upper(), p) for p, m in re.findall(r'new ContractOperation\(\s*"([^"]+)"\s*,\s*"([a-z]+)"', src))
 print("contract operations parsed:", len(contract))
 missing_doc = sorted(contract - set(documented))

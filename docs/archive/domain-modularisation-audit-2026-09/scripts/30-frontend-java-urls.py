@@ -10,8 +10,10 @@ from collections import Counter, defaultdict
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 HERE = os.path.dirname(os.path.abspath(__file__))
-scan = json.load(open(os.path.join(HERE, "30-frontend-java-scan.json"), encoding="utf-8"))
-dmap = json.load(open(os.path.join(HERE, "30-frontend-java-domainmap.json"), encoding="utf-8"))["domain_map"]
+with open(os.path.join(HERE, "30-frontend-java-scan.json"), encoding="utf-8") as fh:
+    scan = json.load(fh)
+with open(os.path.join(HERE, "30-frontend-java-domainmap.json"), encoding="utf-8") as fh:
+    dmap = json.load(fh)["domain_map"]
 sys.path.insert(0, HERE)
 scanmod = __import__("30-frontend-java-scan")
 
@@ -55,7 +57,8 @@ unknown = Counter()
 for c in scan["classes"]:
     key = c["package"] + "." + c["name"]
     path = os.path.join(ROOT, c["file"].replace("/", os.sep))
-    src = scanmod.strip_comments(open(path, encoding="utf-8").read())
+    with open(path, encoding="utf-8") as fh:
+        src = scanmod.strip_comments(fh.read())
     segs = Counter()
     for p in API_LIT.findall(src):
         s = seg(p)

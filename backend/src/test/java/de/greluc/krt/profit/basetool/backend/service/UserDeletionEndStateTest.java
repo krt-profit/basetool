@@ -462,7 +462,7 @@ class UserDeletionEndStateTest {
       order.setExpenses(100.0);
       seeded.refineryOrders.add(refineryOrderRepository.save(order).getId());
     }
-    UUID orderId = joborder(tag, owner).getId();
+    UUID orderId = joborder(tag).getId();
     entityManager.flush();
     jdbc.update(
         "INSERT INTO job_order_assignees (id, job_order_id, user_id) VALUES (?, ?, ?)",
@@ -472,7 +472,7 @@ class UserDeletionEndStateTest {
     return seeded;
   }
 
-  private JobOrder joborder(String tag, User owner) {
+  private JobOrder joborder(String tag) {
     String unique = UUID.randomUUID().toString().substring(0, 8);
     SpecialCommand sk = new SpecialCommand();
     sk.setName("End-SK-" + tag + "-" + unique);
@@ -513,7 +513,7 @@ class UserDeletionEndStateTest {
   }
 
   private UUID claim(User leaver, String tag) {
-    JobOrder order = joborder("c-" + tag, leaver);
+    JobOrder order = joborder("c-" + tag);
     QualityTier good = qualityTierRepository.findByCode("GOOD").orElseThrow();
     return materialClaimRepository
         .save(

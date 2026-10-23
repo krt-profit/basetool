@@ -17,20 +17,15 @@ class DpopKey(Protocol):
 
     def public_jwk(self) -> dict[str, str]:
         """Returns the public key as a JWK with ``kty``, ``crv``, ``x`` and ``y`` only."""
-        ...
 
     def thumbprint(self) -> str:
         """Returns the RFC 7638 thumbprint of the public key, the installation's identity."""
-        ...
 
     def sign(self, data: bytes) -> bytes:
         """Signs ``data`` with ES256 and returns the 64-byte ``r || s`` signature."""
-        ...
 
     def verify(self, data: bytes, signature: bytes) -> bool:
         """Checks an ES256 ``r || s`` signature over ``data`` with this key's public half."""
-        ...
 
     def close(self) -> None:
         """Releases the backend's handles; the stored key is kept."""
-        ...

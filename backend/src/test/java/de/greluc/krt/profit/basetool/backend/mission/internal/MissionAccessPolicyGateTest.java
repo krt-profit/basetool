@@ -359,12 +359,10 @@ class MissionAccessPolicyGateTest {
     UUID participantId = UUID.randomUUID();
     when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.empty());
 
-    NotFoundException ex =
-        assertThrows(
-            NotFoundException.class,
-            () ->
-                missionAccessPolicy.canAccessLoadedParticipant(
-                    mission, participantId, authentication));
+    assertThrows(
+        NotFoundException.class,
+        () ->
+            missionAccessPolicy.canAccessLoadedParticipant(mission, participantId, authentication));
   }
 
   @Test

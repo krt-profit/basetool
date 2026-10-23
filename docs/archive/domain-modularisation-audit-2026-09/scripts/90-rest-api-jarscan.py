@@ -1,6 +1,5 @@
 """Find which classes of a jar contain given byte strings (used to locate ArchUnit's failOnEmptyShould default)."""
 import os
-import sys
 import zipfile
 
 JAR_ROOT = os.path.expanduser(r"~/.gradle/caches/modules-2/files-2.1/com.tngtech.archunit/archunit/1.5.1")
@@ -23,4 +22,4 @@ def main():
                 print(n, hits)
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

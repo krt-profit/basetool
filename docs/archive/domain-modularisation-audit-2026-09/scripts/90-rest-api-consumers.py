@@ -10,7 +10,6 @@ import csv
 import json
 import os
 import re
-import sys
 from collections import Counter, defaultdict
 
 REPO = r"$REPO"
@@ -176,4 +175,4 @@ def main():
             w.writerow([k[0], k[1], by_op[k]["class"], "|".join(v)])
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

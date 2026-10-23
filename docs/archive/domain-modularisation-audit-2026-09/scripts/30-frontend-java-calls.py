@@ -2,11 +2,11 @@
 
 import json
 import os
-import re
 from collections import Counter, defaultdict
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-data = json.load(open(os.path.join(HERE, "30-frontend-java-scan.json"), encoding="utf-8"))
+with open(os.path.join(HERE, "30-frontend-java-scan.json"), encoding="utf-8") as fh:
+    data = json.load(fh)
 calls = data["calls"]
 
 HTTP = {"get", "post", "put", "delete", "patch", "getCached", "getTermsDocumentAnonymously"}
@@ -58,5 +58,5 @@ for c in http_calls:
 per_file = defaultdict(Counter)
 for c in http_calls:
     per_file[c["file"]][style(c)] += 1
-json.dump({k: dict(v) for k, v in per_file.items()},
-          open(os.path.join(HERE, "30-frontend-java-callstyles.json"), "w"), indent=1)
+with open(os.path.join(HERE, "30-frontend-java-callstyles.json"), "w") as fh:
+    json.dump({k: dict(v) for k, v in per_file.items()}, fh, indent=1)

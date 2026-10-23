@@ -91,10 +91,14 @@ final class ExchangeE2eSupport {
    *
    * @param seeder the backend seeder
    * @param members the member accounts and their passwords, alternating
+   * @throws IllegalArgumentException when an account comes without its password
    */
   static void prepare(BackendSeeder seeder, String... members) {
+    if (members.length % 2 != 0) {
+      throw new IllegalArgumentException("members must alternate accounts and passwords");
+    }
     seeder.seedSql("/exchange-e2e-seed.sql");
-    for (int i = 0; i < members.length; i += 2) {
+    for (int i = 0; i + 1 < members.length; i += 2) {
       String memberId = seeder.getUserId(members[i], members[i + 1]);
       seeder.assignStaffelMembership(
           ADMIN, ADMIN_PASSWORD, memberId, IRIDIUM_SQUADRON_ID, false, false);

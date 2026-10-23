@@ -7,7 +7,8 @@ import sys
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 HERE = os.path.dirname(os.path.abspath(__file__))
-data = json.load(open(os.path.join(HERE, "30-frontend-java-scan.json"), encoding="utf-8"))
+with open(os.path.join(HERE, "30-frontend-java-scan.json"), encoding="utf-8") as fh:
+    data = json.load(fh)
 for c in sorted(data["classes"], key=lambda x: x["name"]):
     if c["package"] != "controller":
         continue

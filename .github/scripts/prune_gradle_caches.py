@@ -17,6 +17,7 @@ import json
 import re
 import sys
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 HOME_PREFIX = "gradle-home-"
 SHA_SUFFIX = re.compile(r"-[0-9a-f]{40}$")
@@ -109,7 +110,7 @@ def main() -> int:
     args = parser.parse_args()
     if args.selftest:
         return selftest()
-    raw = open(args.listing, encoding="utf-8").read() if args.listing else sys.stdin.read()
+    raw = Path(args.listing).read_text(encoding="utf-8") if args.listing else sys.stdin.read()
     keep, delete = plan(json.loads(raw), datetime.now(UTC))
     for entry in keep:
         print(f"keep   {entry['key']}", file=sys.stderr)

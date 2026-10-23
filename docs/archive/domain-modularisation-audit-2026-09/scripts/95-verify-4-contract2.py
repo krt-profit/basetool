@@ -5,13 +5,15 @@ import os
 REPO = r"$REPO"
 OAS = os.path.join(REPO, r"backend\src\main\resources\api\openapi.json")
 FROZEN = os.path.join(REPO, r"backend\src\test\resources\api\frozen-contract-types.txt")
-doc = json.load(open(OAS, encoding="utf-8"))
+with open(OAS, encoding="utf-8") as fh:
+    doc = json.load(fh)
 schemas = doc["components"]["schemas"]
 frozen = set()
-for ln in open(FROZEN, encoding="utf-8"):
-    ln = ln.strip()
-    if ln and "." in ln.split("=", 1)[0]:
-        frozen.add(ln.split(".", 1)[0])
+with open(FROZEN, encoding="utf-8") as fh:
+    for ln in fh:
+        ln = ln.strip()
+        if ln and "." in ln.split("=", 1)[0]:
+            frozen.add(ln.split(".", 1)[0])
 
 def refs(node, out):
     if isinstance(node, dict):
