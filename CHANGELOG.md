@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [v1.19.9](https://github.com/krt-profit/basetool/releases/tag/v1.19.9) - 2026-10-23
+
+### Changed
+
+- **Alloy-Pin auf v1.21.0.** Der Compose-Pin folgt dem Host-Paket, das auf Produktion bereits v1.21.0
+  ausführt; die Konfiguration bleibt unverändert und ist gegen das neue Image geprüft.
+
+- **Betrieb.** Der Server prüft auf neue Versionen jetzt fest zu jeder vollen fünften Minute
+  (:00, :05, :10 …) statt zu wandernden Zeitpunkten. Damit ist vorhersehbar, wann ein freigegebenes
+  Update spätestens ankommt.
+
 ## [v1.19.8](https://github.com/krt-profit/basetool/releases/tag/v1.19.8) - 2026-10-23
 
 ## [v1.19.7](https://github.com/krt-profit/basetool/releases/tag/v1.19.7) - 2026-10-23
