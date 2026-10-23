@@ -352,7 +352,7 @@ export async function toggleInventory(row) {
     }
 
     const detailsRow = document.createElement('tr');
-    detailsRow.classList.add('inventory-details-row');
+    detailsRow.classList.add('inventory-details-row', 'detail-row');
     krtHtml.set(
         detailsRow,
         krtHtml`

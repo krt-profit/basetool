@@ -583,12 +583,12 @@
             color 0.2s ease;
     }
 
-    tbody tr:nth-child(even) {
+    tbody tr:nth-child(even of :not([hidden], .detail-row)) {
         background-color: color-mix(in srgb, var(--color-white) 2%, transparent);
     }
 
     tbody tr:hover,
-    tbody tr:nth-child(even):hover {
+    tbody tr:nth-child(even of :not([hidden], .detail-row)):hover {
         background-color: var(--control-bg);
     }
 

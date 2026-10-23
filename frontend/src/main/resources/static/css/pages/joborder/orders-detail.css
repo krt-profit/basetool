@@ -100,6 +100,9 @@
     .od-table {
         margin-top: 0;
     }
+    .tab-panes .data-table {
+        background-color: var(--surface-inset);
+    }
     .od-table > tbody > tr:not(.inventory-details-row, .od-prod-demand-row) > td:first-child {
         color: var(--color-white);
         font-weight: var(--fw-bold);
@@ -156,6 +159,9 @@
         margin-top: var(--space-2);
     }
 
+    .od-progress-cell {
+        white-space: nowrap;
+    }
     .mini-bar {
         display: inline-flex;
         vertical-align: middle;
