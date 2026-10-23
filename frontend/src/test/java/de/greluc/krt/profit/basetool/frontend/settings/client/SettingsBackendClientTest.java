@@ -45,7 +45,7 @@ class SettingsBackendClientTest {
 
   @Test
   void everySettingIsReadAndWrittenAtItsOwnKey() {
-    for (SystemSetting _ : SystemSetting.values()) {
+    for (int i = 0; i < SystemSetting.values().length; i++) {
       backend.answerJson("{}");
       backend.answerJson("{}");
     }
