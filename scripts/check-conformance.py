@@ -1491,6 +1491,64 @@ def check_ssh_root_login_refused(ctx: Context) -> str:
             "passwordauthentication no")
 
 
+NETWORK_SYSCTLS = {
+    "net.ipv4.conf.all.accept_redirects": "0",
+    "net.ipv4.conf.all.secure_redirects": "0",
+    "net.ipv4.conf.all.send_redirects": "0",
+    "net.ipv6.conf.all.accept_redirects": "0",
+    "net.ipv4.conf.all.rp_filter": "1",
+    "net.ipv4.conf.all.log_martians": "1",
+}
+NETWORK_INTERFACE_SYSCTLS = (
+    "net.ipv4.conf.{iface}.accept_redirects",
+    "net.ipv4.conf.{iface}.secure_redirects",
+    "net.ipv4.conf.{iface}.send_redirects",
+    "net.ipv6.conf.{iface}.accept_redirects",
+)
+
+
+def check_network_sysctls(ctx: Context) -> str:
+    """The host's kernel refuses ICMP redirects, sends none, and filters spoofed sources.
+
+    Reads the running values without root. For each physical interface (``eth*``/``en*``) the
+    per-interface redirect switches are read too, because with forwarding off the kernel honours a
+    redirect when either ``all`` or the interface allows it.
+
+    Args:
+        ctx: the run context.
+
+    Returns:
+        How many values were read and found as required.
+
+    Raises:
+        Skip: when no host access is configured.
+        CheckFailed: when any value differs (REQ-OPS-053).
+    """
+    out = ctx.runner.run(
+        "for i in $(ls /sys/class/net | grep -E '^(eth|en)[0-9a-z]+$'); do echo \"IFACE $i\"; done; "
+        f"sysctl {' '.join(NETWORK_SYSCTLS)} 2>&1; "
+        "for i in $(ls /sys/class/net | grep -E '^(eth|en)[0-9a-z]+$'); do "
+        "sysctl " + " ".join(k.replace("{iface}", "$i") for k in NETWORK_INTERFACE_SYSCTLS)
+        + " 2>&1; done",
+        privileged=False)
+    wanted = dict(NETWORK_SYSCTLS)
+    seen: dict[str, str] = {}
+    for line in out.splitlines():
+        if line.startswith("IFACE "):
+            iface = line.split(None, 1)[1].strip()
+            for key in NETWORK_INTERFACE_SYSCTLS:
+                wanted[key.replace("{iface}", iface)] = "0"
+        elif " = " in line:
+            key, _, value = line.partition(" = ")
+            seen[key.strip()] = value.strip()
+
+    problems = [f"{key} is {seen.get(key, 'unreadable')}, expected {value}"
+                for key, value in wanted.items() if seen.get(key) != value]
+    if problems:
+        raise CheckFailed("; ".join(problems))
+    return f"all {len(wanted)} redirect and source-filter values as required"
+
+
 CHECKS: tuple[Check, ...] = (
     Check("vhost-reachable", "REQ-OPS-014", False, check_vhost_reachable),
     Check("certificate-valid", "REQ-OPS-026", False, check_certificate_valid),
@@ -1519,6 +1577,8 @@ CHECKS: tuple[Check, ...] = (
           check_security_updates_enabled),
     Check("ssh-root-login-refused", "REQ-OPS-052", True,
           check_ssh_root_login_refused),
+    Check("network-sysctls", "REQ-OPS-053", True,
+          check_network_sysctls),
 )
 
 

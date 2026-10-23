@@ -1029,6 +1029,42 @@ admits that account and nothing else.
 `ssh-root-login-refused`) · `monitoring/loki/rules/fake/basetool-log-alerts.yml` ·
 **Runbook:** `docs/deployment.md` → *Management access*
 
+### REQ-OPS-053 — The host admits only its public services, refuses redirects, and bans repeat offenders
+
+**Status:** Accepted
+
+The host's own firewall is default-deny on its own, not only behind the provider's cloud
+firewall, and its kernel takes no routing advice from the network.
+
+- **firewalld.** The default zone admits `ssh` and the front end's `80/tcp` and `443/tcp`, nothing
+  else: `cockpit` and `dhcpv6-client` are closed (the host has static addresses and ignores router
+  advertisements). Forwarding is off in every zone that holds an interface, because the host
+  routes nothing. `LogDenied` stays `off`: the internet's background noise would put client
+  addresses into the journal and Loki for 31 days without telling anyone anything new.
+- **Kernel.** `/etc/sysctl.d/90-basetool-network.conf` refuses ICMP redirects and sends none
+  (`all`, `default` **and** every physical interface — with forwarding off the kernel honours a
+  redirect when either `all` or the interface allows it, and IPv6 reads the interface value),
+  turns on strict reverse-path filtering and logs martians. The role reads the running values
+  back and refuses a run whose kernel does not run with them.
+- **fail2ban.** The `sshd` jail bans after 5 failures in 10 minutes for 1 hour, doubling per
+  repeat up to a week, and keeps each ban for 8 days so the doubling has something to count.
+  The `recidive` jail bans a source that was banned 3 times in a day on every port for a week.
+
+**Acceptance**
+
+- [ ] From the internet only 22, 80 and 443 answer, over IPv4 and IPv6; with the cloud firewall
+  disabled, firewalld alone still rejects every other port.
+- [ ] `firewall-cmd --zone=<default> --list-all` lists exactly `services: ssh` and
+  `ports: 80/tcp 443/tcp`, with `forward: no`.
+- [ ] `check-conformance.py --only network-sysctls` passes: no redirect accepted or sent on `all`
+  or any `eth*`/`en*` interface, `rp_filter` and `log_martians` on.
+- [ ] `fail2ban-client status sshd` and `fail2ban-client status recidive` both answer.
+
+**Enforced by:** `ansible/roles/basetool_host/tasks/65-firewall.yml` ·
+`ansible/roles/basetool_host/templates/basetool-network.sysctl.conf.j2` ·
+`ansible/roles/basetool_host/templates/fail2ban-jail.local.j2` · `scripts/check-conformance.py`
+(`network-sysctls`) · **Runbook:** `docs/deployment.md` → *Management access*
+
 ### REQ-OPS-018 — Redis session store: durable persistence and a session-safe memory ceiling
 
 > [!note] Planned — the production rollout (epic #2078, WP 2.1, #2092)

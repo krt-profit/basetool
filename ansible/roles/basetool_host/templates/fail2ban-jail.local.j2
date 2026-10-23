@@ -24,3 +24,14 @@ loglevel  = INFO
 [sshd]
 enabled = true
 port    = ssh
+{% if basetool_host_fail2ban_recidive_enabled | bool %}
+
+[recidive]
+enabled   = true
+backend   = auto
+logpath   = /var/log/fail2ban.log
+banaction = %(banaction_allports)s
+maxretry  = {{ basetool_host_fail2ban_recidive_maxretry }}
+findtime  = {{ basetool_host_fail2ban_recidive_findtime }}
+bantime   = {{ basetool_host_fail2ban_recidive_bantime }}
+{% endif %}
