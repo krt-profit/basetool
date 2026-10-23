@@ -222,7 +222,7 @@
                                         <span th:unless="${r.status() == 'PENDING'}" class="text-muted">&ndash;</span>
                                     </td>
                                 </tr>
-                                <tr class="bank-booking-detail" th:if="${hasDetail}" th:id="${detailId}" hidden
+                                <tr class="bank-booking-detail detail-row" th:if="${hasDetail}" th:id="${detailId}" hidden
                                     data-testid="org-unit-bank-request-detail">
                                     <td colspan="7" class="bank-booking-detail-cell">
                                         <div class="bank-booking-detail-body">
@@ -418,7 +418,7 @@
                                     </td>
                                     <td><span class="utc-time" th:text="${r.createdAt()}">2026-06-17T14:02:00Z</span></td>
                                 </tr>
-                                <tr class="bank-booking-detail" th:if="${hasDetail}" th:id="${detailId}" hidden
+                                <tr class="bank-booking-detail detail-row" th:if="${hasDetail}" th:id="${detailId}" hidden
                                     data-testid="org-unit-bank-foreign-detail">
                                     <td colspan="8" class="bank-booking-detail-cell">
                                         <div class="bank-booking-detail-body">

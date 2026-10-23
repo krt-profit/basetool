@@ -820,6 +820,31 @@ function craftCount(data) {
 }
 
 /**
+ * The materials that cap the craftable count under the current refinery setting: every material
+ * whose own count equals the blueprint's count.
+ *
+ * @param {any} data the blueprint's craftability
+ * @returns {string[]} the limiting material names, in recipe order; empty when none caps the count
+ */
+function limitingNames(data) {
+    /** @type {ApiDto<'CraftabilityMaterialDto'>[]} */
+    const materials = data.materials || [];
+    const count = craftCount(data);
+    const names = materials
+        .filter((m) => {
+            return (refineryOn ? m.craftableWithRefinery : m.craftable) === count;
+        })
+        .map((m) => {
+            return m.materialName || '?';
+        });
+    if (names.length > 0) {
+        return names;
+    }
+    const single = refineryOn ? data.limitingMaterialNameWithRefinery : data.limitingMaterialName;
+    return single ? [single] : [];
+}
+
+/**
  * Formats a craftable count as „3×".
  *
  * @param {number} count the craftable count
@@ -927,9 +952,11 @@ function renderKpi(data) {
         ),
     );
     const parts = [];
-    const limit = refineryOn ? data.limitingMaterialNameWithRefinery : data.limitingMaterialName;
-    if (limit) {
-        parts.push(`${krtI18nText(dict.limitedBy, 'krtBlueprintsRecipeI18n.limitedBy')} ${limit}`);
+    const limits = limitingNames(data);
+    if (limits.length > 0) {
+        parts.push(
+            `${krtI18nText(dict.limitedBy, 'krtBlueprintsRecipeI18n.limitedBy')} ${limits.join(', ')}`,
+        );
     }
     if (refineryOn) {
         parts.push(
@@ -962,7 +989,7 @@ function renderIngredients(data) {
         return null;
     }
     const dict = i18n();
-    const limit = refineryOn ? data.limitingMaterialNameWithRefinery : data.limitingMaterialName;
+    const limits = new Set(limitingNames(data));
     const section = el('section', 'krt-bp-detail-section');
     section.appendChild(
         el(
@@ -1001,14 +1028,16 @@ function renderIngredients(data) {
         const qt = m.quantityType;
         const unit = ` ${unitLabel(qt)}`;
         const row = el('tr');
-        row.appendChild(el('td', 'cell-title', m.materialName || '?'));
+        const nameCell = el('td');
+        nameCell.appendChild(el('span', 'cell-title', m.materialName || '?'));
+        row.appendChild(nameCell);
         const need = el('td', 'num', fmtAmount(m.requiredScu, qt) + unit);
         need.setAttribute('data-label', dict.colNeed || '');
         row.appendChild(need);
         let stockState = 'is-ok';
         if (missing > 0) {
             stockState = 'is-short';
-        } else if (limit && m.materialName === limit) {
+        } else if (limits.has(m.materialName || '?')) {
             stockState = 'is-limit';
         }
         const stock = el('td', `num krt-bp-ing-stock ${stockState}`, fmtAmount(avail, qt) + unit);

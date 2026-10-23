@@ -794,9 +794,9 @@
         color: var(--color-gray-1);
     }
 
-    .krt-bp-ing-table td,
-    .krt-bp-ing-table th {
-        padding-left: 0;
+    .krt-bp-ing-table {
+        background-color: var(--surface-inset);
+        border: var(--border-hairline);
     }
 
     .krt-bp-ing-stock {

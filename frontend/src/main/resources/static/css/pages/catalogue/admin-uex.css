@@ -125,6 +125,10 @@
     details.uex-parent > .uex-parent-body {
         padding: 0.5rem 1rem 1rem;
     }
+    .uex-system-body .data-table {
+        background-color: var(--surface-inset);
+        border: var(--border-hairline);
+    }
     details.uex-system > summary {
         font-size: 1.05rem;
     }

@@ -279,7 +279,7 @@ class JobOrderMaterialDemandRenderTest {
     assertThat(html).as("an item order still contributes material").contains("order-kind-item");
     assertThat(html)
         .as("drill-down starts hidden")
-        .containsPattern("<tr class=\"demand-orders-row\" hidden data-bucket-orders=");
+        .containsPattern("<tr class=\"demand-orders-row detail-row\" hidden data-bucket-orders=");
     assertThat(html).as("toggle reports the collapsed state").contains("aria-expanded=\"false\"");
   }
 

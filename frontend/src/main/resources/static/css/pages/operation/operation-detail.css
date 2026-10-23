@@ -210,6 +210,10 @@
     .op-finance-detail-body {
         padding: 0 var(--space-4) var(--space-3);
     }
+    .op-finance-detail-body .data-table {
+        background-color: var(--surface-inset);
+        border: var(--border-hairline);
+    }
     .op-fin-note {
         margin: 0;
         padding-top: var(--space-2);

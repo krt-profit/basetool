@@ -317,11 +317,11 @@
                     </ul>
                 </td>
                 <td class="num" th:attr="data-label=#{orders.detail.item.amount}" th:text="${#numbers.formatInteger(amt, 1)}">0</td>
-                <td th:attr="data-label=#{orders.detail.item.manufactured}">
+                <td class="od-progress-cell" th:attr="data-label=#{orders.detail.item.manufactured}">
                     <span class="mini-bar"><i th:attr="data-krtm-width=${amt > 0 ? (mfg * 100 / amt) : 0}" th:classappend="${amt > 0 and mfg >= amt} ? ' is-complete' : ''"></i></span>
                     <span th:text="${#numbers.formatInteger(mfg, 1)}">0</span>
                 </td>
-                <td th:attr="data-label=#{orders.detail.item.delivered}">
+                <td class="od-progress-cell" th:attr="data-label=#{orders.detail.item.delivered}">
                     <span class="mini-bar"><i th:attr="data-krtm-width=${amt > 0 ? (dlv * 100 / amt) : 0}" th:classappend="${amt > 0 and dlv >= amt} ? ' is-complete' : ''"></i></span>
                     <span th:text="${#numbers.formatInteger(dlv, 1)}">0</span>
                 </td>
@@ -345,7 +345,7 @@
                     </button>
                 </td>
             </tr>
-            <tr class="od-prod-demand-row" th:if="${!requesterView and canExpand}" th:id="${demandId}" hidden>
+            <tr class="od-prod-demand-row detail-row" th:if="${!requesterView and canExpand}" th:id="${demandId}" hidden>
                 <td th:attr="colspan=${isLogistician ? 6 : 5}" class="od-prod-demand-cell">
                     <div class="od-prod-demand-body" th:if="${isLogistician and hasDemand}">
                         <span class="od-prod-demand-label" th:text="#{orders.detail.production.perUnit}">Bedarf je Stück</span>

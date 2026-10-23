@@ -69,6 +69,7 @@ function initMaterialsMatrix() {
      * @property {MatrixRow | null} row the material row, for a row line
      * @property {number | null} bestSell the row's highest sale price
      * @property {number | null} bestBuy the row's lowest purchase price
+     * @property {boolean} [even] whether the row is an even row of its category
      */
 
     const config = document.getElementById('matrixConfig');
@@ -480,6 +481,7 @@ function initMaterialsMatrix() {
                 return an.localeCompare(bn, undefined, { sensitivity: 'base' });
             });
             flat = items;
+            markEvenRows();
             return;
         }
         groups.forEach((g) => {
@@ -493,6 +495,20 @@ function initMaterialsMatrix() {
                     flat.push(item);
                 });
             }
+        });
+        markEvenRows();
+    }
+
+    /** Marks every second material row of each category, counting from its category line. */
+    function markEvenRows() {
+        let index = 0;
+        flat.forEach((item) => {
+            if (item.type === 'kind') {
+                index = 0;
+                return;
+            }
+            index += 1;
+            item.even = index % 2 === 0;
         });
     }
 
@@ -639,7 +655,7 @@ function initMaterialsMatrix() {
                     ? fmt(item.bestSell - item.bestBuy)
                     : DASH;
             bodyHtml.push(
-                krtHtml`<tr class="row-material"><td class="mtx-name-cell"><span class="mtx-name">`,
+                krtHtml`<tr class="row-material${item.even ? ' row-even' : ''}"><td class="mtx-name-cell"><span class="mtx-name">`,
             );
             appendWarnings(r);
             bodyHtml.push(
