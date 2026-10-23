@@ -96,7 +96,10 @@ The two host packages are not pinned by the role: `alloy` and `node-exporter` re
 versions the compose file pins (measured 2026-09-18), and a second pin would be a drift source.
 Whether they still do is checked, not assumed: `python scripts/check-conformance.py --ssh <host>
 --only host-exporter-versions` compares each running `*_build_info` with the compose pin and fails
-on any difference (OPS-SEC-06, 2026-09-22).
+on any difference (OPS-SEC-06, 2026-09-22). When the host package moves — an advisory applied by
+`dnf-automatic` or a manual `dnf upgrade` — the pin follows in a reviewed commit once
+`config.alloy` passes `fmt --test` and `validate` against the new image (REQ-OPS-032, ADR-0199);
+the host package is not rolled back to the pin.
 Tags quoted inside runnable commands in this repository *are* pinned, and
 [`scripts/check-monitoring-image-pins.sh`](../scripts/check-monitoring-image-pins.sh) (CI,
 `repo-lint.yml`) fails the build if any of them drifts from the compose file. It scans every tracked
@@ -951,9 +954,9 @@ done
 docker rm -f bb-lint
 
 # Alloy — format check + validate. `validate` exits 0 even on failure: read its output.
-docker run --rm -v "$PWD/monitoring/alloy:/cfg" grafana/alloy:v1.20.1 \
+docker run --rm -v "$PWD/monitoring/alloy:/cfg" grafana/alloy:v1.21.0 \
   fmt --test /cfg/config.alloy
-docker run --rm -v "$PWD/monitoring/alloy:/cfg" grafana/alloy:v1.20.1 \
+docker run --rm -v "$PWD/monitoring/alloy:/cfg" grafana/alloy:v1.21.0 \
   validate /cfg/config.alloy
 # The shipper-side masks (CI: repo-lint -> alloy-log-masking)
 python3 scripts/check-alloy-log-masking.py
