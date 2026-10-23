@@ -147,16 +147,48 @@ basetool_host_cockpit_packages:
   - cockpit-ws
   - cockpit-ws-selinux
 
+basetool_host_fw_closed_services:
+  - cockpit
+  - dhcpv6-client
+basetool_host_fw_no_forward_zones:
+  - trusted
+
+basetool_host_network_sysctl_file: /etc/sysctl.d/90-basetool-network.conf
+basetool_host_network_sysctls:
+  net.ipv4.conf.all.accept_redirects: 0
+  net.ipv4.conf.default.accept_redirects: 0
+  net.ipv4.conf.all.secure_redirects: 0
+  net.ipv4.conf.default.secure_redirects: 0
+  net.ipv4.conf.all.send_redirects: 0
+  net.ipv4.conf.default.send_redirects: 0
+  net.ipv6.conf.all.accept_redirects: 0
+  net.ipv6.conf.default.accept_redirects: 0
+  net.ipv4.conf.all.rp_filter: 1
+  net.ipv4.conf.default.rp_filter: 1
+  net.ipv4.conf.all.log_martians: 1
+  net.ipv4.conf.default.log_martians: 1
+basetool_host_network_interface_sysctls:
+  - net.ipv4.conf.{iface}.accept_redirects
+  - net.ipv4.conf.{iface}.secure_redirects
+  - net.ipv4.conf.{iface}.send_redirects
+  - net.ipv6.conf.{iface}.accept_redirects
+basetool_host_network_interface_pattern: "^(eth|en)[0-9a-z]+$"
+
 basetool_host_fail2ban_enabled: true
 
 basetool_host_fail2ban_ignoreip:
   - 127.0.0.1/8
   - ::1
 
-basetool_host_fail2ban_maxretry: 10
+basetool_host_fail2ban_maxretry: 5
 basetool_host_fail2ban_findtime: 10m
 basetool_host_fail2ban_bantime: 1h
 basetool_host_fail2ban_maxtime: 1w
+basetool_host_fail2ban_dbpurgeage: 8d
+basetool_host_fail2ban_recidive_enabled: true
+basetool_host_fail2ban_recidive_maxretry: 3
+basetool_host_fail2ban_recidive_findtime: 1d
+basetool_host_fail2ban_recidive_bantime: 1w
 
 basetool_host_alloy_loki_endpoint: "127.0.0.1:3100"
 basetool_host_alloy_tempo_endpoint: "127.0.0.1:4327"

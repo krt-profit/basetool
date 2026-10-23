@@ -17,13 +17,72 @@
   check_mode: false
   when: basetool_host_manage_firewall | bool
 
-- name: Close the administration UI nobody here uses
+- name: Close the services this host does not use
   ansible.posix.firewalld:
-    service: cockpit
+    service: "{{ item }}"
     state: disabled
     permanent: true
     immediate: true
+  loop: "{{ basetool_host_fw_closed_services }}"
   when: basetool_host_manage_firewall | bool
+
+- name: Turn off forwarding in the zones that hold an interface, since this host routes nothing
+  ansible.posix.firewalld:
+    zone: "{{ item }}"
+    forward: true
+    state: disabled
+    permanent: true
+    immediate: true
+  loop: "{{ ([basetool_host_fw_zone.stdout | default('public') | trim] + basetool_host_fw_no_forward_zones) | unique }}"
+  when: basetool_host_manage_firewall | bool
+
+- name: Start from the host-wide network sysctls
+  ansible.builtin.set_fact:
+    basetool_host_network_wanted: "{{ basetool_host_network_sysctls }}"
+
+- name: Add the per-interface ones, because redirects stay on while either the interface or all allows them
+  ansible.builtin.set_fact:
+    basetool_host_network_wanted: >-
+      {{ basetool_host_network_wanted
+         | combine(dict(basetool_host_network_interface_sysctls | map('replace', '{iface}', item)
+                        | zip_longest([], fillvalue=0))) }}
+  loop: "{{ ansible_facts.interfaces | select('match', basetool_host_network_interface_pattern) | sort }}"
+
+- name: Refuse redirects and spoofed sources in the kernel
+  ansible.builtin.template:
+    src: basetool-network.sysctl.conf.j2
+    dest: "{{ basetool_host_network_sysctl_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+  register: basetool_host_network_sysctl
+
+- name: Apply them now, not only at the next boot
+  ansible.builtin.command: sysctl -p {{ basetool_host_network_sysctl_file }}
+  changed_when: true
+  when:
+    - not ansible_check_mode
+    - basetool_host_network_sysctl is changed
+
+- name: Read what the kernel actually runs with
+  ansible.builtin.command:
+    argv: "{{ ['sysctl', '-n'] + (basetool_host_network_wanted.keys() | list) }}"
+  register: basetool_host_network_effective
+  changed_when: false
+  check_mode: false
+  when: not (ansible_check_mode and basetool_host_network_sysctl is changed)
+
+- name: Refuse a kernel that does not run with them
+  ansible.builtin.assert:
+    that: >-
+      (basetool_host_network_effective.stdout_lines | map('trim') | list)
+      == (basetool_host_network_wanted.values() | map('string') | list)
+    fail_msg: >-
+      The kernel runs with
+      {{ dict(basetool_host_network_wanted.keys() | zip(basetool_host_network_effective.stdout_lines)) }},
+      expected {{ basetool_host_network_wanted }}. A file later in /etc/sysctl.d sets one of them back:
+      sysctl.d reads in lexical order and the last value wins.
+  when: basetool_host_network_effective is not skipped
 
 - name: Put loopback in the trusted zone
   ansible.posix.firewalld:
@@ -57,14 +116,28 @@
       jail that runs, looks healthy and never bans anything.
   when: basetool_host_fail2ban_enabled | bool
 
-- name: Configure the jail
+- name: Configure the jails
   ansible.builtin.template:
     src: fail2ban-jail.local.j2
     dest: /etc/fail2ban/jail.local
     owner: root
     group: root
     mode: "0644"
-  notify: Restart fail2ban
+  register: basetool_host_fail2ban_jail
+  when:
+    - basetool_host_fail2ban_enabled | bool
+    - basetool_host_manage_firewall | bool
+
+- name: Keep each ban in the database long enough for the doubling and for recidive to see it
+  ansible.builtin.copy:
+    dest: /etc/fail2ban/fail2ban.d/basetool.local
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [DEFINITION]
+      dbpurgeage = {{ basetool_host_fail2ban_dbpurgeage }}
+  register: basetool_host_fail2ban_daemon
   when:
     - basetool_host_fail2ban_enabled | bool
     - basetool_host_manage_firewall | bool
@@ -78,11 +151,13 @@
     - basetool_host_manage_firewall | bool
     - not ansible_check_mode
 
-- name: Start it, and keep it started
+- name: Start it, and restart it now when its configuration changed, so the checks below see the new jails
   ansible.builtin.systemd_service:
     name: fail2ban.service
     enabled: true
-    state: started
+    state: >-
+      {{ 'restarted' if (basetool_host_fail2ban_jail is changed or basetool_host_fail2ban_daemon is changed)
+         else 'started' }}
     daemon_reload: true
   when:
     - basetool_host_fail2ban_enabled | bool
@@ -144,8 +219,9 @@
     - not ansible_check_mode
     - basetool_host_fail2ban_log_perms is changed
 
-- name: Ask fail2ban whether the jail is actually up
-  ansible.builtin.command: fail2ban-client status sshd
+- name: Ask fail2ban whether each jail is actually up
+  ansible.builtin.command: fail2ban-client status {{ item }}
+  loop: "{{ ['sshd'] + (['recidive'] if basetool_host_fail2ban_recidive_enabled | bool else []) }}"
   register: basetool_host_fail2ban_status
   changed_when: false
   failed_when: false
@@ -154,16 +230,18 @@
     - basetool_host_manage_firewall | bool
     - not ansible_check_mode
 
-- name: Refuse a fail2ban that is running without its jail
+- name: Refuse a fail2ban that is running without a jail
   ansible.builtin.assert:
     that:
-      - basetool_host_fail2ban_status.rc == 0
+      - item.rc == 0
     fail_msg: >-
-      `fail2ban-client status sshd` exited
-      {{ basetool_host_fail2ban_status.rc | default('?') }}:
-      {{ (basetool_host_fail2ban_status.stderr | default('')) | truncate(200) }}
-      The service can be active with no jail loaded, and then it detects nothing and bans nothing
-      while every other signal says it is running.
+      `fail2ban-client status {{ item.item }}` exited {{ item.rc | default('?') }}:
+      {{ (item.stderr | default('')) | truncate(200) }}
+      The service can be active with a jail not loaded, and then that jail detects nothing and bans
+      nothing while every other signal says it is running.
+  loop: "{{ basetool_host_fail2ban_status.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item }}"
   when:
     - basetool_host_fail2ban_enabled | bool
     - basetool_host_manage_firewall | bool
@@ -172,10 +250,16 @@
 - name: Say what is jailed and what is exempt
   ansible.builtin.debug:
     msg: >-
-      fail2ban: the sshd jail only, banning through firewalld.
+      fail2ban: the sshd jail, banning through firewalld.
       {{ basetool_host_fail2ban_maxretry }} failures in
       {{ basetool_host_fail2ban_findtime }} -> {{ basetool_host_fail2ban_bantime }},
-      doubling per repeat up to {{ basetool_host_fail2ban_maxtime }}.
+      doubling per repeat up to {{ basetool_host_fail2ban_maxtime }}, remembered for
+      {{ basetool_host_fail2ban_dbpurgeage }}.
+      {% if basetool_host_fail2ban_recidive_enabled | bool %}
+      recidive: {{ basetool_host_fail2ban_recidive_maxretry }} bans in
+      {{ basetool_host_fail2ban_recidive_findtime }} -> {{ basetool_host_fail2ban_recidive_bantime }}
+      on every port.
+      {% endif %}
       Never banned: {{ basetool_host_fail2ban_ignoreip | join(', ') }}.
       Ban and unban lines go to /var/log/fail2ban.log, which alloy ships as app="host-fail2ban"
       WITH the client IP (the deliberate 31-day retention, REQ-OBS-007/-010).

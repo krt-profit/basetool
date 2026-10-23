@@ -399,6 +399,18 @@ case "$cmd" in
   *"alloy_build_info"*)
     echo "alloy_build_info{branch=\"HEAD\",goarch=\"amd64\",goos=\"linux\",goversion=\"go1.24.1\",revision=\"x\",tags=\"\",version=\"v${STUB_ALLOY_PIN}\"} 1"
     ;;
+  *"/sys/class/net"*)
+    echo "IFACE eth0"
+    printf '%s = 0\n' net.ipv4.conf.all.accept_redirects net.ipv4.conf.all.secure_redirects \
+      net.ipv4.conf.all.send_redirects net.ipv6.conf.all.accept_redirects
+    printf '%s = 1\n' net.ipv4.conf.all.rp_filter net.ipv4.conf.all.log_martians
+    printf '%s = 0\n' net.ipv4.conf.eth0.accept_redirects net.ipv4.conf.eth0.secure_redirects \
+      net.ipv4.conf.eth0.send_redirects
+    case "$scenario" in
+      iface-redirects) echo "net.ipv6.conf.eth0.accept_redirects = 1" ;;
+      *)               echo "net.ipv6.conf.eth0.accept_redirects = 0" ;;
+    esac
+    ;;
   *"sshd -T -C user=root"*)
     case "$scenario" in
       root-allowed) printf 'permitrootlogin without-password\npasswordauthentication no\n' ;;
@@ -798,6 +810,12 @@ fi
 STUB_SCENARIO=root-allowed assert_status \
   "ssh-root-login-refused fails when root may log in by key" \
   ssh-root-login-refused fail "permitrootlogin is without-password" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=healthy assert_status \
+  "network-sysctls passes when redirects are refused and sources filtered" \
+  network-sysctls pass "all 10 redirect and source-filter values" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=iface-redirects assert_status \
+  "network-sysctls fails when one interface still accepts IPv6 redirects" \
+  network-sysctls fail "net.ipv6.conf.eth0.accept_redirects is 1" -- "${STUB_ARGS[@]}"
 STUB_SCENARIO=no-allowusers assert_status \
   "ssh-root-login-refused fails without an AllowUsers list" \
   ssh-root-login-refused fail "no AllowUsers" -- "${STUB_ARGS[@]}"

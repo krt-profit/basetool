@@ -137,9 +137,13 @@ read-only `podman` sub-commands as `iri`, `sshd -T` and `fail2ban-client status`
 lockout is rolled out in two phases — [`ansible/README.md` → *Root's lockout*](../ansible/README.md#roots-lockout-two-phases).
 If the key and the password are both lost, the way back is Hetzner's rescue system: root is
 password-locked and the console accepts no login. There is **no VPN**: a read-only check on 2026-09-22 found no WireGuard interface
-and no `/etc/wireguard` on the production host. fail2ban guards SSH; firewalld is default-deny and
-opens SSH, 80 and 443 only; the provider's cloud firewall sits in front of it, deliberately
-([`PODMAN_HOST_BOOTSTRAP.md` §10](archive/PODMAN_HOST_BOOTSTRAP.md)).
+and no `/etc/wireguard` on the production host. fail2ban guards SSH — the `sshd` jail after 5
+failures in 10 minutes, the `recidive` jail for a week on every port after 3 bans in a day — so a
+burst of mistyped logins from your own address bans it too: unban with
+`sudo fail2ban-client unban <address>` from another address, or through the provider's console.
+firewalld is default-deny and opens SSH, 80 and 443 only, forwards nothing, and the kernel
+refuses ICMP redirects (REQ-OPS-053); the provider's cloud firewall sits in front of it,
+deliberately ([`PODMAN_HOST_BOOTSTRAP.md` §10](archive/PODMAN_HOST_BOOTSTRAP.md)).
 
 ### Shell conventions used below
 

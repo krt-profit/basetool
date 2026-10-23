@@ -1202,8 +1202,10 @@ abuse detection:
   (2026-07-28 fix). Both watches are directory-wide (`-w /root/.ssh/`, `-w /etc/ssh/sshd_config.d/`),
   so a benign `known_hosts` append by an outbound `ssh` is a genuine, attributable hit and stays in
   scope on purpose.
-- **Host fail2ban log** — `/var/log/fail2ban.log`: SSH-jail ban/unban events carrying the offending
-  client IP — the active-blocking complement to the `SshFailedAuthSpike` detection. The
+- **Host fail2ban log** — `/var/log/fail2ban.log`: ban/unban events of the `sshd` and `recidive`
+  jails, each line naming its jail in brackets and carrying the offending client IP — the
+  active-blocking complement to the `SshFailedAuthSpike` detection. `recidive` reads this same
+  file, so its `Found` lines are earlier bans, not new login failures. The
   *SSH / host auth* dashboard reads it: detected failures, bans and unbans over time, the bans
   and detected failures in the selected range, the ten most frequent offending addresses, and
   the ban/unban lines themselves.

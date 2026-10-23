@@ -49,7 +49,7 @@ The task files themselves carry the measurements behind each step. This README c
 | `45-updates.yml` | `updates` | `dnf-automatic` for **security advisories only**, the container runtime excluded, never rebooting; its timer moved to 07:00 (started); an `ExecStopPost=` that records each run and `iri-host-updates-metrics.service`, which re-reads `needs-restarting -r` at boot (REQ-OPS-032) |
 | `50-podman.yml` | `podman` | `~iri/.config/containers/containers.conf` (the pasta `--map-guest-addr` pair, ADR-0196), the public-name alias drop-ins, the optional JVM truststore drop-in |
 | `60-hardening.yml` | `hardening` | an OpenSCAP scan against `cis_server_l1` with the tailoring in `defaults/main.yml`; remediation only with `basetool_host_hardening_remediate: true` |
-| `65-firewall.yml` | `firewall` | firewalld default-deny (SSH, plus the front end's ports), loopback trusted, fail2ban's sshd jail |
+| `65-firewall.yml` | `firewall` | firewalld default-deny (SSH, plus the front end's ports), `cockpit` and `dhcpv6-client` closed, forwarding off, loopback trusted; the kernel network sysctls in `/etc/sysctl.d/90-basetool-network.conf` (no redirects, `rp_filter`, martians logged), read back and asserted; fail2ban's `sshd` and `recidive` jails (REQ-OPS-053) |
 | `70-frontend.yml` | `frontend` | haproxy on 80/443 forwarding to the edge's loopback ports with PROXY protocol v2 (ADR-0187); **enabled, not started** |
 
 It deliberately does **not** write any secret: `.env`, the keystore, `realm-export.json`, the redis
