@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+## [v1.19.6](https://github.com/krt-profit/basetool/releases/tag/v1.19.6) - 2026-10-23
+
+### Fixed
+
+- **Schiffstypen.** Zwölf Schiffe standen doppelt im Katalog, z. B. San'tok.yāi, Ares Star Fighter
+  Inferno und Ion, Nova und Stinger. Sie sind jetzt je ein Eintrag mit dem Namen aus dem Spiel;
+  Hangar-Schiffe, Missionseinheiten und Items hängen am verbleibenden Eintrag.
+
+- **Monitoring.** Das Dashboard *SSH / host auth* zeigt fehlgeschlagene und erfolgreiche Anmeldungen
+  sowie sudo-Fehler wieder an statt „No data“. Neu sind die Erkennungen und Sperren von fail2ban und
+  die häufigsten auffälligen Adressen. `SshFailedAuthSpike` und `SudoAuthFailure` erkennen jetzt die
+  Logzeilen, die die Rocky-Server tatsächlich schreiben.
+
+### Security
+
+- **Server-Zugang.** Auf Test- und Produktionsserver meldet sich der Betrieb mit einem persönlichen
+  Konto per SSH-Schlüssel an, dessen `sudo` ein Passwort verlangt. `root` kann sich nicht mehr per
+  SSH anmelden. Die Ansible-Rolle sperrt `root` erst in einem Lauf, der das neue Konto selbst
+  benutzt hat (REQ-OPS-052).
+
 ## [v1.19.5](https://github.com/krt-profit/basetool/releases/tag/v1.19.5) - 2026-10-21
 
 ### Changed
