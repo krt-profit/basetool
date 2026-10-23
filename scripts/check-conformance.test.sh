@@ -179,6 +179,19 @@ case "$cmd" in
      exit 1 ;;
 esac
 
+[ -n "${STUB_ARGV_LOG:-}" ] && printf '%s\n' "$cmd" >> "$STUB_ARGV_LOG"
+
+case "$cmd" in
+  *"sudo -k -S -p '' bash -c "*)
+    IFS= read -r pw || pw=
+    if [ "$pw" != "${STUB_SUDO_PASSWORD:-stub-sudo-pw}" ]; then
+      echo "sudo: 1 incorrect password attempt" >&2
+      exit 1
+    fi
+    case "$cmd" in *"bash -c 'cd /; true'") exit 0 ;; esac
+    ;;
+esac
+
 emit_prom() { printf '{"status":"success","data":{"resultType":"vector","result":[%s]}}\n' "$1"; }
 sample() { printf '{"metric":{%s},"value":[0,"%s"]}' "$1" "$2"; }
 
@@ -428,7 +441,11 @@ assert_status() {
   shift 4
   [ "${1:-}" = "--" ] && shift
   local out parsed got detail
-  out="$("$PY" "$SUITE" --json --only "$check" "$@" 2>/dev/null)"
+  if [ -n "${ASSERT_STDIN:-}" ]; then
+    out="$(printf '%s\n' "$ASSERT_STDIN" | "$PY" "$SUITE" --json --only "$check" "$@" 2>/dev/null)"
+  else
+    out="$("$PY" "$SUITE" --json --only "$check" "$@" 2>/dev/null)"
+  fi
   parsed="$(printf '%s' "$out" | "$PY" -c "
 import json,sys
 try:
@@ -758,9 +775,26 @@ STUB_SCENARIO=updates-runtime assert_status \
 STUB_SCENARIO=healthy assert_status \
   "ssh-root-login-refused passes when root is refused and AllowUsers names the admin" \
   ssh-root-login-refused pass "allowusers greluc" -- "${STUB_ARGS[@]}"
-STUB_SCENARIO=healthy assert_status \
-  "ssh-root-login-refused passes through --sudo, still rooted at /" \
-  ssh-root-login-refused pass "allowusers greluc" -- --sudo "${STUB_ARGS[@]}"
+: > "${WORK}/stub-argv.log"
+STUB_ARGV_LOG="${WORK}/stub-argv.log" ASSERT_STDIN=stub-sudo-pw STUB_SCENARIO=healthy assert_status \
+  "ssh-root-login-refused passes through --sudo, the password on stdin" \
+  ssh-root-login-refused pass "allowusers greluc" \
+  -- --sudo --sudo-password-stdin "${STUB_ARGS[@]}"
+if grep -q "sudo -k -S -p '' bash -c 'cd /; c=" "${WORK}/stub-argv.log" \
+   && ! grep -q "stub-sudo-pw" "${WORK}/stub-argv.log"; then
+  ok "--sudo wraps the command in sudo -k -S and never puts the password on a command line"
+else
+  bad "--sudo command lines: $(tr '\n' '|' < "${WORK}/stub-argv.log" | cut -c1-200)"
+fi
+sudo_out="$(printf 'wrong-pw\n' | "$PY" "$SUITE" --json --only ssh-root-login-refused \
+  --sudo --sudo-password-stdin "${STUB_ARGS[@]}" 2>&1)"
+sudo_rc=$?
+if [ "$sudo_rc" -ne 0 ] && [[ "$sudo_out" == *"did not accept the password, no check was run"* ]] \
+   && [[ "$sudo_out" != *'"status"'* ]]; then
+  ok "--sudo stops before any check when sudo refuses the password"
+else
+  bad "--sudo with a wrong password - rc=$sudo_rc: ${sudo_out:0:160}"
+fi
 STUB_SCENARIO=root-allowed assert_status \
   "ssh-root-login-refused fails when root may log in by key" \
   ssh-root-login-refused fail "permitrootlogin is without-password" -- "${STUB_ARGS[@]}"

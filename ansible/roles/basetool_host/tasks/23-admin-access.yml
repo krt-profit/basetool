@@ -58,7 +58,6 @@
     mode: "0440"
     validate: "visudo -cf %s"
     content: |
-      Defaults:{{ basetool_host_admin_user }} timestamp_type=global, timestamp_timeout={{ basetool_host_admin_sudo_timeout_minutes }}
       Cmnd_Alias BASETOOL_ADMIN_READ_PODMAN = {% for sub in basetool_host_admin_read_podman_subcommands -%}
         /usr/bin/podman {{ sub }}, /usr/bin/podman {{ sub }} *{{ ', ' if not loop.last else '' }}
         {%- endfor %}
@@ -81,10 +80,13 @@
       - basetool_host_admin_sudo.stdout is search('\(ALL(\s*:\s*ALL)?\)\s+ALL')
       - basetool_host_admin_sudo.stdout is not search('NOPASSWD:\s*ALL')
       - basetool_host_admin_sudo.stdout is search('podman ps')
+      - basetool_host_admin_sudo.stdout is not search('timestamp_type\s*=\s*global')
     fail_msg: >-
       `sudo -l -U {{ basetool_host_admin_user }}` does not show `(ALL) ALL` behind a password, plus the
-      read grant: {{ basetool_host_admin_sudo.stdout }}. The full grant comes from `%wheel ALL=(ALL) ALL`
-      in /etc/sudoers; a NOPASSWD ALL anywhere would let a stolen key become root without the password.
+      read grant, without a global timestamp: {{ basetool_host_admin_sudo.stdout }}. The full grant
+      comes from `%wheel ALL=(ALL) ALL` in /etc/sudoers; a NOPASSWD ALL anywhere would let a stolen
+      key become root without the password, and timestamp_type=global would lend one session's
+      sudo to every other session of the account (ADR-0308 Amendment 1).
   when: basetool_host_admin_sudo is not skipped
 
 - name: Watch the SSH configuration and both authorized_keys directories

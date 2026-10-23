@@ -12,7 +12,6 @@ Usage
 
     python scripts/check-conformance.py
 
-    ssh -t greluc@198.51.100.10 sudo -v
     python scripts/check-conformance.py --ssh greluc@198.51.100.10 --sudo
 
     python scripts/check-conformance.py --ssh greluc@198.51.100.10 --sudo --include-load
@@ -30,6 +29,7 @@ import argparse
 import concurrent.futures
 import dataclasses
 import datetime as dt
+import getpass
 import io
 import ipaddress
 import json
@@ -153,15 +153,35 @@ class HostRunner:
         stub: a command line, split with :func:`shlex.split`, that receives the host command
             as its last argument; takes precedence over ``ssh_target``.
         timeout: seconds before a command is abandoned.
+        sudo_password: the login account's sudo password; when given, every privileged command
+            runs as root through ``sudo -k -S``, which reads it from the command's stdin.
     """
 
     def __init__(self, ssh_target: str | None, stub: str | None, timeout: int = 45,
-                 sudo: bool = False) -> None:
+                 sudo_password: str | None = None) -> None:
         self.ssh_target = ssh_target
         self.stub = stub
         self.timeout = timeout
-        self.sudo = sudo
+        self._sudo_password = sudo_password
         self._container_cli: str | None = None
+
+    @property
+    def sudo(self) -> bool:
+        """Whether privileged commands run as root through ``sudo``.
+
+        Returns:
+            ``True`` when the runner was given a sudo password.
+        """
+        return self._sudo_password is not None
+
+    def verify_sudo(self) -> None:
+        """Prove the sudo password once, before any check depends on it.
+
+        Raises:
+            Skip: when no host access is configured.
+            CheckFailed: when sudo refuses the password or the account has no grant.
+        """
+        self.run("true")
 
     @property
     def available(self) -> bool:
@@ -177,8 +197,8 @@ class HostRunner:
 
         Args:
             command: a shell command line, run by the remote login shell (bash).
-            privileged: run it as root through ``sudo -n`` when the runner was built with
-                ``sudo=True``; ``False`` keeps the login account's own environment.
+            privileged: run it as root through ``sudo -k -S`` when the runner has a sudo
+                password; ``False`` keeps the login account's own environment.
 
         Returns:
             The command's stdout, with trailing whitespace stripped.
@@ -191,8 +211,10 @@ class HostRunner:
             raise Skip("no --ssh target and no --host-stub")
 
         command = f"cd /; {command}"
-        if self.sudo and privileged:
-            command = f"cd /; sudo -n bash -c {shlex.quote(command)}"
+        stdin = None
+        if self._sudo_password is not None and privileged:
+            command = f"cd /; sudo -k -S -p '' bash -c {shlex.quote(command)}"
+            stdin = self._sudo_password + "\n"
 
         if self.stub:
             argv = shlex.split(self.stub) + [command]
@@ -204,13 +226,16 @@ class HostRunner:
                     self.ssh_target or "", command]
 
         try:
-            proc = subprocess.run(argv, capture_output=True, text=True, timeout=self.timeout)
+            proc = subprocess.run(argv, input=stdin.encode() if stdin is not None else None,
+                                  capture_output=True, timeout=self.timeout)
         except subprocess.TimeoutExpired as exc:
             raise CheckFailed(f"host command timed out after {self.timeout}s: {command}") from exc
+        stdout = proc.stdout.decode("utf-8", errors="replace").replace("\r\n", "\n")
+        stderr = proc.stderr.decode("utf-8", errors="replace").replace("\r\n", "\n")
         if proc.returncode != 0:
-            err = (proc.stderr or proc.stdout).strip().splitlines()
+            err = (stderr or stdout).strip().splitlines()
             raise CheckFailed(f"host command failed ({proc.returncode}): {err[-1] if err else command}")
-        return proc.stdout.strip()
+        return stdout.strip()
 
     @property
     def container_cli(self) -> str:
@@ -1548,8 +1573,11 @@ def _parse_args(argv: Sequence[str]) -> argparse.Namespace:
     p.add_argument("--ssh", metavar="USER@HOST",
                    help="enable the host-side checks over read-only SSH")
     p.add_argument("--sudo", action="store_true",
-                   help="run each host command as root through `sudo -n`; prime it first with "
-                        "`ssh -t USER@HOST sudo -v` (REQ-OPS-052)")
+                   help="run each host command as root; asks for the login account's sudo "
+                        "password once and hands it to `sudo -S` on stdin (REQ-OPS-052)")
+    p.add_argument("--sudo-password-stdin", action="store_true",
+                   help="with --sudo, read the password from the first line of stdin instead "
+                        "of prompting")
     p.add_argument("--host-stub", metavar="CMD",
                    help="run host commands through this command line instead of ssh, "
                         "e.g. \"bash tools/stub.sh\". The host command is appended as "
@@ -1592,6 +1620,29 @@ def _resolve_hosts(overrides: Iterable[str]) -> dict[str, str]:
             raise SystemExit(f"unknown role {role!r}; known roles: {', '.join(sorted(hosts))}")
         hosts[role] = name
     return hosts
+
+
+def _sudo_password(args: argparse.Namespace) -> str | None:
+    """Obtain the sudo password once, without echoing it and without putting it on a command line.
+
+    Args:
+        args: the parsed command line.
+
+    Returns:
+        The password, or ``None`` without ``--sudo``.
+
+    Raises:
+        SystemExit: when ``--sudo-password-stdin`` finds no line on stdin.
+    """
+    if not args.sudo:
+        return None
+    if args.sudo_password_stdin:
+        line = sys.stdin.readline()
+        if not line:
+            raise SystemExit("--sudo-password-stdin: stdin is empty")
+        return line.rstrip("\r\n")
+    target = args.ssh or "the host"
+    return getpass.getpass(f"sudo password for {target}: ")
 
 
 def _report(results: Sequence[Result], as_json: bool) -> None:
@@ -1641,9 +1692,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     if unknown:
         raise SystemExit(f"unknown check(s): {', '.join(unknown)}")
 
+    if args.sudo_password_stdin and not args.sudo:
+        raise SystemExit("--sudo-password-stdin needs --sudo")
+    runner = HostRunner(args.ssh, args.host_stub, sudo_password=_sudo_password(args))
+    if runner.sudo and runner.available:
+        try:
+            runner.verify_sudo()
+        except CheckFailed as exc:
+            raise SystemExit(f"sudo did not accept the password, no check was run: {exc}") from None
+
     ctx = Context(
         hosts=_resolve_hosts(args.host),
-        runner=HostRunner(args.ssh, args.host_stub, sudo=args.sudo),
+        runner=runner,
         include_load=args.include_load,
         log_window=args.log_window,
     )
