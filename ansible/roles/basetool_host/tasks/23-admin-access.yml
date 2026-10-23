@@ -66,6 +66,16 @@
 
       {{ basetool_host_admin_user }} ALL=({{ basetool_host_service_user }}) NOPASSWD: SETENV: BASETOOL_ADMIN_READ_PODMAN
       {{ basetool_host_admin_user }} ALL=(root) NOPASSWD: BASETOOL_ADMIN_READ_ROOT
+  register: basetool_host_admin_sudoers
+
+- name: Say why the grant is not checked in this dry run
+  ansible.builtin.debug:
+    msg: >-
+      /etc/sudoers.d/basetool-admin would change, and under --check it is not written, so sudo -l
+      would still describe the old file. The grant is asserted on the real run.
+  when:
+    - ansible_check_mode
+    - basetool_host_admin_sudoers is changed
 
 - name: Ask sudo what the admin account may do
   ansible.builtin.command: sudo -l -U {{ basetool_host_admin_user }}
@@ -87,7 +97,9 @@
       comes from `%wheel ALL=(ALL) ALL` in /etc/sudoers; a NOPASSWD ALL anywhere would let a stolen
       key become root without the password, and timestamp_type=global would lend one session's
       sudo to every other session of the account (ADR-0308 Amendment 1).
-  when: basetool_host_admin_sudo is not skipped
+  when:
+    - basetool_host_admin_sudo is not skipped
+    - not (ansible_check_mode and basetool_host_admin_sudoers is changed)
 
 - name: Watch the SSH configuration and both authorized_keys directories
   ansible.builtin.copy:
