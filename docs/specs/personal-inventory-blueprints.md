@@ -707,8 +707,8 @@ names of all its rows in one registry query, and none when no row came from a cl
 
 The recipe's stat chips (REQ-INV-009) show, for every stat whose crafted-item base value is stored
 (REQ-DATA-027), the base value and the value the slider's quality yields — „Integrity 550 → 605"
-with the factor „×1,10" beside it in grey. A stat without a stored base value keeps the factor
-alone, as before.
+with the factor's change „+10 %" beside it in grey. A stat without a stored base value shows that
+change alone.
 
 - **The data.** The recipe endpoint (`GET /api/v1/personal-blueprints/{id}/recipe`) carries
   `baseStats`: the representative recipe's crafted item's base values, each with its `propertyKey`,
@@ -725,13 +725,16 @@ alone, as before.
   has one decimal from 10, two from 1 and three significant digits below. The chip's tooltip adds
   „Grundwert → Wert bei der gewählten Qualität" to the better-direction hint. Unit labels and the
   tooltip come from the DE/EN bundles.
+- **The factor.** Every factor in the recipe — beside a value, alone on a chip, and in the hint
+  „(1000 → +5 %)" — reads as the signed change it makes: `1.1` is „+10 %", `0.95` „-5 %", `1`
+  „±0 %", with at most one decimal.
 
 **Acceptance**
 
 - [x] The recipe response carries the crafted item's base values sorted by property key, and none
   without a crafted item. *`BlueprintProductServiceTest`.*
 - [x] The value is base times factor; the text is unit-aware and scales a percentage; a missing
-  factor shows „?". *`blueprint-stats.test.mjs` (`:frontend:testBlueprintStatsJs`).*
+  factor shows „?"; a factor reads as a signed percentage. *`blueprint-stats.test.mjs` (`:frontend:testBlueprintStatsJs`).*
 - [x] The frontend mirror follows the contract. *`FrontendDtoContractTest`.*
 
 **Code:** `BlueprintStatBaseDto`, `BlueprintProductService#resolveRecipe`,

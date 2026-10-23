@@ -34,6 +34,7 @@ const indexBaseStats = fn('indexBaseStats');
 const statValueAt = fn('statValueAt');
 const formatStatNumber = fn('formatStatNumber');
 const formatStatRange = fn('formatStatRange');
+const formatFactorPercent = fn('formatFactorPercent');
 
 const UNITS = {
     PERCENT: '%',
@@ -77,6 +78,13 @@ assert.equal(formatStatNumber(97.2, 'de'), '97,2');
 assert.equal(formatStatNumber(5.26, 'en'), '5.26');
 assert.equal(formatStatNumber(0.00588, 'en'), '0.00588');
 assert.equal(formatStatNumber(263040000, 'de'), '263.040.000');
+
+assert.equal(formatFactorPercent(1.1, 'de'), '+10 %');
+assert.equal(formatFactorPercent(0.95, 'de'), '-5 %');
+assert.equal(formatFactorPercent(1, 'de'), '±0 %');
+assert.equal(formatFactorPercent(1.025, 'de'), '+2,5 %');
+assert.equal(formatFactorPercent(1.025, 'en'), '+2.5 %');
+assert.equal(formatFactorPercent(0.9, 'en'), '-10 %');
 
 const integrity = { propertyKey: 'health_maxhealth', baseValue: 550, unit: 'NONE' };
 assert.equal(formatStatRange(integrity, 1.1, 'en', UNITS), '550 → 605');

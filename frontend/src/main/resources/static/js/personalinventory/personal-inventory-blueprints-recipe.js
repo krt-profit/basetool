@@ -4,6 +4,7 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import {
     computeModifierValue,
+    formatFactorPercent,
     formatStatRange,
     indexBaseStats,
 } from '/js/personalinventory/personal-inventory-blueprint-stats.js';
@@ -499,7 +500,7 @@ function renderQualityBlock(group, groupIndex, baseByKey) {
     mods.forEach((m) => {
         const chip = el('span', 'chip');
         chip.appendChild(el('span', null, `${m.label || m.propertyKey || ''} `));
-        const valueOut = el('output', null, '×?');
+        const valueOut = el('output', null, '?');
         chip.appendChild(valueOut);
         const base = (m.propertyKey && baseByKey.get(m.propertyKey)) || null;
         /** @type {HTMLElement | null} */
@@ -586,7 +587,7 @@ function renderQualityBlock(group, groupIndex, baseByKey) {
         }
         if (banded[0] && banded[0].modifierAtMaxQuality != null) {
             hintParts.push(
-                `${formatNumber(Math.round(qmax), 0, document.documentElement.lang)} → ×${formatNumber(banded[0].modifierAtMaxQuality, 2, document.documentElement.lang)}`,
+                `${formatNumber(Math.round(qmax), 0, document.documentElement.lang)} → ${formatFactorPercent(banded[0].modifierAtMaxQuality, document.documentElement.lang)}`,
             );
         }
         if (hintParts.length > 0) {
@@ -644,7 +645,7 @@ function statUnitLabels() {
  */
 function showChipValue(chip, factor, missing) {
     const lang = document.documentElement.lang;
-    const factorText = factor == null ? missing : `×${formatNumber(factor, 2, lang)}`;
+    const factorText = factor == null ? missing : formatFactorPercent(factor, lang);
     if (chip.base && chip.factorOut) {
         chip.out.textContent = formatStatRange(chip.base, factor, lang, statUnitLabels());
         chip.factorOut.textContent = ` ${factorText}`;

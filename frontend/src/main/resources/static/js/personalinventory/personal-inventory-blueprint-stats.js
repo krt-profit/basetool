@@ -123,6 +123,23 @@ export function formatStatNumber(value, lang) {
 }
 
 /**
+ * Formats a modifier factor as the signed change it makes: `1.1` is „+10 %", `0.95` „-5 %" and
+ * `1` „±0 %", with at most one decimal.
+ *
+ * @param {number} factor the modifier factor
+ * @param {string} lang a BCP 47 language tag such as `de` or `en`
+ * @returns {string} the signed percentage
+ */
+export function formatFactorPercent(factor, lang) {
+    const percent = Math.round((factor - 1) * 1000) / 10;
+    const sign = percent > 0 ? '+' : percent < 0 ? '-' : '±';
+    const amount = Math.abs(percent).toLocaleString(lang || undefined, {
+        maximumFractionDigits: 1,
+    });
+    return `${sign}${amount} %`;
+}
+
+/**
  * Formats a stat's base value and its value at a quality as „550 → 605", with the unit once at
  * the end; a percentage is shown scaled to 0–100.
  *
