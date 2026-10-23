@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+## [v1.19.11](https://github.com/krt-profit/basetool/releases/tag/v1.19.11) - 2026-10-23
+
+### Added
+
+- **Blueprints: echte Werte.** Die Rezeptansicht unter „Mein Inventar" zeigt den Grundwert des
+  Gegenstands und den Wert bei der gewählten Qualität, etwa „Integrity 550 → 605 +10 %" oder
+  „Min Temp -61 → -67,1 °C". Der Qualitätsfaktor steht als Prozent-Änderung da („+10 %" statt
+  „×1,10"). Die Werte kommen aus dem SC Wiki; die drei Rückstoß-Werte zeigen nur die Änderung, weil
+  keine Quelle sie liefert.
+
+### Fixed
+
+- **Aufträge.** In der Item-Tabelle eines Auftrags stehen die Zahlen „Hergestellt“ und „Geliefert“
+  wieder in derselben Zeile wie ihr Fortschrittsbalken, statt darunter umzubrechen.
+
+- **Tabellen.** Tabellen in Auftragsdetails, Organisationsleitung, Operations-Finanzen und der
+  Rezeptansicht der Blueprints heben sich wieder von der Fläche dahinter ab.
+
+- **Mein Inventar.** In der Rezeptansicht der Blueprints nennt „limitiert durch“ jetzt alle
+  begrenzenden Materialien statt nur des ersten, und die Materialspalte der Zutaten steht wieder
+  sauber in der Tabelle.
+
+- **Tabellen.** Zeilen wechseln sich wieder farblich ab, auch wo aufklappbare Detailzeilen
+  dazwischen stehen (Aufträge, Material-Bedarf, Bank) und in der Preis-Matrix der Materialien.
+
 ## [v1.19.10](https://github.com/krt-profit/basetool/releases/tag/v1.19.10) - 2026-10-23
 
 ### Security
