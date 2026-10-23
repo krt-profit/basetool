@@ -1,0 +1,27 @@
+rule_files:
+  - ../alerts/infrastructure.yml
+  - ../alerts/ops-automation.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: "HostRebootRequired - an installed fix waiting a day for a reboot warns; the reboot clears it"
+    interval: 1m
+    input_series:
+      - series: "basetool_host_reboot_required"
+        values: "1x1800 0x600"
+    alert_rule_test:
+      - eval_time: 20h
+        alertname: HostRebootRequired
+        exp_alerts: []
+      - eval_time: 28h
+        alertname: HostRebootRequired
+        exp_alerts:
+          - exp_labels:
+              severity: "warning"
+            exp_annotations:
+              summary: "Host reboot required to activate installed updates"
+              description: "An installed update (typically a kernel, glibc or systemd fix) only takes effect after a reboot, and the host has not rebooted for a day since (`needs-restarting -r`). dnf-automatic never reboots on its own -- restarting the one production host is an owner decision. Plan a reboot; the stack comes back by itself (Quadlet units are WantedBy=default.target and the service user lingers)."
+      - eval_time: 35h
+        alertname: HostRebootRequired
+        exp_alerts: []

@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Fail when e2e.yml's concurrency selector stops mirroring its job gate.
+"""Fail when e2e.yml's job gates stop mirroring its concurrency selector.
 
-``concurrency.group`` must embed ``jobs.e2e.if`` verbatim, select ``'suite'`` for
-admitted runs and fall back to ``github.run_id`` otherwise, and ``pull_request.types``
-must contain ``labeled`` (ADR-0169).
+``concurrency.group`` holds the gate once, selects ``'suite'`` for admitted runs and falls back to
+``github.run_id`` otherwise; every gated job (``e2e``, ``build-stack``, ``build-stack-main``) must
+carry that gate verbatim as one ``&&`` conjunct of its ``if``, and ``pull_request.types`` must
+contain ``labeled`` (ADR-0169, ADR-0317).
 
 Exit codes:
-  0  -> the selector still mirrors the gate.
+  0  -> every gated job still mirrors the selector.
   1  -> they have drifted; each problem is printed with what must change.
 
 Usage:
@@ -24,12 +25,14 @@ import yaml
 REPO = Path(__file__).resolve().parents[2]
 WORKFLOW = REPO / ".github" / "workflows" / "e2e.yml"
 
-JOB = "e2e"
+GATED_JOBS = ("e2e", "build-stack", "build-stack-main")
 SUITE_KEY = "'suite'"
 
 UNIQUE_KEY = "github.run_id"
 
 REQUIRED_PR_TYPE = "labeled"
+
+SELECTOR = re.compile(r"\$\{\{(?P<gate>(?:(?!\$\{\{).)*?)&&\s*'suite'", re.DOTALL)
 
 
 def _normalise(expression: str) -> str:
@@ -37,8 +40,32 @@ def _normalise(expression: str) -> str:
     return re.sub(r"\s+", " ", expression).strip()
 
 
+def conjuncts(expression: str) -> list[str]:
+    """Split an expression at its top-level ``&&``, outside parentheses and string literals."""
+    parts: list[str] = []
+    depth = 0
+    quoted = False
+    start = 0
+    i = 0
+    while i < len(expression):
+        char = expression[i]
+        if char == "'":
+            quoted = not quoted
+        elif not quoted and char == "(":
+            depth += 1
+        elif not quoted and char == ")":
+            depth -= 1
+        elif not quoted and depth == 0 and expression.startswith("&&", i):
+            parts.append(expression[start:i])
+            start = i + 2
+            i += 1
+        i += 1
+    parts.append(expression[start:])
+    return [_normalise(part) for part in parts]
+
+
 def check(document: str) -> list[str]:
-    """Return one message per way the workflow's two copies of the gate disagree.
+    """Return one message per way the workflow's copies of the gate disagree.
 
     Takes the workflow source text; an empty list means they agree.
     """
@@ -47,23 +74,10 @@ def check(document: str) -> list[str]:
 
     concurrency = workflow.get("concurrency") or {}
     group = concurrency.get("group")
-    job = (workflow.get("jobs") or {}).get(JOB) or {}
-    gate = job.get("if")
-
     if not group:
         return ["concurrency.group is missing -- every run would share one group."]
-    if not gate:
-        return [f"jobs.{JOB}.if is missing -- the heavy suite would run on every event."]
 
-    group_n, gate_n = _normalise(group), _normalise(gate)
-
-    if gate_n not in group_n:
-        problems.append(
-            f"concurrency.group no longer contains jobs.{JOB}.if verbatim, so a run that will\n"
-            f"  skip can cancel the run that would have executed.\n"
-            f"  gate  : {gate_n}\n"
-            f"  group : {group_n}"
-        )
+    group_n = _normalise(group)
     if SUITE_KEY not in group_n:
         problems.append(
             f"concurrency.group no longer selects {SUITE_KEY} for the runs the gate admits; "
@@ -74,6 +88,28 @@ def check(document: str) -> list[str]:
             f"concurrency.group no longer falls back to {UNIQUE_KEY}, so the runs that skip "
             "share a group again and cancel each other -- which reads as `fail` on the PR."
         )
+
+    match = SELECTOR.search(group)
+    gate = _normalise(match.group("gate")) if match else ""
+    if not gate:
+        problems.append(
+            "concurrency.group holds no `${{ <gate> && 'suite' || ... }}` selector, so there is "
+            "no gate the jobs could mirror."
+        )
+
+    jobs = workflow.get("jobs") or {}
+    for name in GATED_JOBS:
+        condition = (jobs.get(name) or {}).get("if")
+        if not condition:
+            problems.append(f"jobs.{name}.if is missing -- the job would run on every event.")
+            continue
+        if gate and gate not in conjuncts(condition):
+            problems.append(
+                f"jobs.{name}.if no longer carries the selector's gate as one `&&` conjunct, so\n"
+                f"  a run that will skip can cancel the run that would have executed.\n"
+                f"  gate : {gate}\n"
+                f"  if   : {_normalise(condition)}"
+            )
 
     triggers = workflow.get(True) or workflow.get("on") or {}
     types = ((triggers or {}).get("pull_request") or {}).get("types") or []
@@ -97,15 +133,28 @@ concurrency:
     && 'suite' || format('noop-{0}', github.run_id) }}
   cancel-in-progress: true
 jobs:
+  build-stack:
+    if: >-
+      (github.event_name != 'pull_request' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'e2e')) &&
+      !(github.event_name != 'pull_request' && github.ref == 'refs/heads/main')
+  build-stack-main:
+    if: >-
+      (github.event_name != 'pull_request' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'e2e')) &&
+      (github.event_name != 'pull_request' && github.ref == 'refs/heads/main')
   e2e:
     if: >-
-      github.event_name != 'pull_request' ||
-      (github.event.action == 'labeled' && github.event.label.name == 'e2e')
+      !cancelled() &&
+      (github.event_name != 'pull_request' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'e2e')) &&
+      (needs.build-stack.result == 'success' || needs.build-stack-main.result == 'success')
 """
 
-_GOOD_GATE = (
-    "      github.event_name != 'pull_request' ||\n"
-    "      (github.event.action == 'labeled' && github.event.label.name == 'e2e')"
+_GOOD_E2E_GATE = (
+    "      !cancelled() &&\n"
+    "      (github.event_name != 'pull_request' ||\n"
+    "      (github.event.action == 'labeled' && github.event.label.name == 'e2e')) &&"
 )
 
 _GOOD_GROUP = (
@@ -116,14 +165,25 @@ _GOOD_GROUP = (
 
 
 def selftest() -> int:
-    """Check that the detector tells a mirrored selector from each drifted variant; return the exit code."""
+    """Check that the detector tells a mirrored workflow from each drifted variant; return the exit code."""
     cases: list[tuple[str, str, bool]] = [
-        ("mirrored selector", _GOOD, False),
+        ("mirrored gates", _GOOD, False),
         (
-            "gate widened, group left behind",
+            "e2e gate widened, group left behind",
             _GOOD.replace(
-                _GOOD_GATE,
-                "      github.event_name != 'pull_request' || github.event.action == 'labeled'",
+                _GOOD_E2E_GATE,
+                "      !cancelled() &&\n"
+                "      (github.event_name != 'pull_request' || github.event.action == 'labeled') &&",
+            ),
+            True,
+        ),
+        (
+            "build job gate OR-ed open",
+            _GOOD.replace(
+                "      (github.event.action == 'labeled' && github.event.label.name == 'e2e')) &&\n"
+                "      !(github.event_name",
+                "      (github.event.action == 'labeled' && github.event.label.name == 'e2e')) ||\n"
+                "      !(github.event_name",
             ),
             True,
         ),
@@ -142,7 +202,11 @@ def selftest() -> int:
             _GOOD.replace("[opened, synchronize, reopened, labeled]", "[opened, synchronize]"),
             True,
         ),
-        ("gate deleted", _GOOD.replace("    if: >-", "    unrelated-key: >-"), True),
+        (
+            "cache-writer gate deleted",
+            _GOOD.replace("  build-stack-main:\n    if:", "  build-stack-main:\n    x:"),
+            True,
+        ),
     ]
 
     failures = 0
@@ -166,16 +230,17 @@ def main() -> int:
     problems = check(WORKFLOW.read_text(encoding="utf-8"))
     if problems:
         relative = WORKFLOW.relative_to(REPO).as_posix()
-        print(f"{relative}: the concurrency selector and the job gate disagree.\n")
+        print(f"{relative}: the concurrency selector and the job gates disagree.\n")
         for problem in problems:
             print(f"- {problem}")
         print(
-            "\nBoth must state the same decision; see ADR-0169 and REQ-OPS-027. If the gate\n"
-            "changed on purpose, copy it into the concurrency.group selector verbatim."
+            "\nAll must state the same decision; see ADR-0169, ADR-0317 and REQ-OPS-027. If the\n"
+            "gate changed on purpose, copy it into the concurrency.group selector and into every\n"
+            "gated job's if verbatim."
         )
         return 1
 
-    print("e2e.yml: the concurrency selector mirrors the job gate.")
+    print("e2e.yml: every gated job mirrors the concurrency selector.")
     return 0
 
 

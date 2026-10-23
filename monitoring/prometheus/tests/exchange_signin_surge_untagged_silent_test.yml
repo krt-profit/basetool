@@ -1,0 +1,15 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: silent - refresh events carry their client_id
+    interval: 5m
+    input_series:
+      - series: 'keycloak_user_events_total{job="keycloak", realm="iri", idp="", event="refresh_token", error="", client_id="basetool-frontend"}'
+        values: "0+2x40"
+    alert_rule_test:
+      - eval_time: 3h
+        alertname: KeycloakEventMetricsUntagged
+        exp_alerts: []

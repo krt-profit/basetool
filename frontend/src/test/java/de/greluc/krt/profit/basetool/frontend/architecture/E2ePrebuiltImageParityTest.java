@@ -114,15 +114,17 @@ class E2ePrebuiltImageParityTest {
   }
 
   /**
-   * The matrix job actually asks for prebuilt mode -- otherwise the build-stack job would build for
-   * nobody and every cell would build again.
+   * The matrix job actually asks for prebuilt mode and waits for both build variants -- otherwise
+   * the build jobs would build for nobody and every cell would build again (ADR-0317).
    *
    * @throws IOException if the workflow cannot be read
    */
   @Test
-  void theMatrixRunsInPrebuiltModeAndDependsOnTheBuildJob() throws IOException {
+  void theMatrixRunsInPrebuiltModeAndDependsOnTheBuildJobs() throws IOException {
     String workflow = Files.readString(WORKFLOW, StandardCharsets.UTF_8);
-    assertThat(workflow).contains("-Pe2e.prebuilt=true").contains("needs: build-stack");
+    assertThat(workflow)
+        .contains("-Pe2e.prebuilt=true")
+        .contains("needs: [build-stack, build-stack-main]");
   }
 
   /**

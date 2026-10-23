@@ -1,0 +1,29 @@
+rule_files:
+  - ../alerts/infrastructure.yml
+  - ../alerts/ops-automation.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: "PostgresDown - an exporter that answers pg_up 0 pages, one that answers 1 does not"
+    interval: 1m
+    input_series:
+      - series: "pg_up{job=\"postgres-backend\", instance=\"postgres-exporter-backend:9187\", database=\"basetool-backend\"}"
+        values: "1x2 0x10"
+      - series: "pg_up{job=\"postgres-keycloak\", instance=\"postgres-exporter-keycloak:9187\", database=\"keycloak\"}"
+        values: "1x12"
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: PostgresDown
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: PostgresDown
+        exp_alerts:
+          - exp_labels:
+              severity: "critical"
+              job: "postgres-backend"
+              instance: "postgres-exporter-backend:9187"
+              database: "basetool-backend"
+            exp_annotations:
+              summary: "PostgreSQL down: basetool-backend"
+              description: "postgres-exporter for basetool-backend has not been able to connect to its database for 2 minutes (pg_up == 0) while the exporter itself answers -- the database is down, refusing connections, or out of connection slots. Check `sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) systemctl --user status db-backend.service` (or db-keycloak.service) and its journal (`journalctl CONTAINER_NAME=db-backend`)."

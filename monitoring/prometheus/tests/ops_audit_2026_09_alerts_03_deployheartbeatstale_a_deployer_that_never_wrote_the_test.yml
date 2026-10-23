@@ -1,0 +1,24 @@
+rule_files:
+  - ../alerts/infrastructure.yml
+  - ../alerts/ops-automation.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: "DeployHeartbeatStale - a deployer that never wrote the gauge fires"
+    interval: 1m
+    input_series:
+      - series: "basetool_deploy_last_success_timestamp"
+        values: "0x60"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: DeployHeartbeatStale
+        exp_alerts: []
+      - eval_time: 30m
+        alertname: DeployHeartbeatStale
+        exp_alerts:
+          - exp_labels:
+              severity: "warning"
+            exp_annotations:
+              summary: "Deploy heartbeat stale >1h (no tick has verified the stack)"
+              description: "No deploy tick has observed the stack at its target and healthy for over an hour, or the heartbeat metric is absent -- so the running stack is not being verified and no release can reach it. Check `systemctl list-timers iri-deploy.timer` and `systemctl status iri-deploy.service`, then `{app=\"ops-deploy\"}` in Grafana -> Explore -> Loki for the last tick's lines (a FATAL, a lock message, or nothing at all). A deliberate skip (a gated stateful-infra change, a backoff after a rollback) also stops the heartbeat; DeployConfigBlocked and DeployRolledBack name those."

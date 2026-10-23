@@ -1,0 +1,17 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: silent - the gauge is absent but the backend only just restarted
+    interval: 1m
+    input_series:
+      - series: 'process_start_time_seconds{job="basetool-backend"}'
+        values: "60x40"
+      - series: 'basetool_scheduled_job_enabled{task="business_metrics"}'
+        values: "1x40"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: BusinessMetricsStale
+        exp_alerts: []

@@ -1,6 +1,6 @@
 # ADR-0200 — The E2E images are built once per run and shared as an artifact
 
-- **Status:** Accepted
+- **Status:** Accepted — amended by [ADR-0317](0317-the-e2e-image-build-reads-a-registry-cache-that-only-main-writes.md) (2026-10-23: the build reads a GHCR layer cache that only `main` writes, in two job variants)
 - **Date:** 2026-09-22
 - **Deciders:** @greluc (improvement audit 2026-09, item CI-06)
 - **Related:** [ADR-0137](0137-one-image-build-per-commit-and-no-buildkit-layer-cache.md) (no

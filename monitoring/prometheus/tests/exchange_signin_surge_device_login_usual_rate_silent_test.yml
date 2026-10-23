@@ -1,0 +1,15 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: silent - a busy client at its usual rate is not a surge
+    interval: 30m
+    input_series:
+      - series: 'keycloak_user_events_total{job="keycloak", realm="iri", idp="", event="oauth2_device_verify_user_code", error="", client_id="versekit"}'
+        values: "0+10x348"
+    alert_rule_test:
+      - eval_time: 170h
+        alertname: ExchangeClientDeviceLoginSurge
+        exp_alerts: []

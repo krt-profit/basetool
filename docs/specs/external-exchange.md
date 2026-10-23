@@ -1955,7 +1955,8 @@ tombstones and journal reports task metrics.
   tag goes missing; the „Exchange" dashboard shows the events per client. A device flow that is only
   started or polled emits no Keycloak event (verified against 26.8: `DeviceEndpoint` raises
   `OAUTH2_DEVICE_AUTH` for errors only), so the signal is the confirmed code, not the start
-  (ADR-0303). *`exchange_signin_surge_alerts_test.yml`.*
+  (ADR-0303). *`exchange_signin_surge_*_test.yml`, one file per case so the week-long series
+  evaluate in parallel.*
 - `basetool_ingest_gate_enforcing` is not extended to the exchange gates, since they cannot be
   switched off (owner decision 2026-09-27).
 
@@ -1982,7 +1983,7 @@ writes the E2E realm (`frontend/src/e2e/resources/realm-export.e2e.json`) from t
 E2E accounts, production's realm settings and login theme, and the third-party client
 `e2e-exchange-client`; `E2eStackExtension` starts `ingest-dev` beside the other six services, and
 `ExchangeRoundTripE2eTest` runs the exchange round trip of REQ-XCH-032 in every browser × device
-cell of `e2e.yml`. `ExchangeConnectionsE2eTest` (installation revoke, reconnect, account check,
+cell of `e2e.yml` (two device classes on a pull request, all six nightly, ADR-0312). `ExchangeConnectionsE2eTest` (installation revoke, reconnect, account check,
 admin suspension), `ExchangeSyncE2eTest` (corpus round trip, confirmed mass change) and
 `ExchangeDepartureE2eTest` run the same way, each as its own account (`test-exchange-2`,
 `test-exchange-3`, `test-exchange-departed`), with the steps they share in `ExchangeE2eSupport`.
@@ -2343,7 +2344,7 @@ succeeding, never succeeded).
   retention shorter than the change retention, or than 90 days, refuses to start.
   *`ExchangeConnectionRetentionTaskTest`, `BackendPropertiesValidationTest`.*
 - [x] `ScheduledJobStale` fires for the job when it stopped or never succeeded.
-  *`scheduled_job_never_succeeded_test.yml`.*
+  *`scheduled_job_never_succeeded_*_test.yml`.*
 
 **Status:** built (#2092)
 
@@ -2390,7 +2391,10 @@ contract allows.
   `src/main`, the published
   fixtures or the shared seam definition — fails the `Exchange changes carry the e2e label` job of
   `e2e.yml` until it carries the `e2e` label, so the full E2E suite runs on it
-  (`.github/scripts/check_exchange_e2e_label.py`, self-tested in `repo-lint.yml`).
+  (`.github/scripts/check_exchange_e2e_label.py`, self-tested in `repo-lint.yml`). The job runs on
+  `opened`, `synchronize`, `reopened` and when `e2e` is added; adding any other label afterwards
+  reports it as `skipped`, which can hide an earlier failure until `e2e` is added or the next push
+  (ADR-0311).
 
 Every guard is proven able to fail by a planted violation in its own test.
 

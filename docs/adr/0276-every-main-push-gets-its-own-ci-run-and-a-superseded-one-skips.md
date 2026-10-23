@@ -1,6 +1,6 @@
 # ADR-0276 — Every `main` push gets its own CI run, and a superseded one skips
 
-- **Status:** Accepted
+- **Status:** Accepted — amended by [ADR-0310](0310-the-superseded-check-runs-only-on-a-main-push.md) (2026-10-23: the `Superseded check` job runs on a push only)
 - **Date:** 2026-10-17
 - **Deciders:** @greluc
 - **Related:** [ADR-0137](0137-one-image-build-per-commit-and-no-buildkit-layer-cache.md) (its 2026-09-23

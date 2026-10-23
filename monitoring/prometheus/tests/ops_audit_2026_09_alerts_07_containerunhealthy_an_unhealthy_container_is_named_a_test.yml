@@ -1,0 +1,39 @@
+rule_files:
+  - ../alerts/infrastructure.yml
+  - ../alerts/ops-automation.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: "ContainerUnhealthy - an unhealthy container is named, a starting and a healthy one are not"
+    interval: 1m
+    input_series:
+      - series: "podman_container_info{id=\"aaa\", image=\"x\", name=\"keycloak\", pod_id=\"\", pod_name=\"\", ports=\"\"}"
+        values: "1x30"
+      - series: "podman_container_health{id=\"aaa\", pod_id=\"\", pod_name=\"\"}"
+        values: "1x30"
+      - series: "podman_container_info{id=\"bbb\", image=\"x\", name=\"backend\", pod_id=\"\", pod_name=\"\", ports=\"\"}"
+        values: "1x30"
+      - series: "podman_container_health{id=\"bbb\", pod_id=\"\", pod_name=\"\"}"
+        values: "2x30"
+      - series: "podman_container_info{id=\"ccc\", image=\"x\", name=\"redis\", pod_id=\"\", pod_name=\"\", ports=\"\"}"
+        values: "1x30"
+      - series: "podman_container_health{id=\"ccc\", pod_id=\"\", pod_name=\"\"}"
+        values: "0x30"
+      - series: "podman_container_info{id=\"ddd\", image=\"x\", name=\"acme\", pod_id=\"\", pod_name=\"\", ports=\"\"}"
+        values: "1x30"
+      - series: "podman_container_health{id=\"ddd\", pod_id=\"\", pod_name=\"\"}"
+        values: "-1x30"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: ContainerUnhealthy
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: ContainerUnhealthy
+        exp_alerts:
+          - exp_labels:
+              severity: "warning"
+              name: "keycloak"
+            exp_annotations:
+              summary: "Container unhealthy: keycloak"
+              description: "Container keycloak has failed its own health check for 10 minutes. For backend, frontend and ingest deploy.sh restarts it on its next tick (DeployHealthRestartFailing pages if that does not help); for every other container nothing restarts it automatically. Check `sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) podman healthcheck run keycloak` and `journalctl CONTAINER_NAME=keycloak`."

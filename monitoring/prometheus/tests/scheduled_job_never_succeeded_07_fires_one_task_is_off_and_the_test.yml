@@ -1,0 +1,23 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: fires - one task is off and the other is dead, and only the dead one fires
+    interval: 1m
+    input_series:
+      - series: 'process_start_time_seconds{job="basetool-backend"}'
+        values: "0x3100"
+      - series: 'basetool_scheduled_job_enabled{task="uex_sync"}'
+        values: "1x3100"
+    alert_rule_test:
+      - eval_time: 50h
+        alertname: ExternalSyncStale
+        exp_alerts:
+          - exp_labels:
+              severity: "warning"
+              task: "uex_sync"
+            exp_annotations:
+              summary: "External sync stale >48h (uex_sync)"
+              description: "The uex_sync catalogue sync last succeeded more than 48 hours ago."

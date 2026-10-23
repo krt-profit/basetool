@@ -1,0 +1,19 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: silent - a retention sweep switched off on purpose is not a stale one
+    interval: 1m
+    input_series:
+      - series: 'process_start_time_seconds{job="basetool-backend"}'
+        values: "0x1900"
+      - series: 'basetool_scheduled_job_enabled{task="notification_retention"}'
+        values: "1x1900"
+      - series: 'basetool_scheduled_job_last_success_timestamp_seconds{task="notification_retention"}'
+        values: "0+60x1900"
+    alert_rule_test:
+      - eval_time: 30h
+        alertname: ScheduledJobStale
+        exp_alerts: []

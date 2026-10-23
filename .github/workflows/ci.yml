@@ -19,6 +19,7 @@ permissions:
 jobs:
   supersede:
     name: Superseded check
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
