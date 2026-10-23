@@ -26,7 +26,6 @@ import static org.mockito.Mockito.*;
 import de.greluc.krt.profit.basetool.frontend.dashboard.client.DashboardBackendClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
-import jakarta.servlet.http.HttpSession;
 import java.util.Collections;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
@@ -42,7 +41,6 @@ class HomeControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     HomeController controller = new HomeController(new DashboardBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
-    HttpSession session = mock(HttpSession.class);
     OidcUser user = mock(OidcUser.class);
 
     when(user.getFullName()).thenReturn("Max Mustermann");

@@ -9,7 +9,6 @@ import csv
 import json
 import os
 import re
-import sys
 from collections import Counter
 
 REPO = r"$REPO"
@@ -76,4 +75,4 @@ def main():
     print("admitted operations per first segment:", sorted(fam.items()))
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

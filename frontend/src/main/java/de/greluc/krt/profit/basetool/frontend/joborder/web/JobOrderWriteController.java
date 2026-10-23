@@ -135,7 +135,6 @@ public class JobOrderWriteController {
    *
    * @param form the bound item-order form
    * @param redirectAttributes flash carrier for toasts / re-render
-   * @param principal the caller, or {@code null} for anonymous
    * @return redirect target
    */
   @NotNull
@@ -143,8 +142,7 @@ public class JobOrderWriteController {
   public String createItemOrder(
       @ModelAttribute("jobOrderItemForm") JobOrderItemForm form,
       @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
-      RedirectAttributes redirectAttributes,
-      @AuthenticationPrincipal OidcUser principal) {
+      RedirectAttributes redirectAttributes) {
     try {
       List<CreateJobOrderItemLineDto> lines = buildItemLineDtos(form);
 
@@ -342,8 +340,7 @@ public class JobOrderWriteController {
   public String createOrder(
       @ModelAttribute("jobOrderForm") JobOrderForm form,
       @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
-      RedirectAttributes redirectAttributes,
-      @AuthenticationPrincipal OidcUser principal) {
+      RedirectAttributes redirectAttributes) {
     try {
       List<CreateJobOrderMaterialDto> materials =
           form.getMaterials().stream()

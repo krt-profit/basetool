@@ -90,10 +90,9 @@ class JobOrderHandoverReportControllerTest {
     when(jobOrderHandoverReportService.generateHandoverReport(jobOrderId, handoverId, null))
         .thenThrow(new NotFoundException("Handover not found"));
 
-    NotFoundException ex =
-        assertThrows(
-            NotFoundException.class,
-            () -> controller.downloadHandoverReport(jobOrderId, handoverId, null));
+    assertThrows(
+        NotFoundException.class,
+        () -> controller.downloadHandoverReport(jobOrderId, handoverId, null));
   }
 
   @Test

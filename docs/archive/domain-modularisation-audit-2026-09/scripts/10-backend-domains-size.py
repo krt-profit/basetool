@@ -28,7 +28,6 @@ def main():
                 t = fh.read()
             t = re.sub(r"/\*.*?\*/", lambda m: re.sub(r"[^\n]", " ", m.group(0)), t, flags=re.S)
             n = len(PUB.findall(t))
-            ctor = len(re.findall(r"^  (?:private|final|@)?.*\b" + re.escape(r["simple"]) + r"\s*\(", t, re.M))
             deps = len(re.findall(r"^  private final (?!static)[\w<>.,? ]+\s+\w+;", t, re.M))
             pubs.append((n, r["simple"], r["domain"], r["layer"], loc, deps))
     total = sum(len(v) for v in big.values())

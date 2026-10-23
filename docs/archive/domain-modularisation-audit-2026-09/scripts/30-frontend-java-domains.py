@@ -210,7 +210,8 @@ def build_map(classes):
     return dmap
 
 def main():
-    data = json.load(open(os.path.join(HERE, "30-frontend-java-scan.json"), encoding="utf-8"))
+    with open(os.path.join(HERE, "30-frontend-java-scan.json"), encoding="utf-8") as fh:
+        data = json.load(fh)
     classes = data["classes"]
     dmap = build_map(classes)
     unmapped = [k for k, v in dmap.items() if v == "UNMAPPED"]
@@ -246,17 +247,18 @@ def main():
     print("totals", dict(tot))
 
     edges = set()
-    for line in open(os.path.join(HERE, "jdeps-frontend.txt"), encoding="utf-8", errors="replace"):
-        m = re.match(r"\s+(\S+)\s+->\s+(\S+)\s+", line)
-        if not m:
-            continue
-        a, b = m.group(1), m.group(2)
-        if not (a.startswith(BASE) and b.startswith(BASE)):
-            continue
-        a = a[len(BASE):].split("$")[0]
-        b = b[len(BASE):].split("$")[0]
-        if a != b:
-            edges.add((a, b))
+    with open(os.path.join(HERE, "jdeps-frontend.txt"), encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            m = re.match(r"\s+(\S+)\s+->\s+(\S+)\s+", line)
+            if not m:
+                continue
+            a, b = m.group(1), m.group(2)
+            if not (a.startswith(BASE) and b.startswith(BASE)):
+                continue
+            a = a[len(BASE):].split("$")[0]
+            b = b[len(BASE):].split("$")[0]
+            if a != b:
+                edges.add((a, b))
     print()
     print("folded frontend-internal edges:", len(edges))
 
@@ -328,7 +330,8 @@ def main():
     for a, b in sorted(ctrl_ctrl):
         print(f"  {a.split('.')[-1]:45s} -> {b.split('.')[-1]:40s} [{dom_of(a)} -> {dom_of(b)}]")
 
-    json.dump({"domain_map": dmap}, open(os.path.join(HERE, "30-frontend-java-domainmap.json"), "w"), indent=1)
+    with open(os.path.join(HERE, "30-frontend-java-domainmap.json"), "w") as fh:
+        json.dump({"domain_map": dmap}, fh, indent=1)
 
 if __name__ == "__main__":
     main()

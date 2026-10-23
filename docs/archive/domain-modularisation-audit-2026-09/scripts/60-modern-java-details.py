@@ -3,11 +3,11 @@
 import collections
 import json
 import os
-import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-D = json.load(open(os.path.join(HERE, "60-modern-java-data.json"), encoding="utf-8"))
+with open(os.path.join(HERE, "60-modern-java-data.json"), encoding="utf-8") as fh:
+    D = json.load(fh)
 SECTION = sys.argv[1] if len(sys.argv) > 1 else "all"
 
 def sec(name):

@@ -159,7 +159,9 @@ class ScLinkCatalogTest {
     Properties messages = new Properties();
     try (InputStream in = getClass().getClassLoader().getResourceAsStream(bundle)) {
       assertThat(in).as(bundle).isNotNull();
-      messages.load(new InputStreamReader(in, StandardCharsets.UTF_8));
+      try (InputStreamReader reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
+        messages.load(reader);
+      }
     }
     List<String> required =
         Stream.of(

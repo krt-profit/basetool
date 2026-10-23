@@ -71,8 +71,7 @@ public final class ModuleDependencyRule {
         .definedBy(identifier)
         .derivingModule(
             DescriptorFunction.describe(
-                "named after the module",
-                (id, contained) -> ArchModule.Descriptor.create(id.getPart(1))))
+                "named after the module", (id, _) -> ArchModule.Descriptor.create(id.getPart(1))))
         .should(respectRanks(map, classes))
         .as(description);
   }

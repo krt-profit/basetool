@@ -7,7 +7,8 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
-data = json.load(open(os.path.join(HERE, "sept_audit_findings.json"), encoding="utf-8"))
+with open(os.path.join(HERE, "sept_audit_findings.json"), encoding="utf-8") as fh:
+    data = json.load(fh)
 want = set(sys.argv[1:])
 for x in data:
     if want and x["id"] not in want:

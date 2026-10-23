@@ -251,8 +251,7 @@ class MissionFinancePageControllerTest {
 
     @Test
     void happyPath_callsBackendDelete_andRedirects() {
-      String view =
-          controller.deleteFinanceEntry(MISSION_ID, ENTRY_ID, principal, redirectAttributes);
+      String view = controller.deleteFinanceEntry(MISSION_ID, ENTRY_ID, redirectAttributes);
 
       assertEquals("redirect:/missions/" + MISSION_ID, view);
       verify(backendApiClient)
@@ -272,8 +271,7 @@ class MissionFinancePageControllerTest {
           .when(backendApiClient)
           .delete(anyString(), any(), any(Object[].class));
 
-      String view =
-          controller.deleteFinanceEntry(MISSION_ID, ENTRY_ID, principal, redirectAttributes);
+      String view = controller.deleteFinanceEntry(MISSION_ID, ENTRY_ID, redirectAttributes);
 
       assertEquals("redirect:/missions/" + MISSION_ID, view);
       assertEquals(
@@ -300,7 +298,7 @@ class MissionFinancePageControllerTest {
               eq(MISSION_ID)))
           .thenReturn(created);
 
-      ResponseEntity<Object> resp = controller.addFinanceEntryAjax(MISSION_ID, body, principal);
+      ResponseEntity<Object> resp = controller.addFinanceEntryAjax(MISSION_ID, body);
 
       assertEquals(200, resp.getStatusCode().value());
       assertEquals(created, resp.getBody());

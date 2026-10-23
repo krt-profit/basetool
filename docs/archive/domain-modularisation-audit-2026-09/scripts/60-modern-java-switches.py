@@ -6,7 +6,8 @@ import os
 import re
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-D = json.load(open(os.path.join(HERE, "60-modern-java-data.json"), encoding="utf-8"))
+with open(os.path.join(HERE, "60-modern-java-data.json"), encoding="utf-8") as fh:
+    D = json.load(fh)
 SW = D["switches"]
 
 SEC = re.compile(r"(Role|Permission|Capability|Authority|Scope|Access|Grant|Approv|Status|State|Audit|Kind|Visibility|Level|Gate|Decision|Outcome|Verdict|Mode|Action|Grantee|Relative|Membership)", re.I)
@@ -85,7 +86,8 @@ for sw in SW:
         print(sw["rel"].split("/")[-1], sw["line"], "EXPR" if sw["expr"] else "STMT", "+".join(sw["forms"]), "default:" + (sw["default"]["kind"] if sw["has_default"] else "-"), len(sw["labels"]))
 
 print("\n== bytecode switch events without a matching source switch ==")
-bc = json.load(open(os.path.join(HERE, "60-modern-java-bytecode.json"), encoding="utf-8"))["events"]
+with open(os.path.join(HERE, "60-modern-java-bytecode.json"), encoding="utf-8") as fh:
+    bc = json.load(fh)["events"]
 matched = set()
 for sw in SW:
     for e in sw.get("bytecode", []):

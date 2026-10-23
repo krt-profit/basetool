@@ -14,13 +14,13 @@ for dp, _, fns in os.walk(ROOT):
         if not fn.endswith(".java"):
             continue
         path = os.path.join(dp, fn)
-        lines = open(path, encoding="utf-8").read().split("\n")
+        with open(path, encoding="utf-8") as fh:
+            lines = fh.read().split("\n")
         i = 0
         while i < len(lines):
             m = ANN.search(lines[i])
             if m and not lines[i].strip().startswith(("*", "/**", "//")):
                 kind = m.group(1)
-                args = m.group(2) or ""
                 j = i
                 block = lines[i]
                 while j + 1 < len(lines) and not re.search(r"^\s*(private|protected|public)\s+[^(]*;", lines[j]):

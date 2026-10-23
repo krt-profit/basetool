@@ -4,7 +4,8 @@ import json
 import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-D = json.load(open(os.path.join(HERE, "60-modern-java-data.json"), encoding="utf-8"))
+with open(os.path.join(HERE, "60-modern-java-data.json"), encoding="utf-8") as fh:
+    D = json.load(fh)
 C = D["counts"]
 COLS = [("backend", "main"), ("frontend", "main"), ("ingest", "main"), ("keycloak-spi", "main"),
         ("logging-support", "main"), ("test-support", "main")]

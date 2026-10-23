@@ -8,7 +8,6 @@
 import csv
 import os
 import re
-import sys
 from collections import Counter, defaultdict
 
 REPO = r"$REPO"
@@ -112,4 +111,4 @@ def main():
         print(f"   {sub:22s} {s:14s} {c}")
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

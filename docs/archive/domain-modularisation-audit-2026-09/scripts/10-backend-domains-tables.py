@@ -42,7 +42,8 @@ def writes_table():
     print("\n%d sites in %d caller methods" % (len(rows), len(grp)))
 
 def domain_table():
-    cards = json.load(open(os.path.join(here, "10-backend-domains-cards.json"), encoding="utf-8"))
+    with open(os.path.join(here, "10-backend-domains-cards.json"), encoding="utf-8") as fh:
+        cards = json.load(fh)
     print("| module | classes | LOC | endpoints | entities | Ce edges → modules | Ca edges ← modules |")
     print("| --- | ---: | ---: | ---: | ---: | --- | --- |")
     for d, c in sorted(cards.items(), key=lambda kv: -kv[1]["loc"]):

@@ -195,9 +195,7 @@ class InventoryItemServiceBulkCheckoutTest {
 
     BulkCheckoutRequest request = new BulkCheckoutRequest(List.of(missingItemId));
 
-    NotFoundException ex =
-        assertThrows(
-            NotFoundException.class, () -> inventoryItemService.bulkCheckout(request, userId));
+    assertThrows(NotFoundException.class, () -> inventoryItemService.bulkCheckout(request, userId));
 
     verify(inventoryItemRepository, never()).deleteAllById(any());
   }

@@ -4,14 +4,14 @@ schemas each tag references (to judge per-domain generation). Read-only."""
 import io
 import json
 import os
-import re
 import sys
 from collections import Counter, defaultdict
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 REPO = r"$REPO"
-spec = json.load(open(os.path.join(REPO, "backend", "src", "main", "resources", "api", "openapi.json"),
-                      encoding="utf-8"))
+with open(os.path.join(REPO, "backend", "src", "main", "resources", "api", "openapi.json"),
+          encoding="utf-8") as fh:
+    spec = json.load(fh)
 schemas = spec.get("components", {}).get("schemas", {})
 paths = spec.get("paths", {})
 print("openapi:", spec.get("openapi"), "schemas:", len(schemas), "paths:", len(paths))

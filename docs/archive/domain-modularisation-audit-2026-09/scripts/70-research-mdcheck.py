@@ -12,7 +12,8 @@ def count_pipes(line: str) -> int:
 
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    lines = open(sys.argv[1], encoding="utf-8").read().split("\n")
+    with open(sys.argv[1], encoding="utf-8") as fh:
+        lines = fh.read().split("\n")
     header = None
     problems = 0
     for number, line in enumerate(lines, 1):

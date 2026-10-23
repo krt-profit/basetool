@@ -34,7 +34,8 @@ FEATURES = [
 
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    data = json.load(open(sys.argv[1], encoding="utf-8"))
+    with open(sys.argv[1], encoding="utf-8") as fh:
+        data = json.load(fh)
     features = data["features"]
     print("| id | name | baseline | low date | high date | support |")
     print("| --- | --- | --- | --- | --- | --- |")

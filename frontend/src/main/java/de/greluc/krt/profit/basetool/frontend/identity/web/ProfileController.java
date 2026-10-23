@@ -312,7 +312,6 @@ public class ProfileController {
    *
    * @param form validated JSON payload
    * @param bindingResult validation errors of the JSON body
-   * @param principal authenticated OIDC user
    * @return 200 with {@code {version, description, displayName}}, otherwise an error body with a
    *     localized {@code detail}
    */
@@ -322,9 +321,7 @@ public class ProfileController {
       consumes = MediaType.APPLICATION_JSON_VALUE,
       produces = MediaType.APPLICATION_JSON_VALUE)
   public ResponseEntity<Map<String, Object>> updateDescriptionAjax(
-      @Valid @RequestBody ProfileDescriptionForm form,
-      BindingResult bindingResult,
-      @AuthenticationPrincipal OidcUser principal) {
+      @Valid @RequestBody ProfileDescriptionForm form, BindingResult bindingResult) {
     if (bindingResult.hasErrors()) {
       return ResponseEntity.badRequest().body(Map.of("detail", firstFieldError(bindingResult)));
     }
@@ -405,7 +402,6 @@ public class ProfileController {
    *
    * @param form validated JSON payload
    * @param bindingResult validation errors of the JSON body
-   * @param principal authenticated OIDC user
    * @return 200 with {@code {version, defaultPayoutPreference}}, otherwise an error body with a
    *     localized {@code detail}
    */
@@ -415,9 +411,7 @@ public class ProfileController {
       consumes = MediaType.APPLICATION_JSON_VALUE,
       produces = MediaType.APPLICATION_JSON_VALUE)
   public ResponseEntity<Map<String, Object>> updatePayoutPreferenceAjax(
-      @Valid @RequestBody ProfilePayoutPreferenceForm form,
-      BindingResult bindingResult,
-      @AuthenticationPrincipal OidcUser principal) {
+      @Valid @RequestBody ProfilePayoutPreferenceForm form, BindingResult bindingResult) {
     if (bindingResult.hasErrors()) {
       return ResponseEntity.badRequest().body(Map.of("detail", firstFieldError(bindingResult)));
     }
@@ -498,7 +492,6 @@ public class ProfileController {
    *
    * @param form validated JSON payload
    * @param bindingResult validation errors of the JSON body
-   * @param principal authenticated OIDC user
    * @return 200 with {@code {version, shareBlueprintsGlobally}}, otherwise an error body with a
    *     localized {@code detail}
    */
@@ -508,9 +501,7 @@ public class ProfileController {
       consumes = MediaType.APPLICATION_JSON_VALUE,
       produces = MediaType.APPLICATION_JSON_VALUE)
   public ResponseEntity<Map<String, Object>> updateBlueprintSharingAjax(
-      @Valid @RequestBody ProfileBlueprintSharingForm form,
-      BindingResult bindingResult,
-      @AuthenticationPrincipal OidcUser principal) {
+      @Valid @RequestBody ProfileBlueprintSharingForm form, BindingResult bindingResult) {
     if (bindingResult.hasErrors()) {
       return ResponseEntity.badRequest().body(Map.of("detail", firstFieldError(bindingResult)));
     }

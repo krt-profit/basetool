@@ -94,10 +94,9 @@ class JobOrderHandoverReportServiceTest {
   void generateHandoverReport_shouldThrowNotFound_whenHandoverDoesNotExist() {
     when(jobOrderHandoverRepository.findById(handoverId)).thenReturn(Optional.empty());
 
-    NotFoundException ex =
-        assertThrows(
-            NotFoundException.class,
-            () -> service.generateHandoverReport(jobOrderId, handoverId, null));
+    assertThrows(
+        NotFoundException.class,
+        () -> service.generateHandoverReport(jobOrderId, handoverId, null));
   }
 
   @Test
@@ -110,10 +109,9 @@ class JobOrderHandoverReportServiceTest {
 
     when(jobOrderHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
 
-    NotFoundException ex =
-        assertThrows(
-            NotFoundException.class,
-            () -> service.generateHandoverReport(jobOrderId, handoverId, null));
+    assertThrows(
+        NotFoundException.class,
+        () -> service.generateHandoverReport(jobOrderId, handoverId, null));
   }
 
   @Test

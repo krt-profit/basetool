@@ -9,7 +9,8 @@ hits = []
 for fn in sorted(os.listdir(ROOT)):
     if not fn.endswith(".java"):
         continue
-    src = open(os.path.join(ROOT, fn), encoding="utf-8").read()
+    with open(os.path.join(ROOT, fn), encoding="utf-8") as fh:
+        src = fh.read()
     m = re.search(r"public\s+record\s+(\w+)\s*\((.*?)\)\s*(implements[^{]*)?\{", src, re.S)
     if not m:
         continue

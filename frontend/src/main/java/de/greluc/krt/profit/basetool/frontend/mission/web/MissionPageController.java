@@ -302,7 +302,6 @@ public class MissionPageController {
    * @param size optional page size
    * @param fragment {@code "results"} to render only the results fragment for a live-filter swap
    * @param model the view model
-   * @param principal the signed-in user
    * @return the {@code missions-index} view name, or the results fragment selector
    */
   @NotNull
@@ -319,8 +318,7 @@ public class MissionPageController {
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String fragment,
-      Model model,
-      @AuthenticationPrincipal OidcUser principal) {
+      Model model) {
     List<String> knownStatuses =
         status == null
             ? List.of()

@@ -10,7 +10,6 @@ import importlib.util
 import json
 import os
 import re
-import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 _spec = importlib.util.spec_from_file_location("mjlex", os.path.join(HERE, "60-modern-java-lexer.py"))
@@ -472,7 +471,6 @@ for f in FILES:
         e = enclosing_type(f, mm.start())
         if e is None:
             continue
-        depth_ok = True
         hit("var.explicit_local_decl", f, mm.start(), n=1)
         if re.search(r"=\s*new\s+", f["code"][mm.end() - 1: mm.end() + 60].split(";")[0] if mm.end() else ""):
             hit("var.explicit_local_decl_new", f, mm.start())
@@ -1072,9 +1070,7 @@ for name, decls in DECLS.items():
         if len(subs) < 2:
             continue
         same_pkg = all(s["file"]["pkg"] == d["file"]["pkg"] for s in subs)
-        main_only = d["file"]["sset"] == "main"
         test_subs = [s for s in subs if s["file"]["sset"] != "main"]
-        anon_impls = 0
         SEALED_CANDIDATES.append({
             "name": name, "kind": d["kind"], "rel": d["file"]["rel"], "line": d["line"],
             "group": grp(d["file"]), "sealed": "sealed" in d["mods"], "n_subs": len(subs),

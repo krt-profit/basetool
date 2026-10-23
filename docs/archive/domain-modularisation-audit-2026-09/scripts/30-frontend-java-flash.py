@@ -24,7 +24,8 @@ for dirpath, _, files in os.walk(ROOT):
         if not f.endswith(".java"):
             continue
         path = os.path.join(dirpath, f)
-        src = scan.strip_comments(open(path, encoding="utf-8").read())
+        with open(path, encoding="utf-8") as fh:
+            src = scan.strip_comments(fh.read())
         for m in CALL.finditer(src):
             close = scan.matching_paren(src, m.end() - 1)
             args = scan.split_top_level(src[m.end():close])

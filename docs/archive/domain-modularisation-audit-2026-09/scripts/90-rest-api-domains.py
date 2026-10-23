@@ -8,7 +8,6 @@ import csv
 import json
 import os
 import re
-import sys
 from collections import Counter, defaultdict
 
 OUT = r"$SCRATCHPAD"
@@ -156,4 +155,4 @@ def main():
         json.dump({"header": hdr, "rows": table, "foreign": foreign}, fh, indent=1)
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

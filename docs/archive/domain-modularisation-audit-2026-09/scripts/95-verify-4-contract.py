@@ -8,7 +8,8 @@ TEST = os.path.join(REPO, r"backend\src\test\java\de\greluc\krt\profit\basetool\
 OAS = os.path.join(REPO, r"backend\src\main\resources\api\openapi.json")
 FROZEN = os.path.join(REPO, r"backend\src\test\resources\api\frozen-contract-types.txt")
 
-lines = open(TEST, encoding="utf-8").read().splitlines()
+with open(TEST, encoding="utf-8") as fh:
+    lines = fh.read().splitlines()
 block = "\n".join(lines[303:1833])
 joined = re.sub(r'"\s*\+\s*"', "", block)
 paths = sorted(set(re.findall(r'"(/api/v1/[^"]*)"', joined)))
@@ -18,7 +19,8 @@ print("  of them under /api/v1/exchange/**:", xch)
 mex = [p for p in paths if p.startswith("/api/v1/material-exchange")]
 print("  (material-exchange paths, a different domain:", len(mex), ")")
 
-doc = json.load(open(OAS, encoding="utf-8"))
+with open(OAS, encoding="utf-8") as fh:
+    doc = json.load(fh)
 schemas = doc["components"]["schemas"]
 
 def refs(node, out):
@@ -63,8 +65,9 @@ both = sorted(xcl & ccl)
 print("exchange schemas also reachable from the CONTRACT set:", both)
 
 frozen_schemas = set()
-for ln in open(FROZEN, encoding="utf-8"):
-    ln = ln.strip()
-    if ln and "." in ln.split("=", 1)[0]:
-        frozen_schemas.add(ln.split(".", 1)[0])
+with open(FROZEN, encoding="utf-8") as fh:
+    for ln in fh:
+        ln = ln.strip()
+        if ln and "." in ln.split("=", 1)[0]:
+            frozen_schemas.add(ln.split(".", 1)[0])
 print("frozen-contract-types.txt schemas that exchange operations use:", sorted(xcl & frozen_schemas))

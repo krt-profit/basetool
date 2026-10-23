@@ -12,7 +12,6 @@ import csv
 import json
 import os
 import re
-import sys
 from collections import defaultdict
 
 REPO = r"$REPO"
@@ -212,4 +211,4 @@ def main():
         json.dump({f"{k[0]} {k[1]}": v for k, v in moved_ops.items()}, fh, indent=1)
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

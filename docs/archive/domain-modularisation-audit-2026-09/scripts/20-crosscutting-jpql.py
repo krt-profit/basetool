@@ -20,7 +20,6 @@ def main():
             if a["type"] == "jakarta.persistence.Entity":
                 m = re.search(r'name="([^"]+)"', a["text"])
                 entities[m.group(1) if m else common.simple_name(fq)] = fq
-    fkres = json.load(open(os.path.join(common.SCRATCH, "20-crosscutting-fk.json"), encoding="utf-8"))
     queries = 0
     native = 0
     cross = collections.Counter()

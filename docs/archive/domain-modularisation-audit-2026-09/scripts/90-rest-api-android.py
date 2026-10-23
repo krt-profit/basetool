@@ -8,7 +8,6 @@ import csv
 import json
 import os
 import re
-import sys
 
 APP = r"$ANDROID_REPO"
 REPO = r"$REPO"
@@ -62,4 +61,4 @@ def main():
         print("   ", p, sorted(literals[p])[:3])
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

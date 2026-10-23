@@ -12,14 +12,15 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 scanmod = __import__("30-frontend-java-scan")
-data = json.load(open(os.path.join(HERE, "30-frontend-java-scan.json"), encoding="utf-8"))
+with open(os.path.join(HERE, "30-frontend-java-scan.json"), encoding="utf-8") as fh:
+    data = json.load(fh)
 
 cache = {}
 
 def src_of(rel):
     if rel not in cache:
-        cache[rel] = scanmod.strip_comments(
-            open(os.path.join(scanmod.ROOT, rel.replace("/", os.sep)), encoding="utf-8").read())
+        with open(os.path.join(scanmod.ROOT, rel.replace("/", os.sep)), encoding="utf-8") as fh:
+            cache[rel] = scanmod.strip_comments(fh.read())
     return cache[rel]
 
 kinds = Counter()

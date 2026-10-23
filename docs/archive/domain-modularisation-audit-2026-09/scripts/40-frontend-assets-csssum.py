@@ -4,7 +4,8 @@ from collections import Counter
 
 sys.stdout.reconfigure(encoding="utf-8")
 BASE = r"$SCRATCHPAD"
-d = json.load(open(BASE + r"\40-frontend-assets-css.json", encoding="utf-8"))
+with open(BASE + r"\40-frontend-assets-css.json", encoding="utf-8") as fh:
+    d = json.load(fh)
 res = d["results"]
 mode = sys.argv[1] if len(sys.argv) > 1 else "totals"
 

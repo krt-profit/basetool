@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -50,5 +52,8 @@ public class JacksonRefineryOrderTest {
     String json = mapper.writeValueAsString(orderDto);
 
     RefineryOrder order = mapper.readValue(json, RefineryOrder.class);
+
+    assertThat(order.getDurationMinutes()).isEqualTo(10L);
+    assertThat(order.getExpenses()).isEqualTo(100.0);
   }
 }

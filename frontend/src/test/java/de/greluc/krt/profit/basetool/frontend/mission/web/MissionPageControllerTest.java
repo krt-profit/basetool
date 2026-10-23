@@ -58,17 +58,6 @@ class MissionPageControllerTest {
 
   private static final ParallelPageLoader PARALLEL = new ParallelPageLoader();
 
-  /**
-   * Builds a {@link FrontendAuthHelperService} mock for injection into the {@link
-   * MissionWriteController} under test.
-   *
-   * @param anonymous the anonymity flag the test case models
-   * @return an auth-helper mock for the controller under test
-   */
-  private static FrontendAuthHelperService authHelper(boolean unusedAnonymousFlag) {
-    return mock(FrontendAuthHelperService.class);
-  }
-
   @Test
   void createMissionForm_ShouldInitializeModelCorrectly() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
@@ -437,7 +426,6 @@ class MissionPageControllerTest {
             mock(FrontendAuthHelperService.class),
             PARALLEL);
     Model model = new ConcurrentModel();
-    OidcUser user = mock(OidcUser.class);
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
     when(backendApiClient.get(uriCaptor.capture(), anyTypeRef()))
@@ -445,7 +433,7 @@ class MissionPageControllerTest {
             new de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<>(
                 Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList()));
 
-    controller.listMissions(null, null, null, null, true, null, null, null, null, model, user);
+    controller.listMissions(null, null, null, null, true, null, null, null, null, model);
 
     String uri = uriCaptor.getValue();
     assertTrue(uri.contains("status=COMPLETED"));
@@ -474,8 +462,7 @@ class MissionPageControllerTest {
             new de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<>(
                 Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList()));
 
-    controller.listMissions(
-        null, null, null, null, false, "PAST", null, null, null, model, mock(OidcUser.class));
+    controller.listMissions(null, null, null, null, false, "PAST", null, null, null, model);
 
     String uri = uriCaptor.getValue();
     assertTrue(uri.contains("status=COMPLETED&status=CANCELLED"));
@@ -500,8 +487,7 @@ class MissionPageControllerTest {
             new de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<>(
                 Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList()));
 
-    controller.listMissions(
-        null, null, null, null, false, "SOMETIME", null, null, null, model, mock(OidcUser.class));
+    controller.listMissions(null, null, null, null, false, "SOMETIME", null, null, null, model);
 
     String uri = uriCaptor.getValue();
     assertTrue(uri.contains("status=PLANNED&status=ACTIVE"));

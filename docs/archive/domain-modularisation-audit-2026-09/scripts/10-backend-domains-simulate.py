@@ -8,7 +8,6 @@ shared-kernel and infrastructure.
 """
 import importlib.util
 import os
-import re
 from collections import defaultdict
 
 here = os.path.dirname(os.path.abspath(__file__))

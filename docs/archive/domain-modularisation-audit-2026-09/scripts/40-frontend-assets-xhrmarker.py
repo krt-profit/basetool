@@ -5,14 +5,16 @@ import sys
 sys.stdout.reconfigure(encoding="utf-8")
 BASE = r"$SCRATCHPAD"
 JS = r"$REPO\frontend\src\main\resources\static\js"
-d = json.load(open(os.path.join(BASE, "40-frontend-assets-jsast.json"), encoding="utf-8"))["results"]
+with open(os.path.join(BASE, "40-frontend-assets-jsast.json"), encoding="utf-8") as fh:
+    d = json.load(fh)["results"]
 tot = 0
 marked = 0
 unmarked = []
 for r in d:
     if r["file"] in ("krt-fetch.js", "krt-client-error.js"):
         continue
-    lines = open(os.path.join(JS, r["file"]), encoding="utf-8").read().split("\n")
+    with open(os.path.join(JS, r["file"]), encoding="utf-8") as fh:
+        lines = fh.read().split("\n")
     for f in r["fetchCalls"]:
         tot += 1
         win = "\n".join(lines[f["line"] - 1:f["line"] + 8])

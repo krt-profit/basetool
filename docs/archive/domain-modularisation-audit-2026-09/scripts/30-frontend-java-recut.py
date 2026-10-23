@@ -2,7 +2,6 @@
 paths (own-domain classes, other-domain classes, kernel classes), and how often the frontend tests and
 the E2E sources reference them. Read-only."""
 
-import io
 import json
 import os
 import re
@@ -14,7 +13,8 @@ sys.path.insert(0, HERE)
 urls = __import__("30-frontend-java-urls")
 print("=" * 30, "re-cut table", "=" * 30)
 scanmod = __import__("30-frontend-java-scan")
-dmap = json.load(open(os.path.join(HERE, "30-frontend-java-domainmap.json"), encoding="utf-8"))["domain_map"]
+with open(os.path.join(HERE, "30-frontend-java-domainmap.json"), encoding="utf-8") as fh:
+    dmap = json.load(fh)["domain_map"]
 REPO = scanmod.REPO
 
 own = Counter()
@@ -40,7 +40,8 @@ def count_dir(root):
         for f in fs:
             if not f.endswith(".java"):
                 continue
-            s = open(os.path.join(dp, f), encoding="utf-8", errors="replace").read()
+            with open(os.path.join(dp, f), encoding="utf-8", errors="replace") as fh:
+                s = fh.read()
             for p in re.findall(r'"(/api/v1/[^"]*)"', s):
                 d = urls.SEG_DOMAIN.get(urls.seg(p), "?" + urls.seg(p))
                 c[d] += 1

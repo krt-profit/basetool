@@ -29,7 +29,8 @@ TERMS = {
 
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    data = json.load(open(sys.argv[1], encoding="utf-8"))
+    with open(sys.argv[1], encoding="utf-8") as fh:
+        data = json.load(fh)
     items = data if isinstance(data, list) else data.get("findings", data)
     for label, pat in TERMS.items():
         hits = []

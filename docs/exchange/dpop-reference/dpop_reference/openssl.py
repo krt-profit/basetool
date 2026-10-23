@@ -7,6 +7,7 @@ from __future__ import annotations
 import ctypes
 import ctypes.util
 import glob
+import importlib.util
 import os
 import stat
 import sys
@@ -35,12 +36,10 @@ def _candidates() -> list[str]:
         return []
     if sys.platform == "win32":
         found: list[str] = []
-        try:
-            import _hashlib
-
-            found += glob.glob(os.path.join(os.path.dirname(_hashlib.__file__), "libcrypto-3*.dll"))
-        except (ImportError, AttributeError):
-            pass
+        hashlib_spec = importlib.util.find_spec("_hashlib")
+        if hashlib_spec is not None and hashlib_spec.has_location and hashlib_spec.origin:
+            hashlib_dir = os.path.dirname(hashlib_spec.origin)
+            found += glob.glob(os.path.join(hashlib_dir, "libcrypto-3*.dll"))
         for prefix in (sys.base_prefix, sys.prefix):
             found += glob.glob(os.path.join(prefix, "DLLs", "libcrypto-3*.dll"))
         return found

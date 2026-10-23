@@ -26,7 +26,8 @@ def jpa():
         print("| %s → %s | %d | %s |" % (k[0], k[1], len(grp[k]), "; ".join(items)))
 
 def layering():
-    txt = open(os.path.join(here, "10-backend-domains-layering.out.txt"), encoding="utf-8").read()
+    with open(os.path.join(here, "10-backend-domains-layering.out.txt"), encoding="utf-8") as fh:
+        txt = fh.read()
     blocks = re.split(r"\n(?=[a-z\-]+\(\d+\) -> [a-z\-]+\(\d+\): \d+)", txt)
     print("| from (rank) → to (rank) | edges | source classes → targets |")
     print("| --- | ---: | --- |")
