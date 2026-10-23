@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [v1.19.10](https://github.com/krt-profit/basetool/releases/tag/v1.19.10) - 2026-10-23
+
+### Security
+
+- **Server-Netzwerk.** Der Server nimmt keine umgeleiteten Netzwerkrouten (ICMP-Redirects) mehr an
+  und verwirft gefälschte Absender. Die Firewall schließt einen ungenutzten Dienst. Wer sich
+  wiederholt falsch per SSH anmeldet, wird schneller gesperrt und bei Wiederholung eine Woche lang
+  auf allen Ports (REQ-OPS-053).
+
 ## [v1.19.9](https://github.com/krt-profit/basetool/releases/tag/v1.19.9) - 2026-10-23
 
 ### Changed
