@@ -26,15 +26,28 @@
   loop: "{{ basetool_host_fw_closed_services }}"
   when: basetool_host_manage_firewall | bool
 
-- name: Turn off forwarding in the zones that hold an interface, since this host routes nothing
-  ansible.posix.firewalld:
-    zone: "{{ item }}"
-    forward: true
-    state: disabled
-    permanent: true
-    immediate: true
+- name: Ask which zones forward, in the permanent or the running configuration
+  ansible.builtin.shell: >-
+    firewall-cmd --permanent --zone={{ item | quote }} --query-forward
+    || firewall-cmd --zone={{ item | quote }} --query-forward
   loop: "{{ ([basetool_host_fw_zone.stdout | default('public') | trim] + basetool_host_fw_no_forward_zones) | unique }}"
+  register: basetool_host_fw_forward
+  changed_when: false
+  failed_when: basetool_host_fw_forward.rc not in [0, 1]
+  check_mode: false
   when: basetool_host_manage_firewall | bool
+
+- name: Turn forwarding off in them, since this host routes nothing
+  ansible.builtin.shell: >-
+    firewall-cmd --permanent --zone={{ item.item | quote }} --remove-forward
+    && firewall-cmd --zone={{ item.item | quote }} --remove-forward
+  loop: "{{ basetool_host_fw_forward.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item }}"
+  changed_when: true
+  when:
+    - basetool_host_manage_firewall | bool
+    - item.rc | default(1) == 0
 
 - name: Start from the host-wide network sysctls
   ansible.builtin.set_fact:
