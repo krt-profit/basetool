@@ -345,7 +345,7 @@
                     </button>
                 </td>
             </tr>
-            <tr class="od-prod-demand-row" th:if="${!requesterView and canExpand}" th:id="${demandId}" hidden>
+            <tr class="od-prod-demand-row detail-row" th:if="${!requesterView and canExpand}" th:id="${demandId}" hidden>
                 <td th:attr="colspan=${isLogistician ? 6 : 5}" class="od-prod-demand-cell">
                     <div class="od-prod-demand-body" th:if="${isLogistician and hasDemand}">
                         <span class="od-prod-demand-label" th:text="#{orders.detail.production.perUnit}">Bedarf je Stück</span>

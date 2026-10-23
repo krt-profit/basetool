@@ -103,19 +103,6 @@
     .tab-panes .data-table {
         background-color: var(--surface-inset);
     }
-    .od-table > tbody > tr:nth-child(even) {
-        background-color: transparent;
-    }
-    .od-table > tbody > tr:nth-child(even of :not(.inventory-details-row, .od-prod-demand-row)) {
-        background-color: color-mix(in srgb, var(--color-white) 2%, transparent);
-    }
-    .od-table > tbody > tr:hover,
-    .od-table > tbody > tr:nth-child(even):hover,
-    .od-table
-        > tbody
-        > tr:nth-child(even of :not(.inventory-details-row, .od-prod-demand-row)):hover {
-        background-color: var(--control-bg);
-    }
     .od-table > tbody > tr:not(.inventory-details-row, .od-prod-demand-row) > td:first-child {
         color: var(--color-white);
         font-weight: var(--fw-bold);

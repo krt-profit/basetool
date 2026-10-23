@@ -156,9 +156,10 @@ placed inside a panel (`.list-panel`, another card, a `.detail-pane`, a modal) i
 `.kpi-total--inset` / `.kpi-card--inset` and takes the bar fill `#1A1D21`, so the tile stands
 apart from its container; a page's own tile class inside a panel takes the same fill. A framed
 `.data-table` inside a padded card or tab panel lays its rows on `--surface-inset`, so the rows, the
-bar-filled head and the panel stay three distinct levels. Rows alternate by visible row: a hidden
-detail row between two rows does not count, so the stripes still alternate. A lighter tile is not an option — `#36373B` and `#373E43`
-are reserved for hairlines, `.btn-secondary` and controls.
+bar-filled head and the panel stay three distinct levels. Rows alternate by visible row: a row that
+is `hidden` or carries `.detail-row` (an expandable detail under its row) does not count, so the
+stripes still alternate. A lighter tile is not an option — `#36373B` and `#373E43` are reserved for
+hairlines, `.btn-secondary` and controls.
 
 `--color-bg-black` `#000000` is **no page background**: it is the text on orange and the base
 of shadows and scrims. The page background is **flat** — no ambient pattern or texture; a

@@ -2,5 +2,7 @@
 
 - **Aufträge.** In der Item-Tabelle eines Auftrags stehen die Zahlen „Hergestellt“ und „Geliefert“
   wieder in derselben Zeile wie ihr Fortschrittsbalken, statt darunter umzubrechen.
-- **Aufträge.** Die Tabellen der Auftragsdetails heben sich wieder von der Fläche dahinter ab, und
-  ihre Zeilen wechseln sich wieder farblich ab.
+- **Tabellen.** Tabellen in Auftragsdetails, Organisationsleitung, Operations-Finanzen und der
+  Rezeptansicht der Blueprints heben sich wieder von der Fläche dahinter ab.
+- **Tabellen.** Zeilen wechseln sich wieder farblich ab, auch wo aufklappbare Detailzeilen
+  dazwischen stehen (Aufträge, Material-Bedarf, Bank) und in der Preis-Matrix der Materialien.

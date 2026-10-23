@@ -465,6 +465,22 @@
         color: var(--color-warning);
     }
 
+    .matrix-table tbody tr {
+        background-color: transparent;
+    }
+
+    .matrix-table tbody tr.row-even {
+        background-color: color-mix(in srgb, var(--color-white) 2%, transparent);
+    }
+
+    .matrix-table tbody tr.row-even td:first-child {
+        background-color: color-mix(in srgb, var(--color-white) 2%, var(--color-bg-dark-gray));
+    }
+
+    .matrix-table tbody tr.row-material:hover {
+        background-color: var(--control-bg);
+    }
+
     .matrix-table tbody tr.row-spacer td {
         position: static;
         height: auto;

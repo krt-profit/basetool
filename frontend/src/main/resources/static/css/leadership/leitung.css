@@ -138,6 +138,11 @@
         padding: var(--space-4) var(--space-6);
     }
 
+    .leitung-detail .data-table {
+        background-color: var(--surface-inset);
+        border: var(--border-hairline);
+    }
+
     .leitung-pane {
         display: flex;
         flex-direction: column;
