@@ -1,0 +1,50 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: silent - items carry stat base values
+    interval: 1m
+    input_series:
+      - series: 'basetool_catalogue_items_with_stats{job="basetool-backend"}'
+        values: "1500x4320"
+    alert_rule_test:
+      - eval_time: 72h
+        alertname: ScWikiItemStatsMissing
+        exp_alerts: []
+
+  - name: silent - zero for less than two days, as during the first run after a deploy
+    interval: 1m
+    input_series:
+      - series: 'basetool_catalogue_items_with_stats{job="basetool-backend"}'
+        values: "0x1440 1500x2880"
+    alert_rule_test:
+      - eval_time: 72h
+        alertname: ScWikiItemStatsMissing
+        exp_alerts: []
+
+  - name: fires - no item has a stat base value for two days
+    interval: 1m
+    input_series:
+      - series: 'basetool_catalogue_items_with_stats{job="basetool-backend"}'
+        values: "0x4320"
+    alert_rule_test:
+      - eval_time: 72h
+        alertname: ScWikiItemStatsMissing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "No game item carries a blueprint stat base value"
+              description: "After two days of SC-Wiki item syncs no game item has a row in game_item_stat, so the blueprint recipe view in Mein Inventar shows only the quality factors instead of the crafted item's values (REQ-DATA-027, ADR-0309). The sync reads the values from the item payload's stat blocks (durability, personal_weapon, vehicle_weapon, clothing, temperature_resistance, ...); a renamed block or field empties every value without failing the sync. Fetch one blueprint output with GET https://api.star-citizen.wiki/api/items/{uuid}, compare its fields with ScWikiItemStatExtractor, and check that the item payload still says is_craftable=true. The series is absent while the item sync is disabled."
+
+  - name: silent - the series is absent (item sync disabled)
+    interval: 1m
+    input_series:
+      - series: 'basetool_catalogue_item_class_unknown_total{job="basetool-backend"}'
+        values: "0x4320"
+    alert_rule_test:
+      - eval_time: 72h
+        alertname: ScWikiItemStatsMissing
+        exp_alerts: []

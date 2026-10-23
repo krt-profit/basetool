@@ -32,10 +32,12 @@ import java.util.List;
  *     modifiers
  * @param ingredients flat ingredient list used as the fallback when {@code requirementGroups} is
  *     empty
+ * @param baseStats the crafted item's stat base values per property key; empty when none is stored
  */
 @DtoMirror
 public record PersonalBlueprintRecipeDto(
     String productName,
     int variantCount,
     List<BlueprintRequirementGroupDto> requirementGroups,
-    List<BlueprintRequirementIngredientDto> ingredients) {}
+    List<BlueprintRequirementIngredientDto> ingredients,
+    List<BlueprintStatBaseDto> baseStats) {}

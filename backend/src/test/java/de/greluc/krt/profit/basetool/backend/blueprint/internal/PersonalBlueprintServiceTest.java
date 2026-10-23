@@ -466,7 +466,7 @@ class PersonalBlueprintServiceTest {
             .build();
     when(repository.findByIdAndOwnerUserId(id, SUB)).thenReturn(Optional.of(entity));
     PersonalBlueprintRecipeResponse recipe =
-        new PersonalBlueprintRecipeResponse("Name", 2, List.of(), List.of());
+        new PersonalBlueprintRecipeResponse("Name", 2, List.of(), List.of(), List.of());
     when(blueprintProductService.resolveRecipe("k")).thenReturn(Optional.of(recipe));
 
     assertSame(recipe, service.recipeForOwn(SUB, id));

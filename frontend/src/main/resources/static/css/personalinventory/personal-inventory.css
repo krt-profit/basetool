@@ -852,6 +852,15 @@
         margin-bottom: 12px;
     }
 
+    .krt-bp-detail-recipe .quality-affects output {
+        font-variant-numeric: tabular-nums;
+    }
+
+    .krt-bp-stat-factor {
+        color: var(--color-gray-2-text);
+        font-variant-numeric: tabular-nums;
+    }
+
     .krt-bp-detail-note {
         margin: 0;
         font-size: var(--fs-sm);

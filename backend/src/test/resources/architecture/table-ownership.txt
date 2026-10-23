@@ -39,6 +39,7 @@ faction catalogue
 frequency_type catalogue
 game_item catalogue
 game_item_price catalogue
+game_item_stat catalogue
 inventory_item inventory
 inventory_item_donation_allocation inventory
 inventory_item_job_order_allocation inventory

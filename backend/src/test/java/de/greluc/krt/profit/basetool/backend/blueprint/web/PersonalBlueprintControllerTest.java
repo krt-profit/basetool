@@ -144,7 +144,7 @@ class PersonalBlueprintControllerTest {
   void recipe_derivesSubAndRelaysToService() {
     UUID id = UUID.randomUUID();
     PersonalBlueprintRecipeResponse recipe =
-        new PersonalBlueprintRecipeResponse("Name", 1, List.of(), List.of());
+        new PersonalBlueprintRecipeResponse("Name", 1, List.of(), List.of(), List.of());
     when(service.recipeForOwn(SUB, id)).thenReturn(recipe);
 
     assertSame(recipe, controller.recipe(id, SUB));

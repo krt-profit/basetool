@@ -35,9 +35,12 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.GameItemStatWriter;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiItemStatFollowUp;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiItemSyncService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiProperties;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncEventType;
@@ -85,6 +88,7 @@ class ScWikiItemSyncServiceBackfillTest {
   @Mock private BlueprintRepository blueprintRepository;
   @Mock private ManufacturerRepository manufacturerRepository;
   @Mock private SyncReportService syncReportService;
+  @Mock private GameItemStatRepository gameItemStatRepository;
   @Mock private ObjectProvider<ScWikiItemSyncService> self;
 
   /**
@@ -124,6 +128,9 @@ class ScWikiItemSyncServiceBackfillTest {
             blueprintRepository,
             manufacturerRepository,
             syncReportService,
+            gameItemStatRepository,
+            new GameItemStatWriter(gameItemStatRepository),
+            new ScWikiItemStatFollowUp(scWikiClient, properties, gameItemStatRepository),
             meterRegistry,
             self);
     lenient().when(self.getObject()).thenReturn(service);
@@ -137,6 +144,21 @@ class ScWikiItemSyncServiceBackfillTest {
 
     verify(scWikiClient, never()).fetchOne(any(), any(), any(), any());
     verify(scWikiClient).fetchAllPagesResult(eq(WEAPONS), any(), any(), any(), any());
+  }
+
+  @Test
+  void syncItems_backfill_fetchesBlueprintOutputsWithoutStatsInFullAndSetsTheGauge() {
+    stubPass(WEAPONS, itemDto(UUID.randomUUID(), "Behring P4-AR"));
+    UUID output = UUID.randomUUID();
+    when(gameItemStatRepository.findBlueprintOutputUuidsWithoutStats()).thenReturn(List.of(output));
+    when(gameItemStatRepository.countItemsWithStats()).thenReturn(42L);
+    when(scWikiClient.fetchOne(eq(ITEMS), eq(output), eq(ScWikiItemDto.class), any()))
+        .thenReturn(null);
+
+    service.syncItems();
+
+    verify(scWikiClient).fetchOne(eq(ITEMS), eq(output), eq(ScWikiItemDto.class), any());
+    assertEquals(42.0, meterRegistry.get(MetricNames.CATALOGUE_ITEMS_WITH_STATS).gauge().value());
   }
 
   @Test
@@ -655,7 +677,22 @@ class ScWikiItemSyncServiceBackfillTest {
         Map.of("en_EN", "desc"),
         Boolean.TRUE,
         Boolean.FALSE,
-        "4.8.0-LIVE");
+        "4.8.0-LIVE",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null);
   }
 
   /**

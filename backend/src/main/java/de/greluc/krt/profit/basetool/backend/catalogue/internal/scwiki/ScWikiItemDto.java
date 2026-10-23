@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
 import java.util.UUID;
+import tools.jackson.databind.JsonNode;
 
 /**
  * SC Wiki item payload of {@code GET /api/items/{uuid}}, used by {@code ScWikiItemSyncService} to
@@ -52,6 +53,21 @@ import java.util.UUID;
  * @param isBaseVariant whether this is the base variant of a family
  * @param isCraftable whether the item is craftable
  * @param version game version the row was last seen in
+ * @param durability durability block ({@code health}), or {@code null}
+ * @param clothing clothing block (damage resistance, temperature range), or {@code null}
+ * @param suitArmor suit-armour block, the same shape as {@code clothing}, or {@code null}
+ * @param personalWeapon personal-weapon block (damage per shot, rpm), or {@code null}
+ * @param vehicleWeapon vehicle-weapon block (damage per shot), or {@code null}
+ * @param miningLaser mining-laser block (laser power), or {@code null}
+ * @param shield shield-generator block (max health), or {@code null}
+ * @param powerPlant power-plant block (power segment generation), or {@code null}
+ * @param cooler cooler block (coolant segment generation), or {@code null}
+ * @param quantumDrive quantum-drive block (drive speed, fuel requirement), or {@code null}
+ * @param radar radar block (aim-assist distances), or {@code null}
+ * @param tractorBeam tractor-beam block (force, distances, volume), or {@code null}
+ * @param weaponModifier weapon-modifier block (salvage multipliers), or {@code null}
+ * @param radiationResistance radiation-resistance block (dissipation rate), or {@code null}
+ * @param temperatureResistance temperature-resistance block (min / max), or {@code null}
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ScWikiItemDto(
@@ -75,5 +91,20 @@ public record ScWikiItemDto(
     @JsonProperty("description") Map<String, String> description,
     @JsonProperty("is_base_variant") Boolean isBaseVariant,
     @JsonProperty("is_craftable") Boolean isCraftable,
-    @JsonProperty("version") String version)
+    @JsonProperty("version") String version,
+    @JsonProperty("durability") JsonNode durability,
+    @JsonProperty("clothing") JsonNode clothing,
+    @JsonProperty("suit_armor") JsonNode suitArmor,
+    @JsonProperty("personal_weapon") JsonNode personalWeapon,
+    @JsonProperty("vehicle_weapon") JsonNode vehicleWeapon,
+    @JsonProperty("mining_laser") JsonNode miningLaser,
+    @JsonProperty("shield") JsonNode shield,
+    @JsonProperty("power_plant") JsonNode powerPlant,
+    @JsonProperty("cooler") JsonNode cooler,
+    @JsonProperty("quantum_drive") JsonNode quantumDrive,
+    @JsonProperty("radar") JsonNode radar,
+    @JsonProperty("tractor_beam") JsonNode tractorBeam,
+    @JsonProperty("weapon_modifier") JsonNode weaponModifier,
+    @JsonProperty("radiation_resistance") JsonNode radiationResistance,
+    @JsonProperty("temperature_resistance") JsonNode temperatureResistance)
     implements ScWikiRow {}

@@ -162,7 +162,7 @@ class PersonalInventoryBlueprintsControllerTest {
   void recipe_delegatesToBackendRecipeEndpoint() {
     UUID id = UUID.randomUUID();
     PersonalBlueprintRecipeDto dto =
-        new PersonalBlueprintRecipeDto("Arclight Pistol", 2, List.of(), List.of());
+        new PersonalBlueprintRecipeDto("Arclight Pistol", 2, List.of(), List.of(), List.of());
     when(backendApiClient.get(
             eq("/api/v1/personal-blueprints/{id}/recipe"),
             eq(PersonalBlueprintRecipeDto.class),
