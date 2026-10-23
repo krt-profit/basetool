@@ -1,0 +1,21 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: fires - device logins for one client jump far above its own week
+    interval: 30m
+    input_series:
+      - series: 'keycloak_user_events_total{job="keycloak", realm="iri", idp="", event="oauth2_device_verify_user_code", error="", client_id="hangar-exporter"}'
+        values: "0+0.5x336 178+10x6"
+    alert_rule_test:
+      - eval_time: 170h
+        alertname: ExchangeClientDeviceLoginSurge
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              client_id: hangar-exporter
+            exp_annotations:
+              summary: "Unusually many device logins for one client"
+              description: "Members confirmed device codes for hangar-exporter more than three times as often in the last hour as in its average hour of the past week (at least 5). For a client with a browser-extension build, whose Keycloak Web Origins are *, this is the signal of a page driving that client's device flow in members' browsers (ADR-0303). Check who connected on the Exchange dashboard and the connected-apps audit trail; suspend the client under Administration - Verbundene Anwendungen if the logins are not the client's own."

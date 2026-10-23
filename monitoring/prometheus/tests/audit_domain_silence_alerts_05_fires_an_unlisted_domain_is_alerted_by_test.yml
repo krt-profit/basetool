@@ -1,0 +1,23 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1h
+
+tests:
+  - name: fires - an unlisted domain is alerted by default
+    interval: 1h
+    input_series:
+      - series: 'basetool_audit_events_total{job="basetool-backend", instance="backend:11261", domain="FUTURE_AREA"}'
+        values: "0+1x2 2x800"
+      - series: 'up{job="basetool-backend", instance="backend:11261"}'
+        values: "1x803"
+    alert_rule_test:
+      - eval_time: 760h
+        alertname: AuditDomainSilenceAnomaly
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              domain: FUTURE_AREA
+            exp_annotations:
+              summary: "Audit domain silent 30d (FUTURE_AREA)"
+              description: "The FUTURE_AREA audit domain recorded zero events in 30 days while the backend is up — this domain may have lost its audit wiring (REQ-AUDIT-001) even though other domains are still active."

@@ -167,8 +167,8 @@ answer to "what is the current tip?".
 
 No migration in `main` carries the numbers below, on purpose. Each was claimed by a pull
 request that gave it up before merging, and a later migration had already taken a higher
-number, so the free one could not be used any more (hard rule 1). The `Flyway Migrations`
-CI check reads this list: a gap in the sequence that is not listed here fails the build, and
+number, so the free one could not be used any more (hard rule 1). The `flyway /` steps of
+the `Commit & repo gates` CI check read this list: a gap in the sequence that is not listed here fails the build, and
 so does an entry that a migration claims after all or that lies above the tip.
 
 - **V87** — claimed by #134 for `tighten_squadron_id_not_null`; renumbered to V89 before
@@ -375,7 +375,7 @@ every existing database.
   knows about them.
 - [ ] The change is mentioned in `CHANGELOG.md` under the right `### Added`
   / `### Changed` / `### Removed` heading when it is user-visible.
-- [ ] Version numbering passes the `Flyway Migrations` CI check (no duplicate
+- [ ] Version numbering passes the `Commit & repo gates` CI check (no duplicate
   `V<n>`, new files numbered after the current tip on `main`, every gap listed
   under [Skipped version numbers](#skipped-version-numbers)). Run it
   locally before pushing:

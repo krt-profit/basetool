@@ -1,0 +1,22 @@
+rule_files:
+  - ../alerts/infrastructure.yml
+  - ../alerts/ops-automation.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: "ContainerUnhealthy - a container recreated under a new id does not keep the old one's verdict"
+    interval: 1m
+    input_series:
+      - series: "podman_container_info{id=\"old\", image=\"x\", name=\"grafana\", pod_id=\"\", pod_name=\"\", ports=\"\"}"
+        values: "1x5"
+      - series: "podman_container_health{id=\"old\", pod_id=\"\", pod_name=\"\"}"
+        values: "1x5"
+      - series: "podman_container_info{id=\"new\", image=\"x\", name=\"grafana\", pod_id=\"\", pod_name=\"\", ports=\"\"}"
+        values: "_x5 1x25"
+      - series: "podman_container_health{id=\"new\", pod_id=\"\", pod_name=\"\"}"
+        values: "_x5 0x25"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: ContainerUnhealthy
+        exp_alerts: []

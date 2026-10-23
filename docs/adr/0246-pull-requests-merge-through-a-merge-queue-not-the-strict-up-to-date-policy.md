@@ -1,6 +1,6 @@
 # ADR-0246 — Pull requests merge through a merge queue, not through the strict up-to-date policy
 
-- **Status:** Accepted — the ruleset change (owner) follows the merge of the workflow change
+- **Status:** Accepted — the ruleset change (owner) follows the merge of the workflow change; amended by [ADR-0313](0313-codeql-analyses-the-buildless-languages-in-one-job.md) (2026-10-23: the buildless CodeQL languages share one job) and [ADR-0315](0315-the-small-required-gates-run-as-one-job-and-for-real-in-the-merge-group.md) (2026-10-23: the shims are gone; DCO and gitleaks run in the merge group)
 - **Date:** 2026-10-10
 - **Deciders:** @greluc
 - **Related:** spec [`deployment-delivery.md`](../specs/deployment-delivery.md) (`REQ-OPS-044`,

@@ -1,6 +1,6 @@
 # ADR-0137 — One image build per commit, and no BuildKit layer cache
 
-- **Status:** Accepted — amended by [ADR-0210](0210-a-main-push-that-changes-no-image-input-re-tags-the-previous-build.md) (2026-09-23: a `main` push that changes no image input re-tags the previous `main` build instead of building); amended 2026-09-23 (a superseded `main`-push run skips, see below)
+- **Status:** Accepted — amended by [ADR-0210](0210-a-main-push-that-changes-no-image-input-re-tags-the-previous-build.md) (2026-09-23: a `main` push that changes no image input re-tags the previous `main` build instead of building); amended 2026-09-23 (a superseded `main`-push run skips, see below); amended by [ADR-0316](0316-the-trivy-scan-runs-inside-the-image-build-job.md) (2026-10-23: Trivy moves back into the `build` job)
 - **Date:** 2026-08-19
 - **Deciders:** Repository owner (@greluc)
 - **Related:** spec REQ-OPS-021 ([`deployment-delivery.md`](../specs/deployment-delivery.md)) · REQ-OPS-002 (promotion gates) · REQ-OPS-015 (host-side signature verification) · ADR-0049 (config as a promotable OCI artifact) · ADR-0055 (keycloak-spi bundle)

@@ -21,10 +21,19 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  BACKEND_IMAGE: ghcr.io/krt-profit/basetool-backend:e2e-local
+  FRONTEND_IMAGE: ghcr.io/krt-profit/basetool-frontend:e2e-local
+  INGEST_IMAGE: ghcr.io/krt-profit/basetool-ingest:e2e-local
+  KEYCLOAK_IMAGE: ghcr.io/krt-profit/basetool-sandbox-keycloak:e2e-local
+  CACHE_REPO: ghcr.io/krt-profit/basetool-e2e-cache
+
 jobs:
   exchange-label:
     name: Exchange changes carry the e2e label
-    if: github.event_name == 'pull_request'
+    if: >-
+      github.event_name == 'pull_request' &&
+      (github.event.action != 'labeled' || github.event.label.name == 'e2e')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -57,17 +66,16 @@ jobs:
   build-stack:
     name: Build E2E images
     if: >-
-      github.event_name != 'pull_request' ||
+      (github.event_name != 'pull_request' ||
       (github.event.action == 'labeled' && github.event.label.name == 'e2e') ||
       (github.event.action != 'labeled' &&
-      contains(github.event.pull_request.labels.*.name, 'e2e'))
+      contains(github.event.pull_request.labels.*.name, 'e2e'))) &&
+      !(github.event_name != 'pull_request' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      BACKEND_IMAGE: ghcr.io/krt-profit/basetool-backend:e2e-local
-      FRONTEND_IMAGE: ghcr.io/krt-profit/basetool-frontend:e2e-local
-      INGEST_IMAGE: ghcr.io/krt-profit/basetool-ingest:e2e-local
-      KEYCLOAK_IMAGE: ghcr.io/krt-profit/basetool-sandbox-keycloak:e2e-local
+    permissions:
+      contents: read
+      packages: read
 
     steps:
       - name: Checkout
@@ -75,67 +83,55 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Build the application and sandbox Keycloak images
-        run: |
-          set -euo pipefail
-          build() {
-            local dockerfile="$1" tag="$2" attempt
-            shift 2
-            for attempt in 1 2; do
-              if docker build --file "$dockerfile" "$@" --tag "$tag" .; then
-                return 0
-              fi
-              echo "::warning::building ${tag} failed (attempt ${attempt}/2)"
-              sleep 15
-            done
-            return 1
-          }
-          (
-            build docker/app/Dockerfile "$INGEST_IMAGE" --build-arg MODULE=ingest
-            build docker/sandbox/keycloak/Dockerfile "$KEYCLOAK_IMAGE"
-          ) > side-builds.log 2>&1 &
-          side=$!
-          status=0
-          build docker/app/Dockerfile "$BACKEND_IMAGE" --build-arg MODULE=backend || status=1
-          build docker/app/Dockerfile "$FRONTEND_IMAGE" --build-arg MODULE=frontend || status=1
-          wait "$side" || status=1
-          echo "::group::ingest and sandbox Keycloak build log"
-          cat side-builds.log
-          echo "::endgroup::"
-          [ "$status" -eq 0 ]
-          docker image ls --format '{{.Repository}}:{{.Tag}} {{.Size}}' | grep ':e2e-local '
-
-      - name: Save the images
-        run: |
-          set -euo pipefail
-          docker save "$BACKEND_IMAGE" "$FRONTEND_IMAGE" "$INGEST_IMAGE" "$KEYCLOAK_IMAGE" \
-            | zstd -T0 -3 -q -o e2e-images.tar.zst
-          ls -l e2e-images.tar.zst
-
-      - name: Upload the images
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+      - name: Build, save and upload the E2E images
+        uses: ./.github/actions/build-e2e-images
         with:
-          name: e2e-images
-          path: e2e-images.tar.zst
-          compression-level: 0
-          retention-days: 1
-          if-no-files-found: error
+          token: ${{ secrets.GITHUB_TOKEN }}
+          cache-write: 'false'
+
+  build-stack-main:
+    name: Build E2E images (cache writer)
+    if: >-
+      (github.event_name != 'pull_request' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'e2e') ||
+      (github.event.action != 'labeled' &&
+      contains(github.event.pull_request.labels.*.name, 'e2e'))) &&
+      (github.event_name != 'pull_request' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Build, save and upload the E2E images
+        uses: ./.github/actions/build-e2e-images
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          cache-write: 'true'
 
   e2e:
     name: E2E flows (${{ matrix.browser }}, ${{ matrix.device }})
-    needs: build-stack
+    needs: [build-stack, build-stack-main]
     if: >-
-      github.event_name != 'pull_request' ||
+      !cancelled() &&
+      (github.event_name != 'pull_request' ||
       (github.event.action == 'labeled' && github.event.label.name == 'e2e') ||
       (github.event.action != 'labeled' &&
-      contains(github.event.pull_request.labels.*.name, 'e2e'))
+      contains(github.event.pull_request.labels.*.name, 'e2e'))) &&
+      (needs.build-stack.result == 'success' || needs.build-stack-main.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         browser: [chromium, firefox, webkit]
-        device: ['375x812', '810x1080', '1024x768', '1180x820', '1280x800', '1600x900']
+        device: ${{ fromJSON(github.event_name == 'pull_request' && '["375x812", "1600x900"]' || '["375x812", "810x1080", "1024x768", "1180x820", "1280x800", "1600x900"]') }}
 
     steps:
       - name: Checkout
