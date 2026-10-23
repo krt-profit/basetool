@@ -181,6 +181,9 @@
           same keyword first. Do NOT reload sshd until `sshd -T` shows permitrootlogin no.
       when: not ansible_check_mode
 
+    - name: Reload sshd now, before anything later in the run can fail
+      ansible.builtin.meta: flush_handlers
+
     - name: Empty root's authorized_keys
       ansible.builtin.copy:
         dest: /root/.ssh/authorized_keys
@@ -207,6 +210,28 @@
         validate: "visudo -cf %s"
       loop: "{{ basetool_host_retired_admin_users }}"
       failed_when: false
+
+    - name: Stop keeping their user manager alive
+      ansible.builtin.command: loginctl disable-linger {{ item }}
+      args:
+        removes: /var/lib/systemd/linger/{{ item }}
+      loop: "{{ basetool_host_retired_admin_users }}"
+
+    - name: Read which of them still has processes
+      ansible.builtin.command: pgrep -u {{ item }}
+      loop: "{{ basetool_host_retired_admin_users }}"
+      register: basetool_host_retired_procs
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: End their sessions and user manager
+      ansible.builtin.command: loginctl terminate-user {{ item.item }}
+      loop: "{{ basetool_host_retired_procs.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+      changed_when: true
+      when: item.rc == 0
 
     - name: Remove the accounts
       ansible.builtin.user:
