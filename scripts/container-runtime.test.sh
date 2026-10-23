@@ -393,6 +393,21 @@ for timer in "${HERE}"/iri-*.timer; do
 done
 (( timers >= 6 )) || bad "expected the six iri-*.timer files beside this suite, found ${timers}"
 
+DEPLOY_TIMER="${HERE}/iri-deploy.timer"
+if grep -Eq '^OnCalendar=\*-\*-\* \*:00/5:00$' "${DEPLOY_TIMER}" \
+   && grep -Eq '^AccuracySec=1s$' "${DEPLOY_TIMER}" \
+   && grep -Eq '^RandomizedDelaySec=0$' "${DEPLOY_TIMER}" \
+   && grep -Eq '^Persistent=false$' "${DEPLOY_TIMER}"; then
+  ok "iri-deploy.timer fires on the 5-minute wall-clock grid, to the second, without jitter or catch-up"
+else
+  bad "iri-deploy.timer must be OnCalendar=*-*-* *:00/5:00 with AccuracySec=1s, RandomizedDelaySec=0, Persistent=false"
+fi
+if grep -Eq '^[[:space:]]*On(Boot|Startup|Active|UnitActive|UnitInactive)Sec[[:space:]]*=' "${DEPLOY_TIMER}"; then
+  bad "iri-deploy.timer has a monotonic trigger -- it fires off the grid"
+else
+  ok "...and has no monotonic trigger that would fire between the marks"
+fi
+
 ROLE="${HERE}/../ansible/roles/basetool_host"
 ORDER_TMPL="${ROLE}/templates/iri-deploy-account-order.conf.j2"
 if grep -Eq '^After=.*systemd-logind\.service' "${ORDER_TMPL}" 2>/dev/null \

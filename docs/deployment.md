@@ -122,7 +122,7 @@ alertmanager, exporters). Derive, never transcribe:
 
 | Timer | When | Runs |
 |---|---|---|
-| `iri-deploy.timer` | 5 min after boot, then every 5 min | `deploy.sh` as `deploy` |
+| `iri-deploy.timer` | every 5 min on the clock — :00, :05, :10 … — never in between, no catch-up after a boot | `deploy.sh` as `deploy` |
 | `iri-backup.timer` | daily 04:15 | `backup.sh` — see [`backup.md`](backup.md) |
 | `iri-restore-drill.timer` | Sun 05:30 | `restore-drill.sh` — see [`backup.md`](backup.md) |
 | `iri-container-cleanup.timer` | Sat 02:00 UTC | `container-cleanup.sh` — see [Weekly cleanup](#weekly-container-cleanup) |
@@ -1570,8 +1570,8 @@ aardvark-dns, containers-common, passt) is updated by hand, testing host first:
 >
 > What a reboot looks like now is under **Reboot** in [Driving the stack](#driving-the-stack).
 > **Starting a timer no longer runs its job.** `systemctl start iri-backup.timer` arms it for 04:15;
-> run a job now with `systemctl start iri-backup.service`. (`iri-deploy.timer` still fires at once on
-> a host that has been up more than five minutes, because its `OnBootSec` has passed.) Reaches a host
+> run a job now with `systemctl start iri-backup.service`. `iri-deploy.timer` too: it waits for the
+> next five-minute mark of the clock. Reaches a host
 > only through the role: `--tags scripts`.
 
 Confirm by content, never by mtime, and before every promotion:

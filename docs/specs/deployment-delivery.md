@@ -57,8 +57,14 @@ already published.
 - [ ] The Ansible role that provisions the host ships no image, unit file or configuration bundle
   and is never scheduled on the host (ADR-0188); the scripts and units it installs carry no image
   digest or application version.
+- [ ] `iri-deploy.timer` polls on the wall-clock grid — at :00, :05, :10 … of every hour, to the
+  second (`OnCalendar=*-*-* *:00/5:00`, `AccuracySec=1s`, `RandomizedDelaySec=0`) — and never
+  between the marks: no boot or activation-relative trigger, and no catch-up run after downtime
+  (`Persistent=false`). A run that outlasts five minutes skips the marks it overlaps; the next
+  run is on the grid again (`container-runtime.test.sh`).
 
-**Enforced by:** `scripts/deploy.sh` · `scripts/iri-deploy.service` (sandbox) · **Runbook:** `docs/deployment.md` → *Why this design*
+**Enforced by:** `scripts/deploy.sh` · `scripts/iri-deploy.service` (sandbox) ·
+`scripts/iri-deploy.timer` · **Runbook:** `docs/deployment.md` → *Why this design*
 
 ### REQ-OPS-002 — Deliberate promotion
 
