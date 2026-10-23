@@ -317,11 +317,11 @@
                     </ul>
                 </td>
                 <td class="num" th:attr="data-label=#{orders.detail.item.amount}" th:text="${#numbers.formatInteger(amt, 1)}">0</td>
-                <td th:attr="data-label=#{orders.detail.item.manufactured}">
+                <td class="od-progress-cell" th:attr="data-label=#{orders.detail.item.manufactured}">
                     <span class="mini-bar"><i th:attr="data-krtm-width=${amt > 0 ? (mfg * 100 / amt) : 0}" th:classappend="${amt > 0 and mfg >= amt} ? ' is-complete' : ''"></i></span>
                     <span th:text="${#numbers.formatInteger(mfg, 1)}">0</span>
                 </td>
-                <td th:attr="data-label=#{orders.detail.item.delivered}">
+                <td class="od-progress-cell" th:attr="data-label=#{orders.detail.item.delivered}">
                     <span class="mini-bar"><i th:attr="data-krtm-width=${amt > 0 ? (dlv * 100 / amt) : 0}" th:classappend="${amt > 0 and dlv >= amt} ? ' is-complete' : ''"></i></span>
                     <span th:text="${#numbers.formatInteger(dlv, 1)}">0</span>
                 </td>

@@ -156,6 +156,9 @@
         margin-top: var(--space-2);
     }
 
+    .od-progress-cell {
+        white-space: nowrap;
+    }
     .mini-bar {
         display: inline-flex;
         vertical-align: middle;
