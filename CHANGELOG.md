@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [v1.19.7](https://github.com/krt-profit/basetool/releases/tag/v1.19.7) - 2026-10-23
+
+### Security
+
+- **Server-Zugang.** Nach einer sudo-Anmeldung bekommen andere Sitzungen desselben Kontos nicht
+  mehr zehn Minuten lang Root-Rechte. Die Prüfsuite fragt das sudo-Passwort einmal ab und gibt es
+  pro Befehl verdeckt weiter (REQ-OPS-052).
+
 ## [v1.19.6](https://github.com/krt-profit/basetool/releases/tag/v1.19.6) - 2026-10-23
 
 ### Fixed
