@@ -1,0 +1,52 @@
+name: Build the E2E images
+
+description: >
+  Builds the backend, frontend, ingest and sandbox Keycloak images for the E2E suite with a BuildKit
+  registry cache on GHCR, saves them and uploads them as the e2e-images artifact (ADR-0200,
+  ADR-0317). The cache is always read; it is written only when cache-write is 'true'.
+
+inputs:
+  token:
+    description: The GITHUB_TOKEN of the calling job, used to log in to GHCR.
+    required: true
+  cache-write:
+    description: >
+      'true' exports the layer cache to GHCR after each build; the calling job then needs
+      packages: write. 'false' only imports it.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Docker Buildx
+      uses: ./.github/actions/setup-buildx
+
+    - name: Log in to GHCR
+      uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ inputs.token }}
+
+    - name: Build the application and sandbox Keycloak images
+      shell: bash
+      env:
+        CACHE_WRITE: ${{ inputs.cache-write }}
+      run: bash .github/scripts/build_e2e_images.sh
+
+    - name: Save the images
+      shell: bash
+      run: |
+        set -euo pipefail
+        docker save "$BACKEND_IMAGE" "$FRONTEND_IMAGE" "$INGEST_IMAGE" "$KEYCLOAK_IMAGE" \
+          | zstd -T0 -3 -q -o e2e-images.tar.zst
+        ls -l e2e-images.tar.zst
+
+    - name: Upload the images
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+      with:
+        name: e2e-images
+        path: e2e-images.tar.zst
+        compression-level: 0
+        retention-days: 1
+        if-no-files-found: error

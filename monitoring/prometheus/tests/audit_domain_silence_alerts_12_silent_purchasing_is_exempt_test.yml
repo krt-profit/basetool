@@ -1,0 +1,17 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1h
+
+tests:
+  - name: silent - PURCHASING is exempt
+    interval: 1h
+    input_series:
+      - series: 'basetool_audit_events_total{job="basetool-backend", instance="backend:11261", domain="PURCHASING"}'
+        values: "0+1x2 2x800"
+      - series: 'up{job="basetool-backend", instance="backend:11261"}'
+        values: "1x803"
+    alert_rule_test:
+      - eval_time: 760h
+        alertname: AuditDomainSilenceAnomaly
+        exp_alerts: []

@@ -1,0 +1,16 @@
+rule_files:
+  - ../alerts/infrastructure.yml
+  - ../alerts/ops-automation.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: "DeployHeartbeatStale - a heartbeat that keeps pace with time() is silent"
+    interval: 1m
+    input_series:
+      - series: "basetool_deploy_last_stack_healthy_timestamp"
+        values: "0+60x240"
+    alert_rule_test:
+      - eval_time: 3h
+        alertname: DeployHeartbeatStale
+        exp_alerts: []

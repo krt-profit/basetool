@@ -2344,7 +2344,7 @@ succeeding, never succeeded).
   retention shorter than the change retention, or than 90 days, refuses to start.
   *`ExchangeConnectionRetentionTaskTest`, `BackendPropertiesValidationTest`.*
 - [x] `ScheduledJobStale` fires for the job when it stopped or never succeeded.
-  *`scheduled_job_never_succeeded_test.yml`.*
+  *`scheduled_job_never_succeeded_*_test.yml`.*
 
 **Status:** built (#2092)
 

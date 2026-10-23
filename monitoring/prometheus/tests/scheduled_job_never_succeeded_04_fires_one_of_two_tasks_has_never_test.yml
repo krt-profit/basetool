@@ -1,0 +1,27 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: fires - one of two tasks has never succeeded while the other is healthy
+    interval: 1m
+    input_series:
+      - series: 'process_start_time_seconds{job="basetool-backend"}'
+        values: "0x3100"
+      - series: 'basetool_scheduled_job_enabled{task="uex_sync"}'
+        values: "1x3100"
+      - series: 'basetool_scheduled_job_enabled{task="scwiki_sync"}'
+        values: "1x3100"
+      - series: 'basetool_scheduled_job_last_success_timestamp_seconds{task="uex_sync"}'
+        values: "0+60x3100"
+    alert_rule_test:
+      - eval_time: 50h
+        alertname: ExternalSyncStale
+        exp_alerts:
+          - exp_labels:
+              severity: "warning"
+              task: "scwiki_sync"
+            exp_annotations:
+              summary: "External sync stale >48h (scwiki_sync)"
+              description: "The scwiki_sync catalogue sync last succeeded more than 48 hours ago."

@@ -1,0 +1,23 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: fires - business_metrics has never succeeded and the backend is past its window
+    interval: 1m
+    input_series:
+      - series: 'process_start_time_seconds{job="basetool-backend"}'
+        values: "0x40"
+      - series: 'basetool_scheduled_job_enabled{task="business_metrics"}'
+        values: "1x40"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: BusinessMetricsStale
+        exp_alerts:
+          - exp_labels:
+              severity: "warning"
+              task: "business_metrics"
+            exp_annotations:
+              summary: "Business-metrics sampler stale >10min"
+              description: "BusinessMetricsCollector.refresh() has not completed successfully in over 10 minutes \u2014 the approval/work-queue depth gauges are frozen and the queue-overdue alerts may be evaluating stale values. Check the backend logs for the sampler's failure."

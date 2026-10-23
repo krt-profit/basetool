@@ -2055,10 +2055,14 @@ to the shared group and restores the defect exactly.
 - [ ] Toggling a label other than `e2e` on an `e2e`-labelled PR starts **no** suite.
 - [ ] A further push to an `e2e`-labelled PR supersedes the in-flight suite rather than running a
   second one beside it.
-- [ ] `concurrency.group` contains `jobs.e2e.if` verbatim, and CI fails when it stops doing so; the
-  checker self-tests against a known-drifted workflow first, so it cannot pass vacuously.
-- [ ] The `build-stack` job, which builds the E2E images once per run for all matrix cells (since
-  2026-09-22), carries the same gate expression, so a run whose gate is false builds nothing.
+- [ ] The gate in `concurrency.group`'s selector is a verbatim `&&` conjunct of the `if` of `e2e`,
+  `build-stack` and `build-stack-main`, and CI fails when it stops being one; the checker self-tests
+  against known-drifted workflows first, so it cannot pass vacuously (ADR-0317).
+- [ ] The E2E images are built once per run for all matrix cells (since 2026-09-22) by exactly one of
+  two jobs that carry the gate: `build-stack` (`packages: read`) reads the GHCR layer cache
+  `basetool-e2e-cache`; `build-stack-main` (`packages: write`) runs instead on a non-pull-request
+  run on `main` and also writes it. A pull request never holds `packages: write`, and a run whose
+  gate is false builds nothing (ADR-0317).
 - [ ] `e2e.yml` carries no `merge_group` trigger: its gate admits any event that is not a pull
   request, so a merge group would start the whole suite (REQ-OPS-044).
 - [ ] A pull request runs the suite on the three engines × `375x812` and `1600x900`; the nightly
@@ -2069,11 +2073,13 @@ to the shared group and restores the defect exactly.
   on `labeled` only for the `e2e` label; any other label starts no runner for it (ADR-0311).
 
 **Enforced by:** `.github/workflows/e2e.yml` (`concurrency.group`, `jobs.e2e.if`,
-`jobs.build-stack.if`, `jobs.exchange-label.if`, the `device` axis) ·
+`jobs.build-stack.if`, `jobs.build-stack-main.if`, `jobs.exchange-label.if`, the `device` axis) ·
+`.github/actions/build-e2e-images` · `.github/scripts/build_e2e_images.sh` ·
 `.github/scripts/check_e2e_gate_mirror.py` · `.github/scripts/check_e2e_device_matrix.py` ·
 `.github/workflows/repo-lint.yml` (`Repository gates` → `e2e-gate-mirror / …`) · **Decision:** [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md),
 [ADR-0311](../adr/0311-the-exchange-label-job-runs-only-on-events-that-can-change-its-verdict.md),
-[ADR-0312](../adr/0312-pull-requests-run-the-e2e-suite-on-two-device-classes.md)
+[ADR-0312](../adr/0312-pull-requests-run-the-e2e-suite-on-two-device-classes.md),
+[ADR-0317](../adr/0317-the-e2e-image-build-reads-a-registry-cache-that-only-main-writes.md)
 
 ## Out of scope
 
@@ -2356,7 +2362,7 @@ haproxy, glibc and the host-native `node_exporter` and `alloy` were fixed only w
   enabled and active, the configuration is security-only and applies, and `podman` is excluded.
 - [ ] `host-updates-metrics.test.sh` passes: a run is recorded by the run, a boot refresh keeps it,
   and a reboot state that cannot be read is left out rather than written as `0`.
-- [ ] `ops_audit_2026_09_alerts_test.yml` passes: each of the three alerts fires and stays silent where
+- [ ] `ops_audit_2026_09_alerts_*_test.yml` pass: each of the three alerts fires and stays silent where
   it must.
 
 **Enforced by:** `ansible/roles/basetool_host/tasks/45-updates.yml` ·

@@ -1400,7 +1400,7 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
 >
 > Every `absent()` leg in `business.yml` now requires it, per task and never over an alternation —
 > for the same reason the `absent()` legs themselves are written per task. Pinned by
-> `tests/scheduled_job_never_succeeded_test.yml`, which covers both directions: a switched-off job
+> `tests/scheduled_job_never_succeeded_*_test.yml`, which cover both directions: a switched-off job
 > stays silent, and an enabled one that has never succeeded still fires.
 
 **Backend.**
@@ -1516,7 +1516,7 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   false while one of the two tasks was dead. And `process_start_time_seconds` is wrapped in `max()`
   with `and on()` so the join carries no labels from the uptime side and survives a rolling deploy
   briefly exposing two backend processes. Covered by
-  `monitoring/prometheus/tests/scheduled_job_never_succeeded_test.yml`, whose cases pin both
+  `monitoring/prometheus/tests/scheduled_job_never_succeeded_*_test.yml`, whose cases pin both
   directions — fires when the window has passed, silent right after a restart.
 
   **Reading rule, generally:** an absent *counter* is good news (Micrometer registers one lazily, so
@@ -1783,7 +1783,7 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   trade of coverage for signal. Everything not named there is alerted, so a newly added
   `AuditDomain` is covered by default and exempting one is a deliberate edit rather than an
   omission. The rule, its exclusions and the `up` guard are pinned by promtool unit tests in
-  `monitoring/prometheus/tests/audit_domain_silence_alerts_test.yml`. **All three silence rules
+  `monitoring/prometheus/tests/audit_domain_silence_alerts_*_test.yml`. **All three silence rules
   carry `keep_firing_for: 15m`** (since 2026-09-11): `for:` delays a fire and never a resolve, so the
   nightly backup quiesce — `scripts/backup.sh` stops `frontend backend ingest` at 04:15 host-local
   for the `pg_dump`, REQ-OPS-009 — emptied the `and on() (up == 1)` conjunction for about a minute,
