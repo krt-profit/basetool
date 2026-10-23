@@ -40,6 +40,12 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintProductRow;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRequirementGroupDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRequirementIngredientDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintStatBaseDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintStatProperty;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintStatUnit;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStat;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatRepository;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -59,6 +65,7 @@ class BlueprintProductServiceTest {
   @Mock private BlueprintRepository blueprintRepository;
   @Mock private PersonalBlueprintRepository personalBlueprintRepository;
   @Mock private BlueprintMapper blueprintMapper;
+  @Mock private GameItemStatRepository gameItemStatRepository;
 
   private BlueprintProductService service;
 
@@ -69,7 +76,8 @@ class BlueprintProductServiceTest {
             blueprintRepository,
             personalBlueprintRepository,
             new BlueprintNameNormalizer(),
-            blueprintMapper);
+            blueprintMapper,
+            gameItemStatRepository);
   }
 
   private static BlueprintProductRow row(
@@ -315,6 +323,41 @@ class BlueprintProductServiceTest {
     assertEquals(2, result.get().variantCount());
     assertSame(groups, result.get().requirementGroups());
     assertSame(ingredients, result.get().ingredients());
+    assertTrue(result.get().baseStats().isEmpty());
+  }
+
+  @Test
+  void resolveRecipe_carriesTheOutputItemsStatBaseValuesWithTheirUnits() {
+    UUID id = UUID.randomUUID();
+    UUID itemId = UUID.randomUUID();
+    when(blueprintRepository.findActiveIdNameRows())
+        .thenReturn(List.of(new BlueprintIdNameRow(id, "Omnisky III Cannon")));
+    GameItem item = new GameItem();
+    item.setId(itemId);
+    Blueprint recipe = new Blueprint();
+    recipe.setOutputItem(item);
+    when(blueprintRepository.findById(id)).thenReturn(Optional.of(recipe));
+    when(gameItemStatRepository.findByGameItemId(itemId))
+        .thenReturn(
+            List.of(
+                stat(BlueprintStatProperty.WEAPON_DAMAGE, 97.2),
+                stat(BlueprintStatProperty.HEALTH_MAX_HEALTH, 550.0)));
+
+    PersonalBlueprintRecipeResponse result =
+        service.resolveRecipe("omnisky iii cannon").orElseThrow();
+
+    assertEquals(
+        List.of(
+            new BlueprintStatBaseDto("health_maxhealth", 550.0, BlueprintStatUnit.NONE),
+            new BlueprintStatBaseDto("weapon_damage", 97.2, BlueprintStatUnit.NONE)),
+        result.baseStats());
+  }
+
+  private static GameItemStat stat(BlueprintStatProperty property, double value) {
+    GameItemStat stat = new GameItemStat();
+    stat.setProperty(property);
+    stat.setBaseValue(value);
+    return stat;
   }
 
   @Test

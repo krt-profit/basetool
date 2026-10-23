@@ -1622,6 +1622,12 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   the WARN log once per value, never into a label. Registered at zero by every enabled item sync, so
   the first increment is visible to `increase()`. Backs `ScWikiItemClassUnknown` (> 0 in 24h for
   1h, warning).
+- `basetool_catalogue_items_with_stats` gauge (untagged, `ScWikiItemSyncService`), the number of
+  game items with a stored blueprint stat base value (REQ-DATA-027, ADR-0309), registered by every
+  enabled item sync and set from `game_item_stat` at the end of the run. The values come from stat
+  blocks of the Wiki item payload, so a renamed block or field empties them while the sync keeps
+  succeeding; the gauge is what makes that visible. Backs `ScWikiItemStatsMissing` (== 0 for 48h,
+  warning); absent while the item sync is disabled.
 - `basetool_redis_fanout_subscribed{fanout}` gauge (`LiveSyncRedisConfig`,
   `NotificationRedisConfig`), 1 while the cross-instance pub/sub container is listening and 0 while
   it is not; `fanout` is the two-valued literal `livesync` / `notifications`. Exists because the

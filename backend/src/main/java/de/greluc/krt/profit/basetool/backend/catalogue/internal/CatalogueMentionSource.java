@@ -100,6 +100,7 @@ public class CatalogueMentionSource implements PersonMentionSource {
         "faction",
         "game_item",
         "game_item_price",
+        "game_item_stat",
         "jurisdiction",
         "manufacturer",
         "material",

@@ -890,6 +890,24 @@ val testNumberFormatJs =
     outputs.upToDateWhen { false }
   }
 
+val testBlueprintStatsJs =
+  tasks.register<NodeTask>("testBlueprintStatsJs") {
+    group = "verification"
+    description =
+      "Regression tests for the blueprint recipe's stat values: quality factor, base times factor and the unit-aware text."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(layout.projectDirectory.file("scripts/blueprint-stats.test.mjs").asFile)
+    ignoreExitValue.set(false)
+    inputs.file(layout.projectDirectory.file("scripts/blueprint-stats.test.mjs"))
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(
+      layout.projectDirectory.file(
+        "src/main/resources/static/js/personalinventory/personal-inventory-blueprint-stats.js",
+      ),
+    )
+    outputs.upToDateWhen { false }
+  }
+
 val testEslintBans =
   tasks.register<NodeTask>("testEslintBans") {
     group = "verification"
@@ -1017,6 +1035,7 @@ tasks.named("check").configure {
     testReorderJs,
     testSearchJs,
     testNumberFormatJs,
+    testBlueprintStatsJs,
     testEslintBans,
     testTypecheckRatchet,
     testPromotionCsvEscape,

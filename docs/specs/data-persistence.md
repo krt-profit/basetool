@@ -1097,7 +1097,7 @@ pass the migration and fail every later write to `personal_blueprint`, `default_
 `inventory_item` or `ship`; the migration that renames a column recreates the functions that name
 it.
 
-The ownership map, 117 tables. Its machine-readable copy is
+The ownership map, 118 tables. Its machine-readable copy is
 `backend/src/test/resources/architecture/table-ownership.txt`, which the test reads; a new table is
 added to both. `deletion_request` sits with identity, as do the GDPR classes once the transitional
 `privacy` module dissolves (plan §7.6).
@@ -1107,7 +1107,7 @@ added to both. `deletion_request` sits with identity, as do the GDPR classes onc
 | `identity` | 7 | `app_user`, `deletion_request`, `role`, `role_permissions`, `terms_acceptance`, `user_approval_event`, `user_roles` |
 | `audit` | 1 | `audit_event` |
 | `notification` | 3 | `notification`, `notification_rule`, `notification_rule_selector` |
-| `catalogue` | 37 | `blueprint`, `blueprint_dismantle_return`, `blueprint_ingredient`, `blueprint_modifier_segment`, `blueprint_requirement_group`, `blueprint_requirement_modifier`, `blueprint_summary_property`, `city`, `external_sync_report`, `faction`, `frequency_type`, `game_item`, `game_item_price`, `job_type`, `jurisdiction`, `location`, `manufacturer`, `manufacturer_uex_company`, `material`, `material_category`, `material_external_alias`, `material_price`, `moon`, `orbit`, `outpost`, `p4k_import_job`, `p4k_import_job_payload`, `planet`, `poi`, `refinery_yield`, `refining_method`, `ship_type`, `ship_type_uex_alias`, `space_station`, `star_system`, `terminal`, `uex_category` |
+| `catalogue` | 38 | `blueprint`, `blueprint_dismantle_return`, `blueprint_ingredient`, `blueprint_modifier_segment`, `blueprint_requirement_group`, `blueprint_requirement_modifier`, `blueprint_summary_property`, `city`, `external_sync_report`, `faction`, `frequency_type`, `game_item`, `game_item_price`, `game_item_stat`, `job_type`, `jurisdiction`, `location`, `manufacturer`, `manufacturer_uex_company`, `material`, `material_category`, `material_external_alias`, `material_price`, `moon`, `orbit`, `outpost`, `p4k_import_job`, `p4k_import_job_payload`, `planet`, `poi`, `refinery_yield`, `refining_method`, `ship_type`, `ship_type_uex_alias`, `space_station`, `star_system`, `terminal`, `uex_category` |
 | `orgunit` | 3 | `kommando_group`, `org_unit`, `org_unit_membership` |
 | `admin` | 1 | `system_setting` |
 | `dashboard` | 1 | `announcement` |
@@ -1381,6 +1381,46 @@ request and no sync writes it.
 `P4kImportServiceTest`, `V310MigrationTest` · **Code:** `ShipTypeUexAlias`, the three
 `ShipTypeRepository#findBy…UexAlias…` queries, `UexVehicleService`, `ScWikiVehicleSyncService`,
 `P4kImportService`, V310
+
+### REQ-DATA-027 — a crafted item's blueprint stat base values come from the SC Wiki item payload (ADR-0309)
+
+A blueprint modifier names the stat it changes by its SC Wiki `property_key` (`health_maxhealth`,
+`weapon_damage`, `armor_temperaturemin`, …) and gives only the factor a quality applies. The value
+the factor multiplies is the crafted item's own stat. `game_item_stat` stores it: one row per game
+item and stat (`BlueprintStatProperty`), the base value in the stat's unit, unique per item and stat.
+
+- **Source.** The SC Wiki item sync writes the rows from the item payload — the detail response of
+  `GET /api/items/{uuid}` or a row of a kind list endpoint (`/api/weapons`, `/api/vehicle-items`,
+  `/api/armor`, …), which carry the same stat blocks; the residual `/api/items` list carries none.
+  `BlueprintStatProperty` maps each of the 21 known property keys to its field (ADR-0309 lists them);
+  a property key it does not list — today the three recoil keys — has no base value.
+- **Craftable items only.** Only a payload with `is_craftable = true` writes rows.
+- **Units.** A damage mitigation is stored as the fraction the armour absorbs
+  (`1 − damage_resistance.physical.multiplier`), a salvage extraction efficiency as a fraction, a
+  temperature in °C; every other stat as the Wiki serves it.
+- **No zero, no wipe.** A missing, non-numeric or zero value writes no row, since a factor cannot
+  change a zero base. A payload with values replaces the item's rows — updated in place, the stats
+  it no longer carries deleted; a payload without any value leaves the stored rows alone, so a list
+  row never wipes what a detail fetch stored.
+- **Completion.** After the kind passes of a full run (`sync-all-items=true`), the sync fetches the
+  detail of every item an active blueprint crafts that still has no row. The closure mode fetches
+  every item's detail anyway.
+- **Monitoring.** The gauge `basetool_catalogue_items_with_stats` counts the items with a row after
+  each run; the alert `ScWikiItemStatsMissing` fires when it stays at zero.
+
+**Acceptance**
+
+- [x] Each of the 21 properties is read from its field; a mining laser's laser power wins over its
+  zero damage per shot; the armour mitigation is `1 − multiplier`.
+- [x] A zero, non-numeric or missing value yields no row; a payload without values, or one of an item
+  that is not craftable, writes nothing.
+- [x] Stored rows are updated in place, and a stat the payload no longer carries is deleted.
+- [x] A full run fetches the detail of every blueprint output without a row and sets the gauge.
+
+**Enforced by:** `ScWikiItemStatExtractorTest`, `GameItemStatWriterTest`,
+`ScWikiItemSyncServiceClosureTest`, `ScWikiItemSyncServiceBackfillTest` · **Code:**
+`BlueprintStatProperty`, `GameItemStat`, `GameItemStatRepository`, `ScWikiItemStatExtractor`,
+`GameItemStatWriter`, `ScWikiItemSyncService`, V311
 
 ## Out of scope
 

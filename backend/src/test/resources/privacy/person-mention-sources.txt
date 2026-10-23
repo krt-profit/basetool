@@ -270,6 +270,7 @@ exempt-table|faction
 exempt-table|flyway_schema_history
 exempt-table|game_item
 exempt-table|game_item_price
+exempt-table|game_item_stat
 exempt-table|jurisdiction
 exempt-table|manufacturer
 exempt-table|material

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.blueprint.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRequirementGroupDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRequirementIngredientDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintStatBaseDto;
 import java.util.List;
 
 /**
@@ -34,9 +35,12 @@ import java.util.List;
  * @param requirementGroups the representative recipe's build slots with ingredients and per-quality
  *     stat modifiers; may be empty
  * @param ingredients flat ingredient list, used when {@link #requirementGroups} is empty
+ * @param baseStats the crafted item's stat base values per property key (REQ-INV-069); empty when
+ *     none is stored
  */
 public record PersonalBlueprintRecipeResponse(
     String productName,
     int variantCount,
     List<BlueprintRequirementGroupDto> requirementGroups,
-    List<BlueprintRequirementIngredientDto> ingredients) {}
+    List<BlueprintRequirementIngredientDto> ingredients,
+    List<BlueprintStatBaseDto> baseStats) {}

@@ -79707,6 +79707,22 @@
           }
         }
       },
+      "BlueprintStatBaseDto" : {
+        "type" : "object",
+        "properties" : {
+          "baseValue" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "propertyKey" : {
+            "type" : "string"
+          },
+          "unit" : {
+            "type" : "string",
+            "enum" : [ "NONE", "PERCENT", "CELSIUS", "METER", "METER_PER_SECOND", "ROUNDS_PER_MINUTE" ]
+          }
+        }
+      },
       "BlueprintSummaryPropertyDto" : {
         "type" : "object",
         "properties" : {
@@ -88564,6 +88580,12 @@
       "PersonalBlueprintRecipeResponse" : {
         "type" : "object",
         "properties" : {
+          "baseStats" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlueprintStatBaseDto"
+            }
+          },
           "ingredients" : {
             "type" : "array",
             "items" : {

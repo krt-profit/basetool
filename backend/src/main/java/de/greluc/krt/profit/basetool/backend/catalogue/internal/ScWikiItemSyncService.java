@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiItemDto;
@@ -42,6 +43,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Contract;
@@ -63,7 +65,9 @@ import org.springframework.util.StringUtils;
  * <p>Mode A ({@code sync-all-items=false}) fetches only items already in scope, per UUID, and never
  * sweeps. Mode B ({@code sync-all-items=true}) pages every per-kind endpoint plus the residual
  * {@code /api/items} pass and tombstones orphans only on a vouched-for census (ADR-0195). Both
- * write only Wiki-owned columns and never overwrite the UEX-canonical name or flags.
+ * write only Wiki-owned columns and never overwrite the UEX-canonical name or flags. A craftable
+ * item's blueprint stat base values go to {@code game_item_stat} (REQ-DATA-027); Mode B fetches the
+ * full payload of every blueprint output still without one.
  */
 @Slf4j
 @Service
@@ -89,9 +93,15 @@ public class ScWikiItemSyncService {
   private final BlueprintRepository blueprintRepository;
   private final ManufacturerRepository manufacturerRepository;
   private final SyncReportService syncReportService;
+  private final GameItemStatRepository gameItemStatRepository;
+  private final GameItemStatWriter gameItemStatWriter;
+  private final ScWikiItemStatFollowUp statFollowUp;
 
   /** Registry the orphan-sweep stand-down counter binds to. */
   private final MeterRegistry meterRegistry;
+
+  /** Items with a stored blueprint stat base value, read by the gauge after each run. */
+  private final AtomicLong itemsWithStats = new AtomicLong();
 
   /**
    * Lazily resolved self-proxy, so the per-item {@code REQUIRES_NEW} writes each open their own
@@ -115,10 +125,11 @@ public class ScWikiItemSyncService {
       return 0;
     }
     meterRegistry.counter(MetricNames.CATALOGUE_ITEM_CLASS_UNKNOWN);
-    if (Boolean.TRUE.equals(properties.syncAllItems())) {
-      return syncItemsBackfill();
-    }
-    return syncItemsClosure();
+    meterRegistry.gauge(MetricNames.CATALOGUE_ITEMS_WITH_STATS, itemsWithStats);
+    int written =
+        Boolean.TRUE.equals(properties.syncAllItems()) ? syncItemsBackfill() : syncItemsClosure();
+    itemsWithStats.set(gameItemStatRepository.countItemsWithStats());
+    return written;
   }
 
   /**
@@ -220,6 +231,7 @@ public class ScWikiItemSyncService {
       item.setSourceSystems(GameItemSourceSystem.BOTH);
     }
     gameItemRepository.save(item);
+    gameItemStatWriter.write(item, dto);
     return isNew ? ClosureOutcome.CREATED : ClosureOutcome.FILLED;
   }
 
@@ -297,6 +309,10 @@ public class ScWikiItemSyncService {
           allPassesSucceeded,
           ctx.seen.size());
     }
+
+    statFollowUp.fetchMissing(
+        (uuid, dto) ->
+            self.getObject().fillClosureItemWithinTransaction(ctx.runId, uuid, dto, ctx.now));
 
     syncReportService.pruneRuns(SyncSourceSystem.SCWIKI);
     log.info(
@@ -562,6 +578,7 @@ public class ScWikiItemSyncService {
       item.setManufacturer(resolvedManufacturer);
       applyWikiFields(item, dto, now);
       gameItemRepository.save(item);
+      gameItemStatWriter.write(item, dto);
       syncReportService.logScwikiEvent(
           runId,
           SyncEventType.CREATED_WIKI_ONLY,
@@ -580,6 +597,7 @@ public class ScWikiItemSyncService {
       outcome = BackfillOutcome.LINKED;
     }
     gameItemRepository.save(item);
+    gameItemStatWriter.write(item, dto);
     return outcome;
   }
 
@@ -609,6 +627,7 @@ public class ScWikiItemSyncService {
     applyWikiFields(uexRow, dto, now);
     uexRow.setSourceSystems(GameItemSourceSystem.BOTH);
     gameItemRepository.save(uexRow);
+    gameItemStatWriter.write(uexRow, dto);
     syncReportService.logScwikiEvent(
         runId,
         SyncEventType.LINKED_VIA_NAME,

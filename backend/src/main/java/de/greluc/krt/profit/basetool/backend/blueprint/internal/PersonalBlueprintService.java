@@ -301,7 +301,7 @@ public class PersonalBlueprintService {
         .orElseGet(
             () ->
                 new PersonalBlueprintRecipeResponse(
-                    entity.getProductName(), 0, List.of(), List.of()));
+                    entity.getProductName(), 0, List.of(), List.of(), List.of()));
   }
 
   /**

@@ -60,14 +60,16 @@ public final class MetricNames {
   /**
    * Counter {@code basetool_catalogue_orphan_sweep_skipped_total} — tags {@code sweep} ({@link
    * #SWEEP_ITEM}) and {@code reason} ({@link #SWEEP_SKIP_INCOMPLETE} / {@link
-   * #SWEEP_SKIP_NOT_MODIFIED} / {@link #SWEEP_SKIP_NO_ROWS}), bumped when a catalogue sync stands
-   * its orphan sweep down because the fetch was not a full census (REQ-OBS-011).
+   * #SWEEP_SKIP_NOT_MODIFIED} / {@link #SWEEP_SKIP_NO_ROWS}), one per stood-down sweep.
    */
   public static final String CATALOGUE_ORPHAN_SWEEP_SKIPPED =
       "basetool.catalogue.orphan.sweep.skipped";
 
   /** Untagged counter of SC Wiki items with an unknown {@code class} value (REQ-DATA-024). */
   public static final String CATALOGUE_ITEM_CLASS_UNKNOWN = "basetool.catalogue.item.class.unknown";
+
+  /** Untagged gauge of game items with a stored blueprint stat base value (REQ-DATA-027). */
+  public static final String CATALOGUE_ITEMS_WITH_STATS = "basetool.catalogue.items.with.stats";
 
   /**
    * Gauge {@code basetool_redis_fanout_subscribed} — tag {@code fanout} ({@code notifications}); 1

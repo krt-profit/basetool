@@ -26,13 +26,18 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintStatProperty;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStat;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.GameItemStatWriter;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiItemStatFollowUp;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiItemSyncService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiProperties;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncEventType;
@@ -61,6 +66,7 @@ import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.json.JsonMapper;
 
 /** Unit tests for {@link ScWikiItemSyncService} — the R4 closure-mode item fill. */
 @ExtendWith(MockitoExtension.class)
@@ -71,6 +77,7 @@ class ScWikiItemSyncServiceClosureTest {
   @Mock private BlueprintRepository blueprintRepository;
   @Mock private ManufacturerRepository manufacturerRepository;
   @Mock private SyncReportService syncReportService;
+  @Mock private GameItemStatRepository gameItemStatRepository;
   @Mock private ObjectProvider<ScWikiItemSyncService> self;
 
   /**
@@ -107,9 +114,40 @@ class ScWikiItemSyncServiceClosureTest {
             blueprintRepository,
             manufacturerRepository,
             syncReportService,
+            gameItemStatRepository,
+            new GameItemStatWriter(gameItemStatRepository),
+            new ScWikiItemStatFollowUp(scWikiClient, properties, gameItemStatRepository),
             meterRegistry,
             self);
     lenient().when(self.getObject()).thenReturn(service);
+  }
+
+  @Test
+  void fillClosureItem_storesTheStatBaseValuesOfACraftableItem() {
+    UUID uuid = UUID.fromString("26838ca7-418a-47d2-8429-7339ebbb8993");
+    GameItem existing = new GameItem();
+    existing.setId(UUID.randomUUID());
+    existing.setExternalUuid(uuid);
+    existing.setSourceSystems(GameItemSourceSystem.BOTH);
+    when(gameItemRepository.findByExternalUuid(uuid)).thenReturn(Optional.of(existing));
+    when(gameItemStatRepository.findByGameItemId(existing.getId())).thenReturn(List.of());
+    ScWikiItemDto dto =
+        JsonMapper.builder()
+            .build()
+            .readValue(
+                "{\"uuid\":\""
+                    + uuid
+                    + "\",\"name\":\"Omnisky III Cannon\",\"is_craftable\":true,"
+                    + "\"durability\":{\"health\":550}}",
+                ScWikiItemDto.class);
+
+    service.fillClosureItemWithinTransaction(UUID.randomUUID(), uuid, dto, Instant.now());
+
+    ArgumentCaptor<GameItemStat> stat = ArgumentCaptor.forClass(GameItemStat.class);
+    verify(gameItemStatRepository).save(stat.capture());
+    assertEquals(BlueprintStatProperty.HEALTH_MAX_HEALTH, stat.getValue().getProperty());
+    assertEquals(550.0, stat.getValue().getBaseValue());
+    assertSame(existing, stat.getValue().getGameItem());
   }
 
   @Test
@@ -170,7 +208,22 @@ class ScWikiItemSyncServiceClosureTest {
             Map.of("en_EN", "An explorer helmet.", "de_DE", "Ein Forscherhelm."),
             true,
             false,
-            "4.8.0-LIVE");
+            "4.8.0-LIVE",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
 
     when(gameItemRepository.findAllExternalUuids()).thenReturn(List.of(uuid));
     when(blueprintRepository.findReferencedItemUuids()).thenReturn(List.of());
@@ -224,7 +277,22 @@ class ScWikiItemSyncServiceClosureTest {
             Map.of("en_EN", "A mineral."),
             false,
             true,
-            "4.8");
+            "4.8",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
     when(gameItemRepository.findAllExternalUuids()).thenReturn(List.of());
     when(blueprintRepository.findReferencedItemUuids()).thenReturn(List.of(uuid));
     when(scWikiClient.fetchOne(eq("/api/items"), eq(uuid), eq(ScWikiItemDto.class), any()))
@@ -468,7 +536,22 @@ class ScWikiItemSyncServiceClosureTest {
         Map.of("en_EN", "desc"),
         Boolean.TRUE,
         Boolean.FALSE,
-        "4.8.0-LIVE");
+        "4.8.0-LIVE",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null);
   }
 
   private static ScWikiItemDto itemDto(UUID uuid) {
@@ -493,6 +576,21 @@ class ScWikiItemSyncServiceClosureTest {
         Map.of("en_EN", "desc"),
         Boolean.TRUE,
         Boolean.FALSE,
-        "4.8.0-LIVE");
+        "4.8.0-LIVE",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null);
   }
 }

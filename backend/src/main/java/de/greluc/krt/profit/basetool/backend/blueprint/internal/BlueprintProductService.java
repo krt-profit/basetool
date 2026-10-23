@@ -29,6 +29,9 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintProductRow;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintStatBaseDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -72,6 +75,7 @@ public class BlueprintProductService implements BlueprintProducts {
   private final PersonalBlueprintRepository personalBlueprintRepository;
   private final BlueprintNameNormalizer normalizer;
   private final BlueprintMapper blueprintMapper;
+  private final GameItemStatRepository gameItemStatRepository;
 
   /**
    * Searches blueprint products by case-insensitive name substring, flagging those {@code
@@ -219,7 +223,25 @@ public class BlueprintProductService implements BlueprintProducts {
             Objects.requireNonNull(displayName),
             variantCount,
             blueprintMapper.toGroupDtos(recipe.getRequirementGroups()),
-            blueprintMapper.toIngredientDtos(recipe.getIngredients())));
+            blueprintMapper.toIngredientDtos(recipe.getIngredients()),
+            baseStats(recipe.getOutputItem())));
+  }
+
+  /**
+   * Reads the stored stat base values of a recipe's crafted item (REQ-INV-069).
+   *
+   * @param outputItem the crafted item, or {@code null} when the recipe names none
+   * @return the base values ordered by property key; empty when none is stored
+   */
+  @NotNull
+  private List<BlueprintStatBaseDto> baseStats(@Nullable GameItem outputItem) {
+    if (outputItem == null || outputItem.getId() == null) {
+      return List.of();
+    }
+    return gameItemStatRepository.findByGameItemId(outputItem.getId()).stream()
+        .map(BlueprintStatBaseDto::of)
+        .sorted(Comparator.comparing(BlueprintStatBaseDto::propertyKey))
+        .toList();
   }
 
   /**

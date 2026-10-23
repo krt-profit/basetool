@@ -2,6 +2,12 @@ import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { formatNumber } from '/js/kernel/krt-number-format.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import {
+    computeModifierValue,
+    formatFactorPercent,
+    formatStatRange,
+    indexBaseStats,
+} from '/js/personalinventory/personal-inventory-blueprint-stats.js';
 
 /** @type {HTMLElement | null} */
 let mdEl = null;
@@ -48,6 +54,18 @@ let activeRow = null;
 
 /**
  * @typedef {ApiDto<'BlueprintRequirementModifierDto'>} BpRecipeModifier
+ */
+
+/**
+ * @typedef {ApiDto<'BlueprintStatBaseDto'>} BpStatBase
+ */
+
+/**
+ * @typedef {object} StatChip
+ * @property {BpRecipeModifier} modifier the modifier the chip shows
+ * @property {HTMLElement} out the value output
+ * @property {BpStatBase | null} base the crafted item's base value of the stat, null when unknown
+ * @property {HTMLElement | null} factorOut the factor beside the value, null without a base value
  */
 
 const recipeCache = new Map();
@@ -415,8 +433,9 @@ function renderRecipe(recipe) {
 
     if (groups.length > 0) {
         const pane = recipeEl;
+        const baseByKey = indexBaseStats(recipe.baseStats);
         groups.forEach((g, idx) => {
-            pane.appendChild(renderQualityBlock(g, idx));
+            pane.appendChild(renderQualityBlock(g, idx, baseByKey));
         });
     } else {
         const block = el('div', 'quality-block');
@@ -435,9 +454,10 @@ function renderRecipe(recipe) {
  *
  * @param {BpRecipeGroup} group the requirement group
  * @param {number} groupIndex the group's position, matching the craftability groups
+ * @param {Map<string, BpStatBase>} baseByKey the crafted item's stat base values per property key
  * @returns {HTMLElement} the quality block
  */
-function renderQualityBlock(group, groupIndex) {
+function renderQualityBlock(group, groupIndex, baseByKey) {
     const block = el('div', 'quality-block');
     const slot = group.name || group.groupKey;
     if (slot) {
@@ -475,18 +495,34 @@ function renderQualityBlock(group, groupIndex) {
         return block;
     }
 
-    /** @type {{ modifier: BpRecipeModifier, out: HTMLElement }[]} */
+    /** @type {StatChip[]} */
     const chips = [];
     mods.forEach((m) => {
         const chip = el('span', 'chip');
         chip.appendChild(el('span', null, `${m.label || m.propertyKey || ''} `));
-        const valueOut = el('output', null, '×?');
+        const valueOut = el('output', null, '?');
         chip.appendChild(valueOut);
+        const base = (m.propertyKey && baseByKey.get(m.propertyKey)) || null;
+        /** @type {HTMLElement | null} */
+        let factorOut = null;
+        if (base) {
+            factorOut = el('small', 'krt-bp-stat-factor', '');
+            chip.appendChild(factorOut);
+        }
+        const titleParts = [];
+        if (base) {
+            titleParts.push(
+                krtI18nText(i18n().statValueTitle, 'krtBlueprintsRecipeI18n.statValueTitle'),
+            );
+        }
         const bw = betterWhenText(m.betterWhen);
         if (bw) {
-            chip.title = bw;
+            titleParts.push(bw);
         }
-        chips.push({ modifier: m, out: valueOut });
+        if (titleParts.length > 0) {
+            chip.title = titleParts.join(' · ');
+        }
+        chips.push({ modifier: m, out: valueOut, base, factorOut });
         affects.appendChild(chip);
     });
 
@@ -551,7 +587,7 @@ function renderQualityBlock(group, groupIndex) {
         }
         if (banded[0] && banded[0].modifierAtMaxQuality != null) {
             hintParts.push(
-                `${formatNumber(Math.round(qmax), 0, document.documentElement.lang)} → ×${formatNumber(banded[0].modifierAtMaxQuality, 2, document.documentElement.lang)}`,
+                `${formatNumber(Math.round(qmax), 0, document.documentElement.lang)} → ${formatFactorPercent(banded[0].modifierAtMaxQuality, document.documentElement.lang)}`,
             );
         }
         if (hintParts.length > 0) {
@@ -565,22 +601,57 @@ function renderQualityBlock(group, groupIndex) {
             qOut.textContent = String(Math.round(q));
             range.setAttribute('aria-valuetext', `${Math.round(q)} / ${Math.round(qmax)}`);
             chips.forEach((c) => {
-                const value = computeModifierValue(c.modifier, q);
-                c.out.textContent = `×${value == null ? '?' : formatNumber(value, 2, document.documentElement.lang)}`;
+                showChipValue(c, computeModifierValue(c.modifier, q), '?');
             });
         }
         range.addEventListener('input', compute);
         compute();
     } else {
         chips.forEach((c) => {
-            const v = c.modifier.modifierAtMaxQuality;
-            c.out.textContent =
-                v == null ? '–' : `×${formatNumber(v, 2, document.documentElement.lang)}`;
+            showChipValue(c, c.modifier.modifierAtMaxQuality, '–');
         });
     }
 
     block.appendChild(affects);
     return block;
+}
+
+/**
+ * The unit labels of the stat values, keyed by the unit name of the base value.
+ *
+ * @returns {Record<string, string>} the label per unit name
+ */
+function statUnitLabels() {
+    const dict = i18n();
+    /** @type {Record<string, string>} */
+    const labels = {};
+    ['PERCENT', 'CELSIUS', 'METER', 'METER_PER_SECOND', 'ROUNDS_PER_MINUTE'].forEach((unit) => {
+        labels[unit] = krtI18nText(
+            dict[`statUnit${unit}`],
+            `krtBlueprintsRecipeI18n.statUnit${unit}`,
+        );
+    });
+    return labels;
+}
+
+/**
+ * Writes a chip's value for a modifier factor: „base → value" with the factor beside it when the
+ * crafted item's base value is known, the factor alone otherwise.
+ *
+ * @param {StatChip} chip the chip
+ * @param {number | null | undefined} factor the modifier factor, null when unknown
+ * @param {string} missing the text for an unknown factor
+ * @returns {void}
+ */
+function showChipValue(chip, factor, missing) {
+    const lang = document.documentElement.lang;
+    const factorText = factor == null ? missing : formatFactorPercent(factor, lang);
+    if (chip.base && chip.factorOut) {
+        chip.out.textContent = formatStatRange(chip.base, factor, lang, statUnitLabels());
+        chip.factorOut.textContent = ` ${factorText}`;
+        return;
+    }
+    chip.out.textContent = factorText;
 }
 
 /**
@@ -637,68 +708,6 @@ function betterWhenText(bw) {
     }
     if (bw === 'neutral') {
         return krtI18nText(i18n().betterNeutral, 'krtBlueprintsRecipeI18n.betterNeutral');
-    }
-    return null;
-}
-
-/**
- * Clamps a value to the unit interval.
- *
- * @param {number} t the value
- * @returns {number} the value between 0 and 1
- */
-function clamp01(t) {
-    return t < 0 ? 0 : t > 1 ? 1 : t;
-}
-
-/**
- * Linear interpolation.
- *
- * @param {number} a the value at 0
- * @param {number} b the value at 1
- * @param {number} t the position between 0 and 1
- * @returns {number} the interpolated value
- */
-function lerp(a, b, t) {
-    return a + (b - a) * t;
-}
-
-/**
- * Evaluates a quality modifier at a quality, over its segments or its min/max range.
- *
- * @param {BpRecipeModifier} m the modifier
- * @param {number} q the quality
- * @returns {number | null | undefined} the modifier value, null when the quality is out of range
- */
-function computeModifierValue(m, q) {
-    const segs = m.segments || [];
-    if (segs.length > 0) {
-        const stepped = (m.valueRangeType || 'linear').toLowerCase() !== 'linear';
-        for (let i = 0; i < segs.length; i++) {
-            const a = segs[i].qualityMin;
-            const b = segs[i].qualityMax;
-            const vs = segs[i].modifierAtStart;
-            const ve = segs[i].modifierAtEnd;
-            if (a == null || b == null) {
-                continue;
-            }
-            if (q <= b || i === segs.length - 1) {
-                if (stepped) {
-                    return vs == null ? ve : vs;
-                }
-                const t = b === a ? 0 : clamp01((q - a) / (b - a));
-                return vs == null || ve == null ? vs : lerp(vs, ve, t);
-            }
-        }
-        return null;
-    }
-    const qmin = m.effectiveQualityMin;
-    const qmax = m.effectiveQualityMax;
-    const vmin = m.modifierAtMinQuality;
-    const vmax = m.modifierAtMaxQuality;
-    if (qmin != null && qmax != null && vmin != null && vmax != null) {
-        const tt = qmax === qmin ? 0 : clamp01((q - qmin) / (qmax - qmin));
-        return lerp(vmin, vmax, tt);
     }
     return null;
 }

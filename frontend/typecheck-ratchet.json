@@ -183,6 +183,7 @@
     ],
     "personalinventory": [
       "personalinventory/admin-personal-blueprints-purge.js",
+      "personalinventory/personal-inventory-blueprint-stats.js",
       "personalinventory/personal-inventory-blueprints-import.js",
       "personalinventory/personal-inventory-blueprints-recipe.js",
       "personalinventory/personal-inventory-blueprints.js",

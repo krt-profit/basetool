@@ -65,7 +65,8 @@ then the craftability block of REQ-INV-048 (key figure and the ingredients table
 existing lazy endpoint (`GET /personal-inventory/blueprints/{id}/recipe`, cached per id): source
 slot, material + quantity (SCU/units) + min. quality, ONE quality slider spanning the group's
 effective band (`aria-label` "Qualität {material}", `aria-valuetext`), and the group's affected
-stats as chips with **live factors**. The factor interpolation is the pre-existing
+stats as chips with **live factors** — and, where the crafted item's base value is known, the live
+value (REQ-INV-069). The factor interpolation is the pre-existing
 implementation, kept verbatim (`computeModifierValue`: ordered segments — interpolated when
 `linear`, held constant for stepped forms — else linear interpolation across the effective
 band); the mock's `1 + (max−1)·q/1000` formula is explicitly NOT used. Slider state is
@@ -701,3 +702,41 @@ names of all its rows in one registry query, and none when no row came from a cl
 `PersonalBlueprintRepository#grantDefaultBlueprintsTo…`, `ExchangeBlueprintWriteService`,
 `ExchangeBlueprintFeedService`, `ExchangeClientRepository#findDisplayNamesByClientIdIn`,
 `personal-inventory-blueprints-recipe.js` `describeSource` / `sourceChipText` · **Issues:** #2084 (epic #2078), #2231.
+
+### REQ-INV-069 — The stat contribution shows the crafted item's values, not only the factor
+
+The recipe's stat chips (REQ-INV-009) show, for every stat whose crafted-item base value is stored
+(REQ-DATA-027), the base value and the value the slider's quality yields — „Integrity 550 → 605"
+with the factor's change „+10 %" beside it in grey. A stat without a stored base value shows that
+change alone.
+
+- **The data.** The recipe endpoint (`GET /api/v1/personal-blueprints/{id}/recipe`) carries
+  `baseStats`: the representative recipe's crafted item's base values, each with its `propertyKey`,
+  `baseValue` and `unit` (`NONE`, `PERCENT`, `CELSIUS`, `METER`, `METER_PER_SECOND`,
+  `ROUNDS_PER_MINUTE`); empty when none is stored or the recipe names no crafted item. A chip finds
+  its value by the modifier's `propertyKey`.
+- **The value.** The value at a quality is the base value times the factor
+  `computeModifierValue` yields (REQ-INV-009, unchanged), for every unit alike: a negative base —
+  the lowest tolerated temperature — moves away from zero as the factor grows, which is the
+  direction the factor means. It updates live with the slider; without a slider band the chip shows
+  the value at the maximum factor.
+- **The text.** The unit stands once, after the value („-61 → -67,1 °C", „30 → 36 %",
+  „650 → 683 Schuss/min"); a percentage is a fraction scaled to 0–100. A number is whole from 100,
+  has one decimal from 10, two from 1 and three significant digits below. The chip's tooltip adds
+  „Grundwert → Wert bei der gewählten Qualität" to the better-direction hint. Unit labels and the
+  tooltip come from the DE/EN bundles.
+- **The factor.** Every factor in the recipe — beside a value, alone on a chip, and in the hint
+  „(1000 → +5 %)" — reads as the signed change it makes: `1.1` is „+10 %", `0.95` „-5 %", `1`
+  „±0 %", with at most one decimal.
+
+**Acceptance**
+
+- [x] The recipe response carries the crafted item's base values sorted by property key, and none
+  without a crafted item. *`BlueprintProductServiceTest`.*
+- [x] The value is base times factor; the text is unit-aware and scales a percentage; a missing
+  factor shows „?"; a factor reads as a signed percentage. *`blueprint-stats.test.mjs` (`:frontend:testBlueprintStatsJs`).*
+- [x] The frontend mirror follows the contract. *`FrontendDtoContractTest`.*
+
+**Code:** `BlueprintStatBaseDto`, `BlueprintProductService#resolveRecipe`,
+`personal-inventory-blueprint-stats.js`, `personal-inventory-blueprints-recipe.js`
+`renderQualityBlock` / `showChipValue` · **Decision:** ADR-0309
