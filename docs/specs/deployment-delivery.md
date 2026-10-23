@@ -2287,9 +2287,16 @@ haproxy, glibc and the host-native `node_exporter` and `alloy` were fixed only w
 - **Every run records itself**: the same script writes the run's timestamp and outcome from systemd's
   `$SERVICE_RESULT`. `HostSecurityUpdatesFailing`, `HostSecurityUpdatesStale` and
   `HostRebootRequired` read them (REQ-OBS-011).
+- **The compose pin follows the host-native `alloy` and `node_exporter`.** Both are unpinned host
+  packages whose version is chosen in `docker-compose.monitoring.yml`. When the host package moves —
+  an advisory applied here or a manual `dnf upgrade` — the image pin moves to the running version in
+  a reviewed commit, after the configuration passes `scripts/check-monitoring-configs.sh` against the
+  new image; the host package is not rolled back to the pin (ADR-0199).
 
 **Acceptance**
 
+- [ ] `check-conformance.py --only host-exporter-versions` passes against the host: the running
+  `alloy_build_info` and `node_exporter_build_info` versions equal the compose pins.
 - [ ] `check-conformance.py --only security-updates-enabled` passes against the host: the timer is
   enabled and active, the configuration is security-only and applies, and `podman` is excluded.
 - [ ] `host-updates-metrics.test.sh` passes: a run is recorded by the run, a boot refresh keeps it,
@@ -2299,7 +2306,8 @@ haproxy, glibc and the host-native `node_exporter` and `alloy` were fixed only w
 
 **Enforced by:** `ansible/roles/basetool_host/tasks/45-updates.yml` ·
 `scripts/host-updates-metrics.sh` · `scripts/iri-host-updates-metrics.service` ·
-`monitoring/prometheus/alerts/infrastructure.yml` · `scripts/check-conformance.py` · **Decision:**
+`monitoring/prometheus/alerts/infrastructure.yml` · `scripts/check-conformance.py` ·
+`scripts/check-monitoring-configs.sh` · **Decision:**
 [ADR-0199](../adr/0199-the-host-applies-security-updates-unattended-with-the-container-runtime-excluded.md)
 
 ### REQ-OPS-033 — A realm gets the Basetool's shape from the provisioner, never by hand
