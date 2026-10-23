@@ -169,7 +169,7 @@ distribution's own `dnf-automatic.timer` with a role drop-in; none rides the con
 
 | Timer | Schedule | Runs as | Does |
 | --- | --- | --- | --- |
-| `iri-deploy` | every 5 min | `deploy` | Pull, Cosign-verify, reconcile (§6.6) |
+| `iri-deploy` | every 5 min on the clock (:00, :05 …) | `deploy` | Pull, Cosign-verify, reconcile (§6.6) |
 | `iri-backup` | daily 04:15 | `deploy` | The restic backup to Nextcloud (§6.7) |
 | `iri-restore-drill` | Sunday 05:30 | `deploy` | Restore the latest snapshot into a throwaway Postgres and score seven artifacts |
 | `iri-cert-expiry` | daily 03:40, and at boot | `root` | Write `basetool_certificate_expiry_timestamp_seconds` for the certificate *files* |

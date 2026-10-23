@@ -1,15 +1,15 @@
 [Unit]
-Description=Profit Basetool — periodic deploy check (every 5 minutes)
+Description=Profit Basetool — periodic deploy check (every 5 minutes, on the wall-clock grid)
 Documentation=https://github.com/krt-profit/basetool/blob/main/docs/deployment.md
 
 [Timer]
-OnBootSec=5min
+OnCalendar=*-*-* *:00/5:00
 
-OnUnitActiveSec=5min
+AccuracySec=1s
 
-RandomizedDelaySec=30s
+RandomizedDelaySec=0
 
-Persistent=true
+Persistent=false
 
 Unit=iri-deploy.service
 
