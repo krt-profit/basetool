@@ -1360,6 +1360,14 @@ backend from the public edge onto the internal connector `https://keycloak:18443
 check stay on the public issuer, so tokens and sessions do not change. The release carrying the
 wiring passes it **empty**, which keeps today's discovery-based behaviour exactly.
 
+> [!note] Applied on production 2026-10-24 (~17:17 UTC, v1.19.12)
+> Exactly as below: the `.env` line (backup `.env.backup-20261024-171557`), the render (both
+> `env.d` files carry the value), backend restarted 17:16:44 and frontend 17:17:15, both `healthy`.
+> The frontend logged `Keycloak back-channel is internal` and neither service a TLS error. An owner
+> sign-out and sign-in completed and the mission list loaded; in the edge log from 17:17:46 to
+> 17:19:31 the browser's `logout`, `auth` and callback requests appear, no `…/token` request from
+> any source, and from the host's own address only blackbox probes.
+
 **What changes when it is set:** the frontend starts without contacting Keycloak, a login and a
 token refresh no longer depend on the edge, and the edge's token rate limit sees browser traffic
 only. Members notice nothing; sessions open before the restart refresh against the new endpoint,
