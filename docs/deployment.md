@@ -1372,6 +1372,14 @@ backend from the public edge onto the internal connector `https://keycloak:18443
 check stay on the public issuer, so tokens and sessions do not change. The release carrying the
 wiring passes it **empty**, which keeps today's discovery-based behaviour exactly.
 
+> [!note] Applied on production 2026-10-24 (~17:17 UTC, v1.19.12)
+> Exactly as below: the `.env` line (backup `.env.backup-20261024-171557`), the render (both
+> `env.d` files carry the value), backend restarted 17:16:44 and frontend 17:17:15, both `healthy`.
+> The frontend logged `Keycloak back-channel is internal` and neither service a TLS error. An owner
+> sign-out and sign-in completed and the mission list loaded; in the edge log from 17:17:46 to
+> 17:19:31 the browser's `logout`, `auth` and callback requests appear, no `…/token` request from
+> any source, and from the host's own address only blackbox probes.
+
 **What changes when it is set:** the frontend starts without contacting Keycloak, a login and a
 token refresh no longer depend on the edge, and the edge's token rate limit sees browser traffic
 only. Members notice nothing; sessions open before the restart refresh against the new endpoint,
@@ -1399,17 +1407,31 @@ ${UCTL} restart frontend.service                                  # blocks until
 **Verify:** the frontend log carries `Keycloak back-channel is internal` once
 (`journalctl --since -10min CONTAINER_NAME=frontend -o cat | grep 'back-channel is internal'`) and
 no `PKIX` / `No subject alternative` line. Sign out, sign in, load the mission list: the login
-completes and the page loads. The edge access log then shows no token, discovery or certs request
-from the host's own address any more:
+completes and the page loads.
+
+In the edge access log, the frontend's calls disappear from the host's own address, which is where
+every hairpinned container call arrives (arc42 §11.5a). Group those calls by path and user agent,
+over a window that starts after the frontend restart:
 
 ```bash
-journalctl --since -15min CONTAINER_NAME=edge -o cat \
+IP4=$(ip -4 -o addr show scope global | awk '{print $4}' | cut -d/ -f1 | head -1)
+journalctl --since -15min CONTAINER_NAME=edge -o cat | awk -v s="$IP4" '$1==s' \
   | grep -E '"(GET|POST) /auth/realms/basetool/(protocol/openid-connect/(token|certs|userinfo)|\.well-known)' \
-  | awk '{print $1}' | sort | uniq -c
+  | awk -F'"' '{split($2,r," "); p=r[2]; sub(/\?.*/,"",p); print r[1], p, "|", $6}' \
+  | sort | uniq -c | sort -rn
 ```
 
-Only blackbox probes (the discovery document) and browsers remain. `FrontendLoginBroken` and
-`IdentityProviderUnavailable` stay silent, and `basetool_login_total` keeps counting successes.
+| user agent | caller | after the switch |
+| --- | --- | --- |
+| `ReactorNetty/…` on `…/token` | frontend token grants | **gone** |
+| `Blackbox-Exporter/…` on the discovery document | the external probes | stays, by design |
+| `Java-http-client/…` on `…/token`, `Java/…` on `…/certs` | the ingest gateway's service-account grant and JWKS | stays: the gateway has no network to Keycloak (REQ-SEC-087) |
+
+Measured on production before the switch, over six hours: 52 `ReactorNetty` token grants,
+720 blackbox probes, one Java token grant and one Java certs fetch. A `ReactorNetty` line after the
+restart means the frontend still runs on the issuer — check that `KEYCLOAK_BACKCHANNEL_URI`
+reached `env.d/frontend.env`. `FrontendLoginBroken` and `IdentityProviderUnavailable` stay silent,
+and `basetool_login_total{outcome="success"}` keeps counting.
 
 **Rollback:** delete the line from `basetool.env`, render `env.d/` again with the same command, restart
 backend and frontend. The variable then arrives empty and discovery against the public issuer is
