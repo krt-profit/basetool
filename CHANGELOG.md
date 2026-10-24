@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [v1.19.13](https://github.com/krt-profit/basetool/releases/tag/v1.19.13) - 2026-10-24
+
+### Changed
+
+- **Tabellen.** Die abwechselnd grauen Tabellenzeilen heben sich deutlicher voneinander ab, sodass
+  man eine Zeile in breiten Tabellen leichter mit dem Auge verfolgen kann.
+
 ## [v1.19.12](https://github.com/krt-profit/basetool/releases/tag/v1.19.12) - 2026-10-24
 
 ### Added
