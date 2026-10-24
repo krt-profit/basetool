@@ -842,6 +842,7 @@ common() {
     # shellcheck disable=SC1090
     . "$COMMON"; eval "$1" )
 }
+# shellcheck disable=SC2016
 got="$(env -u CONFIG_DIR -u ENV_FILE -u ENV_D_DIR -u COMPOSE_DIR bash -c '. "$1"; printf "%s %s %s %s" "$COMPOSE_DIR" "$CONFIG_DIR" "$ENV_FILE" "$ENV_D_DIR"' _ "$COMMON")"
 if [[ "$got" == "/opt/basetool /etc/basetool /etc/basetool/basetool.env /etc/basetool/env.d" ]]; then ok "the release tree and the host config are separate roots"; else bad "defaults gave '${got}'"; fi
 got="$(BASETOOL_CONFIG_DIR=/x BASETOOL_ENV_FILE=/y/e.env bash -c '. "$1"; printf "%s %s" "$ENV_FILE" "$ENV_D_DIR"' _ "$COMMON")"

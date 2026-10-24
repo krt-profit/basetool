@@ -11,7 +11,6 @@ BASETOOL_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 . "${BASETOOL_SCRIPT_DIR}/lib/container-runtime.sh"
 
-STATE_DIR="${BASETOOL_STATE_DIR:-/var/lib/basetool/deploy}"
 BACKUP_DIR="${BASETOOL_BACKUP_DIR:-/var/lib/basetool/backup}"
 WORK_BASE="${BACKUP_DIR}/restore-drill"
 BACKUP_ENV="${BASETOOL_BACKUP_ENV:-/etc/basetool/deploy/backup.env}"

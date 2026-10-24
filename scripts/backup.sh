@@ -15,7 +15,6 @@ BASETOOL_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "${BASETOOL_SCRIPT_DIR}/lib/restic-repo.sh"
 
 COMPOSE_DIR="${BASETOOL_COMPOSE_DIR:-/opt/basetool}"
-STATE_DIR="${BASETOOL_STATE_DIR:-/var/lib/basetool/deploy}"
 BACKUP_DIR="${BASETOOL_BACKUP_DIR:-/var/lib/basetool/backup}"
 STAGING_BASE="${BACKUP_DIR}/staging"
 LOCKFILE="${BASETOOL_LOCKFILE:-/run/lock/basetool-deploy.lock}"
