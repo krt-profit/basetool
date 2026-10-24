@@ -142,6 +142,7 @@
         --surface-raised: var(--color-gray-3);
         --control-bg: var(--color-control);
         --control-bg-hover: var(--color-control-hover);
+        --table-stripe-bg: color-mix(in srgb, var(--color-control) 50%, transparent);
         --control-border: var(--color-gray-2);
         --control-fg: var(--color-gray-1);
         --control-selected-bg: color-mix(in srgb, var(--color-primary) 26%, transparent);
@@ -584,7 +585,7 @@
     }
 
     tbody tr:nth-child(even of :not([hidden], .detail-row)) {
-        background-color: color-mix(in srgb, var(--color-white) 2%, transparent);
+        background-color: var(--table-stripe-bg);
     }
 
     tbody tr:hover,
