@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.Mockito.mock;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.security.KeycloakBackchannelProperties;
 import io.micrometer.observation.ObservationRegistry;
 import java.time.Duration;
 import java.time.Instant;
@@ -99,7 +100,8 @@ class WebClientConfigOauthTokenPoolTest {
         new ClientIpRelayFilter(),
         environment,
         mock(SslBundles.class),
-        ObservationRegistry.NOOP);
+        ObservationRegistry.NOOP,
+        new KeycloakBackchannelProperties(null));
   }
 
   @Test

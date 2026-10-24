@@ -90,6 +90,12 @@ haproxy, the PROXY header, the edge, vhost routing and the application. What it 
 public DNS and internet routing — and it never did: the Docker host's hairpin kept the packet on the
 machine too. The probes prove *"the name has a record and the edge answers"*, nothing more.
 
+The same hairpin carries the application traffic that dials a public name, and the edge sees all of
+it with one source, the host's own public address (measured 2026-10-24). That address is not on the
+`/auth/admin` allow-list — three admin paths answered `403` from it — so a container that hairpins
+does not reach the Keycloak console. ADR-0318 takes the frontend's and the backend's Keycloak calls
+off the hairpin once `IRI_KEYCLOAK_BACKCHANNEL_URI` is set; their aliases can then go.
+
 Two things to know before changing it. Podman **replaces** its own `--map-guest-addr` rather than
 appending, so dropping the v4 entry from `pasta_options` takes `host-gateway` from open to
 unreachable — measured. And if a future podman drops `pasta_options` for the rootless namespace,

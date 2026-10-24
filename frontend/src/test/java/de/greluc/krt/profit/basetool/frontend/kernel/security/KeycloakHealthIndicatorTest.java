@@ -36,6 +36,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.Status;
+import org.springframework.boot.ssl.DefaultSslBundleRegistry;
 
 /**
  * Unit tests for {@link KeycloakHealthIndicator} against a {@link MockWebServer}: a 2xx discovery
@@ -81,7 +82,7 @@ class KeycloakHealthIndicatorTest {
                 """
                     .formatted(issuerUri, issuerUri, issuerUri, issuerUri)));
     KeycloakHealthIndicator indicator =
-        new KeycloakHealthIndicator(issuerUri, TEST_CONNECT_TIMEOUT, TEST_READ_TIMEOUT);
+        new KeycloakHealthIndicator(issuerUri, null, TEST_CONNECT_TIMEOUT, TEST_READ_TIMEOUT);
 
     Health health = indicator.health();
 
@@ -98,7 +99,7 @@ class KeycloakHealthIndicatorTest {
   void health_returns_down_when_discovery_endpoint_responds_503() throws Exception {
     server.enqueue(new MockResponse().setResponseCode(503).setBody("upstream exploded"));
     KeycloakHealthIndicator indicator =
-        new KeycloakHealthIndicator(issuerUri, TEST_CONNECT_TIMEOUT, TEST_READ_TIMEOUT);
+        new KeycloakHealthIndicator(issuerUri, null, TEST_CONNECT_TIMEOUT, TEST_READ_TIMEOUT);
 
     Health health = indicator.health();
 
@@ -115,7 +116,7 @@ class KeycloakHealthIndicatorTest {
   void health_returns_down_when_discovery_endpoint_responds_404() {
     server.enqueue(new MockResponse().setResponseCode(404));
     KeycloakHealthIndicator indicator =
-        new KeycloakHealthIndicator(issuerUri, TEST_CONNECT_TIMEOUT, TEST_READ_TIMEOUT);
+        new KeycloakHealthIndicator(issuerUri, null, TEST_CONNECT_TIMEOUT, TEST_READ_TIMEOUT);
 
     Health health = indicator.health();
 
@@ -132,7 +133,7 @@ class KeycloakHealthIndicatorTest {
       throw new IllegalStateException("server shutdown failed during arrange", ex);
     }
     KeycloakHealthIndicator indicator =
-        new KeycloakHealthIndicator(deadIssuerUri, TEST_CONNECT_TIMEOUT, TEST_READ_TIMEOUT);
+        new KeycloakHealthIndicator(deadIssuerUri, null, TEST_CONNECT_TIMEOUT, TEST_READ_TIMEOUT);
 
     Health health = indicator.health();
 
@@ -141,6 +142,34 @@ class KeycloakHealthIndicatorTest {
     Object error = health.getDetails().get("error");
     assertNotNull(error, "transport failure must record an `error` detail for log correlation");
     assertNotEquals("", error.toString(), "the recorded error class name must not be empty");
+  }
+
+  @Test
+  void productionConstructor_probesTheBackchannelInsteadOfTheIssuerWhenSet() throws Exception {
+    server.enqueue(new MockResponse().setResponseCode(200).setBody("{}"));
+    KeycloakHealthIndicator indicator =
+        new KeycloakHealthIndicator(
+            "https://profit-base.invalid/auth/realms/iri",
+            new KeycloakBackchannelProperties(server.url("/auth/realms/iri/").toString()),
+            new DefaultSslBundleRegistry());
+
+    assertEquals(Status.UP, indicator.health().getStatus());
+    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+    assertNotNull(req);
+    assertEquals("/auth/realms/iri/.well-known/openid-configuration", req.getPath());
+  }
+
+  @Test
+  void productionConstructor_probesTheIssuerWhenTheBackchannelIsBlank() throws Exception {
+    server.enqueue(new MockResponse().setResponseCode(200).setBody("{}"));
+    KeycloakHealthIndicator indicator =
+        new KeycloakHealthIndicator(
+            issuerUri, new KeycloakBackchannelProperties(""), new DefaultSslBundleRegistry());
+
+    assertEquals(Status.UP, indicator.health().getStatus());
+    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+    assertNotNull(req);
+    assertEquals("/realms/iri/.well-known/openid-configuration", req.getPath());
   }
 
   @Test

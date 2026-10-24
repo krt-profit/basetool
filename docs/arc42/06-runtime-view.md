@@ -17,7 +17,10 @@ view, and because each one before the exchange's (§6.8) has burned somebody at 
    while it is pending the account sees nothing but its own registration status, and an admin
    approves it, rejects it, or links it onto an existing account.
 5. The frontend receives the tokens, creates a Spring Session in **Redis**, and calls the backend
-   as a *resource server* with a bearer token. The backend never sees a credential.
+   as a *resource server* with a bearer token. The backend never sees a credential. The code-for-token
+   exchange, the ID token's keys and the userinfo call are the frontend's own requests to Keycloak:
+   with `IRI_KEYCLOAK_BACKCHANNEL_URI` set they go to the internal connector, otherwise through the
+   edge (REQ-SEC-087, ADR-0318).
 
 The session lives in Redis rather than in memory so it survives a frontend restart — which a deploy
 performs routinely.

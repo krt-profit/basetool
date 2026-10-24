@@ -19,16 +19,17 @@
 
 package de.greluc.krt.profit.basetool.frontend.kernel.security;
 
-import java.net.http.HttpClient;
 import java.time.Duration;
+import javax.net.ssl.SSLContext;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.health.autoconfigure.contributor.ConditionalOnEnabledHealthIndicator;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.HealthIndicator;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.boot.ssl.SslBundles;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -39,9 +40,9 @@ import org.springframework.web.client.RestClientResponseException;
  * {issuer}/.well-known/openid-configuration}) and reports {@code DOWN} when it is unreachable, so
  * the frontend's readiness reflects SSO viability.
  *
- * <p>The issuer comes from the frontend's OAuth2 client property {@code
- * spring.security.oauth2.client.provider.keycloak.issuer-uri}. Probes use a 2&nbsp;s connect and
- * 3&nbsp;s read timeout. The indicator key is {@code keycloak}; {@code
+ * <p>The realm probed is {@code app.security.keycloak-backchannel.uri} when set, otherwise the
+ * issuer {@code spring.security.oauth2.client.provider.keycloak.issuer-uri}. Probes use a 2&nbsp;s
+ * connect and 3&nbsp;s read timeout. The indicator key is {@code keycloak}; {@code
  * management.health.keycloak.enabled=false} disables it.
  */
 @Component
@@ -59,34 +60,48 @@ public class KeycloakHealthIndicator implements HealthIndicator {
   private final RestClient client;
 
   /**
-   * Creates the indicator for the configured issuer with the indicator-specific timeouts.
+   * Creates the indicator with the indicator-specific timeouts, probing the internal realm base
+   * over the {@code keycloak-trust} bundle when a back-channel is configured (REQ-SEC-087).
    *
    * @param issuerUri the Keycloak realm issuer URI from {@code
-   *     spring.security.oauth2.client.provider.keycloak.issuer-uri}; the discovery path is appended
-   *     verbatim
+   *     spring.security.oauth2.client.provider.keycloak.issuer-uri}
+   * @param backchannel the internal realm base, probed instead of the issuer when set
+   * @param sslBundles the registered SSL bundles
    */
   @Autowired
   public KeycloakHealthIndicator(
-      @Value("${spring.security.oauth2.client.provider.keycloak.issuer-uri}") String issuerUri) {
-    this(issuerUri, CONNECT_TIMEOUT, READ_TIMEOUT);
+      @Value("${spring.security.oauth2.client.provider.keycloak.issuer-uri}") String issuerUri,
+      @NotNull KeycloakBackchannelProperties backchannel,
+      @NotNull SslBundles sslBundles) {
+    this(
+        backchannel.enabled() ? backchannel.realmBase() : issuerUri,
+        backchannel.enabled() ? KeycloakBackchannelTls.sslContext(sslBundles) : null,
+        CONNECT_TIMEOUT,
+        READ_TIMEOUT);
   }
 
   /**
    * Visible-for-testing constructor that lets unit tests inject shorter timeouts when driving the
    * indicator against an in-process {@code MockWebServer}.
    *
-   * @param issuerUri the Keycloak realm issuer URI; the OIDC discovery path is appended verbatim
-   * @param connectTimeout maximum time the underlying {@link HttpClient} waits to establish the TCP
-   *     connection before the probe is treated as {@code DOWN}
+   * @param realmUri the realm URI probed; the OIDC discovery path is appended verbatim
+   * @param sslContext the TLS context of the probe, or {@code null} for the JVM trust store
+   * @param connectTimeout maximum time the probe waits to establish the TCP connection before it is
+   *     treated as {@code DOWN}
    * @param readTimeout maximum time the {@link RestClient} waits for response bytes before the
    *     probe is treated as {@code DOWN}
    */
-  KeycloakHealthIndicator(String issuerUri, Duration connectTimeout, Duration readTimeout) {
-    this.discoveryUrl = issuerUri + DISCOVERY_PATH;
-    HttpClient httpClient = HttpClient.newBuilder().connectTimeout(connectTimeout).build();
-    JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
-    factory.setReadTimeout(readTimeout);
-    this.client = RestClient.builder().requestFactory(factory).build();
+  KeycloakHealthIndicator(
+      String realmUri,
+      @Nullable SSLContext sslContext,
+      Duration connectTimeout,
+      Duration readTimeout) {
+    this.discoveryUrl = realmUri + DISCOVERY_PATH;
+    this.client =
+        RestClient.builder()
+            .requestFactory(
+                KeycloakBackchannelTls.requestFactory(sslContext, connectTimeout, readTimeout))
+            .build();
   }
 
   /**

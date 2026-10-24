@@ -22,8 +22,10 @@ package de.greluc.krt.profit.basetool.backend.platform.internal;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.lang.reflect.Constructor;
+import java.security.KeyStore;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
@@ -36,6 +38,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.Status;
+import org.springframework.boot.ssl.DefaultSslBundleRegistry;
+import org.springframework.boot.ssl.SslBundle;
+import org.springframework.boot.ssl.SslStoreBundle;
 
 /**
  * Unit tests for {@link KeycloakHealthIndicator} against a {@link MockWebServer}: a 2xx discovery
@@ -84,7 +89,7 @@ class KeycloakHealthIndicatorTest {
                 """
                     .formatted(issuerUri, issuerUri, issuerUri, issuerUri)));
     KeycloakHealthIndicator indicator =
-        new KeycloakHealthIndicator(issuerUri, TEST_CONNECT_TIMEOUT, TEST_READ_TIMEOUT);
+        new KeycloakHealthIndicator(issuerUri, null, TEST_CONNECT_TIMEOUT, TEST_READ_TIMEOUT);
 
     Health health = indicator.health();
 
@@ -101,7 +106,7 @@ class KeycloakHealthIndicatorTest {
   void health_returns_down_when_discovery_endpoint_responds_503() throws Exception {
     server.enqueue(new MockResponse().setResponseCode(503).setBody("upstream exploded"));
     KeycloakHealthIndicator indicator =
-        new KeycloakHealthIndicator(issuerUri, TEST_CONNECT_TIMEOUT, TEST_READ_TIMEOUT);
+        new KeycloakHealthIndicator(issuerUri, null, TEST_CONNECT_TIMEOUT, TEST_READ_TIMEOUT);
 
     Health health = indicator.health();
 
@@ -118,7 +123,7 @@ class KeycloakHealthIndicatorTest {
   void health_returns_down_when_discovery_endpoint_responds_404() {
     server.enqueue(new MockResponse().setResponseCode(404));
     KeycloakHealthIndicator indicator =
-        new KeycloakHealthIndicator(issuerUri, TEST_CONNECT_TIMEOUT, TEST_READ_TIMEOUT);
+        new KeycloakHealthIndicator(issuerUri, null, TEST_CONNECT_TIMEOUT, TEST_READ_TIMEOUT);
 
     Health health = indicator.health();
 
@@ -131,7 +136,7 @@ class KeycloakHealthIndicatorTest {
     String deadIssuerUri = server.url("/realms/iri").toString();
     server.shutdown();
     KeycloakHealthIndicator indicator =
-        new KeycloakHealthIndicator(deadIssuerUri, TEST_CONNECT_TIMEOUT, TEST_READ_TIMEOUT);
+        new KeycloakHealthIndicator(deadIssuerUri, null, TEST_CONNECT_TIMEOUT, TEST_READ_TIMEOUT);
 
     Health health = indicator.health();
 
@@ -140,6 +145,46 @@ class KeycloakHealthIndicatorTest {
     Object error = health.getDetails().get("error");
     assertNotNull(error, "transport failure must record an `error` detail for log correlation");
     assertNotEquals("", error.toString(), "the recorded error class name must not be empty");
+  }
+
+  @Test
+  void productionConstructor_probesTheBackchannelInsteadOfTheIssuerWhenSet() throws Exception {
+    server.enqueue(new MockResponse().setResponseCode(200).setBody("{}"));
+    KeycloakHealthIndicator indicator =
+        new KeycloakHealthIndicator(
+            "https://profit-base.invalid/auth/realms/iri",
+            server.url("/auth/realms/iri/").toString(),
+            new DefaultSslBundleRegistry());
+
+    assertEquals(Status.UP, indicator.health().getStatus());
+    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+    assertNotNull(req);
+    assertEquals("/auth/realms/iri/.well-known/openid-configuration", req.getPath());
+  }
+
+  @Test
+  void productionConstructor_probesTheIssuerWhenTheBackchannelIsBlank() throws Exception {
+    server.enqueue(new MockResponse().setResponseCode(200).setBody("{}"));
+    KeycloakHealthIndicator indicator =
+        new KeycloakHealthIndicator(issuerUri, " ", new DefaultSslBundleRegistry());
+
+    assertEquals(Status.UP, indicator.health().getStatus());
+    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+    assertNotNull(req);
+    assertEquals("/realms/iri/.well-known/openid-configuration", req.getPath());
+  }
+
+  @Test
+  void keycloakTrust_isAbsentWithoutTheBundleAndBuiltWithIt() throws Exception {
+    assertNull(KeycloakHealthIndicator.keycloakTrust(new DefaultSslBundleRegistry()));
+
+    KeyStore truststore = KeyStore.getInstance("PKCS12");
+    truststore.load(null, null);
+    DefaultSslBundleRegistry registry = new DefaultSslBundleRegistry();
+    registry.registerBundle(
+        KeycloakHealthIndicator.KEYCLOAK_TRUST_BUNDLE,
+        SslBundle.of(SslStoreBundle.of(null, null, truststore)));
+    assertNotNull(KeycloakHealthIndicator.keycloakTrust(registry));
   }
 
   @Test

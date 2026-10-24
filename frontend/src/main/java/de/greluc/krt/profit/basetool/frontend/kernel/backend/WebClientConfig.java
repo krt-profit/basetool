@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.kernel.backend;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.security.KeycloakBackchannelProperties;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.KeycloakBackchannelTls;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.SingleFlightAuthorizedClientManager;
 import io.github.resilience4j.bulkhead.Bulkhead;
 import io.github.resilience4j.bulkhead.BulkheadRegistry;
@@ -47,10 +49,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.TrustManagerFactory;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.boot.ssl.NoSuchSslBundleException;
 import org.springframework.boot.ssl.SslBundle;
 import org.springframework.boot.ssl.SslBundles;
@@ -140,6 +144,12 @@ public class WebClientConfig {
    * trace context when tracing is enabled (REQ-OBS-009).
    */
   private final ObservationRegistry observationRegistry;
+
+  /**
+   * The internal Keycloak realm base; when set, the token calls trust the {@code keycloak-trust}
+   * bundle instead of the JVM trust store (REQ-SEC-087).
+   */
+  private final KeycloakBackchannelProperties keycloakBackchannel;
 
   /**
    * Dedicated connection pool for the OAuth2 token-endpoint calls to Keycloak ({@code
@@ -349,12 +359,19 @@ public class WebClientConfig {
    * #oauthTokenPool} (ADR-0115).
    *
    * <p>Read and write timeouts bound every phase of the exchange, including a stalled request body.
+   * With an internal back-channel the TLS trust is the {@code keycloak-trust} bundle, hostname
+   * verification on (REQ-SEC-087).
    *
    * @return a {@code RestClient} whose transport is the idle-evicting OAuth pool
    */
   private RestClient oauthTokenRestClient() {
+    HttpClient pooled = HttpClient.create(oauthTokenPool);
+    SslContext keycloakTrust = keycloakBackchannelSslContext();
+    if (keycloakTrust != null) {
+      pooled = pooled.secure(spec -> spec.sslContext(keycloakTrust));
+    }
     HttpClient httpClient =
-        HttpClient.create(oauthTokenPool)
+        pooled
             .option(
                 ChannelOption.CONNECT_TIMEOUT_MILLIS,
                 Math.toIntExact(httpProperties.connectTimeout().toMillis()))
@@ -377,6 +394,28 @@ public class WebClientConfig {
         .defaultStatusHandler(new OAuth2ErrorResponseErrorHandler())
         .requestFactory(new ReactorClientHttpRequestFactory(httpClient))
         .build();
+  }
+
+  /**
+   * Builds the Netty TLS context for the token calls to the internal Keycloak connector.
+   *
+   * @return the pinned context, or {@code null} when no back-channel or no {@code keycloak-trust}
+   *     bundle is configured
+   */
+  @Nullable
+  SslContext keycloakBackchannelSslContext() {
+    if (!keycloakBackchannel.enabled()) {
+      return null;
+    }
+    TrustManagerFactory tmf = KeycloakBackchannelTls.trustManagers(sslBundles);
+    if (tmf == null) {
+      return null;
+    }
+    try {
+      return SslContextBuilder.forClient().trustManager(tmf).build();
+    } catch (SSLException ex) {
+      throw new IllegalStateException("Failed to build the Keycloak back-channel TLS context", ex);
+    }
   }
 
   /**

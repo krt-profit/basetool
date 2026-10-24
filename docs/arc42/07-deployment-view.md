@@ -141,7 +141,10 @@ and `podman-exporter` for Prometheus). The alias lives in the generated unit rat
 runtime-specific fact stays in the one file that is generated per runtime. The same mechanism, as a
 role-written drop-in, points the host's **own public names** at `host-gateway` for the containers
 that dial them, because a rootless container cannot hairpin to the host's public address
-(ADR-0196, §11.5a).
+(ADR-0196, §11.5a). Such a hairpin reaches the edge with the host's own public address as its
+source. The frontend and the backend need it only while `IRI_KEYCLOAK_BACKCHANNEL_URI` is empty:
+set, their Keycloak calls stay on `net-backend-keycloak` (ADR-0318). The ingest gateway, Grafana
+and the blackbox exporter keep dialling the public names.
 
 Alloy also changed *how* it reads container logs: it reads the **journal**, keyed on
 `__journal_container_name`, instead of the Docker API. A host running a newer config bundle on the

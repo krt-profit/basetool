@@ -842,7 +842,8 @@ keep-alive socket.** With rotation off and the `scope` leak severed, an intermit
 remained; its cause is transport, not protocol. The frontend's `authorization_code` and
 `refresh_token` grants call Keycloak's token endpoint, whose URL derives from the public `issuer-uri`,
 so they hairpin **out through the public edge** (then NPM, now the native nginx edge; on the rootless
-host ADR-0196 aliases the public name to the container gateway). Spring Security 7's default `RestClient`
+host ADR-0196 aliases the public name to the container gateway) — unless REQ-SEC-087 moves them
+onto the internal connector. Spring Security 7's default `RestClient`
 token-response clients run on reactor-netty's **global** connection pool which — unlike the app's own
 `frontend-pool` / `frontend-sse-pool` (ADR-0078) — has **no idle eviction** (verified from the shipped
 bytecode). The edge reaps idle keep-alive sockets after ~60–75 s, so a refresh grant reusing one fails
@@ -6227,6 +6228,58 @@ app 19 moved to the typed `GET /api/v1/orders/settings`. The web reads the typed
 
 **Enforced by:** `SystemSettingControllerSecurityTest`, `AuthorizationMatrixTest` ·
 **Code:** `SystemSettingController` · **Related:** REQ-SEC-031, REQ-SEC-052, REQ-API-009, REQ-API-023
+
+### REQ-SEC-087 — Server-to-server Keycloak calls stay on the internal connector
+
+A call from one of our services to Keycloak that no browser follows does not leave the container
+networks when the deployment says where the internal connector is (ADR-0318). The setting is
+`app.security.keycloak-backchannel.uri` (env `KEYCLOAK_BACKCHANNEL_URI`, host
+`IRI_KEYCLOAK_BACKCHANNEL_URI`): the realm base on the internal connector,
+`https://keycloak:18443/auth/realms/iri`. Empty — the default — keeps the issuer-derived behaviour.
+
+With it set:
+
+- **The frontend's `keycloak` registration is built without discovery.** Issuer, authorization
+  endpoint and `end_session_endpoint` are the public issuer's (`<issuer>/protocol/openid-connect/…`),
+  because the browser follows them and the ID token's `iss` is the public issuer (REQ-SEC-024);
+  token, JWKS and userinfo are the internal realm base's. The client id, secret, authentication
+  method, grant type, redirect URI, scopes and user-name attribute come from the same
+  `spring.security.oauth2.client` properties as before (REQ-SEC-069).
+- **Every one of those calls trusts the `keycloak-trust` bundle**, the internal truststore of
+  REQ-SEC-014, with hostname verification on: the token client on `frontend-oauth-pool` (ADR-0115),
+  the ID-token decoder's JWKS fetch and the userinfo call. Without the bundle the JVM trust store
+  applies.
+- **The ID-token decoder validates as Spring Security's default does**: RS256, timestamps, the OIDC
+  ID-token claims against the registration (including `iss` against the public issuer), the
+  standard claim conversion.
+- **The `keycloak` health indicator of frontend and backend probes the internal discovery
+  document** over the same trust.
+
+The ingest gateway and Grafana are out of scope and keep reaching Keycloak through the edge: the
+ingest gateway is the internet-facing service and has no network to Keycloak, and neither has
+Grafana; a network would give them Keycloak's whole internal connector instead of the public
+surface.
+
+**Acceptance**
+
+- [x] With the setting blank no registration, decoder factory or user service of this requirement
+  exists, and both health indicators probe the issuer.
+- [x] With it set, the registration's issuer, authorization and end-session endpoints are public and
+  its token, JWKS and userinfo endpoints internal; a trailing slash on either URL is dropped, and a
+  missing issuer fails the start.
+- [x] With it set, the token client trusts a certificate the `keycloak-trust` bundle pins and refuses
+  one whose name does not match; without it, the bundle is not applied.
+- [x] The ID-token decoder fetches the JWKS from the internal endpoint and is built once per
+  registration.
+- [x] With it set, both health indicators probe `<internal realm>/.well-known/openid-configuration`.
+- [ ] Production runs with the setting, and the edge log shows no token, certs, userinfo or
+  discovery request from the host's own address except the blackbox probes
+  ([`deployment.md` → *Internal Keycloak back-channel*](../deployment.md#internal-keycloak-back-channel)).
+
+**Enforced by:** `KeycloakBackchannelConfigTest`, `KeycloakBackchannelTokenTrustTest`, both
+`KeycloakHealthIndicatorTest`s · **Code:** `KeycloakBackchannelConfig`,
+`KeycloakBackchannelProperties`, `KeycloakBackchannelTls`, `WebClientConfig`, both
+`KeycloakHealthIndicator`s · **Related:** REQ-SEC-014, REQ-SEC-024, REQ-SEC-069, REQ-OPS-022
 
 ---
 

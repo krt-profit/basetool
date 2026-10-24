@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.kernel.backend;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.security.KeycloakBackchannelProperties;
 import io.micrometer.observation.ObservationRegistry;
 import io.netty.channel.Channel;
 import io.netty.handler.ssl.SslHandler;
@@ -97,7 +98,8 @@ final class WebClientTestSupport {
         new ClientIpRelayFilter(),
         environment,
         mock(SslBundles.class),
-        ObservationRegistry.NOOP);
+        ObservationRegistry.NOOP,
+        new KeycloakBackchannelProperties(null));
   }
 
   /**

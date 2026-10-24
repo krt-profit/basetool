@@ -103,6 +103,8 @@ app:
     configure-keyspace-notifications: true
   security:
     trusted-types: ${APP_SECURITY_TRUSTED_TYPES:report}
+    keycloak-backchannel:
+      uri: ${KEYCLOAK_BACKCHANNEL_URI:}
   ui:
     notification-duration: 5000
   logging:
