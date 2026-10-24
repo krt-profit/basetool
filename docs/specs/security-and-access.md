@@ -6272,8 +6272,9 @@ surface.
 - [x] The ID-token decoder fetches the JWKS from the internal endpoint and is built once per
   registration.
 - [x] With it set, both health indicators probe `<internal realm>/.well-known/openid-configuration`.
-- [ ] Production runs with the setting, and the edge log shows no token, certs, userinfo or
-  discovery request from the host's own address except the blackbox probes
+- [ ] Production runs with the setting, and the edge log shows no frontend request (`ReactorNetty`
+  user agent) to token, certs, userinfo or discovery from the host's own address; the blackbox
+  probes and the ingest gateway's calls remain
   ([`deployment.md` → *Internal Keycloak back-channel*](../deployment.md#internal-keycloak-back-channel)).
 
 **Enforced by:** `KeycloakBackchannelConfigTest`, `KeycloakBackchannelTokenTrustTest`, both
