@@ -260,7 +260,7 @@ never acts for a user other than the one it authenticated.
 
 - [x] A request without a valid signed realm token is rejected 401/403; no forward happens. With
   the audience check configured, a token lacking the configured audience is rejected too — the
-  gateway's value is `basetool-ingest` (`IRI_INGEST_EXPECTED_AUDIENCES`), never the backend's (see
+  gateway's value is `basetool-ingest` (`BASETOOL_INGEST_EXPECTED_AUDIENCES`), never the backend's (see
   the amendment above).
 - [x] The device-grant client is public (no secret) and the secret is never embedded in the
   desktop binary or in any committed config.
@@ -269,7 +269,7 @@ never acts for a user other than the one it authenticated.
 **Enforced by:** `SecurityConfigTest` (audience validator accepts a token carrying `basetool-ingest`,
 rejects a frontend session token that carries only `basetool-backend` — corrected 2026-09-22, the test
 used to assert the backend's value), `scripts/check-ingest-audience.py` (repo-lint `ingest-audience`:
-no ingest config, env template or runbook pairs `expected-audiences` / `IRI_INGEST_EXPECTED_AUDIENCES`
+no ingest config, env template or runbook pairs `expected-audiences` / `BASETOOL_INGEST_EXPECTED_AUDIENCES`
 with `basetool-backend`), `ExchangeDpopGateTest` (an unauthenticated or unbound caller is refused,
 nothing relayed), `ArchitectureTest` (every REST surface is authorization-annotated) · **Code:**
 `SecurityConfig`, `ExchangeController`, `HandoffStagingService` (per-`sub` Redis key); the public
@@ -462,8 +462,8 @@ internal proxy, so an external client cannot trivially mint a fresh budget by sp
 header. Both bucket maps are bounded (LRU, capped key count) so neither grows without limit
 under key churn. The two keys have **separate budgets**: the per-`sub` bucket is
 `app.rate-limit.capacity` / `refill-tokens` (30 per minute), the per-IP bucket its own, looser
-`app.rate-limit.ip-capacity` / `ip-refill-tokens` (120 per minute, `IRI_INGEST_RATE_LIMIT_IP_CAPACITY`
-/ `IRI_INGEST_RATE_LIMIT_IP_REFILL_TOKENS`), both refilled over `refill-period`. The IP bucket used to
+`app.rate-limit.ip-capacity` / `ip-refill-tokens` (120 per minute, `BASETOOL_INGEST_RATE_LIMIT_IP_CAPACITY`
+/ `BASETOOL_INGEST_RATE_LIMIT_IP_REFILL_TOKENS`), both refilled over `refill-period`. The IP bucket used to
 share the per-member budget, so every member behind one CGNAT or office NAT shared a single member's
 30 requests a minute (ING-SIMP-02, 2026-09-22). One factory (`RateLimitBuckets.newBucket`) builds
 both. The per-IP limiter runs **before** the payload cap, so an over-budget caller is refused without
@@ -685,13 +685,13 @@ serves it statically and anonymously at `/exchange/v1/openapi.json` with the JSO
 > **Superseded 2026-09-28 (#2092 step 9).** The client-identity gate below guarded only the removed
 > `/v1` routes, and it is removed with them: `ClientIdentityFilter`, `ClientIdentityProperties`
 > (`app.ingest.client-identity.*` — `allowed-client-ids`, `required-scope`, `allowed-tools`,
-> `audit-only`; `IRI_INGEST_ALLOWED_CLIENT_IDS`, `IRI_INGEST_REQUIRED_SCOPE`,
-> `IRI_INGEST_ALLOWED_TOOLS`, `IRI_INGEST_CLIENT_AUDIT_ONLY`), `LegacyClientGateGuard`,
+> `audit-only`; `BASETOOL_INGEST_ALLOWED_CLIENT_IDS`, `BASETOOL_INGEST_REQUIRED_SCOPE`,
+> `BASETOOL_INGEST_ALLOWED_TOOLS`, `BASETOOL_INGEST_CLIENT_AUDIT_ONLY`), `LegacyClientGateGuard`,
 > `ProvenanceGuard`, `basetool_ingest_client_total`, `basetool_ingest_client_rejected_total`, the
 > `azp`/`scope`/`tool` series of `basetool_ingest_gate_enforcing` and the `IngestUnknownClient`
 > alert. Which client software may call the gateway is now decided by the exchange registry alone
 > (REQ-XCH-002/-003). **What still holds is the audience check**: the gateway's decoder requires
-> `aud=basetool-ingest` (`app.security.jwt.expected-audiences`, `IRI_INGEST_EXPECTED_AUDIENCES`),
+> `aud=basetool-ingest` (`app.security.jwt.expected-audiences`, `BASETOOL_INGEST_EXPECTED_AUDIENCES`),
 > which the `exchange.*` client scopes stamp, so a frontend session token still cannot drive it;
 > `basetool_ingest_gate_enforcing{gate="audience"}` reports it, the startup banner logs it as the
 > `Audience gate` line, and `IngestAudienceGateOff` fires while it is off. The text below is the
@@ -757,8 +757,8 @@ allowlist no longer only admits the extractor: any realm token that passes the a
 third-party exchange client's included — would reach the legacy draft relays, which run with the
 member's full stored authorities rather than the reduced exchange authentication (REQ-XCH-009). Under
 `prod`, with `app.ingest.legacy-endpoints.enabled` true and `allowed-client-ids` empty, the gateway
-therefore fails its start with a message naming `IRI_INGEST_ALLOWED_CLIENT_IDS`; with `audit-only`
-true it fails the same way naming `IRI_INGEST_CLIENT_AUDIT_ONLY`, because an allowlist that only counts
+therefore fails its start with a message naming `BASETOOL_INGEST_ALLOWED_CLIENT_IDS`; with `audit-only`
+true it fails the same way naming `BASETOOL_INGEST_CLIENT_AUDIT_ONLY`, because an allowlist that only counts
 admits the same tokens (owner decision 2026-09-27). The audit-only dry run of a new check therefore
 runs on the testing host or a local stack, not on production. `dev` and `test` keep
 the inert default, and once the legacy endpoints are off (REQ-XCH-033) the allowlist is no longer
@@ -902,7 +902,7 @@ the public one, and every proof fails. No test can catch that: without a proxy b
 agree. `app.ingest.public-base-url` therefore supplies the origin, and only the origin — the path
 still comes from the request, so a proof stays bound to its endpoint. **Under the `prod` profile it is
 required:** `PublicBaseUrlGuard` refuses the gateway's start while it is blank
-(`IRI_INGEST_PUBLIC_BASE_URL`), because the request-derived fallback binds `htu` to whatever `Host`
+(`BASETOOL_INGEST_PUBLIC_BASE_URL`), because the request-derived fallback binds `htu` to whatever `Host`
 and `X-Forwarded-Host` the request carried (security review 2, L10). `dev` and `test` keep the
 fallback.
 

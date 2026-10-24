@@ -4,7 +4,7 @@ x-backend-build: &backend-build
     dockerfile: docker/app/Dockerfile
     args:
       MODULE: backend
-  image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-backend:${IRI_BASETOOL_VERSION:-local}
+  image: ghcr.io/${BASETOOL_IMAGE_NAMESPACE:-krt-profit}/basetool-backend:${BASETOOL_VERSION:-local}
 
 x-frontend-build: &frontend-build
   build:
@@ -12,7 +12,7 @@ x-frontend-build: &frontend-build
     dockerfile: docker/app/Dockerfile
     args:
       MODULE: frontend
-  image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-frontend:${IRI_BASETOOL_VERSION:-local}
+  image: ghcr.io/${BASETOOL_IMAGE_NAMESPACE:-krt-profit}/basetool-frontend:${BASETOOL_VERSION:-local}
 
 x-backend-watch: &backend-watch
   develop:
@@ -44,7 +44,7 @@ x-ingest-build: &ingest-build
     dockerfile: docker/app/Dockerfile
     args:
       MODULE: ingest
-  image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-ingest:${IRI_BASETOOL_VERSION:-local}
+  image: ghcr.io/${BASETOOL_IMAGE_NAMESPACE:-krt-profit}/basetool-ingest:${BASETOOL_VERSION:-local}
 
 x-ingest-watch: &ingest-watch
   develop:

@@ -80,7 +80,7 @@ RUN set -eu; \
             -Dspring.security.oauth2.resourceserver.jwt.issuer-uri= \
             -Dspring.security.oauth2.resourceserver.jwt.jwk-set-uri="http://${stub}/certs" ;; \
         frontend) set -- \
-            -Dspring.security.oauth2.client.provider.keycloak.issuer-uri="http://${stub}/realms/iri" \
+            -Dspring.security.oauth2.client.provider.keycloak.issuer-uri="http://${stub}/realms/basetool" \
             -Dspring.security.oauth2.client.registration.keycloak.provider=aot-training \
             -Dspring.security.oauth2.client.provider.aot-training.authorization-uri="http://${stub}/auth" \
             -Dspring.security.oauth2.client.provider.aot-training.token-uri="http://${stub}/token" \

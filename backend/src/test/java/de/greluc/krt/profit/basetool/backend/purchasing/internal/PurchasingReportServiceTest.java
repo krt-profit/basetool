@@ -200,7 +200,7 @@ class PurchasingReportServiceTest {
     List<ReportNeedDto> needs = service.report(FIRST, LAST).needs();
 
     assertThat(needs).extracting(ReportNeedDto::needId).containsExactly(NEED_ONE, NEED_TWO);
-    assertThat(needs.get(0).unit()).isEqualTo("Iridium");
+    assertThat(needs.get(0).unit()).isEqualTo("Alpha");
     assertThat(needs.get(0).entry()).isEqualTo("Quantanium");
     assertThat(needs.get(0).dealCount()).isEqualTo(2);
     assertThat(needs.get(0).boughtAmount()).isEqualTo(10.0);
@@ -354,9 +354,9 @@ class PurchasingReportServiceTest {
     delivered.setSettlementDueAt(Instant.now().plus(Duration.ofDays(3)));
     UUID unitOne = UUID.randomUUID();
     UUID unitTwo = UUID.randomUUID();
-    Squadron iridium = new Squadron();
-    iridium.setId(unitOne);
-    iridium.setName("Iridium");
+    Squadron alpha = new Squadron();
+    alpha.setId(unitOne);
+    alpha.setName("Alpha");
     Squadron aegis = new Squadron();
     aegis.setId(unitTwo);
     aegis.setName("Aegis");
@@ -383,7 +383,7 @@ class PurchasingReportServiceTest {
             Map.of(
                 NEED_ONE, needRef(NEED_ONE, unitOne, "Quantanium"),
                 NEED_TWO, needRef(NEED_TWO, unitTwo, "Medpen")));
-    when(orgUnitRepository.findAllById(any())).thenReturn(List.<OrgUnit>of(iridium, aegis));
+    when(orgUnitRepository.findAllById(any())).thenReturn(List.<OrgUnit>of(alpha, aegis));
   }
 
   private static PurchasingDeal deal(

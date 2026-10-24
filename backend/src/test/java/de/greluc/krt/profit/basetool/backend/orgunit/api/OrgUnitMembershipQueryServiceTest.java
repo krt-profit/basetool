@@ -257,8 +257,8 @@ class OrgUnitMembershipQueryServiceTest {
     when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of(row));
     Squadron staffel = new Squadron();
     staffel.setId(squadronId);
-    staffel.setName("IRIDIUM");
-    staffel.setShorthand("IRI");
+    staffel.setName("ALPHA");
+    staffel.setShorthand("ALP");
     when(orgUnitRepository.findAllById(any())).thenReturn(List.of(staffel));
 
     List<OrgUnitMembershipOptionDto> options = queryService.listOptionsForUser(userId);
@@ -266,8 +266,8 @@ class OrgUnitMembershipQueryServiceTest {
     assertEquals(1, options.size());
     OrgUnitMembershipOptionDto only = options.getFirst();
     assertEquals(squadronId, only.orgUnitId());
-    assertEquals("IRIDIUM", only.orgUnitName());
-    assertEquals("IRI", only.orgUnitShorthand());
+    assertEquals("ALPHA", only.orgUnitName());
+    assertEquals("ALP", only.orgUnitShorthand());
     assertEquals(OrgUnitKind.SQUADRON, only.kind());
   }
 
@@ -291,8 +291,8 @@ class OrgUnitMembershipQueryServiceTest {
 
     Squadron staffel = new Squadron();
     staffel.setId(staffelId);
-    staffel.setName("IRIDIUM");
-    staffel.setShorthand("IRI");
+    staffel.setName("ALPHA");
+    staffel.setShorthand("ALP");
 
     SpecialCommand skBravo = new SpecialCommand();
     skBravo.setId(skBravoId);
@@ -309,7 +309,7 @@ class OrgUnitMembershipQueryServiceTest {
 
     assertEquals(3, options.size());
     assertEquals(OrgUnitKind.SQUADRON, options.get(0).kind());
-    assertEquals("IRIDIUM", options.get(0).orgUnitName());
+    assertEquals("ALPHA", options.get(0).orgUnitName());
     assertEquals(OrgUnitKind.SPECIAL_COMMAND, options.get(1).kind());
     assertEquals("Alpha", options.get(1).orgUnitName());
     assertEquals(OrgUnitKind.SPECIAL_COMMAND, options.get(2).kind());
@@ -405,8 +405,8 @@ class OrgUnitMembershipQueryServiceTest {
     ol.setShorthand("OL");
     Squadron staffel = new Squadron();
     staffel.setId(staffelId);
-    staffel.setName("IRIDIUM");
-    staffel.setShorthand("IRI");
+    staffel.setName("ALPHA");
+    staffel.setShorthand("ALP");
     SpecialCommand sk = new SpecialCommand();
     sk.setId(skId);
     sk.setName("SK ROTFUCHS");
@@ -434,7 +434,7 @@ class OrgUnitMembershipQueryServiceTest {
   void listAllPinnableOptions_coversAllFourKindsTopDown() {
     Squadron staffel = new Squadron();
     staffel.setId(UUID.randomUUID());
-    staffel.setName("IRIDIUM");
+    staffel.setName("ALPHA");
     SpecialCommand sk = new SpecialCommand();
     sk.setId(UUID.randomUUID());
     sk.setName("SK ROTFUCHS");
@@ -468,15 +468,15 @@ class OrgUnitMembershipQueryServiceTest {
 
   @Test
   void listAllActiveOptions_mixed_sortsStaffelFirstThenSkAlphabetical() {
-    Squadron iri = new Squadron();
-    iri.setId(UUID.randomUUID());
-    iri.setName("IRIDIUM");
-    iri.setShorthand("IRI");
+    Squadron alphaSquadron = new Squadron();
+    alphaSquadron.setId(UUID.randomUUID());
+    alphaSquadron.setName("ALPHA");
+    alphaSquadron.setShorthand("ALP");
     Squadron khg = new Squadron();
     khg.setId(UUID.randomUUID());
     khg.setName("KHG");
     khg.setShorthand("KHG");
-    when(squadronRepository.findAllByActiveTrue()).thenReturn(List.of(iri, khg));
+    when(squadronRepository.findAllByActiveTrue()).thenReturn(List.of(alphaSquadron, khg));
 
     SpecialCommand bravo = new SpecialCommand();
     bravo.setId(UUID.randomUUID());
@@ -492,7 +492,7 @@ class OrgUnitMembershipQueryServiceTest {
 
     assertEquals(4, result.size());
     assertEquals(OrgUnitKind.SQUADRON, result.get(0).kind());
-    assertEquals("IRIDIUM", result.get(0).orgUnitName());
+    assertEquals("ALPHA", result.get(0).orgUnitName());
     assertEquals(OrgUnitKind.SQUADRON, result.get(1).kind());
     assertEquals("KHG", result.get(1).orgUnitName());
     assertEquals(OrgUnitKind.SPECIAL_COMMAND, result.get(2).kind());
@@ -505,8 +505,8 @@ class OrgUnitMembershipQueryServiceTest {
   void listAllActiveOptions_carriesProfitEligibleFlagPerOrgUnit() {
     Squadron profitSquadron = new Squadron();
     profitSquadron.setId(UUID.randomUUID());
-    profitSquadron.setName("IRIDIUM");
-    profitSquadron.setShorthand("IRI");
+    profitSquadron.setName("ALPHA");
+    profitSquadron.setShorthand("ALP");
     profitSquadron.setProfitEligible(true);
     when(squadronRepository.findAllByActiveTrue()).thenReturn(List.of(profitSquadron));
 

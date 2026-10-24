@@ -84,7 +84,7 @@ class BankHolderDetailFragmentMvcTest {
         Instant.parse("2026-06-10T18:30:00Z"),
         null,
         "KB-0001",
-        "Staffel IRIDIUM",
+        "Staffel ALPHA",
         null,
         BigDecimal.ZERO);
   }
@@ -122,7 +122,7 @@ class BankHolderDetailFragmentMvcTest {
         Instant.parse("2026-06-12T18:30:00Z"),
         null,
         "KB-0001",
-        "Staffel IRIDIUM",
+        "Staffel ALPHA",
         null,
         new BigDecimal("3"));
   }

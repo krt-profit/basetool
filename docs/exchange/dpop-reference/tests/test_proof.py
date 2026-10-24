@@ -58,11 +58,11 @@ class BuildProofTest(unittest.TestCase):
     def test_token_endpoint_claims(self) -> None:
         """Without a token or nonce the proof has exactly ``jti``, ``htm``, ``htu`` and ``iat``."""
         _, claims, signing_input, signature = decode_proof(
-            build_proof(self.key, "post", "https://profit-base.online/auth/realms/iri/protocol/"
+            build_proof(self.key, "post", "https://profit-base.online/auth/realms/basetool/protocol/"
                         "openid-connect/token", issued_at=1_790_000_000, jti="fixed-id"))
         self.assertEqual(
             {"jti": "fixed-id", "htm": "POST", "iat": 1_790_000_000,
-             "htu": "https://profit-base.online/auth/realms/iri/protocol/openid-connect/token"},
+             "htu": "https://profit-base.online/auth/realms/basetool/protocol/openid-connect/token"},
             claims,
         )
         self.assertEqual([signing_input], self.key.signed)
@@ -124,7 +124,7 @@ class NonceTest(unittest.TestCase):
         cache.update("https://ingest.profit-base.online/exchange/v1", {"Other": "x"})
         self.assertEqual("gateway-nonce",
                          cache.get("https://INGEST.profit-base.online:443/exchange/v1/me/ships"))
-        self.assertIsNone(cache.get("https://profit-base.online/auth/realms/iri/protocol/"
+        self.assertIsNone(cache.get("https://profit-base.online/auth/realms/basetool/protocol/"
                                     "openid-connect/token"))
         cache.update(URL, {"dpop-nonce": "newer"})
         self.assertEqual("newer", cache.get(URL))

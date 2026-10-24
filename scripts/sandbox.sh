@@ -51,7 +51,7 @@ check_issuer_host() {
       echo "sandbox: host.docker.internal resolves to $resolved, not to the loopback." >&2 ;;
   esac
   cat >&2 <<'HOSTS'
-sandbox: the issuer is http://host.docker.internal:18080/auth/realms/iri and the sandbox listens on
+sandbox: the issuer is http://host.docker.internal:18080/auth/realms/basetool and the sandbox listens on
 sandbox: 127.0.0.1 only, so this machine must resolve that name to the loopback. Add this line to
 sandbox: /etc/hosts (it needs root) and run the command again:
 
@@ -68,7 +68,7 @@ up() {
   fi
   "${compose[@]}" up -d --wait --wait-timeout 600 "${services[@]}"
   "${compose[@]}" run --rm sandbox-seed
-  echo "sandbox: up. Issuer http://host.docker.internal:18080/auth/realms/iri,"
+  echo "sandbox: up. Issuer http://host.docker.internal:18080/auth/realms/basetool,"
   echo "sandbox: gateway https://localhost:11262/exchange/v1, web https://localhost:18081"
   echo "sandbox: the gateway answers 503 EXCHANGE_DISABLED for up to about 15 s until it sees the switch"
 }

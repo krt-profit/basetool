@@ -48,7 +48,7 @@ class PurchasingNoticesTest {
 
     NoticeEvent notice =
         PurchasingNotices.needReleased(
-            ENTITY, "Iridium", "Quantanium", "12.5", Set.of(delegate), ACTOR);
+            ENTITY, "Alpha", "Quantanium", "12.5", Set.of(delegate), ACTOR);
 
     assertThat(notice.eventType()).isEqualTo(NotificationEventType.PURCHASING_NEED_RELEASED);
     assertThat(notice.entityType()).isEqualTo(PurchasingNotices.NEED_ENTITY_TYPE);
@@ -57,7 +57,7 @@ class PurchasingNoticesTest {
     assertThat(notice.contextRecipientUserIds()).containsExactly(delegate);
     assertThat(notice.renderParams())
         .containsOnlyKeys("unit", "entry", "amount")
-        .containsEntry("unit", "Iridium")
+        .containsEntry("unit", "Alpha")
         .containsEntry("entry", "Quantanium")
         .containsEntry("amount", "12.5");
   }
@@ -78,7 +78,7 @@ class PurchasingNoticesTest {
   void aRecordedDeliveryGoesToTheRaisingUnit() {
     NoticeEvent notice =
         PurchasingNotices.deliveryRecorded(
-            ENTITY, 42L, UNIT, OrgUnitKind.SQUADRON, "Iridium", "Quantanium", "4", ACTOR);
+            ENTITY, 42L, UNIT, OrgUnitKind.SQUADRON, "Alpha", "Quantanium", "4", ACTOR);
 
     assertThat(notice.eventType()).isEqualTo(NotificationEventType.PURCHASING_DELIVERY_RECORDED);
     assertThat(notice.entityType()).isEqualTo(PurchasingNotices.DEAL_ENTITY_TYPE);
@@ -154,7 +154,7 @@ class PurchasingNoticesTest {
   void aUnitPauseNamesTheUnitAndAddsItsLeadershipAsContext() {
     NoticeEvent notice =
         PurchasingNotices.paused(
-            UNIT, UNIT, OrgUnitKind.SQUADRON, "Iridium", "MANUAL", Set.of(), ACTOR);
+            UNIT, UNIT, OrgUnitKind.SQUADRON, "Alpha", "MANUAL", Set.of(), ACTOR);
 
     assertThat(notice.entityId()).isEqualTo(UNIT);
     assertThat(notice.contextOrgUnits())
@@ -162,7 +162,7 @@ class PurchasingNoticesTest {
             NotificationContextRole.RESPONSIBLE, new OrgUnitRef(UNIT, OrgUnitKind.SQUADRON));
     assertThat(notice.renderParams())
         .containsEntry("scopeCode", PurchasingNotices.SCOPE_UNIT)
-        .containsEntry("unit", "Iridium")
+        .containsEntry("unit", "Alpha")
         .containsEntry("reasonCode", "MANUAL");
   }
 

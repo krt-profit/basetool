@@ -78,7 +78,7 @@ class OrgChartServiceTest {
 
   @Test
   void getOrgChart_assemblesAreaSquadronAndSkIntoNestedTree() {
-    Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
+    Squadron squadron = squadron(UUID.randomUUID(), "ALPHA", "ALP");
     SpecialCommand sk = specialCommand(UUID.randomUUID(), "Alpha SK", "ASK");
     when(orgUnitRepository.findActiveSquadronsAndSpecialCommands())
         .thenReturn(List.of(squadron, sk));
@@ -107,7 +107,7 @@ class OrgChartServiceTest {
 
     assertEquals(1, chart.squadrons().size());
     SquadronChartDto squadronDto = chart.squadrons().getFirst();
-    assertEquals("IRIDIUM", squadronDto.name());
+    assertEquals("ALPHA", squadronDto.name());
     assertNotNull(squadronDto.lead());
     assertEquals(1, squadronDto.commands().size());
     CommandChartDto command = squadronDto.commands().getFirst();
@@ -126,7 +126,7 @@ class OrgChartServiceTest {
 
   @Test
   void getOrgChart_leaderlessNamedCommand_carriesNameAndNullLeader() {
-    Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
+    Squadron squadron = squadron(UUID.randomUUID(), "ALPHA", "ALP");
     when(orgUnitRepository.findActiveSquadronsAndSpecialCommands()).thenReturn(List.of(squadron));
     when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
         .thenReturn(List.of());
@@ -147,7 +147,7 @@ class OrgChartServiceTest {
 
   @Test
   void getOrgChart_freeTextCommandLeader_carriesLeaderDisplayName() {
-    Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
+    Squadron squadron = squadron(UUID.randomUUID(), "ALPHA", "ALP");
     when(orgUnitRepository.findActiveSquadronsAndSpecialCommands()).thenReturn(List.of(squadron));
     when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
         .thenReturn(List.of());
@@ -169,7 +169,7 @@ class OrgChartServiceTest {
 
   @Test
   void getOrgChart_groupLinkedCommand_projectsKommandoGroupId() {
-    Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
+    Squadron squadron = squadron(UUID.randomUUID(), "ALPHA", "ALP");
     when(orgUnitRepository.findActiveSquadronsAndSpecialCommands()).thenReturn(List.of(squadron));
     when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
         .thenReturn(List.of());
@@ -211,7 +211,7 @@ class OrgChartServiceTest {
 
   @Test
   void getOrgChart_fullSquadron_clearsCanAddFlags() {
-    Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
+    Squadron squadron = squadron(UUID.randomUUID(), "ALPHA", "ALP");
     when(orgUnitRepository.findActiveSquadronsAndSpecialCommands()).thenReturn(List.of(squadron));
     when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
         .thenReturn(List.of());
@@ -322,7 +322,7 @@ class OrgChartServiceTest {
   void createPosition_commandLeadWithoutUser_createsLeaderlessNamedKommando() {
     UUID unitId = UUID.randomUUID();
     when(orgUnitRepository.findById(unitId))
-        .thenReturn(Optional.of(squadron(unitId, "IRIDIUM", "IRI")));
+        .thenReturn(Optional.of(squadron(unitId, "ALPHA", "ALP")));
     when(positionRepository.countByOrgUnitIdAndPositionType(
             unitId, OrgChartPositionType.COMMAND_LEAD))
         .thenReturn(0L);
@@ -381,7 +381,7 @@ class OrgChartServiceTest {
     UUID unitId = UUID.randomUUID();
     when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId, "lead")));
     when(orgUnitRepository.findById(unitId))
-        .thenReturn(Optional.of(squadron(unitId, "IRIDIUM", "IRI")));
+        .thenReturn(Optional.of(squadron(unitId, "ALPHA", "ALP")));
 
     BadRequestException ex =
         assertThrows(
@@ -406,7 +406,7 @@ class OrgChartServiceTest {
   void createPosition_deputyUnderLeaderlessKommando_persists() {
     UUID unitId = UUID.randomUUID();
     UUID parentId = UUID.randomUUID();
-    Squadron squadron = squadron(unitId, "IRIDIUM", "IRI");
+    Squadron squadron = squadron(unitId, "ALPHA", "ALP");
     OrgChartPosition leaderlessKommando =
         pos(OrgChartPositionType.COMMAND_LEAD, squadron, null, null);
     leaderlessKommando.setId(parentId);
@@ -437,7 +437,7 @@ class OrgChartServiceTest {
   void createPosition_childUnderGroupLinkedKommando_isRejected() {
     UUID unitId = UUID.randomUUID();
     UUID parentId = UUID.randomUUID();
-    Squadron squadron = squadron(unitId, "IRIDIUM", "IRI");
+    Squadron squadron = squadron(unitId, "ALPHA", "ALP");
     OrgChartPosition groupedKommando =
         pos(OrgChartPositionType.COMMAND_LEAD, squadron, null, user(UUID.randomUUID(), "kl"));
     groupedKommando.setId(parentId);
@@ -608,7 +608,7 @@ class OrgChartServiceTest {
     UUID unitId = UUID.randomUUID();
     when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId, "cl")));
     when(orgUnitRepository.findById(unitId))
-        .thenReturn(Optional.of(squadron(unitId, "IRIDIUM", "IRI")));
+        .thenReturn(Optional.of(squadron(unitId, "ALPHA", "ALP")));
     when(positionRepository.countByOrgUnitIdAndPositionType(
             unitId, OrgChartPositionType.COMMAND_LEAD))
         .thenReturn(4L);
@@ -637,7 +637,7 @@ class OrgChartServiceTest {
     UUID unitId = UUID.randomUUID();
     when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId, "e")));
     when(orgUnitRepository.findById(unitId))
-        .thenReturn(Optional.of(squadron(unitId, "IRIDIUM", "IRI")));
+        .thenReturn(Optional.of(squadron(unitId, "ALPHA", "ALP")));
     when(positionRepository.countByOrgUnitIdAndPositionType(unitId, OrgChartPositionType.ENSIGN))
         .thenReturn(4L);
 
@@ -688,7 +688,7 @@ class OrgChartServiceTest {
     UUID unitId = UUID.randomUUID();
     when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId, "d")));
     when(orgUnitRepository.findById(unitId))
-        .thenReturn(Optional.of(squadron(unitId, "IRIDIUM", "IRI")));
+        .thenReturn(Optional.of(squadron(unitId, "ALPHA", "ALP")));
 
     BadRequestException ex =
         assertThrows(
@@ -713,7 +713,7 @@ class OrgChartServiceTest {
     UUID userId = UUID.randomUUID();
     UUID unitId = UUID.randomUUID();
     UUID parentId = UUID.randomUUID();
-    Squadron squadron = squadron(unitId, "IRIDIUM", "IRI");
+    Squadron squadron = squadron(unitId, "ALPHA", "ALP");
     OrgChartPosition squadronLead = pos(OrgChartPositionType.SQUADRON_LEAD, squadron, null);
     squadronLead.setId(parentId);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId, "e")));
@@ -743,7 +743,7 @@ class OrgChartServiceTest {
     UUID userId = UUID.randomUUID();
     UUID unitId = UUID.randomUUID();
     UUID parentId = UUID.randomUUID();
-    Squadron squadron = squadron(unitId, "IRIDIUM", "IRI");
+    Squadron squadron = squadron(unitId, "ALPHA", "ALP");
     OrgChartPosition commandLead = pos(OrgChartPositionType.COMMAND_LEAD, squadron, null);
     commandLead.setId(parentId);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId, "d")));
@@ -931,7 +931,7 @@ class OrgChartServiceTest {
     UUID squadronId = UUID.randomUUID();
     when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId, "x")));
     when(orgUnitRepository.findById(squadronId))
-        .thenReturn(Optional.of(squadron(squadronId, "IRIDIUM", "IRI")));
+        .thenReturn(Optional.of(squadron(squadronId, "ALPHA", "ALP")));
 
     BadRequestException ex =
         assertThrows(
@@ -1104,7 +1104,7 @@ class OrgChartServiceTest {
   @Test
   void updatePosition_assignFreeTextLeaderToLeaderlessKommando_persists() {
     UUID id = UUID.randomUUID();
-    Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
+    Squadron squadron = squadron(UUID.randomUUID(), "ALPHA", "ALP");
     OrgChartPosition kommando = pos(OrgChartPositionType.COMMAND_LEAD, squadron, null, null);
     kommando.setId(id);
     kommando.setVersion(0L);
@@ -1121,7 +1121,7 @@ class OrgChartServiceTest {
   @Test
   void updatePosition_renameLeaderlessCommand_persists() {
     UUID id = UUID.randomUUID();
-    Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
+    Squadron squadron = squadron(UUID.randomUUID(), "ALPHA", "ALP");
     OrgChartPosition kommando = pos(OrgChartPositionType.COMMAND_LEAD, squadron, null, null);
     kommando.setId(id);
     kommando.setVersion(0L);
@@ -1264,7 +1264,7 @@ class OrgChartServiceTest {
   @Test
   void vacateCommandLeader_clearsFreeTextLeaderName() {
     UUID id = UUID.randomUUID();
-    Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
+    Squadron squadron = squadron(UUID.randomUUID(), "ALPHA", "ALP");
     OrgChartPosition kommando = pos(OrgChartPositionType.COMMAND_LEAD, squadron, null, null);
     kommando.setDisplayName("Max");
     kommando.setName("Alpha");
@@ -1342,7 +1342,7 @@ class OrgChartServiceTest {
   @Test
   void vacateCommandLeader_clearsHolderButKeepsKommando() {
     UUID id = UUID.randomUUID();
-    Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
+    Squadron squadron = squadron(UUID.randomUUID(), "ALPHA", "ALP");
     OrgChartPosition kommando =
         pos(OrgChartPositionType.COMMAND_LEAD, squadron, null, user(UUID.randomUUID(), "lead"));
     kommando.setId(id);
@@ -1378,7 +1378,7 @@ class OrgChartServiceTest {
   @Test
   void vacateCommandLeader_staleVersion_throwsOptimisticLock() {
     UUID id = UUID.randomUUID();
-    Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
+    Squadron squadron = squadron(UUID.randomUUID(), "ALPHA", "ALP");
     OrgChartPosition kommando =
         pos(OrgChartPositionType.COMMAND_LEAD, squadron, null, user(UUID.randomUUID(), "lead"));
     kommando.setId(id);
@@ -1402,7 +1402,7 @@ class OrgChartServiceTest {
   @Test
   void vacateCommandLeader_groupLinked_isRejected() {
     UUID id = UUID.randomUUID();
-    Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
+    Squadron squadron = squadron(UUID.randomUUID(), "ALPHA", "ALP");
     OrgChartPosition kommando =
         pos(OrgChartPositionType.COMMAND_LEAD, squadron, null, user(UUID.randomUUID(), "kl"));
     kommando.setKommandoGroup(group(squadron, "Alpha", 0));
@@ -1516,7 +1516,7 @@ class OrgChartServiceTest {
   void mirrorSquadronRank_staffelleiter_createsSquadronLeadWhenNone() {
     UUID squadronId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    Squadron s = squadron(squadronId, "IRIDIUM", "IRI");
+    Squadron s = squadron(squadronId, "ALPHA", "ALP");
     when(positionRepository.findByOrgUnitIdAndUserId(squadronId, userId)).thenReturn(List.of());
     when(positionRepository.findFirstByOrgUnitIdAndPositionTypeOrderBySortIndexAscCreatedAtAsc(
             squadronId, OrgChartPositionType.SQUADRON_LEAD))
@@ -1539,7 +1539,7 @@ class OrgChartServiceTest {
   void mirrorSquadronRank_kommandoleiter_fillsExistingGroupNodeWithoutSave() {
     UUID squadronId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    Squadron s = squadron(squadronId, "IRIDIUM", "IRI");
+    Squadron s = squadron(squadronId, "ALPHA", "ALP");
     KommandoGroup group = group(s, "Alpha", 0);
     User u = user(userId, "kl");
     OrgChartPosition command = pos(OrgChartPositionType.COMMAND_LEAD, s, null, null);
@@ -1559,7 +1559,7 @@ class OrgChartServiceTest {
   void mirrorSquadronRank_kommandoleiter_createsGroupNodeWhenMissing() {
     UUID squadronId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    Squadron s = squadron(squadronId, "IRIDIUM", "IRI");
+    Squadron s = squadron(squadronId, "ALPHA", "ALP");
     KommandoGroup group = group(s, "Alpha", 1);
     User u = user(userId, "kl");
     when(positionRepository.findByOrgUnitIdAndUserId(squadronId, userId)).thenReturn(List.of());
@@ -1581,7 +1581,7 @@ class OrgChartServiceTest {
   void mirrorSquadronRank_stellv_createsDeputyUnderGroupNode() {
     UUID squadronId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    Squadron s = squadron(squadronId, "IRIDIUM", "IRI");
+    Squadron s = squadron(squadronId, "ALPHA", "ALP");
     KommandoGroup group = group(s, "Alpha", 0);
     OrgChartPosition command = pos(OrgChartPositionType.COMMAND_LEAD, s, null, null);
     when(positionRepository.findByOrgUnitIdAndUserId(squadronId, userId)).thenReturn(List.of());
@@ -1605,7 +1605,7 @@ class OrgChartServiceTest {
   void mirrorSquadronRank_ensignWithGroup_createsEnsignUnderGroupNode() {
     UUID squadronId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    Squadron s = squadron(squadronId, "IRIDIUM", "IRI");
+    Squadron s = squadron(squadronId, "ALPHA", "ALP");
     KommandoGroup group = group(s, "Alpha", 0);
     OrgChartPosition command = pos(OrgChartPositionType.COMMAND_LEAD, s, null, null);
     when(positionRepository.findByOrgUnitIdAndUserId(squadronId, userId)).thenReturn(List.of());
@@ -1629,7 +1629,7 @@ class OrgChartServiceTest {
   void mirrorSquadronRank_generalEnsign_createsParentlessEnsign() {
     UUID squadronId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    Squadron s = squadron(squadronId, "IRIDIUM", "IRI");
+    Squadron s = squadron(squadronId, "ALPHA", "ALP");
     when(positionRepository.findByOrgUnitIdAndUserId(squadronId, userId)).thenReturn(List.of());
     when(positionRepository.countByOrgUnitIdAndPositionType(
             squadronId, OrgChartPositionType.ENSIGN))
@@ -1649,7 +1649,7 @@ class OrgChartServiceTest {
   void mirrorSquadronRank_reassignFromKommandoleiter_vacatesPriorNodeNotDeletes() {
     UUID squadronId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    Squadron s = squadron(squadronId, "IRIDIUM", "IRI");
+    Squadron s = squadron(squadronId, "ALPHA", "ALP");
     OrgChartPosition priorCommand =
         pos(OrgChartPositionType.COMMAND_LEAD, s, null, user(userId, "kl"));
     when(positionRepository.findByOrgUnitIdAndUserId(squadronId, userId))
@@ -1675,7 +1675,7 @@ class OrgChartServiceTest {
     UUID squadronId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     OrgChartPosition ensign =
-        pos(OrgChartPositionType.ENSIGN, squadron(squadronId, "IRIDIUM", "IRI"), null);
+        pos(OrgChartPositionType.ENSIGN, squadron(squadronId, "ALPHA", "ALP"), null);
     when(positionRepository.findByOrgUnitIdAndUserId(squadronId, userId))
         .thenReturn(List.of(ensign));
 
@@ -1730,7 +1730,7 @@ class OrgChartServiceTest {
 
   @Test
   void mirrorCreateKommandoGroup_addsLeaderlessKommandoNode() {
-    Squadron s = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
+    Squadron s = squadron(UUID.randomUUID(), "ALPHA", "ALP");
     KommandoGroup group = group(s, "Alpha", 2);
     when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -1748,7 +1748,7 @@ class OrgChartServiceTest {
 
   @Test
   void mirrorUpdateKommandoGroup_updatesNodeNameAndSortWithoutSave() {
-    Squadron s = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
+    Squadron s = squadron(UUID.randomUUID(), "ALPHA", "ALP");
     KommandoGroup group = group(s, "Bravo", 3);
     OrgChartPosition node = pos(OrgChartPositionType.COMMAND_LEAD, s, null, null);
     node.setName("Alpha");
@@ -1766,7 +1766,7 @@ class OrgChartServiceTest {
   void mirrorDeleteKommandoGroup_removesNode() {
     UUID groupId = UUID.randomUUID();
     OrgChartPosition node =
-        pos(OrgChartPositionType.COMMAND_LEAD, squadron(UUID.randomUUID(), "IRIDIUM", "IRI"), null);
+        pos(OrgChartPositionType.COMMAND_LEAD, squadron(UUID.randomUUID(), "ALPHA", "ALP"), null);
     when(positionRepository.findByKommandoGroupId(groupId)).thenReturn(Optional.of(node));
 
     service().onKommandoGroupDeleted(groupId);

@@ -808,7 +808,7 @@ def check_redis_requires_auth(ctx: Context) -> str:
             "tokens included -- is readable and writable by anything that can reach it on the "
             "internal network. The cause is almost certainly a users.acl with no `user default` "
             "line, which makes Redis reset default to nopass at load: check with "
-            "`grep -c '^user default ' /var/iri/redis/users.acl`, which must answer 1.")
+            "`grep -c '^user default ' /var/lib/basetool/redis/users.acl`, which must answer 1.")
     if "NOAUTH" not in reply.upper():
         raise CheckFailed(
             f"Redis answered {reply!r} to an unauthenticated ping - expected -NOAUTH. That is "
@@ -1094,13 +1094,13 @@ def check_trace_pipeline(ctx: Context) -> str:
         CheckFailed: when tracing is on and no span has reached the receiver.
     """
     raw = ctx.runner.run(
-        "grep -E '^MONITORING_TRACING_ENABLED=' /var/iri/code/.env 2>/dev/null || true")
+        "grep -E '^MONITORING_TRACING_ENABLED=' /etc/basetool/basetool.env 2>/dev/null || true")
     if not raw.strip():
-        if not ctx.runner.run("test -e /var/iri/code/.env && echo yes || true").strip():
-            raise Skip("no /var/iri/code/.env on this host yet -- it arrives with the restore, so "
+        if not ctx.runner.run("test -e /etc/basetool/basetool.env && echo yes || true").strip():
+            raise Skip("no /etc/basetool/basetool.env on this host yet -- it arrives with the restore, so "
                        "before that there is nothing to read and nothing to conclude")
-        if not ctx.runner.run("test -r /var/iri/code/.env && echo yes || true").strip():
-            raise Skip("/var/iri/code/.env is not readable by this SSH account (0640 "
+        if not ctx.runner.run("test -r /etc/basetool/basetool.env && echo yes || true").strip():
+            raise Skip("/etc/basetool/basetool.env is not readable by this SSH account (0640 "
                        "deploy:deploy) -- rerun with an account that can read it")
         raise Skip("the .env does not set MONITORING_TRACING_ENABLED; it defaults to false "
                    "(REQ-OBS, tracing is inert by default) so there are no spans to expect")
@@ -1182,19 +1182,19 @@ class Check:
 
 
 BAKED_INTO_UNITS = {
-    "IRI_IMAGE_NAMESPACE": "Image=",
-    "IRI_BASETOOL_VERSION": "Image=",
-    "IRI_KEYCLOAK_HOST_ALIAS": "AddHost=",
-    "IRI_KEYSTORE_HOST_PATH": "Volume=",
-    "IRI_BACKEND_KEYSTORE_HOST_PATH": "Volume=",
-    "IRI_FRONTEND_KEYSTORE_HOST_PATH": "Volume=",
-    "IRI_INGEST_KEYSTORE_HOST_PATH": "Volume=",
-    "IRI_KEYCLOAK_KEYSTORE_HOST_PATH": "Volume=",
-    "IRI_INTERNAL_TRUSTSTORE_HOST_PATH": "Volume=",
-    "IRI_TRUSTSTORE_HOST_PATH": "Volume=",
-    "IRI_REDIS_ACL_HOST_PATH": "Volume=",
-    "IRI_UPSTREAM_CA_HOST_PATH": "Volume=",
-    "IRI_GRAFANA_UPSTREAM_CERT_HOST_PATH": "Volume=",
+    "BASETOOL_IMAGE_NAMESPACE": "Image=",
+    "BASETOOL_VERSION": "Image=",
+    "BASETOOL_KEYCLOAK_HOST_ALIAS": "AddHost=",
+    "BASETOOL_KEYSTORE_HOST_PATH": "Volume=",
+    "BASETOOL_BACKEND_KEYSTORE_HOST_PATH": "Volume=",
+    "BASETOOL_FRONTEND_KEYSTORE_HOST_PATH": "Volume=",
+    "BASETOOL_INGEST_KEYSTORE_HOST_PATH": "Volume=",
+    "BASETOOL_KEYCLOAK_KEYSTORE_HOST_PATH": "Volume=",
+    "BASETOOL_INTERNAL_TRUSTSTORE_HOST_PATH": "Volume=",
+    "BASETOOL_TRUSTSTORE_HOST_PATH": "Volume=",
+    "BASETOOL_REDIS_ACL_HOST_PATH": "Volume=",
+    "BASETOOL_UPSTREAM_CA_HOST_PATH": "Volume=",
+    "BASETOOL_GRAFANA_UPSTREAM_CERT_HOST_PATH": "Volume=",
 }
 
 
@@ -1216,12 +1216,12 @@ def check_env_reaches_the_units(ctx: Context) -> str:
     """
     wanted = "|".join(sorted(BAKED_INTO_UNITS))
     env_raw = ctx.runner.run(
-        f"grep -E '^({wanted})=' /var/iri/code/.env 2>/dev/null || true")
+        f"grep -E '^({wanted})=' /etc/basetool/basetool.env 2>/dev/null || true")
     if not env_raw.strip():
-        if not ctx.runner.run("test -f /var/iri/code/.env && echo yes || true").strip():
-            raise Skip("no /var/iri/code/.env on this host")
-        if not ctx.runner.run("test -r /var/iri/code/.env && echo yes || true").strip():
-            raise Skip("/var/iri/code/.env is not readable by this SSH account (it is 0640 "
+        if not ctx.runner.run("test -f /etc/basetool/basetool.env && echo yes || true").strip():
+            raise Skip("no /etc/basetool/basetool.env on this host")
+        if not ctx.runner.run("test -r /etc/basetool/basetool.env && echo yes || true").strip():
+            raise Skip("/etc/basetool/basetool.env is not readable by this SSH account (it is 0640 "
                        "deploy:deploy) -- rerun with an account that can read it, or this check "
                        "says nothing")
         raise Skip("the .env on this host sets none of the variables the units bake in")

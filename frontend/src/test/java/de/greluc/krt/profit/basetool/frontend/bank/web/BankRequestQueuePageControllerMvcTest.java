@@ -82,10 +82,10 @@ class BankRequestQueuePageControllerMvcTest {
             UUID.randomUUID(),
             UUID.randomUUID(),
             "KB-0001",
-            "Staffel IRIDIUM",
+            "Staffel ALPHA",
             UUID.randomUUID(),
-            "IRIDIUM",
-            "IRI",
+            "ALPHA",
+            "ALP",
             "DEPOSIT",
             new BigDecimal("5000"),
             "from sale",
@@ -137,7 +137,7 @@ class BankRequestQueuePageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("bank/bank-requests"))
         .andExpect(content().string(Matchers.containsString("KB-0001")))
-        .andExpect(content().string(Matchers.containsString("Staffel IRIDIUM")))
+        .andExpect(content().string(Matchers.containsString("Staffel ALPHA")))
         .andExpect(content().string(Matchers.containsString("officerX")))
         .andExpect(content().string(Matchers.containsString("bank-request-confirm-btn")))
         .andExpect(content().string(Matchers.containsString("bank-confirm-request-modal")))
@@ -211,7 +211,7 @@ class BankRequestQueuePageControllerMvcTest {
         new BankAccountDto(
             UUID.randomUUID(),
             "KB-0001",
-            "Staffel IRIDIUM",
+            "Staffel ALPHA",
             "ORG_UNIT",
             "ACTIVE",
             null,

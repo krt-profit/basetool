@@ -9,12 +9,12 @@ Type=oneshot
 
 User=deploy
 
-ExecStart=/var/iri/code/scripts/restore-drill.sh
+ExecStart=/opt/basetool/scripts/restore-drill.sh
 
-StandardOutput=append:/var/log/iri-restore-drill.log
-StandardError=append:/var/log/iri-restore-drill.log
+StandardOutput=append:/var/log/basetool/restore-drill.log
+StandardError=append:/var/log/basetool/restore-drill.log
 
-ReadWritePaths=/var/lib/iri /var/iri/backup /var/iri/monitoring/textfile /var/log
+ReadWritePaths=/var/lib/basetool/deploy /var/lib/basetool/backup /var/lib/basetool/textfile /var/cache/basetool /var/log/basetool
 
 MemoryMax=1G
 CPUQuota=200%

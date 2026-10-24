@@ -38,7 +38,7 @@ groups:
           severity: warning
         annotations:
           summary: "A JVM started without its image's startup cache ({{ $labels.app }})"
-          description: "The container's stdout carries 'Unable to use AOT cache' (or the AppCDS equivalent): the JVM refused the cache baked into the image and started without it, typically because JAVA_TOOL_OPTIONS sets a different -XX:UseCompactObjectHeaders than the image was built with (ADR-0180, REQ-OPS-030). The service runs; only its start is slower. Compare the flag in JAVA_TOOL_OPTIONS / IRI_EXTRA_JAVA_OPTS with docker/app/Dockerfile; if the rollback lever is in use on purpose, this is expected until the image is rebuilt."
+          description: "The container's stdout carries 'Unable to use AOT cache' (or the AppCDS equivalent): the JVM refused the cache baked into the image and started without it, typically because JAVA_TOOL_OPTIONS sets a different -XX:UseCompactObjectHeaders than the image was built with (ADR-0180, REQ-OPS-030). The service runs; only its start is slower. Compare the flag in JAVA_TOOL_OPTIONS / BASETOOL_EXTRA_JAVA_OPTS with docker/app/Dockerfile; if the rollback lever is in use on purpose, this is expected until the image is rebuilt."
 
       - alert: KeycloakErrorRateHigh
         expr: sum(rate({app="keycloak"} |~ "(?i)\\bERROR\\b" [5m])) > 0.2

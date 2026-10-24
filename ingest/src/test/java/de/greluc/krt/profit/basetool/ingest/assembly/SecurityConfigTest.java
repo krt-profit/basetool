@@ -131,7 +131,7 @@ class SecurityConfigTest {
     ECKey key = new ECKeyGenerator(Curve.P_256).keyID("k1").generate();
     try (MockWebServer keycloak = new MockWebServer()) {
       keycloak.start();
-      String issuer = keycloak.url("/realms/iri").toString();
+      String issuer = keycloak.url("/realms/basetool").toString();
       keycloak.setDispatcher(keycloakDispatcher(issuer, key));
 
       NimbusJwtDecoder decoder =
@@ -156,7 +156,7 @@ class SecurityConfigTest {
 
       JwtDecoder decoder =
           config.resourceServerJwtDecoder(
-              "https://keycloak.example/realms/iri",
+              "https://keycloak.example/realms/basetool",
               keycloak.url("/certs").toString(),
               List.of("  ", ""),
               new DefaultSslBundleRegistry());
@@ -179,7 +179,7 @@ class SecurityConfigTest {
       SecurityConfig config = new SecurityConfig();
       JwtDecoder decoder =
           config.resourceServerJwtDecoder(
-              "https://keycloak.example/realms/iri",
+              "https://keycloak.example/realms/basetool",
               keycloak.url("/certs").toString(),
               EXPECTED,
               new DefaultSslBundleRegistry());
@@ -299,7 +299,7 @@ class SecurityConfigTest {
    * @throws Exception if signing fails
    */
   private static String signedToken(ECKey key, List<String> audience) throws Exception {
-    return signedToken(key, audience, "https://keycloak.example/realms/iri");
+    return signedToken(key, audience, "https://keycloak.example/realms/basetool");
   }
 
   /**

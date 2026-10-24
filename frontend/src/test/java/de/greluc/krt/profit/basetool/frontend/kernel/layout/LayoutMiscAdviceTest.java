@@ -62,9 +62,9 @@ class LayoutMiscAdviceTest {
   void appTitle_squadronPin_appendsShorthand() {
     stubEchoMessages();
     OrgUnitMembershipOptionDto pin =
-        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "IRIDIUM", "IRI", "SQUADRON", true);
+        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "ALPHA", "ALP", "SQUADRON", true);
 
-    assertEquals("app.title.with.squadron:IRI", advice().appTitle(pin, false));
+    assertEquals("app.title.with.squadron:ALP", advice().appTitle(pin, false));
   }
 
   @Test
@@ -132,7 +132,7 @@ class LayoutMiscAdviceTest {
 
   /**
    * Stubs the mocked {@link MessageSource} to echo each requested code, suffixed with the first
-   * format argument when one is present (e.g. {@code "app.title.with.squadron:IRI"}). Keeps the
+   * format argument when one is present (e.g. {@code "app.title.with.squadron:ALP"}). Keeps the
    * {@code appTitle} assertions focused on the resolved code + argument without binding to real
    * bundle text or fiddly array matchers.
    */

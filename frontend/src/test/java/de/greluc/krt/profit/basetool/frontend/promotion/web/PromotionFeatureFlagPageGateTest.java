@@ -73,7 +73,7 @@ class PromotionFeatureFlagPageGateTest {
 
   private void stubSquadronContext(UUID squadronId, boolean promotionEnabled) {
     SquadronDto squadron =
-        new SquadronDto(squadronId, "IRIDIUM", "IRI", null, true, promotionEnabled, false, 0L);
+        new SquadronDto(squadronId, "ALPHA", "ALP", null, true, promotionEnabled, false, 0L);
     when(backendApiClient.get(contains("/api/v1/squadrons"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(squadron), 0, 1000, 1, 1, List.of()));
     when(backendApiClient.getCached(eq(CachedCatalog.SQUADRONS), anyTypeRef()))
@@ -123,7 +123,7 @@ class PromotionFeatureFlagPageGateTest {
     UUID pinnedId = UUID.randomUUID();
     stubSquadronContext(pinnedId, false);
     mockMvc
-        .perform(get("/promotion/overview").sessionAttr("iridium.activeOrgUnitId", pinnedId))
+        .perform(get("/promotion/overview").sessionAttr("basetool.activeOrgUnitId", pinnedId))
         .andExpect(status().isForbidden());
   }
 
@@ -133,7 +133,7 @@ class PromotionFeatureFlagPageGateTest {
     UUID pinnedId = UUID.randomUUID();
     stubSquadronContext(pinnedId, true);
     mockMvc
-        .perform(get("/promotion/overview").sessionAttr("iridium.activeOrgUnitId", pinnedId))
+        .perform(get("/promotion/overview").sessionAttr("basetool.activeOrgUnitId", pinnedId))
         .andExpect(status().is2xxSuccessful());
   }
 

@@ -125,8 +125,8 @@ class HtuTest(unittest.TestCase):
             "https://[::1]:8443/exchange/v1": "https://[::1]:8443/exchange/v1",
             "https://ingest.profit-base.online/exchange/v1/schemas/a%2Fb":
                 "https://ingest.profit-base.online/exchange/v1/schemas/a%2Fb",
-            "https://profit-base.online/auth/realms/iri/protocol/openid-connect/token":
-                "https://profit-base.online/auth/realms/iri/protocol/openid-connect/token",
+            "https://profit-base.online/auth/realms/basetool/protocol/openid-connect/token":
+                "https://profit-base.online/auth/realms/basetool/protocol/openid-connect/token",
         }
         for url, expected in cases.items():
             with self.subTest(url=url):

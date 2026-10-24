@@ -11,12 +11,12 @@
         <div class="ou-card-top">
             <div class="ou-card-ident">
                 <a class="ou-card-name" th:href="@{/org-unit-bank/accounts/{id}(id=${b.accountId()})}"
-                   data-testid="org-unit-bank-card-detail" th:text="${b.accountName()}">IRI Betriebskonto</a>
+                   data-testid="org-unit-bank-card-detail" th:text="${b.accountName()}">ALP Betriebskonto</a>
                 <div class="ou-card-sub">
                     <span th:text="${b.accountNo()}">KB-0001</span>
                     <span aria-hidden="true"> &middot; </span>
                     <span th:if="${b.orgUnitId() != null}"
-                          th:text="${b.orgUnitShorthand() != null ? b.orgUnitShorthand() : b.orgUnitName()}">IRI</span>
+                          th:text="${b.orgUnitShorthand() != null ? b.orgUnitShorthand() : b.orgUnitName()}">ALP</span>
                     <span th:if="${b.orgUnitId() == null}"
                           th:text="#{'bank.account.type.' + ${b.type()}}">Sonderkonto</span>
                 </div>
@@ -67,13 +67,13 @@
         <div>
             <div class="r-name">
                 <a th:href="@{/org-unit-bank/accounts/{id}(id=${b.accountId()})}"
-                   th:text="${b.accountName()}">Staffel IRIDIUM</a>
+                   th:text="${b.accountName()}">Staffel ALPHA</a>
             </div>
             <div class="r-sub">
                 <span th:text="${b.accountNo()}">KB-0001</span>
                 <span> &middot; </span>
                 <span th:if="${b.orgUnitId() != null}"
-                      th:text="${b.orgUnitShorthand() != null ? b.orgUnitShorthand() : b.orgUnitName()}">IRI</span>
+                      th:text="${b.orgUnitShorthand() != null ? b.orgUnitShorthand() : b.orgUnitName()}">ALP</span>
                 <span th:if="${b.orgUnitId() == null}"
                       th:text="#{'bank.account.type.' + ${b.type()}}">Sonderkonto</span>
             </div>
@@ -130,7 +130,7 @@
                     <option th:each="t : ${requestSources}"
                             th:value="${t.id()}"
                             th:attr="data-can-debit=${debitableAccountIds.contains(t.id())},data-limit=${requestLimits.get(t.id())},data-exempt=${approvalExemptAccountIds.contains(t.id())},data-requires-justification=${t.type() == 'CARTEL' or t.type() == 'CARTEL_BANK' or t.type() == 'SPECIAL'}"
-                            th:text="${t.name()} + ' (' + ${t.accountNo()} + ')'">Staffel IRIDIUM (KB-0001)</option>
+                            th:text="${t.name()} + ' (' + ${t.accountNo()} + ')'">Staffel ALPHA (KB-0001)</option>
                 </select>
                 <span class="bank-field-hint" data-deposit-hint th:text="#{bank.orgUnit.request.deposit.accountHint}">Einzahlungen sind f&uuml;r jedes aktive Konto m&ouml;glich.</span>
                 <span class="bank-field-hint" data-debit-hint hidden th:text="#{bank.orgUnit.request.accountHint}">Nur Konten, f&uuml;r die du antragsberechtigt bist.</span>

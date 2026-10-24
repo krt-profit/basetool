@@ -64,7 +64,7 @@ measures below are accordingly proportionate rather than exhaustive.
 - **Backups are client-side encrypted** before leaving the host; the storage target only ever
   receives encrypted blobs (REQ-OPS-008). This is the copy that leaves the controller's own
   infrastructure, so it is the one that must be encrypted regardless of the target.
-- **The TLS keystore stays with the service account**: it lives under `/var/iri/secrets`, owned by
+- **The TLS keystore stays with the service account**: it lives under `/etc/basetool/secrets`, owned by
   the unprivileged account the containers run as, and is mounted read-only into the four containers
   that use it (`quadlet/systemd/{backend,frontend,ingest,keycloak}.container`).
 
@@ -133,7 +133,7 @@ measures below are accordingly proportionate rather than exhaustive.
 - **The deploy path is confined** by a systemd sandbox — `ProtectSystem=strict`, kernel and
   control-group protections, a capability **deny-list** that removes the capabilities able to
   reconfigure the host, load kernel code or read another process's memory, a seccomp allow-list
-  (`@system-service @mount`), and a narrow set of writable paths (`scripts/iri-deploy.service`,
+  (`@system-service @mount`), and a narrow set of writable paths (`scripts/basetool-deploy.service`,
   REQ-OPS-016). It reaches the service account through a sudoers rule naming two commands and one
   target user.
 - **Pull-only delivery**: the host pulls; nothing is pushed into it and no inbound access is required
@@ -198,7 +198,7 @@ Stated deliberately, because a measures document that lists only strengths is no
 - **The deploy sandbox is looser than it was under Docker.** Rootless Podman needs user namespaces,
   the mount syscalls and a working `sudo`, so the unit keeps `RestrictNamespaces` off, widens the
   seccomp set by `@mount` and uses a capability deny-list instead of an empty bounding set — each
-  measured and recorded in `scripts/iri-deploy.service`. The trade is deliberate: the root-equivalent
+  measured and recorded in `scripts/basetool-deploy.service`. The trade is deliberate: the root-equivalent
   `docker` group membership it replaced was the larger exposure.
 - **An erasure request is not applied to existing backups.** The data leaves as the snapshots expire,
   within roughly six months; re-erasure after a restore is part of the restore procedure.

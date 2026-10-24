@@ -60,17 +60,18 @@ trap 'rm -rf "${T_MINIMAL}"' EXIT
 setup_host() {
   local tmp="$1"
   T_COMPOSE_DIR="${tmp}/code"
+  T_CONFIG_DIR="${tmp}/config"
   T_STATE_DIR="${tmp}/state"
   T_FAKE_BIN="${tmp}/bin"
   T_DOCKER_LOG="${tmp}/docker-invocations.log"
   T_TOKEN="${tmp}/ghcr-token"
   T_LOCK="${tmp}/deploy.lock"
 
-  mkdir -p "${T_COMPOSE_DIR}" "${T_STATE_DIR}" "${T_FAKE_BIN}"
+  mkdir -p "${T_COMPOSE_DIR}" "${T_CONFIG_DIR}" "${T_STATE_DIR}" "${T_FAKE_BIN}"
   echo "# dummy compose file — never parsed; the units are the deployment" \
     > "${T_COMPOSE_DIR}/docker-compose.yml"
   seed_units "${tmp}"
-  printf 'IRI_KEYSTORE_HOST_PATH=%s/keystore.p12\n' "${tmp}" > "${T_COMPOSE_DIR}/.env"
+  printf 'BASETOOL_KEYSTORE_HOST_PATH=%s/keystore.p12\n' "${tmp}" > "${T_CONFIG_DIR}/basetool.env"
   : > "${tmp}/keystore.p12"
   echo "fake-token" > "${T_TOKEN}"
   : > "${T_DOCKER_LOG}"
@@ -200,7 +201,7 @@ case "$*" in
   *start*|*restart*|*stop*)
     if [[ -n "${FAKE_UNIT_DOWN_FILE:-}" ]]; then
       down="${FAKE_UNIT_DOWN_FILE}" pending="${FAKE_UNIT_DOWN_FILE}.pending" starts="${FAKE_UNIT_DOWN_FILE}.starts"
-      live_jar="${IRI_COMPOSE_DIR:-}/keycloak/providers/keycloak-spi.jar"
+      live_jar="${BASETOOL_COMPOSE_DIR:-}/keycloak/providers/keycloak-spi.jar"
       touch "${down}" "${pending}" "${starts}"
       verb="" units=()
       for a in "$@"; do
@@ -419,11 +420,12 @@ run_deploy() {
   LAST_OUTPUT="$(
     env \
       PATH="${run_path}" \
-      IRI_COMPOSE_DIR="${T_COMPOSE_DIR}" \
-      IRI_STATE_DIR="${T_STATE_DIR}" \
-      IRI_MONITORING_TEXTFILE_DIR="${T_STATE_DIR}/textfile" \
-      IRI_LOCKFILE="${T_LOCK}" \
-      IRI_GHCR_TOKEN_FILE="${T_TOKEN}" \
+      BASETOOL_COMPOSE_DIR="${T_COMPOSE_DIR}" \
+      BASETOOL_CONFIG_DIR="${T_CONFIG_DIR}" \
+      BASETOOL_STATE_DIR="${T_STATE_DIR}" \
+      BASETOOL_MONITORING_TEXTFILE_DIR="${T_STATE_DIR}/textfile" \
+      BASETOOL_LOCKFILE="${T_LOCK}" \
+      BASETOOL_GHCR_TOKEN_FILE="${T_TOKEN}" \
       FAKE_DOCKER_LOG="${T_DOCKER_LOG}" \
       FAKE_REMOTE_BACKEND="${DIG_BACKEND}" \
       FAKE_REMOTE_FRONTEND="${DIG_FRONTEND}" \
@@ -431,7 +433,7 @@ run_deploy() {
       FAKE_REMOTE_CONFIG="${DIG_CONFIG}" \
       FAKE_REMOTE_KCSPI="${DIG_KCSPI}" \
       RT_BACKEND=podman \
-      IRI_QUADLET_BIN="${T_FAKE_BIN}/quadlet" \
+      BASETOOL_QUADLET_BIN="${T_FAKE_BIN}/quadlet" \
       RT_UNIT_DIR="${T_UNIT_DIR}" \
       "${extra_env[@]}" \
       bash "${DEPLOY}" "${script_args[@]}" 2>&1
@@ -787,7 +789,7 @@ scenario_monitoring_config_reload() {
   write_marker "${MARKER}"
   mapfile -t fake < <(converged_env)
   run_deploy -- "${fake[@]}" \
-    "IRI_MONITORING_ENABLED=true" \
+    "BASETOOL_MONITORING_ENABLED=true" \
     "FAKE_CONFIG_BUNDLE=${bundle}" \
     "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
   assert_exit 0 "$rc" "config-change deploy with a monitoring recreate succeeds"
@@ -816,7 +818,7 @@ scenario_monitoring_reload_no_drift() {
   write_marker "${MARKER}"
   mapfile -t fake < <(converged_env)
   run_deploy -- "${fake[@]}" \
-    "IRI_MONITORING_ENABLED=true" \
+    "BASETOOL_MONITORING_ENABLED=true" \
     "FAKE_REPODIGESTS_backend=ghcr.io/krt-profit/basetool-backend@sha256:backend-stale" || rc=$?
   assert_exit 0 "$rc" "monitoring-enabled deploy over a converged config succeeds"
   assert_docker "systemctl --user start loki.service" "the monitoring stack is still reconciled"
@@ -848,7 +850,7 @@ scenario_monitoring_reload_self_heals_on_noop() {
   cp -R "${T_COMPOSE_DIR}/monitoring/blackbox" "${T_STATE_DIR}/monitoring-reload/blackbox-exporter"
   write_marker "${MARKER}"
   mapfile -t fake < <(converged_env)
-  run_deploy -- "${fake[@]}" "IRI_MONITORING_ENABLED=true" || rc=$?
+  run_deploy -- "${fake[@]}" "BASETOOL_MONITORING_ENABLED=true" || rc=$?
   assert_exit 0 "$rc" "the self-healing no-op tick exits 0"
   assert_contains "no change" "it is still the idempotence no-op for the app stack"
   assert_no_docker "podman pull" "the app stack is not pulled on the fast exit"
@@ -883,7 +885,7 @@ scenario_monitoring_compose_def_applied_on_noop() {
   cp -R "${T_COMPOSE_DIR}/monitoring/blackbox" "${T_STATE_DIR}/monitoring-reload/blackbox-exporter"
   write_marker "${MARKER}"
   mapfile -t fake < <(converged_env)
-  run_deploy -- "${fake[@]}" "IRI_MONITORING_ENABLED=true" || rc=$?
+  run_deploy -- "${fake[@]}" "BASETOOL_MONITORING_ENABLED=true" || rc=$?
   assert_exit 0 "$rc" "the converged no-op tick exits 0"
   assert_contains "no change" "it is still the idempotence no-op for the app stack"
   assert_no_docker "podman pull" "the app stack is not pulled on the fast exit"
@@ -894,7 +896,7 @@ scenario_monitoring_compose_def_applied_on_noop() {
 }
 
 scenario_monitoring_reconcile_disabled_when_running() {
-  echo "Scenario: monitoring stack running but IRI_MONITORING_ENABLED unset → WARN + reconcile-disabled gauge=1"
+  echo "Scenario: monitoring stack running but BASETOOL_MONITORING_ENABLED unset → WARN + reconcile-disabled gauge=1"
   local tmp rc=0
   tmp="$(mktmp)"
   setup_host "${tmp}"
@@ -904,7 +906,7 @@ scenario_monitoring_reconcile_disabled_when_running() {
   run_deploy -- "${fake[@]}" "FAKE_MON_PS=prometheus" || rc=$?
   assert_exit 0 "$rc" "the gated-but-running no-op tick still exits 0"
   assert_contains "no change" "it is still the idempotence no-op"
-  assert_contains "iri-monitoring is RUNNING but IRI_MONITORING_ENABLED != 'true'" \
+  assert_contains "basetool-monitoring is RUNNING but BASETOOL_MONITORING_ENABLED != 'true'" \
     "the gated-off-but-running condition is logged as a loud WARN"
   assert_no_monitoring_recreate "nothing is recreated while the reconcile is gated off"
   if grep -q '^basetool_monitoring_reconcile_disabled{component="deploy"} 1' \
@@ -917,17 +919,17 @@ scenario_monitoring_reconcile_disabled_when_running() {
 }
 
 scenario_monitoring_flag_read_from_env_file() {
-  echo "Scenario: IRI_MONITORING_ENABLED in the compose .env enables the reconcile"
+  echo "Scenario: BASETOOL_MONITORING_ENABLED in the compose .env enables the reconcile"
   local tmp rc=0
   tmp="$(mktmp)"
   setup_host "${tmp}"
   write_marker "${MARKER}"
-  printf 'SOME_SECRET=must-not-leak\nIRI_MONITORING_ENABLED="true"\n' >> "${T_COMPOSE_DIR}/.env"
+  printf 'SOME_SECRET=must-not-leak\nBASETOOL_MONITORING_ENABLED="true"\n' >> "${T_CONFIG_DIR}/basetool.env"
   seed_monitoring_units
   mapfile -t fake < <(converged_env)
   run_deploy -- "${fake[@]}" "FAKE_MON_PS=prometheus" || rc=$?
   assert_exit 0 "$rc" "the tick still exits 0"
-  assert_excludes "iri-monitoring is RUNNING but IRI_MONITORING_ENABLED != 'true'" \
+  assert_excludes "basetool-monitoring is RUNNING but BASETOOL_MONITORING_ENABLED != 'true'" \
     "the gated-off WARN is gone once the flag is read from .env"
   if grep -q '^basetool_monitoring_reconcile_disabled{component="deploy"} 0' \
        "${T_STATE_DIR}/textfile/monitoring-reconcile.prom" 2>/dev/null; then
@@ -1060,13 +1062,13 @@ scenario_one_release_deploys() {
 }
 
 scenario_mixed_release_break_glass() {
-  echo "Scenario: IRI_REQUIRE_ONE_RELEASE=false deploys a mixed set and says so"
+  echo "Scenario: BASETOOL_REQUIRE_ONE_RELEASE=false deploys a mixed set and says so"
   local tmp rc=0
   tmp="$(mktmp)"
   setup_host "${tmp}"
   write_marker "sha256:backend-old|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}"
   mapfile -t fake < <(converged_env)
-  run_deploy -- "${fake[@]}" "FAKE_REV_FRONTEND=rev-two" "IRI_REQUIRE_ONE_RELEASE=false" || rc=$?
+  run_deploy -- "${fake[@]}" "FAKE_REV_FRONTEND=rev-two" "BASETOOL_REQUIRE_ONE_RELEASE=false" || rc=$?
   assert_exit 0 "$rc" "the break-glass deploys"
   assert_contains "release-revision gate DISABLED" "the bypass is announced"
   assert_no_docker "skopeo inspect --config" "no label is read when the gate is off"
@@ -1116,7 +1118,7 @@ scenario_transient_verify_failure_retries() {
   setup_host "${tmp}"
   write_marker "sha256:backend-old|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}"
   mapfile -t fake < <(converged_env)
-  run_deploy -- "${fake[@]}" "FAKE_COSIGN_FAIL_TIMES=1" "IRI_COSIGN_VERIFY_DELAY=0" || rc=$?
+  run_deploy -- "${fake[@]}" "FAKE_COSIGN_FAIL_TIMES=1" "BASETOOL_COSIGN_VERIFY_DELAY=0" || rc=$?
   assert_exit 0 "$rc" "a single transient verify failure does not fail the deploy"
   assert_contains "verify attempt 1/3 failed" "the failed attempt is logged"
   assert_contains "TRANSIENT registry error" "cosign's stderr reaches the operator log"
@@ -1135,7 +1137,7 @@ scenario_signature_identity_is_anchored() {
     write_marker "sha256:backend-old|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}"
     mapfile -t fake < <(converged_env)
     rc=0
-    run_deploy -- "${fake[@]}" "FAKE_COSIGN_SUBJECT=${prefix}${ref}" "IRI_COSIGN_VERIFY_DELAY=0" || rc=$?
+    run_deploy -- "${fake[@]}" "FAKE_COSIGN_SUBJECT=${prefix}${ref}" "BASETOOL_COSIGN_VERIFY_DELAY=0" || rc=$?
     assert_exit 0 "$rc" "a signature minted on refs/${ref} is trusted"
     assert_contains "backend: signature OK" "refs/${ref}: the gate reports the signature OK"
     rm -rf "${tmp}"
@@ -1151,7 +1153,7 @@ scenario_signature_identity_is_anchored() {
     write_marker "sha256:backend-old|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}"
     mapfile -t fake < <(converged_env)
     rc=0
-    run_deploy -- "${fake[@]}" "FAKE_COSIGN_SUBJECT=${subject}" "IRI_COSIGN_VERIFY_DELAY=0" || rc=$?
+    run_deploy -- "${fake[@]}" "FAKE_COSIGN_SUBJECT=${subject}" "BASETOOL_COSIGN_VERIFY_DELAY=0" || rc=$?
     assert_exit 1 "$rc" "a signature minted as ${subject##*/workflows/} is refused"
     assert_contains "none of the expected identities matched" \
       "${subject##*/workflows/}: the abort quotes cosign's identity mismatch"
@@ -1161,13 +1163,13 @@ scenario_signature_identity_is_anchored() {
 }
 
 scenario_break_glass_skips_verify() {
-  echo "Scenario: IRI_COSIGN_VERIFY=false skips verification (loudly) and still applies"
+  echo "Scenario: BASETOOL_COSIGN_VERIFY=false skips verification (loudly) and still applies"
   local tmp rc=0
   tmp="$(mktmp)"
   setup_host "${tmp}"
   write_marker "sha256:backend-old|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}"
   mapfile -t fake < <(converged_env)
-  run_deploy -- "${fake[@]}" "IRI_COSIGN_VERIFY=false" || rc=$?
+  run_deploy -- "${fake[@]}" "BASETOOL_COSIGN_VERIFY=false" || rc=$?
   assert_exit 0 "$rc" "break-glass deploy succeeds"
   assert_contains "signature verification DISABLED" "the disabled gate is logged loudly"
   assert_no_docker "cosign verify" "cosign is not invoked when the gate is disabled"
@@ -1188,7 +1190,7 @@ scenario_cosign_off_path() {
 
   mapfile -t fake < <(converged_env)
   RUN_DEPLOY_MINIMAL_PATH=1 run_deploy -- "${fake[@]}" \
-    "IRI_COSIGN_SEARCH_PATH=${alt}" || rc=$?
+    "BASETOOL_COSIGN_SEARCH_PATH=${alt}" || rc=$?
   assert_exit 0 "$rc" "the deploy succeeds with cosign off PATH but findable"
   assert_contains "but not on PATH" "it says where it found cosign, rather than aborting"
   assert_docker "cosign verify" "and it still verifies every signature"
@@ -1197,7 +1199,7 @@ scenario_cosign_off_path() {
   rc=0
   write_marker "sha256:backend-old|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}"
   RUN_DEPLOY_MINIMAL_PATH=1 run_deploy -- "${fake[@]}" \
-    "IRI_COSIGN_SEARCH_PATH=${tmp}/nowhere" || rc=$?
+    "BASETOOL_COSIGN_SEARCH_PATH=${tmp}/nowhere" || rc=$?
   assert_exit 1 "$rc" "a genuinely missing cosign still fails closed"
   assert_contains "cosign not found on PATH or under" "the abort names where it looked"
   assert_no_docker "cosign verify" "nothing is verified when cosign is absent"
@@ -1592,7 +1594,7 @@ PMARKER_OLD="$(hexdig ba5e)|${PDIG_FRONTEND}|${PDIG_INGEST}|${PDIG_CONFIG}|${PDI
 podman_env() {
   printf '%s\n' \
     "RT_BACKEND=podman" \
-    "IRI_QUADLET_BIN=${T_FAKE_BIN}/quadlet" \
+    "BASETOOL_QUADLET_BIN=${T_FAKE_BIN}/quadlet" \
     "RT_UNIT_DIR=${T_UNIT_DIR}" \
     "FAKE_REMOTE_BACKEND=${PDIG_BACKEND}" \
     "FAKE_REMOTE_FRONTEND=${PDIG_FRONTEND}" \
@@ -1764,7 +1766,7 @@ scenario_podman_refuses_without_quadlet() {
   write_marker "${PMARKER}"
   mapfile -t pod < <(podman_env)
   mapfile -t conv < <(podman_converged_env)
-  run_deploy -- "${pod[@]}" "${conv[@]}" "IRI_QUADLET_BIN=${tmp}/no-such-quadlet" || rc=$?
+  run_deploy -- "${pod[@]}" "${conv[@]}" "BASETOOL_QUADLET_BIN=${tmp}/no-such-quadlet" || rc=$?
   assert_exit 1 "$rc" "podman: a host without the Quadlet generator refuses"
   assert_contains "Quadlet generator is missing" "podman: and says which piece is absent"
   rm -rf "${tmp}"
@@ -1785,7 +1787,7 @@ write_bundle() {
   printf '[Container]\nContainerName=frontend\nImage=placeholder\n' > "${b}/quadlet/systemd/frontend.container"
   printf '[Network]\nNetworkName=net-app\n'                          > "${b}/quadlet/systemd/net-app.network"
   # shellcheck disable=SC2016
-  printf 'BACKEND_TOKEN=${IRI_KEYSTORE_HOST_PATH:?}\n'                > "${b}/quadlet/env.d/backend.env.tmpl"
+  printf 'BACKEND_TOKEN=${BASETOOL_KEYSTORE_HOST_PATH:?}\n'                > "${b}/quadlet/env.d/backend.env.tmpl"
 }
 
 write_env_renderer() {
@@ -1826,8 +1828,8 @@ scenario_podman_bundle_installs_the_units() {
   mapfile -t conv < <(podman_converged_env)
   run_deploy -- "${pod[@]}" "${conv[@]}" \
     "FAKE_CONFIG_BUNDLE=${bundle}" \
-    "IRI_ENV_RENDERER=${T_FAKE_BIN}/render-env-d.py" \
-    "IRI_ENV_D_DIR=${T_COMPOSE_DIR}/env.d" || rc=$?
+    "BASETOOL_ENV_RENDERER=${T_FAKE_BIN}/render-env-d.py" \
+    "BASETOOL_ENV_D_DIR=${T_CONFIG_DIR}/env.d" || rc=$?
   assert_exit 0 "$rc" "podman: a deploy that ships new units exits 0"
 
   if grep -q '^Image=placeholder$' "${T_UNIT_DIR}/backend.container" 2>/dev/null; then
@@ -1845,7 +1847,7 @@ scenario_podman_bundle_installs_the_units() {
   else
     record 0 "podman: an operator drop-in survives a unit install"
   fi
-  if [[ -f "${T_COMPOSE_DIR}/env.d/backend.env" ]]; then
+  if [[ -f "${T_CONFIG_DIR}/env.d/backend.env" ]]; then
     record 1 "podman: env.d is rendered on the host, from the host's own .env"
   else
     record 0 "podman: env.d is rendered on the host, from the host's own .env"
@@ -1869,8 +1871,8 @@ scenario_podman_retired_unit_is_stopped_then_removed() {
   : > "${T_DOCKER_LOG}"
   run_deploy -- "${pod[@]}" "${conv[@]}" \
     "FAKE_CONFIG_BUNDLE=${bundle}" \
-    "IRI_ENV_RENDERER=${T_FAKE_BIN}/render-env-d.py" \
-    "IRI_ENV_D_DIR=${T_COMPOSE_DIR}/env.d" >/dev/null 2>&1 || true
+    "BASETOOL_ENV_RENDERER=${T_FAKE_BIN}/render-env-d.py" \
+    "BASETOOL_ENV_D_DIR=${T_CONFIG_DIR}/env.d" >/dev/null 2>&1 || true
 
   if [[ -f "${T_UNIT_DIR}/retired.container" ]]; then
     record 0 "podman: the retired unit file is removed"
@@ -1895,8 +1897,8 @@ scenario_podman_first_deploy_fills_an_empty_unit_dir() {
   mapfile -t conv < <(podman_converged_env)
   run_deploy -- "${pod[@]}" "${conv[@]}" \
     "FAKE_CONFIG_BUNDLE=${bundle}" \
-    "IRI_ENV_RENDERER=${T_FAKE_BIN}/render-env-d.py" \
-    "IRI_ENV_D_DIR=${T_COMPOSE_DIR}/env.d" || rc=$?
+    "BASETOOL_ENV_RENDERER=${T_FAKE_BIN}/render-env-d.py" \
+    "BASETOOL_ENV_D_DIR=${T_CONFIG_DIR}/env.d" || rc=$?
   assert_exit 0 "$rc" "podman: a converged host with no units still exits 0"
   if [[ -f "${T_UNIT_DIR}/backend.container" ]]; then
     record 1 "podman: an empty unit directory is filled from the bundle"
@@ -1943,10 +1945,10 @@ scenario_podman_changed_monitoring_and_acme_units_are_restarted() {
   mapfile -t conv < <(podman_converged_env)
   : > "${T_DOCKER_LOG}"
   run_deploy -- "${pod[@]}" "${conv[@]}" \
-    "IRI_MONITORING_ENABLED=true" \
+    "BASETOOL_MONITORING_ENABLED=true" \
     "FAKE_CONFIG_BUNDLE=${bundle}" \
-    "IRI_ENV_RENDERER=${T_FAKE_BIN}/render-env-d.py" \
-    "IRI_ENV_D_DIR=${T_COMPOSE_DIR}/env.d" || rc=$?
+    "BASETOOL_ENV_RENDERER=${T_FAKE_BIN}/render-env-d.py" \
+    "BASETOOL_ENV_D_DIR=${T_CONFIG_DIR}/env.d" || rc=$?
   assert_exit 0 "$rc" "podman: the release deploys"
 
   local n
@@ -1988,7 +1990,7 @@ scenario_podman_keystore_checked_where_the_unit_mounts_it() {
   setup_host "${tmp}"
   podman_units "${tmp}"
   write_marker "${PMARKER}"
-  printf 'IRI_KEYSTORE_HOST_PATH=%s/nowhere.p12\n' "${tmp}" > "${T_COMPOSE_DIR}/.env"
+  printf 'BASETOOL_KEYSTORE_HOST_PATH=%s/nowhere.p12\n' "${tmp}" > "${T_CONFIG_DIR}/basetool.env"
   mapfile -t pod < <(podman_env)
   mapfile -t conv < <(podman_converged_env)
   run_deploy -- "${pod[@]}" "${conv[@]}" || rc=$?
@@ -3385,7 +3387,7 @@ scenario_host_scripts_matching_manifest_is_reported_on_a_noop() {
   write_script_manifest "${tmp}/host-scripts" "${T_COMPOSE_DIR}/host-scripts.sha256"
   write_marker "${MARKER}"
   mapfile -t fake < <(converged_env)
-  run_deploy -- "${fake[@]}" "IRI_HOST_SCRIPTS_DIR=${tmp}/host-scripts" || rc=$?
+  run_deploy -- "${fake[@]}" "BASETOOL_HOST_SCRIPTS_DIR=${tmp}/host-scripts" || rc=$?
   assert_exit 0 "$rc" "a converged stack with current scripts exits 0"
   assert_contains "host scripts: all 5 match the manifest of the deployed release" "the match is logged"
   assert_host_scripts_metric "basetool_host_scripts_check_timestamp_seconds " "the check stamps its liveness"
@@ -3404,7 +3406,7 @@ scenario_host_scripts_drift_between_promotions_warns_and_is_exported() {
   rm -f "${tmp}/host-scripts/lib/common.sh"
   write_marker "${MARKER}"
   mapfile -t fake < <(converged_env)
-  run_deploy -- "${fake[@]}" "IRI_HOST_SCRIPTS_DIR=${tmp}/host-scripts" || rc=$?
+  run_deploy -- "${fake[@]}" "BASETOOL_HOST_SCRIPTS_DIR=${tmp}/host-scripts" || rc=$?
   assert_exit 0 "$rc" "drift between promotions does not fail the tick"
   assert_contains "host scripts: WARN deploy.sh differs from the manifest of the deployed release" "the differing file is named"
   assert_contains "host scripts: WARN lib/common.sh is missing" "the missing file is named"
@@ -3425,7 +3427,7 @@ scenario_host_scripts_without_a_manifest_say_so_and_export_nothing() {
   echo 'basetool_host_scripts_check_timestamp_seconds 1' > "${T_STATE_DIR}/textfile/host-scripts.prom"
   write_marker "${MARKER}"
   mapfile -t fake < <(converged_env)
-  run_deploy -- "${fake[@]}" "IRI_HOST_SCRIPTS_DIR=${tmp}/host-scripts" || rc=$?
+  run_deploy -- "${fake[@]}" "BASETOOL_HOST_SCRIPTS_DIR=${tmp}/host-scripts" || rc=$?
   assert_exit 0 "$rc" "a release without a manifest still no-ops"
   assert_contains "carries no host-scripts.sha256" "the missing reference is logged"
   if [[ -e "${T_STATE_DIR}/textfile/host-scripts.prom" ]]; then
@@ -3435,7 +3437,7 @@ scenario_host_scripts_without_a_manifest_say_so_and_export_nothing() {
   fi
   printf 'not a manifest\n' > "${T_COMPOSE_DIR}/host-scripts.sha256"
   rc=0
-  run_deploy -- "${fake[@]}" "IRI_HOST_SCRIPTS_DIR=${tmp}/host-scripts" || rc=$?
+  run_deploy -- "${fake[@]}" "BASETOOL_HOST_SCRIPTS_DIR=${tmp}/host-scripts" || rc=$?
   assert_exit 0 "$rc" "a malformed manifest does not fail the tick"
   assert_contains "is empty or malformed" "the malformed manifest is logged"
   rm -rf "${tmp}"
@@ -3450,7 +3452,7 @@ scenario_host_scripts_stale_apply_path_refuses_the_release_and_the_fix_applies_i
   host_scripts_release_fixture "${tmp}"
   cp "${HS_DIR}/deploy.sh" "${tmp}/deploy.sh.good"
   echo "an older order" >> "${HS_DIR}/deploy.sh"
-  run_deploy -- "${HS_FAKE[@]}" "IRI_HOST_SCRIPTS_DIR=${HS_DIR}" \
+  run_deploy -- "${HS_FAKE[@]}" "BASETOOL_HOST_SCRIPTS_DIR=${HS_DIR}" \
     "FAKE_CONFIG_BUNDLE=${HS_BUNDLE}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
   assert_exit 1 "$rc" "the release is refused"
   assert_contains "HOST SCRIPTS: [deploy.sh]" "the refusal names the apply-path script"
@@ -3466,7 +3468,7 @@ scenario_host_scripts_stale_apply_path_refuses_the_release_and_the_fix_applies_i
   fi
   cp "${tmp}/deploy.sh.good" "${HS_DIR}/deploy.sh"
   rc=0
-  run_deploy -- "${HS_FAKE[@]}" "IRI_HOST_SCRIPTS_DIR=${HS_DIR}" \
+  run_deploy -- "${HS_FAKE[@]}" "BASETOOL_HOST_SCRIPTS_DIR=${HS_DIR}" \
     "FAKE_CONFIG_BUNDLE=${HS_BUNDLE}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
   assert_exit 0 "$rc" "once the script is installed the very next tick applies the release"
   assert_file_says "${T_COMPOSE_DIR}/docker/edge/nginx.conf" "NEW edge" "the release's config tree is applied"
@@ -3480,14 +3482,14 @@ scenario_host_scripts_stale_apply_path_refuses_the_release_and_the_fix_applies_i
 }
 
 scenario_host_scripts_stale_apply_path_can_be_forced_or_switched_off() {
-  echo "Scenario: --force and IRI_REQUIRE_CURRENT_SCRIPTS=false are the two ways past the host-scripts gate"
+  echo "Scenario: --force and BASETOOL_REQUIRE_CURRENT_SCRIPTS=false are the two ways past the host-scripts gate"
   local tmp rc=0
   tmp="$(mktmp)"
   setup_host "${tmp}"
   write_rsync_stub
   host_scripts_release_fixture "${tmp}"
   echo "an older order" >> "${HS_DIR}/lib/container-runtime.sh"
-  run_deploy --force -- "${HS_FAKE[@]}" "IRI_HOST_SCRIPTS_DIR=${HS_DIR}" \
+  run_deploy --force -- "${HS_FAKE[@]}" "BASETOOL_HOST_SCRIPTS_DIR=${HS_DIR}" \
     "FAKE_CONFIG_BUNDLE=${HS_BUNDLE}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
   assert_exit 0 "$rc" "--force applies past the gate"
   assert_contains "--force given, applying anyway" "the bypass is logged"
@@ -3499,7 +3501,7 @@ scenario_host_scripts_stale_apply_path_can_be_forced_or_switched_off() {
   host_scripts_release_fixture "${tmp}"
   echo "an older order" >> "${HS_DIR}/render-env-d.py"
   rc=0
-  run_deploy -- "${HS_FAKE[@]}" "IRI_HOST_SCRIPTS_DIR=${HS_DIR}" "IRI_REQUIRE_CURRENT_SCRIPTS=false" \
+  run_deploy -- "${HS_FAKE[@]}" "BASETOOL_HOST_SCRIPTS_DIR=${HS_DIR}" "BASETOOL_REQUIRE_CURRENT_SCRIPTS=false" \
     "FAKE_CONFIG_BUNDLE=${HS_BUNDLE}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
   assert_exit 0 "$rc" "the break-glass applies past the gate"
   assert_contains "host-scripts gate DISABLED" "the bypass is logged"
@@ -3514,7 +3516,7 @@ scenario_host_scripts_stale_non_apply_script_warns_but_applies() {
   write_rsync_stub
   host_scripts_release_fixture "${tmp}"
   echo "an older version" >> "${HS_DIR}/restore-drill.sh"
-  run_deploy -- "${HS_FAKE[@]}" "IRI_HOST_SCRIPTS_DIR=${HS_DIR}" \
+  run_deploy -- "${HS_FAKE[@]}" "BASETOOL_HOST_SCRIPTS_DIR=${HS_DIR}" \
     "FAKE_CONFIG_BUNDLE=${HS_BUNDLE}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
   assert_exit 0 "$rc" "the release is applied"
   assert_contains "host scripts: WARN restore-drill.sh differs from the manifest of the release being applied" "the drift is logged"
@@ -3531,7 +3533,7 @@ scenario_host_scripts_bundle_without_a_manifest_applies_and_drops_the_old_one() 
   host_scripts_release_fixture "${tmp}"
   rm -f "${HS_BUNDLE}/host-scripts.sha256"
   echo "stale manifest of the previous release" > "${T_COMPOSE_DIR}/host-scripts.sha256"
-  run_deploy -- "${HS_FAKE[@]}" "IRI_HOST_SCRIPTS_DIR=${HS_DIR}" \
+  run_deploy -- "${HS_FAKE[@]}" "BASETOOL_HOST_SCRIPTS_DIR=${HS_DIR}" \
     "FAKE_CONFIG_BUNDLE=${HS_BUNDLE}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
   assert_exit 0 "$rc" "the release is applied"
   assert_contains "the config bundle carries no host-scripts.sha256" "the missing reference is logged"
@@ -3553,7 +3555,7 @@ scenario_host_scripts_manifest_follows_a_rollback() {
   previous="$(sed 's/^[0-9a-f]\{4\}/0000/' "${HS_BUNDLE}/host-scripts.sha256")"
   printf '%s\n' "${previous}" > "${T_COMPOSE_DIR}/host-scripts.sha256"
   echo "services: {}" > "${T_STATE_DIR}/current-digest-pin.yml"
-  run_deploy -- "${HS_FAKE[@]}" "IRI_HOST_SCRIPTS_DIR=${HS_DIR}" \
+  run_deploy -- "${HS_FAKE[@]}" "BASETOOL_HOST_SCRIPTS_DIR=${HS_DIR}" \
     "FAKE_CONFIG_BUNDLE=${HS_BUNDLE}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" "FAKE_UP_RC=1" || rc=$?
   assert_exit 1 "$rc" "the failing release exits non-zero"
   assert_contains "health check failed" "the release fails its health gate"

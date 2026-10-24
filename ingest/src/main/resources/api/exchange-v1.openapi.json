@@ -1289,7 +1289,7 @@
     "securitySchemes": {
       "memberToken": {
         "type": "openIdConnect",
-        "openIdConnectUrl": "https://profit-base.online/auth/realms/iri/.well-known/openid-configuration",
+        "openIdConnectUrl": "https://profit-base.online/auth/realms/basetool/.well-known/openid-configuration",
         "description": "The member's access token from the client's own public Keycloak client, device grant, sent as `Authorization: DPoP <token>` with a `DPoP` proof. Scopes are the capabilities; `exchange.connect` is the base scope."
       }
     },

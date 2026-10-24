@@ -31,11 +31,11 @@ services:
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./monitoring/prometheus/alerts:/etc/prometheus/alerts:ro
-      - /var/iri/monitoring/secrets/prometheus-web.yml:/etc/prometheus/web.yml:ro
-      - /var/iri/monitoring/secrets/scrape_password:/etc/prometheus/secrets/scrape_password:ro
-      - /var/iri/monitoring/secrets/prometheus_web_password:/etc/prometheus/secrets/web_password:ro
-      - /var/iri/monitoring/certs/basetool-ca.crt:/etc/prometheus/certs/basetool-ca.crt:ro
-      - /var/iri/monitoring/data/prometheus:/prometheus
+      - /etc/basetool/monitoring/secrets/prometheus-web.yml:/etc/prometheus/web.yml:ro
+      - /etc/basetool/monitoring/secrets/scrape_password:/etc/prometheus/secrets/scrape_password:ro
+      - /etc/basetool/monitoring/secrets/prometheus_web_password:/etc/prometheus/secrets/web_password:ro
+      - /etc/basetool/monitoring/certs/basetool-ca.crt:/etc/prometheus/certs/basetool-ca.crt:ro
+      - /var/lib/basetool/monitoring/prometheus:/prometheus
     deploy:
       resources:
         limits:
@@ -73,9 +73,9 @@ services:
       GF_AUTH_GENERIC_OAUTH_CLIENT_ID: ${GRAFANA_OAUTH_CLIENT_ID:-grafana}
       GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET: ${GRAFANA_OAUTH_CLIENT_SECRET:?GRAFANA_OAUTH_CLIENT_SECRET must be set for the monitoring stack}
       GF_AUTH_GENERIC_OAUTH_SCOPES: "openid email profile"
-      GF_AUTH_GENERIC_OAUTH_AUTH_URL: ${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri/protocol/openid-connect/auth
-      GF_AUTH_GENERIC_OAUTH_TOKEN_URL: ${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri/protocol/openid-connect/token
-      GF_AUTH_GENERIC_OAUTH_API_URL: ${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri/protocol/openid-connect/userinfo
+      GF_AUTH_GENERIC_OAUTH_AUTH_URL: ${BASETOOL_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/basetool/protocol/openid-connect/auth
+      GF_AUTH_GENERIC_OAUTH_TOKEN_URL: ${BASETOOL_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/basetool/protocol/openid-connect/token
+      GF_AUTH_GENERIC_OAUTH_API_URL: ${BASETOOL_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/basetool/protocol/openid-connect/userinfo
       GF_AUTH_GENERIC_OAUTH_USE_PKCE: "true"
       GF_AUTH_GENERIC_OAUTH_EMAIL_ATTRIBUTE_PATH: email
       GF_AUTH_GENERIC_OAUTH_LOGIN_ATTRIBUTE_PATH: preferred_username
@@ -86,9 +86,9 @@ services:
     volumes:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
-      - /var/iri/monitoring/certs/grafana.crt:/etc/grafana/certs/grafana.crt:ro
-      - /var/iri/monitoring/certs/grafana.key:/etc/grafana/certs/grafana.key:ro
-      - /var/iri/monitoring/data/grafana:/var/lib/grafana
+      - /etc/basetool/monitoring/certs/grafana.crt:/etc/grafana/certs/grafana.crt:ro
+      - /etc/basetool/monitoring/certs/grafana.key:/etc/grafana/certs/grafana.key:ro
+      - /var/lib/basetool/monitoring/grafana:/var/lib/grafana
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null --no-check-certificate https://localhost:3000/api/health || exit 1"]
       interval: 30s
@@ -116,7 +116,7 @@ services:
     volumes:
       - ./monitoring/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
       - ./monitoring/loki/rules:/etc/loki/rules:ro
-      - /var/iri/monitoring/data/loki:/loki
+      - /var/lib/basetool/monitoring/loki:/loki
     deploy:
       resources:
         limits:
@@ -137,7 +137,7 @@ services:
     stop_grace_period: 45s
     volumes:
       - ./monitoring/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
-      - /var/iri/monitoring/data/tempo:/var/tempo
+      - /var/lib/basetool/monitoring/tempo:/var/tempo
     deploy:
       resources:
         limits:
@@ -161,11 +161,11 @@ services:
       - /etc/alloy/config.alloy
     volumes:
       - ./monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro
-      - /var/iri/monitoring/data/alloy:/var/lib/alloy/data
-      - /var/iri/backend/log:/logs/backend:ro
-      - /var/iri/frontend/log:/logs/frontend:ro
-      - /var/iri/ingest/log:/logs/ingest:ro
-      - /var/iri/keycloak/log:/logs/keycloak:ro
+      - /var/lib/basetool/monitoring/alloy:/var/lib/alloy/data
+      - /var/log/basetool/backend:/logs/backend:ro
+      - /var/log/basetool/frontend:/logs/frontend:ro
+      - /var/log/basetool/ingest:/logs/ingest:ro
+      - /var/log/basetool/keycloak:/logs/keycloak:ro
       - /var/log:/hostlog:ro
     deploy:
       resources:
@@ -188,8 +188,8 @@ services:
       - --storage.path=/alertmanager
       - --data.retention=744h
     volumes:
-      - /var/iri/monitoring/secrets/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
-      - /var/iri/monitoring/data/alertmanager:/alertmanager
+      - /etc/basetool/monitoring/secrets/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - /var/lib/basetool/monitoring/alertmanager:/alertmanager
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:9093/-/ready || exit 1"]
       interval: 30s
@@ -214,7 +214,7 @@ services:
     command:
       - --path.rootfs=/host
       - --collector.systemd
-      - --collector.textfile.directory=/host/var/iri/monitoring/textfile
+      - --collector.textfile.directory=/host/var/lib/basetool/textfile
       - --no-collector.wifi
     volumes:
       - /:/host:ro,rslave
@@ -299,7 +299,7 @@ services:
       - --config.file=/etc/blackbox/blackbox.yml
     volumes:
       - ./monitoring/blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro
-      - /var/iri/monitoring/certs/basetool-ca.crt:/etc/blackbox/certs/basetool-ca.crt:ro
+      - /etc/basetool/monitoring/certs/basetool-ca.crt:/etc/blackbox/certs/basetool-ca.crt:ro
     deploy:
       resources:
         limits:

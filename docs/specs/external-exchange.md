@@ -333,7 +333,7 @@ pins `client.offline.session.*` and `client.session.*` on the client, so a clien
 `offline_access` does not inherit the realm's 180-day SSO session (owner decision 2026-09-28,
 ADR-0217 amendment). An offline token needs the member to hold the `offline_access` realm role
 within the client's scope, and these clients have `fullScopeAllowed` off: the realm's default role
-`default-roles-iri` therefore carries `offline_access` as a composite, and the `offline_access`
+`default-roles-basetool` therefore carries `offline_access` as a composite, and the `offline_access`
 client scope maps the role, both converged by the provisioner (owner decision 2026-09-28, ADR-0202
 amendment 5). Without the composite the device grant's token request answers `400 not_allowed`.
 Of the first-party clients only `basetool-sc-extractor` is offered `offline_access`; the provisioner
@@ -367,7 +367,7 @@ accepted. The provisioner applied this on production only **after** the legacy s
   (owner decision 2026-09-27). Both clients' online sessions are pinned at 30/90 days as well, and
   section 13 fails without the pin (owner decision 2026-09-28).
 - [x] Every member can be issued an offline token by these clients: the provisioner plans, applies
-  and verifies `offline_access` as a composite of `default-roles-iri` and as the role mapped on the
+  and verifies `offline_access` as a composite of `default-roles-basetool` and as the role mapped on the
   `offline_access` client scope, and sends neither write to a realm holding both (self-test section
   18, which fails without it; owner decision 2026-09-28, ADR-0202 amendment 5). *Production lacked
   the composite until the owner added it by hand on 2026-09-28, after SC Extractor 2.10.0's sign-in
@@ -1883,9 +1883,9 @@ conditions (owner decision 2026-10-20, ADR-0303):
 
 The gateway admits extensions cross-origin on `/exchange/**` only: each approved Chromium build's
 fixed `chrome-extension://<id>`, bound to its client as `<clientId>=chrome-extension://<id>`
-(`app.exchange.cors.extension-origins`, from `IRI_EXCHANGE_CORS_EXTENSION_ORIGINS`), and
+(`app.exchange.cors.extension-origins`, from `BASETOOL_EXCHANGE_CORS_EXTENSION_ORIGINS`), and
 `moz-extension://*` while one client has a Firefox build (`app.exchange.cors.firefox-clients`, from
-`IRI_EXCHANGE_CORS_FIREFOX_CLIENTS`), for `GET`, `POST` and `OPTIONS`, with `Authorization`, `DPoP`, `Content-Type`,
+`BASETOOL_EXCHANGE_CORS_FIREFOX_CLIENTS`), for `GET`, `POST` and `OPTIONS`, with `Authorization`, `DPoP`, `Content-Type`,
 `Accept`, `Accept-Language`, `Idempotency-Key`, `X-Correlation-Id`, `User-Agent` and
 `Exchange-Client-Agent`, never with credentials, and exposes `DPoP-Nonce`, `WWW-Authenticate`,
 `RateLimit`, `RateLimit-Policy`, `Retry-After`, `Idempotency-Replayed` and `X-Correlation-Id`.
@@ -1966,7 +1966,7 @@ tombstones and journal reports task metrics.
 
 Public sandbox images and a `sandbox` compose profile run the ingest gateway, the backend and a
 Keycloak realm with a test client and seeded data on a developer's machine. The sandbox issuer is
-`http://host.docker.internal:18080/auth/realms/iri`. No production credential or artefact enters it.
+`http://host.docker.internal:18080/auth/realms/basetool`. No production credential or artefact enters it.
 
 The sandbox is `docker-compose.sandbox.yml` on the test stack, started, reset and stopped by
 `scripts/sandbox.sh` / `scripts/sandbox.ps1`, with the committed throwaway values of
@@ -2177,7 +2177,7 @@ catalogue) and whether it was undone.
 > **Amended 2026-09-28 — removed (#2092 step 9, owner decision of the same day).** Production ran
 > with the switch off from the go-live (S14), and extractor 2.10.0 uses only `/exchange/v1`. The
 > routes are now removed entirely, **without** a `410` stub: `LegacyEndpointGoneFilter`, the flag
-> `app.ingest.legacy-endpoints.enabled` (`IRI_INGEST_LEGACY_ENDPOINTS_ENABLED`),
+> `app.ingest.legacy-endpoints.enabled` (`BASETOOL_INGEST_LEGACY_ENDPOINTS_ENABLED`),
 > `LegacyClientGateGuard`, the client-identity gate of REQ-INGEST-011 and the two metrics are gone.
 > A request under `/v1` gets what any unknown path of the gateway gets — `404` with a token the
 > decoder accepts, `401` with one it refuses, `403` from the CSRF filter without a token
@@ -2196,7 +2196,7 @@ never reach these relays, which run with the member's stored authorities (REQ-IN
 unaffected). The routes also refuse every client the exchange registry lists unless the allowlist
 names it too (`exchange_client`, review 2 L1); a registry that cannot be read skips that check.
 
-The switch is `IRI_INGEST_LEGACY_ENDPOINTS_ENABLED` on the host. The refusal runs before the security
+The switch is `BASETOOL_INGEST_LEGACY_ENDPOINTS_ENABLED` on the host. The refusal runs before the security
 chain, so an outdated extractor sees the hint (*„Diese Schnittstelle wurde abgeschaltet. Bitte
 aktualisiere den SC Extractor auf die neueste Version."*) whether or not its token is still
 accepted. `basetool_ingest_legacy_endpoints_enabled` reports the switch and

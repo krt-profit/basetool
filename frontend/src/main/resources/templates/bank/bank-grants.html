@@ -32,7 +32,7 @@
                         data-testid="bank-grants-filter">
                     <option value="" th:text="#{bank.grants.filter.allAccounts}">Alle Konten</option>
                     <option th:if="${selectedAccount != null}" th:value="${selectedAccount.id()}" selected
-                            th:text="${selectedAccount.accountNo()} + ' &#8212; ' + ${selectedAccount.name()}">KB-0001 &#8212; Staffel IRIDIUM</option>
+                            th:text="${selectedAccount.accountNo()} + ' &#8212; ' + ${selectedAccount.name()}">KB-0001 &#8212; Staffel ALPHA</option>
                 </select>
             </div>
             <div class="bank-grants-filter" th:if="${byEmployee}">
@@ -74,7 +74,7 @@
                               th:title="#{bank.grants.missingRole.hint}"
                               th:text="#{bank.grants.missingRole}">Rolle fehlt</span>
                     </td>
-                    <td th:attr="data-label=#{bank.grants.col.account}" th:text="${g.accountNo()} + ' &#8212; ' + ${g.accountName()}">KB-0001 &#8212; Staffel IRIDIUM</td>
+                    <td th:attr="data-label=#{bank.grants.col.account}" th:text="${g.accountNo()} + ' &#8212; ' + ${g.accountName()}">KB-0001 &#8212; Staffel ALPHA</td>
                     <td class="bank-grants-flag-col" th:attr="data-label=#{bank.grants.col.deposit}">
                         <button type="button" class="matrix-flag" data-flag="canDeposit"
                                 th:classappend="${g.canDeposit()} ? ' on' : ''"

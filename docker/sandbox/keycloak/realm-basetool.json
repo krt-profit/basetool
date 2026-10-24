@@ -1317,11 +1317,11 @@
   "defaultRole": {
     "clientRole": false,
     "composite": true,
-    "containerId": "iri",
+    "containerId": "basetool",
     "description": "${role_default-roles}",
-    "name": "default-roles-iri"
+    "name": "default-roles-basetool"
   },
-  "displayName": "IRI (SANDBOX REALM - throwaway, do not use in prod)",
+  "displayName": "Basetool (SANDBOX REALM - throwaway, do not use in prod)",
   "duplicateEmailsAllowed": false,
   "editUsernameAllowed": false,
   "enabled": true,
@@ -1332,7 +1332,7 @@
   "oauth2DevicePollingInterval": 5,
   "offlineSessionMaxLifespan": 7776000,
   "offlineSessionMaxLifespanEnabled": true,
-  "realm": "iri",
+  "realm": "basetool",
   "refreshTokenMaxReuse": 5,
   "registrationAllowed": false,
   "requiredActions": [
@@ -1381,14 +1381,14 @@
       {
         "clientRole": false,
         "composite": false,
-        "containerId": "iri",
+        "containerId": "basetool",
         "description": "${role_offline-access}",
         "name": "offline_access"
       },
       {
         "clientRole": false,
         "composite": false,
-        "containerId": "iri",
+        "containerId": "basetool",
         "description": "${role_uma_authorization}",
         "name": "uma_authorization"
       },
@@ -1402,7 +1402,7 @@
           ]
         },
         "description": "${role_default-roles}",
-        "name": "default-roles-iri"
+        "name": "default-roles-basetool"
       }
     ]
   },
@@ -1435,7 +1435,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000001",
       "realmRoles": [
-        "default-roles-iri",
+        "default-roles-basetool",
         "KRT Member"
       ],
       "username": "sandbox-member"
@@ -1453,7 +1453,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000002",
       "realmRoles": [
-        "default-roles-iri",
+        "default-roles-basetool",
         "KRT Member"
       ],
       "username": "sandbox-member-2"
@@ -1471,7 +1471,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000003",
       "realmRoles": [
-        "default-roles-iri",
+        "default-roles-basetool",
         "Admin",
         "Officer",
         "KRT Member"
@@ -1491,7 +1491,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000201",
       "realmRoles": [
-        "default-roles-iri",
+        "default-roles-basetool",
         "KRT Member"
       ],
       "username": "sandbox-load-01"
@@ -1509,7 +1509,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000202",
       "realmRoles": [
-        "default-roles-iri",
+        "default-roles-basetool",
         "KRT Member"
       ],
       "username": "sandbox-load-02"
@@ -1527,7 +1527,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000203",
       "realmRoles": [
-        "default-roles-iri",
+        "default-roles-basetool",
         "KRT Member"
       ],
       "username": "sandbox-load-03"
@@ -1545,7 +1545,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000204",
       "realmRoles": [
-        "default-roles-iri",
+        "default-roles-basetool",
         "KRT Member"
       ],
       "username": "sandbox-load-04"
@@ -1563,7 +1563,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000205",
       "realmRoles": [
-        "default-roles-iri",
+        "default-roles-basetool",
         "KRT Member"
       ],
       "username": "sandbox-load-05"
@@ -1581,7 +1581,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000206",
       "realmRoles": [
-        "default-roles-iri",
+        "default-roles-basetool",
         "KRT Member"
       ],
       "username": "sandbox-load-06"
@@ -1599,7 +1599,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000207",
       "realmRoles": [
-        "default-roles-iri",
+        "default-roles-basetool",
         "KRT Member"
       ],
       "username": "sandbox-load-07"
@@ -1617,7 +1617,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000208",
       "realmRoles": [
-        "default-roles-iri",
+        "default-roles-basetool",
         "KRT Member"
       ],
       "username": "sandbox-load-08"
@@ -1635,7 +1635,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000209",
       "realmRoles": [
-        "default-roles-iri",
+        "default-roles-basetool",
         "KRT Member"
       ],
       "username": "sandbox-load-09"
@@ -1653,7 +1653,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000210",
       "realmRoles": [
-        "default-roles-iri",
+        "default-roles-basetool",
         "KRT Member"
       ],
       "username": "sandbox-load-10"
@@ -1671,7 +1671,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000211",
       "realmRoles": [
-        "default-roles-iri",
+        "default-roles-basetool",
         "KRT Member"
       ],
       "username": "sandbox-load-11"
@@ -1689,7 +1689,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000212",
       "realmRoles": [
-        "default-roles-iri",
+        "default-roles-basetool",
         "KRT Member"
       ],
       "username": "sandbox-load-12"
@@ -1707,7 +1707,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000213",
       "realmRoles": [
-        "default-roles-iri",
+        "default-roles-basetool",
         "KRT Member"
       ],
       "username": "sandbox-load-13"
@@ -1725,7 +1725,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000214",
       "realmRoles": [
-        "default-roles-iri",
+        "default-roles-basetool",
         "KRT Member"
       ],
       "username": "sandbox-load-14"
@@ -1743,7 +1743,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000215",
       "realmRoles": [
-        "default-roles-iri",
+        "default-roles-basetool",
         "KRT Member"
       ],
       "username": "sandbox-load-15"
@@ -1761,7 +1761,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000216",
       "realmRoles": [
-        "default-roles-iri",
+        "default-roles-basetool",
         "KRT Member"
       ],
       "username": "sandbox-load-16"
@@ -1777,7 +1777,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-0000000000a1",
       "realmRoles": [
-        "default-roles-iri"
+        "default-roles-basetool"
       ],
       "serviceAccountClientId": "backend-service",
       "username": "service-account-backend-service"
@@ -1786,7 +1786,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-0000000000a2",
       "realmRoles": [
-        "default-roles-iri"
+        "default-roles-basetool"
       ],
       "serviceAccountClientId": "basetool-ingest-gateway",
       "username": "service-account-basetool-ingest-gateway"

@@ -2,38 +2,39 @@
 
 set -euo pipefail
 
-IRI_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BASETOOL_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source-path=SCRIPTDIR
 # shellcheck source=lib/common.sh
 # shellcheck disable=SC1091
-. "${IRI_SCRIPT_DIR}/lib/common.sh"
+. "${BASETOOL_SCRIPT_DIR}/lib/common.sh"
 # shellcheck source=lib/container-runtime.sh
 # shellcheck disable=SC1091
-. "${IRI_SCRIPT_DIR}/lib/container-runtime.sh"
+. "${BASETOOL_SCRIPT_DIR}/lib/container-runtime.sh"
 # shellcheck source=lib/restic-repo.sh
 # shellcheck disable=SC1091
-. "${IRI_SCRIPT_DIR}/lib/restic-repo.sh"
+. "${BASETOOL_SCRIPT_DIR}/lib/restic-repo.sh"
 
-COMPOSE_DIR="${IRI_COMPOSE_DIR:-/var/iri/code}"
-STATE_DIR="${IRI_STATE_DIR:-/var/lib/iri}"
-BACKUP_DIR="${IRI_BACKUP_DIR:-/var/iri/backup}"
+COMPOSE_DIR="${BASETOOL_COMPOSE_DIR:-/opt/basetool}"
+STATE_DIR="${BASETOOL_STATE_DIR:-/var/lib/basetool/deploy}"
+BACKUP_DIR="${BASETOOL_BACKUP_DIR:-/var/lib/basetool/backup}"
 STAGING_BASE="${BACKUP_DIR}/staging"
-LOCKFILE="${IRI_LOCKFILE:-/var/lock/iri-deploy.lock}"
-BACKUP_ENV="${IRI_BACKUP_ENV:-/etc/iri/backup.env}"
-REDIS_ACL_PATH="${IRI_REDIS_ACL_HOST_PATH:-/var/iri/redis/users.acl}"
+LOCKFILE="${BASETOOL_LOCKFILE:-/run/lock/basetool-deploy.lock}"
+BACKUP_ENV="${BASETOOL_BACKUP_ENV:-/etc/basetool/deploy/backup.env}"
+REDIS_ACL_PATH="${BASETOOL_REDIS_ACL_HOST_PATH:-/var/lib/basetool/redis/users.acl}"
 
 WRITER_SERVICES=(frontend backend ingest)
-LOCK_WAIT="${IRI_BACKUP_LOCK_WAIT:-300}"
+LOCK_WAIT="${BASETOOL_BACKUP_LOCK_WAIT:-300}"
 
-KEEP_DAILY="${IRI_KEEP_DAILY:-7}"
-KEEP_WEEKLY="${IRI_KEEP_WEEKLY:-4}"
-KEEP_MONTHLY="${IRI_KEEP_MONTHLY:-6}"
+KEEP_DAILY="${BASETOOL_KEEP_DAILY:-7}"
+KEEP_WEEKLY="${BASETOOL_KEEP_WEEKLY:-4}"
+KEEP_MONTHLY="${BASETOOL_KEEP_MONTHLY:-6}"
 
-HELPER_IMAGE="${IRI_BACKUP_HELPER_IMAGE:-}"
+HELPER_IMAGE="${BASETOOL_BACKUP_HELPER_IMAGE:-}"
 BACKUP_TAG="basetool"
 SNAPSHOT_COUNT=""
 
-MON_DATA="${IRI_MONITORING_DIR:-/var/iri/monitoring}"
+MON_DATA="${BASETOOL_MONITORING_DATA_DIR:-/var/lib/basetool/monitoring}"
+MON_CONFIG="${BASETOOL_MONITORING_CONFIG_DIR:-${CONFIG_DIR}/monitoring}"
 START_EPOCH="$(date +%s)"
 
 QUIESCE=true
@@ -62,11 +63,11 @@ Options:
                  dump and upload nothing.
   -h, --help     Show this help.
 
-Configuration (in /etc/iri/backup.env, sourced at start):
+Configuration (in /etc/basetool/deploy/backup.env, sourced at start):
   RESTIC_REPOSITORY   e.g. rclone:nextcloud:Basetool-Backups   (required)
   RESTIC_PASSWORD     restic repo encryption password           (or RESTIC_PASSWORD_FILE)
   RCLONE_CONFIG       path to rclone.conf with the `nextcloud` webdav remote
-  IRI_KEEP_DAILY / IRI_KEEP_WEEKLY / IRI_KEEP_MONTHLY  (GFS retention; 7/4/6)
+  BASETOOL_KEEP_DAILY / BASETOOL_KEEP_WEEKLY / BASETOOL_KEEP_MONTHLY  (GFS retention; 7/4/6)
 USAGE
       exit 0 ;;
     *) echo "FATAL: unknown argument: $1 (try --help)" >&2; exit 1 ;;
@@ -94,7 +95,7 @@ write_backup_metrics() {
   } | write_textfile backup.prom || true
 }
 
-[[ -f "${COMPOSE_DIR}/.env" ]] || fail "missing ${COMPOSE_DIR}/.env"
+[[ -f "${ENV_FILE}" ]] || fail "missing ${ENV_FILE}"
 [[ -f "${BACKUP_ENV}" ]] || fail "missing ${BACKUP_ENV} (restic repo + rclone config; see docs/backup.md)"
 rt_detect
 rt_wait_for_startup
@@ -106,7 +107,7 @@ log "helper image: ${HELPER_IMAGE}"
 command -v restic >/dev/null 2>&1 || fail "restic not found (dnf install restic; ansible role: 10-packages.yml)"
 command -v rclone >/dev/null 2>&1 || fail "rclone not found (dnf install rclone; ansible role: 10-packages.yml)"
 
-export RESTIC_CACHE_DIR="${RESTIC_CACHE_DIR:-${STATE_DIR}/restic-cache}"
+export RESTIC_CACHE_DIR="${RESTIC_CACHE_DIR:-${CACHE_DIR}/restic}"
 mkdir -p "${RESTIC_CACHE_DIR}" "${STAGING_BASE}"
 
 set -a
@@ -116,14 +117,14 @@ set +a
 [[ -n "${RESTIC_REPOSITORY:-}" ]] || fail "RESTIC_REPOSITORY not set in ${BACKUP_ENV}"
 [[ -n "${RESTIC_PASSWORD:-}${RESTIC_PASSWORD_FILE:-}" ]] || fail "RESTIC_PASSWORD or RESTIC_PASSWORD_FILE not set in ${BACKUP_ENV}"
 
-KEYSTORE_PATH="$(read_env IRI_KEYSTORE_HOST_PATH)"
-KEYSTORE_PATH="${KEYSTORE_PATH:-/var/iri/secrets/keystore.p12}"
-INTERNAL_TLS_DIR="${IRI_INTERNAL_TLS_DIR:-/var/iri/secrets/tls}"
+KEYSTORE_PATH="$(read_env BASETOOL_KEYSTORE_HOST_PATH)"
+KEYSTORE_PATH="${KEYSTORE_PATH:-/etc/basetool/secrets/keystore.p12}"
+INTERNAL_TLS_DIR="${BASETOOL_INTERNAL_TLS_DIR:-/etc/basetool/secrets/tls}"
 
 cd "${COMPOSE_DIR}"
 
 if [[ "${DRY_RUN}" == "true" ]]; then
-  log "DRY RUN — would back up: krt_basetool + keycloak dumps, the edge-certs/edge-acme-state/edge-acme-webroot volumes, .env, ${KEYSTORE_PATH}, ${INTERNAL_TLS_DIR} (if present), ${REDIS_ACL_PATH}, realm-export.json, keycloak/providers"
+  log "DRY RUN — would back up: krt_basetool + keycloak dumps, the edge-certs/edge-acme-state/edge-acme-webroot volumes, basetool.env, ${KEYSTORE_PATH}, ${INTERNAL_TLS_DIR} (if present), ${REDIS_ACL_PATH}, realm-export.json, keycloak/providers"
   log "DRY RUN — quiesce=${QUIESCE} (stop: ${WRITER_SERVICES[*]}); repo=${RESTIC_REPOSITORY}; retention ${KEEP_DAILY}/${KEEP_WEEKLY}/${KEEP_MONTHLY}"
   log "existing snapshots:"
   restic snapshots --compact 2>&1 | sed 's/^/  /' || log "  (repo not reachable / not initialized yet)"
@@ -204,8 +205,8 @@ else
   log "WARN: no redis ACL at ${REDIS_ACL_PATH} — redis will NOT start from this snapshot"
 fi
 
-log "capturing host config (.env, keystore, realm-export, providers)"
-cp -p "${COMPOSE_DIR}/.env" "${STAGING}/config/dotenv"
+log "capturing host config (basetool.env, keystore, realm-export, providers)"
+cp -p "${ENV_FILE}" "${STAGING}/config/dotenv"
 if [[ -f "${KEYSTORE_PATH}" ]]; then
   if rt_read_mount "$(dirname "${KEYSTORE_PATH}")" "${HELPER_IMAGE}" \
        cat "/src/$(basename "${KEYSTORE_PATH}")" > "${STAGING}/config/keystore.p12" 2>/dev/null \
@@ -228,12 +229,12 @@ if [[ -d "${INTERNAL_TLS_DIR}" ]]; then
     log "WARN: could not read the internal TLS material at ${INTERNAL_TLS_DIR} via ${HELPER_IMAGE} — skipped"
   fi
 fi
-if [[ -f "${COMPOSE_DIR}/realm-export.json" ]]; then
-  if rt_read_mount "${COMPOSE_DIR}" "${HELPER_IMAGE}" cat /src/realm-export.json        > "${STAGING}/config/realm-export.json" 2>/dev/null      && [[ -s "${STAGING}/config/realm-export.json" ]]; then
+if [[ -f "${CONFIG_DIR}/realm-export.json" ]]; then
+  if rt_read_mount "${CONFIG_DIR}" "${HELPER_IMAGE}" cat /src/realm-export.json        > "${STAGING}/config/realm-export.json" 2>/dev/null      && [[ -s "${STAGING}/config/realm-export.json" ]]; then
     :
   else
     rm -f "${STAGING}/config/realm-export.json"
-    log "WARN: could not read ${COMPOSE_DIR}/realm-export.json — skipped"
+    log "WARN: could not read ${CONFIG_DIR}/realm-export.json — skipped"
   fi
 fi
 if [[ -d "${COMPOSE_DIR}/keycloak/providers" ]]; then
@@ -258,20 +259,20 @@ if rt_monitoring_configured && rt_is_running grafana; then
   else
     log "WARN: could not stop grafana; copying its SQLite live (may be inconsistent)"
   fi
-  if [[ -f "${MON_DATA}/data/grafana/grafana.db" ]]; then
-    rt_read_mount "${MON_DATA}/data/grafana" "${HELPER_IMAGE}" \
+  if [[ -f "${MON_DATA}/grafana/grafana.db" ]]; then
+    rt_read_mount "${MON_DATA}/grafana" "${HELPER_IMAGE}" \
       cat /src/grafana.db > "${STAGING}/monitoring/grafana.db" 2>/dev/null \
       || log "WARN: could not capture grafana.db"
   else
-    log "WARN: grafana.db not found under ${MON_DATA}/data/grafana"
+    log "WARN: grafana.db not found under ${MON_DATA}/grafana"
   fi
   [[ "${grafana_stopped}" == "true" ]] && { rt_monitoring_up grafana >/dev/null 2>&1 || log "WARN: failed to restart grafana"; }
   log "capturing monitoring secrets + certs"
-  rt_read_mount "${MON_DATA}" "${HELPER_IMAGE}" \
+  rt_read_mount "${MON_CONFIG}" "${HELPER_IMAGE}" \
     sh -c 'tar -C /src -cz secrets certs 2>/dev/null || true' > "${STAGING}/monitoring/secrets.tar.gz" 2>/dev/null \
     || log "WARN: could not archive monitoring secrets/certs"
   log "capturing Alertmanager state (silences + notification log)"
-  rt_read_mount "${MON_DATA}/data/alertmanager" "${HELPER_IMAGE}" \
+  rt_read_mount "${MON_DATA}/alertmanager" "${HELPER_IMAGE}" \
     sh -c 'tar -C /src -cz . 2>/dev/null || true' > "${STAGING}/monitoring/alertmanager.tar.gz" 2>/dev/null \
     || log "WARN: could not archive alertmanager state"
 else
@@ -287,7 +288,7 @@ if [[ "$(date -u +%u)" == "7" ]] && rt_monitoring_configured && rt_is_running pr
   snap_json="$(rt_prometheus_snapshot 2>/dev/null || true)"
   snap_name="$(printf '%s' "${snap_json}" | sed -n 's/.*"name":"\([^"]*\)".*/\1/p')"
   if [[ "${snap_name}" =~ ^[0-9A-Za-z-]+$ ]]; then
-    if rt_read_mount "${MON_DATA}/data/prometheus/snapshots/${snap_name}" "${HELPER_IMAGE}" \
+    if rt_read_mount "${MON_DATA}/prometheus/snapshots/${snap_name}" "${HELPER_IMAGE}" \
          sh -c 'tar -C /src -cz .' > "${STAGING}/monitoring/prometheus-tsdb-snapshot.tar.gz" 2>/dev/null \
        && [[ -s "${STAGING}/monitoring/prometheus-tsdb-snapshot.tar.gz" ]]; then
       log "captured Prometheus TSDB snapshot ${snap_name}"

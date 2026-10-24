@@ -1,8 +1,8 @@
 ---
 - name: Look for the host environment file
   ansible.builtin.stat:
-    path: "{{ basetool_host_root_dir }}/code/.env"
-  register: basetool_host_env_file
+    path: "{{ basetool_host_env_file }}"
+  register: basetool_host_env_file_stat
 
 - name: Read the service user's uid
   ansible.builtin.getent:
@@ -14,13 +14,14 @@
   ansible.builtin.set_fact:
     basetool_host_service_uid: "{{ ansible_facts.getent_passwd[basetool_host_service_user][1] }}"
 
-- name: Create the container data tree, owned by the service user
+- name: Create the root-owned roots of the host layout
   ansible.builtin.file:
-    path: "{{ basetool_host_root_dir }}"
+    path: "{{ item }}"
     state: directory
-    owner: "{{ basetool_host_service_user }}"
-    group: "{{ basetool_host_service_group }}"
+    owner: root
+    group: root
     mode: "0755"
+  loop: "{{ basetool_host_root_dirs }}"
 
 - name: Create the deployer's state directory, owned by the deploy account
   ansible.builtin.file:
@@ -40,7 +41,7 @@
 
 - name: Create the directories container root writes to
   ansible.builtin.file:
-    path: "{{ basetool_host_root_dir }}/{{ item }}"
+    path: "{{ item }}"
     state: directory
     owner: "{{ basetool_host_service_user }}"
     group: "{{ basetool_host_service_group }}"
@@ -49,7 +50,7 @@
 
 - name: Create the directories the deploy account writes to
   ansible.builtin.file:
-    path: "{{ basetool_host_root_dir }}/{{ item }}"
+    path: "{{ item }}"
     state: directory
     owner: "{{ basetool_host_deploy_user }}"
     group: "{{ basetool_host_deploy_user }}"
@@ -58,7 +59,7 @@
 
 - name: Create the backup staging tree, readable by nobody else
   ansible.builtin.file:
-    path: "{{ basetool_host_root_dir }}/backup"
+    path: "{{ basetool_host_data_dir }}/backup"
     state: directory
     owner: "{{ basetool_host_deploy_user }}"
     group: "{{ basetool_host_deploy_user }}"
@@ -66,7 +67,7 @@
 
 - name: Reclaim the subtrees a release owns end to end
   ansible.builtin.file:
-    path: "{{ basetool_host_root_dir }}/code/{{ item }}"
+    path: "{{ basetool_host_release_dir }}/{{ item }}"
     state: directory
     owner: "{{ basetool_host_deploy_user }}"
     group: "{{ basetool_host_deploy_user }}"
@@ -80,7 +81,7 @@
 
 - name: Create the rendered environment directory, shared between the two accounts
   ansible.builtin.file:
-    path: "{{ basetool_host_root_dir }}/code/env.d"
+    path: "{{ basetool_host_env_d_dir }}"
     state: directory
     owner: "{{ basetool_host_deploy_user }}"
     group: "{{ basetool_host_service_group }}"
@@ -88,15 +89,15 @@
 
 - name: Let the deploy account read the host environment file
   ansible.builtin.file:
-    path: "{{ basetool_host_root_dir }}/code/.env"
+    path: "{{ basetool_host_env_file }}"
     owner: "{{ basetool_host_deploy_user }}"
     group: "{{ basetool_host_deploy_user }}"
     mode: "0640"
-  when: basetool_host_env_file.stat.exists | default(false)
+  when: basetool_host_env_file_stat.stat.exists | default(false)
 
 - name: Create the directories a non-root container user writes to
   ansible.builtin.file:
-    path: "{{ basetool_host_root_dir }}/{{ item.1 }}"
+    path: "{{ item.1 }}"
     state: directory
     owner: "{{ basetool_host_subuid_base + item.0.container_uid - 1 }}"
     group: "{{ basetool_host_subuid_base + item.0.container_uid - 1 }}"

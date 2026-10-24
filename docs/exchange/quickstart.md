@@ -22,7 +22,7 @@ sandbox's addresses:
 
 | | |
 | --- | --- |
-| Keycloak (issuer) | `http://host.docker.internal:18080/auth/realms/iri` |
+| Keycloak (issuer) | `http://host.docker.internal:18080/auth/realms/basetool` |
 | Gateway | `https://localhost:11262/exchange/v1` |
 | Web frontend | `https://localhost:18081` |
 | Client | `sandbox-client` — public, no secret |
@@ -44,7 +44,7 @@ import base64, json, ssl, sys, time, urllib.error, urllib.parse, urllib.request,
 sys.path.insert(0, "docs/exchange/dpop-reference")
 from dpop_reference import NonceCache, asks_for_nonce, authorization_header, build_proof, open_installation_key
 
-KEYCLOAK = "http://host.docker.internal:18080/auth/realms/iri/protocol/openid-connect"
+KEYCLOAK = "http://host.docker.internal:18080/auth/realms/basetool/protocol/openid-connect"
 GATEWAY = "https://localhost:11262"
 CLIENT = "sandbox-client"
 TLS = ssl.create_default_context(cafile="docker/test-tls/basetool-test-ca.crt")

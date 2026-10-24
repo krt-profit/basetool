@@ -85,7 +85,7 @@
                         <td th:if="${isAllSquadronsMode}" th:attr="data-label=#{mission.owning_squadron}">
                             <span th:if="${m.owningSquadron != null}" class="squadron-badge"
                                   th:title="${m.owningSquadron.name()}"
-                                  th:text="${m.owningSquadron.shorthand()}">IRI</span>
+                                  th:text="${m.owningSquadron.shorthand()}">ALP</span>
                             <span th:if="${m.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
                         </td>
                         <td class="num" th:text="#{mission.list.registered(${m.registeredCount})}">6 angemeldet</td>

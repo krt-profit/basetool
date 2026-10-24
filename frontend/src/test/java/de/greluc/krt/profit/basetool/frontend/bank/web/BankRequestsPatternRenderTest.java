@@ -134,10 +134,10 @@ class BankRequestsPatternRenderTest {
         id,
         UUID.randomUUID(),
         "KB-0007",
-        "IRI Betriebskonto",
+        "ALP Betriebskonto",
         UUID.randomUUID(),
-        "IRIDIUM",
-        "IRI",
+        "ALPHA",
+        "ALP",
         type,
         new BigDecimal("600000"),
         null,
@@ -245,7 +245,7 @@ class BankRequestsPatternRenderTest {
         .contains(">Ausstehend<")
         .doesNotContain(">PENDING<")
         .contains("Quartalsabgabe Q3")
-        .contains("IRI Betriebskonto → KB-0001");
+        .contains("ALP Betriebskonto → KB-0001");
     assertThat(html.split("btn btn-success btn-xs", -1)).hasSize(3);
     assertThat(html)
         .containsPattern("class=\"chip chip--warning bank-req-route\"[^>]*>→ Bankleitung<")

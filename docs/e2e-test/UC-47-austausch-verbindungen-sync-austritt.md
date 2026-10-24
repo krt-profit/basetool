@@ -69,7 +69,7 @@ Nur im ephemeren Modus (`assumeTrue(STACK.managesStack())`). Jede Klasse ruft `E
 ### Austritt (`aDepartedMemberIsRefusedOnTheNextRequest`)
 
 1. Device-Login; ein Aufruf wird beantwortet.
-2. Der Keycloak-Administrator entfernt die direkten Realm-Rollen des Mitglieds (`KRT Member` und `default-roles-iri`, die `KRT Member` ebenfalls enthält).
+2. Der Keycloak-Administrator entfernt die direkten Realm-Rollen des Mitglieds (`KRT Member` und `default-roles-basetool`, die `KRT Member` ebenfalls enthält).
 3. Das Mitglied meldet sich per Passwort-Grant am Backend an; der Login-Abgleich erkennt den Rollenverlust (`MemberDepartedEvent`), und `ExchangeDepartureService` beendet die Verbindung.
 4. Der Client ruft das Gateway erneut auf.
 
@@ -78,6 +78,6 @@ Nur im ephemeren Modus (`assumeTrue(STACK.managesStack())`). Jede Klasse ruft `E
 ## Sonderfälle & Lehren
 
 - **Login- statt Roster-Abgleich.** Der Austritt läuft über den Login-Abgleich. Der Roster-Abgleich („Jetzt synchronisieren") gleicht jedes Konto des gemeinsamen Stacks ab und würde Zustand anderer Klassen verändern; sein Auslöser ist in `UserReconciliationServiceTest` abgedeckt.
-- **`KRT Member` steckt auch in der Standardrolle.** Wer nur `KRT Member` entzieht, lässt die Rolle über `default-roles-iri` bestehen; der Test entzieht beide.
+- **`KRT Member` steckt auch in der Standardrolle.** Wer nur `KRT Member` entzieht, lässt die Rolle über `default-roles-basetool` bestehen; der Test entzieht beide.
 - **Die Massenänderung zählt Lose, keine Blaupausen.** Bei Blaupausen zählt der aktuelle Bestand die Standard-Blaupausen mit, deren Zahl von anderen Klassen abhängt; die fünf Lose eines sonst unbenutzten Mitglieds machen die Schwelle (mindestens 5 und mehr als ein Fünftel) unabhängig davon.
 - **Gemeinsame Schritte** (Device-Login, Registrierung, Warten auf den Registerspiegel, Änderungssätze) liegen in `ExchangeE2eSupport`, den auch [UC-46](UC-46-austausch-rundlauf.md) nutzt.

@@ -7,7 +7,7 @@ Type=oneshot
 
 User=root
 
-ExecStart=/var/iri/code/scripts/cgroup-container-metrics.py --output /var/iri/monitoring/textfile/containers.prom
+ExecStart=/opt/basetool/scripts/cgroup-container-metrics.py --output /var/lib/basetool/textfile/containers.prom
 
 SuccessExitStatus=0 1
 
@@ -26,7 +26,7 @@ RestrictAddressFamilies=AF_UNIX
 SystemCallFilter=@system-service
 SystemCallErrorNumber=EPERM
 
-ReadWritePaths=/var/iri/monitoring/textfile
+ReadWritePaths=/var/lib/basetool/textfile
 
 TimeoutStartSec=30
 

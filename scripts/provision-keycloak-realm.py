@@ -348,8 +348,8 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
             env_vars_to_fill=(["KEYCLOAK_FRONTEND_CLIENT_SECRET"] if frontend_confidential
                               else []),
             env_doc_hint=" (the frontend's confidential login, ADR-0001)",
-            create_only={"name": "IRIDIUM Basetool Frontend",
-                         "description": "Frontend Application for IRIDIUM Basetool"},
+            create_only={"name": "Profit Basetool Frontend",
+                         "description": "Frontend Application for Profit Basetool"},
             attributes={
                 "backchannel.logout.revoke.offline.tokens": "false",
                 "backchannel.logout.session.required": "false",
@@ -453,12 +453,12 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
             withheld_scopes=[OFFLINE_ACCESS],
             withheld_scope_reason=_NO_OFFLINE_SESSION,
             service_account_roles={"<realm>": [f"default-roles-{realm}"]},
-            env_vars_to_fill=["IRI_INGEST_SERVICE_ACCOUNT_CLIENT_SECRET"],
+            env_vars_to_fill=["BASETOOL_INGEST_SERVICE_ACCOUNT_CLIENT_SECRET"],
             env_doc_hint=(" together with the other four values of docs/archive/INGEST_KEYCLOAK_SETUP.md "
-                        "step 9b (IRI_INGEST_PUBLIC_BASE_URL, "
-                        "IRI_INGEST_SERVICE_ACCOUNT_TOKEN_URI, "
-                        "IRI_INGEST_SERVICE_ACCOUNT_CLIENT_ID=basetool-ingest-gateway, and "
-                        "IRI_INGEST_GATEWAY_CLIENT_IDS=basetool-ingest-gateway for the backend) - "
+                        "step 9b (BASETOOL_INGEST_PUBLIC_BASE_URL, "
+                        "BASETOOL_INGEST_SERVICE_ACCOUNT_TOKEN_URI, "
+                        "BASETOOL_INGEST_SERVICE_ACCOUNT_CLIENT_ID=basetool-ingest-gateway, and "
+                        "BASETOOL_INGEST_GATEWAY_CLIENT_IDS=basetool-ingest-gateway for the backend) - "
                         "the gateway refuses to send until all five are set"),
         ),
         ClientSpec(
@@ -1450,7 +1450,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Bring a Keycloak realm to the production shape of the Basetool's clients, "
                     "scopes, policies and token settings. Dry run unless --apply.")
-    parser.add_argument("--realm", default="iri", help="target realm (default: iri)")
+    parser.add_argument("--realm", default="basetool", help="target realm (default: basetool)")
     parser.add_argument("--public-origin", required=True,
                         help="the environment's web origin, e.g. https://basetool.example — "
                              "feeds the frontend's and the app's redirect URIs and web origins")

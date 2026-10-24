@@ -10,9 +10,9 @@ ReadOnly=true
 DropCapability=ALL
 NoNewPrivileges=true
 Network=net-monitoring-core.network
-Volume=/var/iri/monitoring/secrets/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
-Volume=/var/iri/monitoring/data/alertmanager:/alertmanager
-EnvironmentFile=/var/iri/code/env.d/alertmanager.env
+Volume=/etc/basetool/monitoring/secrets/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+Volume=/var/lib/basetool/monitoring/alertmanager:/alertmanager
+EnvironmentFile=/etc/basetool/env.d/alertmanager.env
 Exec=--config.file=/etc/alertmanager/alertmanager.yml --storage.path=/alertmanager --data.retention=744h
 HealthCmd=wget -q -O /dev/null http://localhost:9093/-/ready || exit 1
 HealthInterval=30s

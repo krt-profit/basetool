@@ -162,8 +162,8 @@ class RefineryOrderMapperTest {
   void toListDto_shouldProjectStaffelOwnerIntoOwningSquadron() {
     Squadron squadron = new Squadron();
     squadron.setId(UUID.randomUUID());
-    squadron.setName("IRIDIUM");
-    squadron.setShorthand("IRI");
+    squadron.setName("ALPHA");
+    squadron.setShorthand("ALP");
     RefineryOrder order = new RefineryOrder();
     order.setId(UUID.randomUUID());
     order.setOwningOrgUnit(squadron);
@@ -173,7 +173,7 @@ class RefineryOrderMapperTest {
     assertNotNull(dto);
     assertNotNull(dto.owningSquadron(), "Staffel owner must surface on the list row");
     assertEquals(squadron.getId(), dto.owningSquadron().id());
-    assertEquals("IRI", dto.owningSquadron().shorthand());
+    assertEquals("ALP", dto.owningSquadron().shorthand());
   }
 
   @Test

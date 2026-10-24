@@ -39,20 +39,20 @@ The task files themselves carry the measurements behind each step. This README c
 | `00-preflight.yml` | `preflight` | EL 10, cgroup v2, SELinux loaded — and **sets** enforcing, scheduling a relabel and saying a reboot is owed when it had to change the mode |
 | `10-packages.yml` | `packages` | podman, passt, netavark, aardvark-dns, crun, skopeo, restic, rclone, acl, rsync, firewalld, SELinux tooling; asserts the Podman floor; removes cockpit and refuses a host still listening on 9090 |
 | `15-cosign.yml` | `packages`, `cosign` | the upstream cosign binary, checked against the sha256 pinned in `defaults/main.yml` |
-| `20-user.yml` | `user` | the service user `iri`, its subuid/subgid range, lingering |
-| `22-deploy-user.yml` | `user`, `deploy` | the `deploy` account and the sudoers bridge to `iri` (the podman sub-commands in `basetool_host_deploy_podman_subcommands`, `systemctl --user *`, `systemctl restart alloy.service`) — and proves it works. The list is exactly what the `rt_*` seam and the four deploy-account scripts run; `scripts/check-deploy-podman-allowlist.py` (repo-lint) fails when a script starts using another sub-command or an entry goes unused. `podman run` and `exec` are on it, so `deploy` can still run any code **as `iri`**; it cannot become root |
-| `23-admin-access.yml` | `access` | the operator's admin account (`basetool_host_admin_user`) with exactly the inventory's keys, `wheel` + `adm` + `systemd-journal`, sudo **with its password** plus a password-free read grant (`basetool_host_admin_read_podman_subcommands` as `iri`, `sshd -T`, `fail2ban-client status`), the auditd watches on the SSH config and both `~/.ssh`; with `basetool_host_ssh_lock_root: true` also `00-basetool-access.conf` (`PermitRootLogin no`, `AllowUsers`), checked with `sshd -T` before the reload, root's keys emptied and `basetool_host_retired_admin_users` removed (REQ-OPS-052) |
-| `30-directories.yml` | `directories` | `/var/iri`, `/var/lib/iri`, `/etc/iri`, the setgid `env.d`, the backup staging tree, the unit delivery directory `/etc/containers/systemd/users/<uid>`, every data directory at its **translated** owner |
-| `25-scripts.yml` | `scripts` | `deploy.sh`, `backup.sh`, `restore-drill.sh`, `container-cleanup.sh`, `lib/container-runtime.sh`, `lib/common.sh`, `lib/restic-repo.sh`, `render-env-d.py`, `render-redis-acl.py`, `mint-internal-tls.sh` (root-owned, `0755`) and the Redis ACL rules template `redis-users.acl.tmpl` (`0644`); the four `iri-*` units and timers with their shared sandbox drop-in `10-deploy-account-sandbox.conf` (`basetool_host_deploy_account_units`) and the templated `20-service-user.conf`, which orders each after `user@<iri uid>.service` so its sandbox sees `iri`'s runtime, logrotate, the lock tmpfiles; timers **enabled, not started** |
+| `20-user.yml` | `user` | the service user `basetool`, its subuid/subgid range, lingering |
+| `22-deploy-user.yml` | `user`, `deploy` | the `deploy` account and the sudoers bridge to `basetool` (the podman sub-commands in `basetool_host_deploy_podman_subcommands`, `systemctl --user *`, `systemctl restart alloy.service`) — and proves it works. The list is exactly what the `rt_*` seam and the four deploy-account scripts run; `scripts/check-deploy-podman-allowlist.py` (repo-lint) fails when a script starts using another sub-command or an entry goes unused. `podman run` and `exec` are on it, so `deploy` can still run any code **as `basetool`**; it cannot become root |
+| `23-admin-access.yml` | `access` | the operator's admin account (`basetool_host_admin_user`) with exactly the inventory's keys, `wheel` + `adm` + `systemd-journal`, sudo **with its password** plus a password-free read grant (`basetool_host_admin_read_podman_subcommands` as `basetool`, `sshd -T`, `fail2ban-client status`), the auditd watches on the SSH config and both `~/.ssh`; with `basetool_host_ssh_lock_root: true` also `00-basetool-access.conf` (`PermitRootLogin no`, `AllowUsers`), checked with `sshd -T` before the reload, root's keys emptied and `basetool_host_retired_admin_users` removed (REQ-OPS-052) |
+| `30-directories.yml` | `directories` | the roots `/etc/basetool`, `/var/lib/basetool`, `/var/log/basetool` and `/var/cache/basetool`, the release tree `/opt/basetool`, `/var/lib/basetool/deploy`, `/etc/basetool/deploy`, the setgid `/etc/basetool/env.d`, the backup staging tree, the unit delivery directory `/etc/containers/systemd/users/<uid>`, every data directory at its **translated** owner |
+| `25-scripts.yml` | `scripts` | `deploy.sh`, `backup.sh`, `restore-drill.sh`, `container-cleanup.sh`, `lib/container-runtime.sh`, `lib/common.sh`, `lib/restic-repo.sh`, `render-env-d.py`, `render-redis-acl.py`, `mint-internal-tls.sh` (root-owned, `0755`) and the Redis ACL rules template `redis-users.acl.tmpl` (`0644`); the four `basetool-*` units and timers with their shared sandbox drop-in `10-deploy-account-sandbox.conf` (`basetool_host_deploy_account_units`) and the templated `20-service-user.conf`, which orders each after `user@<basetool uid>.service` so its sandbox sees `basetool`'s runtime, logrotate, the lock tmpfiles; timers **enabled, not started** |
 | `40-selinux.yml` | `selinux` | `container_file_t` on the data tree, `bin_t` on the scripts, `restorecon -RF` |
-| `27-observability.yml` | `observability`, `monitoring` | node_exporter, alloy (enabled, not started), prometheus-podman-exporter as a user unit of `iri`, persistent journald bounded to 31 days and 4G (REQ-OBS-010), log-source permissions for alloy, the cgroup and certificate-expiry collectors and their timers (started) |
-| `45-updates.yml` | `updates` | `dnf-automatic` for **security advisories only**, the container runtime excluded, never rebooting; its timer moved to 07:00 (started); an `ExecStopPost=` that records each run and `iri-host-updates-metrics.service`, which re-reads `needs-restarting -r` at boot (REQ-OPS-032) |
-| `50-podman.yml` | `podman` | `~iri/.config/containers/containers.conf` (the pasta `--map-guest-addr` pair, ADR-0196), the public-name alias drop-ins, the optional JVM truststore drop-in |
+| `27-observability.yml` | `observability`, `monitoring` | node_exporter, alloy (enabled, not started), prometheus-podman-exporter as a user unit of `basetool`, persistent journald bounded to 31 days and 4G (REQ-OBS-010), log-source permissions for alloy, the cgroup and certificate-expiry collectors and their timers (started) |
+| `45-updates.yml` | `updates` | `dnf-automatic` for **security advisories only**, the container runtime excluded, never rebooting; its timer moved to 07:00 (started); an `ExecStopPost=` that records each run and `basetool-host-updates-metrics.service`, which re-reads `needs-restarting -r` at boot (REQ-OPS-032) |
+| `50-podman.yml` | `podman` | `~basetool/.config/containers/containers.conf` (the pasta `--map-guest-addr` pair, ADR-0196), the public-name alias drop-ins, the optional JVM truststore drop-in |
 | `60-hardening.yml` | `hardening` | an OpenSCAP scan against `cis_server_l1` with the tailoring in `defaults/main.yml`; remediation only with `basetool_host_hardening_remediate: true` |
 | `65-firewall.yml` | `firewall` | firewalld default-deny (SSH, plus the front end's ports), `cockpit` and `dhcpv6-client` closed, forwarding off, loopback trusted; the kernel network sysctls in `/etc/sysctl.d/90-basetool-network.conf` (no redirects, `rp_filter`, martians logged), read back and asserted; fail2ban's `sshd` and `recidive` jails (REQ-OPS-053) |
 | `70-frontend.yml` | `frontend` | haproxy on 80/443 forwarding to the edge's loopback ports with PROXY protocol v2 (ADR-0187); **enabled, not started** |
 
-It deliberately does **not** write any secret: `.env`, the keystore, `realm-export.json`, the redis
+It deliberately does **not** write any secret: `basetool.env`, the keystore, `realm-export.json`, the redis
 `users.acl`, the GHCR pull token (it only warns if `deploy` cannot read it), `backup.env` and
 `rclone.conf`, and the monitoring secrets and certificates are operator-provided — see
 [`docs/deployment.md` → *Secrets and host-only files*](../docs/deployment.md#secrets-and-host-only-files).
@@ -101,8 +101,8 @@ production host 2026-09-18: first run `changed=25`, second `changed=0`.
 
 > [!warning] A `--tags` run on a fresh host leaves exactly the half the deployer needs
 > Audited on the production host 2026-09-20 after a `--tags scripts,selinux,observability` run: the
-> scripts, the labels and the timers were right, while `/var/lib/iri`, `/etc/iri` and
-> `/var/iri/code` still had the wrong owner and `env.d`, `/var/iri/backup`, the unit delivery
+> scripts, the labels and the timers were right, while `/var/lib/basetool/deploy`, `/etc/basetool/deploy` and
+> `/opt/basetool` still had the wrong owner and `/etc/basetool/env.d`, `/var/lib/basetool/backup`, the unit delivery
 > directory and the lock tmpfiles did not exist. Tags are for changing a provisioned host, not for
 > building one.
 
@@ -135,7 +135,7 @@ open instead of closing both.
    symbols. A password without one of the four classes fails at once with
    `BAD PASSWORD: … less than 4 character classes` and `Authentication token manipulation error`.
 3. **Prove it by hand.** From each workstation: `ssh greluc@<host>`, then `sudo -v` (asks the
-   password), `sudo -n -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) podman ps` (asks nothing),
+   password), `sudo -n -u basetool XDG_RUNTIME_DIR=/run/user/$(id -u basetool) podman ps` (asks nothing),
    `journalctl -u sshd -n 5` (no sudo). Keep this session open until step 5 is done.
 4. **Lock.** Set `ansible_user: greluc` and `basetool_host_ssh_lock_root: true` for the host, then
    `ansible-playbook site.yml --limit <host> --tags access -K --check --diff` and the same without
@@ -166,9 +166,9 @@ are not in this public repository.
 
 | Variable | Why it matters |
 |---|---|
-| `basetool_host_public_name_aliases` | **Required on every rootless host, production included** ([ADR-0196](../docs/adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md)). A container cannot reach the host through its own public address, so each public name a container dials — the frontend, ingest and grafana hosts — is aliased to `host-gateway`. `backend` is on the list for the OIDC issuer it resolves at startup, not for any vhost of its own. The first entry must match `IRI_KEYCLOAK_HOST_ALIAS` in the host `.env`. Empty removes the drop-ins, so a hand-written one does not survive the next run: put it here. |
+| `basetool_host_public_name_aliases` | **Required on every rootless host, production included** ([ADR-0196](../docs/adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md)). A container cannot reach the host through its own public address, so each public name a container dials — the frontend, ingest and grafana hosts — is aliased to `host-gateway`. `backend` is on the list for the OIDC issuer it resolves at startup, not for any vhost of its own. The first entry must match `BASETOOL_KEYCLOAK_HOST_ALIAS` in the host `basetool.env`. Empty removes the drop-ins, so a hand-written one does not survive the next run: put it here. |
 | `basetool_host_public_name_aliases_v6` | the same names on the IPv6 guest address, for `blackbox-exporter` only |
-| `basetool_host_edge_trusted_proxies` | the edge's five pinned addresses (default in `defaults/main.yml`); must equal the pins `scripts/generate-quadlet.py` writes into `edge.container` — the generator refuses a mismatch — and `EDGE_TRUSTED_PROXY` in `.env` must name the same five |
+| `basetool_host_edge_trusted_proxies` | the edge's five pinned addresses (default in `defaults/main.yml`); must equal the pins `scripts/generate-quadlet.py` writes into `edge.container` — the generator refuses a mismatch — and `EDGE_TRUSTED_PROXY` in `basetool.env` must name the same five |
 | `basetool_host_jvm_truststore_path` | only where the edge holds a privately signed certificate (testing); production sets nothing |
 | `basetool_host_admin_user`, `basetool_host_admin_authorized_keys` | **Required.** The operator's login and its public keys; the role installs exactly these keys and no others |
 | `basetool_host_ssh_lock_root` | `false` until the two-phase lockout above; then `true`, with `ansible_user` set to the admin account |
@@ -183,7 +183,7 @@ Under a user namespace the container's uid is not the host's. Measured with
 `podman unshare cat /proc/self/uid_map`:
 
 ```
-0       <uid of iri>  1      <- container root = the service user itself
+0       <uid of basetool>  1      <- container root = the service user itself
 1         100000  65536      <- container uid N = base + N - 1
 ```
 
@@ -222,7 +222,7 @@ quietly become a single bucket for the entire internet.
 python scripts/check-conformance.py --ssh greluc@<host> --sudo
 ```
 
-With **`--sudo`**: the container checks read the service user's store and `.env` is
+With **`--sudo`**: the container checks read the service user's store and `basetool.env` is
 `0640 deploy:deploy`, so without root the login account sees an empty host. The suite asks for the
 sudo password once, without echo, and hands it to `sudo -S` on each command's stdin; nothing is
 cached on the host, and no other session of the account gains root from it (ADR-0308

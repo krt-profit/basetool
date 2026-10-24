@@ -82,8 +82,8 @@ class OrgUnitDepartureNotifierTest {
     bereich.setName("Nord");
     squadron = new Squadron();
     squadron.setId(UUID.randomUUID());
-    squadron.setName("Iridium");
-    squadron.setShorthand("IRI");
+    squadron.setName("Alpha");
+    squadron.setShorthand("ALP");
     squadron.setParent(bereich);
   }
 
@@ -115,7 +115,7 @@ class OrgUnitDepartureNotifierTest {
         .isEqualTo(squadron.getId());
     assertThat(notice.renderParams())
         .containsEntry("member", "ada")
-        .containsEntry("unit", "IRI")
+        .containsEntry("unit", "ALP")
         .containsEntry("reasonCode", "disabled")
         .containsEntry("vacancyCode", "NO");
   }

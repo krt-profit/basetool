@@ -96,14 +96,14 @@ class AdminOrgStructurePageControllerMvcTest {
             new OrgUnitNodeDto(
                 olId, "Organisationsleitung KRT", "OL", "ORGANISATIONSLEITUNG", null, null, 0L),
             new OrgUnitNodeDto(bereichId, "Bereich Profit", "PRF", "BEREICH", olId, "PROFIT", 0L),
-            new OrgUnitNodeDto(staffelId, "Iridium", "IRI", "SQUADRON", bereichId, null, 0L));
+            new OrgUnitNodeDto(staffelId, "Alpha", "ALP", "SQUADRON", bereichId, null, 0L));
     when(backendApiClient.get(eq("/api/v1/org-units"), anyTypeRef())).thenReturn(nodes);
 
     mockMvc
         .perform(get("/admin/org-structure"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("Bereich Profit")))
-        .andExpect(content().string(containsString("Iridium")));
+        .andExpect(content().string(containsString("Alpha")));
   }
 
   @Test

@@ -33,7 +33,7 @@ Beyond roles there are three mechanisms that are easy to miss:
   removed both audiences.
 - **The session store is not a trust boundary** — a session value names its own class, so the
   frontend reads only classes on `SessionTypeAllowList` (REQ-SEC-067, ADR-0206). Shipped in
-  `report` mode, enforced in the E2E stack; production switches to `enforce` by one `.env` value,
+  `report` mode, enforced in the E2E stack; production switches to `enforce` by one `basetool.env` value,
   and has run `enforce` since 2026-09-25; `enforce` is also the code default. The types the
   frontend can put into a session are derived from its bytecode, and the list names exactly those
   application types, by class name — no application package is admitted by prefix (REQ-FE-027,
@@ -420,8 +420,8 @@ Type-safe `@ConfigurationProperties` with `@Validated` for anything that matters
 misconfiguration fails at start-up rather than at first use. In the backend they are immutable
 records with `@DefaultValue` (BE-MOD-04), registered by `@ConfigurationPropertiesScan`; a unit test
 binds one through `BoundProperties`, so an unset key keeps its production default. On the host, `env.d` files are
-*rendered* from `.env` by `render-env-d.py`; the compose environment blocks are closed allow-lists,
-so a variable not named there cannot be pulled in from `.env` by accident.
+*rendered* from `basetool.env` by `render-env-d.py`; the compose environment blocks are closed allow-lists,
+so a variable not named there cannot be pulled in from `basetool.env` by accident.
 
 ## 8.12 Testing
 

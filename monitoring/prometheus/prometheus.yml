@@ -124,7 +124,7 @@ scrape_configs:
       - targets:
           - https://profit-base.online
           - https://grafana.profit-base.online
-          - https://profit-base.online/auth/realms/iri/.well-known/openid-configuration
+          - https://profit-base.online/auth/realms/basetool/.well-known/openid-configuration
           - https://ingest.profit-base.online/exchange/v1/openapi.json
     relabel_configs:
       - source_labels: [__address__]
@@ -305,7 +305,7 @@ scrape_configs:
       - targets:
           - https://profit-base.online
           - https://grafana.profit-base.online
-          - https://profit-base.online/auth/realms/iri/.well-known/openid-configuration
+          - https://profit-base.online/auth/realms/basetool/.well-known/openid-configuration
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target

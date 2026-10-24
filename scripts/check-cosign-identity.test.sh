@@ -28,7 +28,7 @@ MAIN_FLAG="$(cat <<'EOF'
 EOF
 )"
 DEPLOY_DEFAULT="$(cat <<'EOF'
-COSIGN_IDENTITY_REGEXP="${IRI_COSIGN_IDENTITY_REGEXP:-^https://github\\.com/${COSIGN_REPO}/\\.github/workflows/release-images\\.yml@refs/(heads/main|tags/v[0-9]+\\.[0-9]+\\.[0-9]+)$}"
+COSIGN_IDENTITY_REGEXP="${BASETOOL_COSIGN_IDENTITY_REGEXP:-^https://github\\.com/${COSIGN_REPO}/\\.github/workflows/release-images\\.yml@refs/(heads/main|tags/v[0-9]+\\.[0-9]+\\.[0-9]+)$}"
 EOF
 )"
 
@@ -55,7 +55,7 @@ fixture() {
     {
       echo '#!/usr/bin/env bash'
       cat <<'EOF'
-COSIGN_REPO="${IRI_COSIGN_REPO:-krt-profit/basetool}"
+COSIGN_REPO="${BASETOOL_COSIGN_REPO:-krt-profit/basetool}"
 EOF
       printf '%s\n' "$3"
     } > "${root}/scripts/deploy.sh"

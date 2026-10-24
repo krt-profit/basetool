@@ -36,7 +36,7 @@ tests:
               job: node
             exp_annotations:
               summary: "Backup repository keeps more snapshots than its retention allows (109)"
-              description: "After the last successful backup the off-site restic repository held more snapshots than the GFS retention (IRI_KEEP_DAILY + IRI_KEEP_WEEKLY + IRI_KEEP_MONTHLY) can keep, so `restic forget` removed nothing it should have. The repository grows every night, and every run then reads more files from the store — a burst large enough to be blocked as a crawler by the store's edge. `{app=\"ops-backup\"} |~ \"retention|snapshots kept\"` in Grafana -> Explore -> Loki shows what forget kept; `backup.sh --dry-run` lists the snapshots and their paths. Not visible via `journalctl -u iri-backup.service` (stdout/stderr are appended to /var/log/iri-backup.log)."
+              description: "After the last successful backup the off-site restic repository held more snapshots than the GFS retention (BASETOOL_KEEP_DAILY + BASETOOL_KEEP_WEEKLY + BASETOOL_KEEP_MONTHLY) can keep, so `restic forget` removed nothing it should have. The repository grows every night, and every run then reads more files from the store — a burst large enough to be blocked as a crawler by the store's edge. `{app=\"ops-backup\"} |~ \"retention|snapshots kept\"` in Grafana -> Explore -> Loki shows what forget kept; `backup.sh --dry-run` lists the snapshots and their paths. Not visible via `journalctl -u basetool-backup.service` (stdout/stderr are appended to /var/log/basetool/backup.log)."
 
   - name: silent - a backup that never counted its snapshots
     interval: 1m

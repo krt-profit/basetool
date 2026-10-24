@@ -22,10 +22,23 @@ configuration bundle.
 
 | Runs as | What | Why at that level |
 | --- | --- | --- |
-| **system services** (system systemd) | `haproxy` on `:80`/`:443` (ADR-0187), `node-exporter`, `alloy`; the `iri-cert-expiry` and `iri-container-metrics` collectors as `root` | They need the public ports or host-level access — journal, `/var/log`, the cgroup tree, `/run/systemd/private` |
-| **`deploy`** (unprivileged) | `deploy.sh`, `backup.sh`, `restore-drill.sh`, `container-cleanup.sh` | Runs the automation; can read `.env` and the registry token, cannot administer the host |
-| **`iri`** (unprivileged, lingering enabled) | **Every container**, as rootless Podman Quadlet units under its *user* systemd instance, plus `prometheus-podman-exporter` as a user unit | A container escape lands on an account that owns nothing but the containers |
+| **system services** (system systemd) | `haproxy` on `:80`/`:443` (ADR-0187), `node-exporter`, `alloy`; the `basetool-cert-expiry` and `basetool-container-metrics` collectors as `root` | They need the public ports or host-level access — journal, `/var/log`, the cgroup tree, `/run/systemd/private` |
+| **`deploy`** (unprivileged) | `deploy.sh`, `backup.sh`, `restore-drill.sh`, `container-cleanup.sh` | Runs the automation; can read `basetool.env` and the registry token, cannot administer the host |
+| **`basetool`** (unprivileged, lingering enabled) | **Every container**, as rootless Podman Quadlet units under its *user* systemd instance, plus `prometheus-podman-exporter` as a user unit | A container escape lands on an account that owns nothing but the containers |
 | **`greluc`** (the operator's login) | Every SSH session and every Ansible run; root only through `sudo` with its password, reads without one | The only account sshd admits — `root` never logs in over SSH (`REQ-OPS-052`, ADR-0308) |
+
+**The host follows the RHEL/FHS layout.** The release the deployer rewrites lives in
+`/opt/basetool`, host configuration and secrets in `/etc/basetool` (the deploy account's tokens in
+`/etc/basetool/deploy`), data in `/var/lib/basetool` (the deploy account's state in
+`/var/lib/basetool/deploy`), logs in `/var/log/basetool` and the restic cache in
+`/var/cache/basetool`. Separating configuration from the release is what keeps the host `basetool.env`
+out of every config-tree swap ([`docs/deployment.md`](../deployment.md)). SELinux follows the same
+split (`ADR-0319`): everything a container bind-mounts is `container_file_t`, the scripts `bin_t`, the
+deploy account's credentials and state `etc_t` / `var_lib_t`, and the host-script logs stay `var_log_t`
+so logrotate can rotate them — do not "fix" `/var/log/basetool` to a single label. The move from the
+former single tree is the one-time migration in
+[`HOST_LAYOUT_MIGRATION_RUNBOOK.md`](../HOST_LAYOUT_MIGRATION_RUNBOOK.md); this section describes the host
+from that cutover on.
 
 **The uid translation is the fact that surprises everyone.** A rootless container's uid *N* appears
 on the host as `subuid_base + N − 1`. With a base of 100000 that makes nginx's 101 → `100100`,
@@ -63,14 +76,14 @@ Consequences worth stating:
   seconds longer (what systemd waits for podman). Until 2026-09-22 only the second was generated,
   and podman killed every container after its 10 s default — the JVMs mid-shutdown, Loki and Tempo
   mid-drain, PostgreSQL mid-checkpoint.
-- **The config tree is mounted read-only.** Every bind mount from `/var/iri/code` — what the deployer
+- **The config tree is mounted read-only.** Every bind mount from `/opt/basetool` — what the deployer
   rewrites on each release — carries `:ro`, and the generator refuses one that does not (`REQ-OPS-014`).
 - **The data networks have no egress.** `net-db-*` and `net-redis-*` are `Internal=true` in the
   units, so the two databases and Redis, which sit on nothing else, cannot reach the internet
   (ADR-0162, extended 2026-09-22). Compose keeps them non-internal for the local `-dev` twins, which
   publish their ports there. *Applied on production on 2026-09-25 (the networks recreated, a
   ~2.5-minute maintenance); the testing host still runs the old, non-internal networks.*
-- **Redis's ACL is rendered, not written.** `/var/iri/redis/users.acl` comes from
+- **Redis's ACL is rendered, not written.** `/var/lib/basetool/redis/users.acl` comes from
   `scripts/redis-users.acl.tmpl` through `render-redis-acl.py` (installed by the role), one user per
   service and SHA-256 hashes only, and is applied live with `ACL LOAD` (REQ-SEC-068, ADR-0207).
   The backend writes the `exchange:*` family (the client registry mirror) and ingest may only read
@@ -81,14 +94,14 @@ Consequences worth stating:
   The unit carries `--notify-keyspace-events Egx` and an unauthenticated `PING` health probe, so
   neither depends on which ACL users exist.
 - **Each service mounts its own keystore and an internal truststore** — `/run/secrets/keystore.p12`
-  from `IRI_<SERVICE>_KEYSTORE_HOST_PATH`, `/run/secrets/internal-truststore.p12` from
-  `IRI_INTERNAL_TRUSTSTORE_HOST_PATH` (REQ-SEC-070, ADR-0211). The generator bakes all five to
-  `/var/iri/secrets/tls/`, which the owner minted with `mint-internal-tls.sh` (installed by the
+  from `BASETOOL_<SERVICE>_KEYSTORE_HOST_PATH`, `/run/secrets/internal-truststore.p12` from
+  `BASETOOL_INTERNAL_TRUSTSTORE_HOST_PATH` (REQ-SEC-070, ADR-0211). The generator bakes all five to
+  `/etc/basetool/secrets/tls/`, which the owner minted with `mint-internal-tls.sh` (installed by the
   role, run through the backend image) in step 2 of the rollout; the release before that baked them
-  to the shared `/var/iri/secrets/keystore.p12`. `deploy.sh` refuses a release whose units mount any
+  to the shared `/etc/basetool/secrets/keystore.p12`. `deploy.sh` refuses a release whose units mount any
   PKCS#12 the host lacks. The shared keystore stays on the host as the rollback of that release;
   no unit of it mounts the file — the REQ-OPS-022 JVM-truststore mount moved to the CA-only
-  `/var/iri/secrets/tls/truststore.p12` as well *(corrected 2026-09-25: this said that mount still
+  `/etc/basetool/secrets/tls/truststore.p12` as well *(corrected 2026-09-25: this said that mount still
   defaults to the shared keystore; the units #2036 generated say otherwise)*. Production minted the material on 2026-09-25 (rollout step 2); the
   flip (#2036) reached it with v1.12.0 the same day (step 3), and step 4 left the CA as the only
   anchor.
@@ -142,7 +155,7 @@ runtime-specific fact stays in the one file that is generated per runtime. The s
 role-written drop-in, points the host's **own public names** at `host-gateway` for the containers
 that dial them, because a rootless container cannot hairpin to the host's public address
 (ADR-0196, §11.5a). Such a hairpin reaches the edge with the host's own public address as its
-source. The frontend and the backend need it only while `IRI_KEYCLOAK_BACKCHANNEL_URI` is empty:
+source. The frontend and the backend need it only while `BASETOOL_KEYCLOAK_BACKCHANNEL_URI` is empty:
 set, their Keycloak calls stay on `net-backend-keycloak` (ADR-0318). The ingest gateway, Grafana
 and the blackbox exporter keep dialling the public names.
 
@@ -172,17 +185,17 @@ distribution's own `dnf-automatic.timer` with a role drop-in; none rides the con
 
 | Timer | Schedule | Runs as | Does |
 | --- | --- | --- | --- |
-| `iri-deploy` | every 5 min on the clock (:00, :05 …) | `deploy` | Pull, Cosign-verify, reconcile (§6.6) |
-| `iri-backup` | daily 04:15 | `deploy` | The restic backup to Nextcloud (§6.7) |
-| `iri-restore-drill` | Sunday 05:30 | `deploy` | Restore the latest snapshot into a throwaway Postgres and score seven artifacts |
-| `iri-cert-expiry` | daily 03:40, and at boot | `root` | Write `basetool_certificate_expiry_timestamp_seconds` for the certificate *files* |
-| `iri-container-metrics` | every 30 s | `root` | The cgroup textfile collector that replaces part of cAdvisor |
-| `iri-container-cleanup` | Saturday 02:00 UTC | `deploy` | Weekly prune of stopped containers, unused images and networks — never volumes (§7.4a) |
+| `basetool-deploy` | every 5 min on the clock (:00, :05 …) | `deploy` | Pull, Cosign-verify, reconcile (§6.6) |
+| `basetool-backup` | daily 04:15 | `deploy` | The restic backup to Nextcloud (§6.7) |
+| `basetool-restore-drill` | Sunday 05:30 | `deploy` | Restore the latest snapshot into a throwaway Postgres and score seven artifacts |
+| `basetool-cert-expiry` | daily 03:40, and at boot | `root` | Write `basetool_certificate_expiry_timestamp_seconds` for the certificate *files* |
+| `basetool-container-metrics` | every 30 s | `root` | The cgroup textfile collector that replaces part of cAdvisor |
+| `basetool-container-cleanup` | Saturday 02:00 UTC | `deploy` | Weekly prune of stopped containers, unused images and networks — never volumes (§7.4a) |
 | `dnf-automatic` | daily 07:00 (+ up to 15 min) | `root` | Security advisories only, container runtime excluded, never reboots; each run records itself for `HostSecurityUpdates*` / `HostRebootRequired` (`REQ-OPS-032`) |
 
 ### 7.4a The weekly cleanup never prunes volumes
 
-`iri-container-cleanup` (ADR-0194) runs `container-cleanup.sh` through `lib/container-runtime.sh`
+`basetool-container-cleanup` (ADR-0194) runs `container-cleanup.sh` through `lib/container-runtime.sh`
 as the rootless service user, and what it does **not** prune is the part worth knowing:
 
 | what | weekly cleanup |
@@ -203,13 +216,13 @@ as the rootless service user, and what it does **not** prune is the part worth k
 > measured — was fixed at its source instead: `rt_rm_force` removes a container together with its
 > anonymous volume.
 
-History — the job's Docker form (`iri-docker-cleanup`, five steps, volume pruning included) and why
+History — the job's Docker form (five steps, volume pruning included) and why
 two steps did not survive the move: ADR-0194, `docs/archive/PODMAN_MIGRATION_PLAN.md` and git.
 
 ### 7.4b What the timers wait for after a boot, and what they deliberately do not
 
-The four units that reach the containers -- `iri-deploy`, `iri-backup`, `iri-restore-drill`,
-`iri-container-cleanup` -- run as the deploy account, in a sandbox (the drop-in
+The four units that reach the containers -- `basetool-deploy`, `basetool-backup`, `basetool-restore-drill`,
+`basetool-container-cleanup` -- run as the deploy account, in a sandbox (the drop-in
 `10-deploy-account-sandbox.conf` the role installs beside each, OPS-SIMP-03), and reach the stack
 through the rootless service user. They used to be ordered on `docker.service`, which on this host
 does not exist: inert, and read as if it ordered them on their runtime, so nothing noticed that
@@ -224,7 +237,7 @@ could not have been a catch-up — nothing was due, and no timer's `LastTrigger`
 did not engage. Both causes were reproduced on 2026-09-25 in a systemd container on the production
 versions (Rocky 10.2, systemd 257, podman 5.8.2):
 
-- **Why the jobs ran at boot.** Every `iri-*.timer` carried `Requires=<its service>`. A timer
+- **Why the jobs ran at boot.** Every `basetool-*.timer` carried `Requires=<its service>`. A timer
   started by `timers.target` then starts that service at once, without elapsing — the service ran
   3 ms after its timer while `OnBootSec=5min` and `LastTrigger` stood still. It also turned
   `systemctl start <timer>` into "run the job now". The six timers now carry only `Unit=`.
@@ -267,7 +280,7 @@ quiesce stop the backend while it was starting.
 > `rt_detect` runs no podman until the runtime is visible (and, with the ordering, read-only, so
 > podman can only join). Not observed on production.
 
-**`iri-deploy` does not wait for startup, on purpose.** A stack stuck in `starting` because a unit
+**`basetool-deploy` does not wait for startup, on purpose.** A stack stuck in `starting` because a unit
 will not come up may be exactly what the next release exists to fix, and a deployer that refused to
 act until startup finished could never deliver it. It does wait, bounded, for the first container
 to exist — without one there is nothing it could reach. Since the timer lost its `Requires=`, its
@@ -290,7 +303,7 @@ the three calls, the one absence, the timers and the ordering drop-in.
                  ▼
             Cosign signatures + SLSA provenance + SBOM attestations
                                           │
-                        iri-deploy.timer ─┴─► verify → pull → render env.d → reconcile units
+                        basetool-deploy.timer ─┴─► verify → pull → render env.d → reconcile units
 ```
 
 Only `main` and a `vMAJOR.MINOR.PATCH` tag on a commit already on `main` may sign (the `ref-guard`
@@ -329,7 +342,7 @@ config bundle's revision for that reason. A `main`-push run whose commit is no l
 it starts skips entirely — except a release commit's — and the next run reuses from the newest
 ancestor that has images (ADR-0137/ADR-0210 amendments, 2026-09-23).
 
-`deploy.sh` and the host's own `iri-*` units are **not** part of the config bundle: a bundle cannot
+`deploy.sh` and the host's own `basetool-*` units are **not** part of the config bundle: a bundle cannot
 rewrite the thing that applies bundles, so they arrive with the Ansible role. The Quadlet units do
 ride the bundle. What the bundle *does* carry about those scripts is their hashes
 (`host-scripts.sha256`, generated from the commit): every tick compares the host's copies with the
@@ -342,11 +355,11 @@ sandbox Dockerfile — and `repo-lint.yml` (`keycloak-version`) fails when they 
 Keycloak lines (REQ-OPS-040). Requirements:
 [`deployment-delivery.md`](../specs/deployment-delivery.md).
 
-**A value that must roll back with the release lives in the image, not in `.env`.** `env.d` is
-rendered from the host `.env`, which no rollback touches, so a value the API depends on would
+**A value that must roll back with the release lives in the image, not in `basetool.env`.** `env.d` is
+rendered from the host `basetool.env`, which no rollback touches, so a value the API depends on would
 survive a rollback of the API it was set for; such a value is a reviewed literal in the module's
 `application.yml` (the reasoning REQ-API-020 recorded). A variable the templates stop passing
-simply stops reaching the container; its stale `.env` line stays for the older releases a rollback
+simply stops reaching the container; its stale `basetool.env` line stays for the older releases a rollback
 may still render.
 
 **The Keycloak realm is the one piece of the deployment no artifact carries.** It lives in
@@ -361,7 +374,7 @@ where they remain (ADR-0202, amended 2026-10-17) — and
 (`REQ-OPS-033`, ADR-0202).
 
 **The testing host deliberately differs in one client and one setting.** Its realm carries the
-seed client `basetool-seed` (`--seed-client`) and its `.env` lets the backend accept that client, so
+seed client `basetool-seed` (`--seed-client`) and its `basetool.env` lets the backend accept that client, so
 `scripts/seed-briefing.py` can fill it with briefing data through the API; `scripts/testing-reset.sh`,
 copied to the host for the run and installed by no role, empties its Basetool database again
 (`REQ-OPS-050`, ADR-0279). Production has neither.
@@ -369,7 +382,7 @@ copied to the host for the run and installed by no role, empties its Basetool da
 ## 7.6 Backups leave the host
 
 `restic` through an `rclone` WebDAV remote to **Nextcloud**, on a GFS retention policy, with the
-repository password and the WebDAV app-password in `/etc/iri/backup.env` — readable by `deploy`
+repository password and the WebDAV app-password in `/etc/basetool/deploy/backup.env` — readable by `deploy`
 only. Deliberately a different provider account from the host, so that losing one does not lose
 both. Procedure: [`docs/backup.md`](../backup.md).
 

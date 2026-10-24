@@ -92,14 +92,14 @@ class OrgUnitSeatNotifierTest {
     when(membershipRepository.existsLeadershipSeat(USER)).thenReturn(true);
     roles(false, false);
 
-    notifier.seatChanged(USER, "IRI", MembershipRole.STAFFELLEITER, true, null);
+    notifier.seatChanged(USER, "ALP", MembershipRole.STAFFELLEITER, true, null);
 
     NoticeEvent notice = published();
     assertThat(notice.eventType()).isEqualTo(NotificationEventType.ORG_LEADERSHIP_ROLE_MISMATCH);
     assertThat(notice.entityId()).isEqualTo(USER);
     assertThat(notice.renderParams())
         .containsEntry("member", "ada")
-        .containsEntry("unit", "IRI")
+        .containsEntry("unit", "ALP")
         .containsEntry("seatCode", "APPOINTED")
         .containsEntry("rankCode", "STAFFELLEITER")
         .containsEntry("mismatchCode", "MISSING_OFFICER");
@@ -110,7 +110,7 @@ class OrgUnitSeatNotifierTest {
     when(membershipRepository.existsLeadershipSeat(USER)).thenReturn(false);
     roles(true, false);
 
-    notifier.seatChanged(USER, "IRI", MembershipRole.STAFFELLEITER, false, null);
+    notifier.seatChanged(USER, "ALP", MembershipRole.STAFFELLEITER, false, null);
 
     NoticeEvent notice = published();
     assertThat(notice.renderParams())
@@ -123,7 +123,7 @@ class OrgUnitSeatNotifierTest {
     when(membershipRepository.existsLeadershipSeat(USER)).thenReturn(true);
     roles(true, false);
 
-    notifier.seatChanged(USER, "IRI", MembershipRole.ENSIGN, true, null);
+    notifier.seatChanged(USER, "ALP", MembershipRole.ENSIGN, true, null);
 
     assertThat(published().eventType())
         .isEqualTo(NotificationEventType.ORG_LEADERSHIP_ROLE_MISMATCH_CLEARED);
@@ -134,7 +134,7 @@ class OrgUnitSeatNotifierTest {
     when(membershipRepository.existsLeadershipSeat(USER)).thenReturn(true);
     roles(false, true);
 
-    notifier.seatChanged(USER, "IRI", MembershipRole.OL_MEMBER, true, null);
+    notifier.seatChanged(USER, "ALP", MembershipRole.OL_MEMBER, true, null);
 
     assertThat(published().eventType())
         .isEqualTo(NotificationEventType.ORG_LEADERSHIP_ROLE_MISMATCH_CLEARED);
@@ -145,7 +145,7 @@ class OrgUnitSeatNotifierTest {
     when(membershipRepository.existsLeadershipSeat(USER)).thenReturn(false);
     roles(false, false);
 
-    notifier.seatChanged(USER, "IRI", MembershipRole.ENSIGN, false, null);
+    notifier.seatChanged(USER, "ALP", MembershipRole.ENSIGN, false, null);
 
     assertThat(published().eventType())
         .isEqualTo(NotificationEventType.ORG_LEADERSHIP_ROLE_MISMATCH_CLEARED);

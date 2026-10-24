@@ -49,7 +49,7 @@ x-db-backend: &db-backend-template
         cpus: '4.0'
         pids: 512
   volumes:
-    - /var/iri/db-backend:/var/lib/postgresql/data
+    - /var/lib/basetool/db-backend:/var/lib/postgresql/data
 
 x-db-keycloak: &db-keycloak-template
   image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
@@ -92,7 +92,7 @@ x-db-keycloak: &db-keycloak-template
         cpus: '1.0'
         pids: 512
   volumes:
-    - /var/iri/db-keycloak:/var/lib/postgresql/data
+    - /var/lib/basetool/db-keycloak:/var/lib/postgresql/data
 
 x-keycloak: &keycloak-template
   image: quay.io/keycloak/keycloak:26.8@sha256:79c623a22abacf3fe6c00a5fb30f5b7843d717b234033b80995891c06116d244
@@ -110,7 +110,7 @@ x-keycloak: &keycloak-template
         cpus: '3.0'
         pids: 2048
   environment:
-    KC_HOSTNAME: ${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}
+    KC_HOSTNAME: ${BASETOOL_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}
     KC_HOSTNAME_STRICT: "true"
     KC_HTTP_RELATIVE_PATH: /auth
     KC_HTTP_MANAGEMENT_RELATIVE_PATH: /
@@ -153,14 +153,14 @@ x-keycloak: &keycloak-template
   volumes:
     - ./keycloak-theme/krt-theme:/opt/keycloak/themes/krt-theme
     - ./realm-export.json:/opt/keycloak/data/import/realm-export.json
-    - /var/iri/code/keycloak/providers:/opt/keycloak/providers
-    - /var/iri/keycloak/log:/var/log/keycloak
+    - /opt/basetool/keycloak/providers:/opt/keycloak/providers
+    - /var/log/basetool/keycloak:/var/log/keycloak
 
 x-backend: &backend-template
-  image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-backend:${IRI_BASETOOL_VERSION:-stable}
+  image: ghcr.io/${BASETOOL_IMAGE_NAMESPACE:-krt-profit}/basetool-backend:${BASETOOL_VERSION:-stable}
   restart: always
   extra_hosts:
-    - "${IRI_KEYCLOAK_HOST_ALIAS:-localhost:127.0.0.1}"
+    - "${BASETOOL_KEYCLOAK_HOST_ALIAS:-localhost:127.0.0.1}"
   init: true
   logging: *default-logging
   security_opt:
@@ -183,19 +183,19 @@ x-backend: &backend-template
     SPRING_DATASOURCE_URL: jdbc:postgresql://db-backend:15432/${POSTGRES_DB:?POSTGRES_DB must be set in .env}
     SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:?POSTGRES_USER must be set in .env}
     SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
-    KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri}
-    APP_SECURITY_JWT_EXPECTED_AUDIENCES: ${IRI_BACKEND_EXPECTED_AUDIENCES:-}
-    APP_SECURITY_INGEST_GATEWAY_CLIENT_IDS: ${IRI_INGEST_GATEWAY_CLIENT_IDS:-}
+    KEYCLOAK_ISSUER_URI: ${BASETOOL_KEYCLOAK_ISSUER_URI:-${BASETOOL_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/basetool}
+    APP_SECURITY_JWT_EXPECTED_AUDIENCES: ${BASETOOL_BACKEND_EXPECTED_AUDIENCES:-}
+    APP_SECURITY_INGEST_GATEWAY_CLIENT_IDS: ${BASETOOL_INGEST_GATEWAY_CLIENT_IDS:-}
     APP_SECURITY_PARTIAL_ROLE_SCOPE_CLIENT_IDS: ${APP_SECURITY_PARTIAL_ROLE_SCOPE_CLIENT_IDS:-}
-    APP_SECURITY_JWT_ACCEPTED_CLIENT_IDS: ${IRI_BACKEND_ACCEPTED_CLIENT_IDS:-basetool-frontend,basetool-ingest-gateway}
+    APP_SECURITY_JWT_ACCEPTED_CLIENT_IDS: ${BASETOOL_BACKEND_ACCEPTED_CLIENT_IDS:-basetool-frontend,basetool-ingest-gateway}
     APP_INVENTORY_STOLEN_MARKING_ENABLED: ${APP_INVENTORY_STOLEN_MARKING_ENABLED:-true}
-    APP_SECURITY_AUTHORITIES_CACHE_TTL: ${IRI_AUTHORITIES_CACHE_TTL:-PT5M}
+    APP_SECURITY_AUTHORITIES_CACHE_TTL: ${BASETOOL_AUTHORITIES_CACHE_TTL:-PT5M}
     APP_RATE_LIMIT_SUBJECT_EXPORT_CAPACITY: ${APP_RATE_LIMIT_SUBJECT_EXPORT_CAPACITY:-10}
     APP_RATE_LIMIT_SUBJECT_EXPORT_REFILL_PERIOD: ${APP_RATE_LIMIT_SUBJECT_EXPORT_REFILL_PERIOD:-1m}
     KEYCLOAK_ADMIN_URL: https://keycloak:18443/auth
     KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:?KEYCLOAK_ADMIN_CLIENT_SECRET must be set in .env}
-    KEYCLOAK_JWK_SET_URI: ${IRI_BACKEND_KEYCLOAK_JWK_SET_URI:-}
-    KEYCLOAK_BACKCHANNEL_URI: ${IRI_KEYCLOAK_BACKCHANNEL_URI:-}
+    KEYCLOAK_JWK_SET_URI: ${BASETOOL_BACKEND_KEYCLOAK_JWK_SET_URI:-}
+    KEYCLOAK_BACKCHANNEL_URI: ${BASETOOL_KEYCLOAK_BACKCHANNEL_URI:-}
     APP_KEYCLOAK_SYNC_CRON: ${APP_KEYCLOAK_SYNC_CRON:-0 0 5 * * *}
     APP_KEYCLOAK_SYNC_ZONE: ${APP_KEYCLOAK_SYNC_ZONE:-Europe/Berlin}
     KRT_DISCORD_SPI_SHARED_SECRET: ${KRT_DISCORD_SPI_SHARED_SECRET:-}
@@ -236,12 +236,12 @@ x-backend: &backend-template
     SERVER_SSL_KEY_STORE_PASSWORD: ${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}
     INTERNAL_TLS_TRUSTSTORE: ${INTERNAL_TLS_TRUSTSTORE:-file:/run/secrets/internal-truststore.p12}
     INTERNAL_TLS_TRUSTSTORE_PASSWORD: ${INTERNAL_TLS_TRUSTSTORE_PASSWORD:-${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}}
-    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:+UseG1GC -XX:+UseCompactObjectHeaders -XX:MaxRAMPercentage=57.0 -XX:InitialRAMPercentage=35.0 ${IRI_EXTRA_JAVA_OPTS:-}
+    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:+UseG1GC -XX:+UseCompactObjectHeaders -XX:MaxRAMPercentage=57.0 -XX:InitialRAMPercentage=35.0 ${BASETOOL_EXTRA_JAVA_OPTS:-}
   volumes:
-    - /var/iri/backend/log:/app/logs
-    - ${IRI_BACKEND_KEYSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/keystore.p12:ro
-    - ${IRI_TRUSTSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/truststore.p12:ro
-    - ${IRI_INTERNAL_TRUSTSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/internal-truststore.p12:ro
+    - /var/log/basetool/backend:/app/logs
+    - ${BASETOOL_BACKEND_KEYSTORE_HOST_PATH:-${BASETOOL_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/keystore.p12:ro
+    - ${BASETOOL_TRUSTSTORE_HOST_PATH:-${BASETOOL_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/truststore.p12:ro
+    - ${BASETOOL_INTERNAL_TRUSTSTORE_HOST_PATH:-${BASETOOL_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/internal-truststore.p12:ro
 
 x-redis: &redis-template
   image: redis:8-alpine@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0
@@ -270,13 +270,13 @@ x-redis: &redis-template
     timeout: 5s
     retries: 5
   volumes:
-    - /var/iri/redis:/data
+    - /var/lib/basetool/redis:/data
 
 x-frontend: &frontend-template
-  image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-frontend:${IRI_BASETOOL_VERSION:-stable}
+  image: ghcr.io/${BASETOOL_IMAGE_NAMESPACE:-krt-profit}/basetool-frontend:${BASETOOL_VERSION:-stable}
   restart: always
   extra_hosts:
-    - "${IRI_KEYCLOAK_HOST_ALIAS:-localhost:127.0.0.1}"
+    - "${BASETOOL_KEYCLOAK_HOST_ALIAS:-localhost:127.0.0.1}"
   init: true
   logging: *default-logging
   security_opt:
@@ -297,9 +297,9 @@ x-frontend: &frontend-template
     SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
     SERVER_PORT: 18081
     APP_LOGGING_SLOW_REQUEST_THRESHOLD_MS: ${APP_LOGGING_SLOW_REQUEST_THRESHOLD_MS:-2000}
-    KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri}
+    KEYCLOAK_ISSUER_URI: ${BASETOOL_KEYCLOAK_ISSUER_URI:-${BASETOOL_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/basetool}
     KEYCLOAK_FRONTEND_CLIENT_SECRET: ${KEYCLOAK_FRONTEND_CLIENT_SECRET:-}
-    KEYCLOAK_BACKCHANNEL_URI: ${IRI_KEYCLOAK_BACKCHANNEL_URI:-}
+    KEYCLOAK_BACKCHANNEL_URI: ${BASETOOL_KEYCLOAK_BACKCHANNEL_URI:-}
     BACKEND_URL: https://backend:11261
     APP_HTTP_BACKEND_PROTOCOL: ${APP_HTTP_BACKEND_PROTOCOL:-H2}
     APP_HTTP_MAX_CONCURRENT_STREAMS: ${APP_HTTP_MAX_CONCURRENT_STREAMS:-20}
@@ -320,18 +320,18 @@ x-frontend: &frontend-template
     INTERNAL_TLS_TRUSTSTORE: ${INTERNAL_TLS_TRUSTSTORE:-file:/run/secrets/internal-truststore.p12}
     INTERNAL_TLS_TRUSTSTORE_PASSWORD: ${INTERNAL_TLS_TRUSTSTORE_PASSWORD:-${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}}
     INTERNAL_TLS_VERIFY_HOSTNAME: ${INTERNAL_TLS_VERIFY_HOSTNAME:-true}
-    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:+UseG1GC -XX:+UseCompactObjectHeaders -XX:MaxRAMPercentage=50.0 -XX:InitialRAMPercentage=35.0 ${IRI_EXTRA_JAVA_OPTS:-}
+    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:+UseG1GC -XX:+UseCompactObjectHeaders -XX:MaxRAMPercentage=50.0 -XX:InitialRAMPercentage=35.0 ${BASETOOL_EXTRA_JAVA_OPTS:-}
   volumes:
-    - /var/iri/frontend/log:/app/logs
-    - ${IRI_FRONTEND_KEYSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/keystore.p12:ro
-    - ${IRI_TRUSTSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/truststore.p12:ro
-    - ${IRI_INTERNAL_TRUSTSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/internal-truststore.p12:ro
+    - /var/log/basetool/frontend:/app/logs
+    - ${BASETOOL_FRONTEND_KEYSTORE_HOST_PATH:-${BASETOOL_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/keystore.p12:ro
+    - ${BASETOOL_TRUSTSTORE_HOST_PATH:-${BASETOOL_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/truststore.p12:ro
+    - ${BASETOOL_INTERNAL_TRUSTSTORE_HOST_PATH:-${BASETOOL_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/internal-truststore.p12:ro
 
 x-ingest: &ingest-template
-  image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-ingest:${IRI_BASETOOL_VERSION:-stable}
+  image: ghcr.io/${BASETOOL_IMAGE_NAMESPACE:-krt-profit}/basetool-ingest:${BASETOOL_VERSION:-stable}
   restart: always
   extra_hosts:
-    - "${IRI_KEYCLOAK_HOST_ALIAS:-localhost:127.0.0.1}"
+    - "${BASETOOL_KEYCLOAK_HOST_ALIAS:-localhost:127.0.0.1}"
   init: true
   logging: *default-logging
   security_opt:
@@ -348,23 +348,23 @@ x-ingest: &ingest-template
     SPRING_PROFILES_ACTIVE: prod
     SERVER_PORT: 11262
     APP_LOGGING_SLOW_REQUEST_THRESHOLD_MS: ${APP_LOGGING_SLOW_REQUEST_THRESHOLD_MS:-2000}
-    KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri}
+    KEYCLOAK_ISSUER_URI: ${BASETOOL_KEYCLOAK_ISSUER_URI:-${BASETOOL_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/basetool}
     BACKEND_URL: https://backend:11261
-    FRONTEND_URL: ${IRI_FRONTEND_PUBLIC_URL:-https://profit-base.online}
-    APP_INGEST_HANDOFF_TTL: ${IRI_INGEST_HANDOFF_TTL:-PT30M}
-    APP_RATE_LIMIT_IP_CAPACITY: ${IRI_INGEST_RATE_LIMIT_IP_CAPACITY:-120}
-    APP_RATE_LIMIT_IP_REFILL_TOKENS: ${IRI_INGEST_RATE_LIMIT_IP_REFILL_TOKENS:-120}
+    FRONTEND_URL: ${BASETOOL_FRONTEND_PUBLIC_URL:-https://profit-base.online}
+    APP_INGEST_HANDOFF_TTL: ${BASETOOL_INGEST_HANDOFF_TTL:-PT30M}
+    APP_RATE_LIMIT_IP_CAPACITY: ${BASETOOL_INGEST_RATE_LIMIT_IP_CAPACITY:-120}
+    APP_RATE_LIMIT_IP_REFILL_TOKENS: ${BASETOOL_INGEST_RATE_LIMIT_IP_REFILL_TOKENS:-120}
     REDIS_HOST: redis
     REDIS_PORT: 6379
     REDIS_USERNAME: ${REDIS_INGEST_USERNAME:-}
     REDIS_PASSWORD: ${REDIS_INGEST_PASSWORD:-${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}}
-    APP_SECURITY_JWT_EXPECTED_AUDIENCES: ${IRI_INGEST_EXPECTED_AUDIENCES:-}
-    APP_INGEST_PUBLIC_BASE_URL: ${IRI_INGEST_PUBLIC_BASE_URL:-}
-    APP_EXCHANGE_CORS_EXTENSIONORIGINS: ${IRI_EXCHANGE_CORS_EXTENSION_ORIGINS:-}
-    APP_EXCHANGE_CORS_FIREFOXCLIENTS: ${IRI_EXCHANGE_CORS_FIREFOX_CLIENTS:-}
-    APP_INGEST_SERVICE_ACCOUNT_TOKEN_URI: ${IRI_INGEST_SERVICE_ACCOUNT_TOKEN_URI:-}
-    APP_INGEST_SERVICE_ACCOUNT_CLIENT_ID: ${IRI_INGEST_SERVICE_ACCOUNT_CLIENT_ID:-}
-    APP_INGEST_SERVICE_ACCOUNT_CLIENT_SECRET: ${IRI_INGEST_SERVICE_ACCOUNT_CLIENT_SECRET:-}
+    APP_SECURITY_JWT_EXPECTED_AUDIENCES: ${BASETOOL_INGEST_EXPECTED_AUDIENCES:-}
+    APP_INGEST_PUBLIC_BASE_URL: ${BASETOOL_INGEST_PUBLIC_BASE_URL:-}
+    APP_EXCHANGE_CORS_EXTENSIONORIGINS: ${BASETOOL_EXCHANGE_CORS_EXTENSION_ORIGINS:-}
+    APP_EXCHANGE_CORS_FIREFOXCLIENTS: ${BASETOOL_EXCHANGE_CORS_FIREFOX_CLIENTS:-}
+    APP_INGEST_SERVICE_ACCOUNT_TOKEN_URI: ${BASETOOL_INGEST_SERVICE_ACCOUNT_TOKEN_URI:-}
+    APP_INGEST_SERVICE_ACCOUNT_CLIENT_ID: ${BASETOOL_INGEST_SERVICE_ACCOUNT_CLIENT_ID:-}
+    APP_INGEST_SERVICE_ACCOUNT_CLIENT_SECRET: ${BASETOOL_INGEST_SERVICE_ACCOUNT_CLIENT_SECRET:-}
     MONITORING_SCRAPE_USER: ${MONITORING_SCRAPE_USER:-}
     MONITORING_SCRAPE_PASSWORD: ${MONITORING_SCRAPE_PASSWORD:-}
     MONITORING_TRACING_ENABLED: ${MONITORING_TRACING_ENABLED:-false}
@@ -375,12 +375,12 @@ x-ingest: &ingest-template
     INTERNAL_TLS_TRUSTSTORE: ${INTERNAL_TLS_TRUSTSTORE:-file:/run/secrets/internal-truststore.p12}
     INTERNAL_TLS_TRUSTSTORE_PASSWORD: ${INTERNAL_TLS_TRUSTSTORE_PASSWORD:-${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}}
     INTERNAL_TLS_VERIFY_HOSTNAME: ${INTERNAL_TLS_VERIFY_HOSTNAME:-true}
-    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:+UseSerialGC -XX:+UseCompactObjectHeaders -XX:MaxRAMPercentage=60.0 -XX:InitialRAMPercentage=50.0 ${IRI_EXTRA_JAVA_OPTS:-}
+    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:+UseSerialGC -XX:+UseCompactObjectHeaders -XX:MaxRAMPercentage=60.0 -XX:InitialRAMPercentage=50.0 ${BASETOOL_EXTRA_JAVA_OPTS:-}
   volumes:
-    - ${IRI_INGEST_KEYSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/keystore.p12:ro
-    - ${IRI_TRUSTSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/truststore.p12:ro
-    - ${IRI_INTERNAL_TRUSTSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/internal-truststore.p12:ro
-    - /var/iri/ingest/log:/app/logs
+    - ${BASETOOL_INGEST_KEYSTORE_HOST_PATH:-${BASETOOL_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/keystore.p12:ro
+    - ${BASETOOL_TRUSTSTORE_HOST_PATH:-${BASETOOL_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/truststore.p12:ro
+    - ${BASETOOL_INTERNAL_TRUSTSTORE_HOST_PATH:-${BASETOOL_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/internal-truststore.p12:ro
+    - /var/log/basetool/ingest:/app/logs
 
 services:
   redis:
@@ -389,8 +389,8 @@ services:
     container_name: redis
     command: redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 768mb --maxmemory-policy noeviction --notify-keyspace-events Egx --loglevel notice --aclfile /etc/redis/users.acl
     volumes:
-      - /var/iri/redis:/data
-      - ${IRI_REDIS_ACL_HOST_PATH:-/var/iri/redis/users.acl}:/etc/redis/users.acl:ro
+      - /var/lib/basetool/redis:/data
+      - ${BASETOOL_REDIS_ACL_HOST_PATH:-/var/lib/basetool/redis/users.acl}:/etc/redis/users.acl:ro
     networks:
       - net-redis-frontend
       - net-redis-ingest
@@ -468,9 +468,9 @@ services:
       --log-file=/var/log/keycloak/keycloak.log
     volumes:
       - ./keycloak-theme/krt-theme:/opt/keycloak/themes/krt-theme:ro
-      - /var/iri/code/keycloak/providers:/opt/keycloak/providers:ro
-      - /var/iri/keycloak/log:/var/log/keycloak
-      - ${IRI_KEYCLOAK_KEYSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/keystore.p12:ro
+      - /opt/basetool/keycloak/providers:/opt/keycloak/providers:ro
+      - /var/log/basetool/keycloak:/var/log/keycloak
+      - ${BASETOOL_KEYCLOAK_KEYSTORE_HOST_PATH:-${BASETOOL_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/keystore.p12:ro
     depends_on:
       db-keycloak:
         condition: service_healthy
@@ -544,7 +544,7 @@ services:
         target: /app/logs
         tmpfs:
           mode: 0o777
-      - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
+      - ${BASETOOL_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
     ports:
       - "127.0.0.1:11261:11261"
     depends_on:
@@ -617,7 +617,7 @@ services:
         target: /app/logs
         tmpfs:
           mode: 0o777
-      - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
+      - ${BASETOOL_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
     ports:
       - "127.0.0.1:18081:18081"
     depends_on:
@@ -683,7 +683,7 @@ services:
         target: /app/logs
         tmpfs:
           mode: 0o777
-      - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
+      - ${BASETOOL_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
     ports:
       - "127.0.0.1:11262:11262"
     depends_on:
@@ -747,8 +747,8 @@ services:
       - ./docker/edge:/etc/nginx/edge:ro
       - edge-certs:/etc/nginx/certs:ro
       - edge-acme-webroot:/var/www/acme:ro
-      - ${IRI_UPSTREAM_CA_HOST_PATH:-/var/iri/monitoring/certs/basetool-ca.crt}:/etc/nginx/upstream-ca.crt:ro
-      - ${IRI_GRAFANA_UPSTREAM_CERT_HOST_PATH:-/var/iri/monitoring/certs/grafana.crt}:/etc/nginx/grafana-upstream.crt:ro
+      - ${BASETOOL_UPSTREAM_CA_HOST_PATH:-/etc/basetool/monitoring/certs/basetool-ca.crt}:/etc/nginx/upstream-ca.crt:ro
+      - ${BASETOOL_GRAFANA_UPSTREAM_CERT_HOST_PATH:-/etc/basetool/monitoring/certs/grafana.crt}:/etc/nginx/grafana-upstream.crt:ro
       - ./docker/maintenance/static:/usr/share/nginx/html/maintenance:ro
     networks:
       - net-edge-ingress

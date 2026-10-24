@@ -2,18 +2,18 @@
 
 set -euo pipefail
 
-IRI_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BASETOOL_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source-path=SCRIPTDIR
 # shellcheck source=lib/common.sh
 # shellcheck disable=SC1091
-. "${IRI_SCRIPT_DIR}/lib/common.sh"
+. "${BASETOOL_SCRIPT_DIR}/lib/common.sh"
 # shellcheck source=lib/container-runtime.sh
 # shellcheck disable=SC1091
-. "${IRI_SCRIPT_DIR}/lib/container-runtime.sh"
+. "${BASETOOL_SCRIPT_DIR}/lib/container-runtime.sh"
 
-COMPOSE_DIR="${IRI_COMPOSE_DIR:-/var/iri/code}"
-LOCKFILE="${IRI_LOCKFILE:-/var/lock/iri-deploy.lock}"
-LOCK_WAIT="${IRI_RESET_LOCK_WAIT:-300}"
+COMPOSE_DIR="${BASETOOL_COMPOSE_DIR:-/opt/basetool}"
+LOCKFILE="${BASETOOL_LOCKFILE:-/run/lock/basetool-deploy.lock}"
+LOCK_WAIT="${BASETOOL_RESET_LOCK_WAIT:-300}"
 CONFIRM_FLAG="--wipe-testing-database"
 WRITER_SERVICES=(frontend ingest backend)
 
@@ -28,10 +28,10 @@ if [[ "${1:-}" != "${CONFIRM_FLAG}" || $# -ne 1 ]]; then
   exit 2
 fi
 
-[[ -f "${COMPOSE_DIR}/.env" ]] || fail "missing ${COMPOSE_DIR}/.env"
+[[ -f "${ENV_FILE}" ]] || fail "missing ${ENV_FILE}"
 [[ "$(read_env APP_INSTANCE_TEST_SYSTEM)" == "true" ]] \
-  || fail "refusing: ${COMPOSE_DIR}/.env does not set APP_INSTANCE_TEST_SYSTEM=true, so this is not the testing host"
-[[ -n "$(read_env POSTGRES_DB)" ]] || fail "POSTGRES_DB is not set in ${COMPOSE_DIR}/.env"
+  || fail "refusing: ${ENV_FILE} does not set APP_INSTANCE_TEST_SYSTEM=true, so this is not the testing host"
+[[ -n "$(read_env POSTGRES_DB)" ]] || fail "POSTGRES_DB is not set in ${ENV_FILE}"
 
 rt_detect
 log "container runtime: ${RT_BACKEND}"

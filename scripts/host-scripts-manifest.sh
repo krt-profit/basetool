@@ -15,7 +15,7 @@ Usage: host-scripts-manifest.sh generate [--rev <git-rev>]
 
 Prints the sha256 manifest of the host scripts named in scripts/host-scripts.list,
 one "<sha256>  <path>" line per file, in list order. The format is what
-`sha256sum -c` reads, run from /var/iri/code/scripts on the host.
+`sha256sum -c` reads, run from /opt/basetool/scripts on the host.
 
   --rev <git-rev>   Read the list and every script from that revision with
                     `git show` (byte-exact, independent of the checkout's line

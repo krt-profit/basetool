@@ -239,13 +239,13 @@ class MaterialRequestServiceTest {
     when(orgUnitMembershipRepository.findAllByIdUserIdInAndKindIn(any(), any()))
         .thenReturn(List.of(membership(ownerId, squadronId, OrgUnitKind.SQUADRON)));
     when(orgUnitRepository.findAllById(any()))
-        .thenReturn(List.of(squadron(squadronId, "Iridium Alpha", "IA")));
+        .thenReturn(List.of(squadron(squadronId, "Alpha Prime", "AP")));
 
     MaterialRequestDto dto = boardService.detail(requestId);
 
     assertThat(dto.ownerOrgUnits())
         .extracting(OrgUnitReferenceDto::shorthand)
-        .containsExactly("IA");
+        .containsExactly("AP");
   }
 
   /**

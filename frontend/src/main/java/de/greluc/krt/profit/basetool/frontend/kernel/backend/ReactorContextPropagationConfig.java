@@ -47,20 +47,20 @@ public class ReactorContextPropagationConfig {
    * Same string is consumed by the {@code ThreadLocalAccessor} below; not used as a header name
    * (see {@code ActiveSquadronRelayFilter.ACTIVE_ORG_UNIT_HEADER} for that).
    */
-  public static final String ACTIVE_ORG_UNIT_CONTEXT_KEY = "iridium.activeOrgUnitId";
+  public static final String ACTIVE_ORG_UNIT_CONTEXT_KEY = "basetool.activeOrgUnitId";
 
   /**
    * Context-registry key under which the per-request correlation id is propagated through Reactor
    * pipelines. Matches the existing {@code CorrelationContext} thread-local owner.
    */
-  public static final String CORRELATION_CONTEXT_KEY = "iridium.correlationId";
+  public static final String CORRELATION_CONTEXT_KEY = "basetool.correlationId";
 
   /**
    * Context-registry key under which the user's resolved UI locale is propagated through Reactor
    * pipelines for the {@code Accept-Language} relay of {@link
    * de.greluc.krt.profit.basetool.frontend.kernel.backend.UserLocaleRelayFilter}.
    */
-  public static final String USER_LOCALE_CONTEXT_KEY = "iridium.userLocale";
+  public static final String USER_LOCALE_CONTEXT_KEY = "basetool.userLocale";
 
   /**
    * Context-registry key under which the resolved originating client IP ({@link ClientIpContext})
@@ -69,7 +69,7 @@ public class ReactorContextPropagationConfig {
    * per-IP rate limiter sees the real client rather than the frontend container (security audit
    * DOS-1).
    */
-  public static final String CLIENT_IP_CONTEXT_KEY = "iridium.clientIp";
+  public static final String CLIENT_IP_CONTEXT_KEY = "basetool.clientIp";
 
   /**
    * Activates {@link Hooks#enableAutomaticContextPropagation()} and registers the thread-local

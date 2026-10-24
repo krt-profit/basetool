@@ -74,7 +74,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
 
   /**
    * The JWT {@code aud} value the stack's backend enforces (REQ-SEC-024), passed as {@code
-   * IRI_BACKEND_EXPECTED_AUDIENCES}.
+   * BASETOOL_BACKEND_EXPECTED_AUDIENCES}.
    *
    * <p>Must match the {@code aud-basetool-backend} mapper in {@code realm-export.e2e.json} ({@code
    * E2eAudienceEnforcementParityTest}).
@@ -178,7 +178,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
 
   /** The token endpoint the ingest gateway's service account uses, inside the compose network. */
   private static final String GATEWAY_TOKEN_URI =
-      "http://host.docker.internal:18080/auth/realms/iri/protocol/openid-connect/token";
+      "http://host.docker.internal:18080/auth/realms/basetool/protocol/openid-connect/token";
 
   /** The JWT {@code aud} value the stack's ingest gateway enforces on exchange tokens. */
   static final String INGEST_AUDIENCE = "basetool-ingest";
@@ -346,7 +346,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
    * mode, otherwise one derived from the checkout's path, so parallel checkouts never share an
    * image.
    *
-   * @return the value handed to compose as {@code IRI_BASETOOL_VERSION}
+   * @return the value handed to compose as {@code BASETOOL_VERSION}
    */
   static String imageTag() {
     return prebuilt() ? IMAGE_TAG : ServedBuildCheck.localImageTag(repoRoot());
@@ -570,7 +570,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
 
   /**
    * Returns the throwaway environment for compose's {@code ${VAR}} placeholders, passed to the
-   * subprocess rather than written to disk; {@code IRI_KEYSTORE_HOST_PATH} is never set.
+   * subprocess rather than written to disk; {@code BASETOOL_KEYSTORE_HOST_PATH} is never set.
    *
    * @return the environment variable map for the compose subprocess
    */
@@ -595,13 +595,13 @@ public final class E2eStackExtension implements BeforeAllCallback {
     env.put("REDIS_INGEST_USERNAME", RedisAclTemplate.INGEST_USER);
     env.put("REDIS_INGEST_PASSWORD", RedisAclTemplate.E2E_PASSWORDS.get("REDIS_INGEST_PASSWORD"));
     env.put("SERVER_SSL_KEY_STORE_PASSWORD", KEYSTORE_PW);
-    env.put("IRI_BASETOOL_VERSION", imageTag());
+    env.put("BASETOOL_VERSION", imageTag());
     env.put("COMPOSE_PROJECT_NAME", ServedBuildCheck.composeProjectName(repoRoot()));
-    env.put("IRI_BACKEND_EXPECTED_AUDIENCES", EXPECTED_AUDIENCE);
-    env.put("IRI_INGEST_EXPECTED_AUDIENCES", INGEST_AUDIENCE);
-    env.put("IRI_INGEST_SERVICE_ACCOUNT_TOKEN_URI", GATEWAY_TOKEN_URI);
-    env.put("IRI_INGEST_SERVICE_ACCOUNT_CLIENT_ID", "basetool-ingest-gateway");
-    env.put("IRI_INGEST_SERVICE_ACCOUNT_CLIENT_SECRET", GATEWAY_CLIENT_SECRET);
+    env.put("BASETOOL_BACKEND_EXPECTED_AUDIENCES", EXPECTED_AUDIENCE);
+    env.put("BASETOOL_INGEST_EXPECTED_AUDIENCES", INGEST_AUDIENCE);
+    env.put("BASETOOL_INGEST_SERVICE_ACCOUNT_TOKEN_URI", GATEWAY_TOKEN_URI);
+    env.put("BASETOOL_INGEST_SERVICE_ACCOUNT_CLIENT_ID", "basetool-ingest-gateway");
+    env.put("BASETOOL_INGEST_SERVICE_ACCOUNT_CLIENT_SECRET", GATEWAY_CLIENT_SECRET);
     return env;
   }
 

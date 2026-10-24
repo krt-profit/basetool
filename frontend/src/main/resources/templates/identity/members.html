@@ -54,7 +54,7 @@
                                 <th:block th:each="sq, st : ${user.squadrons}">
                                     <span class="squadron-badge"
                                           th:title="${sq.name()}"
-                                          th:text="${sq.shorthand()}">IRI</span><span th:if="${!st.last}">&#160;&middot;&#160;</span>
+                                          th:text="${sq.shorthand()}">ALP</span><span th:if="${!st.last}">&#160;&middot;&#160;</span>
                                 </th:block>
                             </span>
                             <span th:if="${user.squadrons == null or user.squadrons.isEmpty()}"

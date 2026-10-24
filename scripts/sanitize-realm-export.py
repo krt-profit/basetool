@@ -22,7 +22,7 @@ from typing import Any
 
 DEPLOY_PLACEHOLDER = "__SET_AT_DEPLOY__"
 
-REAL_HOSTS = ("profit-base.online", "iri-base.org")
+REAL_HOSTS = ("profit-base.online",)
 NEUTRAL_HOST = "basetool.example.invalid"
 
 DROP_SECTIONS = (
@@ -173,7 +173,7 @@ def selftest() -> int:
     :return: process exit code, 0 when every check holds.
     """
     raw = {
-        "realm": "iri",
+        "realm": "basetool",
         "users": [{"username": "someone", "email": "someone@mail.test"}],
         "clientScopeMappings": {"account": [{"client": "account-console", "roles": ["manage-account"]}]},
         "scopeMappings": [

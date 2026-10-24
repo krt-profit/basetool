@@ -90,7 +90,7 @@ class BankDashboardFilterMvcTest {
     return new BankAccountDto(
         UUID.randomUUID(),
         "KB-0001",
-        "Staffel IRIDIUM",
+        "Staffel ALPHA",
         "ORG_UNIT",
         "ACTIVE",
         null,
@@ -110,7 +110,7 @@ class BankDashboardFilterMvcTest {
         .thenReturn(
             new BankDashboardDto(
                 true,
-                List.of(account("KB-0001", "Staffel IRIDIUM"), account("KB-0002", "KRT")),
+                List.of(account("KB-0001", "Staffel ALPHA"), account("KB-0002", "KRT")),
                 null));
     when(backendApiClient.get(startsWith("/api/v1/bank/accounts"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(activeAccount()), 0, 500, 1, 1, List.of()));
@@ -129,7 +129,7 @@ class BankDashboardFilterMvcTest {
             content()
                 .string(Matchers.containsString("data-filter-empty=\"#bank-acc-filter-empty\"")))
         .andExpect(
-            content().string(Matchers.containsString("data-filter-name=\"Staffel IRIDIUM\"")))
+            content().string(Matchers.containsString("data-filter-name=\"Staffel ALPHA\"")))
         .andExpect(content().string(Matchers.containsString("id=\"bank-acc-filter-empty\"")))
         .andExpect(content().string(Matchers.containsString("bank-movement-open")))
         .andExpect(content().string(Matchers.containsString("id=\"bank-movement-modal\"")))
@@ -143,14 +143,14 @@ class BankDashboardFilterMvcTest {
   void dashboard_employeeUser_seesFilterButNotManagementActions() throws Exception {
     when(backendApiClient.get(eq("/api/v1/bank/dashboard"), eq(BankDashboardDto.class)))
         .thenReturn(
-            new BankDashboardDto(false, List.of(account("KB-0001", "Staffel IRIDIUM")), null));
+            new BankDashboardDto(false, List.of(account("KB-0001", "Staffel ALPHA")), null));
 
     mockMvc
         .perform(get("/bank"))
         .andExpect(status().isOk())
         .andExpect(content().string(Matchers.containsString("id=\"bank-acc-filter\"")))
         .andExpect(
-            content().string(Matchers.containsString("data-filter-name=\"Staffel IRIDIUM\"")))
+            content().string(Matchers.containsString("data-filter-name=\"Staffel ALPHA\"")))
         .andExpect(content().string(Matchers.not(Matchers.containsString("bank-report-download"))))
         .andExpect(content().string(Matchers.not(Matchers.containsString("bank-manage-link"))));
   }

@@ -171,7 +171,7 @@ second time for the nickname. All Discord calls of the provider JAR share one `H
 
 A Discord login leaves the app origin for one hop (`discord.com/…/oauth2/authorize`, see the
 2026-09-25 correction in [ADR-0166](../adr/0166-identity-moves-onto-the-app-origin.md)). When the
-callback to `/auth/realms/iri/broker/discord/endpoint` arrives in a browser context that holds none of
+callback to `/auth/realms/basetool/broker/discord/endpoint` arrives in a browser context that holds none of
 Keycloak's login cookies (`AUTH_SESSION_ID`, `KC_RESTART`, `KEYCLOAK_IDENTITY`), Keycloak cannot
 resume the login and logs `IDENTITY_PROVIDER_LOGIN_ERROR` with `error="cookie_not_found"`
 (`SessionCodeChecks.initialVerifyAuthSession`, Keycloak 26.7.4). Known triggers: Discord finishing
@@ -267,7 +267,7 @@ truststore, and a TLS failure simply fails open.
 
 > [!warning] Production status — corrected 2026-09-25
 > The items above are proven by tests; **on production the precheck was failing open** until
-> 2026-09-25. `.env` named `KRT_BACKEND_TRUSTSTORE_PATH=/run/secrets/backend-truststore.p12`, but the
+> 2026-09-25. `basetool.env` named `KRT_BACKEND_TRUSTSTORE_PATH=/run/secrets/backend-truststore.p12`, but the
 > file had never been created and nothing mounted it, so `BackendTrustSupport` logged `Failed to
 > load the backend truststore; the Discord account-existence precheck will fail open until it is
 > fixed.` at every Keycloak start (at least seven days of log history; how long before that is not

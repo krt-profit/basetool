@@ -22,7 +22,7 @@ from decimal import Decimal
 DB_CONTAINER = "db-backend"
 DB_PORT = "15432"
 
-SERVICE_USER = "iri"
+SERVICE_USER = "basetool"
 
 WINDOWS_SSH = r"C:\Windows\System32\OpenSSH\ssh.exe"
 

@@ -386,7 +386,7 @@ class AdminAuditLogPageControllerTest {
             "ROLE_GRANTED",
             "admin_jo",
             UUID.randomUUID(),
-            "IRIDIUM",
+            "ALPHA",
             UUID.randomUUID(),
             "rank=OL",
             "basetool-android");

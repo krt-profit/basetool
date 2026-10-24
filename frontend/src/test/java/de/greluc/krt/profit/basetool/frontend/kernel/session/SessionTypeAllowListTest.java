@@ -479,7 +479,7 @@ class SessionTypeAllowListTest {
       RSAKey key = new RSAKeyGenerator(2048).keyID("test").generate();
       JWTClaimsSet claims =
           new JWTClaimsSet.Builder()
-              .issuer("https://keycloak.example.test/auth/realms/iri")
+              .issuer("https://keycloak.example.test/auth/realms/basetool")
               .subject("member-subject")
               .audience("basetool-frontend")
               .issueTime(Date.from(now))
@@ -536,12 +536,12 @@ class SessionTypeAllowListTest {
             .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
             .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
             .scope("openid", "profile", "email", "roles")
-            .authorizationUri("https://keycloak.example.test/realms/iri/auth")
-            .tokenUri("https://keycloak.example.test/realms/iri/token")
-            .jwkSetUri("https://keycloak.example.test/realms/iri/certs")
-            .userInfoUri("https://keycloak.example.test/realms/iri/userinfo")
+            .authorizationUri("https://keycloak.example.test/realms/basetool/auth")
+            .tokenUri("https://keycloak.example.test/realms/basetool/token")
+            .jwkSetUri("https://keycloak.example.test/realms/basetool/certs")
+            .userInfoUri("https://keycloak.example.test/realms/basetool/userinfo")
             .userNameAttributeName("preferred_username")
-            .issuerUri("https://keycloak.example.test/realms/iri")
+            .issuerUri("https://keycloak.example.test/realms/basetool")
             .build();
     OAuth2AccessToken accessToken =
         new OAuth2AccessToken(
@@ -559,7 +559,7 @@ class SessionTypeAllowListTest {
 
     OAuth2AuthorizationRequest authorizationRequest =
         OAuth2AuthorizationRequest.authorizationCode()
-            .authorizationUri("https://keycloak.example.test/realms/iri/auth")
+            .authorizationUri("https://keycloak.example.test/realms/basetool/auth")
             .clientId("basetool-frontend")
             .redirectUri("https://frontend.example.test/login/oauth2/code/keycloak")
             .scopes(Set.of("openid", "profile"))

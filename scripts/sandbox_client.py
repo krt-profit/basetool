@@ -38,7 +38,7 @@ from dpop_reference import (  # noqa: E402
 )
 
 PUBLIC_KEYCLOAK = "http://host.docker.internal:18080"
-REALM = "/auth/realms/iri"
+REALM = "/auth/realms/basetool"
 SCOPES = ("offline_access exchange.connect exchange.blueprints.read exchange.blueprints.write "
           "exchange.stock.read exchange.stock.write exchange.hangar.read exchange.hangar.write "
           "exchange.demand.read exchange.orgunits.read exchange.orgstock.read "

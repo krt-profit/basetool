@@ -10,7 +10,7 @@
        th:attr="data-account-no=${card.account().accountNo()},data-filter-name=${card.account().name()}">
         <div class="kpi-card-top">
             <div>
-                <div class="kpi-title" th:text="${card.account().name()}">Staffel IRIDIUM</div>
+                <div class="kpi-title" th:text="${card.account().name()}">Staffel ALPHA</div>
                 <div class="kpi-sub" th:text="${card.account().accountNo()}">KB-0001</div>
             </div>
             <span class="chip"
@@ -48,7 +48,7 @@
             th:classappend="${card.account().status() == 'CLOSED'} ? ' bank-row--closed' : ''"
             th:attr="data-account-no=${card.account().accountNo()},data-filter-name=${card.account().name()}">
             <td>
-                <a th:href="@{'/bank/accounts/' + ${card.account().id()}}" th:text="${card.account().name()}">Staffel IRIDIUM</a>
+                <a th:href="@{'/bank/accounts/' + ${card.account().id()}}" th:text="${card.account().name()}">Staffel ALPHA</a>
                 <span class="cell-sub" th:text="${card.account().accountNo()}">KB-0001</span>
             </td>
             <td>

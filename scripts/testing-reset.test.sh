@@ -14,7 +14,7 @@ WORK="$(mktemp -d "${TMPDIR:-/tmp}/testing-reset-test.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
 BIN="${WORK}/bin"
 LOG="${WORK}/calls.log"
-mkdir -p "$BIN" "${WORK}/code"
+mkdir -p "$BIN" "${WORK}/code" "${WORK}/config"
 
 make_stub() {
   local name="$1"
@@ -36,11 +36,11 @@ make_stub flock
 
 run_reset() {
   local env_body="$1"; shift
-  printf '%s\n' "$env_body" > "${WORK}/code/.env"
+  printf '%s\n' "$env_body" > "${WORK}/config/basetool.env"
   : > "$LOG"
   PATH="${BIN}:${PATH}" RT_BACKEND=podman RT_CLI="" RT_SYSTEMCTL="" \
-    IRI_COMPOSE_DIR="${WORK}/code" IRI_LOCKFILE="${WORK}/lock" \
-    IRI_MONITORING_TEXTFILE_DIR="${WORK}/textfile" \
+    BASETOOL_COMPOSE_DIR="${WORK}/code" BASETOOL_CONFIG_DIR="${WORK}/config" BASETOOL_LOCKFILE="${WORK}/lock" \
+    BASETOOL_MONITORING_TEXTFILE_DIR="${WORK}/textfile" \
     bash "$SCRIPT" "$@" > "${WORK}/out" 2>&1
   echo $? > "${WORK}/rc"
 }

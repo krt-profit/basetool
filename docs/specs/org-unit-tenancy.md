@@ -276,9 +276,9 @@ MDC alias was removed in the rename-soak cleanup release.)
 
 The frontend sends `X-Active-Org-Unit-Id` on every outbound call; the backend reads it to scope
 staffel-scoped queries (an admin pin directly, a non-admin pin only when it matches a membership).
-The selection lives in the Redis-backed Spring Session under `iridium.activeOrgUnitId`, set via
+The selection lives in the Redis-backed Spring Session under `basetool.activeOrgUnitId`, set via
 `POST /me/active-org-unit` and read back via `GET /api/v1/org-units/me/active`. (The pre-R5.e
-`X-Active-Squadron-Id` header, the `iridium.activeSquadronId` session key, and the
+`X-Active-Squadron-Id` header, the `basetool.activeSquadronId` session key, and the
 `/active-squadron` endpoints were removed in the rename-soak cleanup release.)
 
 ### REQ-ORG-009 — Ownerless leadership ("Bereichsleitung") missions & operations

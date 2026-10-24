@@ -69,7 +69,7 @@
                 <span class="fact-v">
                     <span th:if="${order.requestingOrgUnit != null}" class="squadron-badge"
                           th:title="${order.requestingOrgUnit.name()}"
-                          th:text="${order.requestingOrgUnit.shorthand()}">IRI</span>
+                          th:text="${order.requestingOrgUnit.shorthand()}">ALP</span>
                     <span th:if="${order.requestingOrgUnit == null}" class="squadron-badge squadron-badge-muted">—</span>
                 </span>
             </span>
@@ -78,7 +78,7 @@
                 <span class="fact-v">
                     <span th:if="${order.responsibleOrgUnit != null}" class="squadron-badge"
                           th:title="${order.responsibleOrgUnit.name()}"
-                          th:text="${order.responsibleOrgUnit.shorthand()}">IRI</span>
+                          th:text="${order.responsibleOrgUnit.shorthand()}">ALP</span>
                     <span th:if="${order.responsibleOrgUnit == null}" class="squadron-badge squadron-badge-muted">—</span>
                 </span>
             </span>
@@ -811,7 +811,7 @@
                 <label th:text="#{orders.detail.responsible}" class="form-label">Bearbeitende Einheit</label>
                 <span class="squadron-badge squadron-badge-muted"
                       th:title="${order.responsibleOrgUnit.name()}"
-                      th:text="${order.responsibleOrgUnit.shorthand()}">IRI</span>
+                      th:text="${order.responsibleOrgUnit.shorthand()}">ALP</span>
                 <span class="od-readonly-hint"
                       th:text="#{orders.detail.responsible.readonly_hint}">(nur über Umschreiben)</span>
             </div>

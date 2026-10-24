@@ -72,7 +72,7 @@ class NotificationRuleEngineIntegrationTest {
         123,
         "Integration order",
         new OrgUnitRef(UUID.randomUUID(), OrgUnitKind.SQUADRON),
-        "IRI",
+        "ALP",
         new OrgUnitRef(UUID.randomUUID(), OrgUnitKind.SQUADRON),
         "MATERIAL",
         null);

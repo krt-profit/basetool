@@ -62,7 +62,7 @@ import org.jetbrains.annotations.Nullable;
 public final class BackendSeeder {
 
   private static final String KEYCLOAK_TOKEN_URL =
-      "http://localhost:18080/auth/realms/iri/protocol/openid-connect/token";
+      "http://localhost:18080/auth/realms/basetool/protocol/openid-connect/token";
   private static final String BACKEND_BASE_URL = "https://localhost:11261";
   private static final String CLIENT_ID = "basetool-frontend";
   private static final String IRIDIUM_SQUADRON_ID = "00000000-0000-0000-0000-000000000001";

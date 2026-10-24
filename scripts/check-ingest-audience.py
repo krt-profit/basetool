@@ -12,7 +12,7 @@ The gateway's audience is ``basetool-ingest``; every frontend session token carr
 * **Rule A.** In ``ingest/src/main/resources/application*.yml`` neither an ``expected-audiences:``
   value nor the comment block above it may name ``basetool-backend``; ``application.yml`` must
   carry the key.
-* **Rule B.** No tracked file may assign ``basetool-backend`` to ``IRI_INGEST_EXPECTED_AUDIENCES``
+* **Rule B.** No tracked file may assign ``basetool-backend`` to ``BASETOOL_INGEST_EXPECTED_AUDIENCES``
   (``=``, ``:`` or a ``:-`` default). CHANGELOGs, ``docs/archive/`` and ``docs/adr/`` are exempt.
 * **Rule C.** ``quadlet/env.d/ingest.env.tmpl`` must not give ``APP_SECURITY_JWT_EXPECTED_AUDIENCES``
   the backend's audience.
@@ -43,7 +43,7 @@ SELF = "scripts/check-ingest-audience.py"
 KEY_LINE = re.compile(r"^(\s*)expected-audiences\s*:(.*)$")
 COMMENT_LINE = re.compile(r"^\s*#")
 ENV_ASSIGNMENT = re.compile(
-    r"IRI_INGEST_EXPECTED_AUDIENCES\s*(?:=|:-|:)\s*[\"'`]?\s*[\w.,-]*" + re.escape(BACKEND_AUDIENCE)
+    r"BASETOOL_INGEST_EXPECTED_AUDIENCES\s*(?:=|:-|:)\s*[\"'`]?\s*[\w.,-]*" + re.escape(BACKEND_AUDIENCE)
 )
 TEMPLATE_ASSIGNMENT = re.compile(
     r"APP_SECURITY_JWT_EXPECTED_AUDIENCES\s*=.*" + re.escape(BACKEND_AUDIENCE)
@@ -87,7 +87,7 @@ def has_audience_key(text: str) -> bool:
 def check_env_assignments(name: str, text: str) -> list[str]:
     """Rule B for one tracked file."""
     return [
-        f"{name}:{number}: IRI_INGEST_EXPECTED_AUDIENCES is assigned the backend's audience "
+        f"{name}:{number}: BASETOOL_INGEST_EXPECTED_AUDIENCES is assigned the backend's audience "
         f"({BACKEND_AUDIENCE}); the gateway's is basetool-ingest"
         for number, line in enumerate(text.splitlines(), start=1)
         if ENV_ASSIGNMENT.search(line)
@@ -180,24 +180,24 @@ def selftest() -> int:
             1,
         ),
         "B: .env assignment": (
-            {".env.example": "IRI_INGEST_EXPECTED_AUDIENCES=basetool-backend\n"},
+            {".env.example": "BASETOOL_INGEST_EXPECTED_AUDIENCES=basetool-backend\n"},
             1,
         ),
         "B: compose default": (
             {"docker-compose.yml":
-                "      APP_SECURITY_JWT_EXPECTED_AUDIENCES: ${IRI_INGEST_EXPECTED_AUDIENCES:-basetool-backend}\n"},
+                "      APP_SECURITY_JWT_EXPECTED_AUDIENCES: ${BASETOOL_INGEST_EXPECTED_AUDIENCES:-basetool-backend}\n"},
             1,
         ),
         "B: runbook with a list value": (
-            {"docs/RUNBOOK.md": "    IRI_INGEST_EXPECTED_AUDIENCES=basetool-ingest,basetool-backend\n"},
+            {"docs/RUNBOOK.md": "    BASETOOL_INGEST_EXPECTED_AUDIENCES=basetool-ingest,basetool-backend\n"},
             1,
         ),
         "B: history is exempt": (
-            {"docs/archive/OLD.md": "IRI_INGEST_EXPECTED_AUDIENCES=basetool-backend\n"},
+            {"docs/archive/OLD.md": "BASETOOL_INGEST_EXPECTED_AUDIENCES=basetool-backend\n"},
             0,
         ),
         "B: prose that warns against it passes": (
-            {"docs/SETUP.md": "Never set `IRI_INGEST_EXPECTED_AUDIENCES` to the backend value.\n"},
+            {"docs/SETUP.md": "Never set `BASETOOL_INGEST_EXPECTED_AUDIENCES` to the backend value.\n"},
             0,
         ),
         "C: env template literal": (
@@ -211,8 +211,8 @@ def selftest() -> int:
             root = pathlib.Path(tmp)
             fixture = {
                 INGEST_MAIN_CONFIG: clean_yaml,
-                INGEST_ENV_TEMPLATE: "APP_SECURITY_JWT_EXPECTED_AUDIENCES=${IRI_INGEST_EXPECTED_AUDIENCES:-}\n",
-                ".env.example": "#IRI_INGEST_EXPECTED_AUDIENCES=basetool-ingest\n",
+                INGEST_ENV_TEMPLATE: "APP_SECURITY_JWT_EXPECTED_AUDIENCES=${BASETOOL_INGEST_EXPECTED_AUDIENCES:-}\n",
+                ".env.example": "#BASETOOL_INGEST_EXPECTED_AUDIENCES=basetool-ingest\n",
             }
             fixture.update(overrides)
             for name, content in fixture.items():

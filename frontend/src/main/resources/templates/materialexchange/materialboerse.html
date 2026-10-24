@@ -147,7 +147,7 @@
                                     <span th:each="unit : ${offer.ownerOrgUnits()}" class="squadron-badge"
                                           th:classappend="${unit.kind() != 'SQUADRON'} ? 'squadron-badge-sk'"
                                           th:text="${unit.shorthand() != null ? unit.shorthand() : unit.name()}"
-                                          th:title="${unit.name()}">IRI</span>
+                                          th:title="${unit.name()}">ALP</span>
                                 </span>
                             </span>
                         </span>
@@ -182,7 +182,7 @@
                                             <span th:each="unit : ${offer.ownerOrgUnits()}" class="squadron-badge"
                                                   th:classappend="${unit.kind() != 'SQUADRON'} ? 'squadron-badge-sk'"
                                                   th:text="${unit.shorthand() != null ? unit.shorthand() : unit.name()}"
-                                                  th:title="${unit.name()}">IRI</span>
+                                                  th:title="${unit.name()}">ALP</span>
                                         </span>
                                         <span aria-hidden="true">&middot;</span>
                                         <span th:text="#{materialboerse.facts.released}">Freigegeben</span>

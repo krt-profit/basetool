@@ -34,7 +34,7 @@ import org.springframework.validation.annotation.Validated;
  * stay on the public issuer.
  *
  * @param uri the realm base on the internal connector, e.g. {@code
- *     https://keycloak:18443/auth/realms/iri}, or blank
+ *     https://keycloak:18443/auth/realms/basetool}, or blank
  */
 @Validated
 @ConfigurationProperties(prefix = "app.security.keycloak-backchannel")

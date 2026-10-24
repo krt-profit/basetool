@@ -19,7 +19,7 @@ otelcol.receiver.otlp "default" {
 
 otelcol.exporter.otlp "tempo" {
 	client {
-		endpoint = coalesce(sys.env("IRI_ALLOY_TEMPO_ENDPOINT"), "tempo:4317")
+		endpoint = coalesce(sys.env("BASETOOL_ALLOY_TEMPO_ENDPOINT"), "tempo:4317")
 
 		tls {
 			insecure = true
@@ -29,7 +29,7 @@ otelcol.exporter.otlp "tempo" {
 
 loki.write "default" {
 	endpoint {
-		url = "http://" + coalesce(sys.env("IRI_ALLOY_LOKI_ENDPOINT"), "loki:3100") + "/loki/api/v1/push"
+		url = "http://" + coalesce(sys.env("BASETOOL_ALLOY_LOKI_ENDPOINT"), "loki:3100") + "/loki/api/v1/push"
 	}
 }
 
@@ -137,7 +137,7 @@ loki.source.file "host_fail2ban" {
 }
 
 local.file_match "ops_deploy" {
-	path_targets = [{__path__ = "/hostlog/iri-deploy.log", app = "ops-deploy"}]
+	path_targets = [{__path__ = "/hostlog/basetool/deploy.log", app = "ops-deploy"}]
 }
 
 loki.source.file "ops_deploy" {
@@ -146,7 +146,7 @@ loki.source.file "ops_deploy" {
 }
 
 local.file_match "ops_backup" {
-	path_targets = [{__path__ = "/hostlog/iri-backup.log", app = "ops-backup"}]
+	path_targets = [{__path__ = "/hostlog/basetool/backup.log", app = "ops-backup"}]
 }
 
 loki.source.file "ops_backup" {
@@ -156,7 +156,7 @@ loki.source.file "ops_backup" {
 
 local.file_match "ops_cleanup" {
 	path_targets = [
-		{__path__ = "/hostlog/iri-container-cleanup.log", app = "ops-cleanup"},
+		{__path__ = "/hostlog/basetool/container-cleanup.log", app = "ops-cleanup"},
 	]
 }
 
@@ -166,7 +166,7 @@ loki.source.file "ops_cleanup" {
 }
 
 local.file_match "ops_restore_drill" {
-	path_targets = [{__path__ = "/hostlog/iri-restore-drill.log", app = "ops-restore-drill"}]
+	path_targets = [{__path__ = "/hostlog/basetool/restore-drill.log", app = "ops-restore-drill"}]
 }
 
 loki.source.file "ops_restore_drill" {

@@ -294,7 +294,7 @@ class JobOrderBackendClientTest {
         new JobOrderHandoverCreateDto(
             TIME,
             "Pilot",
-            "IRI",
+            "ALP",
             List.of(new JobOrderHandoverItemCreateDto(MATERIAL, 12.5, null, "B"))));
     client.createItemHandover(
         ORDER,
@@ -309,7 +309,7 @@ class JobOrderBackendClientTest {
         "POST",
         "/api/v1/orders/" + ORDER + "/handovers",
         "{\"handoverTime\":\"2026-09-01T10:15:30Z\",\"recipientHandle\":\"Pilot\","
-            + "\"recipientSquadron\":\"IRI\",\"items\":[{\"inventoryItemId\":\""
+            + "\"recipientSquadron\":\"ALP\",\"items\":[{\"inventoryItemId\":\""
             + MATERIAL
             + "\",\"amount\":12.5,\"missionReductions\":null,\"qualityRequirement\":\"B\"}]}");
     backend.expect(

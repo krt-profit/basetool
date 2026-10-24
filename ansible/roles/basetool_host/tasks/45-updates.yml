@@ -61,7 +61,7 @@
     mode: "0644"
     content: |
       [Service]
-      ExecStopPost=-{{ basetool_host_root_dir }}/code/scripts/host-updates-metrics.sh
+      ExecStopPost=-{{ basetool_host_release_dir }}/scripts/host-updates-metrics.sh
   notify: Reload systemd for the operational units
 
 - name: Install the patch-state collector and its boot unit
@@ -73,10 +73,10 @@
     mode: "{{ item.mode }}"
   loop:
     - src: host-updates-metrics.sh
-      dest: "{{ basetool_host_root_dir }}/code/scripts/host-updates-metrics.sh"
+      dest: "{{ basetool_host_release_dir }}/scripts/host-updates-metrics.sh"
       mode: "0755"
-    - src: iri-host-updates-metrics.service
-      dest: /etc/systemd/system/iri-host-updates-metrics.service
+    - src: basetool-host-updates-metrics.service
+      dest: /etc/systemd/system/basetool-host-updates-metrics.service
       mode: "0644"
   notify: Reload systemd for the operational units
   register: basetool_host_updates_collector
@@ -90,7 +90,7 @@
   changed_when: false
   failed_when: basetool_host_updates_verify.rc != 0
   loop:
-    - /etc/systemd/system/iri-host-updates-metrics.service
+    - /etc/systemd/system/basetool-host-updates-metrics.service
     - dnf-automatic.service
   when: not ansible_check_mode
 
@@ -102,17 +102,17 @@
     daemon_reload: true
   loop:
     - { name: dnf-automatic.timer, state: started }
-    - { name: iri-host-updates-metrics.service }
+    - { name: basetool-host-updates-metrics.service }
   when: not ansible_check_mode
 
 - name: Ask whether the collector has ever written
   ansible.builtin.stat:
-    path: "{{ basetool_host_root_dir }}/monitoring/textfile/host-updates.prom"
+    path: "{{ basetool_host_textfile_dir }}/host-updates.prom"
   register: basetool_host_updates_metrics_file
 
 - name: Take the first reading now rather than at the next boot
   ansible.builtin.systemd_service:
-    name: iri-host-updates-metrics.service
+    name: basetool-host-updates-metrics.service
     state: started
   when:
     - not ansible_check_mode

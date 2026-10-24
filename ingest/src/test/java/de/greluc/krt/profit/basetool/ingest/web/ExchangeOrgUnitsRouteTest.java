@@ -66,7 +66,7 @@ class ExchangeOrgUnitsRouteTest {
   private static final JsonMapper MAPPER = JsonMapper.builder().build();
   private static final String UNITS =
       """
-      {"items":[{"id":"%s","name":"Staffel Iridium","shorthand":"IRI","kind":"SQUADRON"},
+      {"items":[{"id":"%s","name":"Staffel Alpha","shorthand":"ALP","kind":"SQUADRON"},
                 {"id":"%s","name":"Bereich Logistik","shorthand":"LOG","kind":"BEREICH"}]}
       """
           .formatted(UUID.randomUUID(), UUID.randomUUID());

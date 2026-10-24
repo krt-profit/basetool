@@ -40,7 +40,7 @@ run() {
   : > "${CALLS}"
   # shellcheck disable=SC2016
   env -i PATH="${WORK}/bin:/usr/bin:/bin" STUB_CALLS="${CALLS}" HOME="${WORK}" \
-    RESTIC_REPOSITORY="rclone:nextcloud:Test" BACKUP_ENV="/etc/iri/backup.env" "$@" \
+    RESTIC_REPOSITORY="rclone:nextcloud:Test" BACKUP_ENV="/etc/basetool/deploy/backup.env" "$@" \
     bash -c 'set -euo pipefail
       log() { printf "[t] %s\n" "$*"; }
       fail() { log "FATAL: $*"; exit 1; }
@@ -102,7 +102,7 @@ rc=$?
 if [[ ${rc} -ne 0 ]]; then ok "an unreadable count fails instead of reporting 0"; else bad "an unreadable count passed as '$(cat "${WORK}/out")'"; fi
 
 echo "== the role installs every lib an installed script sources =="
-ROLE_TASKS="${IRI_ROLE_SCRIPTS_TASKS:-${HERE}/../ansible/roles/basetool_host/tasks/25-scripts.yml}"
+ROLE_TASKS="${BASETOOL_ROLE_SCRIPTS_TASKS:-${HERE}/../ansible/roles/basetool_host/tasks/25-scripts.yml}"
 mapfile -t installed < <(awk '/name: Install the operational scripts/ { f = 1 } f && /^    - / { print $2 } f && /^$/ { exit }' "${ROLE_TASKS}")
 if [[ ${#installed[@]} -gt 0 ]]; then ok "the role's install list has ${#installed[@]} entries"; else bad "no install list found in ${ROLE_TASKS}"; fi
 for script in "${installed[@]}"; do

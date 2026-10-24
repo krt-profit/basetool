@@ -102,7 +102,7 @@ class PromotionAdminRankRequirementsPageMvcTest {
 
     PageResponse<SquadronDto> squadronPage =
         new PageResponse<>(
-            List.of(new SquadronDto(squadronId, "IRIDIUM", "IRI", null, true, true, false, 0L)),
+            List.of(new SquadronDto(squadronId, "ALPHA", "ALP", null, true, true, false, 0L)),
             0,
             1000,
             1,

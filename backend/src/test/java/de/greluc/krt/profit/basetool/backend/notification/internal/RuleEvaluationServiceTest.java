@@ -69,7 +69,7 @@ class RuleEvaluationServiceTest {
         7,
         "Build me a ship",
         new OrgUnitRef(RESPONSIBLE, OrgUnitKind.SQUADRON),
-        "IRI",
+        "ALP",
         new OrgUnitRef(UUID.randomUUID(), OrgUnitKind.SQUADRON),
         "MATERIAL",
         actorSub);
@@ -200,7 +200,7 @@ class RuleEvaluationServiceTest {
             new BigDecimal("500"),
             "KB-0001",
             "greluc",
-            "IRI",
+            "ALP",
             ACTOR);
     when(notificationRuleRepository.findEnabledByEventTypeWithSelectors(
             NotificationEventType.BANK_BOOKING_REQUEST_CREATED))
@@ -330,7 +330,7 @@ class RuleEvaluationServiceTest {
             7,
             "Build me a ship",
             new OrgUnitRef(RESPONSIBLE, OrgUnitKind.SQUADRON),
-            "IRI",
+            "ALP",
             null,
             "MATERIAL",
             ACTOR);

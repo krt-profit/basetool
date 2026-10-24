@@ -9,12 +9,12 @@ Type=oneshot
 
 User=deploy
 
-ExecStart=/var/iri/code/scripts/container-cleanup.sh
+ExecStart=/opt/basetool/scripts/container-cleanup.sh
 
-StandardOutput=append:/var/log/iri-container-cleanup.log
-StandardError=append:/var/log/iri-container-cleanup.log
+StandardOutput=append:/var/log/basetool/container-cleanup.log
+StandardError=append:/var/log/basetool/container-cleanup.log
 
-ReadWritePaths=/var/iri/monitoring /var/log /var/lock
+ReadWritePaths=/var/lib/basetool/textfile /var/log/basetool /run/lock
 
 MemoryMax=1G
 CPUQuota=200%

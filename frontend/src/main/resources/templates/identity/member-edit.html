@@ -121,7 +121,7 @@
                             <option th:each="sq : ${availableSquadrons}"
                                     th:value="${sq.id()}"
                                     th:selected="${memberEditForm.staffel1Id != null and memberEditForm.staffel1Id == sq.id()}"
-                                    th:text="|${sq.shorthand()} — ${sq.name()}|">IRI — IRIDIUM</option>
+                                    th:text="|${sq.shorthand()} — ${sq.name()}|">ALP — ALPHA</option>
                         </select>
                     </div>
                     <div class="staffel-flags" role="group" th:aria-label="#{members.staffel.flags}">
@@ -150,7 +150,7 @@
                             <option th:each="sq : ${availableSquadrons}"
                                     th:value="${sq.id()}"
                                     th:selected="${memberEditForm.staffel2Id != null and memberEditForm.staffel2Id == sq.id()}"
-                                    th:text="|${sq.shorthand()} — ${sq.name()}|">IRI — IRIDIUM</option>
+                                    th:text="|${sq.shorthand()} — ${sq.name()}|">ALP — ALPHA</option>
                         </select>
                     </div>
                     <div class="staffel-flags" role="group" th:aria-label="#{members.staffel.flags}">
@@ -199,8 +199,8 @@
                             <span class="membership-unit">
                                 <span class="squadron-badge"
                                       th:classappend="${m.kind() == 'SPECIAL_COMMAND' ? ' squadron-badge-sk' : ''}"
-                                      th:text="${m.orgUnitShorthand() != null ? m.orgUnitShorthand() : m.orgUnitName()}">IRI</span>
-                                <span class="cell-title" th:text="${m.orgUnitName()}">IRIDIUM</span>
+                                      th:text="${m.orgUnitShorthand() != null ? m.orgUnitShorthand() : m.orgUnitName()}">ALP</span>
+                                <span class="cell-title" th:text="${m.orgUnitName()}">ALPHA</span>
                             </span>
                         </td>
                         <td th:attr="data-label=#{members.memberships.col.kind}">

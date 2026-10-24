@@ -68,7 +68,7 @@ class JwtAudienceStartupCheckTest {
                     .getFailure()
                     .rootCause()
                     .isInstanceOf(IllegalStateException.class)
-                    .hasMessageContaining("IRI_BACKEND_EXPECTED_AUDIENCES"));
+                    .hasMessageContaining("BASETOOL_BACKEND_EXPECTED_AUDIENCES"));
   }
 
   @Test

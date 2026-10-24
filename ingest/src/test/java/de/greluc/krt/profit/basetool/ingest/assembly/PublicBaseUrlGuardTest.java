@@ -41,7 +41,7 @@ class PublicBaseUrlGuardTest {
 
     assertThatThrownBy(guard::afterPropertiesSet)
         .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("IRI_INGEST_PUBLIC_BASE_URL");
+        .hasMessageContaining("BASETOOL_INGEST_PUBLIC_BASE_URL");
   }
 
   @Test

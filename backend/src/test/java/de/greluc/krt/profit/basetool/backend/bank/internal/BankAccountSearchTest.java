@@ -56,7 +56,7 @@ class BankAccountSearchTest {
   @Test
   void managementSearch_filtersByNameSubstring_caseInsensitive() {
     BankAccount phoenix = newAccount("Staffel PHOENIX", BankAccountType.SPECIAL);
-    newAccount("Staffel IRIDIUM", BankAccountType.SPECIAL);
+    newAccount("Staffel ALPHA", BankAccountType.SPECIAL);
     newAccount("Sonderkonto Logistik", BankAccountType.SPECIAL);
 
     Page<BankAccountDto> result =

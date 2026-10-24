@@ -103,7 +103,7 @@
                         <span th:if="${b.type() == 'HOLDER_TRANSFER' and b.counterHolderHandle() != null}"
                               th:text="(${b.amount().signum() < 0} ? '&#8594; ' : '&#8592; ') + ${@handles.display(b.counterHolderHandle())}">&#8594; carol</span>
                         <span th:if="${b.type() != 'HOLDER_TRANSFER' and b.counterAccountNo() != null}"
-                              th:text="${b.counterAccountNo()} + ' &#8212; ' + ${b.counterAccountName()}">KB-0001 &#8212; Staffel IRIDIUM</span>
+                              th:text="${b.counterAccountNo()} + ' &#8212; ' + ${b.counterAccountName()}">KB-0001 &#8212; Staffel ALPHA</span>
                         <span th:if="${(b.type() == 'HOLDER_TRANSFER' and b.counterHolderHandle() == null) or (b.type() != 'HOLDER_TRANSFER' and b.counterAccountNo() == null)}"
                               class="text-muted">&mdash;</span>
                     </td>

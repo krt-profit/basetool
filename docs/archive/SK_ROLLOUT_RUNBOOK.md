@@ -14,9 +14,9 @@ for executing that rollout safely.
 
 | # | PR | Branch | Adds | Risk | Soak |
 | -- | -- | -- | -- | -- | -- |
-| 1 | [#226](https://github.com/krt-iri/basetool/pull/226) Foundation | `consolidate/spezialkommando-foundation` | V97–V100, OrgUnit + SpecialCommand entities, picker on 7 forms, admin pages, switcher | **Low** — fully additive + dual-write | ≥ 1 release |
-| 2 | [#227](https://github.com/krt-iri/basetool/pull/227) Identity | `consolidate/spezialkommando-identity` | V101 promotion guard, JWT converter on memberships, flag-writes to membership row | **Medium** — touches auth path, has legacy fallback | ≥ 1 release |
-| 3 | [#228](https://github.com/krt-iri/basetool/pull/228) Cleanup | `consolidate/spezialkommando-cleanup` | V102–V105, drops legacy `squadron` table + columns | **High** — irreversible without DB backup | n/a (terminal) |
+| 1 | [#226](https://github.com/krt-profit/basetool/pull/226) Foundation | `consolidate/spezialkommando-foundation` | V97–V100, OrgUnit + SpecialCommand entities, picker on 7 forms, admin pages, switcher | **Low** — fully additive + dual-write | ≥ 1 release |
+| 2 | [#227](https://github.com/krt-profit/basetool/pull/227) Identity | `consolidate/spezialkommando-identity` | V101 promotion guard, JWT converter on memberships, flag-writes to membership row | **Medium** — touches auth path, has legacy fallback | ≥ 1 release |
+| 3 | [#228](https://github.com/krt-profit/basetool/pull/228) Cleanup | `consolidate/spezialkommando-cleanup` | V102–V105, drops legacy `squadron` table + columns | **High** — irreversible without DB backup | n/a (terminal) |
 
 **Total deployable releases: 3. Total Flyway migrations: 9 (V97–V105). Total soak windows: 2.**
 
@@ -55,7 +55,7 @@ not proceed — investigate the failure first. Two tests
 (`HangarIntegrationTest.testUserCannotManageOtherHangar`,
 `RefineryOrderTest.testUserCreateAndManageRefineryOrder`) are known
 pre-existing flakes that fail on the R9 branch too — they are
-**out of scope** for the rollout and acknowledged in [#228](https://github.com/krt-iri/basetool/pull/228).
+**out of scope** for the rollout and acknowledged in [#228](https://github.com/krt-profit/basetool/pull/228).
 
 ### 0.3 Stage on `.env.test` first
 
@@ -216,7 +216,7 @@ this out at each stage.
 
 ## 1. Stage 1 — PR-1 Foundation
 
-**PR:** [#226](https://github.com/krt-iri/basetool/pull/226)
+**PR:** [#226](https://github.com/krt-profit/basetool/pull/226)
 **Branch:** `consolidate/spezialkommando-foundation`
 **Base:** `main` (already correct)
 **Commits:** 26 (R1 → R5.e + R6.a-c + CHANGELOG cleanup tail + rebase onto current main + CodeQL XSS sink wrap)
@@ -387,7 +387,7 @@ If PR-1 needs to be reverted before PR-2 lands:
 
 ## 2. Stage 2 — PR-2 Identity Migration
 
-**PR:** [#227](https://github.com/krt-iri/basetool/pull/227)
+**PR:** [#227](https://github.com/krt-profit/basetool/pull/227)
 **Branch:** `consolidate/spezialkommando-identity`
 **Base on disk:** `consolidate/spezialkommando-foundation` (will be retargeted)
 **Commits:** 4 (R6.d + R6.e + R7-sweep + doc V-sweep)
@@ -537,7 +537,7 @@ likely R6.e dual-write regression source.
 
 ## 3. Stage 3 — PR-3 Destructive Cleanup
 
-**PR:** [#228](https://github.com/krt-iri/basetool/pull/228)
+**PR:** [#228](https://github.com/krt-profit/basetool/pull/228)
 **Branch:** `consolidate/spezialkommando-cleanup`
 **Base on disk:** `consolidate/spezialkommando-identity` (will be retargeted)
 **Commits:** 8 (R8 + R9 Step 1-6 + plan-status doc + V-sweep + test-fix for two R9-surfaced regressions)
@@ -792,8 +792,8 @@ The restoration window is dictated by your DB backup-restore time (likely
 
 After PR-3 has been in production for one release cycle without incident:
 
-1. **Close issue [#214](https://github.com/krt-iri/basetool/issues/214)** ("Unterstützung für Spezialkommandos").
-2. **Move all items in [Project 1](https://github.com/orgs/krt-iri/projects/1) to "Done"** status.
+1. **Close issue [#214](https://github.com/krt-profit/basetool/issues/214)** ("Unterstützung für Spezialkommandos").
+2. **Move all items in [Project 1](https://github.com/orgs/krt-profit/projects/1) to "Done"** status.
 3. **Tag the release** with a semver bump:
    ```bash
    git tag -a v0.X.Y -m "Spezialkommando rollout complete (V97-V105)"

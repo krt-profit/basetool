@@ -1,25 +1,22 @@
 <?xml version="1.0"?>
-<!-------------------------------------------------------------------------------------------------
-  - Iridium HQ - Backend                                                                          -
-  - Copyright (C) 2025-2025 Iridium HQ - Backend Team                                             -
-  -                                                                                               -
-  - This file is part of Iridium HQ - Backend.                                                    -
-  -                                                                                               -
-  - Iridium HQ - Backend is free software: you can redistribute it and/or modify                  -
-  - it under the terms of the GNU General Public License as published by                          -
-  - the Free Software Foundation, either version 3 of the License, or                             -
-  - (at your option) any later version.                                                           -
-  -                                                                                               -
-  - Iridium HQ - Backend is distributed in the hope that it will be useful,                       -
-  - but WITHOUT ANY WARRANTY; without even the implied warranty of                                -
-  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the                                  -
-  - GNU General Public License for more details.                                                  -
-  -                                                                                               -
-  - You should have received a copy of the GNU General Public License                             -
-  - along with Iridium HQ - Backend. If not, see https://www.gnu.org/licenses/                    -
-  -                                                                                               -
-  - SPDX-License-Identifier: GPL-3.0-or-later                                                     -
-  ------------------------------------------------------------------------------------------------->
+<!--
+  Profit Basetool - squadron-management web app.
+  Copyright (C) 2026 Lucas Greuloch
+
+  SPDX-License-Identifier: GPL-3.0-only
+
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, version 3.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+-->
 
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
   "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">

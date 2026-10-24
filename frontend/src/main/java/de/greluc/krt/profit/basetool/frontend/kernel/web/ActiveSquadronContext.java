@@ -35,7 +35,7 @@ public final class ActiveSquadronContext {
    * Frontend session attribute holding the caller's active OrgUnit id, relayed to the backend as
    * {@code X-Active-Org-Unit-Id}.
    */
-  public static final String ACTIVE_ORG_UNIT_SESSION_KEY = "iridium.activeOrgUnitId";
+  public static final String ACTIVE_ORG_UNIT_SESSION_KEY = "basetool.activeOrgUnitId";
 
   private static final ThreadLocal<UUID> HOLDER = new ThreadLocal<>();
 

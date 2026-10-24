@@ -395,6 +395,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bash scripts/container-runtime.test.sh
 
+      - name: migrate-host-layout-selftest / Self-test the one-time host layout migration
+        if: ${{ !cancelled() }}
+        run: bash scripts/migrate-host-layout.test.sh
+
       - name: restic-repo-selftest / Self-test the backup's restic repository seam
         if: ${{ !cancelled() }}
         run: bash scripts/restic-repo.test.sh

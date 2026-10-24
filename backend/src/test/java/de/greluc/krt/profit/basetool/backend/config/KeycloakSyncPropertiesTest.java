@@ -37,7 +37,7 @@ class KeycloakSyncPropertiesTest {
         KeycloakSyncProperties.class,
         Map.of(
             "admin-url", "http://keycloak.test:8080",
-            "realm", "iri",
+            "realm", "basetool",
             "client-id", "sync-client",
             "client-secret", "not-a-real-secret"));
   }
@@ -57,7 +57,7 @@ class KeycloakSyncPropertiesTest {
     String printed = configured().toString();
 
     assertThat(printed)
-        .contains("sync-client", "iri", "<redacted>")
+        .contains("sync-client", "basetool", "<redacted>")
         .doesNotContain("not-a-real-secret");
   }
 }

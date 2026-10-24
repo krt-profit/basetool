@@ -69,14 +69,14 @@ class SecurityConfigInternalJwksDecoderTest {
 
   @Test
   void internalJwksDecoder_acceptsEs256Token_notJustRs256() throws Exception {
-    String jwkSetUri = server.url("/realms/iri/protocol/openid-connect/certs").toString();
+    String jwkSetUri = server.url("/realms/basetool/protocol/openid-connect/certs").toString();
     Instant now = Instant.now();
     SignedJWT signedJwt =
         new SignedJWT(
             new JWSHeader.Builder(JWSAlgorithm.ES256).keyID("k1").build(),
             new JWTClaimsSet.Builder()
                 .subject("caller-sub")
-                .issuer("https://keycloak.example/realms/iri")
+                .issuer("https://keycloak.example/realms/basetool")
                 .issueTime(Date.from(now))
                 .expirationTime(Date.from(now.plusSeconds(3600)))
                 .build());
@@ -85,7 +85,7 @@ class SecurityConfigInternalJwksDecoderTest {
 
     NimbusJwtDecoder decoder =
         SecurityConfig.buildDecoder(
-            "https://keycloak.example/realms/iri", jwkSetUri, new DefaultSslBundleRegistry());
+            "https://keycloak.example/realms/basetool", jwkSetUri, new DefaultSslBundleRegistry());
 
     Jwt decoded = assertDoesNotThrow(() -> decoder.decode(token));
     assertEquals("caller-sub", decoded.getSubject());

@@ -11,10 +11,10 @@ DropCapability=ALL
 NoNewPrivileges=true
 PublishPort=127.0.0.1:3100:3100
 Network=net-monitoring-core.network
-Volume=/var/iri/code/monitoring/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
-Volume=/var/iri/code/monitoring/loki/rules:/etc/loki/rules:ro
-Volume=/var/iri/monitoring/data/loki:/loki
-EnvironmentFile=/var/iri/code/env.d/loki.env
+Volume=/opt/basetool/monitoring/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+Volume=/opt/basetool/monitoring/loki/rules:/etc/loki/rules:ro
+Volume=/var/lib/basetool/monitoring/loki:/loki
+EnvironmentFile=/etc/basetool/env.d/loki.env
 Exec=-config.file=/etc/loki/loki-config.yml
 Memory=384M
 PidsLimit=512

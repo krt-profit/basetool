@@ -1,0 +1,2 @@
+f     /run/lock/basetool-deploy.lock         0600 deploy deploy -   -
+f     /run/lock/basetool-container-cleanup.lock 0600 deploy deploy -   -

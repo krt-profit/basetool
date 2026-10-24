@@ -23,4 +23,4 @@ tests:
               instance: "redis-exporter:9121"
             exp_annotations:
               summary: "Redis down"
-              description: "redis-exporter has not been able to reach Redis for 2 minutes (redis_up == 0) while the exporter itself answers. Redis holds every web session and the live-sync fan-out, so members are being logged out and live updates have stopped. Check `sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) systemctl --user status redis.service` and `journalctl CONTAINER_NAME=redis`; a missing or unreadable /var/iri/redis/users.acl stops it from starting at all (ADR-0088)."
+              description: "redis-exporter has not been able to reach Redis for 2 minutes (redis_up == 0) while the exporter itself answers. Redis holds every web session and the live-sync fan-out, so members are being logged out and live updates have stopped. Check `sudo -u basetool XDG_RUNTIME_DIR=/run/user/$(id -u basetool) systemctl --user status redis.service` and `journalctl CONTAINER_NAME=redis`; a missing or unreadable /var/lib/basetool/redis/users.acl stops it from starting at all (ADR-0088)."

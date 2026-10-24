@@ -137,12 +137,12 @@
                 th:attr="data-account-no=${a.accountNo()}">
                 <td>
                     <a class="row-link" data-testid="row-link" th:href="@{'/bank/accounts/' + ${a.id()}}">
-                        <span class="cell-title" th:text="${a.name()}">Staffel IRIDIUM</span>
+                        <span class="cell-title" th:text="${a.name()}">Staffel ALPHA</span>
                         <span class="cell-sub" th:text="${a.accountNo()} + ' &middot; ' + #{'bank.account.type.' + ${a.type()}}">KB-0001 &middot; Org-Einheit</span>
                     </a>
                 </td>
                 <td th:attr="data-label=#{bank.manage.account.ref}"
-                    th:text="${a.orgUnit() != null ? a.orgUnit().name() : (a.areaName() != null ? a.areaName() : '—')}">IRIDIUM</td>
+                    th:text="${a.orgUnit() != null ? a.orgUnit().name() : (a.areaName() != null ? a.areaName() : '—')}">ALPHA</td>
                 <td class="num"
                     th:text="${#numbers.formatInteger(@moneyFormat.round(a.balance()), 1, 'DEFAULT')}">1.850.000</td>
                 <td class="cell-status">
@@ -285,7 +285,7 @@
                             <option value="" th:text="#{bank.field.orgUnit.placeholder}">Org-Einheit w&auml;hlen &hellip;</option>
                             <option th:each="ou : ${orgUnits}" th:value="${ou.orgUnitId()}"
                                     th:data-kind="${ou.kind()}"
-                                    th:text="${ou.orgUnitName()} + (${ou.orgUnitShorthand() != null} ? ' (' + ${ou.orgUnitShorthand()} + ')' : '')">IRIDIUM</option>
+                                    th:text="${ou.orgUnitName()} + (${ou.orgUnitShorthand() != null} ? ' (' + ${ou.orgUnitShorthand()} + ')' : '')">ALPHA</option>
                         </select>
                         <span class="bank-field-error" data-error-for="orgUnitId"></span>
                     </div>

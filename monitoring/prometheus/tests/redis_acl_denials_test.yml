@@ -19,7 +19,7 @@ tests:
               severity: warning
             exp_annotations:
               summary: "Redis is refusing authentication or commands under its ACL (20 in 5m)"
-              description: "Redis counted ACL refusals (INFO acl_access_denied_auth/cmd/key/channel). With one ACL user per service (REQ-SEC-068) that is a service whose REDIS_<SVC>_PASSWORD does not match the rendered /var/iri/redis/users.acl, a rule in scripts/redis-users.acl.tmpl too narrow for what the service does, or a client that is none of ours. Run `redis-cli ACL LOG 20` inside the redis container as the admin user and read the username, reason and context fields only — the object field can carry a session key, i.e. a session id. See docs/deployment.md, The Redis ACL."
+              description: "Redis counted ACL refusals (INFO acl_access_denied_auth/cmd/key/channel). With one ACL user per service (REQ-SEC-068) that is a service whose REDIS_<SVC>_PASSWORD does not match the rendered /var/lib/basetool/redis/users.acl, a rule in scripts/redis-users.acl.tmpl too narrow for what the service does, or a client that is none of ours. Run `redis-cli ACL LOG 20` inside the redis container as the admin user and read the username, reason and context fields only — the object field can carry a session key, i.e. a session id. See docs/deployment.md, The Redis ACL."
 
   - name: fires - a service refused a channel on every publish
     interval: 1m
@@ -34,7 +34,7 @@ tests:
               severity: warning
             exp_annotations:
               summary: "Redis is refusing authentication or commands under its ACL (5 in 5m)"
-              description: "Redis counted ACL refusals (INFO acl_access_denied_auth/cmd/key/channel). With one ACL user per service (REQ-SEC-068) that is a service whose REDIS_<SVC>_PASSWORD does not match the rendered /var/iri/redis/users.acl, a rule in scripts/redis-users.acl.tmpl too narrow for what the service does, or a client that is none of ours. Run `redis-cli ACL LOG 20` inside the redis container as the admin user and read the username, reason and context fields only — the object field can carry a session key, i.e. a session id. See docs/deployment.md, The Redis ACL."
+              description: "Redis counted ACL refusals (INFO acl_access_denied_auth/cmd/key/channel). With one ACL user per service (REQ-SEC-068) that is a service whose REDIS_<SVC>_PASSWORD does not match the rendered /var/lib/basetool/redis/users.acl, a rule in scripts/redis-users.acl.tmpl too narrow for what the service does, or a client that is none of ours. Run `redis-cli ACL LOG 20` inside the redis container as the admin user and read the username, reason and context fields only — the object field can carry a session key, i.e. a session id. See docs/deployment.md, The Redis ACL."
 
   - name: silent - a single refusal
     interval: 1m

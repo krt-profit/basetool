@@ -69,7 +69,7 @@ case "${EDGE_GRAFANA_UPSTREAM_VERIFY:-off}" in
     if [ ! -s "${GRAFANA_UPSTREAM_CERT}" ]; then
       echo "edge: refusing to start - EDGE_GRAFANA_UPSTREAM_VERIFY=on but ${GRAFANA_UPSTREAM_CERT}" >&2
       echo "edge: is missing or empty. It is Grafana's own certificate, mounted from" >&2
-      echo "edge: /var/iri/monitoring/certs/grafana.crt (monitoring/README.md)." >&2
+      echo "edge: /etc/basetool/monitoring/certs/grafana.crt (monitoring/README.md)." >&2
       exit 1
     fi
     EDGE_GRAFANA_UPSTREAM_TLS='include /etc/nginx/edge/include/upstream-grafana-tls.conf;'

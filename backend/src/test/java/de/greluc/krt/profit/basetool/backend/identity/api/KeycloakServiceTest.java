@@ -161,7 +161,7 @@ class KeycloakServiceTest {
                   "admin-url",
                   server.url("/").toString().replaceAll("/+$", ""),
                   "realm",
-                  "iri",
+                  "basetool",
                   "client-id",
                   "client",
                   "client-secret",
@@ -198,7 +198,7 @@ class KeycloakServiceTest {
                   "admin-url",
                   server.url("/").toString().replaceAll("/+$", ""),
                   "realm",
-                  "iri",
+                  "basetool",
                   "client-id",
                   "client",
                   "client-secret",
@@ -269,7 +269,7 @@ class KeycloakServiceTest {
                   "admin-url",
                   server.url("/").toString().replaceAll("/+$", ""),
                   "realm",
-                  "iri",
+                  "basetool",
                   "client-id",
                   "client",
                   "client-secret",
@@ -322,7 +322,7 @@ class KeycloakServiceTest {
                   "admin-url",
                   server.url("/").toString().replaceAll("/+$", ""),
                   "realm",
-                  "iri",
+                  "basetool",
                   "client-id",
                   "client",
                   "client-secret",
@@ -375,7 +375,7 @@ class KeycloakServiceTest {
                   "admin-url",
                   server.url("/").toString().replaceAll("/+$", ""),
                   "realm",
-                  "iri",
+                  "basetool",
                   "client-id",
                   "client",
                   "client-secret",
@@ -439,7 +439,7 @@ class KeycloakServiceTest {
                   "admin-url",
                   server.url("/").toString().replaceAll("/+$", ""),
                   "realm",
-                  "iri",
+                  "basetool",
                   "client-id",
                   "client",
                   "client-secret",
@@ -502,7 +502,7 @@ class KeycloakServiceTest {
                   "admin-url",
                   server.url("/").toString().replaceAll("/+$", ""),
                   "realm",
-                  "iri",
+                  "basetool",
                   "client-id",
                   "client",
                   "client-secret",
@@ -555,7 +555,7 @@ class KeycloakServiceTest {
                   "admin-url",
                   server.url("/").toString().replaceAll("/+$", ""),
                   "realm",
-                  "iri",
+                  "basetool",
                   "client-id",
                   "client",
                   "client-secret",
@@ -607,7 +607,7 @@ class KeycloakServiceTest {
                   "admin-url",
                   server.url("/").toString().replaceAll("/+$", ""),
                   "realm",
-                  "iri",
+                  "basetool",
                   "client-id",
                   "backend-service",
                   "client-secret",
@@ -663,7 +663,7 @@ class KeycloakServiceTest {
                   "admin-url",
                   server.url("/").toString().replaceAll("/+$", ""),
                   "realm",
-                  "iri",
+                  "basetool",
                   "client-id",
                   "client",
                   "client-secret",
@@ -949,7 +949,7 @@ class KeycloakServiceTest {
       assertTrue(list.getPath().endsWith("/users/" + member + "/sessions"));
       RecordedRequest delete = server.takeRequest();
       assertEquals("DELETE", delete.getMethod());
-      assertTrue(delete.getPath().endsWith("/admin/realms/iri/sessions/own"));
+      assertTrue(delete.getPath().endsWith("/admin/realms/basetool/sessions/own"));
       assertEquals(1, shared);
       assertEquals(3, server.getRequestCount(), "the shared and the web session stay");
     } finally {
@@ -1040,7 +1040,7 @@ class KeycloakServiceTest {
           delete
               .getPath()
               .endsWith(
-                  "/admin/realms/iri/basetool-exchange/users/"
+                  "/admin/realms/basetool/basetool-exchange/users/"
                       + member
                       + "/clients/basetool-sc-extractor/sessions"));
     } finally {
@@ -1182,7 +1182,7 @@ class KeycloakServiceTest {
                 "admin-url",
                 server.url("/").toString().replaceAll("/+$", ""),
                 "realm",
-                "iri",
+                "basetool",
                 "client-id",
                 "client",
                 "client-secret",
@@ -1246,8 +1246,8 @@ class KeycloakServiceTest {
   }
 
   /**
-   * Roles granted only through the realm's {@code default-roles-iri} composite, such as {@code KRT
-   * Member}, are folded into each user's roles (REQ-SEC-053).
+   * Roles granted only through the realm's {@code default-roles-basetool} composite, such as {@code
+   * KRT Member}, are folded into each user's roles (REQ-SEC-053).
    *
    * @throws Exception if the mock server cannot be started or stopped.
    */
@@ -1267,7 +1267,7 @@ class KeycloakServiceTest {
                   "admin-url",
                   server.url("/").toString().replaceAll("/+$", ""),
                   "realm",
-                  "iri",
+                  "basetool",
                   "client-id",
                   "client",
                   "client-secret",
@@ -1306,11 +1306,11 @@ class KeycloakServiceTest {
       server.takeRequest();
       RecordedRequest composites = server.takeRequest();
       assertTrue(
-          composites.getPath().contains("/roles/default-roles-iri/composites/realm"),
+          composites.getPath().contains("/roles/default-roles-basetool/composites/realm"),
           "the composite is read on the realm's own default role: " + composites.getPath());
       RecordedRequest compositeMembers = server.takeRequest();
       assertTrue(
-          compositeMembers.getPath().contains("/roles/default-roles-iri/users"),
+          compositeMembers.getPath().contains("/roles/default-roles-basetool/users"),
           "its members are everyone the composite grants to: " + compositeMembers.getPath());
     } finally {
       server.shutdown();
@@ -1339,7 +1339,7 @@ class KeycloakServiceTest {
                   "admin-url",
                   server.url("/").toString().replaceAll("/+$", ""),
                   "realm",
-                  "iri",
+                  "basetool",
                   "client-id",
                   "client",
                   "client-secret",
@@ -1394,7 +1394,7 @@ class KeycloakServiceTest {
                   "admin-url",
                   server.url("/").toString().replaceAll("/+$", ""),
                   "realm",
-                  "iri",
+                  "basetool",
                   "client-id",
                   "client",
                   "client-secret",

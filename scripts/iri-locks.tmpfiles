@@ -1,2 +1,0 @@
-f     /var/lock/iri-deploy.lock         0600 deploy deploy -   -
-f     /var/lock/iri-container-cleanup.lock 0600 deploy deploy -   -

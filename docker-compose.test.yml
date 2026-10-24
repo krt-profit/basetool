@@ -15,9 +15,9 @@ services:
       SPRING_PROFILES_ACTIVE: dev
       SERVER_SSL_KEY_STORE_PASSWORD: basetool-test
       APP_NOTIFICATIONS_REDIS_FANOUT_ENABLED: "false"
-      KEYCLOAK_ISSUER_URI: http://host.docker.internal:18080/auth/realms/iri
+      KEYCLOAK_ISSUER_URI: http://host.docker.internal:18080/auth/realms/basetool
       KEYCLOAK_ADMIN_URL: http://keycloak:18080/auth
-      KEYCLOAK_REALM: iri
+      KEYCLOAK_REALM: basetool
       KEYCLOAK_ADMIN_CLIENT_ID: backend-service
       KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET}
     volumes: !override
@@ -33,7 +33,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: dev
       SERVER_SSL_KEY_STORE_PASSWORD: basetool-test
-      KEYCLOAK_ISSUER_URI: http://host.docker.internal:18080/auth/realms/iri
+      KEYCLOAK_ISSUER_URI: http://host.docker.internal:18080/auth/realms/basetool
       REDIS_HOST: redis
       BACKEND_URL: https://backend:11261
     extra_hosts:
@@ -50,7 +50,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: dev
       SERVER_SSL_KEY_STORE_PASSWORD: basetool-test
-      KEYCLOAK_ISSUER_URI: http://host.docker.internal:18080/auth/realms/iri
+      KEYCLOAK_ISSUER_URI: http://host.docker.internal:18080/auth/realms/basetool
       FRONTEND_URL: http://localhost:18081
     extra_hosts:
       - "host.docker.internal:host-gateway"

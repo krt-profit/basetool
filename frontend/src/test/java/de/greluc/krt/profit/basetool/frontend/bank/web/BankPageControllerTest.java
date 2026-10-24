@@ -62,7 +62,7 @@ class BankPageControllerTest {
     return new BankDashboardAccountDto(
         UUID.randomUUID(),
         "KB-0001",
-        "Staffel IRIDIUM",
+        "Staffel ALPHA",
         "ORG_UNIT",
         "ACTIVE",
         new BigDecimal("1850000"),
@@ -224,7 +224,7 @@ class BankPageControllerTest {
             List.of(
                 groupedAccount("KRT", "CARTEL", "ACTIVE", null, null, null),
                 groupedAccount("KRT Bank", "CARTEL_BANK", "ACTIVE", null, null, null),
-                groupedAccount("IRIDIUM", "ORG_UNIT", "ACTIVE", profit, "Profit", "PROFIT"),
+                groupedAccount("ALPHA", "ORG_UNIT", "ACTIVE", profit, "Profit", "PROFIT"),
                 groupedAccount("Profit", "AREA", "ACTIVE", profit, "Profit", "PROFIT"),
                 groupedAccount("Sonderkonto", "SPECIAL", "ACTIVE", null, null, null),
                 groupedAccount("Waise", "ORG_UNIT", "ACTIVE", null, null, null),
@@ -247,7 +247,7 @@ class BankPageControllerTest {
     assertEquals("Profit", bereich.bereichName());
     assertEquals("bank-dept--profit", bereich.deptClass());
     assertEquals(
-        List.of("Profit", "IRIDIUM"),
+        List.of("Profit", "ALPHA"),
         bereich.cards().stream().map(card -> card.account().name()).toList());
     assertEquals(
         List.of("Altkonto"),

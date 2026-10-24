@@ -7,7 +7,7 @@ tests:
   - name: fires - refresh events arrive without any client_id
     interval: 5m
     input_series:
-      - series: 'keycloak_user_events_total{job="keycloak", realm="iri", idp="", event="refresh_token", error=""}'
+      - series: 'keycloak_user_events_total{job="keycloak", realm="basetool", idp="", event="refresh_token", error=""}'
         values: "0+2x40"
     alert_rule_test:
       - eval_time: 3h

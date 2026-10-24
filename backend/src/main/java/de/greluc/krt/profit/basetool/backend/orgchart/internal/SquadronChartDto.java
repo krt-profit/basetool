@@ -29,7 +29,7 @@ import org.jetbrains.annotations.Nullable;
  *
  * @param orgUnitId id of the owning Staffel.
  * @param name the Staffel's display name.
- * @param shorthand the Staffel's short tag (e.g. {@code IRI}).
+ * @param shorthand the Staffel's short tag (e.g. {@code ALP}).
  * @param lead the Staffelleiter node, or {@code null} when the seat is vacant.
  * @param commands the Kommandos, ordered for display; never {@code null}, at most four.
  * @param directEnsigns Ensigns reporting straight to the Staffelleiter, ordered for display; never

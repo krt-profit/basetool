@@ -7,7 +7,7 @@ tests:
   - name: silent - a new client's first few logins stay under the floor
     interval: 30m
     input_series:
-      - series: 'keycloak_user_events_total{job="keycloak", realm="iri", idp="", event="oauth2_device_verify_user_code", error="", client_id="hangar-exporter"}'
+      - series: 'keycloak_user_events_total{job="keycloak", realm="basetool", idp="", event="oauth2_device_verify_user_code", error="", client_id="hangar-exporter"}'
         values: "0x336 1+1x6"
     alert_rule_test:
       - eval_time: 170h

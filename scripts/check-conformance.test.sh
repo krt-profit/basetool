@@ -262,30 +262,30 @@ case "$cmd" in
       *)       echo "example.test ingest.example.test" ;;
     esac
     ;;
-  *"test -r /var/iri/code/.env"*)
+  *"test -r /etc/basetool/basetool.env"*)
     case "$scenario" in
       env-unreadable) echo "" ;;
       *)              echo "yes" ;;
     esac
     ;;
-  *"test -e /var/iri/code/.env"*)
+  *"test -e /etc/basetool/basetool.env"*)
     case "$scenario" in
       env-no-env) echo "" ;;
       *)          echo "yes" ;;
     esac
     ;;
-  *"test -f /var/iri/code/.env"*)
+  *"test -f /etc/basetool/basetool.env"*)
     case "$scenario" in
       env-no-env) echo "" ;;
       *)          echo "yes" ;;
     esac
     ;;
-  *"/var/iri/code/.env"*)
+  *"/etc/basetool/basetool.env"*)
     case "$scenario" in
       env-no-env)     echo "" ;;
       env-unreadable) echo "" ;;
-      env-orphan)     printf 'IRI_TRUSTSTORE_HOST_PATH=/var/iri/secrets/truststore.p12\n' ;;
-      env-dropin)     printf 'IRI_KEYCLOAK_HOST_ALIAS=basetool.example.test:10.0.0.9\n' ;;
+      env-orphan)     printf 'BASETOOL_TRUSTSTORE_HOST_PATH=/etc/basetool/secrets/truststore.p12\n' ;;
+      env-dropin)     printf 'BASETOOL_KEYCLOAK_HOST_ALIAS=basetool.example.test:10.0.0.9\n' ;;
       traces-on|traces-absent|traces-zero)
                       printf 'MONITORING_TRACING_ENABLED=true\n' ;;
       traces-off)     printf 'MONITORING_TRACING_ENABLED=false\n' ;;
@@ -296,7 +296,7 @@ case "$cmd" in
     case "$scenario" in
       env-no-units) echo "" ;;
       env-dropin)   printf '[Container]\nAddHost=basetool.example.test:10.0.0.9\n' ;;
-      *)            printf '[Container]\nImage=ghcr.io/example/basetool-backend:stable\nVolume=/var/iri/secrets/keystore.p12:/run/secrets/truststore.p12:ro\n' ;;
+      *)            printf '[Container]\nImage=ghcr.io/example/basetool-backend:stable\nVolume=/etc/basetool/secrets/keystore.p12:/run/secrets/truststore.p12:ro\n' ;;
     esac
     ;;
   *"exec prometheus"*|*"query="*)
@@ -731,7 +731,7 @@ STUB_SCENARIO=env-dropin assert_status \
   env-reaches-the-units pass "reach the units" -- "${STUB_ARGS[@]}"
 STUB_SCENARIO=env-no-env assert_status \
   "env-reaches-the-units skips when the host has no .env" \
-  env-reaches-the-units skip "no /var/iri/code/.env" -- "${STUB_ARGS[@]}"
+  env-reaches-the-units skip "no /etc/basetool/basetool.env" -- "${STUB_ARGS[@]}"
 STUB_SCENARIO=env-no-units assert_status \
   "env-reaches-the-units skips when the host has no Quadlet units anywhere" \
   env-reaches-the-units skip "no Quadlet units found" -- "${STUB_ARGS[@]}"

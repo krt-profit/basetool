@@ -32,7 +32,7 @@
                     <option th:each="ou : ${availableOrgUnits}"
                             th:value="${ou.orgUnitId()}"
                             th:selected="${activeSquadronId != null and activeSquadronId == ou.orgUnitId()}"
-                            th:text="${ou.orgUnitShorthand() != null ? ou.orgUnitShorthand() + ' — ' + ou.orgUnitName() : ou.orgUnitName()}">IRI — IRIDIUM</option>
+                            th:text="${ou.orgUnitShorthand() != null ? ou.orgUnitShorthand() + ' — ' + ou.orgUnitName() : ou.orgUnitName()}">ALP — ALPHA</option>
                 </select>
                 <noscript>
                     <button type="submit" class="squadron-switcher-submit">&#x2713;</button>
@@ -336,7 +336,7 @@
                     <span class="nav-user-text">
                         <span class="nav-user-name" sec:authentication="name">greluc</span>
                         <span class="nav-user-meta">
-                            <th:block th:if="${activeOrgUnit != null}"><span th:text="${activeOrgUnit.orgUnitName()}">IRIDIUM</span> · </th:block><span sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" th:text="#{nav.user.role.admin}">Admin</span><span sec:authorize="!hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN) and hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER)" th:text="#{nav.user.role.officer}">Offizier</span><span sec:authorize="!hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER)" th:text="#{nav.user.role.member}">Mitglied</span>
+                            <th:block th:if="${activeOrgUnit != null}"><span th:text="${activeOrgUnit.orgUnitName()}">ALPHA</span> · </th:block><span sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" th:text="#{nav.user.role.admin}">Admin</span><span sec:authorize="!hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN) and hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER)" th:text="#{nav.user.role.officer}">Offizier</span><span sec:authorize="!hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER)" th:text="#{nav.user.role.member}">Mitglied</span>
                         </span>
                     </span>
                     <svg class="krt-icon nav-user-chevron" aria-hidden="true"><use href="#krt-icon-chevron-up"></use></svg>

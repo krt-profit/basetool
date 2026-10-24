@@ -1,7 +1,7 @@
 ---
 - name: Create the script directory
   ansible.builtin.file:
-    path: "{{ basetool_host_root_dir }}/code/scripts/lib"
+    path: "{{ basetool_host_release_dir }}/scripts/lib"
     state: directory
     owner: root
     group: root
@@ -10,7 +10,7 @@
 - name: Install the operational scripts
   ansible.builtin.copy:
     src: "{{ basetool_host_scripts_src }}/{{ item }}"
-    dest: "{{ basetool_host_root_dir }}/code/scripts/{{ item }}"
+    dest: "{{ basetool_host_release_dir }}/scripts/{{ item }}"
     owner: root
     group: root
     mode: "0755"
@@ -29,43 +29,10 @@
 - name: Install the Redis ACL rules template
   ansible.builtin.copy:
     src: "{{ basetool_host_scripts_src }}/redis-users.acl.tmpl"
-    dest: "{{ basetool_host_root_dir }}/code/scripts/redis-users.acl.tmpl"
+    dest: "{{ basetool_host_release_dir }}/scripts/redis-users.acl.tmpl"
     owner: root
     group: root
     mode: "0644"
-
-- name: Find out whether the retired cleanup units are present
-  ansible.builtin.stat:
-    path: "/etc/systemd/system/{{ item }}"
-  register: basetool_host_retired_cleanup
-  loop:
-    - iri-docker-cleanup.timer
-    - iri-docker-cleanup.service
-
-- name: Stop and disable the retired cleanup timer
-  ansible.builtin.systemd_service:
-    name: "{{ item.item }}"
-    state: stopped
-    enabled: false
-  loop: "{{ basetool_host_retired_cleanup.results }}"
-  loop_control:
-    label: "{{ item.item }}"
-  when: item.stat.exists | default(false)
-
-- name: Remove the retired cleanup units and their logrotate entry
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: absent
-  loop:
-    - /etc/systemd/system/iri-docker-cleanup.timer
-    - /etc/systemd/system/iri-docker-cleanup.service
-    - /etc/logrotate.d/iri-docker-cleanup
-  notify: Reload systemd for the operational units
-
-- name: Remove the retired cleanup script
-  ansible.builtin.file:
-    path: "{{ basetool_host_root_dir }}/code/scripts/docker-cleanup.sh"
-    state: absent
 
 - name: Install the systemd units and their timers
   ansible.builtin.copy:
@@ -75,14 +42,14 @@
     group: root
     mode: "0644"
   loop:
-    - iri-deploy.service
-    - iri-deploy.timer
-    - iri-backup.service
-    - iri-backup.timer
-    - iri-restore-drill.service
-    - iri-restore-drill.timer
-    - iri-container-cleanup.service
-    - iri-container-cleanup.timer
+    - basetool-deploy.service
+    - basetool-deploy.timer
+    - basetool-backup.service
+    - basetool-backup.timer
+    - basetool-restore-drill.service
+    - basetool-restore-drill.timer
+    - basetool-container-cleanup.service
+    - basetool-container-cleanup.timer
   notify: Reload systemd for the operational units
 
 - name: Make room for the shared sandbox drop-in
@@ -96,7 +63,7 @@
 
 - name: Install the sandbox the deploy-account units share
   ansible.builtin.copy:
-    src: "{{ basetool_host_scripts_src }}/iri-deploy-account-sandbox.conf"
+    src: "{{ basetool_host_scripts_src }}/basetool-deploy-account-sandbox.conf"
     dest: "/etc/systemd/system/{{ item }}.d/10-deploy-account-sandbox.conf"
     owner: root
     group: root
@@ -123,7 +90,7 @@
 
 - name: Order the deploy-account units after the service user's manager
   ansible.builtin.template:
-    src: iri-deploy-account-order.conf.j2
+    src: basetool-deploy-account-order.conf.j2
     dest: "/etc/systemd/system/{{ item }}.d/20-service-user.conf"
     owner: root
     group: root
@@ -139,22 +106,22 @@
     group: root
     mode: "0644"
   loop:
-    - { src: iri-deploy.logrotate, dest: iri-deploy }
-    - { src: iri-backup.logrotate, dest: iri-backup }
-    - { src: iri-restore-drill.logrotate, dest: iri-restore-drill }
-    - { src: iri-container-cleanup.logrotate, dest: iri-container-cleanup }
+    - { src: basetool-deploy.logrotate, dest: basetool-deploy }
+    - { src: basetool-backup.logrotate, dest: basetool-backup }
+    - { src: basetool-restore-drill.logrotate, dest: basetool-restore-drill }
+    - { src: basetool-container-cleanup.logrotate, dest: basetool-container-cleanup }
 
 - name: Install the lock files the operational units coordinate through
   ansible.builtin.copy:
-    src: "{{ basetool_host_scripts_src }}/iri-locks.tmpfiles"
-    dest: /etc/tmpfiles.d/iri-locks.conf
+    src: "{{ basetool_host_scripts_src }}/basetool-locks.tmpfiles"
+    dest: /etc/tmpfiles.d/basetool-locks.conf
     owner: root
     group: root
     mode: "0644"
   register: basetool_host_lock_rules
 
 - name: Create them now, rather than at the next boot
-  ansible.builtin.command: systemd-tmpfiles --create /etc/tmpfiles.d/iri-locks.conf
+  ansible.builtin.command: systemd-tmpfiles --create /etc/tmpfiles.d/basetool-locks.conf
   when:
     - basetool_host_lock_rules.changed
     - not ansible_check_mode
@@ -169,10 +136,10 @@
   changed_when: false
   failed_when: basetool_host_unit_verify.rc != 0
   loop:
-    - iri-deploy.service
-    - iri-backup.service
-    - iri-restore-drill.service
-    - iri-container-cleanup.service
+    - basetool-deploy.service
+    - basetool-backup.service
+    - basetool-restore-drill.service
+    - basetool-container-cleanup.service
   when: not ansible_check_mode
 
 - name: Enable the timers for the next boot, without starting them
@@ -181,18 +148,18 @@
     enabled: true
     daemon_reload: true
   loop:
-    - iri-deploy.timer
-    - iri-backup.timer
-    - iri-restore-drill.timer
-    - iri-container-cleanup.timer
+    - basetool-deploy.timer
+    - basetool-backup.timer
+    - basetool-restore-drill.timer
+    - basetool-container-cleanup.timer
   when: not ansible_check_mode
 
 - name: Say what is now on the host and what still has to happen
   ansible.builtin.debug:
     msg: >-
-      The operational scripts are at {{ basetool_host_root_dir }}/code/scripts (root-owned, 0755 --
+      The operational scripts are at {{ basetool_host_release_dir }}/scripts (root-owned, 0755 --
       the deploy account runs them and cannot rewrite them), the four units are installed and
       verified, and their timers are ENABLED but NOT STARTED. Nothing deploys until an operator
-      starts iri-deploy.timer or the host reboots. The registry pull token and
+      starts basetool-deploy.timer or the host reboots. The registry pull token and
       {{ basetool_host_token_dir }}/backup.env are still operator-provided secrets and are not
       delivered by this role.

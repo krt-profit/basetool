@@ -70,13 +70,13 @@ class ExchangeOrgStockRouteTest {
   private static final UUID MATERIAL = UUID.randomUUID();
   private static final String PAGE =
       """
-      {"items":[{"key":"u:%1$s|m:x","unit":{"id":"%1$s","name":"Staffel Iridium"},
+      {"items":[{"key":"u:%1$s|m:x","unit":{"id":"%1$s","name":"Staffel Alpha"},
                  "material":{"bt":"%2$s","name":"Laranite"},"location":{"name":"Area18"},
                  "quality":500,"stolen":false,"quantity":{"amount":12.5,"unit":"SCU"},
                  "earmarked":{"jobOrders":{"amount":2,"unit":"SCU"},
                               "missions":{"amount":0,"unit":"SCU"}}}],
        "removed":[],
-       "units":[{"id":"%1$s","name":"Staffel Iridium","shorthand":"IRI","kind":"SQUADRON",
+       "units":[{"id":"%1$s","name":"Staffel Alpha","shorthand":"ALP","kind":"SQUADRON",
                  "logistician":true}],
        "nextCursor":null,"hasMore":false}
       """
@@ -184,7 +184,7 @@ class ExchangeOrgStockRouteTest {
         .thenReturn(
             ok(
                 """
-                {"unit":{"id":"%s","name":"Staffel Iridium"},
+                {"unit":{"id":"%s","name":"Staffel Alpha"},
                  "items":[{"ref":"r1","name":"Cpt. Holder"}]}
                 """
                     .formatted(UNIT)));
@@ -243,7 +243,7 @@ class ExchangeOrgStockRouteTest {
         .thenReturn(
             ok(
                 """
-                {"unit":{"id":"%s","name":"Staffel Iridium"},
+                {"unit":{"id":"%s","name":"Staffel Alpha"},
                  "jobOrders":[{"id":"o1","number":412,"status":"OPEN"}],
                  "missions":[{"id":"m1","name":"Laranite run","status":"PLANNED"}]}
                 """
@@ -283,7 +283,7 @@ class ExchangeOrgStockRouteTest {
         .thenReturn(
             ok(
                 """
-                {"unit":{"id":"%s","name":"Staffel Iridium"},
+                {"unit":{"id":"%s","name":"Staffel Alpha"},
                  "jobOrders":[{"id":"o1","status":"COMPLETED"}],"missions":[]}
                 """
                     .formatted(UNIT)));

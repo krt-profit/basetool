@@ -68,8 +68,9 @@ public class JwtAudienceStartupCheck {
     if (environment.matchesProfiles(PROD_PROFILE)) {
       throw new IllegalStateException(
           "app.security.jwt.expected-audiences is blank under the prod profile. Set"
-              + " IRI_BACKEND_EXPECTED_AUDIENCES (normally basetool-backend) in the host .env:"
-              + " without it the backend would accept any validly-signed token of the realm.");
+              + " BASETOOL_BACKEND_EXPECTED_AUDIENCES (normally basetool-backend) in the host env"
+              + " file: without it the backend would accept any validly-signed token of the"
+              + " realm.");
     }
     log.warn(
         "JWT audience check is OFF (app.security.jwt.expected-audiences is blank); every"

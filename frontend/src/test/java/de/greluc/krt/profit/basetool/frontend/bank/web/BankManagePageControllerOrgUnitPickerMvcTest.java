@@ -74,7 +74,7 @@ class BankManagePageControllerOrgUnitPickerMvcTest {
   void manage_orgUnitOption_rendersNameAndIdNotNull() throws Exception {
     UUID orgUnitId = UUID.randomUUID();
     OrgUnitMembershipOptionDto staffel =
-        new OrgUnitMembershipOptionDto(orgUnitId, "Staffel IRIDIUM", "IRI", "SQUADRON", true);
+        new OrgUnitMembershipOptionDto(orgUnitId, "Staffel ALPHA", "ALP", "SQUADRON", true);
 
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef()))
@@ -84,7 +84,7 @@ class BankManagePageControllerOrgUnitPickerMvcTest {
         .perform(get("/bank/manage"))
         .andExpect(status().isOk())
         .andExpect(view().name("bank/bank-manage"))
-        .andExpect(content().string(Matchers.containsString("Staffel IRIDIUM (IRI)")))
+        .andExpect(content().string(Matchers.containsString("Staffel ALPHA (ALP)")))
         .andExpect(content().string(Matchers.containsString("value=\"" + orgUnitId + "\"")))
         .andExpect(content().string(Matchers.not(Matchers.containsString(">null</option>"))));
   }

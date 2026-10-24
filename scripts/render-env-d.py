@@ -17,7 +17,7 @@ Usage
 -----
 ::
 
-    render-env-d.py --env /var/iri/code/.env --templates quadlet/env.d --out /var/iri/code/env.d
+    render-env-d.py --env /etc/basetool/basetool.env --templates quadlet/env.d --out /etc/basetool/env.d
     render-env-d.py ... --check     # report drift, write nothing
 
 Exit codes: ``0`` clean, ``1`` a refusal or (under ``--check``) drift, ``2`` bad invocation.

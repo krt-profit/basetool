@@ -97,7 +97,7 @@ class TrustedTypesModeTest {
     MockHttpServletRequest request = new MockHttpServletRequest();
     request.setAttribute(CspNonceFilter.REQUEST_ATTRIBUTE, "n0nce");
     MockHttpServletResponse response = new MockHttpServletResponse();
-    SecurityHeaders.cspNonceHeaderWriter("https://auth.example.test/realms/iri", mode)
+    SecurityHeaders.cspNonceHeaderWriter("https://auth.example.test/realms/basetool", mode)
         .writeHeaders(request, response);
     return response;
   }

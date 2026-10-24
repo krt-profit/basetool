@@ -4,45 +4,45 @@ set -euo pipefail
 
 umask 022
 
-IRI_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BASETOOL_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source-path=SCRIPTDIR
 # shellcheck source=lib/common.sh
 # shellcheck disable=SC1091
-. "${IRI_SCRIPT_DIR}/lib/common.sh"
+. "${BASETOOL_SCRIPT_DIR}/lib/common.sh"
 # shellcheck source=lib/container-runtime.sh
 # shellcheck disable=SC1091
-. "${IRI_SCRIPT_DIR}/lib/container-runtime.sh"
+. "${BASETOOL_SCRIPT_DIR}/lib/container-runtime.sh"
 
 cd /
 
-COMPOSE_DIR="${IRI_COMPOSE_DIR:-/var/iri/code}"
-STATE_DIR="${IRI_STATE_DIR:-/var/lib/iri}"
-LOCKFILE="${IRI_LOCKFILE:-/var/lock/iri-deploy.lock}"
-TOKEN_FILE="${IRI_GHCR_TOKEN_FILE:-/etc/iri/ghcr-pull-token}"
-HEALTH_TIMEOUT="${IRI_HEALTH_TIMEOUT:-180}"
+COMPOSE_DIR="${BASETOOL_COMPOSE_DIR:-/opt/basetool}"
+STATE_DIR="${BASETOOL_STATE_DIR:-/var/lib/basetool/deploy}"
+LOCKFILE="${BASETOOL_LOCKFILE:-/run/lock/basetool-deploy.lock}"
+TOKEN_FILE="${BASETOOL_GHCR_TOKEN_FILE:-/etc/basetool/deploy/ghcr-pull-token}"
+HEALTH_TIMEOUT="${BASETOOL_HEALTH_TIMEOUT:-180}"
 
-if [[ -z "${IRI_MONITORING_ENABLED:-}" && -r "${COMPOSE_DIR}/.env" ]]; then
-  IRI_MONITORING_ENABLED="$(read_env IRI_MONITORING_ENABLED)"
-  export IRI_MONITORING_ENABLED
+if [[ -z "${BASETOOL_MONITORING_ENABLED:-}" && -r "${ENV_FILE}" ]]; then
+  BASETOOL_MONITORING_ENABLED="$(read_env BASETOOL_MONITORING_ENABLED)"
+  export BASETOOL_MONITORING_ENABLED
 fi
 
-REGISTRY="${IRI_REGISTRY:-ghcr.io}"
-NAMESPACE="${IRI_IMAGE_NAMESPACE:-krt-profit}"
-GHCR_USERNAME="${IRI_GHCR_USERNAME:-deploy-bot}"
+REGISTRY="${BASETOOL_REGISTRY:-ghcr.io}"
+NAMESPACE="${BASETOOL_IMAGE_NAMESPACE:-krt-profit}"
+GHCR_USERNAME="${BASETOOL_GHCR_USERNAME:-deploy-bot}"
 
-COSIGN_VERIFY="${IRI_COSIGN_VERIFY:-true}"
-COSIGN_REPO="${IRI_COSIGN_REPO:-krt-profit/basetool}"
-COSIGN_IDENTITY_REGEXP="${IRI_COSIGN_IDENTITY_REGEXP:-^https://github\\.com/${COSIGN_REPO}/\\.github/workflows/release-images\\.yml@refs/(heads/main|tags/v[0-9]+\\.[0-9]+\\.[0-9]+)$}"
-COSIGN_OIDC_ISSUER="${IRI_COSIGN_OIDC_ISSUER:-https://token.actions.githubusercontent.com}"
-COSIGN_VERIFY_ATTEMPTS="${IRI_COSIGN_VERIFY_ATTEMPTS:-3}"
-COSIGN_VERIFY_DELAY="${IRI_COSIGN_VERIFY_DELAY:-5}"
-REQUIRE_ONE_RELEASE="${IRI_REQUIRE_ONE_RELEASE:-true}"
-MIXED_RELEASE_GRACE="${IRI_MIXED_RELEASE_GRACE:-900}"
-COSIGN_SEARCH_PATH="${IRI_COSIGN_SEARCH_PATH:-/usr/local/bin:/usr/bin:/opt/cosign/bin}"
+COSIGN_VERIFY="${BASETOOL_COSIGN_VERIFY:-true}"
+COSIGN_REPO="${BASETOOL_COSIGN_REPO:-krt-profit/basetool}"
+COSIGN_IDENTITY_REGEXP="${BASETOOL_COSIGN_IDENTITY_REGEXP:-^https://github\\.com/${COSIGN_REPO}/\\.github/workflows/release-images\\.yml@refs/(heads/main|tags/v[0-9]+\\.[0-9]+\\.[0-9]+)$}"
+COSIGN_OIDC_ISSUER="${BASETOOL_COSIGN_OIDC_ISSUER:-https://token.actions.githubusercontent.com}"
+COSIGN_VERIFY_ATTEMPTS="${BASETOOL_COSIGN_VERIFY_ATTEMPTS:-3}"
+COSIGN_VERIFY_DELAY="${BASETOOL_COSIGN_VERIFY_DELAY:-5}"
+REQUIRE_ONE_RELEASE="${BASETOOL_REQUIRE_ONE_RELEASE:-true}"
+MIXED_RELEASE_GRACE="${BASETOOL_MIXED_RELEASE_GRACE:-900}"
+COSIGN_SEARCH_PATH="${BASETOOL_COSIGN_SEARCH_PATH:-/usr/local/bin:/usr/bin:/opt/cosign/bin}"
 VERIFY_LAST_ERROR=""
 
-HOST_SCRIPTS_DIR="${IRI_HOST_SCRIPTS_DIR:-${IRI_SCRIPT_DIR}}"
-REQUIRE_CURRENT_SCRIPTS="${IRI_REQUIRE_CURRENT_SCRIPTS:-true}"
+HOST_SCRIPTS_DIR="${BASETOOL_HOST_SCRIPTS_DIR:-${BASETOOL_SCRIPT_DIR}}"
+REQUIRE_CURRENT_SCRIPTS="${BASETOOL_REQUIRE_CURRENT_SCRIPTS:-true}"
 HOST_SCRIPTS_MANIFEST_NAME="host-scripts.sha256"
 APPLY_PATH_SCRIPTS=(deploy.sh lib/common.sh lib/container-runtime.sh render-env-d.py)
 HS_DIFFERS=()
@@ -55,11 +55,11 @@ CHECK_ONLY=false
 FORCE=false
 REAPPLY_REQUESTED=false
 
-BACKOFF_BASE="${IRI_BACKOFF_BASE:-600}"
-BACKOFF_MAX="${IRI_BACKOFF_MAX:-21600}"
+BACKOFF_BASE="${BASETOOL_BACKOFF_BASE:-600}"
+BACKOFF_MAX="${BASETOOL_BACKOFF_MAX:-21600}"
 
-HEALTH_RESTART_BASE="${IRI_HEALTH_RESTART_BASE:-300}"
-HEALTH_RESTART_MAX="${IRI_HEALTH_RESTART_MAX:-3600}"
+HEALTH_RESTART_BASE="${BASETOOL_HEALTH_RESTART_BASE:-300}"
+HEALTH_RESTART_MAX="${BASETOOL_HEALTH_RESTART_MAX:-3600}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -89,7 +89,7 @@ Options:
   --tag <ref>     Image tag/ref to deploy. Default: stable
                   Examples: stable, latest, 1.4.2, sha-abc1234
   --reapply       Re-apply the release that is DEPLOYED — the one
-                  /var/lib/iri/last-deployed.digests records — instead of
+                  /var/lib/basetool/deploy/last-deployed.digests records — instead of
                   resolving a tag: re-delivers its config bundle and units,
                   rewrites its digest pin, re-stages its provider JAR (swapped in
                   only if the live one differs) and runs the health gate. Rotates
@@ -110,39 +110,42 @@ Options:
   -h, --help      Show this help.
 
 Environment overrides (all optional, sensible defaults shown):
-  IRI_COMPOSE_DIR=/var/iri/code
-  IRI_STATE_DIR=/var/lib/iri
-  IRI_LOCKFILE=/var/lock/iri-deploy.lock
-  IRI_GHCR_TOKEN_FILE=/etc/iri/ghcr-pull-token
-  IRI_HEALTH_TIMEOUT=180
-  IRI_BACKOFF_BASE=600     (first retry delay after a failed target, seconds)
-  IRI_BACKOFF_MAX=21600    (cap for the exponential backoff, seconds)
-  IRI_HEALTH_RESTART_BASE=300   (first delay before re-restarting an unhealthy
+  BASETOOL_COMPOSE_DIR=/opt/basetool   (the release tree)
+  BASETOOL_CONFIG_DIR=/etc/basetool    (the host config: basetool.env and env.d)
+  BASETOOL_ENV_FILE=<CONFIG_DIR>/basetool.env
+  BASETOOL_ENV_D_DIR=<CONFIG_DIR>/env.d
+  BASETOOL_STATE_DIR=/var/lib/basetool/deploy
+  BASETOOL_LOCKFILE=/run/lock/basetool-deploy.lock
+  BASETOOL_GHCR_TOKEN_FILE=/etc/basetool/deploy/ghcr-pull-token
+  BASETOOL_HEALTH_TIMEOUT=180
+  BASETOOL_BACKOFF_BASE=600     (first retry delay after a failed target, seconds)
+  BASETOOL_BACKOFF_MAX=21600    (cap for the exponential backoff, seconds)
+  BASETOOL_HEALTH_RESTART_BASE=300   (first delay before re-restarting an unhealthy
                                  at-target service — the runtime-health path —
                                  and before retrying a failed re-apply, seconds)
-  IRI_HEALTH_RESTART_MAX=3600   (cap for the health-restart and re-apply
+  BASETOOL_HEALTH_RESTART_MAX=3600   (cap for the health-restart and re-apply
                                  backoffs, seconds)
-  IRI_REGISTRY=ghcr.io
-  IRI_IMAGE_NAMESPACE=krt-profit
-  IRI_GHCR_USERNAME=deploy-bot
-  IRI_COSIGN_VERIFY=true    (host-side cosign signature gate; false = break-glass,
+  BASETOOL_REGISTRY=ghcr.io
+  BASETOOL_IMAGE_NAMESPACE=krt-profit
+  BASETOOL_GHCR_USERNAME=deploy-bot
+  BASETOOL_COSIGN_VERIFY=true    (host-side cosign signature gate; false = break-glass,
                             Sigstore-outage only)
-  IRI_COSIGN_REPO=krt-profit/basetool   (repo whose release-images.yml identity signs)
-  IRI_COSIGN_IDENTITY_REGEXP=...        (override the trusted signer identity regexp)
-  IRI_COSIGN_OIDC_ISSUER=https://token.actions.githubusercontent.com
-  IRI_COSIGN_VERIFY_ATTEMPTS=3   (verify retries; a registry/Sigstore blip must
+  BASETOOL_COSIGN_REPO=krt-profit/basetool   (repo whose release-images.yml identity signs)
+  BASETOOL_COSIGN_IDENTITY_REGEXP=...        (override the trusted signer identity regexp)
+  BASETOOL_COSIGN_OIDC_ISSUER=https://token.actions.githubusercontent.com
+  BASETOOL_COSIGN_VERIFY_ATTEMPTS=3   (verify retries; a registry/Sigstore blip must
                                   not read as an untrusted image)
-  IRI_COSIGN_VERIFY_DELAY=5      (first retry delay in seconds, then doubling)
-  IRI_REQUIRE_ONE_RELEASE=true   (refuse a target set whose images do not share one
+  BASETOOL_COSIGN_VERIFY_DELAY=5      (first retry delay in seconds, then doubling)
+  BASETOOL_REQUIRE_ONE_RELEASE=true   (refuse a target set whose images do not share one
                                   org.opencontainers.image.revision; false = break-glass)
-  IRI_MIXED_RELEASE_GRACE=900   (seconds a mixed target set is waited out as a
+  BASETOOL_MIXED_RELEASE_GRACE=900   (seconds a mixed target set is waited out as a
                                   promotion in progress before it fails the deploy)
-  IRI_REQUIRE_CURRENT_SCRIPTS=true   (refuse a release whose config bundle lists a
+  BASETOOL_REQUIRE_CURRENT_SCRIPTS=true   (refuse a release whose config bundle lists a
                                   deploy.sh, lib/ or render-env-d.py hash the host's
                                   copy does not have; false = break-glass, --force
                                   also bypasses it)
-  IRI_HOST_SCRIPTS_DIR=<dir of this script>   (the host scripts that are hashed)
-  DOCKER_CONFIG=/var/lib/iri/.docker   (the registry credential cosign reads
+  BASETOOL_HOST_SCRIPTS_DIR=<dir of this script>   (the host scripts that are hashed)
+  DOCKER_CONFIG=/var/lib/basetool/deploy/.docker   (the registry credential cosign reads
                                         and skopeo shares via
                                         REGISTRY_AUTH_FILE; under STATE_DIR
                                         because the deploy user has no \$HOME)
@@ -394,13 +397,13 @@ assert_host_scripts_current_or_die() {
     return 0
   fi
   if [[ "${REQUIRE_CURRENT_SCRIPTS}" != "true" ]]; then
-    log "WARNING: host-scripts gate DISABLED (IRI_REQUIRE_CURRENT_SCRIPTS=false), applying with [${apply}] that are not this release's"
+    log "WARNING: host-scripts gate DISABLED (BASETOOL_REQUIRE_CURRENT_SCRIPTS=false), applying with [${apply}] that are not this release's"
     return 0
   fi
   PRE_GATE_GUARD=false
   rm -f "${KEYCLOAK_SPI_STAGE_JAR}"
   write_deploy_metric failure
-  fail "HOST SCRIPTS: [${apply}] on this host are not the ones this release was built with, and they are what applies it. Nothing was changed. Install that release's scripts first: run the role from its tag with --tags deploy,scripts (docs/deployment.md, Before a promotion: the host scripts); the next tick then applies the release. Break-glass: deploy.sh --force, or IRI_REQUIRE_CURRENT_SCRIPTS=false"
+  fail "HOST SCRIPTS: [${apply}] on this host are not the ones this release was built with, and they are what applies it. Nothing was changed. Install that release's scripts first: run the role from its tag with --tags deploy,scripts (docs/deployment.md, Before a promotion: the host scripts); the next tick then applies the release. Break-glass: deploy.sh --force, or BASETOOL_REQUIRE_CURRENT_SCRIPTS=false"
 }
 
 install_quadlet_units() {
@@ -417,7 +420,7 @@ install_quadlet_units() {
   DEPLOY_STEP="render ${ENV_D_DIR}"
   if [[ -d "${src}/env.d" ]]; then
     if [[ -x "${ENV_RENDERER}" ]]; then
-      if ! "${ENV_RENDERER}" --env "${COMPOSE_DIR}/.env"              --templates "${src}/env.d" --out "${ENV_D_DIR}" >/dev/null; then
+      if ! "${ENV_RENDERER}" --env "${ENV_FILE}"              --templates "${src}/env.d" --out "${ENV_D_DIR}" >/dev/null; then
         fail "rendering ${ENV_D_DIR} from the bundle's templates failed — a unit whose EnvironmentFile is missing does not start"
       fi
       log "rendered env.d from the bundle's templates"
@@ -462,8 +465,11 @@ assert_config_tree_writable() {
     [[ -w "${d}" ]] \
       || fail "PRE-FLIGHT: ${d} is not writable by $(id -un) — nothing was changed; fix the owner (docs/deployment.md → Troubleshooting, 'deploy stuck on a config apply')"
   done
-  if [[ -e "${ENV_D_DIR}" && ! -w "${ENV_D_DIR}" ]]; then
-    fail "PRE-FLIGHT: ${ENV_D_DIR} is not writable by $(id -un) — nothing was changed; the role's --tags directories restores deploy:iri 2750"
+  if [[ -e "${ENV_D_DIR}" ]]; then
+    [[ -w "${ENV_D_DIR}" ]] \
+      || fail "PRE-FLIGHT: ${ENV_D_DIR} is not writable by $(id -un) — nothing was changed; the role's --tags directories restores deploy:basetool 2750"
+  elif [[ -d "${src}/env.d" && ! -w "${ENV_D_DIR%/*}" ]]; then
+    fail "PRE-FLIGHT: ${ENV_D_DIR} does not exist and ${ENV_D_DIR%/*} is not writable by $(id -un), so it cannot be created — nothing was changed; the role's --tags directories creates it"
   fi
   for sub in monitoring docker/maintenance docker/edge docker/acme keycloak-theme quadlet; do
     [[ -d "${src}/${sub}" ]] || continue
@@ -549,7 +555,7 @@ write_prometheus_config_applied_metric() {
 
 write_monitoring_reconcile_state_metric() {
   {
-    echo "# HELP basetool_monitoring_reconcile_disabled 1 when the iri-monitoring stack is running but deploy.sh's monitoring reconcile is gated off (IRI_MONITORING_ENABLED != true), so on-disk monitoring config changes are never reloaded into the running Prometheus/alloy/blackbox."
+    echo "# HELP basetool_monitoring_reconcile_disabled 1 when the basetool-monitoring stack is running but deploy.sh's monitoring reconcile is gated off (BASETOOL_MONITORING_ENABLED != true), so on-disk monitoring config changes are never reloaded into the running Prometheus/alloy/blackbox."
     echo "# TYPE basetool_monitoring_reconcile_disabled gauge"
     echo "basetool_monitoring_reconcile_disabled{component=\"deploy\"} ${1}"
   } | write_textfile monitoring-reconcile.prom || true
@@ -598,9 +604,9 @@ reconcile_edge() {
 }
 
 reconcile_monitoring_reloads() {
-  if [[ "${IRI_MONITORING_ENABLED:-false}" != "true" ]]; then
+  if [[ "${BASETOOL_MONITORING_ENABLED:-false}" != "true" ]]; then
     if rt_monitoring_is_running; then
-      log "  monitoring: WARN iri-monitoring is RUNNING but IRI_MONITORING_ENABLED != 'true' — on-disk monitoring config changes will NOT be reloaded into Prometheus/alloy/blackbox (set IRI_MONITORING_ENABLED=true in the iri-deploy service env)"
+      log "  monitoring: WARN basetool-monitoring is RUNNING but BASETOOL_MONITORING_ENABLED != 'true' — on-disk monitoring config changes will NOT be reloaded into Prometheus/alloy/blackbox (set BASETOOL_MONITORING_ENABLED=true in the basetool-deploy service env)"
       write_monitoring_reconcile_state_metric 1
     fi
     return 0
@@ -657,7 +663,7 @@ restore_previous_keycloak_spi_jar() {
 verify_signature() {
   local ref="$1"
   if [[ "${COSIGN_VERIFY}" != "true" ]]; then
-    log "WARNING: signature verification DISABLED (IRI_COSIGN_VERIFY=false) — NOT verifying ${ref}"
+    log "WARNING: signature verification DISABLED (BASETOOL_COSIGN_VERIFY=false) — NOT verifying ${ref}"
     return 0
   fi
   local attempt delay err rc
@@ -736,7 +742,7 @@ mixed_release_waited_seconds() {
 
 assert_one_release_or_die() {
   if [[ "${REQUIRE_ONE_RELEASE}" != "true" ]]; then
-    log "WARNING: release-revision gate DISABLED (IRI_REQUIRE_ONE_RELEASE=false) — NOT comparing the images' source revisions"
+    log "WARNING: release-revision gate DISABLED (BASETOOL_REQUIRE_ONE_RELEASE=false) — NOT comparing the images' source revisions"
     return 0
   fi
   local problem rc=0 waited
@@ -748,7 +754,7 @@ assert_one_release_or_die() {
   fi
   if [[ "${rc}" -ne 1 ]]; then
     write_deploy_metric failure
-    fail "the ${TARGET_TAG} set cannot be shown to be one release: ${problem} — refusing to deploy, the next tick retries (IRI_REQUIRE_ONE_RELEASE=false is the break-glass)"
+    fail "the ${TARGET_TAG} set cannot be shown to be one release: ${problem} — refusing to deploy, the next tick retries (BASETOOL_REQUIRE_ONE_RELEASE=false is the break-glass)"
   fi
   waited="$(mixed_release_waited_seconds)"
   if (( waited < MIXED_RELEASE_GRACE )); then
@@ -756,7 +762,7 @@ assert_one_release_or_die() {
     exit 0
   fi
   write_deploy_metric failure
-  fail "the ${TARGET_TAG} set has not been one release for ${waited}s: ${problem} — a promotion was probably interrupted; refusing to deploy a mixed release, re-run promote.yml for one version to finish it (IRI_REQUIRE_ONE_RELEASE=false is the break-glass)"
+  fail "the ${TARGET_TAG} set has not been one release for ${waited}s: ${problem} — a promotion was probably interrupted; refusing to deploy a mixed release, re-run promote.yml for one version to finish it (BASETOOL_REQUIRE_ONE_RELEASE=false is the break-glass)"
 }
 
 check_only_verify_one() {
@@ -769,7 +775,7 @@ check_only_verify_one() {
   return 1
 }
 
-require_file "${COMPOSE_DIR}/.env"
+require_file "${ENV_FILE}"
 require_file "${TOKEN_FILE}"
 
 mkdir -p "${STATE_DIR}"
@@ -778,10 +784,9 @@ export DOCKER_CONFIG="${DOCKER_CONFIG:-${STATE_DIR}/.docker}"
 install -d -m 0700 "${DOCKER_CONFIG}"
 export REGISTRY_AUTH_FILE="${REGISTRY_AUTH_FILE:-${DOCKER_CONFIG}/config.json}"
 
-export HOME="${IRI_HOME:-${STATE_DIR}}"
+export HOME="${BASETOOL_HOME:-${STATE_DIR}}"
 
-ENV_D_DIR="${IRI_ENV_D_DIR:-${COMPOSE_DIR}/env.d}"
-ENV_RENDERER="${IRI_ENV_RENDERER:-${IRI_SCRIPT_DIR}/render-env-d.py}"
+ENV_RENDERER="${BASETOOL_ENV_RENDERER:-${BASETOOL_SCRIPT_DIR}/render-env-d.py}"
 
 rt_detect
 export RT_HEALTH_TIMEOUT="${HEALTH_TIMEOUT}"
@@ -790,7 +795,7 @@ log "container runtime: ${RT_BACKEND}"
 
 command -v skopeo >/dev/null 2>&1 \
   || fail "skopeo not available; it is how a tag is resolved without pulling (ansible role: 10-packages.yml)"
-QUADLET_BIN="${IRI_QUADLET_BIN:-}"
+QUADLET_BIN="${BASETOOL_QUADLET_BIN:-}"
 if [[ -z "${QUADLET_BIN}" ]]; then
   for candidate in /usr/libexec/podman/quadlet /usr/lib/podman/quadlet; do
     [[ -x "${candidate}" ]] && { QUADLET_BIN="${candidate}"; break; }
@@ -806,9 +811,9 @@ keystore_mount_sources() {
   src="$(grep -h -E '^Volume=[^:]+:(/run/secrets/[A-Za-z0-9._-]+\.p12|/etc/nginx/[A-Za-z0-9._-]+\.crt)(:|$)' "${RT_UNIT_DIR}"/*.container \
            2>/dev/null | sed -E 's/^Volume=([^:]+):.*/\1/' | sort -u || true)"
   if [[ -z "${src}" ]]; then
-    src="$(read_env IRI_KEYSTORE_HOST_PATH || true)"
+    src="$(read_env BASETOOL_KEYSTORE_HOST_PATH || true)"
   fi
-  printf '%s\n' "${src:-/var/iri/secrets/keystore.p12}"
+  printf '%s\n' "${src:-/etc/basetool/secrets/keystore.p12}"
 }
 while IFS= read -r KEYSTORE_HOST_PATH; do
   if [[ -n "${KEYSTORE_HOST_PATH}" ]]; then
@@ -828,7 +833,7 @@ if [[ "${COSIGN_VERIFY}" == "true" ]] && ! command -v cosign >/dev/null 2>&1; th
   unset _cosign_dir _cosign_dirs
 fi
 if [[ "${COSIGN_VERIFY}" == "true" ]] && ! command -v cosign >/dev/null 2>&1; then
-  fail "cosign not found on PATH or under ${COSIGN_SEARCH_PATH}, but signature verification is enabled — install cosign (see docs/deployment.md → 'Signature verification (cosign)') or set IRI_COSIGN_VERIFY=false ONLY to break glass during a Sigstore outage"
+  fail "cosign not found on PATH or under ${COSIGN_SEARCH_PATH}, but signature verification is enabled — install cosign (see docs/deployment.md → 'Signature verification (cosign)') or set BASETOOL_COSIGN_VERIFY=false ONLY to break glass during a Sigstore outage"
 fi
 
 PIN_FILE_CURRENT="${STATE_DIR}/current-digest-pin.yml"
@@ -848,12 +853,12 @@ KEYCLOAK_SPI_PREVIOUS_JAR="${STATE_DIR}/keycloak-spi-previous.jar"
 HEALTH_RESTART_FILE="${STATE_DIR}/health-restart.digests"
 MIXED_RELEASE_FILE="${STATE_DIR}/mixed-release.since"
 
-TEXTFILE_DIR="${IRI_MONITORING_TEXTFILE_DIR:-/var/iri/monitoring/textfile}"
+TEXTFILE_DIR="${BASETOOL_MONITORING_TEXTFILE_DIR:-/var/lib/basetool/textfile}"
 DEPLOY_METRIC_FILE="${TEXTFILE_DIR}/deploy.prom"
 STACK_HEALTH_METRIC_FILE="${TEXTFILE_DIR}/deploy-health.prom"
 START_EPOCH="$(date +%s)"
 
-TOKEN_EXPIRY_FILE="${IRI_GHCR_TOKEN_EXPIRY_FILE:-${TOKEN_FILE}.expiry}"
+TOKEN_EXPIRY_FILE="${BASETOOL_GHCR_TOKEN_EXPIRY_FILE:-${TOKEN_FILE}.expiry}"
 TOKEN_METRIC_FILE="${TEXTFILE_DIR}/ghcr-token.prom"
 
 write_token_expiry_metric() {
@@ -1528,9 +1533,9 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
   fi
   CONFIG_TREE_TOUCHED=true
   apply_config_tree "${CONFIG_STAGE_DIR}" "${COMPOSE_DIR}"
-  DEPLOY_STEP="check ${COMPOSE_DIR}/.env after the swap"
-  [[ -f "${COMPOSE_DIR}/.env" ]] \
-    || fail "POST-APPLY: ${COMPOSE_DIR}/.env vanished after config swap — aborting before up"
+  DEPLOY_STEP="check ${ENV_FILE} after the swap"
+  [[ -f "${ENV_FILE}" ]] \
+    || fail "POST-APPLY: ${ENV_FILE} vanished after config swap — aborting before up"
   install_quadlet_units "${COMPOSE_DIR}"
   rm -f "${CONFIG_APPLY_INCOMPLETE_FILE}"
   log "config applied"
@@ -1618,7 +1623,7 @@ if rt_apply_stack; then
     log "stack-health heartbeat NOT stamped: [${HEALTH_LEFT_OVER}] was unhealthy before this re-apply and was not recreated by it"
   fi
 
-  if [[ "${IRI_MONITORING_ENABLED:-false}" == "true" ]] && rt_monitoring_configured; then
+  if [[ "${BASETOOL_MONITORING_ENABLED:-false}" == "true" ]] && rt_monitoring_configured; then
     log "applying monitoring stack (non-gating)"
     MONITORING_APPLY_RC=0
     rt_monitoring_up > "${STATE_DIR}/monitoring-apply.log" 2>&1 || MONITORING_APPLY_RC=$?

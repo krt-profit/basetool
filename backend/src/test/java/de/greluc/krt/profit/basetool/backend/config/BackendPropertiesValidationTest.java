@@ -207,7 +207,7 @@ class BackendPropertiesValidationTest {
         .withPropertyValues(
             "app.keycloak.sync.enabled=true",
             "app.keycloak.sync.admin-url=htp://not-a-url",
-            "app.keycloak.sync.realm=iri",
+            "app.keycloak.sync.realm=basetool",
             "app.keycloak.sync.client-id=backend-service",
             "app.keycloak.sync.client-secret=secret")
         .run((context) -> assertThat(context).hasFailed());
@@ -220,7 +220,7 @@ class BackendPropertiesValidationTest {
         .withPropertyValues(
             "app.keycloak.sync.enabled=true",
             "app.keycloak.sync.admin-url=https://keycloak.example.invalid",
-            "app.keycloak.sync.realm=iri",
+            "app.keycloak.sync.realm=basetool",
             "app.keycloak.sync.client-id=backend-service",
             "app.keycloak.sync.client-secret=secret")
         .run((context) -> assertThat(context).hasNotFailed());

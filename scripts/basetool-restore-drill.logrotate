@@ -1,5 +1,5 @@
-/var/log/iri-deploy.log {
-    weekly
+/var/log/basetool/restore-drill.log {
+    monthly
     rotate 12
     missingok
     notifempty

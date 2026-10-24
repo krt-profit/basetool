@@ -9,10 +9,10 @@ Type=oneshot
 
 User=deploy
 
-ExecStart=/var/iri/code/scripts/deploy.sh
+ExecStart=/opt/basetool/scripts/deploy.sh
 
-StandardOutput=append:/var/log/iri-deploy.log
-StandardError=append:/var/log/iri-deploy.log
+StandardOutput=append:/var/log/basetool/deploy.log
+StandardError=append:/var/log/basetool/deploy.log
 
 ProtectKernelLogs=true
 ProtectClock=true
@@ -25,7 +25,7 @@ RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 SystemCallArchitectures=native
 SystemCallFilter=@system-service @mount
 SystemCallErrorNumber=EPERM
-ReadWritePaths=/etc/containers/systemd/users /var/lib/iri /var/log /var/lock /var/iri/code /var/iri/monitoring
+ReadWritePaths=/etc/containers/systemd/users /etc/basetool/env.d /var/lib/basetool/deploy /var/lib/basetool/textfile /var/log/basetool /run/lock /opt/basetool
 
 MemoryMax=512M
 CPUQuota=200%

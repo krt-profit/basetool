@@ -187,7 +187,7 @@ class HangarPagePatternRenderTest {
             List.of(
                 new OrgUnitMembershipOptionDto(unitId, "Owner SK", "OSK", "SPECIAL_COMMAND", true),
                 new OrgUnitMembershipOptionDto(
-                    UUID.randomUUID(), "Iridium", "IRI", "SQUADRON", true)));
+                    UUID.randomUUID(), "Alpha", "ALP", "SQUADRON", true)));
 
     String html = render("/hangar");
 
@@ -200,7 +200,7 @@ class HangarPagePatternRenderTest {
         .contains("id=\"ship-unit-modal\"")
         .containsPattern("<option value=\"\">Keine Einheit</option>")
         .contains("Owner SK (OSK)")
-        .contains("Iridium (IRI)")
+        .contains("Alpha (ALP)")
         .contains("id=\"ship-owner-picker-slot\"");
   }
 

@@ -51,7 +51,7 @@ class StartupBannerListenerTest {
             new AppBackendProperties("https://backend:11261"));
     ReflectionTestUtils.setField(listener, "applicationName", "frontend");
     ReflectionTestUtils.setField(
-        listener, "keycloakIssuerUri", "https://keycloak.profit-base.online/realms/iri");
+        listener, "keycloakIssuerUri", "https://keycloak.profit-base.online/realms/basetool");
     ReflectionTestUtils.setField(listener, "redisHost", redisHost);
     ReflectionTestUtils.setField(listener, "redisPort", "6379");
 
@@ -82,7 +82,7 @@ class StartupBannerListenerTest {
         .contains("frontend ready")
         .contains("[prod]")
         .contains("https://backend:11261")
-        .contains("https://keycloak.profit-base.online/realms/iri")
+        .contains("https://keycloak.profit-base.online/realms/basetool")
         .contains("redis:6379")
         .contains("X-Correlation-Id")
         .contains("2000")

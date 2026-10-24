@@ -332,7 +332,7 @@
       },
       "type": "timeseries",
       "title": "Days until disk full per mount (forecast)",
-      "description": "Projected days until each mount fills, from the 24h fill rate (predict via deriv). A non-filling mount shows a very large value; a small value on /var/iri is an early warning.",
+      "description": "Projected days until each mount fills, from the 24h fill rate (predict via deriv). A non-filling mount shows a very large value; a small value on /var/lib/basetool is an early warning.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

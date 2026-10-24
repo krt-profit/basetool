@@ -281,7 +281,7 @@
             <div th:if="${order != null}" class="card rod-assigned" data-testid="refinery-assigned">
                 <span class="kpi-label" th:text="#{refineryorder.assigned.title}">Zugeordnet</span>
                 <p class="rod-assigned__title" th:text="${order.mission != null ? order.mission.name : #messages.msg('refineryorder.assigned.noMission')}">Quantanium-Abbau</p>
-                <p class="rod-assigned__meta"><span th:text="#{refineryorder.assigned.owner(${order.owner != null ? order.owner.effectiveName : '—'})}">Besitzer greluc</span><th:block th:if="${order.owningSquadron != null}"> &middot; <span th:text="${order.owningSquadron.name}">IRIDIUM</span></th:block></p>
+                <p class="rod-assigned__meta"><span th:text="#{refineryorder.assigned.owner(${order.owner != null ? order.owner.effectiveName : '—'})}">Besitzer greluc</span><th:block th:if="${order.owningSquadron != null}"> &middot; <span th:text="${order.owningSquadron.name}">ALPHA</span></th:block></p>
             </div>
         </aside>
     </div>

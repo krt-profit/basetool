@@ -61,7 +61,7 @@ public class PublicBaseUrlGuard implements InitializingBean {
     if (environment.matchesProfiles("prod") && ingestProperties.publicBaseUrl().isBlank()) {
       throw new IllegalStateException(
           "app.ingest.public-base-url is empty under the prod profile; set"
-              + " IRI_INGEST_PUBLIC_BASE_URL to the gateway's public origin, e.g."
+              + " BASETOOL_INGEST_PUBLIC_BASE_URL to the gateway's public origin, e.g."
               + " https://ingest.example.org (REQ-INGEST-012).");
     }
   }

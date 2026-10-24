@@ -150,7 +150,7 @@ class RedisAclFrontendIntegrationTest {
 
     RedisSession session = repository.createSession();
     session.setAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME, "member");
-    session.setAttribute("iridium.activeOrgUnitId", "00000000-0000-0000-0000-000000000001");
+    session.setAttribute("basetool.activeOrgUnitId", "00000000-0000-0000-0000-000000000001");
     repository.save(session);
     assertThat(created.await(5, TimeUnit.SECONDS)).as("session-created event received").isTrue();
 

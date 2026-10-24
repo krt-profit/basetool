@@ -98,7 +98,7 @@ class JwkSetUriNamespaceTest {
   }
 
   /**
-   * Production passes {@code IRI_BACKEND_KEYCLOAK_JWK_SET_URI} to the backend with an empty
+   * Production passes {@code BASETOOL_BACKEND_KEYCLOAK_JWK_SET_URI} to the backend with an empty
    * default, which keeps the issuer-location decoder until it is set (REQ-SEC-024).
    *
    * @throws IOException if the environment template cannot be read
@@ -108,7 +108,7 @@ class JwkSetUriNamespaceTest {
     Path template = repositoryRoot().resolve("quadlet/env.d/backend.env.tmpl");
     assertThat(Files.readAllLines(template))
         .as("the backend's Quadlet environment must pass KEYCLOAK_JWK_SET_URI, empty by default")
-        .contains("KEYCLOAK_JWK_SET_URI=${IRI_BACKEND_KEYCLOAK_JWK_SET_URI:-}");
+        .contains("KEYCLOAK_JWK_SET_URI=${BASETOOL_BACKEND_KEYCLOAK_JWK_SET_URI:-}");
   }
 
   /**

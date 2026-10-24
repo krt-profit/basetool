@@ -100,7 +100,7 @@ class PromotionInPlaceFragmentMvcTest {
         .perform(
             get("/promotion/admin/topics")
                 .param("fragment", "topicsResults")
-                .sessionAttr("iridium.activeOrgUnitId", UUID.randomUUID()))
+                .sessionAttr("basetool.activeOrgUnitId", UUID.randomUUID()))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("data-pa-topic-id=\"" + topicId + "\"")))
         .andExpect(content().string(not(containsString("pa-open-create-topic"))))
@@ -128,7 +128,7 @@ class PromotionInPlaceFragmentMvcTest {
         .perform(
             get("/promotion/admin/rank-requirements")
                 .param("fragment", "ranksResults")
-                .sessionAttr("iridium.activeOrgUnitId", UUID.randomUUID()))
+                .sessionAttr("basetool.activeOrgUnitId", UUID.randomUUID()))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("data-ar-req-id")))
         .andExpect(content().string(not(containsString("ar-open-create"))))
@@ -187,7 +187,7 @@ class PromotionInPlaceFragmentMvcTest {
         .perform(
             get("/promotion/manage")
                 .param("fragment", "matrixBody")
-                .sessionAttr("iridium.activeOrgUnitId", UUID.randomUUID()))
+                .sessionAttr("basetool.activeOrgUnitId", UUID.randomUUID()))
         .andExpect(status().isOk())
         .andExpect(
             content()
@@ -215,7 +215,7 @@ class PromotionInPlaceFragmentMvcTest {
             get("/promotion/manage")
                 .param("fragment", "eligibilityCell")
                 .param("userId", memberId.toString())
-                .sessionAttr("iridium.activeOrgUnitId", UUID.randomUUID()))
+                .sessionAttr("basetool.activeOrgUnitId", UUID.randomUUID()))
         .andExpect(status().isOk())
         .andExpect(
             content()

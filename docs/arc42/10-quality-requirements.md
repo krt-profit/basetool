@@ -24,7 +24,7 @@ because a quality goal nobody measures is a preference, and a gate that cannot f
 | Q3 | Two members edit *unrelated sections* of the same aggregate and one gets a 409. | Treated as a defect: per-section counters (§8.4) |
 | Q4 | A member's name, e-mail or a token appears in a log line. | The unconditional logging rule; the Alloy masking gate (`alloy-log-masking` CI job) |
 | Q5 | The nightly backup reports success while its snapshot cannot actually be restored. | `restore-drill.sh` scores **seven** artifacts from the restored snapshot; `RestoreDrillArtifactNotRestorable` |
-| Q6 | A public name's certificate is within 14 days of expiry. | `CertificateExpiringSoon` on `probe_ssl_earliest_cert_expiry`; the certificate *files* are covered separately by the `iri-cert-expiry` collector and `CertificateFileExpiringSoon` |
+| Q6 | A public name's certificate is within 14 days of expiry. | `CertificateExpiringSoon` on `probe_ssl_earliest_cert_expiry`; the certificate *files* are covered separately by the `basetool-cert-expiry` collector and `CertificateFileExpiringSoon` |
 | Q7 | A deploy applies an image whose signature does not verify. | `deploy.sh` Cosign-verifies every digest *before* pulling; fail-closed |
 | Q8 | A scheduled job silently stops running. | Per-timer `last_success_timestamp` metrics with staleness alerts |
 | Q9 | Keycloak advertises an issuer the applications do not validate, and all three die at start-up. | The `keycloak-issuer` CI gate renders every stack through `docker compose config` and compares them |

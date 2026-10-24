@@ -2,25 +2,25 @@
 
 set -euo pipefail
 
-IRI_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BASETOOL_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source-path=SCRIPTDIR
 # shellcheck source=lib/common.sh
 # shellcheck disable=SC1091
-. "${IRI_SCRIPT_DIR}/lib/common.sh"
+. "${BASETOOL_SCRIPT_DIR}/lib/common.sh"
 # shellcheck source=lib/container-runtime.sh
 # shellcheck disable=SC1091
-. "${IRI_SCRIPT_DIR}/lib/container-runtime.sh"
+. "${BASETOOL_SCRIPT_DIR}/lib/container-runtime.sh"
 
-STATE_DIR="${IRI_STATE_DIR:-/var/lib/iri}"
-BACKUP_DIR="${IRI_BACKUP_DIR:-/var/iri/backup}"
+STATE_DIR="${BASETOOL_STATE_DIR:-/var/lib/basetool/deploy}"
+BACKUP_DIR="${BASETOOL_BACKUP_DIR:-/var/lib/basetool/backup}"
 WORK_BASE="${BACKUP_DIR}/restore-drill"
-BACKUP_ENV="${IRI_BACKUP_ENV:-/etc/iri/backup.env}"
-COMPOSE_DIR="${IRI_COMPOSE_DIR:-/var/iri/code}"
-DRILL_IMAGE="${IRI_DRILL_IMAGE:-}"
-CONTAINER="iri-restore-drill"
-READY_TIMEOUT="${IRI_DRILL_READY_TIMEOUT:-60}"
-MIN_BACKEND_TABLES="${IRI_DRILL_MIN_BACKEND_TABLES:-20}"
-MIN_KEYCLOAK_TABLES="${IRI_DRILL_MIN_KEYCLOAK_TABLES:-20}"
+BACKUP_ENV="${BASETOOL_BACKUP_ENV:-/etc/basetool/deploy/backup.env}"
+COMPOSE_DIR="${BASETOOL_COMPOSE_DIR:-/opt/basetool}"
+DRILL_IMAGE="${BASETOOL_DRILL_IMAGE:-}"
+CONTAINER="basetool-restore-drill"
+READY_TIMEOUT="${BASETOOL_DRILL_READY_TIMEOUT:-60}"
+MIN_BACKEND_TABLES="${BASETOOL_DRILL_MIN_BACKEND_TABLES:-20}"
+MIN_KEYCLOAK_TABLES="${BASETOOL_DRILL_MIN_KEYCLOAK_TABLES:-20}"
 
 START_EPOCH="$(date +%s)"
 OK_DB_BACKEND=0
@@ -76,7 +76,7 @@ log "drill image: ${DRILL_IMAGE}"
 command -v restic >/dev/null 2>&1 || fail "restic not found (dnf install restic; ansible role: 10-packages.yml)"
 command -v rclone >/dev/null 2>&1 || fail "rclone not found (dnf install rclone; ansible role: 10-packages.yml)"
 
-export RESTIC_CACHE_DIR="${RESTIC_CACHE_DIR:-${STATE_DIR}/restic-cache}"
+export RESTIC_CACHE_DIR="${RESTIC_CACHE_DIR:-${CACHE_DIR}/restic}"
 mkdir -p "${RESTIC_CACHE_DIR}" "${WORK_BASE}"
 
 set -a

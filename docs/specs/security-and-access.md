@@ -495,7 +495,7 @@ Every read/write filters by JWT `sub` unless the caller has an elevated role (`A
 > removing the tier widened what was left.
 >
 > All four `canSeeMission` gates and all ten `canAccessParticipant` gates now carry
-> `@authHelperService.isMemberOrAbove()`. It locks nobody out — `default-roles-iri` grants
+> `@authHelperService.isMemberOrAbove()`. It locks nobody out — `default-roles-basetool` grants
 > `KRT Member` to every account Keycloak creates — and it means the mission surface asks one
 > question consistently instead of two different ones on adjacent endpoints.
 >
@@ -873,7 +873,7 @@ rotation, single-flight and the scope-leak fix (ADR-0115).
 - [ ] `EXPIRY_SKEW` ≥ the refresh provider's clock skew (60s) so a freshness-cache hit never serves a
   token the provider would refresh.
 - [ ] `ClientAuthorizationException` is not retried and does not open the backend circuit breaker.
-- [ ] The `iri` realm has `Revoke Refresh Token = Off` (`"revokeRefreshToken": false`), so a replayed
+- [ ] The `basetool` realm has `Revoke Refresh Token = Off` (`"revokeRefreshToken": false`), so a replayed
   or duplicate online refresh token does not trip reuse detection and does not revoke the SSO session.
 - [ ] An application request parameter named `scope` (e.g. the job-orders Staffel filter's
   `scope=all|mine`) never reaches Keycloak as the refresh-token grant scope: the
@@ -1479,7 +1479,7 @@ aliases those public names to the container gateway), not masked external client
 
 The Keycloak token endpoint carries a stricter, versioned limit in its own zone
 (`krt_token_perip`, 20 r/s, `burst=10`, status 429 —
-`location ^~ /auth/realms/iri/protocol/openid-connect/token` in
+`location ^~ /auth/realms/basetool/protocol/openid-connect/token` in
 `conf.d/10-frontend.conf.template`), the one anonymous POST worth brute-forcing; raising the
 general zone does not loosen it. The backend's
 application-level Bucket4j limiter (REQ-SEC-011, REQ-SEC-032, REQ-SEC-033) is unchanged and remains
@@ -1521,7 +1521,7 @@ ADR-0112, ADR-0162, ADR-0187, ADR-0256 · **Runbook:** [`deployment.md` → Edge
 > (ADR-0202), so an accidental mapper persists. Adding a client to the realm no longer grants API
 > access; a new caller is a reviewed change to the release's configuration.
 >
-> **One environment adds a caller.** The testing host's `.env` sets `IRI_BACKEND_ACCEPTED_CLIENT_IDS`
+> **One environment adds a caller.** The testing host's `basetool.env` sets `BASETOOL_BACKEND_ACCEPTED_CLIENT_IDS`
 > to the default plus `basetool-seed`, the testing-only seed client (ADR-0279, REQ-OPS-050).
 > Production and the release default stay `basetool-frontend,basetool-ingest-gateway`.
 >
@@ -1551,7 +1551,7 @@ from masquerading as an application outage (the failure mode that drove the fron
 
 - **Internal JWKS (opt-in).** Setting `app.security.jwt.jwk-set-uri` (env `KEYCLOAK_JWK_SET_URI`)
   points key retrieval at the **internal** Keycloak connector
-  (`https://keycloak:18443/auth/realms/iri/protocol/openid-connect/certs` — Keycloak is mounted under
+  (`https://keycloak:18443/auth/realms/basetool/protocol/openid-connect/certs` — Keycloak is mounted under
   `/auth`, `KC_HTTP_RELATIVE_PATH`), reusing the `keycloak-trust`
   SSL bundle (REQ-SEC-014 — so the cert's SAN must carry `dns:keycloak`) instead of hairpinning
   through the public edge. The `iss` claim is still validated against the **public** issuer
@@ -1566,7 +1566,7 @@ from masquerading as an application outage (the failure mode that drove the fron
   *(Corrected 2026-09-23: the backend's production environment never carried the variable —
   neither `docker-compose.yml` nor the Quadlet `env.d` template passed it — so the opt-in could not
   be taken in production. It now reaches the backend as `KEYCLOAK_JWK_SET_URI` from the host's
-  `IRI_BACKEND_KEYCLOAK_JWK_SET_URI`, empty by default; the runbook is
+  `BASETOOL_BACKEND_KEYCLOAK_JWK_SET_URI`, empty by default; the runbook is
   [`deployment.md` → *Internal JWKS for the backend*](../deployment.md#internal-jwks-for-the-backend).
   The ingest gateway reads the same property but sits on no network that reaches Keycloak, so it is
   not wired.)*
@@ -1600,7 +1600,7 @@ from masquerading as an application outage (the failure mode that drove the fron
   only ever `app.security.jwt.jwk-set-uri`, so an unset `KEYCLOAK_JWK_SET_URI` leaves the
   auto-configured decoder in place instead of failing the context at boot.
 - [x] The backend's production environment passes `KEYCLOAK_JWK_SET_URI`, empty unless the host
-  sets `IRI_BACKEND_KEYCLOAK_JWK_SET_URI` (`JwkSetUriNamespaceTest`).
+  sets `BASETOOL_BACKEND_KEYCLOAK_JWK_SET_URI` (`JwkSetUriNamespaceTest`).
 - [x] Production fetches the JWKS internally. _(2026-09-25 ~15:38 UTC, owner-approved, per
   [`deployment.md` → *Internal JWKS for the backend*](../deployment.md#internal-jwks-for-the-backend):
   only `env.d/backend.env` changed, the backend was healthy in 11 s, no JWKS/PKIX/SAN line, an
@@ -1610,8 +1610,8 @@ from masquerading as an application outage (the failure mode that drove the fron
 - [ ] An expired/invalid bearer token still yields `401`; a caller lacking the required role still
   yields `403` (the 503 re-map never swallows an auth decision).
 - [ ] Optional `aud` enforcement (audit L-1) is available on both resource servers via
-  `app.security.jwt.expected-audiences` (wired to `IRI_BACKEND_EXPECTED_AUDIENCES` /
-  `IRI_INGEST_EXPECTED_AUDIENCES`), sharing the same `resourceServerJwtDecoder` bean. It is **empty
+  `app.security.jwt.expected-audiences` (wired to `BASETOOL_BACKEND_EXPECTED_AUDIENCES` /
+  `BASETOOL_INGEST_EXPECTED_AUDIENCES`), sharing the same `resourceServerJwtDecoder` bean. It is **empty
   by default** (off) so a stack whose realm does not stamp the audience is unaffected; enabling it
   in prod requires the deployed realm to stamp the right audience, or every token is rejected — and
   the two values differ: the backend expects `aud=basetool-backend` (the `extractor-ingest` default
@@ -1620,18 +1620,18 @@ from masquerading as an application outage (the failure mode that drove the fron
   tokens that interface must refuse.
 - [ ] **The backend's `prod` profile requires it** (APPSEC-08, 2026-09-22): with a blank
   `app.security.jwt.expected-audiences` the prod context refuses to start
-  (`JwtAudienceStartupCheck`), because blank means "no `aud` check" and a lost `.env` line used to
+  (`JwtAudienceStartupCheck`), because blank means "no `aud` check" and a lost `basetool.env` line used to
   switch enforcement off in silence. The effective audiences are logged at INFO on every start; any
   other profile keeps "blank = off" and logs it at WARN. The ingest gateway is unchanged (its value
   stays optional).
 - [x] The **backend's** enforced path is exercised end to end, not only in prod: the E2E realm's
   `basetool-frontend` client carries an `aud-basetool-backend` audience mapper (access token only,
   mirroring the prod scope's mapper) and `E2eStackExtension` arms the stack with
-  `IRI_BACKEND_EXPECTED_AUDIENCES=basetool-backend`, so every e2e-labelled PR runs the whole suite
+  `BASETOOL_BACKEND_EXPECTED_AUDIENCES=basetool-backend`, so every e2e-labelled PR runs the whole suite
   through the audience validator against real Keycloak-minted tokens. `E2eAudienceEnforcementParityTest`
   pins the enforced constant to the realm's mapper so the two cannot drift into a suite-wide 401.
   The **ingest gateway** runs in the E2E stack too (ADR-0225), armed with
-  `IRI_INGEST_EXPECTED_AUDIENCES=basetool-ingest`; `ExchangeRoundTripE2eTest` carries a
+  `BASETOOL_INGEST_EXPECTED_AUDIENCES=basetool-ingest`; `ExchangeRoundTripE2eTest` carries a
   Keycloak-minted exchange token with `aud=basetool-ingest` through it.
 
 **Enforced by (both resource servers):** backend `SecurityConfig#resourceServerJwtDecoder` +
@@ -2739,7 +2739,7 @@ not one that also silently changes what a post-incident review can reconstruct.
   is present, and each message names the consequence rather than the symptom.
 - [x] Keycloak's own scope evaluation for the client returns `['KRT Member']` for a plain member and
   `['Admin', 'Bank Employee', 'KRT Member', 'Officer']` for an administrator (measured against the
-  test stack's `iri` realm 2026-09-02, after applying the provisioning script). The pre-reversal
+  test stack's `basetool` realm 2026-09-02, after applying the provisioning script). The pre-reversal
   measurement (`['KRT Member', 'Officer']` for the same admin account, Keycloak 26.7, 2026-08-21) is
   exactly the behaviour that changed and is kept as the before-picture. **The member's token did not
   widen** — that is the non-regression this pair is measured for.
@@ -4145,7 +4145,7 @@ touches no stored session and needs no migration.
 - [ ] The E2E stack runs with `enforce`, so every login, refresh, flash redirect and live-sync
   handshake in the suite is a session read under the strictest mode.
 - [x] Production runs `enforce`. _(2026-09-25, 17:58 UTC, owner-approved: `APP_SESSION_TYPE_ALLOW_LIST=enforce`
-  appended to `.env`, only `frontend.env` changed, the frontend logged `Session type allow-list mode:
+  appended to `basetool.env`, only `frontend.env` changed, the frontend logged `Session type allow-list mode:
   ENFORCE` and no refusal. The owner switched after about five hours of `report` with zero
   refusals since 1.11.0 went live at 12:40 UTC — not the week the runbook asks for; the watch for
   what those days would have shown is `SessionTypeOutsideAllowList` and `SessionValueDropsSustained`.
@@ -4457,7 +4457,7 @@ gateway's acting-member path (ADR-0129), which installs an authentication withou
 `Roles.NO_ROLE_MARKER` is a marker, never a permission — nothing grants on it, and
 `PendingApprovalAccessFilter` is the only reader.
 
-**`default-roles-iri` carries `KRT Member`**, so every account Keycloak creates is a member at the
+**`default-roles-basetool` carries `KRT Member`**, so every account Keycloak creates is a member at the
 IdP. **There is therefore no account holding only a bank role, or only any other role** (confirmed
 by the repository owner, 2026-09-06) — which is what makes `isMemberOrAbove()` safe as a gate on
 the member surface. The E2E realm contradicted this until then: `test-bank-employee` and
@@ -4512,7 +4512,7 @@ covers the path, so the annotation is the only gate; `GameItemControllerTest` ev
 - [x] A token carrying no known realm role is refused `403 NO_ROLE` on `/api/v1/users/me`, on the
   JWT path and through `ActingMemberFilter`.
 - [x] The three exempt paths still answer such a token.
-- [x] A member holding `KRT Member` only through `default-roles-iri` keeps the role after a sync run.
+- [x] A member holding `KRT Member` only through `default-roles-basetool` keeps the role after a sync run.
 - [x] A sync run that resolves no app role at all writes nothing and logs it.
 - [x] `V239` leaves no `GUEST` role, no `user_roles` row for it, and logs the affected user ids
   before deleting — identifiers, not identities.
@@ -4677,7 +4677,7 @@ and siblings, so the Spring-apps dashboard's cache panels and the `CacheHitRatio
 - [x] Hits and misses are published under `cache="jwt-authorities"`.
 - [x] The properties class sits in `support`, keeping `ArchitectureTest`'s package-cycle and
   `support`-is-a-leaf invariants green.
-- [x] The operator's `IRI_AUTHORITIES_CACHE_TTL` in the host `.env` reaches the container as
+- [x] The operator's `BASETOOL_AUTHORITIES_CACHE_TTL` in the host `basetool.env` reaches the container as
   `APP_SECURITY_AUTHORITIES_CACHE_TTL`: `docker-compose.yml`'s backend `environment:` allow-list names
   it, and `scripts/generate-quadlet.py` carries it into `quadlet/env.d/backend.env.tmpl` for the
   production Quadlet unit.
@@ -5872,7 +5872,7 @@ production rollout reaches step by step:
   `dev` and `test` profiles trust any certificate and skip the check regardless of the switch.
 - **Shipped in two releases.** The first was inert: every per-service mount fell back to the shared
   keystore and `INTERNAL_TLS_VERIFY_HOSTNAME` defaulted to `false`. The second — rollout step 3 —
-  bakes the Quadlet units to `/var/iri/secrets/tls/<service>.p12` and the CA-only truststore and
+  bakes the Quadlet units to `/etc/basetool/secrets/tls/<service>.p12` and the CA-only truststore and
   defaults the switch to `true`; it may only be promoted to a host where step 2 has run (runbook
   below). Compose stacks keep the fallbacks.
 - **The committed test material has the same shape** (ADR-0139 amendment 1).
@@ -5899,7 +5899,7 @@ truststore, which turned out never to have existed (REQ-SEC-022's production not
 **v1.12.0** (#2036; promoted 17:39 UTC, deployed 17:38–17:44 UTC) — every service serves its own
 leaf and all four verify against the CA alone with the name checked; step 4 17:58–18:03 UTC —
 `basetool-ca.crt`, the internal truststore and the SPI truststore carry only the CA, and
-`iri-cert-expiry` reports the CA's expiry (2036). **Steps 0–4 are done: the target shape holds on
+`basetool-cert-expiry` reports the CA's expiry (2036). **Steps 0–4 are done: the target shape holds on
 production.** The documented step-4 command failed on the root-owned truststore and was redone on
 a working copy; the runbook now carries that form. A release rollback to 1.11.0 or older needs step
 4 undone first. *(Updated 2026-09-25 evening; this paragraph said steps 3 and 4 were open.)*
@@ -5915,7 +5915,7 @@ a working copy; the runbook now carries that form. A release rollback to 1.11.0 
 `docker-compose.yml`, `scripts/generate-quadlet.py` (`PATH_VARS`), `scripts/deploy.sh`
 (`keystore_mount_sources`), `scripts/backup.sh` · **Monitoring:** unchanged series — the blackbox
 `https_internal` probes and the three app scrapes already verify each service's name against
-`basetool-ca.crt`, and `iri-cert-expiry` reports the CA's expiry once that file is the CA ·
+`basetool-ca.crt`, and `basetool-cert-expiry` reports the CA's expiry once that file is the CA ·
 **Runbook:** [`deployment.md` &rarr; Internal TLS](../deployment.md#internal-tls-per-service-certificates-from-a-private-ca)
 · **ADR:** [ADR-0211](../adr/0211-each-internal-service-holds-its-own-leaf-from-a-private-ca.md) · **Related:** REQ-SEC-014, REQ-OPS-016, REQ-OBS-008, REQ-INGEST-001
 
@@ -6234,8 +6234,8 @@ app 19 moved to the typed `GET /api/v1/orders/settings`. The web reads the typed
 A call from one of our services to Keycloak that no browser follows does not leave the container
 networks when the deployment says where the internal connector is (ADR-0318). The setting is
 `app.security.keycloak-backchannel.uri` (env `KEYCLOAK_BACKCHANNEL_URI`, host
-`IRI_KEYCLOAK_BACKCHANNEL_URI`): the realm base on the internal connector,
-`https://keycloak:18443/auth/realms/iri`. Empty — the default — keeps the issuer-derived behaviour.
+`BASETOOL_KEYCLOAK_BACKCHANNEL_URI`): the realm base on the internal connector,
+`https://keycloak:18443/auth/realms/basetool`. Empty — the default — keeps the issuer-derived behaviour.
 
 With it set:
 

@@ -478,7 +478,7 @@ class HangarIntegrationTest {
   void testSquadronOverviewAsPinnedAdmin_doesNotLeakForeignSkShipsOfSharedType() throws Exception {
     Ship iridiumShip = new Ship();
     iridiumShip.setOwningOrgUnit(iridium);
-    iridiumShip.setName("Iridium Fighter");
+    iridiumShip.setName("Alpha Fighter");
     iridiumShip.setShipType(fighter);
     iridiumShip.setOwner(user1);
     iridiumShip.setInsurance("LTI");

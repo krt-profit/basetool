@@ -22,7 +22,7 @@ committed. The redacted shape of the Keycloak side is in
 |                   Value                   |                                                                                 Where it comes from                                                                                 |
 |-------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Discord **Client ID** + **Client Secret** | the Discord application (step 1)                                                                                                                                                    |
-| Discord redirect URI                      | `https://<keycloak-base>/realms/iri/broker/discord/endpoint` (prod: `https://profit-base.online/auth/realms/iri/broker/discord/endpoint` — note the `/auth`, see the warning below) |
+| Discord redirect URI                      | `https://<keycloak-base>/realms/basetool/broker/discord/endpoint` (prod: `https://profit-base.online/auth/realms/basetool/broker/discord/endpoint` — note the `/auth`, see the warning below) |
 | **Guild ID** of the das-kartell server    | Discord client → Developer Mode → right-click the server → *Copy Server ID*                                                                                                         |
 | **KRT-Mitglied role ID**                  | Server Settings → Roles → right-click *KRT-Mitglied* → *Copy Role ID* (numeric, **not** the name)                                                                                   |
 
@@ -30,7 +30,7 @@ committed. The redacted shape of the Keycloak side is in
 > Keycloak used to answer on a host of its own; since
 > [ADR-0166](../adr/0166-identity-moves-onto-the-app-origin.md) it answers at `/auth` on the web
 > origin, so the broker endpoint it generates is
-> `https://profit-base.online/auth/realms/iri/broker/discord/endpoint`. **Discord validates the
+> `https://profit-base.online/auth/realms/basetool/broker/discord/endpoint`. **Discord validates the
 > redirect URI against the list registered in its developer portal**, so a registration that does
 > not list exactly this value fails every Discord login with `Invalid OAuth2 redirect_uri` — at
 > Discord, before Keycloak is reached, which is why nothing in this repository can catch it.
@@ -56,7 +56,7 @@ Enable **Developer Mode** in Discord (User Settings → Advanced) to get the *Co
 ## 2. The provider JAR
 
 The Discord identity provider, its mappers and the membership gate ship as one JAR from the
-`keycloak-spi` module, bind-mounted from `/var/iri/code/keycloak/providers/` at
+`keycloak-spi` module, bind-mounted from `/opt/basetool/keycloak/providers/` at
 `/opt/keycloak/providers` (`quadlet/systemd/keycloak.container`).
 
 **On production there is nothing to do.** The JAR is a promotable artifact (ADR-0055,
@@ -74,7 +74,7 @@ take effect. Confirm it loaded: **Identity providers → Add provider → Social
 
 ## 3. Add the Discord identity provider in Keycloak
 
-Realm `iri` → **Identity providers** → **Add provider** → **Social → Discord**.
+Realm `basetool` → **Identity providers** → **Add provider** → **Social → Discord**.
 
 - **Alias:** `discord` (must match — it is the `kc_idp_hint` value and the broker redirect path).
 - **Client ID / Client Secret:** from step 1.
@@ -115,7 +115,7 @@ The claim is sourced from the Keycloak **federated-identity link**, not the user
 present for accounts linked at any time and on every login method (ADR-0036). Use the SPI protocol
 mapper from the provider JAR (step 2):
 
-Realm `iri` → **Clients → `basetool-frontend` → Client scopes →
+Realm `basetool` → **Clients → `basetool-frontend` → Client scopes →
 `basetool-frontend-dedicated` → Add mapper → By configuration → *Discord Federated Identity***:
 
 - **Name:** `discord_user_id`
@@ -178,8 +178,8 @@ gate.
    Apply it on the production host — re-render the environment files and restart Keycloak:
 
    ```bash
-   sudo -u deploy /var/iri/code/scripts/render-env-d.py \
-     --env /var/iri/code/.env --templates /var/iri/code/quadlet/env.d --out /var/iri/code/env.d
+   sudo -u deploy /opt/basetool/scripts/render-env-d.py \
+     --env /etc/basetool/basetool.env --templates /opt/basetool/quadlet/env.d --out /etc/basetool/env.d
    ${UCTL} restart keycloak.service
    ```
 
@@ -197,7 +197,7 @@ gate.
    - **Social Profile JSON Field Path:** `guild_nick` *(the synthetic field the provider injects)*
    - **User Attribute Name:** `discord_guild_nickname`
    - **Sync Mode Override:** **Force** *(so the nickname refreshes on every login, not only the first)*
-3. **Carry it into the token.** Realm `iri` → **Clients → `basetool-frontend` → Client scopes →
+3. **Carry it into the token.** Realm `basetool` → **Clients → `basetool-frontend` → Client scopes →
    `basetool-frontend-dedicated` → Add mapper → By configuration → User Attribute**:
    - **Name:** `discord_guild_nickname`
    - **User Attribute:** `discord_guild_nickname`
@@ -226,7 +226,7 @@ action fails with `403` at the Keycloak write; approve / reject and the read-onl
 
 The gate runs in a dedicated *First Broker Login* flow.
 
-1. Realm `iri` → **Authentication → Flows** → duplicate **First broker login** →
+1. Realm `basetool` → **Authentication → Flows** → duplicate **First broker login** →
    name it `First broker login - discord`.
 2. In that copy, **Add step** → **Discord Guild + KRT-Mitglied Gate** → set it **Required**.
    Place it **before** the *Review Profile / Create User* steps so a non-member is denied before any
@@ -235,7 +235,7 @@ The gate runs in a dedicated *First Broker Login* flow.
    - **Guild ID:** the das-kartell guild id (step 0).
    - **KRT-Mitglied role ID:** the numeric role id (step 0).
    - **Discord API base URL:** leave the default `https://discord.com/api/v10`.
-4. Realm `iri` → **Identity providers → discord → Advanced settings → First Login Flow** →
+4. Realm `basetool` → **Identity providers → discord → Advanced settings → First Login Flow** →
    select `First broker login - discord`. Save.
 
 The gate calls `GET /users/@me/guilds/{guildId}/member` with the user's brokered token and admits the
@@ -264,7 +264,7 @@ ambiguity (5xx / timeout / malformed / rate-limited), distinct from a clean 404 
 
 ### 5a. `IDENTITY_PROVIDER_LOGIN_ERROR … error="cookie_not_found"` (REQ-SEC-071)
 
-The Discord callback reached `/auth/realms/iri/broker/discord/endpoint` in a browser context that
+The Discord callback reached `/auth/realms/basetool/broker/discord/endpoint` in a browser context that
 holds none of Keycloak's login cookies, so the login started elsewhere cannot be resumed. Usual
 causes: Discord finished the authorization in the Discord app or another browser, an installed iOS
 web app's Discord hop opened outside the app, a callback URL reopened from history, blocked cookies.
@@ -352,14 +352,14 @@ unit — `deploy.sh` never touches a unit's `.container.d/` directory, so it sur
 (production's keycloak drop-in directory also holds `30-log-driver.conf`). The truststore holds only
 public certificates, so it may be world-readable; Keycloak reads it as container uid 1000 (host uid
 100999). The install and the drop-in, **as run on production 2026-09-25** (as root; `$W` is the
-scratch directory the store was built in, `IRI_UID=$(id -u iri)`):
+scratch directory the store was built in, `BASETOOL_UID=$(id -u basetool)`):
 
 ```bash
-install -o root -g root -m 0644 "$W/backend-truststore.p12" /var/iri/secrets/backend-truststore.p12
-restorecon -F /var/iri/secrets/backend-truststore.p12
+install -o root -g root -m 0644 "$W/backend-truststore.p12" /etc/basetool/secrets/backend-truststore.p12
+restorecon -F /etc/basetool/secrets/backend-truststore.p12
 rm -rf "$W"
-D=/etc/containers/systemd/users/${IRI_UID}/keycloak.container.d
-printf '[Container]\nVolume=/var/iri/secrets/backend-truststore.p12:/run/secrets/backend-truststore.p12:ro\n' > "$D/50-backend-truststore.conf"
+D=/etc/containers/systemd/users/${BASETOOL_UID}/keycloak.container.d
+printf '[Container]\nVolume=/etc/basetool/secrets/backend-truststore.p12:/run/secrets/backend-truststore.p12:ro\n' > "$D/50-backend-truststore.conf"
 chown deploy:deploy "$D/50-backend-truststore.conf"; chmod 0644 "$D/50-backend-truststore.conf"
 ${UCTL} daemon-reload && ${UCTL} restart keycloak.service   # restarts backend, frontend, ingest too (Requires=) -- ~2 min outage, see §3d
 ```
@@ -386,7 +386,7 @@ On a local Docker Compose stack, use a compose override instead (mount target = 
 services:
   keycloak:
     volumes:
-      - /var/iri/secrets/backend-truststore.p12:/opt/keycloak/conf/backend-truststore.p12:ro
+      - /etc/basetool/secrets/backend-truststore.p12:/opt/keycloak/conf/backend-truststore.p12:ro
 ```
 
 If the truststore is missing or wrong, the precheck simply fails open (the login proceeds to the
@@ -397,12 +397,12 @@ services; rebuild the truststore when the backend certificate is rotated.
 
 **After the per-service internal TLS rollout** (REQ-SEC-070) the backend serves a leaf of the
 internal CA, so the truststore holds **the CA** instead of a backend certificate — import
-`/var/iri/secrets/tls/ca.crt` under its own alias (`-alias internal-ca`) next to the old entry
+`/etc/basetool/secrets/tls/ca.crt` under its own alias (`-alias internal-ca`) next to the old entry
 (alias `backend`) in step 2 of the rollout, and delete the `backend` entry in step 4
 ([`deployment.md` → *Internal TLS*](../deployment.md#internal-tls-per-service-certificates-from-a-private-ca)).
 From then on a re-mint changes the CA, and this truststore with it. Production's store was built
 with both entries on 2026-09-25 (step 2f) and holds **only `internal-ca`** since step 4 the same
-evening (~17:58 UTC; the `backend` alias deleted on an `iri`-owned working copy — the installed
+evening (~17:58 UTC; the `backend` alias deleted on a `basetool`-owned working copy — the installed
 store is root-owned, so `keytool` cannot edit it in place; the command is
 [`deployment.md` → *Step 4*](../deployment.md#step-4--drop-the-old-certificate), 4c).
 
@@ -411,8 +411,8 @@ store is root-owned, so `keytool` cannot edit it in place; the command is
 > truststore no longer trusts. Nothing goes down: the probe's handshake fails, the login falls
 > through to the PENDING queue, and the only witness is the `Account-existence probe could not
 > reach the backend (…)` `WARN` per first login. Re-import the `backend` alias (the old shared
-> certificate, `/var/iri/secrets/tls/legacy-shared.crt`) — or install production's
-> `/var/iri/secrets/backend-truststore.p12.backup-20260925-175805` — and restart keycloak **before** promoting.
+> certificate, `/etc/basetool/secrets/tls/legacy-shared.crt`) — or install production's
+> `/etc/basetool/secrets/backend-truststore.p12.backup-20260925-175805` — and restart keycloak **before** promoting.
 
 ### 7.4 Verify
 

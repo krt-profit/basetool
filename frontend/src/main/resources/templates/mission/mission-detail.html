@@ -24,7 +24,7 @@
                     <h1 id="mission-title" th:text="${mission.name}">Mission Name</h1>
                     <span id="mission-head-org-badge-slot" class="head-org-slot"><span th:if="${mission?.owningSquadron != null}" class="squadron-badge"
                           th:title="${mission.owningSquadron.name()}"
-                          th:text="${mission.owningSquadron.shorthand()}">IRI</span></span>
+                          th:text="${mission.owningSquadron.shorthand()}">ALP</span></span>
                     <span id="mission-status-badge" class="status-badge" data-testid="mission-status"
                           th:classappend="${'status-' + #strings.toLowerCase(mission.status)}"
                           th:text="${#messages.msgOrNull('mission.status.' + #strings.toLowerCase(mission.status)) ?: mission.status}">GEPLANT</span>
@@ -1019,7 +1019,7 @@
                               th:classappend="${ou.kind == 'SPECIAL_COMMAND'} ? 'squadron-badge-sk'"
                               class="squadron-badge"
                               th:text="${ou.shorthand != null ? ou.shorthand : ou.name}"
-                              th:title="${ou.name}">IRI</span>
+                              th:title="${ou.name}">ALP</span>
                     </span>
                 </div>
                 <div class="row-sub">
@@ -1099,7 +1099,7 @@
                 <div class="form-group" id="participant-org-units-group">
                     <label th:text="#{mission.participant.org_units}">Org-Einheiten</label>
                     <select name="orgUnitIds" id="participant-org-units" multiple>
-                        <option th:if="${orgUnits}" th:each="ou : ${orgUnits}" th:value="${ou.orgUnitId}" th:text="${ou.orgUnitName}">IRIDIUM</option>
+                        <option th:if="${orgUnits}" th:each="ou : ${orgUnits}" th:value="${ou.orgUnitId}" th:text="${ou.orgUnitName}">ALPHA</option>
                     </select>
                     <small class="form-hint" th:text="#{mission.participant.org_units.external_hint}">Nur fuer externe Teilnehmer relevant.</small>
                 </div>

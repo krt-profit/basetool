@@ -69,7 +69,7 @@
                                            data-all-id="sqAll" data-check-class="sqCheck" data-header-id="squadronHeader">
                                 </label>
                                 <label class="multi-select-option" th:each="sq : ${squadrons}">
-                                    <span th:text="${sq.shorthand() != null ? sq.shorthand() : sq.name()}" th:title="${sq.name()}">IRI</span>
+                                    <span th:text="${sq.shorthand() != null ? sq.shorthand() : sq.name()}" th:title="${sq.name()}">ALP</span>
                                     <input type="checkbox" class="sqCheck" name="squadronId" th:value="${sq.id}"
                                            th:checked="${selectedSquadronIds == null or selectedSquadronIds.isEmpty() or selectedSquadronIds.contains(sq.id)}"
                                            data-trigger="ord-update-squadron-state"
@@ -120,7 +120,7 @@
                                 <span class="order-responsible-label" th:text="#{orders.index.responsible}">Bearbeitende Einheit</span>
                                 <span th:if="${order.responsibleOrgUnit != null}" class="squadron-badge"
                                       th:title="${order.responsibleOrgUnit.name()}"
-                                      th:text="${order.responsibleOrgUnit.shorthand()}">IRI</span>
+                                      th:text="${order.responsibleOrgUnit.shorthand()}">ALP</span>
                                 <span th:if="${order.responsibleOrgUnit == null}" class="squadron-badge squadron-badge-muted"
                                       th:title="#{orders.index.responsible}">—</span>
                             </span>
@@ -142,7 +142,7 @@
                     <td th:attr="data-label=#{orders.index.requesting}">
                         <span th:if="${order.requestingOrgUnit != null}" class="squadron-badge"
                               th:title="${order.requestingOrgUnit.name()}"
-                              th:text="${order.requestingOrgUnit.shorthand()}">IRI</span>
+                              th:text="${order.requestingOrgUnit.shorthand()}">ALP</span>
                         <span th:if="${order.requestingOrgUnit == null}" class="squadron-badge squadron-badge-muted">—</span>
                         <span class="cell-sub" th:text="${@handles.display(order.handle)}">Handle</span>
                     </td>

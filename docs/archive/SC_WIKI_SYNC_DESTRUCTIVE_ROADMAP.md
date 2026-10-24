@@ -6,18 +6,18 @@
 
 Doc type: **historical plan — fully executed.** All four steps shipped; Step 4, the irreversible
 column drop, landed on 2026-06-01 in commit `a0efd7ca1` (PR
-[#281](https://github.com/krt-iri/basetool/pull/281)) as `V125__drop_legacy_material_and_ship_type_columns.sql`.
+[#281](https://github.com/krt-profit/basetool/pull/281)) as `V125__drop_legacy_material_and_ship_type_columns.sql`.
 Restored to `docs/` on 2026-09-02 because [`SC_WIKI_SYNC_PLAN.md`](SC_WIKI_SYNC_PLAN.md) and
 [`SC_WIKI_SYNC_DEPLOYMENT_RUNBOOK.md`](SC_WIKI_SYNC_DEPLOYMENT_RUNBOOK.md) reference it six times
 between them.
 
 > [!note] The cleanup this document plans is complete — done 2026-06-01
 > `V125__drop_legacy_material_and_ship_type_columns.sql` (PR
-> [#281](https://github.com/krt-iri/basetool/pull/281), commit `a0efd7ca1`) dropped both
+> [#281](https://github.com/krt-profit/basetool/pull/281), commit `a0efd7ca1`) dropped both
 > `material.is_manual_entry` and `ship_type.description`, and the same PR removed the JPA fields
 > `Material.isManualEntry` and `ShipType.description`. (`buildLegacyDescription` had already gone one
 > PR earlier, with the Step 2 reader migration in
-> [#275](https://github.com/krt-iri/basetool/pull/275).) `V125MigrationTest` pins the applied
+> [#275](https://github.com/krt-profit/basetool/pull/275).) `V125MigrationTest` pins the applied
 > migration.
 >
 > A `git grep` for `isManualEntry` or for a ship-type `description` still returns hits. Those are the
@@ -40,11 +40,11 @@ scopes R9 **out** of the main rollout ("Out of scope of this plan; tracked separ
 removed two columns that user-facing code still read at the time. This doc is that separate track.
 
 > **Final status (2026-06-01):** all steps merged. Steps 1–2 (the reader migrations — code-only and
-> individually reversible) shipped in PR [#275](https://github.com/krt-iri/basetool/pull/275). Step 3
+> individually reversible) shipped in PR [#275](https://github.com/krt-profit/basetool/pull/275). Step 3
 > (the soak, alongside the R8 soak in PR
-> [#271](https://github.com/krt-iri/basetool/pull/271)) ran clean. Step 4 (the irreversible V125
+> [#271](https://github.com/krt-profit/basetool/pull/271)) ran clean. Step 4 (the irreversible V125
 > column drop, stacked on #275 and held as a draft until the soak finished) merged on 2026-06-01 as
-> commit `a0efd7ca1` in PR [#281](https://github.com/krt-iri/basetool/pull/281).
+> commit `a0efd7ca1` in PR [#281](https://github.com/krt-profit/basetool/pull/281).
 
 ## What R9 removed
 
@@ -133,7 +133,7 @@ gap the two-phase rule requires between "stop using the column" and "drop the co
 ### Step 4 — V125: drop the columns + remove the entity fields (destructive) — merged 2026-06-01
 
 Shipped as `backend/src/main/resources/db/migration/V125__drop_legacy_material_and_ship_type_columns.sql`
-in commit `a0efd7ca1` (PR [#281](https://github.com/krt-iri/basetool/pull/281)):
+in commit `a0efd7ca1` (PR [#281](https://github.com/krt-profit/basetool/pull/281)):
 
 ```sql
 ALTER TABLE material  DROP COLUMN IF EXISTS is_manual_entry;
@@ -177,7 +177,7 @@ column reader); a full DB backup was taken immediately before the merge. Irrever
   description.) The column itself stayed in place until Step 4.
 - [x] Step 3: `git grep` for both columns was clean in `main`; the soak window was observed; APM/logs
   were clean on the migrated pages.
-- [x] Step 4 PR ([#281](https://github.com/krt-iri/basetool/pull/281), commit `a0efd7ca1`,
+- [x] Step 4 PR ([#281](https://github.com/krt-profit/basetool/pull/281), commit `a0efd7ca1`,
   2026-06-01): `V125__drop_legacy_material_and_ship_type_columns.sql` applied; `Material` /
   `ShipType` no longer declare the fields; `ddl-auto=validate` boots green; backup confirmed;
   `V125MigrationTest` pins the applied migration.

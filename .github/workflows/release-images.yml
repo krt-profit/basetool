@@ -330,7 +330,7 @@ jobs:
           labels: |
             org.opencontainers.image.title=basetool-${{ matrix.module }}
             org.opencontainers.image.description=Profit Basetool ${{ matrix.module }} (Spring Boot)
-            org.opencontainers.image.vendor=KRT IRIDIUM
+            org.opencontainers.image.vendor=Lucas Greuloch
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.documentation=https://github.com/${{ github.repository }}/blob/main/docs/deployment.md
             org.opencontainers.image.licenses=GPL-3.0-only
@@ -593,7 +593,7 @@ jobs:
           labels: |
             org.opencontainers.image.title=basetool-config
             org.opencontainers.image.description=Profit Basetool host configuration bundle (compose + maintenance page + Keycloak theme)
-            org.opencontainers.image.vendor=KRT IRIDIUM
+            org.opencontainers.image.vendor=Lucas Greuloch
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.documentation=https://github.com/${{ github.repository }}/blob/main/docs/deployment.md
             org.opencontainers.image.licenses=GPL-3.0-only
@@ -794,7 +794,7 @@ jobs:
           labels: |
             org.opencontainers.image.title=basetool-keycloak-spi
             org.opencontainers.image.description=Profit Basetool Keycloak provider JAR (Discord federation + first-login gate)
-            org.opencontainers.image.vendor=KRT IRIDIUM
+            org.opencontainers.image.vendor=Lucas Greuloch
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.documentation=https://github.com/${{ github.repository }}/blob/main/docs/deployment.md
             org.opencontainers.image.licenses=GPL-3.0-only

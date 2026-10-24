@@ -136,7 +136,7 @@ class PurchasingDeliveryServiceTest {
     location.setId(LOCATION);
     unit = new Squadron();
     unit.setId(UNIT);
-    unit.setName("Iridium");
+    unit.setName("Alpha");
     deal = new PurchasingDeal();
     deal.setId(DEAL);
     deal.setDealNo(42L);
@@ -189,7 +189,7 @@ class PurchasingDeliveryServiceTest {
             details.capture());
     assertThat(details.getValue().toString())
         .contains("delivery=" + DELIVERY, "deliveredAmount=4.0")
-        .doesNotContain("Iridium");
+        .doesNotContain("Alpha");
     NoticeEvent notice = publishedNotice();
     assertThat(notice.eventType()).isEqualTo(NotificationEventType.PURCHASING_DELIVERY_RECORDED);
     assertThat(notice.entityId()).isEqualTo(DEAL);
