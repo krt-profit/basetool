@@ -150,6 +150,7 @@ lightens every value):
 | `--surface-panel` | `#282C30` | cards, list panels, modals, toasts, dropdowns |
 | `--surface-inset` | `#0F0F0F` | a box set into a panel |
 | `--control-bg` | `#373E43` | every control fill and the table row hover |
+| `--table-stripe-bg` | `--color-control` at 50 % (`#30353A` on the panel) | every second visible table row |
 
 A tile never takes the fill of the surface it sits on: a `.card`, `.kpi-total` or `.kpi-card`
 placed inside a panel (`.list-panel`, another card, a `.detail-pane`, a modal) is `.card--inset` /
@@ -158,7 +159,8 @@ apart from its container; a page's own tile class inside a panel takes the same 
 `.data-table` inside a padded card or tab panel lays its rows on `--surface-inset`, so the rows, the
 bar-filled head and the panel stay three distinct levels. Rows alternate by visible row: a row that
 is `hidden` or carries `.detail-row` (an expandable detail under its row) does not count, so the
-stripes still alternate. A lighter tile is not an option — `#36373B` and `#373E43` are reserved for
+stripes still alternate. The stripe is the translucent `--table-stripe-bg`, so it sits halfway
+between the row surface and the row hover on the panel and on an inset table alike. A lighter tile is not an option — `#36373B` and `#373E43` are reserved for
 hairlines, `.btn-secondary` and controls.
 
 `--color-bg-black` `#000000` is **no page background**: it is the text on orange and the base
