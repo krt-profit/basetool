@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [v1.19.12](https://github.com/krt-profit/basetool/releases/tag/v1.19.12) - 2026-10-24
+
+### Added
+
+- **Interner Keycloak-Rückkanal.** Mit `IRI_KEYCLOAK_BACKCHANNEL_URI` holt das Frontend Token,
+  Schlüssel und Benutzerdaten direkt über die interne Keycloak-Verbindung statt über die öffentliche
+  Edge; Anmeldung und Token-Erneuerung hängen dann nicht mehr an der Edge. Ohne den Wert bleibt
+  alles wie bisher (REQ-SEC-087).
+
 ## [v1.19.11](https://github.com/krt-profit/basetool/releases/tag/v1.19.11) - 2026-10-23
 
 ### Added
