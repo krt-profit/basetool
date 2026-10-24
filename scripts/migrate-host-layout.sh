@@ -71,7 +71,6 @@ STATIC_MOVES=(
   "/etc/iri|/etc/basetool/deploy|req"
 )
 PLANNED_VAR_IRI=(code secrets monitoring db-backend db-keycloak redis backup backend frontend ingest keycloak)
-PLANNED_VAR_IRI_SUB=(backend/log frontend/log ingest/log keycloak/log monitoring/secrets monitoring/certs monitoring/textfile monitoring/data)
 RELEASE_ENTRIES=(docker-compose.yml docker-compose.monitoring.yml monitoring docker keycloak-theme quadlet host-scripts.sha256 scripts keycloak)
 LEFTOVER_PARENTS=(
   /var/iri/backend /var/iri/frontend /var/iri/ingest /var/iri/keycloak /var/iri/monitoring /var/iri
@@ -94,6 +93,7 @@ TREE_ANCHORS=(
 DRY=0
 ACTIONS=0
 PLAN=()
+declare -A PLAN_TARGETS=()
 
 trap 'printf "FATAL: a command failed (line %s)\n" "$LINENO" >&2' ERR
 
@@ -404,53 +404,75 @@ ensure_tree() {
 }
 
 add_plan() {
-  PLAN+=("$1|$2|$3")
+  local req="$3"
+  if [[ -n "${PLAN_TARGETS[$2]:-}" ]]; then
+    req=collision
+  fi
+  PLAN_TARGETS["$2"]=1
+  PLAN+=("$1|$2|${req}")
 }
 
-host_local_names() {
-  local f name known entry
+HOST_LOCAL=/etc/basetool/host-local
+
+map_suffix() {
+  local value="${1//IRI_BASETOOL_VERSION/BASETOOL_VERSION}"
+  printf '%s' "${value//IRI_/BASETOOL_}"
+}
+
+emit_unmapped() {
+  local dir="$1" target="$2" prefix="$3" f name known k
+  shift 3
   shopt -s nullglob dotglob
-  for f in "$(P /var/iri/code)"/*; do
+  for f in "$(P "${dir}")"/*; do
     name="${f##*/}"
     known=0
-    case "${name}" in
-      .env | .env.backup-* | env.d | realm-export.json) known=1 ;;
-    esac
-    for entry in "${RELEASE_ENTRIES[@]}"; do
-      if [[ "${name}" == "${entry}" ]]; then
+    if [[ -n "${prefix}" && "${name}" == "${prefix}"* ]]; then
+      known=1
+    fi
+    for k in "$@"; do
+      if [[ "${name}" == "${k}" ]]; then
         known=1
       fi
     done
     if (( ! known )); then
-      printf '%s\n' "${name}"
+      printf '%s/%s|%s/%s|opt\n' "${dir}" "${name}" "${target}" "${name}"
     fi
   done
   shopt -u nullglob dotglob
 }
 
+unmapped_rows() {
+  local svc
+  emit_unmapped /var/iri/code "${HOST_LOCAL}/release" .env.backup- .env env.d realm-export.json "${RELEASE_ENTRIES[@]}"
+  emit_unmapped /var/iri/monitoring "${HOST_LOCAL}/monitoring" "" secrets certs textfile data
+  emit_unmapped /var/iri "${HOST_LOCAL}/data" "" "${PLANNED_VAR_IRI[@]}"
+  for svc in backend frontend ingest keycloak; do
+    emit_unmapped "/var/iri/${svc}" "${HOST_LOCAL}/data/${svc}" "" log
+  done
+}
+
 build_plan() {
-  local f suffix row name
+  local f suffix row from to req
   local -A seen=()
   PLAN=()
+  PLAN_TARGETS=()
   shopt -s nullglob
   for f in "$(P /var/iri/code)"/.env.backup-*; do
-    seen["${f##*/.env.backup-}"]=1
+    suffix="${f##*/.env.backup-}"
+    add_plan "/var/iri/code/.env.backup-${suffix}" "/etc/basetool/basetool.env.backup-$(map_suffix "${suffix}")" opt
   done
   for f in "$(P /etc/basetool)"/basetool.env.backup-*; do
-    seen["${f##*/basetool.env.backup-}"]=1
-  done
-  for suffix in "${!seen[@]}"; do
+    suffix="${f##*/basetool.env.backup-}"
     add_plan "/var/iri/code/.env.backup-${suffix}" "/etc/basetool/basetool.env.backup-${suffix}" opt
   done
-  for row in "${STATIC_MOVES[@]}"; do
-    if [[ "${row}" == "/var/iri/code|"* ]]; then
-      while IFS= read -r name; do
-        add_plan "/var/iri/code/${name}" "/etc/basetool/host-local/${name}" opt
-      done < <(host_local_names)
+  while IFS='|' read -r from to req; do
+    if [[ -n "${from}" ]]; then
+      add_plan "${from}" "${to}" "${req}"
     fi
+  done < <(unmapped_rows)
+  for row in "${STATIC_MOVES[@]}"; do
     PLAN+=("${row}")
   done
-  seen=()
   for f in "$(P /var/log)"/iri-*; do
     if [[ -f "${f}" ]]; then
       seen["${f##*/iri-}"]=1
@@ -469,6 +491,10 @@ build_plan() {
 
 row_state() {
   local from="$1" to="$2" req="$3" f t
+  if [[ "${req}" == collision ]]; then
+    printf 'conflict'
+    return 0
+  fi
   f="$(P "${from}")"
   t="$(P "${to}")"
   if ! exists_path "${f}"; then
@@ -507,18 +533,30 @@ print_plan() {
   done
 }
 
+ensure_private_tree() {
+  local path="$1" cur="${HOST_LOCAL}" part
+  local -a parts
+  ensure_tree /etc/basetool
+  IFS=/ read -ra parts <<< "${path#"${HOST_LOCAL}"}"
+  for part in "" "${parts[@]}"; do
+    if [[ -n "${part}" ]]; then
+      cur="${cur}/${part}"
+    fi
+    if [[ ! -d "$(P "${cur}")" ]]; then
+      act mkdir "$(P "${cur}")"
+      act chmod 0700 "$(P "${cur}")"
+      act chown root:root "$(P "${cur}")"
+    fi
+  done
+}
+
 move_one() {
   local from="$1" to="$2" req="$3" state
   state="$(row_state "${from}" "${to}" "${req}")"
   case "${state}" in
     todo | todo-replace)
-      if [[ "${to}" == /etc/basetool/host-local/* ]]; then
-        ensure_tree /etc/basetool
-        if [[ ! -d "$(P /etc/basetool/host-local)" ]]; then
-          act mkdir "$(P /etc/basetool/host-local)"
-          act chmod 0700 "$(P /etc/basetool/host-local)"
-          act chown root:root "$(P /etc/basetool/host-local)"
-        fi
+      if [[ "${to}" == "${HOST_LOCAL}"/* ]]; then
+        ensure_private_tree "$(dirname "${to}")"
       else
         ensure_tree "$(dirname "${to}")"
       fi
@@ -1258,9 +1296,30 @@ check_units() {
   fi
 }
 
+report_unrecognised() {
+  local dir="$1" label="$2" f name known k names=""
+  shift 2
+  shopt -s nullglob dotglob
+  for f in "$(P "${dir}")"/*; do
+    name="${f##*/}"
+    known=0
+    for k in "$@"; do
+      if [[ "${name}" == "${k}" ]]; then
+        known=1
+      fi
+    done
+    if (( ! known )); then
+      names+=" ${name}"
+    fi
+  done
+  shopt -u nullglob dotglob
+  if [[ -n "${names}" ]]; then
+    report info "not recognised in the ${label} ${dir} (it moves as a whole, so these stay with it; check that no setting points at them):${names}"
+  fi
+}
+
 check_plan() {
-  local row from to req state entry dir sub
-  local -A planned=() planned_sub=()
+  local row from to req state
   build_plan
   for row in "${PLAN[@]}"; do
     IFS='|' read -r from to req <<< "${row}"
@@ -1276,31 +1335,12 @@ check_plan() {
   if [[ -f "$(P /var/lib/iri)/config-apply.incomplete" || -f "$(P "${NEW_DEPLOY_HOME}")/config-apply.incomplete" ]]; then
     report block "an earlier config apply did not complete (config-apply.incomplete): finish or undo it with the old deploy.sh first"
   fi
-  for entry in "${PLANNED_VAR_IRI[@]}"; do
-    planned["${entry}"]=1
-  done
-  for entry in "${PLANNED_VAR_IRI_SUB[@]}"; do
-    planned_sub["${entry}"]=1
-  done
-  if [[ -d "$(P /var/iri)" ]]; then
-    shopt -s nullglob dotglob
-    for entry in "$(P /var/iri)"/*; do
-      if [[ -z "${planned[${entry##*/}]:-}" ]]; then
-        report block "unplanned entry in /var/iri: ${entry##*/}"
-      fi
-    done
-    for dir in backend frontend ingest keycloak monitoring; do
-      if [[ -d "$(P "/var/iri/${dir}")" ]]; then
-        for entry in "$(P "/var/iri/${dir}")"/*; do
-          sub="${dir}/${entry##*/}"
-          if [[ -z "${planned_sub[${sub}]:-}" ]]; then
-            report block "unplanned entry in /var/iri/${dir}: ${entry##*/}"
-          fi
-        done
-      fi
-    done
-    shopt -u nullglob dotglob
-  fi
+  report_unrecognised /var/lib/iri "deploy state directory" \
+    current-digest-pin.yml previous-digest-pin.yml last-deployed.digests failed.digests reapply-failed.digests \
+    config-stage config-previous config-blocked.marker config-apply.incomplete monitoring-reload edge \
+    keycloak-spi-stage.jar keycloak-spi-previous.jar health-restart.digests mixed-release.since monitoring-apply.log \
+    .docker .sigstore .cache .config .containers .local .ansible hardening restic-cache textfile
+  report_unrecognised /etc/iri "deploy credential directory" ghcr-pull-token ghcr-pull-token-expiry backup.env rclone.conf ssg-tailoring.xml
   report info "plan: stop -> export-volumes -> reset-podman -> accounts -> move (${#PLAN[@]} path rows, ${#FCONTEXT_RULES[@]} label rules added, ${#OLD_FCONTEXT_RULES[@]} removed) -> rewrite -> [Ansible role] -> cleanup -> import-volumes"
 }
 

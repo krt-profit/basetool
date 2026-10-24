@@ -204,7 +204,12 @@ stub loginctl <<'STUB'
 echo "loginctl $*" >> "$FAKE/calls.log"
 mkdir -p "$ROOT/var/lib/systemd/linger" "$FAKE/active"
 case "$1" in
-  enable-linger) : > "$ROOT/var/lib/systemd/linger/$2"; mkdir -p "$ROOT/run/user/994"; touch "$FAKE/active/user@994.service" ;;
+  enable-linger)
+    uid="$(awk -F: -v n="$2" '$1 == n { print $3 }' "$ROOT/etc/passwd")"
+    : > "$ROOT/var/lib/systemd/linger/$2"
+    mkdir -p "$ROOT/run/user/$uid"
+    touch "$FAKE/active/user@$uid.service"
+    ;;
   disable-linger) rm -f "$ROOT/var/lib/systemd/linger/$2" ;;
 esac
 exit 0
@@ -314,7 +319,7 @@ ENV_BACKUP_A=$'IRI_KEYSTORE_HOST_PATH=/var/iri/secrets/keystore.p12\nREDIS_PASSW
 ENV_BACKUP_B=$'IRI_STATE_DIR=/var/lib/iri\nSERVER_SSL_KEY_STORE_PASSWORD=OLDSECRETVALUE\n'
 BACKUP_ENV_OLD=$'RESTIC_REPOSITORY=rclone:nextcloud:Basetool-Backups\nRCLONE_CONFIG=/etc/iri/rclone.conf\nRESTIC_PASSWORD=RESTICSECRET\nIRI_KEEP_DAILY=7\n'
 REALM_OLD=$'{\n  "realm": "iri",\n  "roles": {"realm": [{"name": "default-roles-iri", "containerId": "iri"}]},\n  "clients": [{"clientId": "basetool-frontend", "name": "IRIDIUM Basetool Frontend", "description": "Frontend Application for IRIDIUM Basetool", "rootUrl": "https://h/auth/realms/iri/x", "redirectUris": ["/admin/iri/console/*"]}]\n}\n'
-SECRETS_RE='HOSTLOCAL-SECRET-ONE|TOPSECRETVALUE|OLDSECRETVALUE|RESTICSECRET|ANOTHERSECRET|PRIVATE-KEY-MATERIAL|ACME-ACCOUNT'
+SECRETS_RE='HOSTLOCAL-|TOPSECRETVALUE|OLDSECRETVALUE|RESTICSECRET|ANOTHERSECRET|PRIVATE-KEY-MATERIAL|ACME-ACCOUNT'
 
 build_template() {
   rm -rf "$ROOT" "$FAKE"
@@ -380,6 +385,15 @@ VolumeName=${v}
   mkfile "$c/.env.bak1" 'HOSTLOCAL-SECRET-ONE'
   mkfile "$c/kc-client.before.json" 'HOSTLOCAL-JSON'
   chmod 0600 "$c/.env.bak1"
+  mkfile "$c/.env.bak-20261023-keystore" 'HOSTLOCAL-BAK'
+  mkfile "$c/.env.pre-rehearsal-1" 'HOSTLOCAL-PRE'
+  mkfile "$c/env.d.scaffold-1/x" 'HOSTLOCAL-SCAFFOLD'
+  mkfile "$ROOT/var/iri/rollback/snap" 'HOSTLOCAL-ROLLBACK'
+  mkfile "$ROOT/var/iri/monitoring/grafana/g.db" 'HOSTLOCAL-GRAFANA'
+  mkfile "$ROOT/var/iri/monitoring/README.md" 'HOSTLOCAL-README'
+  mkfile "$ROOT/var/iri/backend/extra.txt" 'HOSTLOCAL-BACKEND'
+  mkfile "$ROOT/var/lib/iri/stray-state" 'unrecognised state'
+  mkfile "$c/.env.backup-20260928-154144-IRI_INGEST_LEGACY_ENDPOINTS_ENABLED" $'IRI_INGEST_LEGACY_ENDPOINTS_ENABLED=true\n'
   mkdir -p "$CACHE/template"
   cp -a "$ROOT" "$CACHE/template/root"
   cp -a "$FAKE" "$CACHE/template/fake"
@@ -828,10 +842,11 @@ mv "$ROOT/var/iri/db-backend" "$ROOT/var/iri/db-backend.gone"
 block_case "a required path absent on both sides" 'required, absent on both sides: /var/iri/db-backend'
 restore_state template
 mkdir -p "$ROOT/var/iri/npm"
-block_case "an entry the plan does not know" 'unplanned entry in /var/iri: npm'
-restore_state template
-mkdir -p "$ROOT/var/iri/monitoring/extra"
-block_case "an unknown entry below /var/iri/monitoring" 'unplanned entry in /var/iri/monitoring: extra'
+run_script check
+check "check does not block on an unknown top-level entry; it plans to move it to host-local" bash -c "test '$RC' = 0 && grep -q '^\[todo\] move /var/iri/npm -> /etc/basetool/host-local/data/npm' '$OUT'"
+check "check plans every leftover of the old roots, by name only" bash -c "for l in 'var/iri/rollback -> /etc/basetool/host-local/data/rollback' 'var/iri/monitoring/grafana -> /etc/basetool/host-local/monitoring/grafana' 'var/iri/monitoring/README.md -> /etc/basetool/host-local/monitoring/README.md' 'var/iri/backend/extra.txt -> /etc/basetool/host-local/data/backend/extra.txt' 'var/iri/code/.env.pre-rehearsal-1 -> /etc/basetool/host-local/release/.env.pre-rehearsal-1' 'var/iri/code/env.d.scaffold-1 -> /etc/basetool/host-local/release/env.d.scaffold-1' 'var/iri/code/.env.bak-20261023-keystore -> /etc/basetool/host-local/release/.env.bak-20261023-keystore'; do grep -q \"^\[todo\] move /\$l\" '$OUT' || exit 1; done"
+check "check does not list the mapped monitoring dirs or the log dirs as leftovers" bash -c "! grep -qE 'host-local/(monitoring/(secrets|certs|textfile|data)\$|data/backend/log)' '$OUT'"
+check "check reports unrecognised entries of the wholesale-moved state directory, without moving them" bash -c "grep -q '^\[info\] not recognised in the deploy state directory /var/lib/iri.*: stray-state' '$OUT'"
 restore_state template
 mkfile "$ROOT/etc/basetool/basetool.env" 'in the way'
 block_case "a target that exists next to its source" 'both exist: /var/iri/code/.env and /etc/basetool/basetool.env'
@@ -863,9 +878,17 @@ block_case "a realm export that is not JSON" 'the realm export cannot be rewritt
 restore_state template
 run_script check
 check "check lists the hand-made drop-ins it will carry over, and the role-managed ones it will not" bash -c "grep -q '^\[todo\] drop-in carried over: /etc/systemd/system/iri-deploy.service.d/override.conf -> /etc/systemd/system/basetool-deploy.service.d/override.conf' '$OUT' && grep -q '^\[todo\] drop-in carried over: .*iri-backup.timer.d/schedule.conf -> .*basetool-backup.timer.d/schedule.conf' '$OUT' && grep -q '^\[info\] role-managed drop-in, not carried over: .*iri-deploy.service.d/10-deploy-account-sandbox.conf' '$OUT'"
-check "check lists host-local leftovers by name" bash -c "grep -q '^\[todo\] move /var/iri/code/.env.bak1 -> /etc/basetool/host-local/.env.bak1' '$OUT' && grep -q '^\[todo\] move /var/iri/code/kc-client.before.json -> /etc/basetool/host-local/kc-client.before.json' '$OUT'"
+check "check lists host-local leftovers by name" bash -c "grep -q '^\[todo\] move /var/iri/code/.env.bak1 -> /etc/basetool/host-local/release/.env.bak1' '$OUT' && grep -q '^\[todo\] move /var/iri/code/kc-client.before.json -> /etc/basetool/host-local/release/kc-client.before.json' '$OUT'"
 check "check prints no content of them" bash -c "! grep -q HOSTLOCAL '$OUT'"
-check "check does not list release entries as host-local" bash -c "! grep -qE 'host-local/(scripts|monitoring|keycloak|docker-compose.yml)' '$OUT'"
+check "check does not list release entries as host-local" bash -c "! grep -qE 'host-local/release/(scripts|monitoring|keycloak|docker-compose.yml|quadlet|docker)' '$OUT'"
+check "check shows the env backup under its mapped name" grep -q '^\[todo\] move /var/iri/code/.env.backup-20260928-154144-IRI_INGEST_LEGACY_ENDPOINTS_ENABLED -> /etc/basetool/basetool.env.backup-20260928-154144-BASETOOL_INGEST_LEGACY_ENDPOINTS_ENABLED' "$OUT"
+restore_state template
+mkfile "$ROOT/var/iri/code/.env.backup-20260928-154144-BASETOOL_INGEST_LEGACY_ENDPOINTS_ENABLED" 'x'
+block_case "two env backups that map to the same name" 'both exist: /var/iri/code/.env.backup-20260928-154144-(IRI|BASETOOL)_INGEST_LEGACY_ENDPOINTS_ENABLED'
+restore_state template
+mkfile "$ROOT/etc/basetool/basetool.env.backup-20260928-154144-BASETOOL_INGEST_LEGACY_ENDPOINTS_ENABLED" 'other'
+block_case "an env backup whose mapped name already exists" 'both exist: /var/iri/code/.env.backup-20260928-154144-IRI_INGEST_LEGACY_ENDPOINTS_ENABLED'
+restore_state template
 restore_state template
 mkfile "$ROOT/etc/systemd/system/iri-deploy.service.d/bad.conf" $'[Service]\nExecStart=/var/iri/npm/x\n'
 block_case "a hand-made drop-in that cannot be carried over" 'the drop-in /etc/systemd/system/iri-deploy.service.d/bad.conf cannot be carried over'
@@ -1127,14 +1150,18 @@ check "row realm-export.json -> /etc/basetool" bash -c "test -f '$ROOT/etc/baset
 check "row env.d stays a directory beside the env file" test -d "$ROOT/etc/basetool/env.d" -a ! -e "$ROOT/opt/basetool/env.d"
 check "row /etc/iri/backup.env -> deploy/backup.env" bash -c "test \"\$(cat '$ROOT/etc/basetool/deploy/backup.env')\" = \"\$(printf '%s' '$BACKUP_ENV_OLD')\""
 check "no old path is left: /var/iri holds no file, /etc/iri and /var/lib/iri are gone" bash -c "test -z \"\$(find '$ROOT/var/iri' -type f)\" && test ! -e '$ROOT/etc/iri' && test ! -e '$ROOT/var/lib/iri' && ! ls '$ROOT'/var/log/iri-* > /dev/null 2>&1"
-EXPECTED_CHOWN="$(for d in opt etc/basetool etc/basetool/host-local etc/basetool/monitoring var/lib/basetool var/log/basetool var/cache var/cache/basetool; do printf 'chown root:root %s/%s\n' "$ROOT" "$d"; done | LC_ALL=C sort)"
+EXPECTED_CHOWN="$(for d in opt etc/basetool etc/basetool/host-local etc/basetool/host-local/release etc/basetool/host-local/data etc/basetool/host-local/data/backend etc/basetool/host-local/monitoring etc/basetool/monitoring var/lib/basetool var/log/basetool var/cache var/cache/basetool; do printf 'chown root:root %s/%s\n' "$ROOT" "$d"; done | LC_ALL=C sort)"
 EXPECTED_CHMOD="$(for d in opt etc/basetool etc/basetool/monitoring var/lib/basetool var/log/basetool var/cache var/cache/basetool; do printf '  do: chmod 0755 %s/%s\n' "$ROOT" "$d"; done | LC_ALL=C sort)"
 check "exactly the missing new roots are created, root:root, and no moved path is chowned" test "$(grep '^chown ' "$CALLS" | LC_ALL=C sort)" = "$EXPECTED_CHOWN"
 check "and each of them gets mode 0755" test "$(grep '^  do: chmod 0755 ' "$OUT" | LC_ALL=C sort)" = "$EXPECTED_CHMOD"
-check "host-local leftovers go to /etc/basetool/host-local, never into the release tree" bash -c "test \"\$(cat '$ROOT/etc/basetool/host-local/.env.bak1')\" = HOSTLOCAL-SECRET-ONE && test \"\$(cat '$ROOT/etc/basetool/host-local/kc-client.before.json')\" = HOSTLOCAL-JSON && test ! -e '$ROOT/opt/basetool/.env.bak1' && test ! -e '$ROOT/opt/basetool/kc-client.before.json' && test ! -e '$ROOT/var/iri/code'"
-check "the host-local directory is made root:root 0700" bash -c "grep -q 'do: chmod 0700 $ROOT/etc/basetool/host-local\$' '$OUT' && grep -q 'do: chown root:root $ROOT/etc/basetool/host-local\$' '$OUT'"
-check "a host-local file keeps its mode" test "$(stat -c %a "$ROOT/etc/basetool/host-local/.env.bak1")" = "$(stat -c %a "$CACHE/s4/root/var/iri/code/.env.bak1")"
-check "release entries are not treated as host-local" bash -c "! ls '$ROOT/etc/basetool/host-local' | grep -qE '^(scripts|monitoring|keycloak|docker-compose.yml)\$'"
+check "host-local leftovers go to /etc/basetool/host-local, never into the release tree" bash -c "test \"\$(cat '$ROOT/etc/basetool/host-local/release/.env.bak1')\" = HOSTLOCAL-SECRET-ONE && test \"\$(cat '$ROOT/etc/basetool/host-local/release/kc-client.before.json')\" = HOSTLOCAL-JSON && test ! -e '$ROOT/opt/basetool/.env.bak1' && test ! -e '$ROOT/opt/basetool/kc-client.before.json' && test ! -e '$ROOT/var/iri/code'"
+check "every host-local directory is made root:root 0700" bash -c "for d in '' /release /data /data/backend /monitoring; do grep -q \"do: chmod 0700 $ROOT/etc/basetool/host-local\$d\\\$\" '$OUT' && grep -q \"do: chown root:root $ROOT/etc/basetool/host-local\$d\\\$\" '$OUT' || exit 1; done"
+check "the leftovers of all old roots arrive with their content" bash -c "H='$ROOT/etc/basetool/host-local'; test \"\$(cat \$H/data/rollback/snap)\" = HOSTLOCAL-ROLLBACK && test \"\$(cat \$H/monitoring/grafana/g.db)\" = HOSTLOCAL-GRAFANA && test \"\$(cat \$H/monitoring/README.md)\" = HOSTLOCAL-README && test \"\$(cat \$H/data/backend/extra.txt)\" = HOSTLOCAL-BACKEND && test \"\$(cat \$H/release/.env.pre-rehearsal-1)\" = HOSTLOCAL-PRE && test \"\$(cat \$H/release/env.d.scaffold-1/x)\" = HOSTLOCAL-SCAFFOLD && test \"\$(cat \$H/release/.env.bak-20261023-keystore)\" = HOSTLOCAL-BAK"
+check "no leftover remains in the old roots, and none went into the release tree" bash -c "test ! -e '$ROOT/var/iri/rollback' && test ! -e '$ROOT/opt/basetool/env.d.scaffold-1' && test ! -e '$ROOT/opt/basetool/.env.pre-rehearsal-1'"
+check "the wholesale-moved state directory keeps its unrecognised entry" test -f "$ROOT/var/lib/basetool/deploy/stray-state"
+check "the env backup with IRI_ in its name lands under the BASETOOL_ name, content intact" bash -c "test \"\$(cat '$ROOT/etc/basetool/basetool.env.backup-20260928-154144-BASETOOL_INGEST_LEGACY_ENDPOINTS_ENABLED')\" = \"\$(printf 'IRI_INGEST_LEGACY_ENDPOINTS_ENABLED=true\\n')\" && ! ls '$ROOT/etc/basetool/'*IRI_* > /dev/null 2>&1"
+check "a host-local file keeps its mode" test "$(stat -c %a "$ROOT/etc/basetool/host-local/release/.env.bak1")" = "$(stat -c %a "$CACHE/s4/root/var/iri/code/.env.bak1")"
+check "release entries are not treated as host-local" bash -c "! ls '$ROOT/etc/basetool/host-local/release' | grep -qE '^(scripts|monitoring|keycloak|docker-compose.yml)\$'"
 check "semanage, usermod and groupmod ran with umask 0022" bash -c "grep -q '^semanage' '$FAKE/umask.log' && grep -q '^usermod' '$FAKE/umask.log' && grep -q '^groupmod' '$FAKE/umask.log' && ! grep -qv ' 0022\$' '$FAKE/umask.log'"
 check "the deploy account's home follows its state directory" grep -qx 'deploy:x:992:992::/var/lib/basetool/deploy:/sbin/nologin' "$ROOT/etc/passwd"
 while read -r pattern type; do
@@ -1362,6 +1389,33 @@ restore_state s8
 touch "$FAKE/export-fails"
 run_script import-volumes
 check "an unreadable volume is not treated as empty: nothing is imported, exit 1" bash -c "test '$RC' = 1 && ! grep -q 'volume import' '$CALLS' && grep -q 'cannot read volume edge-certs' '$OUT'"
+
+echo "== another host: other uids =="
+
+restore_state template
+sed -i -e 's/^deploy:x:992:992/deploy:x:990:990/' -e 's/^iri:x:994:994/iri:x:992:992/' "$ROOT/etc/passwd"
+sed -i -e 's/^deploy:x:992:/deploy:x:990:/' -e 's/^iri:x:994:/iri:x:992:/' "$ROOT/etc/group"
+mv "$ROOT/etc/containers/systemd/users/994" "$ROOT/etc/containers/systemd/users/992"
+mv "$ROOT/run/user/994" "$ROOT/run/user/992"
+mv "$FAKE/active/user@994.service" "$FAKE/active/user@992.service"
+: > "$WORK/calls-992"
+run_script check
+cat "$CALLS" >> "$WORK/calls-992"
+check "check on a host with iri=992 succeeds and names that uid" bash -c "test '$RC' = 0 && grep -q 'uid 992 gid 992 home /home/iri' '$OUT' && grep -q 'user@992.service active' '$OUT' && grep -q 'Quadlet units in /etc/containers/systemd/users/992' '$OUT'"
+for p in stop export-volumes reset-podman accounts move rewrite; do
+  run_script "$p"
+  cat "$CALLS" >> "$WORK/calls-992"
+  if (( RC == 0 )); then ok "uid 992: ${p} succeeds"; else bad "uid 992: ${p} (rc ${RC})"; fi
+done
+simulate_role
+for p in cleanup import-volumes; do
+  run_script "$p"
+  cat "$CALLS" >> "$WORK/calls-992"
+  if (( RC == 0 )); then ok "uid 992: ${p} succeeds"; else bad "uid 992: ${p} (rc ${RC})"; fi
+done
+check "uid 992: every derived value uses 992 (runtime dir, manager, unit directory, XDG_RUNTIME_DIR)" bash -c "grep -q 'systemctl start user-runtime-dir@992.service' '$WORK/calls-992' && grep -q 'systemctl stop user@992.service' '$WORK/calls-992' && grep -q 'XDG_RUNTIME_DIR=/run/user/992 podman volume export edge-certs' '$WORK/calls-992' && grep -q 'XDG_RUNTIME_DIR=/run/user/992 systemctl --user start edge-certs-volume.service' '$WORK/calls-992'"
+check "uid 992: the other host's uids appear nowhere in what was run" bash -c "! grep -qE '994|user@990|/run/user/990' '$WORK/calls-992'"
+check "uid 992: account renamed with uid and gid kept, deploy home moved, sub-ids as they were" bash -c "grep -qx 'basetool:x:992:992::/home/basetool:/sbin/nologin' '$ROOT/etc/passwd' && grep -qx 'deploy:x:990:990::/var/lib/basetool/deploy:/sbin/nologin' '$ROOT/etc/passwd' && grep -qx 'basetool:100000:65536' '$ROOT/etc/subuid' && test -e '$ROOT/var/lib/systemd/linger/basetool' && test -e '$FAKE/podman-store/vol/edge-certs/privkey.pem'"
 
 echo "== the whole way =="
 

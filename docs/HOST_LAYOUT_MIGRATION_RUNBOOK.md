@@ -31,7 +31,7 @@ under `/opt/basetool` (ADR-0247 keeps that list to what the role installs).
 
 | | Before | After |
 |---|---|---|
-| Service user and group | `iri` (uid/gid 994, subuid and subgid `100000:65536`, home `/home/iri`) | `basetool` — same uid/gid and range, home `/home/basetool` |
+| Service user and group | `iri` (uid/gid derived per host, subuid and subgid `100000:65536`, home `/home/iri`) | `basetool` — same uid/gid and range, home `/home/basetool` |
 | Deploy user | `deploy`, home `/var/lib/iri` | `deploy`, home `/var/lib/basetool/deploy` |
 | Release tree (compose, `docker/`, `monitoring/`, `quadlet/`, `scripts/`, `keycloak/providers`) | `/var/iri/code` | `/opt/basetool` |
 | Host env file | `/var/iri/code/.env` (+ `.env.backup-*`) | `/etc/basetool/basetool.env` — **outside the release tree** |
@@ -48,7 +48,8 @@ under `/opt/basetool` (ADR-0247 keeps that list to what the role installs).
 | SELinux | local rules `/var/iri(/.*)?` `container_file_t`, `/var/iri/code/scripts(/.*)?` `bin_t` | seven rules, see ADR-0319; the two old ones are deleted |
 | Keycloak realm | `iri` (default role `default-roles-iri`) | `basetool` (default role `default-roles-basetool`) |
 | Environment keys | `IRI_<NAME>` | `BASETOOL_<NAME>`; `IRI_BASETOOL_VERSION` → `BASETOOL_VERSION`; `IRI_MONITORING_DIR` has no successor key: dropped when it equals `/var/iri/monitoring`, otherwise `rewrite` refuses and names `BASETOOL_MONITORING_DATA_DIR` / `BASETOOL_MONITORING_CONFIG_DIR` |
-| Entries of `/var/iri/code` that `deploy.sh` does not deliver | beside the release | `/etc/basetool/host-local/` (root 0700), by name; never into `/opt/basetool` |
+| Entries the plan does not map, in `/var/iri/code`, `/var/iri/monitoring`, `/var/iri` and `/var/iri/<svc>` | beside the release or data | `/etc/basetool/host-local/{release,monitoring,data,data/<svc>}/<name>` (root:root 0700 directories, entries keep owner and mode); never into `/opt/basetool`. Unknown entries in `/var/lib/iri` and `/etc/iri` travel with those directories (`check`: `[info]`) |
+| `.env.backup-<suffix>` | `/var/iri/code/` | `/etc/basetool/basetool.env.backup-<suffix>` with `IRI_` in the suffix renamed to `BASETOOL_`; a name collision blocks `check` and refuses `move` |
 | Hand-made unit drop-ins | `iri-<x>.<type>.d/` | carried by `cleanup` to `basetool-<x>.<type>.d/`, rewritten |
 | Rootless Podman store | under `/home/iri` | reset and re-created; the three named volumes (`edge-certs`, `edge-acme-state`, `edge-acme-webroot`) travel as exports |
 
@@ -140,7 +141,7 @@ Nothing in this section touches the production host except the marked steps.
     ls -d /etc/systemd/system/iri-*.d; ls /etc/systemd/system/iri-*.d   # hand-made drop-ins? only 10-/20- are expected
     getent passwd iri deploy; grep -E '^(iri|basetool):' /etc/subuid /etc/subgid
     sudo -u iri podman volume ls                      # the three edge-* volumes must be there (as root if the read grant does not cover it)
-    ls -A /var/iri /var/iri/monitoring                # anything outside the plan makes `check` block
+    ls -A /var/iri /var/iri/monitoring                # anything outside the plan is listed by `check` and moved to host-local
     df -h /var /opt /etc /home                        # room for the three volume exports
     ```
 
@@ -200,9 +201,9 @@ openssl s_client -connect profit-base.online:443 -servername profit-base.online 
   | openssl x509 -noout -serial -enddate
 ```
 
-`check` is read-only, runs with the stack up and blocks on nothing that the window itself fixes. It prints
+`check` is read-only, runs with the stack up and blocks on nothing that the window itself fixes (unknown entries are moved, not blocking; a target-name collision of two `.env.backup-*` copies does block). It prints
 the tools, accounts, units, every move with its state, the env and realm-export rewrites it would do
-(counts only, never a value), the carried drop-ins, what lands in `host-local`, the label rules, the
+(counts only, never a value), the carried drop-ins, what lands in `host-local` (`[todo] move`, by name), the label rules, the
 staging directory and **`window:` lines** (how many old units are active, the state of alloy,
 `dnf-automatic.timer` and `user@<uid>`, and how many processes run in the subuid range). Exit `3` or any
 `[block]`: resolve it **now**, not inside the window. Write the certificate serial and end date down for
@@ -337,13 +338,13 @@ each `migrate-host-layout.sh` phase read its closing line and the exit code (§3
     ls -ld /home/basetool; ls /var/lib/systemd/linger
     ```
 
-    Expect uid 994, gid 994, home `/home/basetool`, `basetool:100000:65536` in both files and a `basetool`
+    Expect the host's uid and gid unchanged (derived, not fixed), home `/home/basetool`, `basetool:100000:65536` in both files and a `basetool`
     entry in the linger directory.
 
 12. **`move`** — every directory and file of §1 to its new place on the same filesystem (renames: owners,
     modes and labels travel), the `deploy` home, the seven new SELinux rules, the two old ones deleted,
     `restorecon -RF` on the five roots. Entries of `/var/iri/code` that `deploy.sh` does not deliver go to
-    `/etc/basetool/host-local/`. It refuses, and prints the table, while a row is in conflict. **WRITE.**
+    `/etc/basetool/host-local/…` (see §1). It refuses, and prints the table, while a row is in conflict. **WRITE.**
 
     ```bash
     bash "$M/migrate-host-layout.sh" move
@@ -432,7 +433,7 @@ each `migrate-host-layout.sh` phase read its closing line and the exit code (§3
     ```
 
     It ends with `deploy successful`. It renders `/etc/basetool/env.d`, installs the units into
-    `/etc/containers/systemd/users/994/`, pulls the pinned images (the Podman store was reset) and
+    `/etc/containers/systemd/users/<basetool uid>/`, pulls the pinned images (the Podman store was reset) and
     starts the stack. Exit `2` with `manual intervention required` means the health gate failed and
     nothing was rolled back: read the log, fix the cause, then
     `sudo -u deploy /opt/basetool/scripts/deploy.sh --force`. Then start the timers: **WRITE.**
@@ -516,7 +517,7 @@ they were when the snapshot was taken. **First**, if `promote.yml` already moved
 previous version again (`gh workflow run promote.yml -f version=<previous>`, **WRITE**), so the old
 deploy timer finds the old release. **Then** start the timers and writers (**WRITE**):
 `systemctl enable --now iri-deploy.timer iri-backup.timer iri-restore-drill.timer iri-container-cleanup.timer`
-and `sudo -u iri XDG_RUNTIME_DIR=/run/user/994 systemctl --user start backend.service ingest.service frontend.service`.
+and `sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) systemctl --user start backend.service ingest.service frontend.service`.
 Announce that the cutover is postponed (**WRITE**, external).
 
 **Partial manual undo.** The migration has **no undo phase**; the staging directory
@@ -527,9 +528,9 @@ Announce that the cutover is postponed (**WRITE**, external).
 
 | Failed at | State | Way back |
 |---|---|---|
-| steps 2–6 | timers and writers stopped, nothing migrated | `systemctl enable --now` the four `iri-*` timers, start the writers (`sudo -u iri XDG_RUNTIME_DIR=/run/user/994 systemctl --user start backend.service ingest.service frontend.service`) |
+| steps 2–6 | timers and writers stopped, nothing migrated | `systemctl enable --now` the four `iri-*` timers, start the writers (`sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) systemctl --user start backend.service ingest.service frontend.service`) |
 | realm rename (7) | realm renamed, host untouched | no reverse script; restore the snapshot, or go forward and finish the host |
-| `stop`, `export-volumes` | timers/units stopped, volumes exported | `systemctl enable --now` the four `iri-*` timers, `systemctl start user@994.service`; the stack comes back from the parked units in `units/` |
+| `stop`, `export-volumes` | timers/units stopped, volumes exported | `systemctl enable --now` the four `iri-*` timers, `systemctl start user@$(id -u iri).service`; the stack comes back from the parked units in `units/` |
 | `reset-podman` | the old Podman store is gone | forward only (the exports re-create the volumes), or the snapshot |
 | `accounts`, `move`, `rewrite` | partly renamed | forward: every phase resumes where it stopped; backwards by hand is the reverse of the §1 table, untested, prefer the snapshot |
 | role, `cleanup`, `import-volumes` | new units present | forward; `old-files/` holds the removed files |
