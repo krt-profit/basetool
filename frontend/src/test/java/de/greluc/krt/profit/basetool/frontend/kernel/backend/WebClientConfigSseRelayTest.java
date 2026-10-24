@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.security.KeycloakBackchannelProperties;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.ClientIpContext;
 import io.micrometer.observation.ObservationRegistry;
 import java.net.URI;
@@ -87,7 +88,8 @@ class WebClientConfigSseRelayTest {
             new ClientIpRelayFilter(),
             environment,
             mock(SslBundles.class),
-            ObservationRegistry.NOOP);
+            ObservationRegistry.NOOP,
+            new KeycloakBackchannelProperties(null));
 
     return config.sseWebClient();
   }

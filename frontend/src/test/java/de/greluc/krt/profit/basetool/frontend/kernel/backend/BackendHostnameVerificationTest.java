@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.security.KeycloakBackchannelProperties;
 import io.micrometer.observation.ObservationRegistry;
 import java.security.KeyStore;
 import java.time.Duration;
@@ -155,7 +156,8 @@ class BackendHostnameVerificationTest {
             new ClientIpRelayFilter(),
             environment,
             bundles(pinned),
-            ObservationRegistry.NOOP)
+            ObservationRegistry.NOOP,
+            new KeycloakBackchannelProperties(null))
         .sseWebClient();
   }
 

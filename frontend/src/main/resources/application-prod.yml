@@ -26,6 +26,11 @@ spring:
             location: ${INTERNAL_TLS_TRUSTSTORE:${SERVER_SSL_KEY_STORE:classpath:keystore.p12}}
             password: ${INTERNAL_TLS_TRUSTSTORE_PASSWORD:${SERVER_SSL_KEY_STORE_PASSWORD}}
             type: PKCS12
+        keycloak-trust:
+          truststore:
+            location: ${INTERNAL_TLS_TRUSTSTORE:${SERVER_SSL_KEY_STORE:classpath:keystore.p12}}
+            password: ${INTERNAL_TLS_TRUSTSTORE_PASSWORD:${SERVER_SSL_KEY_STORE_PASSWORD}}
+            type: PKCS12
 
 spring.thymeleaf.cache: true
 

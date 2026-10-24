@@ -1351,6 +1351,59 @@ line (`${UPOD} logs --since 10m backend 2>&1 | grep -iE 'jwk|PKIX|subject altern
 **Rollback:** delete the line from `.env`, render `env.d/` again with the same command, restart the
 backend. The variable then arrives empty and the issuer-location decoder is back.
 
+### Internal Keycloak back-channel
+
+`IRI_KEYCLOAK_BACKCHANNEL_URI` moves the frontend's server-to-server Keycloak calls — token
+(login and every refresh), JWKS, userinfo — and the `keycloak` health probe of frontend **and**
+backend from the public edge onto the internal connector `https://keycloak:18443`, over the pinned
+`keycloak-trust` bundle (REQ-SEC-087, ADR-0318). The browser redirects, the logout and the `iss`
+check stay on the public issuer, so tokens and sessions do not change. The release carrying the
+wiring passes it **empty**, which keeps today's discovery-based behaviour exactly.
+
+**What changes when it is set:** the frontend starts without contacting Keycloak, a login and a
+token refresh no longer depend on the edge, and the edge's token rate limit sees browser traffic
+only. Members notice nothing; sessions open before the restart refresh against the new endpoint,
+because the stored client always takes the current registration (REQ-SEC-069). Not the ingest
+gateway or Grafana: neither has a network to Keycloak, by design.
+
+**Precondition** (read-only): the backend's JWKS already runs internally (*Internal JWKS for the
+backend*), which proves that Keycloak's certificate names `keycloak` and that the internal
+truststore pins it; the frontend mounts the same truststore (`INTERNAL_TLS_TRUSTSTORE`).
+
+**Apply** (as root, from `/`; a production write, so it waits for the owner's yes):
+
+```bash
+cd /
+cp -p /var/iri/code/.env /var/iri/code/.env.backup-$(date +%Y%m%d-%H%M%S)
+printf 'IRI_KEYCLOAK_BACKCHANNEL_URI=https://keycloak:18443/auth/realms/iri\n' >> /var/iri/code/.env
+grep -c '^IRI_KEYCLOAK_BACKCHANNEL_URI=' /var/iri/code/.env                            # 1
+sudo -u deploy /var/iri/code/scripts/render-env-d.py \
+  --env /var/iri/code/.env --templates /var/iri/code/quadlet/env.d --out /var/iri/code/env.d
+grep '^KEYCLOAK_BACKCHANNEL_URI=' /var/iri/code/env.d/frontend.env /var/iri/code/env.d/backend.env
+${UCTL} restart backend.service                                   # blocks until healthy
+${UCTL} restart frontend.service                                  # blocks until healthy
+```
+
+**Verify:** the frontend log carries `Keycloak back-channel is internal` once
+(`journalctl --since -10min CONTAINER_NAME=frontend -o cat | grep 'back-channel is internal'`) and
+no `PKIX` / `No subject alternative` line. Sign out, sign in, load the mission list: the login
+completes and the page loads. The edge access log then shows no token, discovery or certs request
+from the host's own address any more:
+
+```bash
+journalctl --since -15min CONTAINER_NAME=edge -o cat \
+  | grep -E '"(GET|POST) /auth/realms/iri/(protocol/openid-connect/(token|certs|userinfo)|\.well-known)' \
+  | awk '{print $1}' | sort | uniq -c
+```
+
+Only blackbox probes (the discovery document) and browsers remain. `FrontendLoginBroken` and
+`IdentityProviderUnavailable` stay silent, and `basetool_login_total` keeps counting successes.
+
+**Rollback:** delete the line from `.env`, render `env.d/` again with the same command, restart
+backend and frontend. The variable then arrives empty and discovery against the public issuer is
+back; the public-name alias (ADR-0196) is what makes that path work, so it stays on the host until
+the back-channel has run for a release.
+
 ### Network changes are installed, not applied
 
 A changed `.network` unit reaches the host like any other and is **not** applied by it: Quadlet

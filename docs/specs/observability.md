@@ -2861,8 +2861,10 @@ monitoring plane therefore **asserts** that posture continuously from where a cl
   `.github/workflows/edge-deny-probe.yml` run. The internal blackbox exporter cannot carry this
   signal: its probes never arrive from a public address — under Docker they were SNAT'd to the
   bridge gateways, under rootless Podman they reach the edge through `host-gateway` and the
-  host-level front end — and the allow-list in `10-frontend.conf.template` names exactly the
-  container-network gateways, so from inside the console can look reachable. The workflow also
+  host-level front end — and the allow-list in `10-frontend.conf.template` names the
+  container-network gateways and loopback, so an internal probe asserts the deny for a source the
+  internet never has. Under rootless Podman a hairpin arrives with the host's own public address,
+  which the list does not name (`403`, measured 2026-10-24). The workflow also
   re-asserts the `/actuator` 404 from outside.
 - **The retired API surface is asserted absent** (ADR-0268 decision 4, the ADR-0173 rule applied to
   a surface that was removed). A closed hole produces no signal of its own, so a regression — a

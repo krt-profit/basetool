@@ -94,6 +94,8 @@ app:
   inventory:
     stolen-marking-enabled: ${APP_INVENTORY_STOLEN_MARKING_ENABLED:true}
   security:
+    keycloak-backchannel:
+      uri: ${KEYCLOAK_BACKCHANNEL_URI:}
     ingest-gateway:
       client-ids: ${APP_SECURITY_INGEST_GATEWAY_CLIENT_IDS:}
     partial-role-scope:
