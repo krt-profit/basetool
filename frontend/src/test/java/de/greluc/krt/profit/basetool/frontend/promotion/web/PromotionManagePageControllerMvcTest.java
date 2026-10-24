@@ -143,7 +143,8 @@ class PromotionManagePageControllerMvcTest {
         .thenReturn(List.of(elig));
 
     mockMvc
-        .perform(get("/promotion/manage").sessionAttr("basetool.activeOrgUnitId", UUID.randomUUID()))
+        .perform(
+            get("/promotion/manage").sessionAttr("basetool.activeOrgUnitId", UUID.randomUUID()))
         .andExpect(status().isOk())
         .andExpect(
             content().string(containsString("data-pm-category-name=\"Trading\">Trading</th>")))
@@ -196,7 +197,8 @@ class PromotionManagePageControllerMvcTest {
         .thenReturn(List.of());
 
     mockMvc
-        .perform(get("/promotion/manage").sessionAttr("basetool.activeOrgUnitId", UUID.randomUUID()))
+        .perform(
+            get("/promotion/manage").sessionAttr("basetool.activeOrgUnitId", UUID.randomUUID()))
         .andExpect(status().isOk())
         .andExpect(content().string(not(containsString("alert-warning"))));
 
@@ -249,7 +251,8 @@ class PromotionManagePageControllerMvcTest {
         .thenReturn(List.of());
 
     mockMvc
-        .perform(get("/promotion/manage").sessionAttr("basetool.activeOrgUnitId", UUID.randomUUID()))
+        .perform(
+            get("/promotion/manage").sessionAttr("basetool.activeOrgUnitId", UUID.randomUUID()))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("alert-warning")));
   }

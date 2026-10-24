@@ -200,8 +200,7 @@ class OrgUnitBankPageControllerMvcTest {
             content().string(Matchers.containsString("data-filter-scope=\"#ou-acc-results\"")))
         .andExpect(
             content().string(Matchers.containsString("data-filter-empty=\"#ou-acc-filter-empty\"")))
-        .andExpect(
-            content().string(Matchers.containsString("data-filter-name=\"Staffel ALPHA\"")))
+        .andExpect(content().string(Matchers.containsString("data-filter-name=\"Staffel ALPHA\"")))
         .andExpect(content().string(Matchers.containsString("id=\"ou-acc-filter-empty\"")));
   }
 
@@ -685,8 +684,7 @@ class OrgUnitBankPageControllerMvcTest {
     when(backendApiClient.get(eq(TRANSFER_TARGETS_URI), anyTypeRef()))
         .thenReturn(
             List.of(
-                new BankAccountRefDto(
-                    UUID.randomUUID(), "KB-0001", "Staffel ALPHA", "ORG_UNIT")));
+                new BankAccountRefDto(UUID.randomUUID(), "KB-0001", "Staffel ALPHA", "ORG_UNIT")));
 
     String html =
         mockMvc

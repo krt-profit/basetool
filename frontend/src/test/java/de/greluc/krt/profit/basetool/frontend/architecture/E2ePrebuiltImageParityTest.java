@@ -157,8 +157,8 @@ class E2ePrebuiltImageParityTest {
 
   /**
    * Renders the built services' {@code image:} templates the way compose does for the E2E stack:
-   * {@code BASETOOL_IMAGE_NAMESPACE} unset (its default applies) and {@code BASETOOL_VERSION} set to
-   * {@code tag}. Distinct values only -- the prod and dev twins share one template.
+   * {@code BASETOOL_IMAGE_NAMESPACE} unset (its default applies) and {@code BASETOOL_VERSION} set
+   * to {@code tag}. Distinct values only -- the prod and dev twins share one template.
    *
    * @param tag the tag the extension sets
    * @return the rendered application and sandbox Keycloak image names

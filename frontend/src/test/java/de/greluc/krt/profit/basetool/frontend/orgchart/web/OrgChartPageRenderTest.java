@@ -110,14 +110,7 @@ class OrgChartPageRenderTest {
                 new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
                 List.of(
                     new SquadronChartDto(
-                        UUID.randomUUID(),
-                        "ALPHA",
-                        "ALP",
-                        null,
-                        List.of(),
-                        List.of(),
-                        true,
-                        true)),
+                        UUID.randomUUID(), "ALPHA", "ALP", null, List.of(), List.of(), true, true)),
                 List.of()));
     when(backendApiClient.get(eq("/api/v1/users/lookup"), anyTypeRef()))
         .thenReturn(List.of(Map.of("id", UUID.randomUUID().toString(), "effectiveName", "Pilot")));
@@ -313,14 +306,7 @@ class OrgChartPageRenderTest {
                 new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
                 List.of(
                     new SquadronChartDto(
-                        UUID.randomUUID(),
-                        "ALPHA",
-                        "ALP",
-                        null,
-                        List.of(),
-                        List.of(),
-                        true,
-                        true)),
+                        UUID.randomUUID(), "ALPHA", "ALP", null, List.of(), List.of(), true, true)),
                 List.of()));
 
     String html =

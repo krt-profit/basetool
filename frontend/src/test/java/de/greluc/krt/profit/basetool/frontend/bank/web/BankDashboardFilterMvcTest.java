@@ -128,8 +128,7 @@ class BankDashboardFilterMvcTest {
         .andExpect(
             content()
                 .string(Matchers.containsString("data-filter-empty=\"#bank-acc-filter-empty\"")))
-        .andExpect(
-            content().string(Matchers.containsString("data-filter-name=\"Staffel ALPHA\"")))
+        .andExpect(content().string(Matchers.containsString("data-filter-name=\"Staffel ALPHA\"")))
         .andExpect(content().string(Matchers.containsString("id=\"bank-acc-filter-empty\"")))
         .andExpect(content().string(Matchers.containsString("bank-movement-open")))
         .andExpect(content().string(Matchers.containsString("id=\"bank-movement-modal\"")))
@@ -149,8 +148,7 @@ class BankDashboardFilterMvcTest {
         .perform(get("/bank"))
         .andExpect(status().isOk())
         .andExpect(content().string(Matchers.containsString("id=\"bank-acc-filter\"")))
-        .andExpect(
-            content().string(Matchers.containsString("data-filter-name=\"Staffel ALPHA\"")))
+        .andExpect(content().string(Matchers.containsString("data-filter-name=\"Staffel ALPHA\"")))
         .andExpect(content().string(Matchers.not(Matchers.containsString("bank-report-download"))))
         .andExpect(content().string(Matchers.not(Matchers.containsString("bank-manage-link"))));
   }

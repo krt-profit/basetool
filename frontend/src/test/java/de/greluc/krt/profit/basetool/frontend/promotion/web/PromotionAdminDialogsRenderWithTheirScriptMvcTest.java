@@ -69,8 +69,7 @@ class PromotionAdminDialogsRenderWithTheirScriptMvcTest {
   @BeforeEach
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-    SquadronDto squadron =
-        new SquadronDto(squadronId, "ALPHA", "ALP", null, true, true, false, 0L);
+    SquadronDto squadron = new SquadronDto(squadronId, "ALPHA", "ALP", null, true, true, false, 0L);
     PageResponse<SquadronDto> page =
         new PageResponse<>(List.of(squadron), 0, 1000, 1, 1, List.of());
     when(backendApiClient.get(contains("/api/v1/squadrons"), anyTypeRef())).thenReturn(page);
