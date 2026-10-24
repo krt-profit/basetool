@@ -470,11 +470,11 @@
     }
 
     .matrix-table tbody tr.row-even {
-        background-color: color-mix(in srgb, var(--color-white) 2%, transparent);
+        background-color: var(--table-stripe-bg);
     }
 
     .matrix-table tbody tr.row-even td:first-child {
-        background-color: color-mix(in srgb, var(--color-white) 2%, var(--color-bg-dark-gray));
+        background-color: color-mix(in srgb, var(--color-control) 50%, var(--color-bg-dark-gray));
     }
 
     .matrix-table tbody tr.row-material:hover {
