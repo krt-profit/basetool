@@ -267,7 +267,7 @@ run_renamer() {
   : > "${state}/calls.log"
   : > "${state}/bodies.log"
   KCADM_STUB_RELOGIN="${RELOGIN:-}" KCADM_STUB_STATE="$state" "$PYTHON" "$RENAMER" \
-    --kcadm-command "${PYTHON} $(to_child_path "${state}/kcadm_stub.py")" "$@" > "${state}/out" 2>&1 || rc=$?
+    --passwd-file "$(to_child_path "${PASSWD_FOR:-${WORK}/passwd.missing}")"     --kcadm-command "${PYTHON} $(to_child_path "${state}/kcadm_stub.py")" "$@" > "${state}/out" 2>&1 || rc=$?
   echo "$rc" > "${state}/rc"
 }
 
@@ -431,6 +431,31 @@ assert_eq "$(rc_of "$state")" "1" "a rejected role rename on an already renamed 
 assert_not_contains "$(out_of "$state")" "config credentials" "and is not blamed on the session"
 assert_not_contains "$(out_of "$state")" "PENDING" "nor reported as pending"
 assert_contains "$(out_of "$state")" "HTTP 400" "Keycloak's own message is shown"
+
+echo "== the re-login names the account that exists on the host =="
+
+state="${WORK}/s8"
+seed "$state" stale-session
+run_renamer "$state" --apply
+printf 'root:x:0:0:root:/root:/bin/bash
+iri:x:994:994::/home/iri:/sbin/nologin
+' > "${WORK}/passwd.old"
+PASSWD_FOR="${WORK}/passwd.old"
+run_renamer "$state"
+assert_eq "$(rc_of "$state")" "2" "before the account rename the check is pending"
+assert_contains "$(out_of "$state")" "sudo -u iri podman exec" "the hint names the old account while it is the only one"
+assert_not_contains "$(out_of "$state")" "sudo -u basetool" "and not the new one"
+printf 'root:x:0:0:root:/root:/bin/bash
+basetool:x:994:994::/home/basetool:/sbin/nologin
+' > "${WORK}/passwd.new"
+PASSWD_FOR="${WORK}/passwd.new"
+run_renamer "$state"
+assert_contains "$(out_of "$state")" "sudo -u basetool podman exec" "after the account rename it names the new account"
+assert_not_contains "$(out_of "$state")" "sudo -u iri" "and not the old one"
+PASSWD_FOR=
+run_renamer "$state"
+assert_contains "$(out_of "$state")" "sudo -u iri podman exec" "with no readable account database both variants are printed (old)"
+assert_contains "$(out_of "$state")" "sudo -u basetool podman exec" "(new)"
 
 echo "== the verification has teeth =="
 

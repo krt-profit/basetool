@@ -127,9 +127,18 @@ shift 3
 exec "$@"
 STUB
 
+stub pkill <<'STUB'
+#!/usr/bin/env bash
+echo "pkill $*" >> "$FAKE/calls.log"
+awk -v u="$2" -v n="$4" '!($1 == u && $3 == n)' "$FAKE/ps.out" > "$FAKE/ps.new" && mv "$FAKE/ps.new" "$FAKE/ps.out"
+exit 0
+STUB
+
 stub podman <<'STUB'
 #!/usr/bin/env bash
 echo "podman $* (HOME=${HOME:-})" >> "$FAKE/calls.log"
+if [[ "$1" != --version && -e "$FAKE/pause-process" ]]; then echo "  994  777 catatonit" >> "$FAKE/ps.out"; fi
+if [[ "$1" != --version && -e "$FAKE/other-process" ]]; then echo "  994  778 sleep" >> "$FAKE/ps.out"; fi
 store="$FAKE/podman-store"
 case "$1 $2" in
   "volume exists") [[ -d "$store/vol/$3" ]] ;;
@@ -278,6 +287,16 @@ FILES=(
   "/var/lib/iri/config-previous/docker-compose.yml|/var/lib/basetool/deploy/config-previous/docker-compose.yml"
   "/var/lib/iri/config-stage/docker-compose.yml|/var/lib/basetool/deploy/config-stage/docker-compose.yml"
   "/var/lib/iri/.docker/config.json|/var/lib/basetool/deploy/.docker/config.json"
+  "/var/lib/iri/failed.digests|/var/lib/basetool/deploy/failed.digests"
+  "/var/lib/iri/reapply-failed.digests|/var/lib/basetool/deploy/reapply-failed.digests"
+  "/var/lib/iri/mixed-release.since|/var/lib/basetool/deploy/mixed-release.since"
+  "/var/lib/iri/health-restart.digests|/var/lib/basetool/deploy/health-restart.digests"
+  "/var/lib/iri/config-blocked.marker|/var/lib/basetool/deploy/config-blocked.marker"
+  "/var/iri/code/quadlet/systemd/backend.container|/opt/basetool/quadlet/systemd/backend.container"
+  "/var/iri/code/docker/edge/nginx.conf|/opt/basetool/docker/edge/nginx.conf"
+  "/var/iri/code/keycloak-theme/theme.properties|/opt/basetool/keycloak-theme/theme.properties"
+  "/var/iri/code/host-scripts.sha256|/opt/basetool/host-scripts.sha256"
+  "/var/iri/code/docker-compose.monitoring.yml|/opt/basetool/docker-compose.monitoring.yml"
   "/var/lib/iri/hardening/report.txt|/var/lib/basetool/deploy/hardening/report.txt"
   "/etc/iri/ghcr-pull-token|/etc/basetool/deploy/ghcr-pull-token"
   "/etc/iri/rclone.conf|/etc/basetool/deploy/rclone.conf"
@@ -407,7 +426,7 @@ tree_content() {
   )
 }
 
-MUTATING='^(usermod|groupmod|loginctl|chown|systemd-tmpfiles) |^systemctl (stop|start|disable|enable|daemon-reload|reset-failed|--user)|^semanage fcontext -[amd]|^podman (system|volume (export|import))|^runuser|^restorecon -RF'
+MUTATING='^(usermod|groupmod|loginctl|chown|systemd-tmpfiles) |^systemctl (stop|start|disable|enable|daemon-reload|reset-failed|--user)|^semanage fcontext -[amd]|^podman (system|volume (export|import))|^runuser|^pkill |^restorecon -RF'
 
 calls_match() {
   grep -qE "$1" "$CALLS"
@@ -863,6 +882,16 @@ sed -i "s/^iri:x:994:994/iri:x:$(id -u):994/" "$ROOT/etc/passwd"
 run_script check
 check "check lists deploy-state entries owned by the service uid, by name" bash -c "grep -q 'owned by the service uid .*: .*\.docker' '$OUT'"
 
+restore_state template
+touch "$FAKE/active/iri-deploy.timer" "$FAKE/active/iri-backup.service" "$FAKE/active/alloy.service"
+printf '  110000  4242 postgres\n  110001  4243 java\n  994  12 systemd\n' > "$FAKE/ps.out"
+BEFORE="$(tree_full)"
+run_script check
+check "check works before the window: a running stack is reported, not a failure" bash -c "test '$RC' = 0 && ! grep -q '^\[block\]' '$OUT'"
+check "check says what stop will find: active units by name, services, manager, container processes" bash -c "grep -q 'window: 2 old unit(s) active (.*iri-deploy.timer' '$OUT' && grep -q 'window: alloy.service active, dnf-automatic.timer active, user@994.service active; stop will stop all three' '$OUT' && grep -q 'window: 2 process(es) in the subuid range now' '$OUT'"
+check "and still changes nothing" test "$BEFORE" = "$(tree_full)"
+: > "$FAKE/ps.out"
+
 echo "== stop =="
 
 restore_state template
@@ -974,6 +1003,22 @@ check "the exports survive the reset" bash -c "cd '$ROOT/root/basetool-migration
 save_state s3
 noop_rerun "reset-podman" reset-podman
 check "a second run resets nothing again" bash -c "! grep -q 'system reset' '$CALLS'"
+
+echo "== podman leaves its pause process behind =="
+
+restore_state s1
+touch "$FAKE/pause-process"
+phase_ok "export-volumes completes although podman leaves a pause process" export-volumes
+check_calls "only the pause process of the account is ended" '^pkill -U 994 -x catatonit$'
+check "and nothing else was killed" test "$(grep -c '^pkill' "$CALLS")" = 1
+check "nothing of the account is left running" test ! -s "$FAKE/ps.out"
+phase_ok "reset-podman completes the same way" reset-podman
+check "reset.done is written" test -e "$ROOT/root/basetool-migration/state/reset.done"
+phase_ok "accounts proceeds" accounts
+restore_state s1
+touch "$FAKE/pause-process" "$FAKE/other-process"
+refused_late "a real other process of the account still refuses, the pause process or not" 'processes of uid 994' export-volumes
+check "only the pause process was ended" bash -c "grep -q 'pkill -U 994 -x catatonit' '$CALLS' && grep -q sleep '$FAKE/ps.out'"
 
 echo "== reset-podman: a second podman process =="
 
@@ -1169,11 +1214,20 @@ check "both env backups are rewritten too" bash -c "grep -qx 'BASETOOL_KEYSTORE_
 check "backup.env: key renamed, RCLONE_CONFIG mapped, the secret untouched" bash -c "f='$ROOT/etc/basetool/deploy/backup.env'; grep -qx 'RCLONE_CONFIG=/etc/basetool/deploy/rclone.conf' \$f && grep -qx 'BASETOOL_KEEP_DAILY=7' \$f && grep -qx 'RESTIC_PASSWORD=RESTICSECRET' \$f && grep -qx 'RESTIC_REPOSITORY=rclone:nextcloud:Basetool-Backups' \$f"
 check "the realm export names the new realm, role, URLs and client labels" bash -c "f='$ROOT/etc/basetool/realm-export.json'; grep -q '\"realm\": \"basetool\"' \$f && grep -q 'default-roles-basetool' \$f && grep -q '/realms/basetool/x' \$f && grep -q '/admin/basetool/console' \$f && grep -q 'Profit Basetool Frontend' \$f && ! grep -q 'IRIDIUM' \$f"
 check "the originals are staged before the rewrite, byte for byte" bash -c "S='$ROOT/root/basetool-migration/originals/etc/basetool'; test \"\$(cat \$S/basetool.env)\" = \"\$(printf '%s' '$ENV_OLD')\" && test \"\$(cat \$S/deploy/backup.env)\" = \"\$(printf '%s' '$BACKUP_ENV_OLD')\" && test \"\$(cat \$S/realm-export.json)\" = \"\$(printf '%s' '$REALM_OLD')\" && test -f \$S/basetool.env.backup-20260925-175805-step4"
-check "the rollback anchors are parked outside the state directory" bash -c "A='$ROOT/root/basetool-migration/anchors'; D='$ROOT/var/lib/basetool/deploy'; for n in previous-digest-pin.yml keycloak-spi-previous.jar config-previous config-stage; do test -e \$A/\$n && test ! -e \$D/\$n || exit 1; done; test -f \$D/last-deployed.digests && test -f \$D/current-digest-pin.yml"
+check "every rollback anchor, pin, marker and counter of the old release is parked outside the state directory" bash -c "A='$ROOT/root/basetool-migration/anchors'; D='$ROOT/var/lib/basetool/deploy'; for n in config-previous config-stage previous-digest-pin.yml current-digest-pin.yml last-deployed.digests failed.digests reapply-failed.digests mixed-release.since health-restart.digests config-blocked.marker keycloak-spi-previous.jar; do test -e \$A/\$n && test ! -e \$D/\$n || exit 1; done"
+check "the old release's config tree is parked too, so deploy.sh sees a first bundle" bash -c "T='$ROOT/root/basetool-migration/release-tree'; for n in docker-compose.yml docker-compose.monitoring.yml monitoring docker keycloak-theme quadlet host-scripts.sha256; do test -e \$T/\$n && test ! -e '$ROOT/opt/basetool'/\$n || exit 1; done"
+check "only the host scripts and the live provider JAR stay in the release directory" test "$(find "$ROOT/opt/basetool" -mindepth 1 -maxdepth 1 -printf '%f\n' | LC_ALL=C sort | tr '\n' ' ')" = "keycloak scripts "
+check "the deploy state keeps what is not tied to the old release" bash -c "test -d '$ROOT/var/lib/basetool/deploy/.docker' && test -f '$ROOT/var/lib/basetool/deploy/hardening/report.txt'"
 check_calls "the relabel ran for /etc/basetool" "^restorecon -RF ${ROOT}/etc/basetool\$"
 save_state s6
 noop_rerun "rewrite" rewrite
 check "a second run leaves the staged originals alone" bash -c "grep -qx 'IRI_KEYSTORE_HOST_PATH=/var/iri/secrets/keystore.p12' '$ROOT/root/basetool-migration/originals/etc/basetool/basetool.env'"
+printf 'NEW' > "$ROOT/var/lib/basetool/deploy/last-deployed.digests"
+printf 'NEWPIN' > "$ROOT/var/lib/basetool/deploy/current-digest-pin.yml"
+mkdir -p "$ROOT/opt/basetool/quadlet"
+printf 'NEWUNIT' > "$ROOT/opt/basetool/quadlet/new.container"
+run_script rewrite
+check "a rewrite re-run after the first new deploy leaves that deploy's state and tree alone" bash -c "test '$RC' = 0 && grep -q 'nothing to do' '$OUT' && test \"\$(cat '$ROOT/var/lib/basetool/deploy/last-deployed.digests')\" = NEW && test \"\$(cat '$ROOT/var/lib/basetool/deploy/current-digest-pin.yml')\" = NEWPIN && test -f '$ROOT/opt/basetool/quadlet/new.container'"
 
 restore_state s5
 BAD="$ROOT/etc/basetool/basetool.env.backup-20261001-000000-redis"

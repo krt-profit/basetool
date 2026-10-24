@@ -48,7 +48,8 @@ that invariant instead of detecting a loss.
 `/var/log/basetool/(backend|frontend|ingest|keycloak)`; `bin_t` on `/opt/basetool/scripts`; `etc_t` on
 `/etc/basetool/deploy` and `var_lib_t` on `/var/lib/basetool/deploy`, because the deployer's credentials
 and state are never mounted into a container. The **host-script logs in `/var/log/basetool` stay
-`var_log_t`**: logrotate may only read `container_file_t`, and it rotates them by `copytruncate`. The
+`var_log_t`**: logrotate may read `container_file_t` but not write it, and it rotates these files by
+`copytruncate`, which writes. The
 two old `/var/iri` rules are deleted, not left beside the new ones.
 
 **Accounts.** The service user and group are renamed `iri` → `basetool` with uid, gid and the subuid/subgid

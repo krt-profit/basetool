@@ -81,7 +81,15 @@ RESIDUE_DIRS=(
   /etc/systemd/system /etc/default /etc/sysconfig /etc/logrotate.d /etc/tmpfiles.d /etc/sudoers.d
   /etc/alloy /etc/containers/systemd /etc/cron.d /etc/profile.d
 )
-ANCHORS=(config-previous config-stage previous-digest-pin.yml keycloak-spi-previous.jar)
+STATE_ANCHORS=(
+  config-previous config-stage config-blocked.marker config-apply.incomplete
+  previous-digest-pin.yml current-digest-pin.yml last-deployed.digests
+  failed.digests reapply-failed.digests mixed-release.since health-restart.digests
+  keycloak-spi-previous.jar keycloak-spi-stage.jar
+)
+TREE_ANCHORS=(
+  docker-compose.yml docker-compose.monitoring.yml monitoring docker keycloak-theme quadlet host-scripts.sha256
+)
 
 DRY=0
 ACTIONS=0
@@ -303,6 +311,7 @@ stop_manager() {
   if unit_busy "user@${uid}.service"; then
     act systemctl stop "user@${uid}.service"
   fi
+  end_pause_process "${uid}"
   if ! wait_quiet user "${uid}"; then
     busy_lines user "${uid}" | sed -n '1,10s/^/    running (uid pid command): /p' >&2
     refuse "processes of uid ${uid} or of its subuid range are still running"
@@ -326,11 +335,19 @@ start_runtime() {
   done
 }
 
+end_pause_process() {
+  local uid="$1"
+  if ps -eo uid=,pid=,comm= | awk -v u="${uid}" '$1 == u && $3 == "catatonit" { found = 1 } END { exit !found }'; then
+    act pkill -U "${uid}" -x catatonit
+  fi
+}
+
 stop_runtime() {
   local uid="$1"
   if unit_busy "user-runtime-dir@${uid}.service"; then
     act systemctl stop "user-runtime-dir@${uid}.service"
   fi
+  end_pause_process "${uid}"
   if ! wait_quiet user "${uid}"; then
     busy_lines user "${uid}" | sed -n '1,10s/^/    running (uid pid command): /p' >&2
     refuse "processes of uid ${uid} or of its subuid range are still running"
@@ -980,13 +997,22 @@ phase_rewrite() {
       run_helper realm-export 0 "${realm_export}"
     fi
   fi
-  state_dir="$(P "${NEW_DEPLOY_HOME}")"
-  for name in "${ANCHORS[@]}"; do
-    if exists_path "${state_dir}/${name}"; then
-      private_dir "${STAGE}/anchors"
-      act mv "${state_dir}/${name}" "${STAGE}/anchors/${name}"
-    fi
-  done
+  if ! stage_marked anchors.done; then
+    state_dir="$(P "${NEW_DEPLOY_HOME}")"
+    for name in "${STATE_ANCHORS[@]}"; do
+      if exists_path "${state_dir}/${name}"; then
+        private_dir "${STAGE}/anchors"
+        act mv "${state_dir}/${name}" "${STAGE}/anchors/${name}"
+      fi
+    done
+    for name in "${TREE_ANCHORS[@]}"; do
+      if exists_path "$(P /opt/basetool)/${name}"; then
+        private_dir "${STAGE}/release-tree"
+        act mv "$(P /opt/basetool)/${name}" "${STAGE}/release-tree/${name}"
+      fi
+    done
+    stage_mark anchors.done
+  fi
   restore_labels /etc/basetool
   finish rewrite
 }
@@ -1381,6 +1407,37 @@ check_residue() {
   done
 }
 
+unit_state() {
+  if unit_busy "$1"; then
+    printf 'active'
+  else
+    printf 'inactive'
+  fi
+}
+
+check_window() {
+  local who uid f unit active=0 enabled=0 names="" procs
+  who="$(service_user)"
+  [[ -n "${who}" ]] || return 0
+  uid="$(passwd_field "${who}" 3)"
+  shopt -s nullglob
+  for f in "$(P /etc/systemd/system)"/iri-*.timer "$(P /etc/systemd/system)"/iri-*.service; do
+    unit="${f##*/}"
+    if unit_busy "${unit}"; then
+      active=$(( active + 1 ))
+      names+=" ${unit}"
+    fi
+    if unit_enabled "${unit}"; then
+      enabled=$(( enabled + 1 ))
+    fi
+  done
+  shopt -u nullglob
+  procs="$(busy_lines containers "${uid}" | wc -l | tr -d '[:space:]')"
+  report info "window: ${active} old unit(s) active${names:+ (${names# })}, ${enabled} enabled; stop will disable them and wait for running jobs"
+  report info "window: alloy.service $(unit_state alloy.service), dnf-automatic.timer $(unit_state dnf-automatic.timer), user@${uid}.service $(unit_state "user@${uid}.service"); stop will stop all three"
+  report info "window: ${procs} process(es) in the subuid range now; none may remain when export-volumes starts"
+}
+
 check_filesystems() {
   local pair old new od nd
   for pair in "/var/iri /opt" "/var/iri /etc" "/var/iri /var/lib" "/var/iri /var/log" \
@@ -1512,6 +1569,7 @@ phase_check() {
   check_tools
   check_accounts
   check_units
+  check_window
   check_plan
   check_filesystems
   check_service_owned

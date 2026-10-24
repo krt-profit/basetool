@@ -3576,6 +3576,62 @@ scenario_host_scripts_stale_non_apply_script_warns_but_applies
 scenario_host_scripts_bundle_without_a_manifest_applies_and_drops_the_old_one
 scenario_host_scripts_manifest_follows_a_rollback
 
+scenario_before_the_layout_migration_a_failed_release_restores_the_old_tree() {
+  echo "Scenario: WITHOUT the migration's parking, a failed first release restores the OLD release tree"
+  local tmp rc=0 bundle
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  mkdir -p "${T_COMPOSE_DIR}/quadlet/systemd"
+  printf '[Container]\nImage=old-release\n' > "${T_COMPOSE_DIR}/quadlet/systemd/backend.container"
+  echo "# old release compose" > "${T_COMPOSE_DIR}/docker-compose.yml"
+  bundle="${tmp}/bundle"
+  mkdir -p "${bundle}/quadlet/systemd"
+  echo "# new layout compose" > "${bundle}/docker-compose.yml"
+  printf '[Container]\nImage=new-release\n' > "${bundle}/quadlet/systemd/backend.container"
+  write_marker "${MARKER}"
+  echo "services: {}" > "${T_STATE_DIR}/current-digest-pin.yml"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${bundle}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" "FAKE_UP_RC=1" || rc=$?
+  assert_exit 1 "$rc" "the failed release rolls back"
+  assert_contains "restoring previous host config" "the old tree is restored over the new one"
+  if grep -q "old release compose" "${T_COMPOSE_DIR}/docker-compose.yml"; then
+    record 1 "the old release's compose file is back, which cannot start on the new layout"
+  else
+    record 0 "the old release's compose file is back, which cannot start on the new layout"
+  fi
+  rm -rf "${tmp}"
+}
+
+scenario_first_deploy_after_the_layout_migration_has_no_old_release_to_roll_back_to() {
+  echo "Scenario: after the migration (anchors, pins and old tree parked) a failing first deploy rolls back to nothing"
+  local tmp rc=0 bundle
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  rm -f "${T_COMPOSE_DIR}/docker-compose.yml"
+  mkdir -p "${T_COMPOSE_DIR}/scripts"
+  bundle="${tmp}/bundle"
+  mkdir -p "${bundle}/quadlet/systemd"
+  echo "# new layout compose" > "${bundle}/docker-compose.yml"
+  printf '[Container]\nImage=new-release\n' > "${bundle}/quadlet/systemd/backend.container"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${bundle}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" "FAKE_UP_RC=1" || rc=$?
+  assert_exit 2 "$rc" "the failed first deploy stops for the operator"
+  assert_contains "first config bundle on this host" "the config is delivered as a first bundle"
+  assert_contains "nothing to restore to" "there is no old tree to put back"
+  assert_contains "no previous pin available" "there is no old release pin to roll back to"
+  assert_excludes "rolled back to previous digest pin" "no rollback to the old release is claimed"
+  assert_excludes "restoring previous host config" "no old config is restored"
+  if grep -q "new layout compose" "${T_COMPOSE_DIR}/docker-compose.yml"; then
+    record 1 "the new release's tree stays in place for the operator to fix forward"
+  else
+    record 0 "the new release's tree stays in place for the operator to fix forward"
+  fi
+  rm -rf "${tmp}"
+}
+
+scenario_before_the_layout_migration_a_failed_release_restores_the_old_tree
+scenario_first_deploy_after_the_layout_migration_has_no_old_release_to_roll_back_to
+
 echo
 if [[ "$tests_failed" -eq 0 ]]; then
   echo "All ${tests_run} deploy.sh tests passed."

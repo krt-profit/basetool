@@ -108,14 +108,33 @@ def is_session_error(error: Exception) -> bool:
     return any(marker in text for marker in SESSION_MARKERS)
 
 
+PASSWD_FILE = Path("/etc/passwd")
+SERVICE_ACCOUNTS = ("basetool", "iri")
+
+
+def service_accounts() -> list[str]:
+    """The rootless service accounts present in the account database: the new name once the host is migrated, the old one before."""
+    try:
+        names = {line.split(":", 1)[0] for line in PASSWD_FILE.read_text(encoding="utf-8").splitlines()}
+    except OSError:
+        names = set()
+    found = [name for name in SERVICE_ACCOUNTS if name in names]
+    return found or list(SERVICE_ACCOUNTS)
+
+
 def print_relogin(realm: str) -> None:
     """Tell the operator exactly how to sign kcadm in again (docs/keycloak/README.md, step 2)."""
     print("\nPENDING: the kcadm session is no longer valid (a session issued by a realm that was renamed "
           "stops working at the rename). Sign in again, then re-run this script; it continues with what "
           "is still open:", file=sys.stderr)
-    print(f"  sudo -u basetool podman exec -it keycloak /opt/keycloak/bin/kcadm.sh config credentials "
-          f"--server https://localhost:18443/auth --realm {realm} --client {PROVISIONER_CLIENT} "
-          f"--config \"$KCCFG\"", file=sys.stderr)
+    accounts = service_accounts()
+    if len(accounts) > 1:
+        print("  (run it as the account that owns the Keycloak container: the host's account is not "
+              "readable here)", file=sys.stderr)
+    for account in accounts:
+        print(f"  sudo -u {account} podman exec -it keycloak /opt/keycloak/bin/kcadm.sh config credentials "
+              f"--server https://localhost:18443/auth --realm {realm} --client {PROVISIONER_CLIENT} "
+              f"--config \"$KCCFG\"", file=sys.stderr)
 
 
 def probe_realm(kc: RenameKcadm, name: str) -> dict | None:
@@ -284,6 +303,7 @@ def run(kc: RenameKcadm, apply: bool) -> int:
 
 
 def main() -> int:
+    global PASSWD_FILE
     parser = argparse.ArgumentParser(
         description=f"Rename the Keycloak realm '{OLD_REALM}' to '{NEW_REALM}', its default role "
                     "and the frontend client's labels. Dry run unless --apply.")
@@ -296,7 +316,10 @@ def main() -> int:
     parser.add_argument("--kcadm-command",
                         help="the whole kcadm invocation, e.g. the rootless-Podman string of "
                              "docs/keycloak/README.md (also used by the tests)")
+    parser.add_argument("--passwd-file", type=Path, default=PASSWD_FILE,
+                        help="account database that tells which service account the re-login hint names")
     args = parser.parse_args()
+    PASSWD_FILE = args.passwd_file
     prefix = (shlex.split(args.kcadm_command) if args.kcadm_command
               else ["docker", "exec", "-i", args.container, "/opt/keycloak/bin/kcadm.sh"])
     kc = RenameKcadm(prefix, OLD_REALM, dry_run=False)
