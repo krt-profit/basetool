@@ -421,7 +421,7 @@ rt_monitoring_recreate() {
 rt_read_mount() {
   local src="$1" image="$2"
   shift 2
-  ${RT_CLI} run --rm -v "${src}:/src:ro" "${image}" "$@"
+  ${RT_CLI} run --rm --log-driver=none -v "${src}:/src:ro" "${image}" "$@"
 }
 
 rt_volume_exists() {
