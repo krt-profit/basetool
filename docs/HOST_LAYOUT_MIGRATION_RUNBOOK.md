@@ -82,6 +82,12 @@ Nothing in this section touches the production host except the marked steps.
    default-role rename by id (`rename-keycloak-realm.py` verifies it by reading back and fails loudly
    if not), that a realm-local service account with `manage-realm` may rename its own realm, and that
    `podman volume import` restores the edge volumes with the translated owners.
+   Testing cannot prove the Discord login: there, verification 7 signs in with a local Keycloak user of
+   the realm instead, and the Discord identity provider is compared read-only before and after the
+   rename (`kcadm.sh get identity-provider/instances/discord -r <realm> --fields 'alias,enabled,config(clientId,syncMode)'`,
+   which never selects the client secret, plus `get identity-provider/instances/discord/mappers`): alias, client
+   id, enabled flag and mappers must be unchanged. The Discord redirect itself is first proven on
+   production, in verification 7, before the members come back.
 2. **Discord developer portal (needs the owner): ADD** the redirect URI
    `https://profit-base.online/auth/realms/basetool/broker/discord/endpoint` **before** the cutover and
    keep the old `…/realms/iri/broker/discord/endpoint` until §9
@@ -201,7 +207,9 @@ openssl s_client -connect profit-base.online:443 -servername profit-base.online 
   | openssl x509 -noout -serial -enddate
 ```
 
-`check` is read-only, runs with the stack up and blocks on nothing that the window itself fixes (unknown entries are moved, not blocking; a target-name collision of two `.env.backup-*` copies does block). It prints
+`check` is read-only, runs with the stack up and blocks on nothing that the window itself fixes (unknown entries are moved, not blocking; a target-name collision of two `.env.backup-*` copies does block, and so does an env file, env
+backup, rendered `env.d` file or host-local env snapshot that is group-writable or readable by
+others; `move` refuses on the same file). It prints
 the tools, accounts, units, every move with its state, the env and realm-export rewrites it would do
 (counts only, never a value), the carried drop-ins, what lands in `host-local` (`[todo] move`, by name), the label rules, the
 staging directory and **`window:` lines** (how many old units are active, the state of alloy,
@@ -343,12 +351,13 @@ each `migrate-host-layout.sh` phase read its closing line and the exit code (§3
 
 12. **`move`** — every directory and file of §1 to its new place on the same filesystem (renames: owners,
     modes and labels travel), the `deploy` home, the seven new SELinux rules, the two old ones deleted,
-    `restorecon -RF` on the five roots. Entries of `/var/iri/code` that `deploy.sh` does not deliver go to
-    `/etc/basetool/host-local/…` (see §1). It refuses, and prints the table, while a row is in conflict. **WRITE.**
+    `restorecon -RF` on the five roots. Entries of `/var/iri` and its service directories, `/var/iri/monitoring`
+    and `/var/iri/code` that the plan does not map go to `/etc/basetool/host-local/…` (see §1). It refuses, and prints the
+    table, while a row is in conflict. **WRITE.**
 
     ```bash
     bash "$M/migrate-host-layout.sh" move
-    ls -la /etc/basetool/host-local 2>/dev/null
+    find /etc/basetool/host-local -maxdepth 2 -ls 2>/dev/null
     ```
 
 13. **`rewrite`** — renames the `IRI_*` keys, maps the old paths and the realm in `basetool.env` and
@@ -474,7 +483,10 @@ Read-only unless stated.
    the values of §4. ACME state: `${UPOD} logs acme --tail 30` shows no error, and the renewal check of
    [`deployment.md` → Public certificates and ACME renewal](deployment.md#public-certificates-and-acme-renewal)
    finds its account.
-7. **A Discord login** by the owner, end to end, and an admin page that reads the realm's roles.
+7. **A Discord login** by the owner, end to end, and an admin page that reads the realm's roles. On
+   production this is the first proof that Discord accepts the new redirect URI, so it runs right after
+   the first deploy, before the window is announced as over, and inside the rollback deadline of §7; a failure here is decided against the
+   snapshot. On testing, sign in with a local Keycloak user of the realm instead (§2 step 1).
 8. **Ingest and exchange:** one post by the desktop extractor (or a client of the owner) to the ingest
    gateway, and one call of an approved exchange client against the new issuer
    ([`exchange/quickstart.md`](exchange/quickstart.md)).

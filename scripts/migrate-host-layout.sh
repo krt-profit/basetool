@@ -533,6 +533,33 @@ print_plan() {
   done
 }
 
+env_file_unsafe() {
+  local mode
+  mode="$(stat -L -c %a "$1")" || return 0
+  [[ "${mode}" =~ ^[0-7]+$ ]] || return 0
+  (( 8#${mode} & 8#026 ))
+}
+
+unsafe_env_names() {
+  local f
+  shopt -s nullglob dotglob
+  for f in "$(P /var/iri/code)"/.env* "$(P /etc/iri)/backup.env" "$(P /etc/basetool)"/basetool.env* \
+           "$(P /etc/basetool/deploy)/backup.env" "$(P "${HOST_LOCAL}")"/*/.env* \
+           "$(P /var/iri/code/env.d)"/* "$(P /etc/basetool/env.d)"/*; do
+    if [[ -f "${f}" ]] && env_file_unsafe "${f}"; then
+      printf '%s\n' "${f#"${ROOT}"}"
+    fi
+  done
+  shopt -u nullglob dotglob
+}
+
+check_env_modes() {
+  local name
+  while IFS= read -r name; do
+    report block "env file ${name} is group-writable or world-accessible: remove the group-write and all other-access bits before the window"
+  done < <(unsafe_env_names)
+}
+
 ensure_private_tree() {
   local path="$1" cur="${HOST_LOCAL}" part
   local -a parts
@@ -544,6 +571,9 @@ ensure_private_tree() {
     fi
     if [[ ! -d "$(P "${cur}")" ]]; then
       act mkdir "$(P "${cur}")"
+      act chmod 0700 "$(P "${cur}")"
+      act chown root:root "$(P "${cur}")"
+    elif [[ "$(stat -c '%u:%g %a' "$(P "${cur}")")" != "0:0 700" ]]; then
       act chmod 0700 "$(P "${cur}")"
       act chown root:root "$(P "${cur}")"
     fi
@@ -915,13 +945,18 @@ phase_accounts() {
 }
 
 phase_move() {
-  local row from to req blockers root
+  local row from to req blockers root unsafe
   user_exists "${NEW_USER}" || refuse "${NEW_USER} does not exist: run the accounts phase first"
   if user_exists "${OLD_USER}"; then
     refuse "${OLD_USER} still exists: run the accounts phase first"
   fi
   refuse_if_busy containers "$(passwd_field "${NEW_USER}" 3)" "container processes (subuid range) are still running"
   command -v semanage > /dev/null 2>&1 || refuse "semanage is not installed"
+  unsafe="$(unsafe_env_names)"
+  if [[ -n "${unsafe}" ]]; then
+    printf '%s\n' "${unsafe}" | sed 's/^/  group-writable or world-accessible env file: /' >&2
+    refuse "an env file is group-writable or world-accessible (see above); remove the group-write and all other-access bits and run the phase again"
+  fi
   build_plan
   blockers="$(plan_blockers)"
   if (( blockers > 0 )); then
@@ -1615,6 +1650,7 @@ phase_check() {
   check_service_owned
   check_dropins
   check_env
+  check_env_modes
   check_labels
   check_stage
   check_residue
