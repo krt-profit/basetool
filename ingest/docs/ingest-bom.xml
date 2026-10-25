@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:c0e2ccbe-5115-4019-9904-1ad92b628093" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:bf232fca-03a9-4aed-b86c-83149db80f34" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-10-24T18:20:37Z</timestamp>
+    <timestamp>2026-10-25T06:07:20Z</timestamp>
     <tools>
       <components>
         <component type="application">
@@ -11,15 +11,15 @@
         </component>
       </components>
     </tools>
-    <component type="application" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/ingest@0.0.1-SNAPSHOT?project_path=%3Aingest">
+    <component type="application" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/ingest@1.20.0?project_path=%3Aingest">
       <group>de.greluc.krt.profit.basetool</group>
       <name>ingest</name>
-      <version>0.0.1-SNAPSHOT</version>
-      <purl>pkg:maven/de.greluc.krt.profit.basetool/ingest@0.0.1-SNAPSHOT?project_path=%3Aingest</purl>
+      <version>1.20.0</version>
+      <purl>pkg:maven/de.greluc.krt.profit.basetool/ingest@1.20.0?project_path=%3Aingest</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="build-system">
-          <url>https://github.com/krt-profit/basetool/actions/runs/40119959174</url>
+          <url>https://github.com/krt-profit/basetool/actions/runs/40167773349</url>
         </reference>
         <reference type="vcs">
           <url>https://github.com/krt-profit/basetool</url>
@@ -441,11 +441,11 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@0.0.1-SNAPSHOT?project_path=%3Alogging-support">
+    <component type="library" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.20.0?project_path=%3Alogging-support">
       <group>de.greluc.krt.profit.basetool</group>
       <name>logging-support</name>
-      <version>0.0.1-SNAPSHOT</version>
-      <purl>pkg:maven/de.greluc.krt.profit.basetool/logging-support@0.0.1-SNAPSHOT?project_path=%3Alogging-support</purl>
+      <version>1.20.0</version>
+      <purl>pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.20.0?project_path=%3Alogging-support</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
@@ -4957,10 +4957,10 @@
       <dependency ref="pkg:maven/com.squareup.okio/okio-jvm@3.16.4?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/commons-logging/commons-logging@1.3.6?type=jar"/>
-    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/ingest@0.0.1-SNAPSHOT?project_path=%3Aingest">
+    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/ingest@1.20.0?project_path=%3Aingest">
       <dependency ref="pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.21.0?type=jar"/>
       <dependency ref="pkg:maven/com.networknt/json-schema-validator@3.0.8?type=jar"/>
-      <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@0.0.1-SNAPSHOT?project_path=%3Alogging-support"/>
+      <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.20.0?project_path=%3Alogging-support"/>
       <dependency ref="pkg:maven/io.github.resilience4j/resilience4j-spring-boot3@2.4.0?type=jar"/>
       <dependency ref="pkg:maven/io.micrometer/micrometer-registry-prometheus@1.17.1?type=jar"/>
       <dependency ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar"/>
@@ -4973,7 +4973,7 @@
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-validation@4.1.1?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-web@4.1.1?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@0.0.1-SNAPSHOT?project_path=%3Alogging-support">
+    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.20.0?project_path=%3Alogging-support">
       <dependency ref="pkg:maven/ch.qos.logback/logback-classic@1.5.38?type=jar"/>
       <dependency ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar"/>
     </dependency>
