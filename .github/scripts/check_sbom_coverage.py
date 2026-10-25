@@ -191,7 +191,8 @@ def check_fresh_generation(shipped: list[str], prepare: str, ci: str) -> list[st
     """Assert a released SBOM is generated fresh and verified against the resolved classpath.
 
     Requires both CycloneDX tasks to be untracked and finalized by ``verifyCyclonedxBom``,
-    the release regeneration to pass ``--no-build-cache``, and ``ci.yml`` to run every
+    the release regeneration to pass ``--no-build-cache`` and ``-PreleaseVersion``, and
+    ``ci.yml`` to run every
     shipped module's ``cyclonedxBom``.
 
     :param shipped: the Gradle modules that publish an SBOM, in declaration order.
@@ -231,6 +232,12 @@ def check_fresh_generation(shipped: list[str], prepare: str, ci: str) -> list[st
             "release-prepare.yml: the `Regenerate CycloneDX SBOMs` step must pass "
             "`--no-build-cache` -- the job restores the Gradle caches, and a release SBOM is never "
             "served from one"
+        )
+    if step is None or "-PreleaseVersion=" not in step.group(1):
+        problems.append(
+            "release-prepare.yml: the `Regenerate CycloneDX SBOMs` step must pass "
+            "`-PreleaseVersion=<version>` -- without it every release SBOM names the software "
+            "0.0.1-SNAPSHOT"
         )
 
     for module in shipped:

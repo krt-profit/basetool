@@ -1914,6 +1914,13 @@ restores — and the BOM kept its old component list. Reproduced on `:ingest` in
   a plugin upgrade that stops seeing a component fails the PR that brings it rather than the next
   release.
 
+**The SBOM names the released version.** The Gradle project version is `0.0.1-SNAPSHOT` unless the
+build is given `-PreleaseVersion=<MAJOR.MINOR.PATCH>`; `release-prepare.yml` passes the version it
+releases, so `metadata.component.version` of every release SBOM — and the version of every
+internal project component listed in it — is the release version. Up to v1.19.13 the property did
+not exist and every release SBOM described the software as `0.0.1-SNAPSHOT`. `verifyCyclonedxBom`
+also fails when the BOM's `metadata.component.version` differs from the project version.
+
 **Why an assertion and not a habit.** By v1.7.3 the set had drifted in both directions available to
 it, and neither drift failed anything:
 
@@ -1956,6 +1963,9 @@ Recorded here rather than left to look like an oversight.
   from the resolved `runtimeClasspath` in either direction; `ci.yml` runs it for all four modules on
   every pull request, and `check_sbom_coverage.py` fails if the untracking, the finalizer or the
   `--no-build-cache` flag is removed.
+- [ ] `release-prepare.yml` regenerates with `-PreleaseVersion=<version>`, `verifyCyclonedxBom`
+  fails when `metadata.component.version` is not the project version, and
+  `check_sbom_coverage.py` fails if the flag is removed.
 
 **Enforced by:** `.github/scripts/check_sbom_coverage.py` · `.github/workflows/repo-lint.yml`
 (`sbom-coverage`) · `verifyCyclonedxBom` (`build-logic`, `basetool.sbom-conventions`) · `.github/workflows/ci.yml` ·
