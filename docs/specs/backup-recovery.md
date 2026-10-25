@@ -59,6 +59,10 @@ nothing is pulled or exposed), consistent with the pull-only host posture of REQ
   an override carrying one. An unreadable unit, an unpinned tag or an unpinned override makes
   `backup.sh` / `restore-drill.sh` abort with `FATAL` before any container starts and without
   writing the success metric (`scripts/container-runtime.test.sh`).
+- [ ] That helper container runs with `--log-driver=none`. It streams the material it reads to its
+  stdout, and the service user's default log driver under systemd is journald, so without the flag
+  every byte — the keystore, the TLS keys, the monitoring secrets, `grafana.db`, the TSDB snapshot —
+  is also stored in the host journal (`scripts/container-runtime.test.sh`).
 
 **Enforced by:** `scripts/backup.sh` · `scripts/lib/restic-repo.sh` · `scripts/basetool-backup.{service,timer}` · **Runbook:** [`docs/backup.md`](../backup.md)
 

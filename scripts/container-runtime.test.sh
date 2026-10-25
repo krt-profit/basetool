@@ -678,12 +678,16 @@ say ""
 say "== reading state out for the backup =="
 expect_call "a named volume is read through the helper" podman \
   'rt_read_mount edge-certs postgres:18-alpine tar -C /src -cz .' \
-  'run --rm -v edge-certs:/src:ro postgres:18-alpine tar -C /src -cz .'
+  'run --rm --log-driver=none -v edge-certs:/src:ro postgres:18-alpine tar -C /src -cz .'
 expect_call "...and a host path identically" podman \
   'rt_read_mount /var/lib/basetool/monitoring postgres:18-alpine cat /src/x' \
-  'run --rm -v /var/lib/basetool/monitoring:/src:ro'
+  'run --rm --log-driver=none -v /var/lib/basetool/monitoring:/src:ro'
 expect_call "the mount is read-only, so a backup cannot write to what it reads" podman \
   'rt_read_mount edge-certs img tar -C /src -cz .' ':/src:ro'
+expect_call "the streamed bytes bypass every log driver, so no secret lands in the journal" podman \
+  'rt_read_mount /etc/basetool img cat /src/keystore.p12' 'run --rm --log-driver=none '
+expect_no_call "...not even the default one, which under systemd is journald" podman \
+  'rt_read_mount /etc/basetool img cat /src/keystore.p12' 'run --rm -v '
 expect_out "a volume that does not exist is reported, not assumed present" podman \
   'STUB_FAIL="volume inspect" rt_volume_exists edge-certs; echo "rc=$?"' 'rc=1'
 expect_out "...and one that does" podman 'rt_volume_exists edge-certs; echo "rc=$?"' 'rc=0'
